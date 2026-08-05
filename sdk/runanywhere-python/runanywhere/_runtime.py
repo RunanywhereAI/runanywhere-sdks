@@ -625,7 +625,7 @@ class Runtime:
                     "images.generate",
                     "this native/_core build has no diffusion bindings "
                     "(load_diffusion_model / generate_image are only exported when "
-                    "RAC_HAVE_BACKEND_COREML is set at compile time) — rebuild with the "
+                    "RAC_HAVE_BACKEND_NEURT is set at compile time) — rebuild with the "
                     "CoreML backend, or use a wheel that includes it",
                 )
             self.unload(ModelCategory.IMAGE_GENERATION)

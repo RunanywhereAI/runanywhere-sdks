@@ -110,6 +110,11 @@ fun RunAnywhere.synthesizeStream(
             close()
             return@callbackFlow
         }
+        // Phase 2 must have completed before the lifecycle query below, or a
+        // voice that is present is reported as missing. synthesize() and
+        // transcribeStream() already gate on this, as does Swift's
+        // synthesizeStream.
+        ensureServicesReady()
 
         // Mirror synthesize(): query ModelLifecycle (the canonical source of
         // truth) instead of CppBridgeTTS's own handle. Swift's

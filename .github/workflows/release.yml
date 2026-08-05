@@ -259,7 +259,7 @@ jobs:
             RABackendLLAMACPP \
             RABackendONNX \
             RABackendSherpa \
-            RABackendCoreML \
+            RABackendNeuRT \
             RABackendMLX \
             RunAnywhereMLXRuntime \
             RunAnywhereMLXMetal; do
@@ -296,7 +296,7 @@ jobs:
           echo "$BACKENDS" | grep -q '"name":"llamacpp"'
           echo "$BACKENDS" | grep -q '"name":"mlx"'
           echo "$BACKENDS" | grep -q '"name":"sherpa"'
-          echo "$BACKENDS" | grep -q '"name":"coreml"'
+          echo "$BACKENDS" | grep -q '"name":"neurt"'
           "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
           "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
       - name: Configure ephemeral Developer ID credentials
@@ -1789,9 +1789,9 @@ jobs:
           assert_pair "iOS ONNX XCFramework"          "RABackendONNX-ios-v${VERSION}.zip"
           assert_pair "iOS Sherpa XCFramework"        "RABackendSherpa-ios-v${VERSION}.zip"
           # Apple CoreML Stable-Diffusion engine. The root Package.swift's ONNXRuntime
-          # target has an UNCONDITIONAL .binaryTarget dependency on RABackendCoreMLBinary,
+          # target has an UNCONDITIONAL .binaryTarget dependency on RABackendNeuRTBinary,
           # so a missing archive silently 404s every external `swift package resolve`.
-          assert_pair "iOS CoreML XCFramework"        "RABackendCoreML-ios-v${VERSION}.zip"
+          assert_pair "iOS CoreML XCFramework"        "RABackendNeuRT-ios-v${VERSION}.zip"
           assert_pair "iOS MLX XCFramework"           "RABackendMLX-ios-v${VERSION}.zip"
           assert_pair "iOS MLX Swift runtime"         "RunAnywhereMLXRuntime-ios-v${VERSION}.zip"
           assert_pair "iOS MLX Metal resources"       "RunAnywhereMLXMetal-ios-v${VERSION}.zip"

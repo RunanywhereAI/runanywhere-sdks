@@ -289,7 +289,7 @@ def test_rerank_reports_the_missing_symbols(sdk) -> None:
 
 
 # --------------------------------------------------------------------------- images
-# native/module.cpp exports load_diffusion_model only when RAC_HAVE_BACKEND_COREML;
+# native/module.cpp exports load_diffusion_model only when RAC_HAVE_BACKEND_NEURT;
 # the fake core simulates a CoreML-enabled build so generate() smokes the real shape.
 def test_images_generate_returns_rgba(sdk, tmp_path) -> None:
     model_dir = tmp_path / "sd-model"
@@ -315,7 +315,7 @@ def test_images_report_unavailable_when_symbols_missing(sdk, monkeypatch, tmp_pa
     model_dir.mkdir()
     with pytest.raises(SDKException) as error:
         ra.images.generate("a cat", ImageOptions(model=str(model_dir)))
-    assert "RAC_HAVE_BACKEND_COREML" in str(error.value) or "diffusion" in str(error.value).lower()
+    assert "RAC_HAVE_BACKEND_NEURT" in str(error.value) or "diffusion" in str(error.value).lower()
 
 
 # --------------------------------------------------------------------------- segmentation

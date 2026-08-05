@@ -14,7 +14,7 @@
 //
 // Modalities: LLM, VLM, embeddings (ONNX), STT + TTS (sherpa), VAD (built-in),
 // diarization + segmentation (ONNX), voice-agent file-PCM turns, and (when
-// RAC_HAVE_BACKEND_COREML) diffusion.
+// RAC_HAVE_BACKEND_NEURT) CoreML diffusion.
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -45,6 +45,9 @@
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 #include "rac/plugin/rac_plugin_entry_onnx.h"
+#ifdef RAC_HAVE_BACKEND_NEURT
+#include "rac/plugin/rac_plugin_entry_neurt.h"
+#endif
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -57,7 +60,7 @@
 #include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/segmentation/rac_segmentation_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
-#if defined(RAC_HAVE_BACKEND_COREML)
+#if defined(RAC_HAVE_BACKEND_NEURT)
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/diffusion/rac_diffusion_types.h"
 #endif
@@ -127,11 +130,10 @@ rac_result_t rac_backend_cloud_register(void);  // Cloud STT provider
 #endif
 }
 
-#if defined(RAC_HAVE_BACKEND_COREML)
-// CoreML has no rac_backend_coreml_register() — it registers via the unified
-// plugin entry (see engines/coreml/rac_static_register_coreml.cpp).
+#if defined(RAC_HAVE_BACKEND_NEURT)
+// The neurt engine has no bespoke rac_backend_*_register() fn — it registers
+// via the unified plugin entry (see engines/neurt/rac_static_register_neurt.cpp).
 #include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_plugin_entry_coreml.h"
 #endif
 
 namespace {
@@ -163,7 +165,7 @@ std::unordered_map<int32_t, rac_handle_t> g_vad_handles;
 std::unordered_map<int32_t, rac_handle_t> g_diar_handles;
 std::unordered_map<int32_t, rac_handle_t> g_seg_handles;
 std::unordered_map<int32_t, rac_voice_agent_handle_t> g_voice_handles;
-#if defined(RAC_HAVE_BACKEND_COREML)
+#if defined(RAC_HAVE_BACKEND_NEURT)
 std::unordered_map<int32_t, rac_handle_t> g_diff_handles;
 #endif
 #ifdef RAC_HAVE_BACKEND_RAG
@@ -399,9 +401,10 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
 #ifdef RAC_HAVE_BACKEND_MLX
         rac_backend_mlx_register();  // Apple MLX (Apple Silicon)
 #endif
-#if defined(RAC_HAVE_BACKEND_COREML)
-        // Unified plugin entry (no rac_backend_coreml_register symbol).
-        (void)rac_plugin_register(rac_plugin_entry_coreml());
+#ifdef RAC_HAVE_BACKEND_NEURT
+        // No bespoke rac_backend_*_register() fn for this engine — register the
+        // plugin entry directly, like rcli's bootstrap does.
+        rac_plugin_register(rac_plugin_entry_neurt());  // Apple Neural Engine + CoreML diffusion
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
         rac_backend_cloud_register();  // cloud STT provider fallback
@@ -1898,12 +1901,12 @@ void destroy_voice_agent(int32_t handle) {
     }
 }
 
-#if defined(RAC_HAVE_BACKEND_COREML)
+#if defined(RAC_HAVE_BACKEND_NEURT)
 // =============================================================================
 // Diffusion (CoreML): load_diffusion_model / generate_image / unload_diffusion_model.
 //
 // Compile-gated: the desktop wheels typically link no diffusion backend. When
-// rac_backend_coreml is present, these export; otherwise capabilities() reports
+// rac_backend_neurt is present, these export; otherwise capabilities() reports
 // images unavailable via hasattr(core, "load_diffusion_model").
 // =============================================================================
 int32_t load_diffusion_model(const std::string& model_path, std::optional<std::string> id) {
@@ -1988,7 +1991,7 @@ void unload_diffusion_model(int32_t handle) {
         rac_diffusion_destroy(h);
     }
 }
-#endif  // RAC_HAVE_BACKEND_COREML
+#endif  // RAC_HAVE_BACKEND_NEURT
 
 // =============================================================================
 // shutdown()
@@ -2037,7 +2040,7 @@ void shutdown() {
                 rac_voice_agent_cleanup(kv.second);
                 rac_voice_agent_destroy(kv.second);
             }
-#if defined(RAC_HAVE_BACKEND_COREML)
+#if defined(RAC_HAVE_BACKEND_NEURT)
             for (auto& kv : g_diff_handles) {
                 rac_diffusion_cleanup(kv.second);
                 rac_diffusion_destroy(kv.second);
@@ -2052,7 +2055,7 @@ void shutdown() {
             g_diar_handles.clear();
             g_seg_handles.clear();
             g_voice_handles.clear();
-#if defined(RAC_HAVE_BACKEND_COREML)
+#if defined(RAC_HAVE_BACKEND_NEURT)
             g_diff_handles.clear();
 #endif
             g_inflight.clear();
@@ -2113,8 +2116,10 @@ std::string version() {
 }
 
 // The engine backends compiled into this build (from the RAC_HAVE_BACKEND_<X> defines the
-// CMake backend loop emits). The plugin registry auto-selects the highest-priority registered
-// backend per modality, so this is what a loaded model can route to on this host.
+// CMake backend loop emits). This is COMPILE-TIME availability only, not proof of registration:
+// an engine's capability_check can still refuse registration at runtime (e.g. neurt returns
+// RAC_ERROR_CAPABILITY_UNSUPPORTED off Apple, RAC_ERROR_BACKEND_UNAVAILABLE in a stub build), in
+// which case it is listed here but nothing routes to it.
 std::vector<std::string> backends() {
     std::vector<std::string> out;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
@@ -2132,8 +2137,8 @@ std::vector<std::string> backends() {
 #ifdef RAC_HAVE_BACKEND_MLX
     out.push_back("mlx");
 #endif
-#ifdef RAC_HAVE_BACKEND_COREML
-    out.push_back("coreml");
+#ifdef RAC_HAVE_BACKEND_NEURT
+    out.push_back("neurt");
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
     out.push_back("cloud");
@@ -2150,7 +2155,9 @@ PYBIND11_MODULE(_core, m) {
     m.doc() = "RunAnywhere native core (rac_* C ABI bound via pybind11).";
 
     m.def("version", &version, "Return the RunAnywhere SDK version string.");
-    m.def("backends", &backends, "List the engine backends compiled into this build.");
+    m.def("backends", &backends,
+          "List the engine backends compiled into this build (compile-time availability; a "
+          "listed engine may still refuse registration at runtime).");
 
     m.def("initialize", &initialize, py::arg("secure_dir"), py::arg("base_dir") = py::none(),
           "Initialize the runtime: fill the platform adapter, set the base dir, "
@@ -2321,7 +2328,7 @@ PYBIND11_MODULE(_core, m) {
     m.def("destroy_voice_agent", &destroy_voice_agent, py::arg("handle"),
           "Cleanup + destroy a voice agent handle.");
 
-#if defined(RAC_HAVE_BACKEND_COREML)
+#if defined(RAC_HAVE_BACKEND_NEURT)
     // Diffusion (CoreML) — only exported when the CoreML backend is linked.
     m.def("load_diffusion_model", &load_diffusion_model, py::arg("model_path"),
           py::arg("id") = py::none(),

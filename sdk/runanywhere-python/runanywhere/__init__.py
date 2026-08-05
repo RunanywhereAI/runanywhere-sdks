@@ -359,7 +359,7 @@ def capabilities() -> SDKCapabilities:
                     "not initialized yet (unknown until then)"
                     if not is_ready()
                     else "this native/_core build has no diffusion bindings "
-                    "(load_diffusion_model is only exported when RAC_HAVE_BACKEND_COREML "
+                    "(load_diffusion_model is only exported when RAC_HAVE_BACKEND_NEURT "
                     "is set at compile time)"
                 ),
             )

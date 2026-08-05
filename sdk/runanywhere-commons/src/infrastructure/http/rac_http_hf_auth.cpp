@@ -8,6 +8,8 @@
 
 #include <cctype>
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <mutex>
 
 #include "rac/infrastructure/http/rac_http_client.h"
@@ -18,12 +20,49 @@ std::mutex g_token_mutex;
 std::string g_token;       // explicit token from rac_http_hf_token_set
 bool g_token_set = false;  // true once set() was called (even with empty/clear)
 
+// Read a token file written by `hf auth login`. Returns "" when absent.
+std::string read_token_file(const std::string& path) {
+    if (path.empty()) {
+        return {};
+    }
+    std::ifstream f(path, std::ios::binary);
+    if (!f) {
+        return {};
+    }
+    std::string value((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    return value;
+}
+
 // HF_TOKEN environment fallback, captured once on first use so a plain env
 // var works with no call-site change (mirrors the retired OkHttp behavior).
+//
+// ALSO reads the token FILE that `hf auth login` writes, because that is how essentially every
+// developer on a workstation is authenticated — the env var is the CI shape, not the desktop one.
+// Without this, `rcli pull` on a private repo failed with "gated-repo tokens are not wired up yet"
+// on a machine where `hf auth whoami` worked fine. Resolution order matches huggingface_hub:
+// HF_TOKEN, then $HF_TOKEN_PATH, then $HF_HOME/token, then ~/.cache/huggingface/token.
 std::string env_token() {
     static const std::string captured = [] {
         const char* raw = std::getenv("HF_TOKEN");
         std::string value = raw ? raw : "";
+        if (value.empty()) {
+            const char* tok_path = std::getenv("HF_TOKEN_PATH");
+            if (tok_path && *tok_path) {
+                value = read_token_file(tok_path);
+            }
+        }
+        if (value.empty()) {
+            const char* hf_home = std::getenv("HF_HOME");
+            if (hf_home && *hf_home) {
+                value = read_token_file(std::string(hf_home) + "/token");
+            }
+        }
+        if (value.empty()) {
+            const char* home = std::getenv("HOME");
+            if (home && *home) {
+                value = read_token_file(std::string(home) + "/.cache/huggingface/token");
+            }
+        }
         // trim whitespace
         const auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
         while (!value.empty() && is_space(value.front())) {

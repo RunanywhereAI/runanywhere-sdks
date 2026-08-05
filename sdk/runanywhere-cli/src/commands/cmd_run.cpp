@@ -597,9 +597,15 @@ int run_llm(const GlobalOptions& options, LlmVerb verb, const std::string& promp
         return 1;
     }
 
-    const v1::InferenceFramework load_framework =
-        resolved.from_catalog ? v1::INFERENCE_FRAMEWORK_UNSPECIFIED : engine_hint.framework;
-    if (!load_model(options, resolved.model_id, load_framework, is_vlm)) {
+    // An explicit --engine is honoured whatever the ref resolved to. This used to
+    // read `resolved.from_catalog ? UNSPECIFIED : engine_hint.framework`, which
+    // silently DISCARDED the flag for anything that came out of the built-in
+    // catalog — `--engine <x>` on a catalog model did nothing at all, with no
+    // warning. When the flag is absent engine_hint.framework is UNSPECIFIED, so
+    // catalog entries still fall back to their own declared framework exactly as
+    // before; the only behaviour that changes is that asking now works. Mirrors
+    // cmd_embed.cpp.
+    if (!load_model(options, resolved.model_id, engine_hint.framework, is_vlm)) {
         return 1;
     }
     if (!params.lora.empty() && !apply_lora_adapter(params.lora, params.lora_scale)) {
@@ -647,7 +653,8 @@ void add_generation_options(CLI::App* cmd, const std::shared_ptr<RunParams>& par
     cmd->add_option("--lora-scale", params->lora_scale,
                     "How strongly the LoRA applies (default 1.0)");
     cmd->add_option("--engine", params->engine,
-                    "Pin the inference engine for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
+                    "catalog models too, not just URL/HF refs.");
     cmd->add_option("--temperature,--temp", params->temperature,
                     "Raise for more random sampling (0 = engine default)");
     cmd->add_option("--top-p", params->top_p, "Keep the smallest token set above this probability");

@@ -22,6 +22,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/plugin/rac_engine_ids.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
@@ -57,7 +58,7 @@ runanywhere::v1::InferenceFramework framework_for_plugin(const rac_engine_vtable
     if (name.find("llama") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
     }
-    if (name.find("coreml") != std::string::npos) {
+    if (name.find(RAC_ENGINE_ID_NEURT) != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
     }
     if (name.find("mlx") != std::string::npos) {

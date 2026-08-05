@@ -484,6 +484,13 @@ jobs:
       - name: Build pinned Sherpa/ONNX static inventory (macOS arm64)
         run: bash sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
       - name: Build XCFramework
+        env:
+          # The NeuRT (Apple ANE) engine is implemented in the sibling `neurun` repo, which is
+          # PRIVATE and not cloned here. Without it the engine builds as a non-routable shell that
+          # refuses registration, which is exactly what this job needs: it verifies that the Swift
+          # package COMPILES and LINKS, not that ANE inference works. The script otherwise refuses
+          # to package a stub, so opt in explicitly — this artifact is never shipped.
+          RAC_ALLOW_NEURT_STUB: "1"
         run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
       - name: Build all Swift products and run tests
         env:

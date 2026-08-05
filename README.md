@@ -568,6 +568,7 @@ Prebuilt bundles published on [Hugging Face](https://huggingface.co/runanywhere/
 |---|---|---|---|
 | Llama-3.2-1B | LLM | 1.2 B | [llama3_2_1b_HNPU](https://huggingface.co/runanywhere/llama3_2_1b_HNPU) |
 | LFM2.5-230M / 350M | LLM | 0.23 / 0.35 B | [lfm2_5_230m_HNPU](https://huggingface.co/runanywhere/lfm2_5_230m_HNPU) · [lfm2_5_350m_HNPU](https://huggingface.co/runanywhere/lfm2_5_350m_HNPU) |
+| LFM2.5-2.6B | LLM | 2.6 B | [lfm2_5_2_6b_HNPU](https://huggingface.co/runanywhere/lfm2_5_2_6b_HNPU) |
 | Qwen3.5-0.8B / 2B / 4B | LLM | 0.8-4 B | [qwen3_5_0_8b_HNPU](https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU) · [2b](https://huggingface.co/runanywhere/qwen3_5_2b_HNPU) · [4b](https://huggingface.co/runanywhere/qwen3_5_4b_HNPU) |
 | Bonsai 1-bit family | LLM | 1.7 / 4 / 8 / 27 B | 1-bit and ternary builds; Bonsai-27B runs on Hexagon v81 |
 | Gemma-4-E2B / E4B | LLM + VLM | ~2 / 4 B | [gemma4_e2b_HNPU](https://huggingface.co/runanywhere/gemma4_e2b_HNPU) · [gemma4_e4b_HNPU](https://huggingface.co/runanywhere/gemma4_e4b_HNPU) |
@@ -652,7 +653,7 @@ runanywhere-sdks/
 │   ├── runanywhere-cli/            # rcli, the terminal SDK
 │   └── runanywhere-commons/        # Shared C/C++ core behind a C ABI
 │
-├── engines/                        # llamacpp, mlx, sherpa, onnx, coreml, qhexrt, cloud
+├── engines/                        # llamacpp, mlx, sherpa, onnx, neurt, qhexrt, cloud
 ├── runtimes/                       # cpu, coreml, onnxrt compute adapters
 ├── idl/                            # Protobuf schemas, generated bindings per language
 ├── examples/                       # Full example apps

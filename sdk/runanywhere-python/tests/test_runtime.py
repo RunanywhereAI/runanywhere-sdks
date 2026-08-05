@@ -100,7 +100,7 @@ def test_capabilities_is_honest_about_an_unrebuilt_core(sdk, monkeypatch) -> Non
     assert "rebuild the native extension" in reasons["diarization"]
     assert "rebuild the native extension" in reasons["segmentation"]
     assert "rebuild the native extension" in reasons["voice"]
-    assert "RAC_HAVE_BACKEND_COREML" in reasons["images"]
+    assert "RAC_HAVE_BACKEND_NEURT" in reasons["images"]
 
 
 def test_device_id_is_stable_and_persisted(sdk, tmp_path) -> None:

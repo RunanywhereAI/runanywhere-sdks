@@ -113,7 +113,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed+Segment) | coreml (Image/Diffusion, Apple)          │
+│  onnx (Embed+Segment) | neurt (ANE LLM + Diffusion, Apple)       │
 │  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -138,13 +138,13 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
-| `RAC_PRIMITIVE_GENERATE_TEXT` | `llm_ops` | llamacpp, platform, qhexrt |
+| `RAC_PRIMITIVE_GENERATE_TEXT` | `llm_ops` | llamacpp, platform, qhexrt, neurt (Apple) |
 | `RAC_PRIMITIVE_TRANSCRIBE` | `stt_ops` | sherpa, qhexrt |
 | `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | sherpa, platform, qhexrt |
 | `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | sherpa (Silero), energy-based (built-in) |
 | `RAC_PRIMITIVE_EMBED` | `embedding_ops` | onnx |
 | `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, qhexrt |
-| `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | platform (CoreML) |
+| `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | neurt (Core ML, Apple), platform (Apple) |
 | `RAC_PRIMITIVE_DIARIZE` | `diarization_ops` | onnx (Sortformer) |
 | `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
 | `RAC_PRIMITIVE_RERANK` | `rerank_ops` | llamacpp (rank-pooling GGUF) |

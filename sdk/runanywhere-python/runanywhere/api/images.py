@@ -1,7 +1,7 @@
 """The ``images`` namespace: text-to-image generation.
 
 Binds ``native/module.cpp``'s ``load_diffusion_model`` / ``generate_image`` when the
-wheel was built with the CoreML diffusion backend (``RAC_HAVE_BACKEND_COREML``).
+wheel was built with the CoreML diffusion backend (``RAC_HAVE_BACKEND_NEURT``).
 Desktop CPU wheels typically omit that backend — :meth:`Images.generate` then raises
 :meth:`SDKException.unsupported_capability` and :func:`runanywhere.capabilities`
 lists ``images`` as unavailable.

@@ -20,15 +20,15 @@ Pod::Spec.new do |s|
   # No downloads needed - frameworks are included in ios/Binaries/
   # =============================================================================
   puts "[RunAnywhereONNX] Using bundled xcframeworks from npm package"
-  # RABackendCoreML is co-vendored here: RACommons references
-  # _rac_plugin_entry_coreml (0.20.10 enabled the CoreML backend in commons),
+  # RABackendNeuRT is co-vendored here: RACommons references
+  # _rac_plugin_entry_neurt (0.20.10 enabled the CoreML backend in commons),
   # so without this xcframework the app link fails with an Undefined symbol
   # error — the same reason RABackendSherpa is bundled. It also makes on-device
   # image generation (diffusion) routable on Apple devices.
   s.vendored_frameworks = [
     "ios/Binaries/RABackendONNX.xcframework",
     "ios/Binaries/RABackendSherpa.xcframework",
-    "ios/Binaries/RABackendCoreML.xcframework"
+    "ios/Binaries/RABackendNeuRT.xcframework"
   ]
 
   # Source files

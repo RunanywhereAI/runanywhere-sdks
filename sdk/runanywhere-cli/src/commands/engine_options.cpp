@@ -22,6 +22,16 @@ bool parse_engine_hint(const std::string& engine,
         *out_framework = runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
         return true;
     }
+    // The Apple engine. Its identity is `neurt` (the runtime that implements it);
+    // the FRAMEWORK it maps onto is still COREML, because that is what the model
+    // files are and there is no NEURT value in InferenceFramework. `coreml` is
+    // accepted as an alias: it is the engine's former name and remains the honest
+    // name of the framework, so a user typing either means the same thing.
+    if (normalized == "neurt" || normalized == "coreml" || normalized == "core-ml" ||
+        normalized == "ane") {
+        *out_framework = runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
+        return true;
+    }
     if (normalized == "llamacpp" || normalized == "llama.cpp" || normalized == "llama_cpp" ||
         normalized == "llama-cpp") {
         *out_framework = runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;

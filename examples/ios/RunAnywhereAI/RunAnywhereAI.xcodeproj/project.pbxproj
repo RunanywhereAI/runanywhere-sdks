@@ -529,7 +529,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereKeyboard/RunAnywhereKeyboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RunAnywhereKeyboard/Info.plist;
@@ -541,7 +541,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereKeyboard;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -560,7 +560,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereKeyboard/RunAnywhereKeyboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RunAnywhereKeyboard/Info.plist;
@@ -572,7 +572,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereKeyboard;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -593,7 +593,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RunAnywhereActivityExtension/Info.plist;
@@ -605,7 +605,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereActivityExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -625,7 +625,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RunAnywhereActivityExtension/Info.plist;
@@ -637,7 +637,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereActivityExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -779,7 +779,7 @@
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -789,6 +789,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "RunAnywhere AI reads your Calendar events so the on-device assistant can answer questions about your schedule and upcoming events.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "RunAnywhere AI requests permission to update Apple Health data. The on-device assistant only reads your health data to answer questions about it, and does not write any.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -805,7 +806,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				OTHER_LDFLAGS = "-all_load";
 				"OTHER_LDFLAGS[sdk=macosx*]" = (
 					"-force_load",
@@ -832,7 +833,7 @@
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				ENABLE_PREVIEWS = YES;
@@ -843,6 +844,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "RunAnywhere AI reads your Calendar events so the on-device assistant can answer questions about your schedule and upcoming events.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "RunAnywhere AI requests permission to update Apple Health data. The on-device assistant only reads your health data to answer questions about it, and does not write any.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -859,7 +861,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				OTHER_LDFLAGS = (
 					"-all_load",
 					"-Wl,-exported_symbols_list,$(SRCROOT)/RunAnywhereExportedSymbols.txt",
@@ -882,12 +884,12 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhereTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -905,11 +907,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhereTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -926,12 +928,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhereUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -948,11 +950,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				MARKETING_VERSION = 0.36;
+				MARKETING_VERSION = 0.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhereUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;

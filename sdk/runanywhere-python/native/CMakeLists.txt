@@ -53,10 +53,10 @@ target_link_libraries(runanywhere_core PRIVATE rac_commons)
 # Link whichever engine backends this build enabled, and tell module.cpp which are present
 # via RAC_HAVE_BACKEND_<X>. The wrapper registers only the linked backends and the C plugin
 # registry routes by priority — so adding a backend (QHexRT on Windows-on-Snapdragon, MLX,
-# CoreML, cloud, ...) is: enable its upstream RAC_BACKEND_* flag so its rac_backend_<x> target
+# neurt, cloud, ...) is: enable its upstream RAC_BACKEND_* flag so its rac_backend_<x> target
 # builds, and it self-links + self-registers here with no wrapper source changes. The default
 # CPU build (RAC_BUILD_BACKENDS=ON) provides llamacpp + onnx + sherpa.
-set(_ra_backends llamacpp onnx sherpa qhexrt mlx coreml cloud)
+set(_ra_backends llamacpp onnx sherpa qhexrt mlx neurt cloud)
 set(_ra_linked_backends "")
 foreach(_ra_b IN LISTS _ra_backends)
     if(TARGET rac_backend_${_ra_b})
