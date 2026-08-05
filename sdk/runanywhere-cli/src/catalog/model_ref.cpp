@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <dirent.h>
 #include <string>
 #include <sys/stat.h>
@@ -73,16 +74,20 @@ std::string id_for_local_path(const std::string &path) {
   std::string full = without_trailing_slashes(path);
   // Canonicalize first so the same bundle spelled differently (relative, `..`,
   // a symlink) keeps ONE id; the raw path is the fallback when it cannot be
-  // resolved.
-  if (char *resolved = ::realpath(full.c_str(), nullptr)) {
-    full.assign(resolved);
-    ::free(resolved);
+  // resolved. `std::filesystem` rather than `realpath` because rcli builds on
+  // Windows too and `realpath` is POSIX-only; `weakly_canonical` also tolerates
+  // a path that does not fully exist instead of failing outright.
+  std::error_code ec;
+  const std::filesystem::path canonical = std::filesystem::weakly_canonical(full, ec);
+  if (!ec && !canonical.empty()) {
+    full = canonical.string();
   }
 
-  std::string base = full;
-  const size_t slash = base.find_last_of('/');
-  if (slash != std::string::npos) {
-    base.erase(0, slash + 1);
+  // filename() handles BOTH separators; a manual find_last_of('/') would return
+  // the whole path as the basename on a Windows-style path.
+  std::string base = std::filesystem::path(full).filename().string();
+  if (base.empty()) {
+    base = full;
   }
   for (char &c : base) {
     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
