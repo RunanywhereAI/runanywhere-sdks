@@ -21,6 +21,10 @@ inline const char* category(v1::ModelCategory category) {
             return "vad";
         case v1::MODEL_CATEGORY_EMBEDDING:
             return "embedding";
+        case v1::MODEL_CATEGORY_SPEAKER_DIARIZATION:
+            return "diarize";
+        case v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+            return "segment";
         case v1::MODEL_CATEGORY_IMAGE_GENERATION:
             return "diffusion";
         case v1::MODEL_CATEGORY_AUDIO:
