@@ -564,13 +564,29 @@ export interface ModelDiscoveryResult {
 export interface ModelLoadRequest {
     modelId: string;
     category?: ModelCategory | undefined;
+    /**
+     * Preferred backend pin. Retained for wire compatibility; new callers
+     * should prefer backend_preferences + accelerator.
+     */
     framework?: InferenceFramework | undefined;
     forceReload: boolean;
     validateAvailability: boolean;
+    /** v4 placement knobs (honored end-to-end; never silently dropped). */
+    contextLength?: number | undefined;
+    threads?: number | undefined;
+    /** deprecated adapter; maps to accelerator */
+    useGpu?: boolean | undefined;
+    backendPreferences: InferenceFramework[];
+    /**
+     * AcceleratorPolicy values live in public_api_v4.proto; stored as int32
+     * here to avoid a circular import with LoadedModelInfo helpers.
+     */
+    acceleratorPolicy?: number | undefined;
 }
 export interface ModelLoadResult {
     modelId: string;
     category: ModelCategory;
+    /** Actual backend that executed the load (not the catalog/request pin). */
     framework: InferenceFramework;
     resolvedPath: string;
     loadedAtUnixMs: number;
@@ -583,6 +599,15 @@ export interface ModelLoadResult {
      */
     resolvedArtifacts: ModelFileDescriptor[];
     error?: SDKError | undefined;
+    /** v4 placement truth. */
+    requestedBackend?: InferenceFramework | undefined;
+    actualDeviceId?: string | undefined;
+    actualDeviceName?: string | undefined;
+    /** cpu | gpu | npu | metal | webgpu | unknown */
+    actualDeviceKind?: string | undefined;
+    runtimeVersion?: string | undefined;
+    abiVersion?: string | undefined;
+    fallbackReason?: string | undefined;
 }
 export interface ModelUnloadRequest {
     modelId: string;
