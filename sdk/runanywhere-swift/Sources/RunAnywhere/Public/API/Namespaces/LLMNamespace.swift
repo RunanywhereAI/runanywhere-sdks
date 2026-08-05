@@ -269,6 +269,32 @@ extension RunAnywhere {
 
                 func partialOrNil() -> String? { accumulatedText.isEmpty ? nil : accumulatedText }
 
+                func emitToken(_ event: RALLMStreamEvent, sequence: Int64) {
+                    guard !event.token.isEmpty else { return }
+                    if firstTokenAt == nil { firstTokenAt = Date() }
+                    tokenCount += 1
+                    let kind = TokenKind(proto: event.kind)
+                    if kind == .thought {
+                        accumulatedThinking += event.token
+                        continuation.yield(.reasoningDelta(
+                            requestId: requestId,
+                            sequence: sequence,
+                            itemId: reasoningItemId,
+                            index: 0,
+                            text: event.token
+                        ))
+                    } else if event.kind != .toolCall {
+                        accumulatedText += event.token
+                        continuation.yield(.textDelta(
+                            requestId: requestId,
+                            sequence: sequence,
+                            itemId: textItemId,
+                            index: 0,
+                            text: event.token
+                        ))
+                    }
+                }
+
                 for await event in events {
                     if Task.isCancelled { break }
                     if !event.requestID.isEmpty { requestId = event.requestID }
@@ -301,30 +327,7 @@ extension RunAnywhere {
                         toolCallIndex += 1
                     }
 
-                    if !event.token.isEmpty {
-                        if firstTokenAt == nil { firstTokenAt = Date() }
-                        tokenCount += 1
-                        let kind = TokenKind(proto: event.kind)
-                        if kind == .thought {
-                            accumulatedThinking += event.token
-                            continuation.yield(.reasoningDelta(
-                                requestId: requestId,
-                                sequence: sequence,
-                                itemId: reasoningItemId,
-                                index: 0,
-                                text: event.token
-                            ))
-                        } else if event.kind != .toolCall {
-                            accumulatedText += event.token
-                            continuation.yield(.textDelta(
-                                requestId: requestId,
-                                sequence: sequence,
-                                itemId: textItemId,
-                                index: 0,
-                                text: event.token
-                            ))
-                        }
-                    }
+                    emitToken(event, sequence: sequence)
 
                     if event.isFinal {
                         let result: GenerationResult

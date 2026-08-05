@@ -145,58 +145,6 @@ public enum RunAnywhere {
     /// Check if device is registered with backend
     public static func isDeviceRegistered() -> Bool { CppBridge.Device.isRegistered }
 
-    // MARK: - Capabilities
-
-    /// Report the packaged and executable surface of this SDK build.
-    ///
-    /// Backends and formats reflect what the Swift SDK actually links
-    /// (`LlamaCPPRuntime`/`ONNXRuntime`/`MLXRuntime`), not IDL enum presence —
-    /// `unavailable` lists what those runtimes and this public API do not
-    /// cover, with the reason, so callers fail fast instead of discovering
-    /// gaps mid-flight.
-    public static func capabilities() -> SDKCapabilities {
-        SDKCapabilities(
-            modalities: [
-                "llm", "vlm", "stt", "tts", "vad",
-                "embeddings", "rerank", "images", "diarization",
-                "segmentation", "rag", "voice", "lora", "cua"
-            ],
-            backends: [.llamaCpp, .onnx, .mlx, .coreml, .sherpa, .foundationModels],
-            audioFormats: [.pcm, .wav],
-            streaming: .init(
-                llmTokenStream: true,
-                sttLiveFrames: true,
-                ttsAudioChunks: true,
-                vadLiveFrames: true,
-                voiceSession: true
-            ),
-            tools: .init(registry: true, parallel: false, cancellation: false),
-            rag: .init(multiSession: true, persistent: true),
-            unavailable: [
-                .init(name: "backend.litert", reason: "LiteRT is an Android/other-SDK concept; not packaged in the Swift SDK"),
-                .init(name: "backend.tflite", reason: "TensorFlow Lite is not packaged in the Swift SDK"),
-                .init(name: "backend.executorch", reason: "ExecuTorch is not packaged in the Swift SDK"),
-                .init(name: "backend.mediapipe", reason: "MediaPipe is not packaged in the Swift SDK"),
-                .init(name: "backend.mlc", reason: "MLC-LLM is not packaged in the Swift SDK"),
-                .init(name: "backend.qhexrt", reason: "Qualcomm Hexagon NPU runtime is not packaged in the Swift SDK"),
-                .init(name: "wakeword", reason: "RunAnywhere.wakeword is explicitly absent from the public API"),
-                .init(name: "realtime", reason: "RunAnywhere.realtime (WebRTC/SIP/S2S transport) is explicitly absent from the public API"),
-                .init(name: "agents", reason: "RunAnywhere.agents is explicitly absent from the public API"),
-                .init(
-                    name: "generateStructured.constrained",
-                    reason: "Engine-constrained decoding is not wired in yet; use .validationOnly or .repair"
-                ),
-                .init(name: "loadOptions.contextLength", reason: "Not carried by the native load ABI yet"),
-                .init(name: "loadOptions.threads", reason: "Not carried by the native load ABI yet"),
-                .init(name: "loadOptions.accelerator", reason: "Not carried by the native load ABI yet"),
-                .init(
-                    name: "loadOptions.backendPreferences.fallback",
-                    reason: "Only the first backend preference reaches commons; ordered fallback is not carried"
-                )
-            ]
-        )
-    }
-
     // MARK: - SDK Reset
 
     /// Tear the SDK down: unload models, close sessions, clear state.
@@ -632,5 +580,59 @@ public enum RunAnywhere {
         if completedHTTPSetup {
             logger.info("HTTP/Auth setup succeeded on retry")
         }
+    }
+}
+
+// MARK: - Capabilities
+
+extension RunAnywhere {
+    /// Report the packaged and executable surface of this SDK build.
+    ///
+    /// Backends and formats reflect what the Swift SDK actually links
+    /// (`LlamaCPPRuntime`/`ONNXRuntime`/`MLXRuntime`), not IDL enum presence —
+    /// `unavailable` lists what those runtimes and this public API do not
+    /// cover, with the reason, so callers fail fast instead of discovering
+    /// gaps mid-flight.
+    public static func capabilities() -> SDKCapabilities {
+        SDKCapabilities(
+            modalities: [
+                "llm", "vlm", "stt", "tts", "vad",
+                "embeddings", "rerank", "images", "diarization",
+                "segmentation", "rag", "voice", "lora", "cua"
+            ],
+            backends: [.llamaCpp, .onnx, .mlx, .coreml, .sherpa, .foundationModels],
+            audioFormats: [.pcm, .wav],
+            streaming: .init(
+                llmTokenStream: true,
+                sttLiveFrames: true,
+                ttsAudioChunks: true,
+                vadLiveFrames: true,
+                voiceSession: true
+            ),
+            tools: .init(registry: true, parallel: false, cancellation: false),
+            rag: .init(multiSession: true, persistent: true),
+            unavailable: [
+                .init(name: "backend.litert", reason: "LiteRT is an Android/other-SDK concept; not packaged in the Swift SDK"),
+                .init(name: "backend.tflite", reason: "TensorFlow Lite is not packaged in the Swift SDK"),
+                .init(name: "backend.executorch", reason: "ExecuTorch is not packaged in the Swift SDK"),
+                .init(name: "backend.mediapipe", reason: "MediaPipe is not packaged in the Swift SDK"),
+                .init(name: "backend.mlc", reason: "MLC-LLM is not packaged in the Swift SDK"),
+                .init(name: "backend.qhexrt", reason: "Qualcomm Hexagon NPU runtime is not packaged in the Swift SDK"),
+                .init(name: "wakeword", reason: "RunAnywhere.wakeword is explicitly absent from the public API"),
+                .init(name: "realtime", reason: "RunAnywhere.realtime (WebRTC/SIP/S2S transport) is explicitly absent from the public API"),
+                .init(name: "agents", reason: "RunAnywhere.agents is explicitly absent from the public API"),
+                .init(
+                    name: "generateStructured.constrained",
+                    reason: "Engine-constrained decoding is not wired in yet; use .validationOnly or .repair"
+                ),
+                .init(name: "loadOptions.contextLength", reason: "Not carried by the native load ABI yet"),
+                .init(name: "loadOptions.threads", reason: "Not carried by the native load ABI yet"),
+                .init(name: "loadOptions.accelerator", reason: "Not carried by the native load ABI yet"),
+                .init(
+                    name: "loadOptions.backendPreferences.fallback",
+                    reason: "Only the first backend preference reaches commons; ordered fallback is not carried"
+                )
+            ]
+        )
     }
 }

@@ -63,6 +63,13 @@ public extension RunAnywhere {
                 options: effective.toVLMProto(prompt: prompt)
             )
 
+            return mapVLMStream(events, model: model)
+        }
+
+        private func mapVLMStream(
+            _ events: AsyncStream<RAVLMStreamEvent>,
+            model: String
+        ) -> AsyncThrowingStream<GenerationEvent, Error> {
             let textItemId = UUID().uuidString
             return AsyncThrowingStream { continuation in
                 let task = Task {
@@ -117,29 +124,13 @@ public extension RunAnywhere {
                     // `failed`, or `cancelled` — never a fabricated `completed`
                     // when the producer never reported one.
                     if !sawTerminal {
-                        if Task.isCancelled {
-                            continuation.yield(.cancelled(requestId: requestId, partial: accumulated.isEmpty ? nil : accumulated))
-                        } else if sawStart {
-                            continuation.yield(.failed(
-                                requestId: requestId,
-                                partial: accumulated.isEmpty ? nil : accumulated,
-                                error: SDKException(
-                                    code: .generationFailed,
-                                    message: "VLM generation stream ended before a terminal event",
-                                    category: .component
-                                )
-                            ))
-                        } else {
-                            continuation.yield(.failed(
-                                requestId: requestId,
-                                partial: nil,
-                                error: SDKException(
-                                    code: .generationFailed,
-                                    message: "VLM generation ended before producing any output",
-                                    category: .component
-                                )
-                            ))
-                        }
+                        Self.emitVLMTerminalFallback(
+                            continuation,
+                            requestId: requestId,
+                            partial: accumulated.isEmpty ? nil : accumulated,
+                            sawStart: sawStart,
+                            isCancelled: Task.isCancelled
+                        )
                     }
                     continuation.finish()
                 }
@@ -149,6 +140,38 @@ public extension RunAnywhere {
                         Task { await CppBridge.VLM.shared.cancel() }
                     }
                 }
+            }
+        }
+
+        private static func emitVLMTerminalFallback(
+            _ continuation: AsyncThrowingStream<GenerationEvent, Error>.Continuation,
+            requestId: String,
+            partial: String?,
+            sawStart: Bool,
+            isCancelled: Bool
+        ) {
+            if isCancelled {
+                continuation.yield(.cancelled(requestId: requestId, partial: partial))
+            } else if sawStart {
+                continuation.yield(.failed(
+                    requestId: requestId,
+                    partial: partial,
+                    error: SDKException(
+                        code: .generationFailed,
+                        message: "VLM generation stream ended before a terminal event",
+                        category: .component
+                    )
+                ))
+            } else {
+                continuation.yield(.failed(
+                    requestId: requestId,
+                    partial: nil,
+                    error: SDKException(
+                        code: .generationFailed,
+                        message: "VLM generation ended before producing any output",
+                        category: .component
+                    )
+                ))
             }
         }
     }
