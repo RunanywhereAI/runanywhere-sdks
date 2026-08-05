@@ -76,9 +76,11 @@ export const vlm = {
   },
 
   /**
-   * Stream an answer about an image as `started`, `token`, and `completed` events.
+   * Stream an answer about an image as `started`, `textDelta`, and a
+   * terminal `completed`/`failed` event. Never fabricates a successful
+   * `completed`.
    *
-   * @throws SDKException on preflight failure; in-flight failures throw into the consumer.
+   * @throws SDKException on preflight failure; in-flight failures arrive as a `failed` event.
    */
   generateStream(
     image: ImageInput,
@@ -91,23 +93,41 @@ export const vlm = {
         image,
         toProtoVlmOptions(prompt, options),
       );
+      const itemId = 'response-0';
+      let requestId = '';
       let announced = false;
-      let completed = false;
+      let terminal = false;
+      let sequence = 0;
+      let text = '';
       try {
         for await (const event of stream) {
+          if (event.requestId) requestId = event.requestId;
           if (!announced) {
             announced = true;
-            yield { type: 'started', requestId: event.requestId };
+            yield { type: 'started', requestId };
           }
-          if (event.error) throw new SDKException(event.error);
-          if (event.token) yield { type: 'token', text: event.token, kind: 'text' };
+          if (event.error) {
+            yield { type: 'failed', requestId, partial: { text }, error: event.error };
+            terminal = true;
+            break;
+          }
+          if (event.token) {
+            text += event.token;
+            yield {
+              type: 'textDelta', requestId, sequence: sequence++, itemId, index: 0, text: event.token,
+            };
+          }
           if (event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED && event.result) {
-            completed = true;
-            yield { type: 'completed', result: vlmToGenerationResult(event.result, event.requestId) };
+            terminal = true;
+            const result = vlmToGenerationResult(event.result, requestId);
+            yield { type: 'completed', requestId, result };
           }
         }
+      } catch (error) {
+        yield { type: 'failed', requestId, partial: { text }, error: SDKException.fromUnknown(error).proto };
+        terminal = true;
       } finally {
-        if (!completed) await VisionLanguage.cancelVLMGeneration();
+        if (!terminal) await VisionLanguage.cancelVLMGeneration();
       }
     })();
   },

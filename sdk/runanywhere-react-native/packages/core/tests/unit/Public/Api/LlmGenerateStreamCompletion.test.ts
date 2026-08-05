@@ -1,15 +1,14 @@
 /**
- * Characterizes and locks in the native-stream-completion contract for
- * `llm.generateStream`.
- *
- * The native boundary can legitimately resolve the stream call without ever
- * sending an `isFinal` proto event (see PR #605 review issue #4). Swift
- * treats that as a successful completion and synthesizes a wall-clock
- * result (`RunAnywhere.synthesizeResult` in
- * `runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LLMNamespace.swift`)
- * rather than throwing, as long as at least one native event was observed.
- * RN must mirror that contract instead of silently ending the iterator with
- * no `completed` event.
+ * Characterizes the native-stream-completion contract for
+ * `llm.generateStream` under the v4 public API spec: a stream never
+ * fabricates a successful `completed`. The native boundary can legitimately
+ * resolve the stream call without ever sending an `isFinal` proto event
+ * (see PR #605 review issue #4); that now surfaces as a `failed` event
+ * carrying whatever partial text was observed, mirroring Swift's
+ * `RunAnywhere.mapGenerationStream`
+ * (`runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LLMNamespace.swift`).
+ * A native call that never invokes the callback at all still fails outright,
+ * since there is no partial `requestId` to report a terminal event against.
  */
 
 const mockNative = {
@@ -113,11 +112,12 @@ describe('llm.generateStream native-completion contract', () => {
     jest.restoreAllMocks();
   });
 
-  test('characterization: native resolving without isFinal is not surfaced as an error today', async () => {
+  test('native resolving without isFinal emits failed instead of a fabricated completion', async () => {
     // Native sends tokens, then the promise from `llmGenerateStreamProto`
     // resolves without ever sending a terminal `isFinal` event -- a
     // legitimate native-boundary shutdown (e.g. backend cooperative stop),
-    // not a bridge failure.
+    // not a bridge failure. The v4 grammar reports this as `failed` rather
+    // than fabricating a successful `completed`.
     mockNative.llmGenerateStreamProto.mockImplementation(
       async (_bytes, onEvent) => {
         onEvent(encodeEvent({ token: 'Hel', isFinal: false }));
@@ -127,21 +127,18 @@ describe('llm.generateStream native-completion contract', () => {
 
     const events = await collect(llm.generateStream('hi'));
 
-    // The stream must not throw and must still report a `completed` event
-    // synthesized from the tokens actually observed -- never a silent stop.
     expect(events.map((e) => e.type)).toEqual([
       'started',
       'token',
       'token',
-      'completed',
+      'failed',
     ]);
-    const completed = events[events.length - 1];
-    if (completed?.type !== 'completed') {
-      throw new Error('expected a completed event');
+    const failed = events[events.length - 1];
+    if (failed?.type !== 'failed') {
+      throw new Error('expected a failed event');
     }
-    expect(completed.result.text).toBe('Hello');
-    expect(completed.result.outputTokens).toBe(2);
-    expect(completed.result.finishReason).toBe('stop');
+    expect(failed.partial).toBe('Hello');
+    expect(failed.error.message).toMatch(/terminal event/);
   });
 
   test('a terminal isFinal event still wins and is not double-emitted', async () => {
@@ -178,7 +175,7 @@ describe('llm.generateStream native-completion contract', () => {
     );
   });
 
-  test('thinking tokens are folded into thinkingText on a synthesized completion', async () => {
+  test('thinking tokens accumulate into the partial text reported on a terminal failure', async () => {
     mockNative.llmGenerateStreamProto.mockImplementation(
       async (_bytes, onEvent) => {
         onEvent(
@@ -193,11 +190,10 @@ describe('llm.generateStream native-completion contract', () => {
     );
 
     const events = await collect(llm.generateStream('hi'));
-    const completed = events[events.length - 1];
-    if (completed?.type !== 'completed') {
-      throw new Error('expected a completed event');
+    const failed = events[events.length - 1];
+    if (failed?.type !== 'failed') {
+      throw new Error('expected a failed event');
     }
-    expect(completed.result.text).toBe('answer');
-    expect(completed.result.thinkingText).toBe('thinking...');
+    expect(failed.partial).toBe('answer');
   });
 });

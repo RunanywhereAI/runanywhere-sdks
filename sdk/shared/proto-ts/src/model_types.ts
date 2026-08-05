@@ -1447,15 +1447,35 @@ export interface ModelDiscoveryResult {
 
 export interface ModelLoadRequest {
   modelId: string;
-  category?: ModelCategory | undefined;
+  category?:
+    | ModelCategory
+    | undefined;
+  /**
+   * Preferred backend pin. Retained for wire compatibility; new callers
+   * should prefer backend_preferences + accelerator.
+   */
   framework?: InferenceFramework | undefined;
   forceReload: boolean;
   validateAvailability: boolean;
+  /** v4 placement knobs (honored end-to-end; never silently dropped). */
+  contextLength?: number | undefined;
+  threads?:
+    | number
+    | undefined;
+  /** deprecated adapter; maps to accelerator */
+  useGpu?: boolean | undefined;
+  backendPreferences: InferenceFramework[];
+  /**
+   * AcceleratorPolicy values live in public_api_v4.proto; stored as int32
+   * here to avoid a circular import with LoadedModelInfo helpers.
+   */
+  acceleratorPolicy?: number | undefined;
 }
 
 export interface ModelLoadResult {
   modelId: string;
   category: ModelCategory;
+  /** Actual backend that executed the load (not the catalog/request pin). */
   framework: InferenceFramework;
   resolvedPath: string;
   loadedAtUnixMs: number;
@@ -1467,7 +1487,20 @@ export interface ModelLoadResult {
    * ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
    */
   resolvedArtifacts: ModelFileDescriptor[];
-  error?: SDKError | undefined;
+  error?:
+    | SDKError
+    | undefined;
+  /** v4 placement truth. */
+  requestedBackend?: InferenceFramework | undefined;
+  actualDeviceId?: string | undefined;
+  actualDeviceName?:
+    | string
+    | undefined;
+  /** cpu | gpu | npu | metal | webgpu | unknown */
+  actualDeviceKind?: string | undefined;
+  runtimeVersion?: string | undefined;
+  abiVersion?: string | undefined;
+  fallbackReason?: string | undefined;
 }
 
 export interface ModelUnloadRequest {
@@ -5585,7 +5618,18 @@ export const ModelDiscoveryResult: MessageFns<ModelDiscoveryResult> = {
 };
 
 function createBaseModelLoadRequest(): ModelLoadRequest {
-  return { modelId: "", category: undefined, framework: undefined, forceReload: false, validateAvailability: false };
+  return {
+    modelId: "",
+    category: undefined,
+    framework: undefined,
+    forceReload: false,
+    validateAvailability: false,
+    contextLength: undefined,
+    threads: undefined,
+    useGpu: undefined,
+    backendPreferences: [],
+    acceleratorPolicy: undefined,
+  };
 }
 
 export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
@@ -5604,6 +5648,23 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
     }
     if (message.validateAvailability !== false) {
       writer.uint32(40).bool(message.validateAvailability);
+    }
+    if (message.contextLength !== undefined) {
+      writer.uint32(48).int32(message.contextLength);
+    }
+    if (message.threads !== undefined) {
+      writer.uint32(56).int32(message.threads);
+    }
+    if (message.useGpu !== undefined) {
+      writer.uint32(64).bool(message.useGpu);
+    }
+    writer.uint32(74).fork();
+    for (const v of message.backendPreferences) {
+      writer.int32(v);
+    }
+    writer.join();
+    if (message.acceleratorPolicy !== undefined) {
+      writer.uint32(80).int32(message.acceleratorPolicy);
     }
     return writer;
   },
@@ -5655,6 +5716,56 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
           message.validateAvailability = reader.bool();
           continue;
         }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.contextLength = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.threads = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.useGpu = reader.bool();
+          continue;
+        }
+        case 9: {
+          if (tag === 72) {
+            message.backendPreferences.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 74) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.backendPreferences.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.acceleratorPolicy = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5683,6 +5794,27 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
         : isSet(object.validate_availability)
         ? globalThis.Boolean(object.validate_availability)
         : false,
+      contextLength: isSet(object.contextLength)
+        ? globalThis.Number(object.contextLength)
+        : isSet(object.context_length)
+        ? globalThis.Number(object.context_length)
+        : undefined,
+      threads: isSet(object.threads) ? globalThis.Number(object.threads) : undefined,
+      useGpu: isSet(object.useGpu)
+        ? globalThis.Boolean(object.useGpu)
+        : isSet(object.use_gpu)
+        ? globalThis.Boolean(object.use_gpu)
+        : undefined,
+      backendPreferences: globalThis.Array.isArray(object?.backendPreferences)
+        ? object.backendPreferences.map((e: any) => inferenceFrameworkFromJSON(e))
+        : globalThis.Array.isArray(object?.backend_preferences)
+        ? object.backend_preferences.map((e: any) => inferenceFrameworkFromJSON(e))
+        : [],
+      acceleratorPolicy: isSet(object.acceleratorPolicy)
+        ? globalThis.Number(object.acceleratorPolicy)
+        : isSet(object.accelerator_policy)
+        ? globalThis.Number(object.accelerator_policy)
+        : undefined,
     };
   },
 
@@ -5703,6 +5835,21 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
     if (message.validateAvailability !== false) {
       obj.validateAvailability = message.validateAvailability;
     }
+    if (message.contextLength !== undefined) {
+      obj.contextLength = Math.round(message.contextLength);
+    }
+    if (message.threads !== undefined) {
+      obj.threads = Math.round(message.threads);
+    }
+    if (message.useGpu !== undefined) {
+      obj.useGpu = message.useGpu;
+    }
+    if (message.backendPreferences?.length) {
+      obj.backendPreferences = message.backendPreferences.map((e) => inferenceFrameworkToJSON(e));
+    }
+    if (message.acceleratorPolicy !== undefined) {
+      obj.acceleratorPolicy = Math.round(message.acceleratorPolicy);
+    }
     return obj;
   },
 
@@ -5716,6 +5863,11 @@ export const ModelLoadRequest: MessageFns<ModelLoadRequest> = {
     message.framework = object.framework ?? undefined;
     message.forceReload = object.forceReload ?? false;
     message.validateAvailability = object.validateAvailability ?? false;
+    message.contextLength = object.contextLength ?? undefined;
+    message.threads = object.threads ?? undefined;
+    message.useGpu = object.useGpu ?? undefined;
+    message.backendPreferences = object.backendPreferences?.map((e) => e) || [];
+    message.acceleratorPolicy = object.acceleratorPolicy ?? undefined;
     return message;
   },
 };
@@ -5731,6 +5883,13 @@ function createBaseModelLoadResult(): ModelLoadResult {
     alreadyLoaded: false,
     resolvedArtifacts: [],
     error: undefined,
+    requestedBackend: undefined,
+    actualDeviceId: undefined,
+    actualDeviceName: undefined,
+    actualDeviceKind: undefined,
+    runtimeVersion: undefined,
+    abiVersion: undefined,
+    fallbackReason: undefined,
   };
 }
 
@@ -5762,6 +5921,27 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     }
     if (message.error !== undefined) {
       SDKError.encode(message.error, writer.uint32(90).fork()).join();
+    }
+    if (message.requestedBackend !== undefined) {
+      writer.uint32(96).int32(message.requestedBackend);
+    }
+    if (message.actualDeviceId !== undefined) {
+      writer.uint32(106).string(message.actualDeviceId);
+    }
+    if (message.actualDeviceName !== undefined) {
+      writer.uint32(114).string(message.actualDeviceName);
+    }
+    if (message.actualDeviceKind !== undefined) {
+      writer.uint32(122).string(message.actualDeviceKind);
+    }
+    if (message.runtimeVersion !== undefined) {
+      writer.uint32(130).string(message.runtimeVersion);
+    }
+    if (message.abiVersion !== undefined) {
+      writer.uint32(138).string(message.abiVersion);
+    }
+    if (message.fallbackReason !== undefined) {
+      writer.uint32(146).string(message.fallbackReason);
     }
     return writer;
   },
@@ -5845,6 +6025,62 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
           message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.requestedBackend = reader.int32() as any;
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.actualDeviceId = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.actualDeviceName = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.actualDeviceKind = reader.string();
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.runtimeVersion = reader.string();
+          continue;
+        }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.abiVersion = reader.string();
+          continue;
+        }
+        case 18: {
+          if (tag !== 146) {
+            break;
+          }
+
+          message.fallbackReason = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5885,6 +6121,41 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
         ? object.resolved_artifacts.map((e: any) => ModelFileDescriptor.fromJSON(e))
         : [],
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+      requestedBackend: isSet(object.requestedBackend)
+        ? inferenceFrameworkFromJSON(object.requestedBackend)
+        : isSet(object.requested_backend)
+        ? inferenceFrameworkFromJSON(object.requested_backend)
+        : undefined,
+      actualDeviceId: isSet(object.actualDeviceId)
+        ? globalThis.String(object.actualDeviceId)
+        : isSet(object.actual_device_id)
+        ? globalThis.String(object.actual_device_id)
+        : undefined,
+      actualDeviceName: isSet(object.actualDeviceName)
+        ? globalThis.String(object.actualDeviceName)
+        : isSet(object.actual_device_name)
+        ? globalThis.String(object.actual_device_name)
+        : undefined,
+      actualDeviceKind: isSet(object.actualDeviceKind)
+        ? globalThis.String(object.actualDeviceKind)
+        : isSet(object.actual_device_kind)
+        ? globalThis.String(object.actual_device_kind)
+        : undefined,
+      runtimeVersion: isSet(object.runtimeVersion)
+        ? globalThis.String(object.runtimeVersion)
+        : isSet(object.runtime_version)
+        ? globalThis.String(object.runtime_version)
+        : undefined,
+      abiVersion: isSet(object.abiVersion)
+        ? globalThis.String(object.abiVersion)
+        : isSet(object.abi_version)
+        ? globalThis.String(object.abi_version)
+        : undefined,
+      fallbackReason: isSet(object.fallbackReason)
+        ? globalThis.String(object.fallbackReason)
+        : isSet(object.fallback_reason)
+        ? globalThis.String(object.fallback_reason)
+        : undefined,
     };
   },
 
@@ -5917,6 +6188,27 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     if (message.error !== undefined) {
       obj.error = SDKError.toJSON(message.error);
     }
+    if (message.requestedBackend !== undefined) {
+      obj.requestedBackend = inferenceFrameworkToJSON(message.requestedBackend);
+    }
+    if (message.actualDeviceId !== undefined) {
+      obj.actualDeviceId = message.actualDeviceId;
+    }
+    if (message.actualDeviceName !== undefined) {
+      obj.actualDeviceName = message.actualDeviceName;
+    }
+    if (message.actualDeviceKind !== undefined) {
+      obj.actualDeviceKind = message.actualDeviceKind;
+    }
+    if (message.runtimeVersion !== undefined) {
+      obj.runtimeVersion = message.runtimeVersion;
+    }
+    if (message.abiVersion !== undefined) {
+      obj.abiVersion = message.abiVersion;
+    }
+    if (message.fallbackReason !== undefined) {
+      obj.fallbackReason = message.fallbackReason;
+    }
     return obj;
   },
 
@@ -5936,6 +6228,13 @@ export const ModelLoadResult: MessageFns<ModelLoadResult> = {
     message.error = (object.error !== undefined && object.error !== null)
       ? SDKError.fromPartial(object.error)
       : undefined;
+    message.requestedBackend = object.requestedBackend ?? undefined;
+    message.actualDeviceId = object.actualDeviceId ?? undefined;
+    message.actualDeviceName = object.actualDeviceName ?? undefined;
+    message.actualDeviceKind = object.actualDeviceKind ?? undefined;
+    message.runtimeVersion = object.runtimeVersion ?? undefined;
+    message.abiVersion = object.abiVersion ?? undefined;
+    message.fallbackReason = object.fallbackReason ?? undefined;
     return message;
   },
 };

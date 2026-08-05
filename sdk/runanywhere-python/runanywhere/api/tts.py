@@ -13,7 +13,7 @@ from ..catalog import CATALOG
 from ..errors import SDKException
 from ..inputs import AudioFormat
 from ..options import TtsOptions
-from ..results import Audio, AudioChunk, Voice
+from ..results import Audio, AudioChunk, SpeechHandle, Voice
 
 __all__ = ["tts"]
 
@@ -80,16 +80,21 @@ class Tts:
         audio = self.synthesize(text, options)
         yield AudioChunk(data=audio.data, index=0, is_final=True, sample_rate=audio.sample_rate)
 
-    def speak(self, text: str, options: Optional[TtsOptions] = None) -> None:
+    def speak(self, text: str, options: Optional[TtsOptions] = None) -> SpeechHandle:
         """Not available in this SDK.
+
+        The v4 contract has `speak` return a `SpeechHandle`; this SDK has no host playback
+        path to hand one back, so it fails preflight honestly instead of returning a handle
+        that could never settle.
 
         Raises:
             SDKException: always — there is no host playback path.
         """
-        raise SDKException.not_implemented(
-            "tts.speak: the Python SDK has no audio output device (numpy is its only runtime "
+        raise SDKException.unsupported_capability(
+            "tts.speak",
+            "the Python SDK has no audio output device (numpy is its only runtime "
             "dependency) and native/module.cpp binds no rac_tts_platform_synthesize; use "
-            "synthesize() and play the bytes with your own audio stack"
+            "synthesize() and play the bytes with your own audio stack",
         )
 
     def stop(self) -> None:
@@ -98,8 +103,8 @@ class Tts:
         Raises:
             SDKException: always — the bridge binds no synthesis-stop entry point.
         """
-        raise SDKException.not_implemented(
-            "tts.stop: native/module.cpp binds no rac_tts_component_stop"
+        raise SDKException.unsupported_capability(
+            "tts.stop", "native/module.cpp binds no rac_tts_component_stop"
         )
 
     def voices(self) -> List[Voice]:

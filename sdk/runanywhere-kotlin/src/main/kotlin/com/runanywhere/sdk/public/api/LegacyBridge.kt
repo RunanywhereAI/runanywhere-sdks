@@ -45,6 +45,7 @@ import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.VLMStreamEvent
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.availableTTSVoicesInternal
 import com.runanywhere.sdk.public.extensions.currentModel
@@ -98,6 +99,11 @@ internal suspend fun legacyDownloadModel(
 
 internal suspend fun legacyDeleteModel(modelId: String): StorageDeleteResult =
     RunAnywhere.deleteModel(modelId)
+
+/** Remove a model's catalog record. Callers must already have unloaded/deleted it. */
+internal fun legacyUnregisterModel(modelId: String) {
+    CppBridgeModelRegistry.remove(modelId)
+}
 
 internal suspend fun legacyStorageInfo(request: StorageInfoRequest): StorageInfoResult =
     RunAnywhere.getStorageInfo(request)

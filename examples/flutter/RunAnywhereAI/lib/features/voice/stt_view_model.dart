@@ -458,7 +458,11 @@ class STTViewModel extends VoiceComponentViewModelBase {
             }
             this.transcription = _committedTranscription;
             partialText = '';
+          case sdk.TranscriptionFailed(:final error):
+            errorMessage = 'Transcription failed: $error';
           case sdk.TranscriptionStarted():
+          case sdk.TranscriptionCompleted():
+          case sdk.TranscriptionCancelled():
             break;
         }
         notify();

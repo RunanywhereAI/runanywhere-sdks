@@ -87,10 +87,12 @@ export const stt = {
     options?: SttOptions
   ): AsyncIterable<TranscriptionEvent> {
     let inner: AsyncIterator<unknown> | null = null;
+    const requestId = nextRequestId('stt');
+    let sequence = 0;
 
     return pushStream<TranscriptionEvent>(
       async (controller) => {
-        controller.push({ type: 'started' });
+        controller.push({ type: 'started', requestId });
         const partials = transcribePartials(toByteStream(audio), {
           ...toSttOptions(options),
         });
@@ -108,16 +110,26 @@ export const stt = {
               }
               if (partial.isFinal) {
                 controller.push({
-                  type: 'final',
-                  transcription: toTranscription(
+                  type: 'transcriptFinal',
+                  requestId,
+                  sequence: sequence++,
+                  segment: toTranscription(
                     partial.finalOutput ??
                       STTOutput.fromPartial({ text: partial.text })
                   ),
                 });
+                controller.push({ type: 'completed', requestId });
                 controller.finish();
                 return;
               }
-              controller.push({ type: 'partial', text: partial.text });
+              controller.push({
+                type: 'partial',
+                requestId,
+                sequence,
+                segmentId: '0',
+                revision: sequence++,
+                alternatives: [{ text: partial.text }],
+              });
             }
             controller.finish();
           } catch (error) {

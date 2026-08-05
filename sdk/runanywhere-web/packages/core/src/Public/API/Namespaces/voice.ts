@@ -22,6 +22,7 @@ import { tts as ttsNamespace } from './tts.js';
 import type { ModelRef } from '../Inputs.js';
 import type { LlmOptions, TurnHandlingOptions, VadOptions } from '../Options.js';
 import type { AgentState, VoiceEvent } from '../Events.js';
+import type { SpeechHandle } from '../Results.js';
 import { ensureModelForCategory, ensureReady } from '../Runtime/Prerequisites.js';
 
 const logger = new SDKLogger('voice');
@@ -47,9 +48,12 @@ export interface VoiceSession {
   /** Open the microphone and begin the turn loop. */
   start(): Promise<void>;
   /** Speak text immediately, outside the turn loop. */
-  say(text: string): Promise<void>;
-  /** Stop the agent mid-utterance. */
-  interrupt(): void;
+  say(text: string): Promise<SpeechHandle>;
+  /**
+   * Stop the agent mid-utterance. Awaitable: resolves once the interrupted
+   * `say()`/turn-loop response, its tools, and its playout have all settled.
+   */
+  interrupt(): Promise<void>;
   /** Close the session and release the microphone. */
   close(): Promise<void>;
 }
@@ -108,6 +112,7 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
   const driver = new VoiceAgentMicDriver();
   let nativePump: AbortController | null = null;
   let closed = false;
+  let lastSpeechHandle: SpeechHandle | null = null;
 
   const publish = (event: VoiceEvent): void => {
     if (!closed) queue.push(event);
@@ -153,15 +158,23 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
       });
     },
 
-    async say(text: string): Promise<void> {
+    async say(text: string): Promise<SpeechHandle> {
       if (closed) throw SDKException.invalidState('This voice session is closed.');
       publish({ type: 'agentStateChanged', state: 'speaking' });
-      await ttsNamespace.speak(text, { voice: options.tts.voice });
-      publish({ type: 'agentStateChanged', state: 'listening' });
+      const handle = await ttsNamespace.speak(text, { voice: options.tts.voice });
+      lastSpeechHandle = handle;
+      void handle.waitForPlayout().then(() => {
+        if (!closed) publish({ type: 'agentStateChanged', state: 'listening' });
+      });
+      return handle;
     },
 
-    interrupt(): void {
-      ttsNamespace.stop();
+    /** Awaits the interrupted `say()` handle and the turn loop's active reply settling. */
+    async interrupt(): Promise<void> {
+      const settling: Promise<void>[] = [driver.interruptCurrentTurn()];
+      if (lastSpeechHandle) settling.push(lastSpeechHandle.interrupt());
+      else ttsNamespace.stop();
+      await Promise.all(settling);
     },
 
     async close(): Promise<void> {

@@ -105,14 +105,23 @@ class VadEventKind(IntEnum):
 
     SPEECH_STARTED = 0
     SPEECH_ENDED = 1
+    #: A frame verdict with no state transition (``vad.open_stream``).
+    ACTIVITY = 2
+    #: The stream failed in flight (``vad.open_stream``).
+    FAILED = 3
+    #: The stream finished normally (``vad.open_stream``).
+    COMPLETED = 4
 
 
 @dataclass
 class VadEvent:
-    """One speech boundary detected in an audio stream."""
+    """One speech boundary or frame verdict detected in an audio stream."""
 
     kind: VadEventKind
     timestamp_ms: int = 0
+    is_speech: bool = False
+    probability: float = 0.0
+    error: Optional[BaseException] = None
 
 
 class VoiceAgentState(IntEnum):

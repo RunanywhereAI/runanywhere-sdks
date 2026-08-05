@@ -354,24 +354,25 @@ rac_result_t dummy_llm_stream(void* impl, const char*, const rac_llm_options_t* 
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         if (g_dummy_llm_callback_after_cancel.load(std::memory_order_acquire)) {
-            (void)callback("provider-late-token", user_data);
+            (void)callback("provider-late-token", RAC_FALSE, nullptr, user_data);
         }
         return static_cast<rac_result_t>(
             g_dummy_llm_post_cancel_result.load(std::memory_order_acquire));
     }
     if (!g_dummy_llm_stream_response.empty()) {
-        if (callback(g_dummy_llm_stream_response.c_str(), user_data) == RAC_TRUE) {
+        if (callback(g_dummy_llm_stream_response.c_str(), RAC_FALSE, nullptr, user_data) ==
+            RAC_TRUE) {
             return RAC_SUCCESS;
         }
         if (g_dummy_llm_callback_after_consumer_stop.load(std::memory_order_acquire)) {
-            (void)callback("provider-late-token", user_data);
+            (void)callback("provider-late-token", RAC_FALSE, nullptr, user_data);
         }
         return static_cast<rac_result_t>(
             g_dummy_llm_consumer_stop_result.load(std::memory_order_acquire));
     }
-    if (callback("mock ", user_data) != RAC_TRUE)
+    if (callback("mock ", RAC_FALSE, nullptr, user_data) != RAC_TRUE)
         return RAC_ERROR_CANCELLED;
-    if (callback("answer", user_data) != RAC_TRUE)
+    if (callback("answer", RAC_FALSE, nullptr, user_data) != RAC_TRUE)
         return RAC_ERROR_CANCELLED;
     return RAC_SUCCESS;
 }

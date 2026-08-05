@@ -8,12 +8,13 @@ import type { SdkEventHub } from './hub';
 import { bridgeStream } from './iter';
 import { IMAGE_DEFAULTS, SEGMENTATION_DEFAULTS } from './options';
 import type { ImageOptions, LoadOptions, SegmentationOptions } from './options';
-import { InferenceFramework, ModelCategory, requireOneOf } from './types';
+import { DevicePlacement, InferenceFramework, ModelCategory, requireOneOf } from './types';
 import type {
   DownloadEvent,
   ImageEvent,
   ImageInput,
   ImageResult,
+  LoadedModel,
   LoraState,
   ModelFilter,
   ModelInfo,
@@ -98,12 +99,45 @@ export interface ModelsNamespace {
   download(id: string): AsyncIterableIterator<DownloadEvent>;
   /** Remove a model's files from the store. */
   delete(id: string): Promise<void>;
-  /** Load a model now rather than paying the cost on the first generate. */
-  load(id: string, options?: LoadOptions): Promise<void>;
-  /** Release one category, or everything when omitted. */
-  unload(category?: ModelCategory): Promise<void>;
+  /**
+   * Load a model into residency now, returning an ownership handle.
+   *
+   * @throws SDKException when the id/category is unknown or the load fails.
+   * @example
+   * const model = await RunAnywhere.models.load('qwen3.5-0.8b');
+   * console.log(model.actualBackend);
+   * await model.close();
+   */
+  load(id: string, options?: LoadOptions): Promise<LoadedModel>;
+  /** Release one resident model. Idempotent — a no-op when `id` is not loaded. */
+  unload(id: string): Promise<void>;
+  /** Release one category's resident model, or every resident model when omitted. */
+  unloadAll(category?: ModelCategory): Promise<void>;
   /** What is loaded and how much storage is left. */
   state(): Promise<ModelsState>;
+}
+
+/**
+ * Build a `LoadedModel` handle from load context. Cheap placement: the addon
+ * does not report actual backend/device per load today, so `actualBackend`
+ * falls back to the requested framework, then to the catalog's known engine
+ * for built-in ids, and `actualDevice` mirrors `LoadOptions.useGpu`.
+ */
+function toLoadedModel(
+  id: string,
+  category: ModelCategory,
+  options: LoadOptions,
+  unload: (id: string) => Promise<void>
+): LoadedModel {
+  const actualBackend = options.framework ?? (isCatalogId(id) ? FRAMEWORK_OF_TYPE[CATALOG[id].type] : undefined);
+  return {
+    id,
+    category,
+    requestedBackend: options.framework,
+    actualBackend,
+    actualDevice: options.useGpu ? DevicePlacement.GPU : DevicePlacement.CPU,
+    close: () => unload(id),
+  };
 }
 
 /** Build the `models` namespace over a backend. */
@@ -173,7 +207,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     return id;
   };
 
-  return {
+  const api: ModelsNamespace = {
     async list(filter = {}) {
       const status = await deps.backend.modelStatus();
       const out: ModelInfo[] = [];
@@ -264,10 +298,24 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
         threads: options.threads,
         useGpu: options.useGpu,
       });
-      deps.hub.emit({ type: 'modelLoaded', id: loaded.id, category });
+      const model = toLoadedModel(loaded.id, category, options, api.unload);
+      deps.hub.emit({ type: 'modelLoaded', id: loaded.id, category, actualBackend: model.actualBackend });
+      return model;
     },
 
-    async unload(category) {
+    async unload(id) {
+      deps.requireReady();
+      const category = await categoryOf(id).catch(() => null);
+      if (!category) return;
+      const slot = SLOT_OF_CATEGORY[category];
+      if (!slot) return;
+      const loaded = await deps.backend.loaded(slot);
+      if (!loaded || loaded.id !== id) return;
+      await deps.backend.unload(slot);
+      deps.hub.emit({ type: 'modelUnloaded', id });
+    },
+
+    async unloadAll(category) {
       if (!category) {
         const previous = await Promise.all(
           Object.values(SLOT_OF_CATEGORY).map((slot) => deps.backend.loaded(slot as LoadSlot))
@@ -308,6 +356,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
       };
     },
   };
+  return api;
 }
 
 // ---------------------------------------------------------------------------
@@ -324,8 +373,15 @@ export interface LoraNamespace {
    * await RunAnywhere.lora.apply('/models/style-lora.gguf', 0.8);
    */
   apply(adapterId: string, scale?: number): Promise<void>;
-  /** Remove one adapter, or all of them when omitted. */
+  /**
+   * Remove one adapter, or all of them when omitted.
+   *
+   * @deprecated Passing no `adapterId` forwards to {@link removeAll}; call
+   *   it directly for new code.
+   */
   remove(adapterId?: string): Promise<void>;
+  /** Remove every applied adapter. */
+  removeAll(): Promise<void>;
   /** Which adapters are applied. */
   list(): Promise<LoraState>;
 }
@@ -347,6 +403,10 @@ export function createLoraNamespace(deps: AssetDeps): LoraNamespace {
     async remove(adapterId) {
       deps.requireReady();
       await deps.backend.loraRemove(adapterId ? await pathFor(adapterId) : undefined);
+    },
+    async removeAll() {
+      deps.requireReady();
+      await deps.backend.loraRemove(undefined);
     },
     async list() {
       const applied = await deps.backend.loraList();
@@ -436,7 +496,7 @@ export interface ImagesNamespace {
 // Apple platform bridge). The Electron addon links no diffusion backend and the
 // diffusion protos are not vendored here, so both verbs report the missing
 // symbols rather than pretending to generate.
-const IMAGES_GAP =
+export const IMAGES_GAP =
   'images.generate on Electron — needs rac_diffusion_generate_proto bound in the addon ' +
   'and a linked diffusion backend (none of llamacpp/onnx/sherpa serves RAC_PRIMITIVE_DIFFUSION)';
 

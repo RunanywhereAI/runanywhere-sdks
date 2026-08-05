@@ -21,6 +21,7 @@ from runanywhere import (
     ModelFilter,
     ModelRef,
     RagDocument,
+    RagQueryOptions,
     ReasoningMode,
     ReasoningOptions,
     Role,
@@ -473,7 +474,10 @@ def handle_rag(args: argparse.Namespace) -> int:
                 ModelRef(args.model or DEFAULT_LLM),
             ) as session:
                 session.ingest([RagDocument.file(path) for path in args.files])
-                result = session.query(args.question, LlmOptions(max_output_tokens=192))
+                result = session.query(
+                    args.question,
+                    RagQueryOptions(generation=LlmOptions(max_output_tokens=192)),
+                )
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1

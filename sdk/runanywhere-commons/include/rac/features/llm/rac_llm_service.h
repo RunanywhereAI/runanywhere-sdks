@@ -117,6 +117,37 @@ typedef struct rac_llm_service_ops {
     rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_llm_service_ops_t;
 
+// =============================================================================
+// INTERNAL SIDE CHANNEL - is_final observation for generate_stream()
+// =============================================================================
+
+/**
+ * @brief INTERNAL. Deprecated fallback for engines that have not yet been
+ * migrated to the widened `rac_llm_stream_callback_fn` (token, is_final,
+ * finish_reason, user_data). Prefer forwarding `is_final` + `finish_reason`
+ * through that callback; commons reads those first.
+ *
+ * Remaining use: a narrow, synchronous, thread-local signal that lets a
+ * backend's generate_stream() implementation tell runanywhere-commons "the
+ * underlying native engine ABI reported a genuine terminal" when the
+ * engine trampoline cannot yet emit the widened terminal callback.
+ * Commons still reads the flag after ops->generate_stream() returns as a
+ * secondary signal when no producer finish_reason arrived via the callback.
+ *
+ * Thread-local: generate_stream() is a synchronous, blocking call on the
+ * calling thread, so there is no concurrent-call aliasing risk.
+ */
+RAC_API void rac_llm_stream_reset_final_signal(void);
+
+/** INTERNAL: call from within a backend's native streaming callback when it
+ *  observes a genuine terminal/is_final marker. See
+ *  rac_llm_stream_reset_final_signal() above. */
+RAC_API void rac_llm_stream_report_final_signal(void);
+
+/** INTERNAL: RAC_TRUE if rac_llm_stream_report_final_signal() was called on
+ *  the calling thread since the last rac_llm_stream_reset_final_signal(). */
+RAC_API rac_bool_t rac_llm_stream_final_signal_seen(void);
+
 /**
  * LLM Service instance.
  * Contains vtable pointer and backend-specific implementation.

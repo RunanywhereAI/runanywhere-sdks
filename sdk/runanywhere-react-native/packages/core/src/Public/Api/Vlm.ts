@@ -126,6 +126,7 @@ export const vlm = {
             if (isTerminal) {
               controller.push({
                 type: 'completed',
+                requestId,
                 result: event.result
                   ? toGenerationResultFromVlm(event.result, requestId, model)
                   : emptyGenerationResult(requestId, model),

@@ -141,18 +141,26 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
         c->cancelled = true;
         return 0;
     }
-    // Terminal call carries no text (the QHexRT C ABI always sends
-    // (NULL, 0, is_final=1)); its qhx_output stats are not forwarded either —
-    // the rac stream callback ABI has no completion-stats channel (same as
-    // llamacpp), so streaming consumers compute timing app-side.
-    if (c == nullptr || is_final != 0 || utf8 == nullptr) {
-        return 1;  // nothing to forward on the terminal call
+    if (c == nullptr || c->cb == nullptr) {
+        return 1;
     }
-    if (c->cb == nullptr) {
+    // Forward the widened commons callback: tokens with is_final=false, and
+    // a terminal call with empty text + finish_reason. Keep the side channel
+    // as a migration fallback for commons paths that still consult it.
+    if (is_final != 0) {
+        rac_llm_stream_report_final_signal();
+        const char* reason = c->cancelled ? "cancelled" : "stop";
+        if (c->cb("", RAC_TRUE, reason, c->user) == RAC_FALSE) {
+            c->cancelled = true;
+            return 0;
+        }
+        return 1;
+    }
+    if (utf8 == nullptr) {
         return 1;
     }
     c->buf.assign(utf8, static_cast<size_t>(len < 0 ? 0 : len));
-    if (c->cb(c->buf.c_str(), c->user) == RAC_FALSE) {
+    if (c->cb(c->buf.c_str(), RAC_FALSE, nullptr, c->user) == RAC_FALSE) {
         c->cancelled = true;
         return 0;
     }

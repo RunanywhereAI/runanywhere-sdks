@@ -42,6 +42,7 @@ from .api import (
     vlm,
     voice,
 )
+from .api.voice import VoiceSession
 from .errors import (
     ErrorCategory,
     ErrorCode,
@@ -87,6 +88,8 @@ from .inputs import (
     ToolDefinition,
 )
 from .options import (
+    AcceleratorPolicy,
+    BackendPreference,
     DiarizationOptions,
     EmbedOptions,
     Endpointing,
@@ -99,10 +102,13 @@ from .options import (
     LoadOptions,
     PoolingMode,
     RagConfig,
+    RagQueryOptions,
+    RagRetrievalOptions,
     ReasoningMode,
     ReasoningOptions,
     SegmentationOptions,
     StructuredOutput,
+    StructuredOutputMode,
     SttOptions,
     ToolChoice,
     ToolChoiceMode,
@@ -114,6 +120,7 @@ from .results import (
     AppliedAdapter,
     Audio,
     AudioChunk,
+    AudioFrame,
     ClassInfo,
     DiarizationResult,
     Embedding,
@@ -121,23 +128,33 @@ from .results import (
     GenerationResult,
     ImageData,
     ImageResult,
+    LoadedModel,
     LoraState,
     Match,
     ModelInfo,
     ModelsState,
+    RagCapabilities,
     RagResult,
     RagStats,
     RankedResult,
+    SDKCapabilities,
     Segment,
     SegmentationResult,
     SpeakerSegment,
+    SpeechHandle,
+    StreamingCapabilities,
     StructuredResult,
     SttState,
+    SttStream,
+    ToolCapabilities,
     TokenKind,
     ToolCall,
     Transcription,
+    UnavailableCapability,
     VadResult,
+    VadStream,
     Voice,
+    VoiceTurnResult,
     Word,
 )
 
@@ -199,6 +216,173 @@ def backends() -> list:
     return _runtime.backends()
 
 
+def _bound(attr: str) -> bool:
+    """True iff the loaded native ``_core`` extension exports ``attr``.
+
+    Never forces a native load: unless the SDK is already initialized this returns False,
+    the same "unknown until ready" treatment :func:`capabilities` already gives
+    ``backends``. So a build that has the symbol only reports it available once
+    :func:`initialize` has actually loaded that build's ``_core``.
+    """
+    return is_ready() and hasattr(_runtime.core(), attr)
+
+
+def capabilities() -> SDKCapabilities:
+    """Installed, packaged, and executable surface of this SDK build.
+
+    Generated from what ``native/module.cpp`` actually binds, not from which namespaces
+    merely exist in this package. ``lora``, ``diarization``, ``segmentation``, ``voice``,
+    and ``images`` are reported available only once :func:`initialize` has run and the
+    loaded ``_core`` build actually exports their bindings — an SDK installed from a
+    wheel built before those bindings existed (or without CoreML for images) still gets
+    an honest answer here. ``rerank`` remains unbound.
+    """
+    lora_ok = _bound("lora_apply")
+    diarization_ok = _bound("load_diarization_model")
+    segmentation_ok = _bound("load_segmentation_model")
+    voice_ok = _bound("create_voice_agent")
+    images_ok = _bound("load_diffusion_model")
+    modalities = ["llm", "vlm", "stt", "tts", "vad", "embeddings", "rag", "models"]
+    if lora_ok:
+        modalities.append("lora")
+    if diarization_ok:
+        modalities.append("diarization")
+    if segmentation_ok:
+        modalities.append("segmentation")
+    if voice_ok:
+        modalities.append("voice")
+    if images_ok:
+        modalities.append("images")
+    unavailable = [
+        UnavailableCapability(
+            name="stt.transcribe_stream",
+            reason=(
+                "native/module.cpp binds no streaming STT entry point; use "
+                "stt.transcribe or stt.open_stream (which reports the same gap)"
+            ),
+        ),
+        UnavailableCapability(
+            name="tts.speak",
+            reason=(
+                "the Python SDK has no audio output device (numpy is its only runtime "
+                "dependency); use tts.synthesize and play the bytes yourself"
+            ),
+        ),
+        UnavailableCapability(
+            name="rerank",
+            reason="native/module.cpp binds no rerank entry point",
+        ),
+        UnavailableCapability(
+            name="agents",
+            reason="runanywhere.agents is not part of the v4 public API surface.",
+        ),
+        UnavailableCapability(
+            name="wakeword",
+            reason="runanywhere.wakeword is not part of the v4 public API surface.",
+        ),
+        UnavailableCapability(
+            name="realtime",
+            reason=(
+                "runanywhere.realtime is not part of the v4 public API surface "
+                "(no WebRTC/SIP/S2S transport namespace)."
+            ),
+        ),
+    ]
+    if not lora_ok:
+        unavailable.append(
+            UnavailableCapability(
+                name="lora",
+                reason=(
+                    "not initialized yet (unknown until then)"
+                    if not is_ready()
+                    else "this native/_core build predates the LoRA bindings "
+                    "(lora_apply / lora_remove / lora_remove_all are not exported by "
+                    "native/module.cpp) — rebuild the native extension"
+                ),
+            )
+        )
+    if not diarization_ok:
+        unavailable.append(
+            UnavailableCapability(
+                name="diarization",
+                reason=(
+                    "not initialized yet (unknown until then)"
+                    if not is_ready()
+                    else "this native/_core build predates the diarization bindings "
+                    "(load_diarization_model / diarize are not exported by "
+                    "native/module.cpp) — rebuild the native extension"
+                ),
+            )
+        )
+    if not segmentation_ok:
+        unavailable.append(
+            UnavailableCapability(
+                name="segmentation",
+                reason=(
+                    "not initialized yet (unknown until then)"
+                    if not is_ready()
+                    else "this native/_core build predates the segmentation bindings "
+                    "(load_segmentation_model / segment are not exported by "
+                    "native/module.cpp) — rebuild the native extension"
+                ),
+            )
+        )
+    if not voice_ok:
+        unavailable.append(
+            UnavailableCapability(
+                name="voice",
+                reason=(
+                    "not initialized yet (unknown until then)"
+                    if not is_ready()
+                    else "this native/_core build predates the voice-agent bindings "
+                    "(create_voice_agent / process_voice_turn are not exported by "
+                    "native/module.cpp) — rebuild the native extension"
+                ),
+            )
+        )
+    else:
+        # File-PCM turns work; mic/speaker remain unavailable on this SDK.
+        unavailable.append(
+            UnavailableCapability(
+                name="voice.microphone",
+                reason=(
+                    "the Python SDK has no microphone or speaker adapter; use "
+                    "VoiceSession.process_turn with file/numpy PCM"
+                ),
+            )
+        )
+    if not images_ok:
+        unavailable.append(
+            UnavailableCapability(
+                name="images",
+                reason=(
+                    "not initialized yet (unknown until then)"
+                    if not is_ready()
+                    else "this native/_core build has no diffusion bindings "
+                    "(load_diffusion_model is only exported when RAC_HAVE_BACKEND_COREML "
+                    "is set at compile time)"
+                ),
+            )
+        )
+    return SDKCapabilities(
+        modalities=modalities,
+        backends=list(_runtime.backends()) if is_ready() else [],
+        audio_formats=[AudioFormat.PCM, AudioFormat.WAV],
+        streaming=StreamingCapabilities(
+            llm=True,
+            vlm=True,
+            stt=False,
+            tts=True,
+            vad=True,
+            rag=True,
+            images=False,
+        ),
+        tools=ToolCapabilities(registry=True, parallel=False, cancellation=True),
+        rag=RagCapabilities(multi_session=True, persistent=False),
+        unavailable=unavailable,
+    )
+
+
 __all__ = [
     "__version__",
     # core
@@ -208,6 +392,7 @@ __all__ = [
     "version",
     "device_id",
     "backends",
+    "capabilities",
     "events",
     "Environment",
     # namespaces
@@ -222,6 +407,7 @@ __all__ = [
     "diarization",
     "segmentation",
     "voice",
+    "VoiceSession",
     "rag",
     "models",
     "lora",
@@ -242,6 +428,8 @@ __all__ = [
     "Role",
     "ToolDefinition",
     # options
+    "AcceleratorPolicy",
+    "BackendPreference",
     "DiarizationOptions",
     "EmbedOptions",
     "Endpointing",
@@ -253,10 +441,13 @@ __all__ = [
     "LoadOptions",
     "PoolingMode",
     "RagConfig",
+    "RagQueryOptions",
+    "RagRetrievalOptions",
     "ReasoningMode",
     "ReasoningOptions",
     "SegmentationOptions",
     "StructuredOutput",
+    "StructuredOutputMode",
     "SttOptions",
     "ToolChoice",
     "ToolChoiceMode",
@@ -267,6 +458,7 @@ __all__ = [
     "AppliedAdapter",
     "Audio",
     "AudioChunk",
+    "AudioFrame",
     "ClassInfo",
     "DiarizationResult",
     "Embedding",
@@ -274,23 +466,33 @@ __all__ = [
     "GenerationResult",
     "ImageData",
     "ImageResult",
+    "LoadedModel",
     "LoraState",
     "Match",
     "ModelInfo",
     "ModelsState",
+    "RagCapabilities",
     "RagResult",
     "RagStats",
     "RankedResult",
+    "SDKCapabilities",
     "Segment",
     "SegmentationResult",
     "SpeakerSegment",
+    "SpeechHandle",
+    "StreamingCapabilities",
     "StructuredResult",
     "SttState",
+    "SttStream",
+    "ToolCapabilities",
     "TokenKind",
     "ToolCall",
     "Transcription",
+    "UnavailableCapability",
     "VadResult",
+    "VadStream",
     "Voice",
+    "VoiceTurnResult",
     "Word",
     # events
     "DownloadEvent",

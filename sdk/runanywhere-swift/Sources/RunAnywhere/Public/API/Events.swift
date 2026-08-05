@@ -26,18 +26,41 @@ public enum TokenKind: Sendable {
 /// Progress of one streaming text or vision generation.
 public enum GenerationEvent: Sendable {
     case started(requestId: String)
-    case token(text: String, kind: TokenKind)
-    case toolCall(ToolCall)
-    case completed(GenerationResult)
+    case outputItemAdded(requestId: String, sequence: Int64, itemId: String, index: Int, item: String)
+    case textDelta(requestId: String, sequence: Int64, itemId: String, index: Int, text: String)
+    case reasoningDelta(requestId: String, sequence: Int64, itemId: String, index: Int, text: String)
+    case toolCallAdded(requestId: String, sequence: Int64, itemId: String, index: Int, call: ToolCall)
+    case toolArgumentsDelta(requestId: String, sequence: Int64, itemId: String, delta: String)
+    case toolArgumentsDone(requestId: String, sequence: Int64, itemId: String, arguments: String)
+    case usage(requestId: String, sequence: Int64, inputTokens: Int, outputTokens: Int)
+    case completed(requestId: String, result: GenerationResult)
+    case failed(requestId: String, partial: String?, error: SDKException)
+    case cancelled(requestId: String, partial: String?)
 }
 
 // MARK: - TranscriptionEvent
 
 /// Progress of one streaming transcription.
 public enum TranscriptionEvent: Sendable {
-    case started
-    case partial(text: String)
-    case final(Transcription)
+    case started(requestId: String)
+    case speechStarted(requestId: String, sequence: Int64, timestampMs: Int64?)
+    case partial(requestId: String, sequence: Int64, segmentId: String, revision: Int, alternatives: [String])
+    case transcriptFinal(requestId: String, sequence: Int64, transcription: Transcription)
+    case speechEnded(requestId: String, sequence: Int64, timestampMs: Int64?)
+    case completed(requestId: String)
+    case failed(requestId: String, error: SDKException)
+    case cancelled(requestId: String)
+}
+
+// MARK: - VadEvent
+
+/// Progress of one live VAD stream.
+public enum VadEvent: Sendable {
+    case speechStarted(timestampMs: Int64?)
+    case speechEnded(timestampMs: Int64?)
+    case activity(isSpeech: Bool, probability: Float, timestampMs: Int64?)
+    case failed(SDKException)
+    case completed
 }
 
 // MARK: - VoiceEvent
@@ -116,9 +139,13 @@ public enum ImageEvent: Sendable {
 
 /// Progress of one model download.
 public enum DownloadEvent: Sendable {
-    case progress(bytesDone: Int64, bytesTotal: Int64, percent: Float)
-    case extracting
-    case completed(ModelInfo)
+    case started(operationId: String, sequence: Int64)
+    case progress(operationId: String, sequence: Int64, bytesDone: Int64, bytesTotal: Int64, percent: Float, file: String?)
+    case verifying(operationId: String, sequence: Int64)
+    case extracting(operationId: String, sequence: Int64, percent: Float?)
+    case completed(operationId: String, sequence: Int64, model: ModelInfo)
+    case failed(operationId: String, sequence: Int64, error: SDKException)
+    case cancelled(operationId: String, sequence: Int64)
 }
 
 // MARK: - SdkEvent

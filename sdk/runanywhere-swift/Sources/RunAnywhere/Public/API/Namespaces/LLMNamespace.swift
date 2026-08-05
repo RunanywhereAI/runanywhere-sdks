@@ -76,18 +76,47 @@ public extension RunAnywhere {
 
         /// Generate output that satisfies `schema`.
         ///
-        /// - Throws: `SDKException` when no model can be loaded, generation
-        ///   fails, or the output cannot be parsed.
+        /// `mode` picks how the schema is enforced:
+        /// - `.validationOnly` (default): generate freely, then validate.
+        /// - `.repair`: validate, then retry once with a repair instruction if invalid.
+        /// - `.constrained`: engine-constrained decoding — fails preflight
+        ///   until a constrained-decoding engine is wired in.
+        ///
+        /// - Throws: `SDKException` when no model can be loaded, `mode` cannot
+        ///   be honored, generation fails, or the output cannot be parsed.
         public func generateStructured(
             prompt: String,
             schema: JsonSchema,
+            mode: StructuredEnforcementMode = .validationOnly,
             options: LlmOptions? = nil
         ) async throws -> StructuredResult {
+            guard mode != .constrained else {
+                throw SDKException(
+                    code: .notSupported,
+                    message: "generateStructured(mode: .constrained) needs engine-level constrained decoding, " +
+                        "which is not wired in yet; use .validationOnly or .repair",
+                    category: .validation
+                )
+            }
+
             var effective = options ?? LlmOptions()
             effective.structuredOutput = StructuredOutput(schema: schema)
-            let generation = try await generate(prompt: prompt, history: [], options: effective)
-            let parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
-            return StructuredResult(proto: parsed, generation: generation)
+
+            var generation = try await generate(prompt: prompt, history: [], options: effective)
+            var parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
+
+            let isValid = parsed.hasValidation ? parsed.validation.isValid : false
+            if mode == .repair, !isValid {
+                let repairPrompt = RunAnywhere.structuredRepairPrompt(
+                    original: prompt,
+                    invalidOutput: generation.text,
+                    schema: schema
+                )
+                generation = try await generate(prompt: repairPrompt, history: [], options: effective)
+                parsed = try RunAnywhere.parseStructuredOutput(text: generation.text, schema: schema)
+            }
+
+            return StructuredResult(proto: parsed, generation: generation, mode: mode)
         }
 
         // MARK: - Shared implementation
@@ -217,8 +246,9 @@ public extension RunAnywhere {
 extension RunAnywhere {
 
     // swiftlint:disable function_body_length
-    /// Fold the native LLM stream onto the spec event grammar, throwing on
-    /// terminal error events instead of leaking them through a payload field.
+    /// Fold the native LLM stream onto the spec event grammar. Never
+    /// fabricates a successful `completed` when the producer did not report
+    /// one — the stream ends in `completed`, `failed`, or `cancelled`.
     internal static func mapGenerationStream(
         _ events: AsyncStream<RALLMStreamEvent>,
         model: String
@@ -232,15 +262,26 @@ extension RunAnywhere {
                 let startedAt = Date()
                 var firstTokenAt: Date?
                 var requestId = ""
-                var sawCompletion = false
+                var sawTerminal = false
+                var toolCallIndex = 0
+                let textItemId = UUID().uuidString
+                let reasoningItemId = UUID().uuidString
+
+                func partialOrNil() -> String? { accumulatedText.isEmpty ? nil : accumulatedText }
 
                 for await event in events {
                     if Task.isCancelled { break }
-                    requestId = event.requestID
+                    if !event.requestID.isEmpty { requestId = event.requestID }
+                    let sequence = Int64(event.seq)
 
                     if event.hasError || event.eventKind == .error {
-                        continuation.finish(throwing: SDKException(proto: event.error))
-                        return
+                        continuation.yield(.failed(
+                            requestId: requestId,
+                            partial: partialOrNil(),
+                            error: SDKException(proto: event.error)
+                        ))
+                        sawTerminal = true
+                        break
                     }
 
                     if !sawStart {
@@ -249,7 +290,15 @@ extension RunAnywhere {
                     }
 
                     if event.hasToolCall {
-                        continuation.yield(.toolCall(event.toolCall))
+                        let itemId = event.toolCall.id.isEmpty ? "tool-\(toolCallIndex)" : event.toolCall.id
+                        continuation.yield(.toolCallAdded(
+                            requestId: requestId,
+                            sequence: sequence,
+                            itemId: itemId,
+                            index: toolCallIndex,
+                            call: event.toolCall
+                        ))
+                        toolCallIndex += 1
                     }
 
                     if !event.token.isEmpty {
@@ -258,10 +307,23 @@ extension RunAnywhere {
                         let kind = TokenKind(proto: event.kind)
                         if kind == .thought {
                             accumulatedThinking += event.token
+                            continuation.yield(.reasoningDelta(
+                                requestId: requestId,
+                                sequence: sequence,
+                                itemId: reasoningItemId,
+                                index: 0,
+                                text: event.token
+                            ))
                         } else if event.kind != .toolCall {
                             accumulatedText += event.token
+                            continuation.yield(.textDelta(
+                                requestId: requestId,
+                                sequence: sequence,
+                                itemId: textItemId,
+                                index: 0,
+                                text: event.token
+                            ))
                         }
-                        continuation.yield(.token(text: event.token, kind: kind))
                     }
 
                     if event.isFinal {
@@ -284,35 +346,39 @@ extension RunAnywhere {
                                 model: model
                             )
                         }
-                        continuation.yield(.completed(result))
-                        sawCompletion = true
+                        continuation.yield(.completed(requestId: requestId, result: result))
+                        sawTerminal = true
                         break
                     }
                 }
 
-                // The grammar ends in `completed` or a thrown error, never a
-                // silent finish: a backend that drops the stream without a
-                // terminal event still gets a wall-clock result, and one that
-                // produced nothing at all is a failure.
-                if !sawCompletion, !Task.isCancelled {
-                    guard sawStart else {
-                        continuation.finish(throwing: SDKException(
-                            code: .generationFailed,
-                            message: "Generation ended before producing any output",
-                            category: .component
+                // Never fabricate `completed` on a stream end without a
+                // producer terminal: emit `cancelled` for caller-initiated
+                // cancellation, `failed` otherwise.
+                if !sawTerminal {
+                    if Task.isCancelled {
+                        continuation.yield(.cancelled(requestId: requestId, partial: partialOrNil()))
+                    } else if sawStart {
+                        continuation.yield(.failed(
+                            requestId: requestId,
+                            partial: partialOrNil(),
+                            error: SDKException(
+                                code: .generationFailed,
+                                message: "Generation stream ended before a terminal event",
+                                category: .component
+                            )
                         ))
-                        return
+                    } else {
+                        continuation.yield(.failed(
+                            requestId: requestId,
+                            partial: nil,
+                            error: SDKException(
+                                code: .generationFailed,
+                                message: "Generation ended before producing any output",
+                                category: .component
+                            )
+                        ))
                     }
-                    continuation.yield(.completed(RunAnywhere.synthesizeResult(
-                        text: accumulatedText,
-                        thinking: accumulatedThinking,
-                        tokenCount: tokenCount,
-                        startedAt: startedAt,
-                        firstTokenAt: firstTokenAt,
-                        finishReason: "",
-                        requestId: requestId,
-                        model: model
-                    )))
                 }
                 continuation.finish()
             }
@@ -362,5 +428,22 @@ extension RunAnywhere {
         try CppBridge.StructuredOutput.parse(
             CppBridge.StructuredOutput.makeParseRequest(text: text, schema: schema)
         )
+    }
+
+    /// Build the one retry prompt `generateStructured(mode: .repair)` sends
+    /// when the first pass did not validate against `schema`.
+    internal static func structuredRepairPrompt(
+        original: String,
+        invalidOutput: String,
+        schema: RAJSONSchema
+    ) -> String {
+        """
+        \(original)
+
+        Your previous answer did not match the required JSON schema. Reply again with ONLY JSON that satisfies this schema.
+
+        Schema: \((try? schema.jsonString()) ?? "")
+        Previous invalid answer: \(invalidOutput)
+        """
     }
 }

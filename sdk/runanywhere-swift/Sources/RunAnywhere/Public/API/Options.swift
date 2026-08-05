@@ -535,21 +535,30 @@ public struct TurnHandlingOptions: Sendable {
 ///
 /// Defaults come from the generated IDL defaults, not hand-copied constants.
 public struct RagConfig: Sendable {
-    public var topK = Int(RARAGConfiguration.defaults().topK)
+    /// Retrieval depth (not LLM sampling topK).
+    public var retrievalTopK = Int(RARAGConfiguration.defaults().topK)
     public var chunkSize = Int(RARAGConfiguration.defaults().chunkSize)
     public var chunkOverlap = Int(RARAGConfiguration.defaults().chunkOverlap)
     public var similarityThreshold: Float?
     public var persistPath: String?
 
+    /// Deprecated alias for `retrievalTopK`.
+    @available(*, deprecated, renamed: "retrievalTopK")
+    public var topK: Int {
+        get { retrievalTopK }
+        set { retrievalTopK = newValue }
+    }
+
     /// Build RAG session configuration.
     public init(
-        topK: Int = Int(RARAGConfiguration.defaults().topK),
+        retrievalTopK: Int = Int(RARAGConfiguration.defaults().topK),
         chunkSize: Int = Int(RARAGConfiguration.defaults().chunkSize),
         chunkOverlap: Int = Int(RARAGConfiguration.defaults().chunkOverlap),
         similarityThreshold: Float? = nil,
-        persistPath: String? = nil
+        persistPath: String? = nil,
+        topK: Int? = nil
     ) {
-        self.topK = topK
+        self.retrievalTopK = topK ?? retrievalTopK
         self.chunkSize = chunkSize
         self.chunkOverlap = chunkOverlap
         self.similarityThreshold = similarityThreshold
@@ -558,7 +567,7 @@ public struct RagConfig: Sendable {
 
     func toProto() -> RARAGConfiguration {
         var proto = RARAGConfiguration.defaults()
-        proto.topK = Int32(topK)
+        proto.topK = Int32(retrievalTopK)
         proto.chunkSize = Int32(chunkSize)
         proto.chunkOverlap = Int32(chunkOverlap)
         if let similarityThreshold { proto.similarityThreshold = similarityThreshold }
@@ -574,22 +583,56 @@ public struct RagConfig: Sendable {
 
 /// Placement knobs applied when a model is loaded, not per request.
 public struct LoadOptions: Sendable {
-    /// Engine pin honoured at load time only.
-    public var framework: InferenceFramework?
+    /// Ordered backend preferences (LiteRT/ExecuTorch-aligned).
+    public var backendPreferences: [BackendPreference]
+    /// Accelerator class preference.
+    public var accelerator: AcceleratorPolicy?
     public var contextLength: Int?
     public var threads: Int?
-    public var useGpu: Bool?
+    public var forceReload: Bool
+
+    /// Deprecated adapter: maps into `backendPreferences`.
+    @available(*, deprecated, message: "Use backendPreferences instead")
+    public var framework: InferenceFramework? {
+        didSet {
+            if let framework, backendPreferences.isEmpty {
+                backendPreferences = [BackendPreference(backend: framework)]
+            }
+        }
+    }
+
+    /// Deprecated adapter: maps into `accelerator`.
+    @available(*, deprecated, message: "Use accelerator instead")
+    public var useGpu: Bool? {
+        didSet {
+            if let useGpu, accelerator == nil {
+                accelerator = useGpu ? .gpu : .cpu
+            }
+        }
+    }
 
     /// Build load options.
     public init(
-        framework: InferenceFramework? = nil,
+        backendPreferences: [BackendPreference] = [],
+        accelerator: AcceleratorPolicy? = nil,
         contextLength: Int? = nil,
         threads: Int? = nil,
+        forceReload: Bool = false,
+        framework: InferenceFramework? = nil,
         useGpu: Bool? = nil
     ) {
-        self.framework = framework
+        self.backendPreferences = backendPreferences
+        self.accelerator = accelerator
         self.contextLength = contextLength
         self.threads = threads
+        self.forceReload = forceReload
+        self.framework = framework
         self.useGpu = useGpu
+        if let framework, self.backendPreferences.isEmpty {
+            self.backendPreferences = [BackendPreference(backend: framework)]
+        }
+        if let useGpu, self.accelerator == nil {
+            self.accelerator = useGpu ? .gpu : .cpu
+        }
     }
 }

@@ -15,7 +15,7 @@ class VADViewModel extends VoiceComponentViewModelBase {
   VADViewModel();
 
   final sdk.AudioCaptureManager _capture = sdk.AudioCaptureManager();
-  StreamSubscription<sdk.VadResult>? _vadSubscription;
+  StreamSubscription<sdk.VadEvent>? _vadSubscription;
   StreamSubscription<double>? _levelSubscription;
 
   // --- Component identity -----------------------------------------------------
@@ -100,15 +100,25 @@ class VADViewModel extends VoiceComponentViewModelBase {
       notify();
     });
 
-    // Consume the SDK's streaming VAD session: one result per mic chunk;
+    // Consume the SDK's streaming VAD session: one event per mic chunk;
     // the SDK owns model framing — no app-side buffer math.
     _vadSubscription = sdk.RunAnywhere.vad
         .detectStream(chunks.map(sdk.AudioInput.pcm16))
         .listen(
-      (result) {
-        isSpeech = result.isSpeech;
-        probability = result.probability;
-        frameCount += 1;
+      (event) {
+        switch (event) {
+          case sdk.VadActivity(:final isSpeech, :final probability):
+            this.isSpeech = isSpeech;
+            this.probability = probability;
+            frameCount += 1;
+          case sdk.VadFailed(:final error):
+            errorMessage = 'VAD failed: $error';
+            isListening = false;
+          case sdk.VadSpeechStarted():
+          case sdk.VadSpeechEnded():
+          case sdk.VadCompleted():
+            break;
+        }
         notify();
       },
       onError: (Object e) {

@@ -237,12 +237,44 @@ export interface RagConfig {
   persistPath?: string;
 }
 
+/** Per-query retrieval overrides for `RagSession.query`/`queryStream`. */
+export interface RagRetrievalOptions {
+  topK?: number;
+  similarityThreshold?: number;
+}
+
+/** Per-query knobs for `RagSession.query`/`queryStream`. */
+export interface RagQueryOptions {
+  retrieval?: RagRetrievalOptions;
+  generation?: LlmOptions;
+}
+
+/** Hardware class {@link LoadOptions.accelerator} requests. */
+export type AcceleratorPolicy = 'auto' | 'cpu' | 'gpu' | 'npu';
+
+/** One ranked backend choice for {@link LoadOptions.backendPreferences}. */
+export interface BackendPreference {
+  backend: InferenceFramework;
+  /** `true` fails the load instead of falling back past this entry. */
+  required?: boolean;
+}
+
+/** Enforcement level `llm.generateStructured` applies to its schema. */
+export type StructuredOutputMode = 'constrained' | 'validationOnly' | 'repair';
+
 /** Placement knobs applied when a model is loaded. */
 export interface LoadOptions {
-  /** Engine pin, honoured at load time only. */
-  framework?: InferenceFramework;
+  /** Ranked backend choices; the first entry the platform can honor wins. */
+  backendPreferences?: BackendPreference[];
+  /** Hardware class to run on. */
+  accelerator?: AcceleratorPolicy;
   contextLength?: number;
   threads?: number;
+  /** Reload even when the model is already resident. */
+  forceReload?: boolean;
+  /** @deprecated Use `backendPreferences`; kept as a thin adapter for one release. */
+  framework?: InferenceFramework;
+  /** @deprecated Use `accelerator`; kept as a thin adapter for one release. */
   useGpu?: boolean;
 }
 
@@ -294,7 +326,13 @@ export interface ModelRegistration {
 // ---------------------------------------------------------------------------
 
 /** Why a generation stopped. */
-export type FinishReason = 'stop' | 'length' | 'toolCalls' | 'cancelled';
+export type FinishReason =
+  | 'stop'
+  | 'length'
+  | 'toolCalls'
+  | 'cancelled'
+  | 'contentFilter'
+  | 'unknown';
 
 /** Generated text plus the metrics every generation reports. */
 export interface GenerationResult {
@@ -302,12 +340,16 @@ export interface GenerationResult {
   thinkingText?: string;
   toolCalls: ToolCall[];
   finishReason: FinishReason;
+  /** Backend-native finish-reason string, before normalization into `finishReason`. */
+  rawFinishReason?: string;
   inputTokens: number;
   outputTokens: number;
   timeToFirstTokenMs: number;
   tokensPerSecond: number;
   requestId: string;
   model: string;
+  actualBackend?: InferenceFramework;
+  actualDevice?: string;
 }
 
 /** A parsed structured generation alongside its raw text and metrics. */
@@ -315,6 +357,7 @@ export interface StructuredResult<T = unknown> extends GenerationResult {
   value: T | null;
   raw: string;
   valid: boolean;
+  mode: StructuredOutputMode;
 }
 
 /** One recognized word with its timing. */
@@ -476,6 +519,84 @@ export interface RagStats {
   indexSizeBytes: number;
 }
 
+/**
+ * Resident-model ownership handle returned by `models.load`.
+ *
+ * `close()` and `models.unload(id)` release the same residency; calling
+ * either after the other is a no-op.
+ */
+export interface LoadedModel {
+  readonly id: string;
+  readonly category: ModelCategory;
+  /** The backend preference that was requested, when one was given. */
+  readonly requestedBackend?: BackendPreference;
+  readonly actualBackend: InferenceFramework;
+  readonly actualDevice: string;
+  readonly runtimeVersion?: string;
+  readonly abiVersion?: string;
+  /** Set when the requested backend/accelerator could not be honored. */
+  readonly fallbackReason?: string;
+  /** Release this model's residency. Idempotent. */
+  close(): Promise<void>;
+}
+
+/** Handle to one in-flight or completed `tts.speak`/`VoiceSession.say` utterance. */
+export interface SpeechHandle {
+  readonly id: string;
+  readonly interrupted: boolean;
+  readonly error?: Error;
+  /** Stop playback and any in-flight synthesis. Resolves once stopped. */
+  interrupt(): Promise<void>;
+  /** Resolve once playback finishes, is interrupted, or fails. */
+  waitForPlayout(): Promise<void>;
+}
+
+/** Whether a modality/backend/feature is honestly available right now. */
+export interface UnavailableCapability {
+  name: string;
+  reason: string;
+}
+
+/** Per-modality streaming support, keyed by namespace name. */
+export interface StreamingCapabilities {
+  llm: boolean;
+  vlm: boolean;
+  stt: boolean;
+  tts: boolean;
+  vad: boolean;
+  rag: boolean;
+  images: boolean;
+}
+
+/** Tool-calling support of the currently registered backends. */
+export interface ToolCapabilities {
+  registry: boolean;
+  parallel: boolean;
+  cancellation: boolean;
+}
+
+/** RAG-session support of the currently registered backends. */
+export interface RagCapabilities {
+  multiSession: boolean;
+  persistent: boolean;
+}
+
+/**
+ * Installed, packaged, and executable surface of this SDK build, generated
+ * from packaging and runtime probes rather than from IDL enum presence
+ * alone. `RunAnywhere.capabilities()` is the source of truth apps should
+ * consult before calling into a modality that might not ship on this platform.
+ */
+export interface SDKCapabilities {
+  modalities: string[];
+  backends: InferenceFramework[];
+  audioFormats: AudioFormatName[];
+  streaming: StreamingCapabilities;
+  tools: ToolCapabilities;
+  rag: RagCapabilities;
+  unavailable: UnavailableCapability[];
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
@@ -483,24 +604,48 @@ export interface RagStats {
 /** Whether a streamed token is answer text or private reasoning. */
 export type TokenKind = 'text' | 'thought';
 
-/** `started`, then deltas, then `completed`. */
+/** `started`, then deltas, then a terminal `completed`/`failed`/`cancelled`. */
 export type GenerationEvent =
   | { type: 'started'; requestId: string }
+  | { type: 'outputItemAdded'; requestId: string; sequence: number; itemId: string; index: number; item: unknown }
+  | { type: 'textDelta'; requestId: string; sequence: number; itemId: string; index: number; text: string }
+  | { type: 'reasoningDelta'; requestId: string; sequence: number; itemId: string; index: number; text: string }
+  | { type: 'toolCallAdded'; requestId: string; sequence: number; itemId: string; index: number; call: ToolCall }
+  | { type: 'toolArgumentsDelta'; requestId: string; sequence: number; itemId: string; delta: string }
+  | { type: 'toolArgumentsDone'; requestId: string; sequence: number; itemId: string; arguments: string }
+  | { type: 'usage'; requestId: string; sequence: number; inputTokens: number; outputTokens: number }
+  | { type: 'completed'; requestId: string; result: GenerationResult }
+  | { type: 'failed'; requestId: string; partial?: string; error: Error }
+  | { type: 'cancelled'; requestId: string; partial?: string }
+  // @deprecated Use textDelta/reasoningDelta.
   | { type: 'token'; text: string; kind: TokenKind }
-  | { type: 'toolCall'; toolCall: ToolCall }
-  | { type: 'completed'; result: GenerationResult };
+  // @deprecated Use toolCallAdded.
+  | { type: 'toolCall'; toolCall: ToolCall };
 
-/** `started`, then partials, then `final`. */
+/** One alternative transcript for a still-revising partial segment. */
+export interface TranscriptAlternative {
+  text: string;
+  confidence?: number;
+}
+
+/** `started`, then partials, then a terminal `completed`/`failed`/`cancelled`. */
 export type TranscriptionEvent =
-  | { type: 'started' }
-  | { type: 'partial'; text: string }
-  | { type: 'final'; transcription: Transcription };
+  | { type: 'started'; requestId: string }
+  | { type: 'speechStarted'; requestId: string; sequence: number; timestampMs?: number }
+  | { type: 'partial'; requestId: string; sequence: number; segmentId: string; revision: number; alternatives: TranscriptAlternative[] }
+  | { type: 'transcriptFinal'; requestId: string; sequence: number; segment: Transcription }
+  | { type: 'speechEnded'; requestId: string; sequence: number; timestampMs?: number }
+  | { type: 'completed'; requestId: string }
+  | { type: 'failed'; requestId: string; error: Error }
+  | { type: 'cancelled'; requestId: string };
 
-/** Frame-level speech detection. */
+/** Frame-level speech detection over a live push stream (`vad.openStream`). */
 export type VadEvent =
-  | { type: 'speechStarted' }
-  | { type: 'speechEnded' }
-  | { type: 'frame'; result: VadResult };
+  | { type: 'speechStarted'; timestampMs?: number }
+  | { type: 'speechEnded'; timestampMs?: number }
+  | { type: 'activity'; isSpeech: boolean; probability: number; timestampMs?: number }
+  | { type: 'failed'; error: Error }
+  | { type: 'completed' };
 
 /** What the agent is doing right now. */
 export type AgentState = 'listening' | 'thinking' | 'speaking';
@@ -514,11 +659,14 @@ export type VoiceEvent =
   | { type: 'speechEnded' }
   | { type: 'error'; message: string; recoverable: boolean };
 
-/** Retrieval, then answer deltas, then `completed`. */
+/** Retrieval, then answer deltas, then a terminal `completed`/`failed`. */
 export type RagEvent =
   | { type: 'retrieved'; matches: Match[] }
-  | { type: 'token'; text: string; kind: TokenKind }
-  | { type: 'completed'; result: RagResult };
+  | { type: 'textDelta'; text: string; kind: TokenKind }
+  | { type: 'completed'; result: RagResult }
+  | { type: 'failed'; error: Error }
+  // @deprecated Use textDelta.
+  | { type: 'token'; text: string; kind: TokenKind };
 
 /** Diffusion progress, then `completed`. */
 export type ImageEvent =
@@ -531,11 +679,15 @@ export type ImageEvent =
     }
   | { type: 'completed'; result: ImageResult };
 
-/** Byte progress, optional extraction, then `completed`. */
+/** Byte progress, optional extraction, then a terminal `completed`/`failed`/`cancelled`. */
 export type DownloadEvent =
-  | { type: 'progress'; bytesDone: number; bytesTotal: number; percent: number }
-  | { type: 'extracting' }
-  | { type: 'completed'; model: ModelInfo };
+  | { type: 'started'; operationId: string; sequence: number }
+  | { type: 'progress'; operationId: string; sequence: number; bytesDone: number; bytesTotal: number; percent: number; file?: string }
+  | { type: 'verifying'; operationId: string; sequence: number }
+  | { type: 'extracting'; operationId: string; sequence: number; percent?: number }
+  | { type: 'completed'; operationId: string; sequence: number; model: ModelInfo }
+  | { type: 'failed'; operationId: string; sequence: number; error: Error }
+  | { type: 'cancelled'; operationId: string; sequence: number };
 
 // ---------------------------------------------------------------------------
 // Sessions
@@ -548,8 +700,11 @@ export interface VoiceSession {
   /** Open the microphone and begin the turn loop. */
   start(): Promise<void>;
   /** Speak this text now, outside the turn loop. */
-  say(text: string): Promise<void>;
-  /** Stop the agent mid-utterance. */
+  say(text: string): Promise<SpeechHandle>;
+  /**
+   * Stop the agent mid-utterance. Awaitable: resolves once the interrupted
+   * response, its tools, and its playout have all settled.
+   */
   interrupt(): Promise<void>;
   /** Release the microphone, playback, and the underlying pipeline. */
   close(): Promise<void>;
@@ -564,9 +719,9 @@ export interface RagSession {
   /** Retrieve the closest chunks without generating an answer. */
   search(query: string, topK?: number): Promise<Match[]>;
   /** Answer a question grounded in the indexed chunks. */
-  query(question: string, options?: LlmOptions): Promise<RagResult>;
+  query(question: string, options?: RagQueryOptions): Promise<RagResult>;
   /** Answer a question, streaming retrieval and answer tokens. */
-  queryStream(question: string, options?: LlmOptions): AsyncIterable<RagEvent>;
+  queryStream(question: string, options?: RagQueryOptions): AsyncIterable<RagEvent>;
   /** Index counters for this session. */
   stats(): Promise<RagStats>;
   /** Drop every indexed chunk, keeping the session open. */

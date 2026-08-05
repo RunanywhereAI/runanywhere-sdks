@@ -125,3 +125,65 @@ export async function collect<T>(source: AsyncIterable<T>): Promise<T[]> {
   for await (const item of source) out.push(item);
   return out;
 }
+
+/**
+ * A push queue that is also an `AsyncIterable`. Unlike {@link bridgeStream},
+ * `push` works before the consumer ever calls `next()` — nothing is lost when
+ * a producer (e.g. `SttStream.pushFrame`) starts feeding it before the
+ * caller starts reading `events`. Used by the live `stt.openStream` /
+ * `vad.openStream` sessions, which are pushed into from outside their own
+ * async iteration.
+ */
+export class AsyncQueue<T> implements AsyncIterable<T> {
+  private readonly buffer: T[] = [];
+  private wake: (() => void) | null = null;
+  private ended = false;
+  private failure: unknown = null;
+
+  /** Enqueue one item. A no-op once the queue has ended. */
+  push(value: T): void {
+    if (this.ended) return;
+    this.buffer.push(value);
+    this.signal();
+  }
+
+  /** End the queue with a terminal error; the next `next()` throws it. */
+  fail(error: unknown): void {
+    if (this.ended) return;
+    this.failure = error;
+    this.ended = true;
+    this.signal();
+  }
+
+  /** End the queue normally once every buffered item has been read. */
+  complete(): void {
+    if (this.ended) return;
+    this.ended = true;
+    this.signal();
+  }
+
+  private signal(): void {
+    const wake = this.wake;
+    this.wake = null;
+    if (wake) wake();
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T> {
+    return {
+      next: async (): Promise<IteratorResult<T>> => {
+        for (;;) {
+          if (this.buffer.length) return { value: this.buffer.shift() as T, done: false };
+          if (this.failure) {
+            const error = this.failure;
+            this.failure = null;
+            throw asSDKException(error);
+          }
+          if (this.ended) return { value: undefined as unknown as T, done: true };
+          await new Promise<void>((resolve) => {
+            this.wake = resolve;
+          });
+        }
+      },
+    };
+  }
+}

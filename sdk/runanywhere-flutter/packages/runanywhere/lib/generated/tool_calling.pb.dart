@@ -1052,8 +1052,13 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   /// When true, one model turn may emit multiple tool-call envelopes;
   /// commons parses and executes all of them before building a single
   /// follow-up prompt. Default false preserves the historical
-  /// one-call-per-turn behavior. (Reclaims the field number that
-  /// originally carried this flag before it was reserved.)
+  /// one-call-per-turn behavior.
+  ///
+  /// Wire history: field 15 originally carried this same bool flag, was
+  /// briefly reserved during a cleanup pass, then restored with identical
+  /// type and meaning. Do not reuse 15 for any other type. Schema-skew
+  /// fixtures under idl/codegen/tests cover old-writer/new-reader for this
+  /// field.
   @$pb.TagNumber(15)
   $core.bool get parallelToolCalls => $_getBF(11);
   @$pb.TagNumber(15)

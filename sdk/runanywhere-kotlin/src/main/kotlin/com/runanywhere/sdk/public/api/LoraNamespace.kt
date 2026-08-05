@@ -58,18 +58,31 @@ public class LoraNamespace internal constructor() {
     }
 
     /**
-     * Peel off [adapterId], or every applied adapter when null.
+     * Peel off [adapterId].
      *
      * @throws SDKException when the removal fails.
      */
+    public suspend fun remove(adapterId: String) {
+        AndroidLoRA.remove(LoRARemoveRequest(adapter_ids = listOf(adapterId)))
+    }
+
+    /**
+     * Peel off every applied adapter.
+     *
+     * @throws SDKException when the removal fails.
+     */
+    public suspend fun removeAll() {
+        AndroidLoRA.remove(LoRARemoveRequest(clear_all = true))
+    }
+
+    /**
+     * @deprecated Use [remove] with an explicit id, or [removeAll]. A null
+     *   [adapterId] forwards to [removeAll].
+     */
+    @JvmName("removeOrClear")
+    @Deprecated("Use remove(adapterId) or removeAll().")
     public suspend fun remove(adapterId: String? = null) {
-        val request =
-            if (adapterId == null) {
-                LoRARemoveRequest(clear_all = true)
-            } else {
-                LoRARemoveRequest(adapter_ids = listOf(adapterId))
-            }
-        AndroidLoRA.remove(request)
+        if (adapterId == null) removeAll() else remove(adapterId)
     }
 
     /** Which adapters are applied, and at what scale. */

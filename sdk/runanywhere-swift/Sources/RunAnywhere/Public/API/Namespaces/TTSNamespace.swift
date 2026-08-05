@@ -8,6 +8,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 public extension RunAnywhere {
 
@@ -72,20 +73,32 @@ public extension RunAnywhere {
             }
         }
 
-        /// Synthesize text and play it through the device speakers.
+        /// Synthesize text and play it through the device speakers, returning a
+        /// handle to the utterance immediately — playback continues in the
+        /// background. Interrupt it with `handle.interrupt()`.
         ///
-        /// - Throws: `SDKException` when no voice is loaded, synthesis fails, or
-        ///   playback cannot start.
-        public func speak(_ text: String, options: TtsOptions? = nil) async throws {
-            _ = try await RunAnywhere.speakProto(
+        /// ```swift
+        /// let handle = try await RunAnywhere.tts.speak("Hello there")
+        /// await handle.waitForPlayout()
+        /// ```
+        ///
+        /// - Throws: `SDKException` when no voice is loaded or synthesis fails.
+        @discardableResult
+        public func speak(_ text: String, options: TtsOptions? = nil) async throws -> SpeechHandle {
+            try await RunAnywhere.speakAndTrack(
                 text: text,
                 options: (options ?? TtsOptions()).toProto()
             )
         }
 
-        /// Stop playback and any synthesis still in flight.
+        /// Interrupt the latest active speech handle, if one exists.
+        @available(*, deprecated, message: "Use the SpeechHandle returned by speak(_:options:) to interrupt one utterance")
         public func stop() async {
-            await RunAnywhere.stopSpeech()
+            if let handle = RunAnywhere.activeSpeechHandleSnapshot() {
+                await handle.interrupt()
+            } else {
+                await RunAnywhere.stopSpeech()
+            }
         }
 
         /// List the voices the loaded engine can speak with.
@@ -103,6 +116,47 @@ extension RunAnywhere {
 
     /// Playback manager shared by `tts.speak` and the deprecated `speak`.
     private static let speechPlayback = AudioPlaybackManager()
+
+    /// The most recently returned `SpeechHandle`, tracked so the deprecated
+    /// `tts.stop()` and `VoiceSession.interrupt()` have something to interrupt.
+    private static let activeSpeechHandleBox = OSAllocatedUnfairLock<SpeechHandle?>(initialState: nil)
+
+    internal static func setActiveSpeechHandle(_ handle: SpeechHandle) {
+        activeSpeechHandleBox.withLock { $0 = handle }
+    }
+
+    internal static func activeSpeechHandleSnapshot() -> SpeechHandle? {
+        activeSpeechHandleBox.withLock { $0 }
+    }
+
+    /// Synthesize `text`, start device playback, and return a `SpeechHandle`
+    /// immediately — playback continues in the background and completes the
+    /// handle when it finishes, is interrupted, or fails.
+    internal static func speakAndTrack(text: String, options: RATTSOptions) async throws -> SpeechHandle {
+        let output = try await synthesizeProto(text: text, options: options)
+
+        let sampleRate = output.sampleRate > 0 ? output.sampleRate : options.sampleRate
+        let wavSampleRate = sampleRate > 0 ? sampleRate : Int32(RADefaults.AudioCapture.ttsSampleRateHz)
+        let wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: wavSampleRate)
+
+        let handle = SpeechHandle(interruptHandler: {
+            await RunAnywhere.stopSpeech()
+        })
+        setActiveSpeechHandle(handle)
+
+        guard !wavData.isEmpty else {
+            handle.complete()
+            return handle
+        }
+
+        speechPlayback.play(wavData) { _ in
+            // `false` covers both a genuine playback failure and a deliberate
+            // interrupt(); `handle.interrupted` already distinguishes the two,
+            // so no synthetic error is attached here.
+            handle.complete()
+        }
+        return handle
+    }
 
     internal static func requireTTSVoice() throws -> RACurrentModelResult {
         guard isReady else {

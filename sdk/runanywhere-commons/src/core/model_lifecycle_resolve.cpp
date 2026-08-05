@@ -539,19 +539,52 @@ runanywhere::v1::ModelLoadResult
 make_load_result(bool success, const std::string& model_id, runanywhere::v1::ModelCategory category,
                  runanywhere::v1::InferenceFramework framework, const std::string& resolved_path,
                  const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts,
-                 int64_t loaded_at_ms, const std::string& error) {
+                 int64_t loaded_at_ms, const std::string& error, const LoadPlacement& placement,
+                 const std::vector<std::string>& warnings) {
     runanywhere::v1::ModelLoadResult result;
     result.set_model_id(model_id);
     result.set_category(category);
+    // `framework` here is expected to already be the ACTUAL backend that
+    // executed the load (see model_lifecycle.cpp's engine-selection block),
+    // never the raw request/catalog pin — that pin lives in
+    // `requested_backend` below instead.
     result.set_framework(framework);
     result.set_resolved_path(resolved_path);
     add_artifacts_to_result(artifacts, result.mutable_resolved_artifacts());
     result.set_loaded_at_unix_ms(loaded_at_ms);
+    for (const std::string& warning : warnings) {
+        result.add_warnings(warning);
+    }
     if (!success) {
         rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_MODEL_LOAD_FAILED);
         if (!error.empty()) {
             result.mutable_error()->set_message(error);
         }
+    }
+    // v4 placement truth. Every setter below is conditional on the source
+    // string/enum being non-empty/specified so an unpopulated LoadPlacement
+    // (the default parameter) leaves these `optional` fields genuinely
+    // unset rather than wiring in empty-string/UNSPECIFIED noise.
+    if (placement.requested_backend != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+        result.set_requested_backend(placement.requested_backend);
+    }
+    if (!placement.actual_device_id.empty()) {
+        result.set_actual_device_id(placement.actual_device_id);
+    }
+    if (!placement.actual_device_name.empty()) {
+        result.set_actual_device_name(placement.actual_device_name);
+    }
+    if (!placement.actual_device_kind.empty()) {
+        result.set_actual_device_kind(placement.actual_device_kind);
+    }
+    if (!placement.runtime_version.empty()) {
+        result.set_runtime_version(placement.runtime_version);
+    }
+    if (!placement.abi_version.empty()) {
+        result.set_abi_version(placement.abi_version);
+    }
+    if (!placement.fallback_reason.empty()) {
+        result.set_fallback_reason(placement.fallback_reason);
     }
     return result;
 }

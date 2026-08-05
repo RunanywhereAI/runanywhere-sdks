@@ -29,10 +29,12 @@ private const val MILLIS_PER_SECOND = 1_000.0
 
 internal fun finishReasonOf(raw: String): FinishReason =
     when (raw.lowercase()) {
+        "", "stop" -> FinishReason.STOP
         "length", "max_tokens" -> FinishReason.LENGTH
         "tool_calls", "tool_call", "tool" -> FinishReason.TOOL_CALLS
         "cancelled", "canceled" -> FinishReason.CANCELLED
-        else -> FinishReason.STOP
+        "content_filter", "content_filtered" -> FinishReason.CONTENT_FILTER
+        else -> FinishReason.UNKNOWN
     }
 
 internal fun LLMGenerationResult.toGenerationResult(requestId: String): GenerationResult =
@@ -42,6 +44,7 @@ internal fun LLMGenerationResult.toGenerationResult(requestId: String): Generati
         toolCalls = tool_calls,
         toolResults = tool_results,
         finishReason = finishReasonOf(finish_reason),
+        rawFinishReason = finish_reason.takeIf { it.isNotEmpty() },
         inputTokens = usage?.input_tokens ?: 0,
         outputTokens = usage?.output_tokens ?: 0,
         timeToFirstTokenMs = ttft_ms?.toLong() ?: 0L,
@@ -62,6 +65,7 @@ internal fun LLMStreamFinalResult.toGenerationResult(
         toolCalls = tool_calls,
         toolResults = tool_results,
         finishReason = finishReasonOf(finish_reason),
+        rawFinishReason = finish_reason.takeIf { it.isNotEmpty() },
         inputTokens = usage?.input_tokens ?: 0,
         outputTokens = usage?.output_tokens ?: 0,
         timeToFirstTokenMs = time_to_first_token_ms,
@@ -74,6 +78,7 @@ internal fun VLMResult.toGenerationResult(requestId: String, model: String): Gen
     GenerationResult(
         text = text,
         finishReason = finishReasonOf(finish_reason),
+        rawFinishReason = finish_reason.takeIf { it.isNotEmpty() },
         inputTokens = usage?.input_tokens ?: 0,
         outputTokens = usage?.output_tokens ?: 0,
         timeToFirstTokenMs = time_to_first_token_ms,

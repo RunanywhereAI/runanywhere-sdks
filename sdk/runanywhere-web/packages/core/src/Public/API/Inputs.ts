@@ -1,5 +1,5 @@
 /**
- * Input value types of the v3 public API — audio, images, chat messages,
+ * Input value types of the v4 public API — audio, images, chat messages,
  * model references, and RAG documents.
  */
 
@@ -14,17 +14,31 @@ import {
 } from '../Extensions/RAVLMImage+Helpers.js';
 import { AudioFileLoader } from '../../Infrastructure/AudioFileLoader.js';
 
-/** Sample encoding of an [AudioInput] payload. */
-export type AudioEncoding = 'pcm16' | 'float32' | 'wav';
+/** Sample encoding of an [AudioFormatSpec]. `container` needs a decoder; live streams never use it. */
+export type AudioEncoding = 'pcmS16Le' | 'pcmF32Le' | 'container';
 
-/** Wire description of an audio payload. */
+/** Encoded container carried when `encoding` is `'container'`. */
+export type AudioContainerFormat = 'pcm' | 'wav' | 'mp3' | 'opus' | 'flac' | 'm4a';
+
+/** Wire description of an audio payload, established once per live stream. */
 export interface AudioFormatSpec {
   encoding: AudioEncoding;
   sampleRate: number;
-  channels: number;
+  /** Defaults to `1` (mono) when unset. */
+  channels?: number;
+  /** Required when `encoding` is `'container'`. */
+  container?: AudioContainerFormat;
 }
 
-/** Audio payload accepted by every speech verb. */
+/** One chunk of PCM samples pushed into an open `SttStream`/`VadStream`. */
+export interface AudioFrame {
+  /** PCM bytes for the stream's established format — never a container. */
+  samples: Uint8Array;
+  sampleCount: number;
+  timestampMs?: number;
+}
+
+/** Audio payload accepted by every batch speech verb. */
 export interface AudioInput {
   readonly bytes: Uint8Array;
   readonly format: AudioFormatSpec;
@@ -46,20 +60,20 @@ function float32ToPcm16(samples: Float32Array): Uint8Array {
 export const AudioInput = {
   /** Wrap signed 16-bit little-endian PCM bytes. */
   pcm16(bytes: Uint8Array, sampleRate = DEFAULT_SAMPLE_RATE, channels = 1): AudioInput {
-    return { bytes, format: { encoding: 'pcm16', sampleRate, channels } };
+    return { bytes, format: { encoding: 'pcmS16Le', sampleRate, channels } };
   },
 
   /** Wrap Float32 samples in [-1, 1]. */
   float32(samples: Float32Array, sampleRate = DEFAULT_SAMPLE_RATE, channels = 1): AudioInput {
     return {
       bytes: new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
-      format: { encoding: 'float32', sampleRate, channels },
+      format: { encoding: 'pcmF32Le', sampleRate, channels },
     };
   },
 
-  /** Wrap a complete RIFF/WAVE container. */
+  /** Wrap a complete RIFF/WAVE container; decoded on demand, never fed to a model as raw PCM. */
   wav(bytes: Uint8Array, sampleRate = DEFAULT_SAMPLE_RATE, channels = 1): AudioInput {
-    return { bytes, format: { encoding: 'wav', sampleRate, channels } };
+    return { bytes, format: { encoding: 'container', sampleRate, channels, container: 'wav' } };
   },
 
   /**
@@ -77,17 +91,56 @@ export const AudioInput = {
   },
 };
 
-/** Float32 samples of an audio payload, converting encodings when needed. */
-export function audioInputToFloat32(audio: AudioInput): Float32Array {
-  if (audio.format.encoding === 'float32') {
+/**
+ * Decode a complete audio container (WAV, MP3, etc.) to mono Float32 samples
+ * through the browser's own decoder, resampling to `targetSampleRate` when
+ * the container's native rate differs.
+ *
+ * @throws DOMException when the browser cannot decode the container.
+ */
+async function decodeContainerToFloat32(
+  bytes: Uint8Array,
+  targetSampleRate: number,
+): Promise<Float32Array> {
+  const context = new AudioContext();
+  try {
+    // Copy into a fresh ArrayBuffer: decodeAudioData detaches the buffer it
+    // is given, and callers must not have their own bytes silently emptied.
+    const copy = bytes.slice().buffer;
+    const decoded = await context.decodeAudioData(copy);
+    if (decoded.sampleRate === targetSampleRate) {
+      return new Float32Array(decoded.getChannelData(0));
+    }
+    const targetLength = Math.ceil(decoded.duration * targetSampleRate);
+    const offline = new OfflineAudioContext(1, targetLength, targetSampleRate);
+    const source = offline.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offline.destination);
+    source.start();
+    const rendered = await offline.startRendering();
+    return new Float32Array(rendered.getChannelData(0));
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * Float32 samples of an audio payload, converting encodings when needed.
+ *
+ * A `'container'` payload (e.g. `AudioInput.wav`) is decoded through the
+ * browser's own audio decoder rather than reinterpreted as raw PCM.
+ */
+export async function audioInputToFloat32(audio: AudioInput): Promise<Float32Array> {
+  if (audio.format.encoding === 'pcmF32Le') {
     const count = Math.floor(audio.bytes.byteLength / 4);
     const view = new DataView(audio.bytes.buffer, audio.bytes.byteOffset, count * 4);
     const out = new Float32Array(count);
     for (let i = 0; i < count; i += 1) out[i] = view.getFloat32(i * 4, true);
     return out;
   }
-  // WAV headers are stripped by commons; both remaining encodings decode as
-  // signed 16-bit little-endian frames here.
+  if (audio.format.encoding === 'container') {
+    return decodeContainerToFloat32(audio.bytes, audio.format.sampleRate);
+  }
   const count = Math.floor(audio.bytes.byteLength / 2);
   const view = new DataView(audio.bytes.buffer, audio.bytes.byteOffset, count * 2);
   const out = new Float32Array(count);
@@ -95,12 +148,16 @@ export function audioInputToFloat32(audio: AudioInput): Float32Array {
   return out;
 }
 
-/** Signed 16-bit little-endian bytes of an audio payload. */
-export function audioInputToPcm16(audio: AudioInput): Uint8Array {
-  if (audio.format.encoding === 'float32') {
-    return float32ToPcm16(audioInputToFloat32(audio));
-  }
-  return audio.bytes;
+/**
+ * Signed 16-bit little-endian bytes of an audio payload.
+ *
+ * A `'container'` payload is decoded through the browser's own audio decoder
+ * (see [audioInputToFloat32]) before conversion to PCM16 — it is never fed to
+ * a model as if its RIFF/container bytes were raw samples.
+ */
+export async function audioInputToPcm16(audio: AudioInput): Promise<Uint8Array> {
+  if (audio.format.encoding === 'pcmS16Le') return audio.bytes;
+  return float32ToPcm16(await audioInputToFloat32(audio));
 }
 
 /** Image payload accepted by the vision and segmentation verbs. */

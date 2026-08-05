@@ -40,9 +40,11 @@ export const images = {
   },
 
   /**
-   * Generate an image, emitting `started`, per-step `progress`, and `completed`.
+   * Generate an image, emitting `started`, per-step `progress`, and a
+   * terminal `completed`/`failed` event. Never fabricates a successful
+   * `completed`.
    *
-   * @throws SDKException on preflight failure; in-flight failures throw into the consumer.
+   * @throws SDKException on preflight failure; in-flight failures arrive as a `failed` event.
    */
   generateStream(prompt: string, options?: ImageOptions): AsyncIterable<ImageEvent> {
     return (async function* generation(): AsyncGenerator<ImageEvent> {
@@ -50,7 +52,7 @@ export const images = {
       const protoOptions = toProtoImageOptions(prompt, options);
       const steps = protoOptions.steps ?? 0;
       let announced = false;
-      let completed = false;
+      let terminal = false;
       try {
         for await (const event of generateImageStream(protoOptions)) {
           if (!('kind' in event)) {
@@ -62,7 +64,11 @@ export const images = {
             };
             continue;
           }
-          if (event.error) throw new SDKException(event.error);
+          if (event.error) {
+            yield { type: 'failed', error: event.error };
+            terminal = true;
+            break;
+          }
           if (!announced) {
             announced = true;
             yield { type: 'started' };
@@ -76,12 +82,15 @@ export const images = {
             };
           }
           if (event.result) {
-            completed = true;
+            terminal = true;
             yield { type: 'completed', result: toImageResult(event.result, steps) };
           }
         }
+      } catch (error) {
+        yield { type: 'failed', error: SDKException.fromUnknown(error).proto };
+        terminal = true;
       } finally {
-        if (!completed) await cancelImageGeneration();
+        if (!terminal) await cancelImageGeneration();
       }
     })();
   },

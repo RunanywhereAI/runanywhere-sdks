@@ -54,13 +54,16 @@ export const lora = {
     }
   },
 
-  /** Remove one adapter, or every applied adapter when `adapterId` is omitted. */
-  async remove(adapterId?: string): Promise<void> {
+  /** Remove one applied adapter. */
+  async remove(adapterId: string): Promise<void> {
     await loraCapability.remove(
-      LoRARemoveRequest.fromPartial(
-        adapterId ? { adapterIds: [adapterId] } : { clearAll: true }
-      )
+      LoRARemoveRequest.fromPartial({ adapterIds: [adapterId] })
     );
+  },
+
+  /** Remove every applied adapter. */
+  async removeAll(): Promise<void> {
+    await loraCapability.remove(LoRARemoveRequest.fromPartial({ clearAll: true }));
   },
 
   /** The adapters currently applied to the loaded model. */

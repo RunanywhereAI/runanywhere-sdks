@@ -763,6 +763,11 @@ struct llm_stream_context {
     // dispatcher. Each delivered token fires a LLMStreamEvent to any
     // collector registered via rac_llm_set_stream_proto_callback().
     rac_handle_t component_handle;
+
+    // Producer finish_reason from the widened rac_llm_stream_callback_fn
+    // terminal (is_final=true). Empty until the engine reports one.
+    std::string producer_finish_reason;
+    bool producer_final_seen = false;
 };
 
 /**
@@ -776,11 +781,25 @@ struct llm_stream_context {
  * `useVLMCamera.ts` is now obsolete because commons emits cleaned tokens
  * directly.
  */
-static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) {
+static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_final,
+                                            const char* finish_reason, void* user_data) {
     auto* ctx = reinterpret_cast<llm_stream_context*>(user_data);
 
     if (ctx->cancel_flag && ctx->cancel_flag->load(std::memory_order_relaxed)) {
         return RAC_FALSE;
+    }
+
+    if (is_final) {
+        ctx->producer_final_seen = true;
+        if (finish_reason != nullptr && finish_reason[0] != '\0') {
+            ctx->producer_finish_reason = finish_reason;
+        }
+        // Terminal event may carry empty text; the component synthesizes its
+        // own proto terminal after generate_stream returns. Do not forward
+        // empty finals to the user token callback.
+        if (token == nullptr || token[0] == '\0') {
+            return RAC_TRUE;
+        }
     }
 
     // Strip tokenizer-internal sentinels before any caller observes the
@@ -977,6 +996,14 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         return result;
     }
 
+    // Prefer the producer finish_reason from the widened stream callback
+    // (is_final + finish_reason). Fall back to the thread-local side channel
+    // for engines still mid-migration. Do not invent "stop" with zero
+    // evidence, and do not use a zero-tokens heuristic (mock backends
+    // legitimately return empty completions).
+    const bool saw_native_final =
+        ctx.producer_final_seen || rac_llm_stream_final_signal_seen() == RAC_TRUE;
+
     // Build final result for completion callback
     auto end_time = std::chrono::steady_clock::now();
     auto total_duration =
@@ -1044,6 +1071,13 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     } else if (effective_options->max_tokens > 0 &&
                ctx.token_count >= effective_options->max_tokens) {
         finish_reason_str = "length";
+    } else if (!ctx.producer_finish_reason.empty()) {
+        finish_reason_str = ctx.producer_finish_reason.c_str();
+    } else if (!saw_native_final) {
+        // RAC_SUCCESS, not cancelled, not max-tokens — but no backend ever
+        // reported a genuine terminal signal for this call. Report "unknown"
+        // instead of fabricating "stop" with zero evidence.
+        finish_reason_str = "unknown";
     }
     rac::llm::LLMStreamEventParams terminal_event;
     terminal_event.is_final = true;
@@ -1788,6 +1822,8 @@ struct ProtoStreamContext {
     std::string thinking_text;
     std::string thinking_open_tag;
     std::string thinking_close_tag;
+    std::string producer_finish_reason;
+    bool producer_final_seen = false;
 };
 
 struct StreamThinkingTagPair {
@@ -2138,13 +2174,24 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
                           error_message, &final_result);
 }
 
-rac_bool_t stream_token_callback(const char* token, void* user_data) {
+rac_bool_t stream_token_callback(const char* token, rac_bool_t is_final, const char* finish_reason,
+                                 void* user_data) {
     auto* ctx = static_cast<ProtoStreamContext*>(user_data);
     if (!ctx || !ctx->ref) {
         return RAC_FALSE;
     }
     if (rac::llm::lifecycle_llm_cancel_requested(ctx->ref)) {
         return RAC_FALSE;
+    }
+
+    if (is_final) {
+        ctx->producer_final_seen = true;
+        if (finish_reason != nullptr && finish_reason[0] != '\0') {
+            ctx->producer_finish_reason = finish_reason;
+        }
+        if (token == nullptr || token[0] == '\0') {
+            return RAC_TRUE;
+        }
     }
 
     const char* safe_token = token ? token : "";
@@ -2371,6 +2418,11 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     // SDKs it would be undefined behaviour through a C ABI return.
     const std::string effective_prompt = rac::llm::apply_no_think_directive(
         request.prompt(), options.disable_thinking, ref.framework_name);
+    // See rac_llm_stream_reset_final_signal() in rac_llm_service.h: reset
+    // right before the call the same way rac_llm_generate_stream() does,
+    // since this path calls ref.ops->generate_stream() directly rather than
+    // through that wrapper.
+    rac_llm_stream_reset_final_signal();
     try {
         rc = ref.ops->generate_stream(ref.impl, effective_prompt.c_str(), &options,
                                       stream_token_callback, &ctx);
@@ -2398,16 +2450,19 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                  rac_error_message(rc), ref.model_id, ctx.token_count,
                                  now_ms() - ctx.started_ms, 0, ref.framework_name);
     } else {
-        // Mirror the OpenAI-style finish_reason
-        // contract from llm_component.cpp:867-884 and rac_llm_generate_proto's
-        // set_result_from_raw — when the backend stopped because it generated
-        // the requested max_tokens, the terminal proto event must report
-        // "length" rather than "stop". Without this gate every successful
-        // streaming proto generation looks like a natural stop, which breaks
-        // OpenAI parity for direct streaming proto callers (JNI, Web, etc.)
-        // and diverges from the non-streaming proto path.
-        const char* finish_reason =
-            (options.max_tokens > 0 && ctx.token_count >= options.max_tokens) ? "length" : "stop";
+        // Prefer producer finish_reason from the widened stream callback,
+        // then max_tokens → "length", then the side-channel fallback, else
+        // "unknown". Do not invent "stop" with zero evidence.
+        const char* finish_reason;
+        if (options.max_tokens > 0 && ctx.token_count >= options.max_tokens) {
+            finish_reason = "length";
+        } else if (!ctx.producer_finish_reason.empty()) {
+            finish_reason = ctx.producer_finish_reason.c_str();
+        } else if (ctx.producer_final_seen || rac_llm_stream_final_signal_seen() == RAC_TRUE) {
+            finish_reason = "stop";
+        } else {
+            finish_reason = "unknown";
+        }
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
         const int64_t stream_elapsed = now_ms() - ctx.started_ms;
         // Tokens/sec over decode time only, not prefill-inclusive wall time.

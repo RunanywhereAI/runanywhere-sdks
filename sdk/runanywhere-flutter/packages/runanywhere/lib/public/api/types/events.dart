@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Public event types for the v3 API surface. Every stream follows one grammar:
-// a started event, then deltas, then a completed event or a thrown error.
+// Public v4 event grammar: one shape throughout — `started`, then deltas,
+// then a terminal `completed`/`failed`/`cancelled`. A stream never fabricates
+// a successful `completed` after an in-flight failure or cancellation; the
+// terminal event carries whatever partial output was produced instead.
+//
+// Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Events.swift,
+// sdk/runanywhere-web/packages/core/src/Public/API/Events.ts, and
+// .claude/handoff/plans/public_api_spec.md.
 
 import 'dart:typed_data';
 
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show ModelCategory;
 import 'package:runanywhere/generated/tool_calling.pb.dart' show ToolCall;
 import 'package:runanywhere/public/api/types/results.dart';
 
-/// Whether a streamed token is answer text or chain-of-thought.
+/// Whether a streamed delta is answer text or chain-of-thought.
 enum TokenKind {
   /// Answer content the user should see.
   text,
@@ -25,7 +32,7 @@ sealed class GenerationEvent {
   const GenerationEvent();
 }
 
-/// The request was accepted and decoding is about to begin.
+/// The request was admitted and generation began.
 final class GenerationStarted extends GenerationEvent {
   /// Announce a request id for correlation.
   const GenerationStarted(this.requestId);
@@ -34,34 +41,147 @@ final class GenerationStarted extends GenerationEvent {
   final String requestId;
 }
 
-/// One decoded token.
+/// One answer-text delta.
+final class GenerationTextDelta extends GenerationEvent {
+  /// Carry the text produced since the previous delta.
+  const GenerationTextDelta(this.text, {this.requestId = ''});
+
+  /// Text produced since the previous delta.
+  final String text;
+
+  /// Correlation id for the generation.
+  final String requestId;
+}
+
+/// One reasoning/thinking delta, emitted only when reasoning output is
+/// enabled.
+final class GenerationReasoningDelta extends GenerationEvent {
+  /// Carry the reasoning text produced since the previous delta.
+  const GenerationReasoningDelta(this.text, {this.requestId = ''});
+
+  /// Reasoning text produced since the previous delta.
+  final String text;
+
+  /// Correlation id for the generation.
+  final String requestId;
+}
+
+/// Deprecated v3 shape: one decoded token tagged with [kind] instead of a
+/// dedicated event per stream.
+///
+/// `llm`/`vlm` `generateStream` no longer emit this — they emit
+/// [GenerationTextDelta] (`kind == TokenKind.text`) or
+/// [GenerationReasoningDelta] (`kind == TokenKind.thought`) — but the type
+/// remains for source compatibility.
+@Deprecated(
+  'Use GenerationTextDelta for answer text or GenerationReasoningDelta '
+  'for thoughts',
+)
 final class GenerationToken extends GenerationEvent {
   /// Carry a token and its semantic category.
-  const GenerationToken(this.text, {this.kind = TokenKind.text});
+  const GenerationToken(
+    this.text, {
+    this.kind = TokenKind.text,
+    this.requestId = '',
+  });
 
   /// Token text.
   final String text;
 
   /// Whether this is answer text or a thought.
   final TokenKind kind;
+
+  /// Correlation id for the generation.
+  final String requestId;
 }
 
 /// The model asked to call a tool.
-final class GenerationToolCall extends GenerationEvent {
+final class GenerationToolCallAdded extends GenerationEvent {
   /// Carry the requested call.
-  const GenerationToolCall(this.call);
+  const GenerationToolCallAdded(this.call, {this.requestId = ''});
 
   /// Tool name and arguments the model produced.
   final ToolCall call;
+
+  /// Correlation id for the generation.
+  final String requestId;
 }
 
-/// Decoding finished; carries the aggregate result and metrics.
+/// Deprecated v3 name for [GenerationToolCallAdded].
+@Deprecated('Use GenerationToolCallAdded')
+final class GenerationToolCall extends GenerationEvent {
+  /// Carry the requested call.
+  const GenerationToolCall(this.call, {this.requestId = ''});
+
+  /// Tool name and arguments the model produced.
+  final ToolCall call;
+
+  /// Correlation id for the generation.
+  final String requestId;
+}
+
+/// Token accounting for the request so far.
+final class GenerationUsage extends GenerationEvent {
+  /// Carry running token counts.
+  const GenerationUsage({
+    required this.inputTokens,
+    required this.outputTokens,
+    this.requestId = '',
+  });
+
+  /// Prompt tokens consumed.
+  final int inputTokens;
+
+  /// Completion tokens produced so far.
+  final int outputTokens;
+
+  /// Correlation id for the generation.
+  final String requestId;
+}
+
+/// Decoding finished; carries the aggregate result and metrics. Terminal —
+/// no event follows.
 final class GenerationCompleted extends GenerationEvent {
-  /// Carry the terminal result.
-  const GenerationCompleted(this.result);
+  /// Carry the terminal result. [requestId] defaults to `result.requestId`
+  /// when not given explicitly.
+  GenerationCompleted(this.result, {String? requestId})
+    : requestId = requestId ?? result.requestId;
 
   /// Full text, tool calls, and metrics.
   final GenerationResult result;
+
+  /// Correlation id for the generation.
+  final String requestId;
+}
+
+/// Generation failed in flight. Terminal — no event follows.
+///
+/// `llm`/`vlm` `generateStream` never fabricate a [GenerationCompleted]
+/// after this.
+final class GenerationFailed extends GenerationEvent {
+  /// Carry the failure and any partial text produced before it.
+  const GenerationFailed(this.error, {this.partial, this.requestId = ''});
+
+  /// What went wrong.
+  final SDKException error;
+
+  /// Text produced before the failure, when any was.
+  final String? partial;
+
+  /// Correlation id for the generation.
+  final String requestId;
+}
+
+/// Generation was cancelled by the caller. Terminal — no event follows.
+final class GenerationCancelled extends GenerationEvent {
+  /// Carry any partial text produced before cancellation.
+  const GenerationCancelled({this.partial, this.requestId = ''});
+
+  /// Text produced before cancellation, when any was.
+  final String? partial;
+
+  /// Correlation id for the generation.
+  final String requestId;
 }
 
 /// Events emitted by `stt.transcribeStream`.
@@ -71,8 +191,11 @@ sealed class TranscriptionEvent {
 
 /// The session opened and is waiting for audio.
 final class TranscriptionStarted extends TranscriptionEvent {
-  /// Announce session start.
-  const TranscriptionStarted();
+  /// Announce session start, optionally with a correlation id.
+  const TranscriptionStarted([this.requestId = '']);
+
+  /// Correlation id for this stream, when one was assigned.
+  final String requestId;
 }
 
 /// An in-progress hypothesis that may still change.
@@ -91,6 +214,88 @@ final class TranscriptionFinal extends TranscriptionEvent {
 
   /// Final transcript with timings.
   final Transcription transcription;
+}
+
+/// The stream settled — [TranscriptionFinal] (when the session produced
+/// one) has already been emitted. Terminal.
+final class TranscriptionCompleted extends TranscriptionEvent {
+  /// Announce a clean finish.
+  const TranscriptionCompleted();
+}
+
+/// The stream ended because of an error. Terminal — no event follows.
+///
+/// `stt.openStream` never fabricates a [TranscriptionFinal]/completion when
+/// the native session ends without one; this is what it emits instead.
+final class TranscriptionFailed extends TranscriptionEvent {
+  /// Carry the failure.
+  const TranscriptionFailed(this.error);
+
+  /// What went wrong.
+  final SDKException error;
+}
+
+/// The stream was cancelled before it produced a final transcript. Terminal.
+final class TranscriptionCancelled extends TranscriptionEvent {
+  /// Announce cancellation.
+  const TranscriptionCancelled();
+}
+
+/// Events emitted by `vad.openStream`.
+sealed class VadEvent {
+  const VadEvent();
+}
+
+/// Speech began after a run of silence (or stream start).
+final class VadSpeechStarted extends VadEvent {
+  /// Carry the frame timestamp that crossed the boundary, when known.
+  const VadSpeechStarted(this.timestampMs);
+
+  /// Timestamp of the triggering frame.
+  final int? timestampMs;
+}
+
+/// Speech ended after a run of activity.
+final class VadSpeechEnded extends VadEvent {
+  /// Carry the frame timestamp that crossed the boundary, when known.
+  const VadSpeechEnded(this.timestampMs);
+
+  /// Timestamp of the triggering frame.
+  final int? timestampMs;
+}
+
+/// One frame's verdict, with no state transition implied.
+final class VadActivity extends VadEvent {
+  /// Carry one frame's detection result.
+  const VadActivity({
+    required this.isSpeech,
+    required this.probability,
+    this.timestampMs,
+  });
+
+  /// True when this frame was classified as speech.
+  final bool isSpeech;
+
+  /// Speech probability for this frame.
+  final double probability;
+
+  /// Timestamp of this frame.
+  final int? timestampMs;
+}
+
+/// The stream failed in flight. Terminal — no event follows.
+final class VadFailed extends VadEvent {
+  /// Carry the failure.
+  const VadFailed(this.error);
+
+  /// What went wrong.
+  final SDKException error;
+}
+
+/// The stream finished normally, after `finish()` drained the last frame.
+final class VadCompleted extends VadEvent {
+  /// Announce a clean finish.
+  const VadCompleted();
 }
 
 /// What the voice agent is doing right now.
@@ -238,19 +443,41 @@ final class ImageCompleted extends ImageEvent {
   final ImageResult result;
 }
 
-/// Events emitted by `models.download`.
+/// Events emitted by `models.download`, correlated by [DownloadEvent.operationId]
+/// and its per-event `sequence` counter.
+///
+/// One grammar throughout: `started`, then progress deltas, then a terminal
+/// `completed`/`failed`/`cancelled`. `models.download` never fabricates a
+/// [DownloadCompleted] after a [DownloadFailed]/[DownloadCancelled].
 sealed class DownloadEvent {
   const DownloadEvent();
+}
+
+/// The transfer was admitted and began.
+final class DownloadStarted extends DownloadEvent {
+  /// Announce the start of one download operation.
+  const DownloadStarted(this.operationId, {this.sequence = 0});
+
+  /// Correlation id for this download, stable across every event it emits.
+  final String operationId;
+
+  /// Monotonic per-operation event counter.
+  final int sequence;
 }
 
 /// Bytes are arriving.
 final class DownloadProgressEvent extends DownloadEvent {
   /// Carry transfer counters.
   const DownloadProgressEvent({
+    required this.operationId,
     required this.bytesDone,
     required this.bytesTotal,
-    required this.percent,
+    this.sequence = 0,
+    this.file,
   });
+
+  /// Correlation id for this download.
+  final String operationId;
 
   /// Bytes received so far.
   final int bytesDone;
@@ -258,23 +485,85 @@ final class DownloadProgressEvent extends DownloadEvent {
   /// Total bytes expected. Zero when the server did not report a length.
   final int bytesTotal;
 
-  /// Overall completion in `[0.0, 1.0]`.
-  final double percent;
+  /// Monotonic per-operation event counter.
+  final int sequence;
+
+  /// File currently being fetched, for multi-file downloads.
+  final String? file;
+
+  /// Deprecated v3 convenience: overall completion in `[0.0, 1.0]`, derived
+  /// from [bytesDone]/[bytesTotal]. Zero when the total is unknown.
+  @Deprecated('Compute from bytesDone / bytesTotal directly')
+  double get percent => bytesTotal > 0 ? bytesDone / bytesTotal : 0;
+}
+
+/// Downloaded bytes are being checksummed/validated.
+final class DownloadVerifying extends DownloadEvent {
+  /// Announce the verification phase.
+  const DownloadVerifying(this.operationId, {this.sequence = 0});
+
+  /// Correlation id for this download.
+  final String operationId;
+
+  /// Monotonic per-operation event counter.
+  final int sequence;
 }
 
 /// The transfer finished and the archive is being unpacked.
 final class DownloadExtracting extends DownloadEvent {
   /// Announce the extraction phase.
-  const DownloadExtracting();
+  const DownloadExtracting(this.operationId, {this.sequence = 0, this.percent});
+
+  /// Correlation id for this download.
+  final String operationId;
+
+  /// Monotonic per-operation event counter.
+  final int sequence;
+
+  /// Extraction completion, when the backend reports incremental progress.
+  final double? percent;
 }
 
-/// The model is on disk and registered.
+/// The model is on disk and registered. Terminal — no event follows.
 final class DownloadCompleted extends DownloadEvent {
   /// Carry the registered model.
-  const DownloadCompleted(this.model);
+  const DownloadCompleted(this.operationId, this.model, {this.sequence = 0});
+
+  /// Correlation id for this download.
+  final String operationId;
 
   /// Registry entry with its resolved local path.
   final ModelInfo model;
+
+  /// Monotonic per-operation event counter.
+  final int sequence;
+}
+
+/// The transfer failed in flight. Terminal — no event follows.
+final class DownloadFailed extends DownloadEvent {
+  /// Carry the failure.
+  const DownloadFailed(this.operationId, this.error, {this.sequence = 0});
+
+  /// Correlation id for this download.
+  final String operationId;
+
+  /// What went wrong.
+  final SDKException error;
+
+  /// Monotonic per-operation event counter.
+  final int sequence;
+}
+
+/// The transfer was cancelled by the caller. Terminal — no event follows.
+final class DownloadCancelled extends DownloadEvent {
+  /// Announce cancellation.
+  const DownloadCancelled(this.operationId, {this.sequence = 0});
+
+  /// Correlation id for this download.
+  final String operationId;
+
+  /// Monotonic per-operation event counter.
+  final int sequence;
 }
 
 /// Lifecycle, download, and error breadcrumbs from `RunAnywhere.events`.

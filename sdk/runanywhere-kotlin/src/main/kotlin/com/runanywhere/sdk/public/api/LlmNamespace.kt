@@ -124,38 +124,73 @@ public class LlmNamespace internal constructor() {
     /**
      * Generate a completion constrained to [schema] and parse it.
      *
-     * @throws SDKException when no language model can be loaded.
+     * [mode] picks how the schema is enforced:
+     * - [StructuredOutputMode.VALIDATION_ONLY] (default): generate freely, then validate.
+     * - [StructuredOutputMode.REPAIR]: validate, then retry once with a repair instruction if invalid.
+     * - [StructuredOutputMode.CONSTRAINED]: engine-constrained decoding — fails preflight
+     *   until a constrained-decoding engine is wired in.
+     *
+     * @throws SDKException when no language model can be loaded, [mode] cannot
+     *   be honored, or generation fails.
      */
     public suspend fun generateStructured(
         prompt: String,
         schema: JsonSchema,
+        mode: StructuredOutputMode = StructuredOutputMode.VALIDATION_ONLY,
         options: LlmOptions? = null,
     ): StructuredResult {
-        val opts =
-            options.orDefault().copy(
-                structuredOutput = options?.structuredOutput ?: StructuredOutput(schema = schema),
+        if (mode == StructuredOutputMode.CONSTRAINED) {
+            throw SDKException.unsupportedCapability(
+                "llm.generateStructured(mode = CONSTRAINED)",
+                "needs engine-level constrained decoding, which is not wired in yet; use VALIDATION_ONLY or REPAIR",
             )
-        val generation = generate(prompt, opts)
-        val parsed =
-            withContext(Dispatchers.IO) {
-                CppBridgeStructuredOutput.parse(
-                    StructuredOutputParseRequest(
-                        request_id = generation.requestId,
-                        text = generation.text,
-                        options = StructuredOutput(schema = schema, strict = opts.strictStructuredOutput()).toProto(),
-                    ),
-                )
-            }
+        }
+        val opts = options.orDefault()
+        val structuredOutput = StructuredOutput(schema = schema)
+        var generation = generateStructuredUnary(prompt, opts, structuredOutput)
+        var parsed = parseStructuredOutput(generation, schema, structuredOutput)
+
+        if (mode == StructuredOutputMode.REPAIR && parsed.validation?.is_valid != true) {
+            val repairPrompt = structuredRepairPrompt(prompt, generation.text, schema)
+            generation = generateStructuredUnary(repairPrompt, opts, structuredOutput)
+            parsed = parseStructuredOutput(generation, schema, structuredOutput)
+        }
+
         return StructuredResult(
             value = parsed.parsed_json.utf8(),
             raw = parsed.raw_text ?: generation.text,
             valid = parsed.validation?.is_valid == true,
+            mode = mode,
             inputTokens = generation.inputTokens,
             outputTokens = generation.outputTokens,
             timeToFirstTokenMs = generation.timeToFirstTokenMs,
             tokensPerSecond = generation.tokensPerSecond,
             requestId = generation.requestId,
             model = generation.model,
+        )
+    }
+
+    /** Plain generation for `generateStructured` — bypasses the tool-calling loop entirely. */
+    private suspend fun generateStructuredUnary(
+        prompt: String,
+        opts: LlmOptions,
+        structuredOutput: StructuredOutput,
+    ): GenerationResult {
+        prepareGeneration(opts, ModelCategory.MODEL_CATEGORY_LANGUAGE)
+        return generateUnary(opts.toRequest(prompt, newRequestId(), emptyList(), structuredOutput))
+    }
+
+    private suspend fun parseStructuredOutput(
+        generation: GenerationResult,
+        schema: JsonSchema,
+        structuredOutput: StructuredOutput,
+    ) = withContext(Dispatchers.IO) {
+        CppBridgeStructuredOutput.parse(
+            StructuredOutputParseRequest(
+                request_id = generation.requestId,
+                text = generation.text,
+                options = structuredOutput.toProto(),
+            ),
         )
     }
 
@@ -226,6 +261,17 @@ public class LlmNamespace internal constructor() {
 
 private fun newRequestId(): String = UUID.randomUUID().toString()
 
+/** The one retry prompt `generateStructured(mode = REPAIR)` sends when the first pass did not validate. */
+private fun structuredRepairPrompt(original: String, invalidOutput: String, schema: JsonSchema): String =
+    """
+    $original
+
+    Your previous answer did not match the required JSON schema. Reply again with ONLY JSON that satisfies this schema.
+
+    Schema: ${schema.raw_json.orEmpty()}
+    Previous invalid answer: $invalidOutput
+    """.trimIndent()
+
 private fun LlmOptions.usesTools(): Boolean = toolChoice != ToolChoice.None
 
 /**
@@ -236,18 +282,17 @@ private fun LlmOptions.usesTools(): Boolean = toolChoice != ToolChoice.None
 private suspend fun LlmOptions.activeTools(): List<ToolDefinition> =
     tools.ifEmpty { ToolCallingOrchestrator.getRegisteredTools() }
 
-private fun LlmOptions.strictStructuredOutput(): Boolean = structuredOutput?.strict ?: true
-
 private fun LlmOptions.toRequest(
     prompt: String,
     requestId: String,
     history: List<ChatMessage>,
+    structuredOutput: StructuredOutput? = null,
 ): LLMGenerateRequest =
     LLMGenerateRequest(
         prompt = prompt,
         request_id = requestId,
         model_id = model.orEmpty(),
-        options = toProto(),
+        options = toProto(structuredOutput),
         history = history.map { it.toProto() },
     )
 
@@ -297,18 +342,22 @@ private fun List<ChatMessage>.toAlternatingTurns(): List<String> {
     return turns
 }
 
+/** Breaks the raw-event collect loop once a terminal event has been emitted. */
+private class StreamTerminalReached : RuntimeException()
+
 /**
- * Fold raw native LLM stream events onto the public `started` / `token` /
- * `toolCall` / `completed` grammar.
+ * Fold raw native LLM stream events onto the v4 `started` / `textDelta` /
+ * `reasoningDelta` / `toolCallAdded` / `completed` grammar.
  *
  * Internal and injectable — [rawEvents] is any `Flow<LLMStreamEvent>`, not
  * tied to [CppBridgeLLM], so unit tests can characterize the native-boundary
- * contract (a stream that ends without `is_final`) without a JNI bridge.
- * Mirrors Swift's `RunAnywhere.mapGenerationStream`
- * (`LLMNamespace.swift`): a native stream that ends after producing at least
- * one event but without a terminal `is_final` is a legitimate completion —
- * synthesized from wall-clock metrics — not a thrown error. A stream that
- * produced zero events is the actual failure.
+ * contract without a JNI bridge.
+ *
+ * Never fabricates a successful `completed`: a stream that ends after
+ * producing at least one event but without a terminal `is_final` emits
+ * `failed` instead (mirrors Swift's `RunAnywhere.mapGenerationStream`). A
+ * stream that produced zero events throws, since there is no partial
+ * `requestId` to report a terminal event against.
  */
 internal fun mapLLMStreamEvents(
     requestId: String,
@@ -319,114 +368,96 @@ internal fun mapLLMStreamEvents(
         val answer = StringBuilder()
         val thinking = StringBuilder()
         var startedEmitted = false
-        var sawCompletion = false
+        var sawTerminal = false
         var sawAnyEvent = false
-        var tokenCount = 0
-        val startedAtMs = System.currentTimeMillis()
-        var firstTokenAtMs: Long? = null
+        var sequence = 0L
+        var toolCallIndex = 0
+        val textItemId = UUID.randomUUID().toString()
+        val reasoningItemId = UUID.randomUUID().toString()
 
-        rawEvents.collect { raw ->
-            sawAnyEvent = true
-            if (!startedEmitted) {
-                startedEmitted = true
-                emit(GenerationEvent.Started(requestId))
-            }
-            raw.failureOrNull()?.let { throw it }
-            if (raw.token.isNotEmpty()) {
-                tokenCount += 1
-                if (firstTokenAtMs == null) firstTokenAtMs = System.currentTimeMillis()
-            }
-            raw.tokenEventOrNull(answer, thinking)?.let { emit(it) }
-            raw.tool_call?.let { emit(GenerationEvent.ToolCallRequested(it)) }
-            if (raw.is_final) {
-                sawCompletion = true
-                emit(
-                    GenerationEvent.Completed(
-                        raw.result?.toGenerationResult(
-                            requestId = requestId,
-                            model = model,
-                            fallbackText = answer.toString(),
-                            fallbackThinking = thinking.toString().takeIf { it.isNotEmpty() },
-                        ) ?: GenerationResult(
-                            text = answer.toString(),
-                            thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
-                            finishReason = finishReasonOf(raw.finish_reason),
-                            requestId = requestId,
-                            model = model,
+        fun partialOrNull(): String? = answer.toString().takeIf { it.isNotEmpty() }
+
+        try {
+            rawEvents.collect { raw ->
+                sawAnyEvent = true
+                if (!startedEmitted) {
+                    startedEmitted = true
+                    emit(GenerationEvent.Started(requestId))
+                }
+                raw.error?.let {
+                    sawTerminal = true
+                    emit(GenerationEvent.Failed(requestId, partialOrNull(), SDKException(it)))
+                    throw StreamTerminalReached()
+                }
+                raw.tokenEventOrNull(requestId, answer, thinking, textItemId, reasoningItemId, sequence)?.let {
+                    sequence += 1
+                    emit(it)
+                }
+                raw.tool_call?.let { call ->
+                    val itemId = call.id.takeIf { it.isNotEmpty() } ?: "tool-$toolCallIndex"
+                    emit(GenerationEvent.ToolCallAdded(requestId, sequence++, itemId, toolCallIndex, call))
+                    emit(GenerationEvent.ToolArgumentsDone(requestId, sequence++, itemId, call.arguments_json))
+                    toolCallIndex += 1
+                }
+                if (raw.is_final) {
+                    sawTerminal = true
+                    emit(
+                        GenerationEvent.Completed(
+                            requestId,
+                            raw.result?.toGenerationResult(
+                                requestId = requestId,
+                                model = model,
+                                fallbackText = answer.toString(),
+                                fallbackThinking = thinking.toString().takeIf { it.isNotEmpty() },
+                            ) ?: GenerationResult(
+                                text = answer.toString(),
+                                thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
+                                finishReason = finishReasonOf(raw.finish_reason),
+                                rawFinishReason = raw.finish_reason.takeIf { it.isNotEmpty() },
+                                requestId = requestId,
+                                model = model,
+                            ),
                         ),
-                    ),
-                )
+                    )
+                    throw StreamTerminalReached()
+                }
             }
+        } catch (_: StreamTerminalReached) {
+            // Terminal event already emitted above; stop consuming raw events.
         }
 
-        if (!sawCompletion) {
+        if (!sawTerminal) {
             if (!sawAnyEvent) {
                 throw SDKException.operation("Generation ended before producing any output")
             }
             emit(
-                GenerationEvent.Completed(
-                    synthesizeStreamResult(
-                        requestId = requestId,
-                        model = model,
-                        text = answer.toString(),
-                        thinking = thinking.toString(),
-                        tokenCount = tokenCount,
-                        startedAtMs = startedAtMs,
-                        firstTokenAtMs = firstTokenAtMs,
-                    ),
+                GenerationEvent.Failed(
+                    requestId,
+                    partialOrNull(),
+                    SDKException.operation("Generation stream ended before a terminal event"),
                 ),
             )
         }
     }
 
-private fun LLMStreamEvent.failureOrNull(): SDKException? {
-    val err = error ?: return null
-    return SDKException(err)
-}
-
 private fun LLMStreamEvent.tokenEventOrNull(
+    requestId: String,
     answer: StringBuilder,
     thinking: StringBuilder,
+    textItemId: String,
+    reasoningItemId: String,
+    sequence: Long,
 ): GenerationEvent? {
     if (token.isEmpty()) return null
     return when (kind) {
         ProtoTokenKind.TOKEN_KIND_THOUGHT -> {
             thinking.append(token)
-            GenerationEvent.Token(token, TokenKind.THOUGHT)
+            GenerationEvent.ReasoningDelta(requestId, sequence, reasoningItemId, 0, token)
         }
         ProtoTokenKind.TOKEN_KIND_TOOL_CALL -> null
         else -> {
             answer.append(token)
-            GenerationEvent.Token(token, TokenKind.TEXT)
+            GenerationEvent.TextDelta(requestId, sequence, textItemId, 0, token)
         }
     }
-}
-
-/**
- * Wall-clock [GenerationResult] for a stream whose native side ended
- * without a terminal `is_final` event. Mirrors Swift's
- * `RunAnywhere.synthesizeResult` (`LLMNamespace.swift`).
- */
-private fun synthesizeStreamResult(
-    requestId: String,
-    model: String,
-    text: String,
-    thinking: String,
-    tokenCount: Int,
-    startedAtMs: Long,
-    firstTokenAtMs: Long?,
-): GenerationResult {
-    val totalSeconds = (System.currentTimeMillis() - startedAtMs) / 1_000.0
-    val ttftMs = firstTokenAtMs?.let { it - startedAtMs } ?: 0L
-    val tokensPerSecond = if (totalSeconds > 0) (tokenCount / totalSeconds).toFloat() else 0f
-    return GenerationResult(
-        text = text,
-        thinkingText = thinking.takeIf { it.isNotEmpty() },
-        finishReason = FinishReason.STOP,
-        outputTokens = tokenCount,
-        timeToFirstTokenMs = ttftMs,
-        tokensPerSecond = tokensPerSecond,
-        requestId = requestId,
-        model = model,
-    )
 }

@@ -548,14 +548,26 @@ message ModelDiscoveryResult {
 message ModelLoadRequest {
     string             model_id         = 1;
     optional ModelCategory category     = 2;
+    // Preferred backend pin. Retained for wire compatibility; new callers
+    // should prefer backend_preferences + accelerator.
     optional InferenceFramework framework = 3;
     bool               force_reload     = 4;
     bool               validate_availability = 5;
+
+    // v4 placement knobs (honored end-to-end; never silently dropped).
+    optional int32     context_length   = 6;
+    optional int32     threads          = 7;
+    optional bool      use_gpu          = 8; // deprecated adapter; maps to accelerator
+    repeated InferenceFramework backend_preferences = 9;
+    // AcceleratorPolicy values live in public_api_v4.proto; stored as int32
+    // here to avoid a circular import with LoadedModelInfo helpers.
+    optional int32     accelerator_policy = 10;
 }
 
 message ModelLoadResult {
     string             model_id         = 2;
     ModelCategory      category         = 3;
+    // Actual backend that executed the load (not the catalog/request pin).
     InferenceFramework framework        = 4;
     string             resolved_path    = 5;
     int64              loaded_at_unix_ms = 6;
@@ -567,6 +579,15 @@ message ModelLoadResult {
     // ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
     repeated ModelFileDescriptor resolved_artifacts = 10;
     optional SDKError  error            = 11;
+
+    // v4 placement truth.
+    optional InferenceFramework requested_backend = 12;
+    optional string    actual_device_id   = 13;
+    optional string    actual_device_name = 14;
+    optional string    actual_device_kind = 15; // cpu | gpu | npu | metal | webgpu | unknown
+    optional string    runtime_version   = 16;
+    optional string    abi_version       = 17;
+    optional string    fallback_reason   = 18;
 }
 
 message ModelUnloadRequest {

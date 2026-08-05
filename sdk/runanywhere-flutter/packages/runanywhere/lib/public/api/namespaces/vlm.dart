@@ -54,11 +54,24 @@ class VlmApi {
     // onCancel also fires on normal completion; only cancel a generation that is
     // still running so a finished stream doesn't emit a spurious cancellation.
     var completed = false;
+    var cancelled = false;
     controller.onListen = () {
-      unawaited(_pump(controller, image, prompt, options, () => completed = true));
+      unawaited(
+        _pump(
+          controller,
+          image,
+          prompt,
+          options,
+          () => completed = true,
+          () => cancelled,
+        ),
+      );
     };
     controller.onCancel = () {
-      if (!completed) cancel();
+      if (!completed) {
+        cancelled = true;
+        cancel();
+      }
     };
     return controller.stream;
   }
@@ -75,10 +88,15 @@ class VlmApi {
     String prompt,
     LlmOptions? options,
     void Function() markCompleted,
+    bool Function() isCancelled,
   ) async {
+    var started = false;
+    var requestId = '';
     try {
       final request = await _request(image, prompt, options);
-      controller.add(GenerationStarted(request.requestId));
+      requestId = request.requestId;
+      controller.add(GenerationStarted(requestId));
+      started = true;
       final buffer = StringBuffer();
       VLMStreamEvent? terminal;
 
@@ -87,7 +105,7 @@ class VlmApi {
       )) {
         if (event.token.isNotEmpty) {
           buffer.write(event.token);
-          controller.add(GenerationToken(event.token));
+          controller.add(GenerationTextDelta(event.token, requestId: requestId));
         }
         if (event.isFinal) {
           terminal = event;
@@ -96,30 +114,59 @@ class VlmApi {
       }
 
       if (terminal != null && terminal.hasError()) {
-        throw SDKException.vlmProcessingFailed(terminal.error.message);
+        markCompleted();
+        controller.add(
+          GenerationFailed(
+            SDKException.vlmProcessingFailed(terminal.error.message),
+            partial: buffer.isEmpty ? null : buffer.toString(),
+            requestId: requestId,
+          ),
+        );
+        return;
       }
+
+      if (terminal == null && isCancelled()) {
+        markCompleted();
+        controller.add(
+          GenerationCancelled(
+            partial: buffer.isEmpty ? null : buffer.toString(),
+            requestId: requestId,
+          ),
+        );
+        return;
+      }
+
       final result = terminal != null && terminal.hasResult()
           ? GenerationResult.fromVlm(
               terminal.result,
-              requestId: request.requestId,
+              requestId: requestId,
               model: request.modelId,
             )
           : GenerationResult(
               text: buffer.toString(),
-              requestId: request.requestId,
+              requestId: requestId,
               model: request.modelId,
             );
+      controller.add(
+        GenerationUsage(
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          requestId: requestId,
+        ),
+      );
       markCompleted();
-      controller.add(GenerationCompleted(result));
+      controller.add(GenerationCompleted(result, requestId: requestId));
     } catch (error, stack) {
       // Terminal reached; don't let teardown fire a spurious cancel after it.
       markCompleted();
-      controller.addError(
-        error is SDKException
-            ? error
-            : SDKException.vlmProcessingFailed('$error'),
-        stack,
-      );
+      final sdkError = error is SDKException
+          ? error
+          : SDKException.vlmProcessingFailed('$error');
+      if (started) {
+        controller.add(GenerationFailed(sdkError, requestId: requestId));
+      } else {
+        controller.addError(sdkError, stack);
+      }
     } finally {
       await controller.close();
     }

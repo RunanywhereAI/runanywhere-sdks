@@ -710,6 +710,10 @@ struct StructuredStreamContext {
     // mirroring rac_llm_proto_service.cpp generate_stream and llm_component.
     uint64_t token_count = 0;
     int32_t max_tokens = 0;
+    // Producer finish_reason from the widened rac_llm_stream_callback_fn
+    // terminal (is_final=true). Empty until the engine reports one.
+    std::string producer_finish_reason;
+    bool producer_final_seen = false;
 };
 
 static void dispatch_structured_stream_event(StructuredStreamContext* ctx,
@@ -789,13 +793,27 @@ static void maybe_dispatch_partial_json(StructuredStreamContext* ctx) {
         partial.c_str(), nullptr, nullptr, RAC_SUCCESS);
 }
 
-static rac_bool_t structured_stream_token_callback(const char* token, void* user_data) {
+static rac_bool_t structured_stream_token_callback(const char* token, rac_bool_t is_final,
+                                                   const char* finish_reason, void* user_data) {
     auto* ctx = static_cast<StructuredStreamContext*>(user_data);
     if (!ctx || !ctx->ref) {
         return RAC_FALSE;
     }
     if (rac::llm::lifecycle_llm_cancel_requested(ctx->ref)) {
         return RAC_FALSE;
+    }
+
+    if (is_final) {
+        ctx->producer_final_seen = true;
+        if (finish_reason != nullptr && finish_reason[0] != '\0') {
+            ctx->producer_finish_reason = finish_reason;
+        }
+        // Terminal event may carry empty text; the structured path synthesizes
+        // its own COMPLETED event after generate_stream returns. Do not forward
+        // empty finals as TOKEN events.
+        if (token == nullptr || token[0] == '\0') {
+            return RAC_TRUE;
+        }
     }
 
     const char* safe_token = token ? token : "";
@@ -1586,15 +1604,19 @@ rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
         dispatch_structured_terminal_once(&ctx, "cancelled", RAC_ERROR_CANCELLED);
         rc = RAC_SUCCESS;
     } else if (rc == RAC_SUCCESS) {
-        // commons-104: mirror the OpenAI-style finish_reason contract from
-        // rac_llm_proto_service.cpp:778-779 / llm_component.cpp:1003-1006 —
-        // when the backend stopped because it generated max_tokens, report
-        // "length" instead of "stop" so agent retry/recovery loops can
-        // distinguish truncation from a natural stop.
-        const char* finish_reason =
-            (ctx.max_tokens > 0 && ctx.token_count >= static_cast<uint64_t>(ctx.max_tokens))
-                ? "length"
-                : "stop";
+        // Prefer length if max_tokens exhausted, else producer finish_reason
+        // from the widened stream callback, else side-channel stop, else
+        // "unknown" — same honesty contract as llm_module.
+        const bool saw_native_final =
+            ctx.producer_final_seen || rac_llm_stream_final_signal_seen() == RAC_TRUE;
+        const char* finish_reason = "unknown";
+        if (ctx.max_tokens > 0 && ctx.token_count >= static_cast<uint64_t>(ctx.max_tokens)) {
+            finish_reason = "length";
+        } else if (!ctx.producer_finish_reason.empty()) {
+            finish_reason = ctx.producer_finish_reason.c_str();
+        } else if (saw_native_final) {
+            finish_reason = "stop";
+        }
         dispatch_structured_terminal_once(&ctx, finish_reason, rc);
     } else {
         dispatch_structured_terminal_once(&ctx, rac_error_message(rc), rc);

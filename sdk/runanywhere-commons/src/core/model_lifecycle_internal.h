@@ -35,6 +35,7 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
 
 // Pull in the full service ops definitions so the `LoadedModel` struct can
@@ -71,8 +72,32 @@ struct LoadedModel {
     std::string resolved_path;
     std::string mmproj_path;
     std::vector<runanywhere::v1::ModelFileDescriptor> resolved_artifacts;
+    // Actual backend that executed the load, resolved from the winning
+    // rac_engine_vtable_t (see framework_for_engine_name()) whenever that
+    // mapping is unambiguous. Falls back to the requested/catalog framework
+    // only when the engine name has no 1:1 InferenceFramework (e.g. the
+    // shared "platform" engine id). NEVER report the requested/catalog pin
+    // here when the actual engine is known to differ from it.
     runanywhere::v1::InferenceFramework framework{runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED};
     std::string framework_name;
+    // What the caller/catalog originally asked for (ModelLoadRequest.framework,
+    // or the first backend_preferences entry, or the model's catalog framework).
+    // May legitimately differ from `framework` above when engine pinning fell
+    // back to plain priority order — see `fallback_reason`.
+    runanywhere::v1::InferenceFramework requested_backend{
+        runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED};
+    // v4 placement truth, populated from the winning rac_engine_vtable_t's
+    // metadata after a successful load. Never fabricated: fields this build
+    // cannot determine truthfully are left empty rather than guessed.
+    std::string actual_device_id;
+    std::string actual_device_name;
+    std::string actual_device_kind;  // cpu | gpu | npu | metal | webgpu | unknown
+    std::string runtime_version;
+    std::string abi_version;
+    // Non-empty only when the actually-selected engine differs from what was
+    // requested/preferred (pin unavailable -> priority-order fallback, or a
+    // later backend_preferences entry was used instead of the first).
+    std::string fallback_reason;
     runanywhere::v1::ModelCategory category{runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED};
     runanywhere::v1::ModelInfo model;
     int64_t loaded_at_ms{0};
@@ -143,6 +168,27 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCategory category);
 rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component);
 
+// Reverse of engine_name_for_framework() (model_lifecycle.cpp): map a
+// registered engine's manifest name (RAC_ENGINE_ID_*) back to the
+// InferenceFramework it actually implements, so load results can report the
+// ENGINE THAT REALLY RAN instead of echoing the request/catalog pin. Returns
+// INFERENCE_FRAMEWORK_UNSPECIFIED for engine ids with no 1:1 framework (e.g.
+// "platform", which backs both FOUNDATION_MODELS and SYSTEM_TTS) or for
+// unrecognized names — callers should keep the previously-known framework in
+// that ambiguous case rather than guessing.
+runanywhere::v1::InferenceFramework framework_for_engine_name(const std::string& engine_name);
+
+// Best-effort, honest device-kind classification for a winning
+// rac_engine_vtable_t. Returns "npu" for the QHexRT engine (the only engine
+// in this tree that ever executes on the Hexagon NPU — a certainty, not a
+// guess). Otherwise inspects metadata.runtimes[] (declared L1 runtimes the
+// engine can consume) and maps the first entry through a static
+// rac_runtime_id_t -> kind table. Returns "unknown" rather than fabricating a
+// device when the engine declares no runtimes (true today for llama.cpp,
+// MLX, and QHexRT's declarative list) — matches "cpu | gpu | npu | metal |
+// webgpu | unknown" from ModelLoadResult.actual_device_kind.
+std::string device_kind_for_vtable(const rac_engine_vtable_t* vt);
+
 rac_model_category_t c_category_from_proto(runanywhere::v1::ModelCategory category);
 rac_model_format_t c_format_from_proto(runanywhere::v1::ModelFormat format);
 rac_inference_framework_t c_framework_from_proto(runanywhere::v1::InferenceFramework framework);
@@ -162,6 +208,19 @@ void publish_current_model_event(const runanywhere::v1::CurrentModelResult& resu
 
 std::string vlm_config_json(const std::string& mmproj_path);
 
+// Advisory `config_json` built from the v4 placement knobs on
+// ModelLoadRequest (context_length/threads/use_gpu/accelerator_policy).
+// Forwarded to the winning engine's create() per the existing ABI contract
+// ("plugins that don't understand config_json MUST ignore it" —
+// rac_llm_service.h); does NOT itself guarantee the engine honors any key.
+// Returns "" when the request sets none of these fields.
+std::string load_options_json(const runanywhere::v1::ModelLoadRequest& request);
+
+// Shallow-merge two flat `{"k":v,...}` JSON objects (no nesting, as produced
+// by load_options_json()/vlm_config_json()). Returns whichever side is
+// non-empty when the other is empty.
+std::string merge_json_objects(const std::string& a, const std::string& b);
+
 // =============================================================================
 // Resolution helpers (defined in `model_lifecycle_resolve.cpp`)
 // =============================================================================
@@ -178,11 +237,33 @@ void add_artifacts_to_result(
     const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts,
     google::protobuf::RepeatedPtrField<runanywhere::v1::ModelFileDescriptor>* out);
 
+// v4 placement truth attached to a ModelLoadResult. Every field defaults to
+// "unknown" (empty string / UNSPECIFIED enum) rather than a guess; callers
+// that cannot determine a field truthfully should simply leave it at the
+// default instead of echoing the request back as if it were observed fact.
+struct LoadPlacement {
+    runanywhere::v1::InferenceFramework requested_backend{
+        runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED};
+    std::string actual_device_id;
+    std::string actual_device_name;
+    std::string actual_device_kind;
+    std::string runtime_version;
+    std::string abi_version;
+    std::string fallback_reason;
+};
+
 runanywhere::v1::ModelLoadResult
 make_load_result(bool success, const std::string& model_id, runanywhere::v1::ModelCategory category,
                  runanywhere::v1::InferenceFramework framework, const std::string& resolved_path,
                  const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts,
-                 int64_t loaded_at_ms, const std::string& error);
+                 int64_t loaded_at_ms, const std::string& error,
+                 const LoadPlacement& placement = {}, const std::vector<std::string>& warnings = {});
+
+// Build a LoadPlacement snapshot from a resident LoadedModel, for the
+// "already loaded" fast-path and create-then-swap "preserved" branches in
+// rac_model_lifecycle_load_proto — both report a PREVIOUSLY loaded model's
+// truth rather than the current request's.
+LoadPlacement placement_from_loaded(const LoadedModel& loaded);
 
 bool matches_current_filter(const LoadedModel& loaded, bool has_category,
                             runanywhere::v1::ModelCategory category, bool has_framework,

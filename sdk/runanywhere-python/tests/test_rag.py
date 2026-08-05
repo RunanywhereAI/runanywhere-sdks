@@ -29,7 +29,9 @@ from runanywhere import (  # noqa: E402
     ModelRef,
     RagConfig,
     RagDocument,
+    RagQueryOptions,
     RagResult,
+    RagRetrievalOptions,
     RagSession,
     ReasoningMode,
     ReasoningOptions,
@@ -104,6 +106,9 @@ class RagCore(FakeCore):
         return response.SerializeToString()
 
     def rag_query_stream(self, handle, query_bytes, on_event):
+        query = pb.RAGQueryOptions()
+        query.ParseFromString(query_bytes)
+        self.last_query = query
         chunk = pb.RAGStreamEvent(kind=pb.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED)
         chunk.chunk.text = "context"
         chunk.chunk.similarity_score = 0.5
@@ -213,12 +218,13 @@ def test_ingest_one_and_many(rag_core) -> None:
 def test_query_returns_answer_sources_and_metrics(rag_core) -> None:
     session = _open(rag_core)
     session.ingest(RagDocument("Paris is the capital of France."))
-    result = session.query(
-        "Capital of France?",
-        LlmOptions(
-            max_output_tokens=64, top_k=4, reasoning=ReasoningOptions(mode=ReasoningMode.OFF)
-        ),
-    )
+    with pytest.deprecated_call():
+        result = session.query(
+            "Capital of France?",
+            LlmOptions(
+                max_output_tokens=64, top_k=4, reasoning=ReasoningOptions(mode=ReasoningMode.OFF)
+            ),
+        )
     assert isinstance(result, RagResult) and result.answer == "Paris"
     assert result.sources and isinstance(result.sources[0], Match)
     assert result.sources[0].score == pytest.approx(0.9)
@@ -227,6 +233,35 @@ def test_query_returns_answer_sources_and_metrics(rag_core) -> None:
     assert query.question == "Capital of France?"
     assert query.generation.max_output_tokens == 64 and query.generation.top_k == 4
     assert query.generation.reasoning.mode == int(ReasoningMode.OFF)
+
+
+def test_query_accepts_rag_query_options_with_retrieval_overrides(rag_core) -> None:
+    session = _open(rag_core)
+    session.ingest(RagDocument("Paris is the capital of France."))
+    result = session.query(
+        "Capital of France?",
+        RagQueryOptions(
+            retrieval=RagRetrievalOptions(top_k=7, similarity_threshold=0.42),
+            generation=LlmOptions(max_output_tokens=64),
+        ),
+    )
+    assert result.answer == "Paris"
+    query = rag_core.last_query
+    assert query.retrieval_top_k == 7
+    assert query.similarity_threshold == pytest.approx(0.42)
+    assert query.generation.max_output_tokens == 64
+
+
+def test_query_stream_accepts_rag_query_options(rag_core) -> None:
+    session = _open(rag_core)
+    session.ingest(RagDocument("Paris is the capital of France."))
+    events = list(
+        session.query_stream(
+            "Capital?", RagQueryOptions(retrieval=RagRetrievalOptions(top_k=3))
+        )
+    )
+    assert events[-1].is_completed
+    assert rag_core.last_query.retrieval_top_k == 3
 
 
 def test_search_returns_only_matches(rag_core) -> None:

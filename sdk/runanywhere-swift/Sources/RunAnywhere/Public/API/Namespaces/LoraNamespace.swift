@@ -37,19 +37,37 @@ public extension RunAnywhere.LoRA {
         }
     }
 
-    /// Remove one adapter, or every applied adapter when `adapterId` is `nil`.
+    /// Remove one applied adapter.
     ///
     /// - Throws: `SDKException` when the removal is rejected.
-    func remove(adapterId: String? = nil) async throws {
+    func remove(adapterId: String) async throws {
         var request = RALoRARemoveRequest()
-        if let adapterId {
-            request.adapterIds = [adapterId]
-        } else {
-            request.clearAll_p = true
-        }
+        request.adapterIds = [adapterId]
         let state = try await remove(request)
         if state.hasError {
             throw SDKException(proto: state.error)
+        }
+    }
+
+    /// Remove every applied adapter.
+    ///
+    /// - Throws: `SDKException` when the removal is rejected.
+    func removeAll() async throws {
+        var request = RALoRARemoveRequest()
+        request.clearAll_p = true
+        let state = try await remove(request)
+        if state.hasError {
+            throw SDKException(proto: state.error)
+        }
+    }
+
+    /// Deprecated: `nil` forwards to `removeAll()`.
+    @available(*, deprecated, message: "Use remove(adapterId:) or removeAll()")
+    func remove(adapterId: String? = nil) async throws {
+        if let adapterId {
+            try await remove(adapterId: adapterId)
+        } else {
+            try await removeAll()
         }
     }
 }

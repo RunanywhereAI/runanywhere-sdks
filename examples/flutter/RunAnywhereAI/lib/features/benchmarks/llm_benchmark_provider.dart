@@ -42,7 +42,7 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
     // Ensure clean state: unload any LLM left over from Chat or a previous
     // run (mirrors iOS pre-unload).
     try {
-      await sdk.RunAnywhere.models.unload(
+      await sdk.RunAnywhere.models.unloadAll(
         sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
       );
     } catch (_) {
@@ -112,7 +112,7 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
       return metrics;
     } finally {
       try {
-        await sdk.RunAnywhere.models.unload(
+        await sdk.RunAnywhere.models.unloadAll(
           sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
         );
       } catch (_) {

@@ -2725,12 +2725,38 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadRequest final : public ::g
 
   // accessors -------------------------------------------------------
   enum : int {
+    kBackendPreferencesFieldNumber = 9,
     kModelIdFieldNumber = 1,
     kCategoryFieldNumber = 2,
     kFrameworkFieldNumber = 3,
     kForceReloadFieldNumber = 4,
     kValidateAvailabilityFieldNumber = 5,
+    kUseGpuFieldNumber = 8,
+    kContextLengthFieldNumber = 6,
+    kThreadsFieldNumber = 7,
+    kAcceleratorPolicyFieldNumber = 10,
   };
+  // repeated .runanywhere.v1.InferenceFramework backend_preferences = 9;
+  [[nodiscard]] int backend_preferences_size()
+      const;
+  private:
+  int _internal_backend_preferences_size() const;
+
+  public:
+  void clear_backend_preferences() ;
+  public:
+  [[nodiscard]] ::runanywhere::v1::InferenceFramework backend_preferences(int index) const;
+  void set_backend_preferences(int index, ::runanywhere::v1::InferenceFramework value);
+  void add_backend_preferences(::runanywhere::v1::InferenceFramework value);
+  [[nodiscard]] const ::google::protobuf::RepeatedField<int>& backend_preferences()
+      const;
+  [[nodiscard]] ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL mutable_backend_preferences();
+
+  private:
+  const ::google::protobuf::RepeatedField<int>& _internal_backend_preferences() const;
+  ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL _internal_mutable_backend_preferences();
+
+  public:
   // string model_id = 1;
   void clear_model_id() ;
   [[nodiscard]] const ::std::string& model_id() const;
@@ -2790,12 +2816,60 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadRequest final : public ::g
   void _internal_set_validate_availability(bool value);
 
   public:
+  // optional bool use_gpu = 8;
+  [[nodiscard]] bool has_use_gpu()
+      const;
+  void clear_use_gpu() ;
+  [[nodiscard]] bool use_gpu() const;
+  void set_use_gpu(bool value);
+
+  private:
+  bool _internal_use_gpu() const;
+  void _internal_set_use_gpu(bool value);
+
+  public:
+  // optional int32 context_length = 6;
+  [[nodiscard]] bool has_context_length()
+      const;
+  void clear_context_length() ;
+  [[nodiscard]] ::int32_t context_length() const;
+  void set_context_length(::int32_t value);
+
+  private:
+  ::int32_t _internal_context_length() const;
+  void _internal_set_context_length(::int32_t value);
+
+  public:
+  // optional int32 threads = 7;
+  [[nodiscard]] bool has_threads()
+      const;
+  void clear_threads() ;
+  [[nodiscard]] ::int32_t threads() const;
+  void set_threads(::int32_t value);
+
+  private:
+  ::int32_t _internal_threads() const;
+  void _internal_set_threads(::int32_t value);
+
+  public:
+  // optional int32 accelerator_policy = 10;
+  [[nodiscard]] bool has_accelerator_policy()
+      const;
+  void clear_accelerator_policy() ;
+  [[nodiscard]] ::int32_t accelerator_policy() const;
+  void set_accelerator_policy(::int32_t value);
+
+  private:
+  ::int32_t _internal_accelerator_policy() const;
+  void _internal_set_accelerator_policy(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.ModelLoadRequest)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 5,
-                          0, 48,
+      ::google::protobuf::internal::TcParseTable<4, 10,
+                          0, 56,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2823,11 +2897,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadRequest final : public ::g
         const ModelLoadRequest& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedField<int> backend_preferences_;
+    ::google::protobuf::internal::CachedSize _backend_preferences_cached_byte_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     int category_;
     int framework_;
     bool force_reload_;
     bool validate_availability_;
+    bool use_gpu_;
+    ::int32_t context_length_;
+    ::int32_t threads_;
+    ::int32_t accelerator_policy_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -8042,11 +8122,18 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadResult final : public ::go
     kResolvedArtifactsFieldNumber = 10,
     kModelIdFieldNumber = 2,
     kResolvedPathFieldNumber = 5,
+    kActualDeviceIdFieldNumber = 13,
+    kActualDeviceNameFieldNumber = 14,
+    kActualDeviceKindFieldNumber = 15,
+    kRuntimeVersionFieldNumber = 16,
+    kAbiVersionFieldNumber = 17,
+    kFallbackReasonFieldNumber = 18,
     kErrorFieldNumber = 11,
     kCategoryFieldNumber = 3,
     kFrameworkFieldNumber = 4,
     kLoadedAtUnixMsFieldNumber = 6,
     kAlreadyLoadedFieldNumber = 9,
+    kRequestedBackendFieldNumber = 12,
   };
   // repeated string warnings = 8;
   [[nodiscard]] int warnings_size()
@@ -8126,6 +8213,108 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadResult final : public ::go
   ::std::string* PROTOBUF_NONNULL _internal_mutable_resolved_path();
 
   public:
+  // optional string actual_device_id = 13;
+  [[nodiscard]] bool has_actual_device_id()
+      const;
+  void clear_actual_device_id() ;
+  [[nodiscard]] const ::std::string& actual_device_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_actual_device_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_actual_device_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_actual_device_id();
+  void set_allocated_actual_device_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_actual_device_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_actual_device_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_actual_device_id();
+
+  public:
+  // optional string actual_device_name = 14;
+  [[nodiscard]] bool has_actual_device_name()
+      const;
+  void clear_actual_device_name() ;
+  [[nodiscard]] const ::std::string& actual_device_name() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_actual_device_name(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_actual_device_name();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_actual_device_name();
+  void set_allocated_actual_device_name(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_actual_device_name() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_actual_device_name(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_actual_device_name();
+
+  public:
+  // optional string actual_device_kind = 15;
+  [[nodiscard]] bool has_actual_device_kind()
+      const;
+  void clear_actual_device_kind() ;
+  [[nodiscard]] const ::std::string& actual_device_kind() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_actual_device_kind(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_actual_device_kind();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_actual_device_kind();
+  void set_allocated_actual_device_kind(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_actual_device_kind() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_actual_device_kind(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_actual_device_kind();
+
+  public:
+  // optional string runtime_version = 16;
+  [[nodiscard]] bool has_runtime_version()
+      const;
+  void clear_runtime_version() ;
+  [[nodiscard]] const ::std::string& runtime_version() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_runtime_version(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_runtime_version();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_runtime_version();
+  void set_allocated_runtime_version(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_runtime_version() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_runtime_version(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_runtime_version();
+
+  public:
+  // optional string abi_version = 17;
+  [[nodiscard]] bool has_abi_version()
+      const;
+  void clear_abi_version() ;
+  [[nodiscard]] const ::std::string& abi_version() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_abi_version(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_abi_version();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_abi_version();
+  void set_allocated_abi_version(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_abi_version() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_abi_version(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_abi_version();
+
+  public:
+  // optional string fallback_reason = 18;
+  [[nodiscard]] bool has_fallback_reason()
+      const;
+  void clear_fallback_reason() ;
+  [[nodiscard]] const ::std::string& fallback_reason() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_fallback_reason(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_fallback_reason();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_fallback_reason();
+  void set_allocated_fallback_reason(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_fallback_reason() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_fallback_reason(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_fallback_reason();
+
+  public:
   // optional .runanywhere.v1.SDKError error = 11;
   [[nodiscard]] bool has_error()
       const;
@@ -8182,12 +8371,24 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadResult final : public ::go
   void _internal_set_already_loaded(bool value);
 
   public:
+  // optional .runanywhere.v1.InferenceFramework requested_backend = 12;
+  [[nodiscard]] bool has_requested_backend()
+      const;
+  void clear_requested_backend() ;
+  [[nodiscard]] ::runanywhere::v1::InferenceFramework requested_backend() const;
+  void set_requested_backend(::runanywhere::v1::InferenceFramework value);
+
+  private:
+  ::runanywhere::v1::InferenceFramework _internal_requested_backend() const;
+  void _internal_set_requested_backend(::runanywhere::v1::InferenceFramework value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.ModelLoadResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 9,
-                          2, 76,
+      ::google::protobuf::internal::TcParseTable<5, 16,
+                          2, 177,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -8219,11 +8420,18 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelLoadResult final : public ::go
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ModelFileDescriptor > resolved_artifacts_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::google::protobuf::internal::ArenaStringPtr resolved_path_;
+    ::google::protobuf::internal::ArenaStringPtr actual_device_id_;
+    ::google::protobuf::internal::ArenaStringPtr actual_device_name_;
+    ::google::protobuf::internal::ArenaStringPtr actual_device_kind_;
+    ::google::protobuf::internal::ArenaStringPtr runtime_version_;
+    ::google::protobuf::internal::ArenaStringPtr abi_version_;
+    ::google::protobuf::internal::ArenaStringPtr fallback_reason_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     int category_;
     int framework_;
     ::int64_t loaded_at_unix_ms_;
     bool already_loaded_;
+    int requested_backend_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -19682,7 +19890,7 @@ inline void ModelDiscoveryResult::set_allocated_error(::runanywhere::v1::SDKErro
 inline void ModelLoadRequest::clear_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.model_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::std::string& ModelLoadRequest::model_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -19692,13 +19900,13 @@ inline const ::std::string& ModelLoadRequest::model_id() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ModelLoadRequest::set_model_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.model_id)
 }
 inline ::std::string* PROTOBUF_NONNULL ModelLoadRequest::mutable_model_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::std::string* _s = _internal_mutable_model_id();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadRequest.model_id)
   return _s;
@@ -19718,10 +19926,10 @@ inline ::std::string* PROTOBUF_NONNULL ModelLoadRequest::_internal_mutable_model
 inline ::std::string* PROTOBUF_NULLABLE ModelLoadRequest::release_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadRequest.model_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   auto* released = _impl_.model_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.model_id_.Set("", GetArena());
@@ -19731,9 +19939,9 @@ inline ::std::string* PROTOBUF_NULLABLE ModelLoadRequest::release_model_id() {
 inline void ModelLoadRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   _impl_.model_id_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
@@ -19744,13 +19952,13 @@ inline void ModelLoadRequest::set_allocated_model_id(::std::string* PROTOBUF_NUL
 
 // optional .runanywhere.v1.ModelCategory category = 2;
 inline bool ModelLoadRequest::has_category() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   return value;
 }
 inline void ModelLoadRequest::clear_category() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.category_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::runanywhere::v1::ModelCategory ModelLoadRequest::category() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.category)
@@ -19758,7 +19966,7 @@ inline ::runanywhere::v1::ModelCategory ModelLoadRequest::category() const {
 }
 inline void ModelLoadRequest::set_category(::runanywhere::v1::ModelCategory value) {
   _internal_set_category(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.category)
 }
 inline ::runanywhere::v1::ModelCategory ModelLoadRequest::_internal_category() const {
@@ -19772,13 +19980,13 @@ inline void ModelLoadRequest::_internal_set_category(::runanywhere::v1::ModelCat
 
 // optional .runanywhere.v1.InferenceFramework framework = 3;
 inline bool ModelLoadRequest::has_framework() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
   return value;
 }
 inline void ModelLoadRequest::clear_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::runanywhere::v1::InferenceFramework ModelLoadRequest::framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.framework)
@@ -19786,7 +19994,7 @@ inline ::runanywhere::v1::InferenceFramework ModelLoadRequest::framework() const
 }
 inline void ModelLoadRequest::set_framework(::runanywhere::v1::InferenceFramework value) {
   _internal_set_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.framework)
 }
 inline ::runanywhere::v1::InferenceFramework ModelLoadRequest::_internal_framework() const {
@@ -19802,7 +20010,7 @@ inline void ModelLoadRequest::_internal_set_framework(::runanywhere::v1::Inferen
 inline void ModelLoadRequest::clear_force_reload() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.force_reload_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline bool ModelLoadRequest::force_reload() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.force_reload)
@@ -19810,7 +20018,7 @@ inline bool ModelLoadRequest::force_reload() const {
 }
 inline void ModelLoadRequest::set_force_reload(bool value) {
   _internal_set_force_reload(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.force_reload)
 }
 inline bool ModelLoadRequest::_internal_force_reload() const {
@@ -19826,7 +20034,7 @@ inline void ModelLoadRequest::_internal_set_force_reload(bool value) {
 inline void ModelLoadRequest::clear_validate_availability() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.validate_availability_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline bool ModelLoadRequest::validate_availability() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.validate_availability)
@@ -19834,7 +20042,7 @@ inline bool ModelLoadRequest::validate_availability() const {
 }
 inline void ModelLoadRequest::set_validate_availability(bool value) {
   _internal_set_validate_availability(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.validate_availability)
 }
 inline bool ModelLoadRequest::_internal_validate_availability() const {
@@ -19844,6 +20052,169 @@ inline bool ModelLoadRequest::_internal_validate_availability() const {
 inline void ModelLoadRequest::_internal_set_validate_availability(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.validate_availability_ = value;
+}
+
+// optional int32 context_length = 6;
+inline bool ModelLoadRequest::has_context_length() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
+inline void ModelLoadRequest::clear_context_length() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.context_length_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+}
+inline ::int32_t ModelLoadRequest::context_length() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.context_length)
+  return _internal_context_length();
+}
+inline void ModelLoadRequest::set_context_length(::int32_t value) {
+  _internal_set_context_length(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.context_length)
+}
+inline ::int32_t ModelLoadRequest::_internal_context_length() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.context_length_;
+}
+inline void ModelLoadRequest::_internal_set_context_length(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.context_length_ = value;
+}
+
+// optional int32 threads = 7;
+inline bool ModelLoadRequest::has_threads() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  return value;
+}
+inline void ModelLoadRequest::clear_threads() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.threads_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+}
+inline ::int32_t ModelLoadRequest::threads() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.threads)
+  return _internal_threads();
+}
+inline void ModelLoadRequest::set_threads(::int32_t value) {
+  _internal_set_threads(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.threads)
+}
+inline ::int32_t ModelLoadRequest::_internal_threads() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.threads_;
+}
+inline void ModelLoadRequest::_internal_set_threads(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.threads_ = value;
+}
+
+// optional bool use_gpu = 8;
+inline bool ModelLoadRequest::has_use_gpu() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void ModelLoadRequest::clear_use_gpu() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.use_gpu_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline bool ModelLoadRequest::use_gpu() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.use_gpu)
+  return _internal_use_gpu();
+}
+inline void ModelLoadRequest::set_use_gpu(bool value) {
+  _internal_set_use_gpu(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.use_gpu)
+}
+inline bool ModelLoadRequest::_internal_use_gpu() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.use_gpu_;
+}
+inline void ModelLoadRequest::_internal_set_use_gpu(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.use_gpu_ = value;
+}
+
+// repeated .runanywhere.v1.InferenceFramework backend_preferences = 9;
+inline int ModelLoadRequest::_internal_backend_preferences_size() const {
+  return _internal_backend_preferences().size();
+}
+inline int ModelLoadRequest::backend_preferences_size() const {
+  return _internal_backend_preferences_size();
+}
+inline void ModelLoadRequest::clear_backend_preferences() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.backend_preferences_.Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline ::runanywhere::v1::InferenceFramework ModelLoadRequest::backend_preferences(int index) const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.backend_preferences)
+  return static_cast<::runanywhere::v1::InferenceFramework>(_internal_backend_preferences().Get(index));
+}
+inline void ModelLoadRequest::set_backend_preferences(int index, ::runanywhere::v1::InferenceFramework value) {
+  _internal_mutable_backend_preferences()->Set(index, value);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.backend_preferences)
+}
+inline void ModelLoadRequest::add_backend_preferences(::runanywhere::v1::InferenceFramework value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _internal_mutable_backend_preferences()
+      ->InternalAddWithArena<const ::google::protobuf::MessageLite*>(
+          internal_visibility(), this, value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.ModelLoadRequest.backend_preferences)
+}
+inline const ::google::protobuf::RepeatedField<int>& ModelLoadRequest::backend_preferences() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.ModelLoadRequest.backend_preferences)
+  return _internal_backend_preferences();
+}
+inline ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL ModelLoadRequest::mutable_backend_preferences()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.ModelLoadRequest.backend_preferences)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_backend_preferences();
+}
+inline const ::google::protobuf::RepeatedField<int>& ModelLoadRequest::_internal_backend_preferences()
+    const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.backend_preferences_;
+}
+inline ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL
+ModelLoadRequest::_internal_mutable_backend_preferences() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.backend_preferences_;
+}
+
+// optional int32 accelerator_policy = 10;
+inline bool ModelLoadRequest::has_accelerator_policy() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
+  return value;
+}
+inline void ModelLoadRequest::clear_accelerator_policy() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.accelerator_policy_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+}
+inline ::int32_t ModelLoadRequest::accelerator_policy() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadRequest.accelerator_policy)
+  return _internal_accelerator_policy();
+}
+inline void ModelLoadRequest::set_accelerator_policy(::int32_t value) {
+  _internal_set_accelerator_policy(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadRequest.accelerator_policy)
+}
+inline ::int32_t ModelLoadRequest::_internal_accelerator_policy() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.accelerator_policy_;
+}
+inline void ModelLoadRequest::_internal_set_accelerator_policy(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.accelerator_policy_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -19918,7 +20289,7 @@ inline void ModelLoadResult::set_allocated_model_id(::std::string* PROTOBUF_NULL
 inline void ModelLoadResult::clear_category() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.category_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
 inline ::runanywhere::v1::ModelCategory ModelLoadResult::category() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.category)
@@ -19926,7 +20297,7 @@ inline ::runanywhere::v1::ModelCategory ModelLoadResult::category() const {
 }
 inline void ModelLoadResult::set_category(::runanywhere::v1::ModelCategory value) {
   _internal_set_category(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.category)
 }
 inline ::runanywhere::v1::ModelCategory ModelLoadResult::_internal_category() const {
@@ -19942,7 +20313,7 @@ inline void ModelLoadResult::_internal_set_category(::runanywhere::v1::ModelCate
 inline void ModelLoadResult::clear_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline ::runanywhere::v1::InferenceFramework ModelLoadResult::framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.framework)
@@ -19950,7 +20321,7 @@ inline ::runanywhere::v1::InferenceFramework ModelLoadResult::framework() const 
 }
 inline void ModelLoadResult::set_framework(::runanywhere::v1::InferenceFramework value) {
   _internal_set_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.framework)
 }
 inline ::runanywhere::v1::InferenceFramework ModelLoadResult::_internal_framework() const {
@@ -20030,7 +20401,7 @@ inline void ModelLoadResult::set_allocated_resolved_path(::std::string* PROTOBUF
 inline void ModelLoadResult::clear_loaded_at_unix_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.loaded_at_unix_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
 }
 inline ::int64_t ModelLoadResult::loaded_at_unix_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.loaded_at_unix_ms)
@@ -20038,7 +20409,7 @@ inline ::int64_t ModelLoadResult::loaded_at_unix_ms() const {
 }
 inline void ModelLoadResult::set_loaded_at_unix_ms(::int64_t value) {
   _internal_set_loaded_at_unix_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.loaded_at_unix_ms)
 }
 inline ::int64_t ModelLoadResult::_internal_loaded_at_unix_ms() const {
@@ -20126,7 +20497,7 @@ ModelLoadResult::_internal_mutable_warnings() {
 inline void ModelLoadResult::clear_already_loaded() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.already_loaded_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
 }
 inline bool ModelLoadResult::already_loaded() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.already_loaded)
@@ -20134,7 +20505,7 @@ inline bool ModelLoadResult::already_loaded() const {
 }
 inline void ModelLoadResult::set_already_loaded(bool value) {
   _internal_set_already_loaded(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.already_loaded)
 }
 inline bool ModelLoadResult::_internal_already_loaded() const {
@@ -20203,7 +20574,7 @@ ModelLoadResult::_internal_mutable_resolved_artifacts() {
 
 // optional .runanywhere.v1.SDKError error = 11;
 inline bool ModelLoadResult::has_error() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
   PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
@@ -20224,16 +20595,16 @@ inline void ModelLoadResult::unsafe_arena_set_allocated_error(
   }
   _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ModelLoadResult.error)
 }
 inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE ModelLoadResult::release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
   ::runanywhere::v1::SDKError* released = _impl_.error_;
   _impl_.error_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -20253,7 +20624,7 @@ inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE ModelLoadResult::unsafe_ar
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadResult.error)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
   ::runanywhere::v1::SDKError* temp = _impl_.error_;
   _impl_.error_ = nullptr;
   return temp;
@@ -20268,7 +20639,7 @@ inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL ModelLoadResult::_internal_
 }
 inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL ModelLoadResult::mutable_error()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadResult.error)
   return _msg;
@@ -20285,13 +20656,449 @@ inline void ModelLoadResult::set_allocated_error(::runanywhere::v1::SDKError* PR
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
   }
 
   _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelLoadResult.error)
+}
+
+// optional .runanywhere.v1.InferenceFramework requested_backend = 12;
+inline bool ModelLoadResult::has_requested_backend() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00008000U);
+  return value;
+}
+inline void ModelLoadResult::clear_requested_backend() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.requested_backend_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+}
+inline ::runanywhere::v1::InferenceFramework ModelLoadResult::requested_backend() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.requested_backend)
+  return _internal_requested_backend();
+}
+inline void ModelLoadResult::set_requested_backend(::runanywhere::v1::InferenceFramework value) {
+  _internal_set_requested_backend(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.requested_backend)
+}
+inline ::runanywhere::v1::InferenceFramework ModelLoadResult::_internal_requested_backend() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::InferenceFramework>(_impl_.requested_backend_);
+}
+inline void ModelLoadResult::_internal_set_requested_backend(::runanywhere::v1::InferenceFramework value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.requested_backend_ = value;
+}
+
+// optional string actual_device_id = 13;
+inline bool ModelLoadResult::has_actual_device_id() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  return value;
+}
+inline void ModelLoadResult::clear_actual_device_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.actual_device_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline const ::std::string& ModelLoadResult::actual_device_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.actual_device_id)
+  return _internal_actual_device_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ModelLoadResult::set_actual_device_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.actual_device_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.actual_device_id)
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::mutable_actual_device_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_actual_device_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadResult.actual_device_id)
+  return _s;
+}
+inline const ::std::string& ModelLoadResult::_internal_actual_device_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.actual_device_id_.Get();
+}
+inline void ModelLoadResult::_internal_set_actual_device_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.actual_device_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::_internal_mutable_actual_device_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.actual_device_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ModelLoadResult::release_actual_device_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadResult.actual_device_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.actual_device_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.actual_device_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ModelLoadResult::set_allocated_actual_device_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.actual_device_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.actual_device_id_.IsDefault()) {
+    _impl_.actual_device_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelLoadResult.actual_device_id)
+}
+
+// optional string actual_device_name = 14;
+inline bool ModelLoadResult::has_actual_device_name() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  return value;
+}
+inline void ModelLoadResult::clear_actual_device_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.actual_device_name_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline const ::std::string& ModelLoadResult::actual_device_name() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.actual_device_name)
+  return _internal_actual_device_name();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ModelLoadResult::set_actual_device_name(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.actual_device_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.actual_device_name)
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::mutable_actual_device_name()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::std::string* _s = _internal_mutable_actual_device_name();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadResult.actual_device_name)
+  return _s;
+}
+inline const ::std::string& ModelLoadResult::_internal_actual_device_name() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.actual_device_name_.Get();
+}
+inline void ModelLoadResult::_internal_set_actual_device_name(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.actual_device_name_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::_internal_mutable_actual_device_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.actual_device_name_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ModelLoadResult::release_actual_device_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadResult.actual_device_name)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  auto* released = _impl_.actual_device_name_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.actual_device_name_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ModelLoadResult::set_allocated_actual_device_name(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+  _impl_.actual_device_name_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.actual_device_name_.IsDefault()) {
+    _impl_.actual_device_name_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelLoadResult.actual_device_name)
+}
+
+// optional string actual_device_kind = 15;
+inline bool ModelLoadResult::has_actual_device_kind() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void ModelLoadResult::clear_actual_device_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.actual_device_kind_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline const ::std::string& ModelLoadResult::actual_device_kind() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.actual_device_kind)
+  return _internal_actual_device_kind();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ModelLoadResult::set_actual_device_kind(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  _impl_.actual_device_kind_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.actual_device_kind)
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::mutable_actual_device_kind()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::std::string* _s = _internal_mutable_actual_device_kind();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadResult.actual_device_kind)
+  return _s;
+}
+inline const ::std::string& ModelLoadResult::_internal_actual_device_kind() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.actual_device_kind_.Get();
+}
+inline void ModelLoadResult::_internal_set_actual_device_kind(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.actual_device_kind_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::_internal_mutable_actual_device_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.actual_device_kind_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ModelLoadResult::release_actual_device_kind() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadResult.actual_device_kind)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  auto* released = _impl_.actual_device_kind_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.actual_device_kind_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ModelLoadResult::set_allocated_actual_device_kind(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  }
+  _impl_.actual_device_kind_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.actual_device_kind_.IsDefault()) {
+    _impl_.actual_device_kind_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelLoadResult.actual_device_kind)
+}
+
+// optional string runtime_version = 16;
+inline bool ModelLoadResult::has_runtime_version() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
+inline void ModelLoadResult::clear_runtime_version() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.runtime_version_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+}
+inline const ::std::string& ModelLoadResult::runtime_version() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.runtime_version)
+  return _internal_runtime_version();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ModelLoadResult::set_runtime_version(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  _impl_.runtime_version_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.runtime_version)
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::mutable_runtime_version()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::std::string* _s = _internal_mutable_runtime_version();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadResult.runtime_version)
+  return _s;
+}
+inline const ::std::string& ModelLoadResult::_internal_runtime_version() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.runtime_version_.Get();
+}
+inline void ModelLoadResult::_internal_set_runtime_version(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.runtime_version_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::_internal_mutable_runtime_version() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.runtime_version_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ModelLoadResult::release_runtime_version() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadResult.runtime_version)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000080U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  auto* released = _impl_.runtime_version_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.runtime_version_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ModelLoadResult::set_allocated_runtime_version(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  }
+  _impl_.runtime_version_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.runtime_version_.IsDefault()) {
+    _impl_.runtime_version_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelLoadResult.runtime_version)
+}
+
+// optional string abi_version = 17;
+inline bool ModelLoadResult::has_abi_version() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  return value;
+}
+inline void ModelLoadResult::clear_abi_version() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.abi_version_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+}
+inline const ::std::string& ModelLoadResult::abi_version() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.abi_version)
+  return _internal_abi_version();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ModelLoadResult::set_abi_version(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  _impl_.abi_version_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.abi_version)
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::mutable_abi_version()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ::std::string* _s = _internal_mutable_abi_version();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadResult.abi_version)
+  return _s;
+}
+inline const ::std::string& ModelLoadResult::_internal_abi_version() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.abi_version_.Get();
+}
+inline void ModelLoadResult::_internal_set_abi_version(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.abi_version_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::_internal_mutable_abi_version() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.abi_version_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ModelLoadResult::release_abi_version() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadResult.abi_version)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000100U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  auto* released = _impl_.abi_version_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.abi_version_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ModelLoadResult::set_allocated_abi_version(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  }
+  _impl_.abi_version_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.abi_version_.IsDefault()) {
+    _impl_.abi_version_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelLoadResult.abi_version)
+}
+
+// optional string fallback_reason = 18;
+inline bool ModelLoadResult::has_fallback_reason() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
+  return value;
+}
+inline void ModelLoadResult::clear_fallback_reason() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.fallback_reason_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+}
+inline const ::std::string& ModelLoadResult::fallback_reason() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelLoadResult.fallback_reason)
+  return _internal_fallback_reason();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ModelLoadResult::set_fallback_reason(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  _impl_.fallback_reason_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelLoadResult.fallback_reason)
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::mutable_fallback_reason()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ::std::string* _s = _internal_mutable_fallback_reason();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelLoadResult.fallback_reason)
+  return _s;
+}
+inline const ::std::string& ModelLoadResult::_internal_fallback_reason() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.fallback_reason_.Get();
+}
+inline void ModelLoadResult::_internal_set_fallback_reason(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.fallback_reason_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ModelLoadResult::_internal_mutable_fallback_reason() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.fallback_reason_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ModelLoadResult::release_fallback_reason() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelLoadResult.fallback_reason)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000200U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  auto* released = _impl_.fallback_reason_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.fallback_reason_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ModelLoadResult::set_allocated_fallback_reason(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  }
+  _impl_.fallback_reason_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.fallback_reason_.IsDefault()) {
+    _impl_.fallback_reason_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelLoadResult.fallback_reason)
 }
 
 // -------------------------------------------------------------------

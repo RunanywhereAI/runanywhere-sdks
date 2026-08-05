@@ -61,6 +61,48 @@ def test_version_and_backends(sdk) -> None:
     assert ra.backends() == ["llamacpp", "onnx", "sherpa"]
 
 
+def test_capabilities_before_initialize_reports_new_modalities_unavailable(
+    fake_core,
+) -> None:
+    caps = ra.capabilities()
+    for name in ("lora", "diarization", "segmentation", "voice", "images"):
+        assert name not in caps.modalities
+    names = {c.name for c in caps.unavailable}
+    for name in ("lora", "diarization", "segmentation", "voice", "images"):
+        assert name in names
+
+
+def test_capabilities_reports_bound_modalities_when_the_core_exports_them(sdk) -> None:
+    # The fake core simulates a build with lora/diarization/segmentation/voice/images bound.
+    caps = ra.capabilities()
+    for name in ("lora", "diarization", "segmentation", "voice", "images"):
+        assert name in caps.modalities
+    names = {c.name for c in caps.unavailable}
+    for name in ("lora", "diarization", "segmentation", "images"):
+        assert name not in names
+    # File-PCM voice works; mic remains an honest gap.
+    assert "voice.microphone" in names
+
+
+def test_capabilities_is_honest_about_an_unrebuilt_core(sdk, monkeypatch) -> None:
+    # An old native _core built before these bindings existed simply lacks the attribute
+    # (methods live on the class, not the instance, so patch the class).
+    monkeypatch.delattr(type(sdk), "lora_apply")
+    monkeypatch.delattr(type(sdk), "load_diarization_model")
+    monkeypatch.delattr(type(sdk), "load_segmentation_model")
+    monkeypatch.delattr(type(sdk), "create_voice_agent")
+    monkeypatch.delattr(type(sdk), "load_diffusion_model")
+    caps = ra.capabilities()
+    for name in ("lora", "diarization", "segmentation", "voice", "images"):
+        assert name not in caps.modalities
+    reasons = {c.name: c.reason for c in caps.unavailable}
+    assert "rebuild the native extension" in reasons["lora"]
+    assert "rebuild the native extension" in reasons["diarization"]
+    assert "rebuild the native extension" in reasons["segmentation"]
+    assert "rebuild the native extension" in reasons["voice"]
+    assert "RAC_HAVE_BACKEND_COREML" in reasons["images"]
+
+
 def test_device_id_is_stable_and_persisted(sdk, tmp_path) -> None:
     first = ra.device_id()
     runtime._device_id = None  # force a re-read from disk
@@ -99,16 +141,26 @@ def test_loading_a_second_id_swaps_the_resident_model(sdk, gguf, tmp_path) -> No
 
 def test_unload_category_and_all(sdk, gguf) -> None:
     ra.models.load(gguf)
-    ra.models.unload(ModelCategory.LANGUAGE)
+    ra.models.unload_all(ModelCategory.LANGUAGE)
     assert sdk.count("unload_model") == 1
     assert runtime.resident_id(ModelCategory.LANGUAGE) is None
-    ra.models.unload()  # nothing resident — must not raise
+    ra.models.unload_all()  # nothing resident — must not raise
+
+
+def test_unload_by_id_is_idempotent_and_scoped_to_that_model(sdk, gguf) -> None:
+    ra.models.load(gguf)
+    ra.models.unload("some-other-id")  # not resident — must not raise or unload gguf
+    assert runtime.resident_id(ModelCategory.LANGUAGE) == gguf
+    ra.models.unload(gguf)
+    assert sdk.count("unload_model") == 1
+    assert runtime.resident_id(ModelCategory.LANGUAGE) is None
+    ra.models.unload(gguf)  # already unloaded — must not raise
 
 
 def test_load_options_are_rejected_until_the_bridge_carries_them(sdk, gguf) -> None:
     with pytest.raises(SDKException) as error:
         ra.models.load(gguf, LoadOptions(context_length=4096))
-    assert error.value.code == ErrorCode.NOT_IMPLEMENTED
+    assert error.value.code == ErrorCode.FEATURE_NOT_AVAILABLE
     assert "context_length" in str(error.value)
 
 
@@ -128,7 +180,7 @@ def test_loading_a_path_that_does_not_exist_is_reported(sdk, tmp_path) -> None:
 def test_using_a_handle_after_unload_raises_instead_of_crashing(sdk, gguf) -> None:
     ra.models.load(gguf)
     handle = runtime.llm()
-    ra.models.unload(ModelCategory.LANGUAGE)
+    ra.models.unload_all(ModelCategory.LANGUAGE)
     with pytest.raises(SDKException) as error:
         list(handle.generate("after unload", {}))
     assert error.value.code == ErrorCode.INVALID_STATE

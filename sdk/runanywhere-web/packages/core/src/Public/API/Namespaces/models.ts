@@ -6,6 +6,7 @@ import {
   ModelArtifactType,
   ModelCategory,
   ModelFileRole,
+  type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { DownloadState, type DownloadProgress } from '@runanywhere/proto-ts/download_service';
@@ -20,9 +21,10 @@ import {
   type RegisterModelFile,
 } from '../../Extensions/RunAnywhere+Storage.js';
 import { SDKCore } from '../../SDKCore.js';
-import type { LoadOptions, ModelFilter, ModelRegistration } from '../Options.js';
+import type { AcceleratorPolicy, BackendPreference, LoadOptions, ModelFilter, ModelRegistration } from '../Options.js';
+import { backendToFramework, frameworkToBackend } from '../Mapping.js';
 import type { DownloadEvent } from '../Events.js';
-import type { ModelsState } from '../Results.js';
+import type { LoadedModel, ModelsState } from '../Results.js';
 import { ensureReady } from '../Runtime/Prerequisites.js';
 
 const FILE_ROLES = {
@@ -82,6 +84,55 @@ function toRegisterFiles(files: readonly NonNullable<ModelRegistration['files']>
     sizeBytes: file.sizeBytes ?? 0,
     isRequired: file.isRequired,
   }));
+}
+
+interface ResolvedLoadOptions {
+  requestedBackend?: BackendPreference;
+  accelerator?: AcceleratorPolicy;
+}
+
+/** Fold the deprecated `framework`/`useGpu` aliases into their v4 replacements. */
+function resolveLoadOptions(options?: LoadOptions): ResolvedLoadOptions {
+  const backendPreferences = options?.backendPreferences?.length
+    ? options.backendPreferences
+    : options?.framework !== undefined
+      ? [{ backend: frameworkToBackend(options.framework) }]
+      : undefined;
+  const accelerator = options?.accelerator
+    ?? (options?.useGpu !== undefined ? (options.useGpu ? 'gpu' : 'cpu') : undefined);
+  return {
+    requestedBackend: backendPreferences?.[0],
+    accelerator,
+  };
+}
+
+/** True when `id` is resident under any category right now. */
+function isModelResident(id: string): boolean {
+  return LOADED_CATEGORIES.some((category) => {
+    const current = WebModelLifecycle.currentModel({ category, includeModelMetadata: false });
+    return current?.found && current.modelId === id;
+  });
+}
+
+function toLoadedModel(
+  id: string,
+  category: ModelCategory,
+  resolved: ResolvedLoadOptions,
+  framework?: InferenceFramework,
+): LoadedModel {
+  return {
+    id,
+    category,
+    requestedBackend: resolved.requestedBackend,
+    actualBackend: frameworkToBackend(framework),
+    actualDevice: Runtime.active === 'webgpu' ? 'gpu' : 'cpu',
+    runtimeVersion: undefined,
+    abiVersion: undefined,
+    fallbackReason: Runtime.degradedReason ?? undefined,
+    close(): Promise<void> {
+      return models.unload(id);
+    },
+  };
 }
 
 /** The model catalog and everything that governs residency. */
@@ -148,7 +199,30 @@ export const models = {
   },
 
   /**
-   * Download a catalogued model, emitting progress until it completes.
+   * Remove `id` from the catalog. Registration metadata only — artifacts and
+   * residency must already be gone.
+   *
+   * @throws SDKException when the model is still loaded or still has local
+   *   artifacts; call `models.unload`/`models.delete` first.
+   */
+  async unregister(id: string): Promise<void> {
+    const model = ModelRegistry.getModel(id);
+    if (!model) return;
+    if (isModelResident(id)) {
+      throw SDKException.invalidState(
+        `Model '${id}' is currently loaded. Call models.unload('${id}') before unregister.`,
+      );
+    }
+    if (model.isDownloaded || model.localPath) {
+      throw SDKException.invalidState(
+        `Model '${id}' still has local artifacts. Call models.delete('${id}') before unregister.`,
+      );
+    }
+    ModelRegistry.removeModel(id);
+  },
+
+  /**
+   * Download a catalogued model, emitting progress correlated by `operationId`/`sequence`.
    *
    * Breaking out of the iterator cancels the transfer and keeps its resume token.
    *
@@ -157,12 +231,38 @@ export const models = {
   download(id: string): AsyncIterable<DownloadEvent> {
     return (async function* download(): AsyncGenerator<DownloadEvent> {
       await ensureReady();
+      const operationId = id;
+      let sequence = 0;
+      yield { type: 'started', operationId, sequence: sequence++ };
       let sawExtracting = false;
       for await (const progress of SDKCore.downloadModelStream(id)) {
+        if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
+          yield {
+            type: 'failed',
+            operationId,
+            sequence: sequence++,
+            error: progress.error ?? {
+              category: 0,
+              code: 0,
+              message: `Download of '${id}' failed.`,
+              timestampMs: Date.now(),
+              severity: 0,
+              component: 'storage',
+              retryable: false,
+              remediationHint: '',
+              correlationId: '',
+            },
+          };
+          return;
+        }
+        if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
+          yield { type: 'cancelled', operationId, sequence: sequence++ };
+          return;
+        }
         if (progress.state === DownloadState.DOWNLOAD_STATE_EXTRACTING) {
           if (!sawExtracting) {
             sawExtracting = true;
-            yield { type: 'extracting' };
+            yield { type: 'extracting', operationId, sequence: sequence++ };
           }
           continue;
         }
@@ -173,10 +273,10 @@ export const models = {
               `Download of '${id}' completed but the catalog entry disappeared.`,
             );
           }
-          yield { type: 'completed', model };
+          yield { type: 'completed', operationId, sequence: sequence++, modelId: id };
           return;
         }
-        yield toProgressEvent(progress);
+        yield toProgressEvent(progress, operationId, sequence++);
       }
     })();
   },
@@ -189,9 +289,10 @@ export const models = {
   /**
    * Load a model now instead of paying the cost on the first generation.
    *
-   * @throws SDKException when the model is absent or the backend rejects it.
+   * @throws SDKException when the model is absent, `accelerator: 'npu'` is
+   *   requested (unsupported on Web), or the backend rejects the load.
    */
-  async load(id: string, options?: LoadOptions): Promise<void> {
+  async load(id: string, options?: LoadOptions): Promise<LoadedModel> {
     await ensureReady();
     if (options?.contextLength !== undefined || options?.threads !== undefined) {
       throw SDKException.invalidConfiguration(
@@ -199,24 +300,52 @@ export const models = {
           + 'cannot honor them. Remove them or set them on the backend register() call.',
       );
     }
-    if (options?.useGpu !== undefined) {
-      await Runtime.setAcceleration(options.useGpu ? 'webgpu' : 'cpu');
+    if (options?.accelerator === 'npu') {
+      throw SDKException.unsupportedCapability(
+        'LoadOptions.accelerator = npu',
+        'The Web SDK has no NPU access from the browser; use "auto", "cpu", or "gpu".',
+      );
+    }
+    const resolved = resolveLoadOptions(options);
+    if (resolved.accelerator && resolved.accelerator !== 'auto') {
+      await Runtime.setAcceleration(resolved.accelerator === 'gpu' ? 'webgpu' : 'cpu');
     }
     const model = ModelRegistry.getModel(id);
+    const framework = resolved.requestedBackend
+      ? backendToFramework(resolved.requestedBackend.backend)
+      : model?.framework;
     const result = await SDKCore.loadModel({
       modelId: id,
       category: model?.category,
-      framework: options?.framework ?? model?.framework,
+      framework,
       forceReload: options?.forceReload ?? false,
       validateAvailability: true,
+    });
+    if (!result || result.error) {
+      throw result?.error
+        ? new SDKException(result.error)
+        : SDKException.processingFailed(`Loading '${id}' failed.`);
+    }
+    return toLoadedModel(id, result.category, resolved, result.framework);
+  },
+
+  /**
+   * Release one resident model. Idempotent — a no-op when `id` is not loaded.
+   */
+  async unload(id: string): Promise<void> {
+    const model = ModelRegistry.getModel(id);
+    const result = await SDKCore.unloadModel({
+      modelId: id,
+      category: model?.category,
+      unloadAll: false,
     });
     if (result?.error) {
       throw new SDKException(result.error);
     }
   },
 
-  /** Unload one category's model, or every resident model when omitted. */
-  async unload(category?: ModelCategory): Promise<void> {
+  /** Unload one category's resident model, or every resident model when omitted. */
+  async unloadAll(category?: ModelCategory): Promise<void> {
     const result = await SDKCore.unloadModel({
       modelId: '',
       category,
@@ -248,13 +377,15 @@ export const models = {
   },
 };
 
-function toProgressEvent(progress: DownloadProgress): DownloadEvent {
+function toProgressEvent(progress: DownloadProgress, operationId: string, sequence: number): DownloadEvent {
   const bytesTotal = Number(progress.totalBytes ?? 0);
   const bytesDone = Number(progress.bytesDownloaded ?? 0);
   return {
     type: 'progress',
+    operationId,
+    sequence,
     bytesDone,
     bytesTotal,
-    percent: bytesTotal > 0 ? (bytesDone / bytesTotal) * 100 : progress.overallProgress * 100,
+    file: progress.currentFileName || undefined,
   };
 }

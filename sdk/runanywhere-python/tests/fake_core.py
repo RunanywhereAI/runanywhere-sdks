@@ -86,6 +86,16 @@ class FakeCore:
     def unload_model(self, handle: int) -> None:
         self._record("unload_model", handle)
 
+    # -- LoRA (rac_llm_component_{load,remove,clear}_lora) --------------------
+    def lora_apply(self, handle: int, adapter_path: str, scale: object = None) -> None:
+        self._record("lora_apply", handle, adapter_path, scale)
+
+    def lora_remove(self, handle: int, adapter_path: str) -> None:
+        self._record("lora_remove", handle, adapter_path)
+
+    def lora_remove_all(self, handle: int) -> None:
+        self._record("lora_remove_all", handle)
+
     # -- VLM -----------------------------------------------------------------
     def load_vlm_model(
         self, path: str, mmproj: str, model_id: object = None, name: object = None
@@ -175,6 +185,142 @@ class FakeCore:
 
     def unload_vad(self, handle: int) -> None:
         self._record("unload_vad", handle)
+
+    # -- diarization (rac_diarization_create/initialize/diarize) -------------
+    def load_diarization_model(self, model_path: str, model_id: object = None) -> int:
+        self._record("load_diarization_model", model_path, model_id)
+        return self._handle()
+
+    def diarize(
+        self,
+        handle: int,
+        samples: np.ndarray,
+        sample_rate_hz: object = None,
+        threshold: object = None,
+        minimum_duration_ms: object = None,
+        merge_gap_ms: object = None,
+    ) -> dict:
+        self._record(
+            "diarize", handle, len(samples), sample_rate_hz, threshold,
+            minimum_duration_ms, merge_gap_ms,
+        )
+        return {
+            "segments": [
+                {"start_ms": 0, "end_ms": 500, "speaker_index": 0, "speaker_id": "speaker_0"},
+                {"start_ms": 500, "end_ms": 1000, "speaker_index": 1, "speaker_id": "speaker_1"},
+            ],
+            "speaker_count": 2,
+            "duration_ms": 1000,
+        }
+
+    def unload_diarization_model(self, handle: int) -> None:
+        self._record("unload_diarization_model", handle)
+
+    # -- segmentation (rac_segmentation_create/initialize/segment) -----------
+    def load_segmentation_model(self, model_path: str, model_id: object = None) -> int:
+        self._record("load_segmentation_model", model_path, model_id)
+        return self._handle()
+
+    def segment(
+        self,
+        handle: int,
+        data: object,
+        width: int,
+        height: int,
+        pixel_format: object = None,
+        stride_bytes: object = None,
+        include_diagnostic_rgba: object = None,
+    ) -> dict:
+        self._record(
+            "segment", handle, width, height, pixel_format, stride_bytes,
+            include_diagnostic_rgba,
+        )
+        mask = np.zeros(width * height, dtype=np.uint16)
+        mask[: width * height // 2] = 1
+        return {
+            "width": width,
+            "height": height,
+            "class_mask": mask,
+            "classes": [
+                {"class_id": 0, "pixel_count": width * height // 2, "fraction": 0.5, "label": "bg"},
+                {"class_id": 1, "pixel_count": width * height // 2, "fraction": 0.5, "label": "fg"},
+            ],
+        }
+
+    def unload_segmentation_model(self, handle: int) -> None:
+        self._record("unload_segmentation_model", handle)
+
+    # -- voice agent (file-PCM turn) ----------------------------------------
+    def create_voice_agent(self) -> int:
+        self._record("create_voice_agent")
+        return self._handle()
+
+    def initialize_voice_agent(
+        self,
+        handle: int,
+        stt_path: str,
+        llm_path: str,
+        tts_path: str,
+        stt_id: object = None,
+        llm_id: object = None,
+        tts_id: object = None,
+        stt_name: object = None,
+        llm_name: object = None,
+        tts_name: object = None,
+    ) -> None:
+        self._record(
+            "initialize_voice_agent", handle, stt_path, llm_path, tts_path,
+            stt_id, llm_id, tts_id,
+        )
+
+    def process_voice_turn(self, handle: int, pcm16: object) -> dict:
+        self._record("process_voice_turn", handle, len(bytes(pcm16)))
+        return {
+            "speech_detected": True,
+            "transcription": self.transcript,
+            "assistant_response": "hi from the agent",
+            "synthesized_audio": b"RIFF" + b"\x00" * 40,
+            "sample_rate_hz": 22050,
+            "channels": 1,
+            "stt_time_ms": 10,
+            "llm_time_ms": 20,
+            "tts_time_ms": 30,
+            "total_time_ms": 60,
+        }
+
+    def destroy_voice_agent(self, handle: int) -> None:
+        self._record("destroy_voice_agent", handle)
+
+    # -- diffusion (CoreML; present on fake to exercise the happy path) ------
+    def load_diffusion_model(self, model_path: str, model_id: object = None) -> int:
+        self._record("load_diffusion_model", model_path, model_id)
+        return self._handle()
+
+    def generate_image(
+        self,
+        handle: int,
+        prompt: str,
+        negative_prompt: object = None,
+        width: object = None,
+        height: object = None,
+        steps: object = None,
+        guidance_scale: object = None,
+        seed: object = None,
+    ) -> dict:
+        w = int(width or 64)
+        h = int(height or 64)
+        self._record("generate_image", handle, prompt, w, h, steps, seed)
+        return {
+            "image_data": bytes([0] * (w * h * 4)),
+            "width": w,
+            "height": h,
+            "seed": int(seed if seed is not None else 42),
+            "generation_time_ms": 100,
+            "safety_flagged": False,
+        }
+
+    def unload_diffusion_model(self, handle: int) -> None:
+        self._record("unload_diffusion_model", handle)
 
     # -- registry ------------------------------------------------------------
     def register_model(self, model_id: str, local_path: str, framework: int, category: int) -> None:

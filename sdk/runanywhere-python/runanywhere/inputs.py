@@ -166,12 +166,16 @@ class ImageInput:
     """Image handed to ``vlm`` or ``segmentation``.
 
     Build one with :meth:`file`, :meth:`bytes` or :meth:`raw_rgb`.
+    ``segmentation`` needs decoded pixels — use :meth:`raw_rgb` (there is no image
+    decoder in commons). ``vlm`` accepts a path or encoded bytes via :meth:`resolve_path`.
     """
 
     path: Optional[str] = None
     data: Optional[bytes] = None
     width: int = 0
     height: int = 0
+    # Packed RGB8 pixels when built via :meth:`raw_rgb` (``rac_segmentation_image_t``).
+    rgb: Optional[bytes] = None
     _temp: bool = False
 
     @classmethod
@@ -189,7 +193,13 @@ class ImageInput:
     @classmethod
     def raw_rgb(cls, data: bytes, width: int, height: int) -> "ImageInput":
         """Wrap packed 8-bit RGB pixels, row-major from the top-left."""
-        return cls(data=_bmp24(bytes(data), width, height), width=width, height=height)
+        raw = bytes(data)
+        return cls(
+            data=_bmp24(raw, width, height),
+            width=width,
+            height=height,
+            rgb=raw,
+        )
 
     def resolve_path(self) -> str:
         """Return a filesystem path for this image, materializing bytes into a temp file."""

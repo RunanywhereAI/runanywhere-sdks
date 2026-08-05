@@ -4,25 +4,27 @@
  */
 
 import { LLMStreamEventKind } from '@runanywhere/proto-ts/llm_service';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import type { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
-import { StructuredOutputMode } from '@runanywhere/proto-ts/structured_output';
 import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../../Adapters/ModalityProtoAdapter.js';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { ToolCalling, type ToolExecutor } from '../../Extensions/RunAnywhere+ToolCalling.js';
+import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
 import type { ChatMessage } from '../Inputs.js';
-import type { JsonSchema, LlmOptions } from '../Options.js';
+import type { JsonSchema, LlmOptions, StructuredOutputMode } from '../Options.js';
 import type { GenerationEvent } from '../Events.js';
 import type { GenerationResult, StructuredResult } from '../Results.js';
 import {
+  currentDevicePlacement,
+  frameworkToBackend,
   streamFinalToGenerationResult,
   toGenerationResult,
   toProtoHistory,
   toProtoLlmOptions,
+  toProtoStructuredOutputOptions,
   toStructuredResult,
 } from '../Mapping.js';
-import { WebModelLifecycle } from '../../Extensions/RunAnywhere+ModelLifecycle.js';
 import { ensureModelForCategory, ensureReady } from '../Runtime/Prerequisites.js';
-import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 
 function requireAdapter(verb: string): NonNullable<ReturnType<typeof LLMProtoAdapter.tryDefault>> {
   const adapter = LLMProtoAdapter.tryDefault();
@@ -81,6 +83,16 @@ function usesTools(options?: LlmOptions): boolean {
   return ToolCalling.getRegisteredTools().length > 0;
 }
 
+/** Attach the honest backend/device placement of the currently resident language model. */
+function withPlacement(result: GenerationResult): GenerationResult {
+  const model = WebModelLifecycle.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+  return {
+    ...result,
+    actualBackend: frameworkToBackend(model?.framework),
+    actualDevice: result.actualDevice ?? currentDevicePlacement(),
+  };
+}
+
 async function generateWithToolLoop(
   input: string | readonly ChatMessage[],
   options?: LlmOptions,
@@ -101,7 +113,7 @@ async function generateWithToolLoop(
       history: history.map((message) => message.content),
     },
   );
-  return {
+  return withPlacement({
     text: result.text,
     thinkingText: result.thinkingContent,
     toolCalls: result.toolCalls,
@@ -112,7 +124,31 @@ async function generateWithToolLoop(
     tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
     requestId: result.conversationId ?? '',
     model: '',
-  };
+  });
+}
+
+/**
+ * Shared generation core for `generate` and `generateStructured`: resolves
+ * the model, then either runs the tool loop or the direct proto call.
+ * `structuredOutput`, when given, is spliced into the proto request options
+ * after the fact — `LlmOptions` itself carries no structured-output schema.
+ */
+async function generateCore(
+  input: string | readonly ChatMessage[],
+  options: LlmOptions | undefined,
+  structuredOutput?: ReturnType<typeof toProtoStructuredOutputOptions>,
+): Promise<GenerationResult> {
+  await ensureReady();
+  await ensureModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE, options?.model);
+  if (!structuredOutput && usesTools(options)) return generateWithToolLoop(input, options);
+  const adapter = requireAdapter('llm.generate');
+  const request = buildRequest(input, options);
+  if (structuredOutput) request.options.structuredOutput = structuredOutput;
+  const result = await adapter.generate(request);
+  if (!result) {
+    throw SDKException.processingFailed('The LLM proto path returned no result.');
+  }
+  return withPlacement(toGenerationResult(result));
 }
 
 /** Text generation against the resident language model. */
@@ -127,27 +163,21 @@ export const llm = {
    * const result = await RunAnywhere.llm.generate('Write a haiku about local AI.');
    * console.log(result.text, result.tokensPerSecond);
    */
-  async generate(
+  generate(
     input: string | readonly ChatMessage[],
     options?: LlmOptions,
   ): Promise<GenerationResult> {
-    await ensureReady();
-    await ensureModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE, options?.model);
-    if (usesTools(options)) return generateWithToolLoop(input, options);
-    const adapter = requireAdapter('llm.generate');
-    const result = await adapter.generate(buildRequest(input, options));
-    if (!result) {
-      throw SDKException.processingFailed('The LLM proto path returned no result.');
-    }
-    return toGenerationResult(result);
+    return generateCore(input, options);
   },
 
   /**
-   * Stream a completion as `started`, `token`, and `completed` events.
+   * Stream a completion as `started`, `textDelta`/`reasoningDelta`,
+   * `toolCallAdded`/`toolArgumentsDone`, `usage`, and a terminal
+   * `completed`/`failed` event. Never fabricates a successful `completed`.
    *
    * Breaking out of the iterator cancels the request.
    *
-   * @throws SDKException on preflight failure; in-flight failures throw into the consumer.
+   * @throws SDKException on preflight failure; in-flight failures arrive as a `failed` event.
    */
   generateStream(
     input: string | readonly ChatMessage[],
@@ -159,74 +189,132 @@ export const llm = {
       const adapter = requireAdapter('llm.generateStream');
       const request = buildRequest(input, options);
       const events = adapter.generateStream(request);
+
+      const itemId = 'response-0';
+      let requestId = '';
       let announced = false;
       let text = '';
       let thinking = '';
       let tokens = 0;
-      let completed = false;
+      let terminal = false;
+      let sequence = 0;
       const startedAt = performance.now();
       let firstTokenAt: number | undefined;
+
+      function partial(): Partial<GenerationResult> {
+        return { text, thinkingText: thinking || undefined };
+      }
+
       try {
         for await (const event of events) {
+          if (event.requestId) requestId = event.requestId;
           if (!announced) {
             announced = true;
-            yield { type: 'started', requestId: event.requestId };
+            yield { type: 'started', requestId };
           }
-          if (event.error) throw new SDKException(event.error);
+          if (event.error) {
+            yield { type: 'failed', requestId, partial: partial(), error: event.error };
+            terminal = true;
+            break;
+          }
           if (event.token) {
             firstTokenAt ??= performance.now();
             const thought = event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING;
-            if (thought) thinking += event.token;
-            else {
+            if (thought) {
+              thinking += event.token;
+              yield {
+                type: 'reasoningDelta', requestId, sequence: sequence++, itemId, index: 0, text: event.token,
+              };
+            } else {
               text += event.token;
               tokens += 1;
+              yield {
+                type: 'textDelta', requestId, sequence: sequence++, itemId, index: 0, text: event.token,
+              };
             }
-            yield { type: 'token', text: event.token, kind: thought ? 'thought' : 'text' };
           }
-          if (event.toolCall) yield { type: 'toolCall', toolCall: event.toolCall };
-          if (event.result) {
-            completed = true;
-            const elapsed = performance.now() - startedAt;
+          if (event.toolCall) {
             yield {
-              type: 'completed',
-              result: streamFinalToGenerationResult(
-                event.result,
-                event.requestId,
-                options?.model
-                  ?? WebModelLifecycle.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)?.id
-                  ?? '',
-                {
-                  text,
-                  thinkingText: thinking,
-                  outputTokens: tokens,
-                  ttftMs: firstTokenAt === undefined ? 0 : firstTokenAt - startedAt,
-                  tokensPerSecond: elapsed > 0 ? (tokens / elapsed) * 1000 : 0,
-                },
-              ),
+              type: 'toolCallAdded',
+              requestId,
+              sequence: sequence++,
+              itemId,
+              index: 0,
+              call: event.toolCall,
+            };
+            yield {
+              type: 'toolArgumentsDone',
+              requestId,
+              sequence: sequence++,
+              itemId,
+              arguments: event.toolCall.argumentsJson,
             };
           }
+          if (event.result) {
+            terminal = true;
+            const elapsed = performance.now() - startedAt;
+            const result = withPlacement(streamFinalToGenerationResult(
+              event.result,
+              requestId,
+              options?.model
+                ?? WebModelLifecycle.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)?.id
+                ?? '',
+              {
+                text,
+                thinkingText: thinking,
+                outputTokens: tokens,
+                ttftMs: firstTokenAt === undefined ? 0 : firstTokenAt - startedAt,
+                tokensPerSecond: elapsed > 0 ? (tokens / elapsed) * 1000 : 0,
+              },
+            ));
+            yield {
+              type: 'usage',
+              requestId,
+              sequence: sequence++,
+              usage: {
+                inputTokens: result.inputTokens,
+                outputTokens: result.outputTokens,
+                totalTokens: result.inputTokens + result.outputTokens,
+                tokensPerSecond: result.tokensPerSecond,
+              },
+            };
+            yield { type: 'completed', requestId, result };
+          }
         }
+      } catch (error) {
+        yield { type: 'failed', requestId, partial: partial(), error: SDKException.fromUnknown(error).proto };
+        terminal = true;
       } finally {
-        if (!completed) adapter.cancel();
+        if (!terminal) adapter.cancel();
       }
     })();
   },
 
   /**
-   * Generate JSON that satisfies a schema, returning the parsed value with the
-   * raw text alongside it.
+   * Generate JSON that satisfies a schema, returning the parsed value with
+   * the raw text alongside it.
    *
-   * @throws SDKException when the backend cannot parse structured output.
+   * @param mode `'validationOnly'` (default) parses and validates after
+   *   generation; `'repair'` additionally attempts to fix malformed JSON.
+   *   `'constrained'` fails preflight — Web has no grammar-constrained
+   *   decoding hook.
+   * @throws SDKException when the backend cannot parse structured output,
+   *   or `mode` is `'constrained'`.
    */
   async generateStructured(
     prompt: string,
     schema: JsonSchema,
+    mode: StructuredOutputMode = 'validationOnly',
     options?: LlmOptions,
   ): Promise<StructuredResult> {
-    const generation = await llm.generate(prompt, {
-      ...options,
-      structuredOutput: { schema, strict: options?.structuredOutput?.strict ?? true },
-    });
+    if (mode === 'constrained') {
+      throw SDKException.unsupportedCapability(
+        "llm.generateStructured(mode: 'constrained')",
+        'The Web SDK has no grammar-constrained decoding hook; use "validationOnly" or "repair".',
+      );
+    }
+    const structuredOutput = toProtoStructuredOutputOptions(schema.json, mode);
+    const generation = await generateCore(prompt, options, structuredOutput);
     const adapter = StructuredOutputProtoAdapter.tryDefault();
     if (!adapter?.supportsProtoParse()) {
       throw SDKException.backendNotAvailable(
@@ -237,20 +325,13 @@ export const llm = {
     const parsed = adapter.parse({
       requestId: generation.requestId,
       text: generation.text,
-      options: {
-        includeSchemaInPrompt: true,
-        jsonSchema: schema.json,
-        strictMode: options?.structuredOutput?.strict ?? true,
-        mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-        repairJson: false,
-        maxRetries: 0,
-      },
+      options: structuredOutput,
       metadata: {},
     });
     if (!parsed) {
       throw SDKException.processingFailed('Structured-output parsing returned no result.');
     }
-    return toStructuredResult(parsed, generation, schema.parse);
+    return toStructuredResult(parsed, generation, mode, schema.parse);
   },
 
   /** Tools the model may call during generation. */

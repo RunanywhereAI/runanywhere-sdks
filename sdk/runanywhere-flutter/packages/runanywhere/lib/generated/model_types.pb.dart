@@ -2732,6 +2732,11 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     InferenceFramework? framework,
     $core.bool? forceReload,
     $core.bool? validateAvailability,
+    $core.int? contextLength,
+    $core.int? threads,
+    $core.bool? useGpu,
+    $core.Iterable<InferenceFramework>? backendPreferences,
+    $core.int? acceleratorPolicy,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -2740,6 +2745,12 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     if (forceReload != null) result.forceReload = forceReload;
     if (validateAvailability != null)
       result.validateAvailability = validateAvailability;
+    if (contextLength != null) result.contextLength = contextLength;
+    if (threads != null) result.threads = threads;
+    if (useGpu != null) result.useGpu = useGpu;
+    if (backendPreferences != null)
+      result.backendPreferences.addAll(backendPreferences);
+    if (acceleratorPolicy != null) result.acceleratorPolicy = acceleratorPolicy;
     return result;
   }
 
@@ -2763,6 +2774,15 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
         enumValues: InferenceFramework.values)
     ..aOB(4, _omitFieldNames ? '' : 'forceReload')
     ..aOB(5, _omitFieldNames ? '' : 'validateAvailability')
+    ..aI(6, _omitFieldNames ? '' : 'contextLength')
+    ..aI(7, _omitFieldNames ? '' : 'threads')
+    ..aOB(8, _omitFieldNames ? '' : 'useGpu')
+    ..pc<InferenceFramework>(
+        9, _omitFieldNames ? '' : 'backendPreferences', $pb.PbFieldType.KE,
+        valueOf: InferenceFramework.valueOf,
+        enumValues: InferenceFramework.values,
+        defaultEnumValue: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED)
+    ..aI(10, _omitFieldNames ? '' : 'acceleratorPolicy')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2802,6 +2822,8 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearCategory() => $_clearField(2);
 
+  /// Preferred backend pin. Retained for wire compatibility; new callers
+  /// should prefer backend_preferences + accelerator.
   @$pb.TagNumber(3)
   InferenceFramework get framework => $_getN(2);
   @$pb.TagNumber(3)
@@ -2828,6 +2850,48 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
   $core.bool hasValidateAvailability() => $_has(4);
   @$pb.TagNumber(5)
   void clearValidateAvailability() => $_clearField(5);
+
+  /// v4 placement knobs (honored end-to-end; never silently dropped).
+  @$pb.TagNumber(6)
+  $core.int get contextLength => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set contextLength($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasContextLength() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearContextLength() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get threads => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set threads($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasThreads() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearThreads() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get useGpu => $_getBF(7);
+  @$pb.TagNumber(8)
+  set useGpu($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasUseGpu() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearUseGpu() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $pb.PbList<InferenceFramework> get backendPreferences => $_getList(8);
+
+  /// AcceleratorPolicy values live in public_api_v4.proto; stored as int32
+  /// here to avoid a circular import with LoadedModelInfo helpers.
+  @$pb.TagNumber(10)
+  $core.int get acceleratorPolicy => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set acceleratorPolicy($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasAcceleratorPolicy() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAcceleratorPolicy() => $_clearField(10);
 }
 
 class ModelLoadResult extends $pb.GeneratedMessage {
@@ -2841,6 +2905,13 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     $core.bool? alreadyLoaded,
     $core.Iterable<ModelFileDescriptor>? resolvedArtifacts,
     $1.SDKError? error,
+    InferenceFramework? requestedBackend,
+    $core.String? actualDeviceId,
+    $core.String? actualDeviceName,
+    $core.String? actualDeviceKind,
+    $core.String? runtimeVersion,
+    $core.String? abiVersion,
+    $core.String? fallbackReason,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -2853,6 +2924,13 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     if (resolvedArtifacts != null)
       result.resolvedArtifacts.addAll(resolvedArtifacts);
     if (error != null) result.error = error;
+    if (requestedBackend != null) result.requestedBackend = requestedBackend;
+    if (actualDeviceId != null) result.actualDeviceId = actualDeviceId;
+    if (actualDeviceName != null) result.actualDeviceName = actualDeviceName;
+    if (actualDeviceKind != null) result.actualDeviceKind = actualDeviceKind;
+    if (runtimeVersion != null) result.runtimeVersion = runtimeVersion;
+    if (abiVersion != null) result.abiVersion = abiVersion;
+    if (fallbackReason != null) result.fallbackReason = fallbackReason;
     return result;
   }
 
@@ -2882,6 +2960,14 @@ class ModelLoadResult extends $pb.GeneratedMessage {
         subBuilder: ModelFileDescriptor.create)
     ..aOM<$1.SDKError>(11, _omitFieldNames ? '' : 'error',
         subBuilder: $1.SDKError.create)
+    ..aE<InferenceFramework>(12, _omitFieldNames ? '' : 'requestedBackend',
+        enumValues: InferenceFramework.values)
+    ..aOS(13, _omitFieldNames ? '' : 'actualDeviceId')
+    ..aOS(14, _omitFieldNames ? '' : 'actualDeviceName')
+    ..aOS(15, _omitFieldNames ? '' : 'actualDeviceKind')
+    ..aOS(16, _omitFieldNames ? '' : 'runtimeVersion')
+    ..aOS(17, _omitFieldNames ? '' : 'abiVersion')
+    ..aOS(18, _omitFieldNames ? '' : 'fallbackReason')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2921,6 +3007,7 @@ class ModelLoadResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearCategory() => $_clearField(3);
 
+  /// Actual backend that executed the load (not the catalog/request pin).
   @$pb.TagNumber(4)
   InferenceFramework get framework => $_getN(2);
   @$pb.TagNumber(4)
@@ -2976,6 +3063,70 @@ class ModelLoadResult extends $pb.GeneratedMessage {
   void clearError() => $_clearField(11);
   @$pb.TagNumber(11)
   $1.SDKError ensureError() => $_ensure(8);
+
+  /// v4 placement truth.
+  @$pb.TagNumber(12)
+  InferenceFramework get requestedBackend => $_getN(9);
+  @$pb.TagNumber(12)
+  set requestedBackend(InferenceFramework value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasRequestedBackend() => $_has(9);
+  @$pb.TagNumber(12)
+  void clearRequestedBackend() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.String get actualDeviceId => $_getSZ(10);
+  @$pb.TagNumber(13)
+  set actualDeviceId($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(13)
+  $core.bool hasActualDeviceId() => $_has(10);
+  @$pb.TagNumber(13)
+  void clearActualDeviceId() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get actualDeviceName => $_getSZ(11);
+  @$pb.TagNumber(14)
+  set actualDeviceName($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(14)
+  $core.bool hasActualDeviceName() => $_has(11);
+  @$pb.TagNumber(14)
+  void clearActualDeviceName() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.String get actualDeviceKind => $_getSZ(12);
+  @$pb.TagNumber(15)
+  set actualDeviceKind($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(15)
+  $core.bool hasActualDeviceKind() => $_has(12);
+  @$pb.TagNumber(15)
+  void clearActualDeviceKind() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.String get runtimeVersion => $_getSZ(13);
+  @$pb.TagNumber(16)
+  set runtimeVersion($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(16)
+  $core.bool hasRuntimeVersion() => $_has(13);
+  @$pb.TagNumber(16)
+  void clearRuntimeVersion() => $_clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.String get abiVersion => $_getSZ(14);
+  @$pb.TagNumber(17)
+  set abiVersion($core.String value) => $_setString(14, value);
+  @$pb.TagNumber(17)
+  $core.bool hasAbiVersion() => $_has(14);
+  @$pb.TagNumber(17)
+  void clearAbiVersion() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.String get fallbackReason => $_getSZ(15);
+  @$pb.TagNumber(18)
+  set fallbackReason($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(18)
+  $core.bool hasFallbackReason() => $_has(15);
+  @$pb.TagNumber(18)
+  void clearFallbackReason() => $_clearField(18);
 }
 
 class ModelUnloadRequest extends $pb.GeneratedMessage {

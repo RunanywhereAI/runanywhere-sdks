@@ -3,6 +3,7 @@
  */
 
 import { RAGStreamEventKind } from '@runanywhere/proto-ts/rag';
+import type { RAGQueryOverrides } from '../../Extensions/RunAnywhere+RAG.js';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import {
   ragClearDocuments,
@@ -15,7 +16,7 @@ import {
   ragSearch,
 } from '../../Extensions/RunAnywhere+RAG.js';
 import type { ModelRef, RagDocument } from '../Inputs.js';
-import type { LlmOptions, RagConfig } from '../Options.js';
+import type { LlmOptions, RagConfig, RagQueryOptions } from '../Options.js';
 import type { RagEvent } from '../Events.js';
 import type { Match, RagResult, RagStats } from '../Results.js';
 import { optionDefaults } from '../Options.js';
@@ -30,9 +31,9 @@ export interface RagSession {
   /** Retrieve matching chunks without generating an answer. */
   search(query: string, topK?: number): Promise<Match[]>;
   /** Answer a question grounded in the corpus. */
-  query(question: string, options?: LlmOptions): Promise<RagResult>;
-  /** Answer a question, emitting `retrieved`, `token`, and `completed`. */
-  queryStream(question: string, options?: LlmOptions): AsyncIterable<RagEvent>;
+  query(question: string, options?: RagQueryOptions): Promise<RagResult>;
+  /** Answer a question, emitting `retrieved`, `textDelta`, and `completed`/`failed`. */
+  queryStream(question: string, options?: RagQueryOptions): AsyncIterable<RagEvent>;
   /** Document, chunk, and index-size counters. */
   stats(): Promise<RagStats>;
   /** Drop every indexed document, keeping the session open. */
@@ -49,6 +50,29 @@ function requireOpen(session: RagSession, verb: string): void {
   if (openSession !== session) {
     throw SDKException.invalidState(`This RAG session is closed; ${verb} is unavailable.`);
   }
+}
+
+function isRagQueryOptions(
+  options: RagQueryOptions | LlmOptions,
+): options is RagQueryOptions {
+  return 'retrieval' in options || 'generation' in options;
+}
+
+/**
+ * Normalize a `query`/`queryStream` call's options into the provider's
+ * override shape. `LlmOptions` is accepted directly as a deprecated v3
+ * adapter — equivalent to `RagQueryOptions({ generation: options })`.
+ */
+function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQueryOverrides {
+  if (!options) return {};
+  if (isRagQueryOptions(options)) {
+    return {
+      retrievalTopK: options.retrieval?.topK,
+      similarityThreshold: options.retrieval?.similarityThreshold,
+      generation: options.generation ? toProtoLlmOptions(options.generation) : undefined,
+    };
+  }
+  return { generation: toProtoLlmOptions(options) };
 }
 
 function toProtoConfig(
@@ -90,31 +114,46 @@ function createSession(): RagSession {
       return (await ragSearch(query, topK)).map(toMatch);
     },
 
-    async query(question: string, options?: LlmOptions): Promise<RagResult> {
+    /**
+     * @param options `RagQueryOptions`, or (deprecated) `LlmOptions` used
+     *   directly as the generation config.
+     */
+    async query(question: string, options?: RagQueryOptions | LlmOptions): Promise<RagResult> {
       requireOpen(session, 'query');
-      const result = await ragQuery(question, { generation: toProtoLlmOptions(options) });
+      const result = await ragQuery(question, normalizeQueryOptions(options));
       if (result.error) throw new SDKException(result.error);
       return toRagResult(result);
     },
 
-    queryStream(question: string, options?: LlmOptions): AsyncIterable<RagEvent> {
+    /**
+     * @param options `RagQueryOptions`, or (deprecated) `LlmOptions` used
+     *   directly as the generation config.
+     */
+    queryStream(question: string, options?: RagQueryOptions | LlmOptions): AsyncIterable<RagEvent> {
       requireOpen(session, 'queryStream');
       return (async function* answer(): AsyncGenerator<RagEvent> {
-        const events = ragQueryStream(question, { generation: toProtoLlmOptions(options) });
+        const events = ragQueryStream(question, normalizeQueryOptions(options));
         let announcedSources = false;
-        for await (const event of events) {
-          if (event.error) throw new SDKException(event.error);
-          if (!announcedSources && event.result?.retrievedChunks.length) {
-            announcedSources = true;
-            yield { type: 'retrieved', matches: event.result.retrievedChunks.map(toMatch) };
-          }
-          if (event.token) yield { type: 'token', text: event.token, kind: 'text' };
-          if (event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED && event.result) {
-            if (!announcedSources) {
+        try {
+          for await (const event of events) {
+            if (event.error) {
+              yield { type: 'failed', error: event.error };
+              return;
+            }
+            if (!announcedSources && event.result?.retrievedChunks.length) {
+              announcedSources = true;
               yield { type: 'retrieved', matches: event.result.retrievedChunks.map(toMatch) };
             }
-            yield { type: 'completed', result: toRagResult(event.result) };
+            if (event.token) yield { type: 'textDelta', text: event.token, kind: 'text' };
+            if (event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED && event.result) {
+              if (!announcedSources) {
+                yield { type: 'retrieved', matches: event.result.retrievedChunks.map(toMatch) };
+              }
+              yield { type: 'completed', result: toRagResult(event.result) };
+            }
           }
+        } catch (error) {
+          yield { type: 'failed', error: SDKException.fromUnknown(error).proto };
         }
       })();
     },

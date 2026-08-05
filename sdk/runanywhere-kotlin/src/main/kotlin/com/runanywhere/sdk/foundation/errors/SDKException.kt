@@ -169,6 +169,20 @@ class SDKException(
                 cause = cause,
             )
 
+        /**
+         * A public v4 operation that is honestly absent on this platform/build —
+         * e.g. an unimplemented modality, an engine that cannot honor a
+         * requested option, or a knob the native ABI has no wire path for yet.
+         * Thrown at preflight, before any work starts.
+         */
+        fun unsupportedCapability(name: String, reason: String, cause: Throwable? = null) =
+            of(
+                code = ProtoErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE,
+                category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
+                message = "$name is not supported: $reason",
+                cause = cause,
+            )
+
         fun invalidApiKey(cause: Throwable? = null) =
             of(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_API_KEY,

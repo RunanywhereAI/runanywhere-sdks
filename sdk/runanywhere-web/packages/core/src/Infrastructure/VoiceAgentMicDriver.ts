@@ -79,6 +79,7 @@ export class VoiceAgentMicDriver {
   private speechMs = 0;
   private silenceMs = 0;
   private noiseFloor = SPEECH_RMS_THRESHOLD;
+  private currentTurnPromise: Promise<void> | null = null;
 
   get isRunning(): boolean {
     return !this.stopped && this.capture.isCapturing;
@@ -195,7 +196,20 @@ export class VoiceAgentMicDriver {
       const audio = this.concatUtterance();
       const hadSpeech = this.speechMs >= MIN_SPEECH_MS;
       this.resetSegmentation();
-      if (hadSpeech) void this.processTurn(audio);
+      if (hadSpeech) this.currentTurnPromise = this.processTurn(audio);
+    }
+  }
+
+  /**
+   * Stop the in-flight reply's playback (if any) and await the turn that was
+   * producing it. Used by `VoiceSession.interrupt()` — unlike `stop()`, the
+   * microphone keeps capturing afterward.
+   */
+  async interruptCurrentTurn(): Promise<void> {
+    this.playback.stop();
+    const pending = this.currentTurnPromise;
+    if (pending) {
+      await pending.catch(() => { /* already reported through onError */ });
     }
   }
 
@@ -251,6 +265,7 @@ export class VoiceAgentMicDriver {
       if (epoch === this.sessionEpoch) {
         this.processing = false;
         this.resetSegmentation();
+        this.currentTurnPromise = null;
         if (!this.stopped) this.callbacks.onPhase?.('listening');
       }
     }

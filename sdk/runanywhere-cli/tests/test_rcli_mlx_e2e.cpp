@@ -160,9 +160,10 @@ rac_result_t fake_llm_generate_stream(rac_handle_t, const char *prompt,
   }
   g_mlx_state.stream_count++;
   const std::string token = "mlx-stub: " + std::string(prompt);
-  return callback(token.c_str(), callback_user_data) == RAC_TRUE
-             ? RAC_SUCCESS
-             : RAC_ERROR_STREAM_CANCELLED;
+  if (callback(token.c_str(), RAC_FALSE, nullptr, callback_user_data) != RAC_TRUE) {
+    return RAC_ERROR_STREAM_CANCELLED;
+  }
+  return RAC_SUCCESS;
 }
 
 rac_result_t fake_vlm_process(rac_handle_t, const rac_vlm_image_t *,
@@ -538,6 +539,18 @@ bool register_mlx_backend_or_fail(TestResult *result) {
   return false;
 }
 
+rac_bool_t append_llm_token_callback(const char *token, rac_bool_t is_final,
+                                     const char * /*finish_reason*/, void *user_data) {
+  if (is_final) {
+    return RAC_TRUE;
+  }
+  auto *out = static_cast<std::string *>(user_data);
+  if (token && out) {
+    out->append(token);
+  }
+  return RAC_TRUE;
+}
+
 rac_bool_t append_token_callback(const char *token, void *user_data) {
   auto *out = static_cast<std::string *>(user_data);
   if (token && out) {
@@ -604,7 +617,7 @@ TestResult test_mlx_callback_bridge_all_slots() {
   if (llm_vt->llm_ops->create("mlx.direct.llm", nullptr, &llm) != RAC_SUCCESS ||
       llm_vt->llm_ops->initialize(llm, "/tmp/mlx-direct-llm") != RAC_SUCCESS ||
       llm_vt->llm_ops->generate(llm, "direct", nullptr, &llm_result) != RAC_SUCCESS ||
-      llm_vt->llm_ops->generate_stream(llm, "stream", nullptr, append_token_callback,
+      llm_vt->llm_ops->generate_stream(llm, "stream", nullptr, append_llm_token_callback,
                                        &llm_stream) != RAC_SUCCESS ||
       llm_vt->llm_ops->get_info(llm, &llm_info) != RAC_SUCCESS ||
       llm_vt->llm_ops->cancel(llm) != RAC_SUCCESS ||

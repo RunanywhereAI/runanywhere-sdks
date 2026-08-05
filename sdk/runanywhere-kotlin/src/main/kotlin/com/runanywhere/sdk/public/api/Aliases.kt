@@ -29,6 +29,9 @@ public typealias ModelCategory = ai.runanywhere.proto.v1.ModelCategory
 /** Backend engine that executes a model. */
 public typealias InferenceFramework = ai.runanywhere.proto.v1.InferenceFramework
 
+/** Cross-SDK name for [InferenceFramework], matching the v4 public API spec. */
+public typealias Backend = InferenceFramework
+
 /** Registry record for one model artifact. */
 public typealias ModelInfo = ai.runanywhere.proto.v1.ModelInfo
 

@@ -107,11 +107,11 @@ public class RagSession internal constructor(
      *
      * @throws SDKException when the session is retrieval-only or generation fails.
      */
-    public suspend fun query(question: String, options: LlmOptions? = null): RagResult {
+    public suspend fun query(question: String, options: RagQueryOptions? = null): RagResult {
         val live = requireHandle()
         requireGenerationModel()
         val request =
-            CppBridgeRAG.prepareQuery(ragQueryOptions(question, config, options, null, stream = false))
+            CppBridgeRAG.prepareQuery(ragQueryProto(question, config, options, stream = false))
         val result =
             runCancellableNativeUnaryRequest(
                 coordinator = requests,
@@ -127,12 +127,12 @@ public class RagSession internal constructor(
      *
      * @throws SDKException when the session is retrieval-only or generation fails.
      */
-    public fun queryStream(question: String, options: LlmOptions? = null): Flow<RagEvent> =
+    public fun queryStream(question: String, options: RagQueryOptions? = null): Flow<RagEvent> =
         callbackFlow {
             val live = requireHandle()
             requireGenerationModel()
             val request =
-                CppBridgeRAG.prepareQuery(ragQueryOptions(question, config, options, null, stream = true))
+                CppBridgeRAG.prepareQuery(ragQueryProto(question, config, options, stream = true))
             val retrieved = mutableListOf<Match>()
             val worker =
                 launch {
@@ -206,16 +206,17 @@ public class RagSession internal constructor(
             RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY ->
                 emit(RagEvent.Retrieved(retrieved.toList()))
             RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN ->
-                if (event.token.isEmpty()) true else emit(RagEvent.Token(event.token, TokenKind.TEXT))
+                if (event.token.isEmpty()) true else emit(RagEvent.TextDelta(event.token, TokenKind.TEXT))
             RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED -> {
                 val result = event.result
                 if (result != null) emit(RagEvent.Completed(result.toRagResult(llmModelId.orEmpty())))
                 false
             }
-            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR ->
-                throw SDKException.operation(
-                    event.error?.message?.takeIf { it.isNotBlank() } ?: "RAG query failed",
-                )
+            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR -> {
+                val message = event.error?.message?.takeIf { it.isNotBlank() } ?: "RAG query failed"
+                emit(RagEvent.Failed(event.error?.let { SDKException(it) } ?: SDKException.operation(message)))
+                false
+            }
             else -> true
         }
 }

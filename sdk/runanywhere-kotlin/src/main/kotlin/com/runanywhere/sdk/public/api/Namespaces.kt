@@ -65,3 +65,34 @@ public val RunAnywhere.models: ModelsNamespace get() = modelsNamespace
 
 /** LoRA adapters layered onto the loaded base model. */
 public val RunAnywhere.lora: LoraNamespace get() = loraNamespace
+
+/** Modality ids the v4 public API spec explicitly excludes from every SDK. */
+private val EXPLICITLY_ABSENT_CAPABILITIES =
+    listOf(
+        UnavailableCapability("agents", "RunAnywhere.agents is not part of the v4 public API surface."),
+        UnavailableCapability("wakeword", "RunAnywhere.wakeword is not part of the v4 public API surface."),
+        UnavailableCapability(
+            "realtime",
+            "RunAnywhere.realtime is not part of the v4 public API surface (no WebRTC/SIP/S2S transport namespace).",
+        ),
+    )
+
+/**
+ * Static per-build manifest of the namespaces and backends this Android SDK
+ * ships. Backing [RunAnywhere.capabilities]; see its doc comment for what
+ * this does and does not probe.
+ */
+internal fun sdkCapabilitiesSnapshot(): SDKCapabilities =
+    SDKCapabilities(
+        modalities =
+            setOf(
+                "llm", "vlm", "stt", "tts", "vad", "embeddings", "rerank", "images",
+                "diarization", "segmentation", "voice", "rag", "models", "lora", "cua",
+            ),
+        backends = setOf(Backend.INFERENCE_FRAMEWORK_LLAMA_CPP, Backend.INFERENCE_FRAMEWORK_ONNX),
+        audioFormats = setOf(AudioFormat.AUDIO_FORMAT_PCM, AudioFormat.AUDIO_FORMAT_WAV, AudioFormat.AUDIO_FORMAT_PCM_S16LE),
+        streaming = StreamingCapabilities(),
+        tools = ToolCapabilities(),
+        rag = RagCapabilities(multiSession = true, persistent = true),
+        unavailable = EXPLICITLY_ABSENT_CAPABILITIES,
+    )

@@ -20,6 +20,7 @@
 
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/plugin/rac_engine_ids.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "foundation/rac_proto_marshal_internal.h"
@@ -48,6 +49,14 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
     return rac::proto::copy_message(message, out, "failed to serialize proto result");
 }
 
+// NOTE on MODEL_CATEGORY coverage: `ModelCategory` (idl/model_types.proto)
+// has NO `MODEL_CATEGORY_RERANK` member by design — rerank models are routed
+// straight to `SDK_COMPONENT_RERANK` / `RAC_PRIMITIVE_RERANK` via the
+// dedicated rerank service factory, never through this category->component
+// mapping. So `rac_model_lifecycle_load_proto` (which resolves the component
+// from `ModelLoadRequest.category`) structurally cannot load a rerank model;
+// that is expected, not a missing `case`. Do not add a rerank arm here
+// without first adding the category to the IDL.
 runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCategory category) {
     switch (category) {
         case runanywhere::v1::MODEL_CATEGORY_LANGUAGE:
@@ -73,6 +82,87 @@ runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCateg
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
+}
+
+runanywhere::v1::InferenceFramework framework_for_engine_name(const std::string& engine_name) {
+    if (engine_name == RAC_ENGINE_ID_LLAMACPP) {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
+    }
+    if (engine_name == RAC_ENGINE_ID_QHEXRT) {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
+    }
+    if (engine_name == RAC_ENGINE_ID_ONNX) {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_ONNX;
+    }
+    if (engine_name == RAC_ENGINE_ID_SHERPA) {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
+    }
+    if (engine_name == RAC_ENGINE_ID_MLX) {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
+    }
+    if (engine_name == RAC_ENGINE_ID_COREML) {
+        return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
+    }
+    // RAC_ENGINE_ID_PLATFORM backs BOTH FOUNDATION_MODELS and SYSTEM_TTS
+    // (engine_name_for_framework() in model_lifecycle.cpp), so there is no
+    // unambiguous reverse mapping. Returning UNSPECIFIED tells the caller to
+    // keep whatever framework it already had rather than guessing between
+    // the two.
+    return runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+}
+
+namespace {
+
+std::string device_kind_for_runtime(rac_runtime_id_t runtime) {
+    switch (runtime) {
+        case RAC_RUNTIME_CPU:
+        case RAC_RUNTIME_WASM_SIMD:
+            return "cpu";
+        case RAC_RUNTIME_METAL:
+            return "metal";
+        case RAC_RUNTIME_CUDA:
+        case RAC_RUNTIME_VULKAN:
+        case RAC_RUNTIME_OPENCL:
+        case RAC_RUNTIME_HIPBLAS:
+            return "gpu";
+        case RAC_RUNTIME_ANE:
+        case RAC_RUNTIME_QNN:
+            return "npu";
+        case RAC_RUNTIME_WEBGPU:
+            return "webgpu";
+        // CoreML/NNAPI/ONNXRT pick their execution device dynamically
+        // (CPU/GPU/ANE) rather than declaring a fixed one; reporting a
+        // specific kind here would be a guess, not an observation.
+        case RAC_RUNTIME_COREML:
+        case RAC_RUNTIME_NNAPI:
+        case RAC_RUNTIME_ONNXRT:
+        case RAC_RUNTIME_UNSPECIFIED:
+        default:
+            return "unknown";
+    }
+}
+
+}  // namespace
+
+std::string device_kind_for_vtable(const rac_engine_vtable_t* vt) {
+    if (!vt) {
+        return "unknown";
+    }
+    // QHexRT is the sole NPU engine in this tree — every model it loads runs
+    // on the Hexagon NPU by construction, so this is a fact, not an
+    // inference from declarative metadata.
+    if (vt->metadata.name && std::string(vt->metadata.name) == RAC_ENGINE_ID_QHEXRT) {
+        return "npu";
+    }
+    if (vt->metadata.runtimes != nullptr && vt->metadata.runtimes_count > 0) {
+        return device_kind_for_runtime(vt->metadata.runtimes[0]);
+    }
+    // No declared runtime (true today for llama.cpp and MLX — see the
+    // `runtimes` field doc in rac_engine_vtable.h) and no other truthful
+    // signal available from commons alone. "unknown" beats fabricating a
+    // device from the request's use_gpu/accelerator_policy, which would just
+    // re-report what was ASKED FOR as if it were observed fact.
+    return "unknown";
 }
 
 rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component) {
@@ -324,6 +414,60 @@ std::string vlm_config_json(const std::string& mmproj_path) {
         return "";
     }
     return R"({"mmproj_path":")" + json_escape(mmproj_path) + R"("})";
+}
+
+std::string load_options_json(const runanywhere::v1::ModelLoadRequest& request) {
+    std::vector<std::string> parts;
+    if (request.has_context_length()) {
+        parts.push_back("\"context_length\":" + std::to_string(request.context_length()));
+    }
+    if (request.has_threads()) {
+        parts.push_back("\"threads\":" + std::to_string(request.threads()));
+    }
+    if (request.has_use_gpu()) {
+        parts.push_back(std::string("\"use_gpu\":") + (request.use_gpu() ? "true" : "false"));
+    }
+    if (request.has_accelerator_policy()) {
+        parts.push_back("\"accelerator_policy\":" + std::to_string(request.accelerator_policy()));
+    }
+    if (parts.empty()) {
+        return "";
+    }
+    std::string json = "{";
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) {
+            json += ",";
+        }
+        json += parts[i];
+    }
+    json += "}";
+    return json;
+}
+
+std::string merge_json_objects(const std::string& a, const std::string& b) {
+    if (a.empty()) {
+        return b;
+    }
+    if (b.empty()) {
+        return a;
+    }
+    // Both are flat `{...}` objects (see load_options_json()/vlm_config_json());
+    // strip the outer braces and splice the members together.
+    const std::string inner_a = a.substr(1, a.size() - 2);
+    const std::string inner_b = b.substr(1, b.size() - 2);
+    return "{" + inner_a + "," + inner_b + "}";
+}
+
+LoadPlacement placement_from_loaded(const LoadedModel& loaded) {
+    LoadPlacement placement;
+    placement.requested_backend = loaded.requested_backend;
+    placement.actual_device_id = loaded.actual_device_id;
+    placement.actual_device_name = loaded.actual_device_name;
+    placement.actual_device_kind = loaded.actual_device_kind;
+    placement.runtime_version = loaded.runtime_version;
+    placement.abi_version = loaded.abi_version;
+    placement.fallback_reason = loaded.fallback_reason;
+    return placement;
 }
 
 rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {

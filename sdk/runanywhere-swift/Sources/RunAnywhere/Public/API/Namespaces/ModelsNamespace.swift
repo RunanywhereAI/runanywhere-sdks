@@ -101,9 +101,14 @@ public extension RunAnywhere {
         /// Download a registered model, reporting progress until it completes.
         ///
         /// `DownloadEvent.progress.percent` is 0–100, matching the other SDKs.
+        /// Every event on this stream carries the same `operationId`, and
+        /// `sequence` is monotonically increasing within that operation.
         ///
-        /// - Throws: `SDKException` from this call when the id is unknown, and
-        ///   into the returned stream when the transfer fails.
+        /// The stream ends in `completed`, `failed`, or `cancelled` — never a
+        /// silent finish, and `completed` is only ever emitted when the
+        /// download genuinely finished.
+        ///
+        /// - Throws: `SDKException` when the id is unknown.
         public func download(id: String) async throws -> AsyncThrowingStream<DownloadEvent, Error> {
             guard let model = await get(id: id) else {
                 throw SDKException(
@@ -115,24 +120,54 @@ public extension RunAnywhere {
 
             return AsyncThrowingStream { continuation in
                 let task = Task {
-                    var sawExtracting = false
+                    var operationId = id
+                    var sequence: Int64 = 0
+                    var sawStarted = false
+                    func nextSequence() -> Int64 {
+                        sequence += 1
+                        return sequence
+                    }
+
                     do {
                         _ = try await RunAnywhere.performDownload(model) { progress in
-                            if progress.stage == .extracting, !sawExtracting {
-                                sawExtracting = true
-                                continuation.yield(.extracting)
+                            if !progress.taskID.isEmpty { operationId = progress.taskID }
+                            if !sawStarted {
+                                sawStarted = true
+                                continuation.yield(.started(operationId: operationId, sequence: nextSequence()))
                             }
-                            continuation.yield(.progress(
-                                bytesDone: progress.bytesDownloaded,
-                                bytesTotal: progress.totalBytes,
-                                percent: progress.overallProgress * 100
-                            ))
+                            switch progress.stage {
+                            case .validating:
+                                continuation.yield(.verifying(operationId: operationId, sequence: nextSequence()))
+                            case .extracting:
+                                continuation.yield(.extracting(
+                                    operationId: operationId,
+                                    sequence: nextSequence(),
+                                    percent: progress.stageProgress * 100
+                                ))
+                            default:
+                                continuation.yield(.progress(
+                                    operationId: operationId,
+                                    sequence: nextSequence(),
+                                    bytesDone: progress.bytesDownloaded,
+                                    bytesTotal: progress.totalBytes,
+                                    percent: progress.overallProgress * 100,
+                                    file: progress.currentFileName.isEmpty ? nil : progress.currentFileName
+                                ))
+                            }
                         }
                         let refreshed = await self.get(id: id) ?? model
-                        continuation.yield(.completed(refreshed))
+                        continuation.yield(.completed(operationId: operationId, sequence: nextSequence(), model: refreshed))
+                        continuation.finish()
+                    } catch is CancellationError {
+                        continuation.yield(.cancelled(operationId: operationId, sequence: nextSequence()))
                         continuation.finish()
                     } catch {
-                        continuation.finish(throwing: error)
+                        continuation.yield(.failed(
+                            operationId: operationId,
+                            sequence: nextSequence(),
+                            error: SDKException.from(error, category: .network)
+                        ))
+                        continuation.finish()
                     }
                 }
                 continuation.onTermination = { @Sendable termination in
@@ -153,11 +188,16 @@ public extension RunAnywhere {
 
         /// Load a model now instead of waiting for the first generation call.
         ///
-        /// Only `LoadOptions.framework` reaches commons today; the remaining
-        /// placement knobs are logged and ignored until the load ABI carries them.
+        /// Only `LoadOptions.backendPreferences.first` (equivalently the
+        /// deprecated `framework`) reaches commons today. `contextLength`,
+        /// `threads`, `accelerator`, and additional ordered `backendPreferences`
+        /// are not yet carried by the native load ABI, so passing them throws
+        /// rather than being silently dropped.
         ///
-        /// - Throws: `SDKException` when the model cannot be loaded.
-        public func load(id: String, options: LoadOptions? = nil) async throws {
+        /// - Throws: `SDKException` when the model cannot be loaded, or when
+        ///   `options` sets a placement knob the load ABI cannot honor yet.
+        @discardableResult
+        public func load(id: String, options: LoadOptions? = nil) async throws -> LoadedModel {
             guard let model = await get(id: id) else {
                 throw SDKException(
                     code: .modelNotFound,
@@ -165,17 +205,47 @@ public extension RunAnywhere {
                     category: .validation
                 )
             }
-            try await RunAnywhere.loadResolved(
-                model: model,
-                category: model.category,
-                options: options
+            let category = model.category == .unspecified ? .language : model.category
+            let result = try await RunAnywhere.loadResolved(model: model, category: category, options: options)
+
+            let resolvedId = result.modelID.isEmpty ? model.id : result.modelID
+            let resolvedCategory = result.category == .unspecified ? category : result.category
+            let actualBackend = result.framework != .unspecified ? result.framework : model.framework
+            let requestedBackend = options?.backendPreferences.first?.backend
+
+            return LoadedModel(
+                id: resolvedId,
+                category: resolvedCategory,
+                requestedBackend: requestedBackend,
+                actualBackend: actualBackend,
+                actualDevice: DevicePlacement(),
+                runtimeVersion: nil,
+                abiVersion: nil,
+                fallbackReason: result.warnings.first,
+                closeHandler: { modelId in
+                    try await RunAnywhere.models.unload(id: modelId)
+                }
             )
         }
 
-        /// Unload one category, or everything when `category` is `nil`.
+        /// Release one resident model by id. Idempotent: unloading a model
+        /// that is not resident is not an error.
         ///
         /// - Throws: `SDKException` when the unload is rejected.
-        public func unload(category: ModelCategory? = nil) async throws {
+        public func unload(id: String) async throws {
+            var request = RAModelUnloadRequest()
+            request.modelID = id
+            let result = await RunAnywhere.performUnload(request)
+            guard !result.hasError else {
+                throw SDKException(proto: result.error)
+            }
+        }
+
+        /// Unload one category, or everything when `category` is `nil`. This is
+        /// the only category/global unload; `unload(id:)` releases one model.
+        ///
+        /// - Throws: `SDKException` when the unload is rejected.
+        public func unloadAll(category: ModelCategory? = nil) async throws {
             var request = RAModelUnloadRequest()
             if let category {
                 request.category = category
@@ -189,6 +259,50 @@ public extension RunAnywhere {
             guard !result.hasError else {
                 throw SDKException(proto: result.error)
             }
+        }
+
+        /// Deprecated: unload one category, or everything when `category` is `nil`.
+        @available(*, deprecated, renamed: "unloadAll(category:)")
+        public func unload(category: ModelCategory? = nil) async throws {
+            try await unloadAll(category: category)
+        }
+
+        /// Remove `id` from the registry. Registration metadata only — this
+        /// never touches downloaded files or a resident load.
+        ///
+        /// - Throws: `SDKException` when `id` is unknown, still loaded, or
+        ///   still has local artifacts. Unload or delete first.
+        public func unregister(id: String) async throws {
+            guard let info = await get(id: id) else {
+                throw SDKException(
+                    code: .modelNotFound,
+                    message: "Model '\(id)' is not registered",
+                    category: .validation
+                )
+            }
+
+            let stillLoaded = Models.trackedCategories.contains { category in
+                let snapshot = RunAnywhere.loadedModelSnapshot(category: category)
+                return snapshot.found && snapshot.modelID == id
+            }
+            guard !stillLoaded else {
+                throw SDKException(
+                    code: .invalidState,
+                    message: "Model '\(id)' is still loaded; call models.unload(id:) first",
+                    category: .validation
+                )
+            }
+
+            let hasLocalArtifacts = info.hasIsDownloaded ? info.isDownloaded : !info.localPath.isEmpty
+            guard !hasLocalArtifacts else {
+                throw SDKException(
+                    code: .invalidState,
+                    message: "Model '\(id)' still has local artifacts; call models.delete(id:) first",
+                    category: .validation
+                )
+            }
+
+            try await CppBridge.ModelRegistry.shared.remove(modelId: id)
         }
 
         /// Report what is loaded per category and how much storage is left.
@@ -313,29 +427,22 @@ extension RunAnywhere {
         return modelId
     }
 
+    @discardableResult
     internal static func loadResolved(
         model: ModelInfo,
         category: ModelCategory,
         options: LoadOptions?
-    ) async throws {
+    ) async throws -> RAModelLoadResult {
         if let options {
-            let ignored = [
-                options.contextLength != nil ? "contextLength" : nil,
-                options.threads != nil ? "threads" : nil,
-                options.useGpu != nil ? "useGpu" : nil
-            ].compactMap { $0 }
-            if !ignored.isEmpty {
-                SDKLogger.models.warning(
-                    "LoadOptions \(ignored.joined(separator: ", ")) are not carried by the commons load ABI yet"
-                )
-            }
+            try options.requireCarriableByLoadABI()
         }
 
         var request = RAModelLoadRequest()
         request.modelID = model.id
         request.category = category == .unspecified ? category.defaultLoadCategory : category
-        if let framework = options?.framework, framework != .unspecified {
-            request.framework = framework
+        request.forceReload = options?.forceReload ?? false
+        if let backend = options?.backendPreferences.first?.backend, backend != .unspecified {
+            request.framework = backend
         } else if model.framework != .unspecified {
             request.framework = model.framework
         }
@@ -347,6 +454,29 @@ extension RunAnywhere {
                 code: .modelLoadFailed,
                 message: "Model '\(model.id)': \(result.error.message)",
                 category: .component
+            )
+        }
+        return result
+    }
+}
+
+private extension LoadOptions {
+    /// `backendPreferences.first` reaches commons through the same
+    /// `RAModelLoadRequest.framework` field the deprecated `framework:`
+    /// property already uses. Everything else the native load ABI cannot
+    /// carry yet — honoring it silently would violate the "every accepted
+    /// field is implemented end to end or fails preflight" contract.
+    func requireCarriableByLoadABI() throws {
+        var unsupported: [String] = []
+        if contextLength != nil { unsupported.append("contextLength") }
+        if threads != nil { unsupported.append("threads") }
+        if accelerator != nil { unsupported.append("accelerator") }
+        if backendPreferences.count > 1 {
+            unsupported.append("backendPreferences (only the first preference reaches commons; ordered fallback is not carried)")
+        }
+        guard unsupported.isEmpty else {
+            throw SDKException.invalidConfiguration(
+                "LoadOptions.\(unsupported.joined(separator: ", ")) cannot be carried by the native load ABI yet"
             )
         }
     }

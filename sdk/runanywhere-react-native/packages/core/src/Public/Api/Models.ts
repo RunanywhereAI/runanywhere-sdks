@@ -21,7 +21,6 @@ import {
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
 import type { SDKError } from '@runanywhere/proto-ts/errors';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import {
   downloadModelStream,
   getModel as getModelProto,
@@ -30,6 +29,7 @@ import {
   registerArchiveModel,
   registerModel as registerUrlModel,
   registerMultiFileModel,
+  removeModel,
 } from '../Extensions/Models/RunAnywhere+ModelRegistry';
 import {
   loadModel,
@@ -41,14 +41,13 @@ import { getStorageInfo } from '../Extensions/Storage/RunAnywhere+Storage';
 import { mapStream } from './Stream';
 import type {
   DownloadEvent,
+  LoadedModel,
   LoadOptions,
   ModelFilter,
   ModelRegistration,
   ModelsState,
 } from './Types';
-import { ignoredLoadOptionKeys } from './LoadOptionsSupport';
-
-const logger = new SDKLogger('RunAnywhere.models');
+import { resolvedBackendPreferences, unsupportedLoadOptionKeys } from './LoadOptionsSupport';
 
 const CATEGORIES: ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -100,9 +99,11 @@ function toModelQuery(filter: ModelFilter): ModelQuery {
 
 function toDownloadEvent(
   progress: Parameters<typeof toDownloadEventInput>[0],
-  model: ModelInfo
+  model: ModelInfo,
+  operationId: string,
+  sequence: () => number
 ): DownloadEvent | undefined {
-  return toDownloadEventInput(progress, model);
+  return toDownloadEventInput(progress, model, operationId, sequence);
 }
 
 function toDownloadEventInput(
@@ -114,33 +115,38 @@ function toDownloadEventInput(
     overallProgress: number;
     error?: SDKError | undefined;
   },
-  model: ModelInfo
+  model: ModelInfo,
+  operationId: string,
+  sequence: () => number
 ): DownloadEvent | undefined {
   if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
-    throw progress.error
+    const error = progress.error
       ? new SDKException(progress.error)
       : SDKException.of(
           ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
           `download failed for ${model.id}`,
           { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
         );
+    return { type: 'failed', operationId, sequence: sequence(), error };
   }
   if (
     progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
     progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
   ) {
-    return { type: 'completed', model };
+    return { type: 'completed', operationId, sequence: sequence(), model };
   }
   if (
     progress.stage === DownloadStage.DOWNLOAD_STAGE_EXTRACTING ||
     progress.state === DownloadState.DOWNLOAD_STATE_EXTRACTING
   ) {
-    return { type: 'extracting' };
+    return { type: 'extracting', operationId, sequence: sequence() };
   }
   const bytesTotal = Number(progress.totalBytes);
   const bytesDone = Number(progress.bytesDownloaded);
   return {
     type: 'progress',
+    operationId,
+    sequence: sequence(),
     bytesDone,
     bytesTotal,
     percent:
@@ -258,17 +264,25 @@ export const models = {
     return {
       [Symbol.asyncIterator]() {
         let inner: AsyncIterator<DownloadEvent> | null = null;
+        let seq = 0;
+        let sawStarted = false;
+        const nextSeq = (): number => seq++;
         const ensureInner = async (): Promise<AsyncIterator<DownloadEvent>> => {
           if (!inner) {
             const model = await requireModel(id);
             inner = mapStream(downloadModelStream(model), (progress) =>
-              toDownloadEvent(progress, model)
+              toDownloadEvent(progress, model, id, nextSeq)
             )[Symbol.asyncIterator]();
           }
           return inner;
         };
         return {
           async next(): Promise<IteratorResult<DownloadEvent>> {
+            if (!sawStarted) {
+              sawStarted = true;
+              await ensureInner();
+              return { value: { type: 'started', operationId: id, sequence: nextSeq() }, done: false };
+            }
             return (await ensureInner()).next();
           },
           async return(): Promise<IteratorResult<DownloadEvent>> {
@@ -295,45 +309,101 @@ export const models = {
   /**
    * Load a model now instead of paying for it on the first generation.
    *
-   * `options.contextLength`, `.threads`, and `.useGpu` are not carried by the
-   * commons load ABI yet and are ignored; only `options.framework` reaches
-   * commons today.
+   * Only `options.backendPreferences[0]` (equivalently the deprecated
+   * `framework`) reaches commons today; `contextLength`, `threads`, and a
+   * real `accelerator` choice are not yet carried by the native load ABI.
    *
-   * @throws SDKException when the model is unknown or the load fails.
+   * @throws SDKException when the model is unknown, or `options` sets a
+   * placement knob the load ABI cannot honor yet.
    */
-  async load(id: string, options?: LoadOptions): Promise<void> {
+  async load(id: string, options?: LoadOptions): Promise<LoadedModel> {
     const model = await requireModel(id);
-    const ignored = ignoredLoadOptionKeys(options);
-    if (ignored.length > 0) {
-      logger.warning(
-        `LoadOptions ${ignored.join(', ')} are not carried by the commons load ABI yet`
+    const unsupported = unsupportedLoadOptionKeys(options);
+    if (unsupported.length > 0) {
+      throw SDKException.invalidInput(
+        `LoadOptions.${unsupported.join(', ')} cannot be carried by the native load ABI yet`
       );
     }
+    const requestedBackend = resolvedBackendPreferences(options)[0];
     const result = await loadModel(
       ModelLoadRequest.fromPartial({
         modelId: id,
         category: model.category,
-        ...(options?.framework !== undefined
-          ? { framework: options.framework }
-          : {}),
+        ...(requestedBackend ? { framework: requestedBackend.backend } : {}),
+        forceReload: options?.forceReload ?? false,
         validateAvailability: true,
       })
     );
     if (result.error) {
       throw new SDKException(result.error);
     }
+    return {
+      id,
+      category: model.category,
+      ...(requestedBackend ? { requestedBackend } : {}),
+      actualBackend: requestedBackend?.backend ?? model.framework,
+      actualDevice: 'unknown',
+      async close(): Promise<void> {
+        await models.unload(id);
+      },
+    };
   },
 
   /**
-   * Unload one category's model, or everything when `category` is omitted.
+   * Release one resident model by `id`. Idempotent — a no-op when `id` is
+   * not loaded.
+   *
+   * @throws SDKException when the unload fails.
    */
-  async unload(category?: ModelCategory): Promise<void> {
+  async unload(id: string): Promise<void> {
+    const model = await get(id);
+    if (!model) return;
+    const current = await modelInfoForCategory(model.category).catch(() => null);
+    if (current?.id !== id) return;
     await unloadModel(
       ModelUnloadRequest.fromPartial({
-        unloadAll: true,
+        modelId: id,
+        category: model.category,
+        unloadAll: false,
+      })
+    );
+  },
+
+  /**
+   * Unload the model resident under `category`, or every resident model
+   * when `category` is omitted. This is the only category/global unload;
+   * `unload` releases exactly one model by id.
+   */
+  async unloadAll(category?: ModelCategory): Promise<void> {
+    await unloadModel(
+      ModelUnloadRequest.fromPartial({
+        unloadAll: category === undefined,
         ...(category !== undefined ? { category } : {}),
       })
     );
+  },
+
+  /**
+   * Remove `id` from the registry. Registration metadata only — `id` must
+   * already be unloaded and have no local artifacts.
+   *
+   * @throws SDKException when `id` is unknown, still loaded, or still has
+   * local artifacts; call `unload`/`delete` first.
+   */
+  async unregister(id: string): Promise<void> {
+    const model = await requireModel(id);
+    const current = await modelInfoForCategory(model.category).catch(() => null);
+    if (current?.id === id) {
+      throw SDKException.invalidState(
+        `Model '${id}' is currently loaded. Call models.unload('${id}') before unregister.`
+      );
+    }
+    if (model.isDownloaded || model.localPath) {
+      throw SDKException.invalidState(
+        `Model '${id}' still has local artifacts. Call models.delete('${id}') before unregister.`
+      );
+    }
+    await removeModel(id);
   },
 
   /**

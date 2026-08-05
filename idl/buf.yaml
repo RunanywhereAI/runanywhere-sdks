@@ -1,0 +1,18 @@
+# Buf configuration for RunAnywhere IDL.
+# FILE for intentionally public generated packages; WIRE for C-ABI/event/manifests.
+version: v2
+modules:
+  - path: .
+    name: buf.build/runanywhere/idl
+lint:
+  use:
+    - STANDARD
+  except:
+    - PACKAGE_VERSION_SUFFIX
+    - PACKAGE_DIRECTORY_MATCH
+breaking:
+  use:
+    - WIRE
+  except:
+    - EXTENSION_NO_DELETE
+    - FIELD_SAME_DEFAULT

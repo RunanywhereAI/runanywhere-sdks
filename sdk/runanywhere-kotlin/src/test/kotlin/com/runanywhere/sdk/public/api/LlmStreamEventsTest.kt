@@ -2,18 +2,14 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Characterizes and locks in the native-stream-completion contract for
- * `RunAnywhere.llm.generateStream` (PR #605 review issue #4).
- *
- * The native boundary can legitimately resolve a stream call without ever
- * sending an `is_final` proto event. Swift treats that as a successful
- * completion and synthesizes a wall-clock result
- * (`RunAnywhere.synthesizeResult` in
- * `runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LLMNamespace.swift`)
- * rather than throwing, as long as at least one native event was observed.
+ * Characterizes the native-stream-completion contract for
+ * `RunAnywhere.llm.generateStream` under the v4 public API spec: a stream
+ * never fabricates a successful `completed`. A native call that resolves
+ * without ever sending an `is_final` proto event emits `failed` instead
+ * (mirrors Swift's `RunAnywhere.mapGenerationStream` in
+ * `runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LLMNamespace.swift`).
  * [mapLLMStreamEvents] is the injectable core [LlmNamespace.streamEvents]
- * delegates to, so these tests exercise the real fold/synthesis logic
- * without a JNI bridge.
+ * delegates to, so these tests exercise the real fold logic without a JNI bridge.
  */
 
 package com.runanywhere.sdk.public.api
@@ -32,7 +28,7 @@ import org.junit.Test
 
 class LlmStreamEventsTest {
     @Test
-    fun `characterization -- native stream ending without is_final synthesizes a completion instead of stopping silently`() =
+    fun `native stream ending without is_final emits failed instead of fabricating a completion`() =
         runBlocking {
             val raw =
                 flowOf(
@@ -46,18 +42,15 @@ class LlmStreamEventsTest {
             assertEquals(
                 listOf(
                     GenerationEvent.Started::class,
-                    GenerationEvent.Token::class,
-                    GenerationEvent.Token::class,
-                    GenerationEvent.Completed::class,
+                    GenerationEvent.TextDelta::class,
+                    GenerationEvent.TextDelta::class,
+                    GenerationEvent.Failed::class,
                 ),
                 events.map { it::class },
             )
-            val completed = events.last() as GenerationEvent.Completed
-            assertEquals("Hello", completed.result.text)
-            assertEquals(2, completed.result.outputTokens)
-            assertEquals(FinishReason.STOP, completed.result.finishReason)
-            assertEquals("req-1", completed.result.requestId)
-            assertEquals("model-a", completed.result.model)
+            val failed = events.last() as GenerationEvent.Failed
+            assertEquals("Hello", failed.partial)
+            assertTrue(failed.error.message.orEmpty().contains("terminal event"))
         }
 
     @Test
@@ -78,7 +71,7 @@ class LlmStreamEventsTest {
             assertEquals(
                 listOf(
                     GenerationEvent.Started::class,
-                    GenerationEvent.Token::class,
+                    GenerationEvent.TextDelta::class,
                     GenerationEvent.Completed::class,
                 ),
                 events.map { it::class },
@@ -101,7 +94,7 @@ class LlmStreamEventsTest {
         }
 
     @Test
-    fun `thinking tokens are folded into thinkingText on a synthesized completion`() =
+    fun `thinking tokens are folded into thinkingText on a terminal completion`() =
         runBlocking {
             val raw =
                 flowOf(
@@ -110,17 +103,16 @@ class LlmStreamEventsTest {
                         is_final = false,
                         kind = TokenKind.TOKEN_KIND_THOUGHT,
                     ),
-                    LLMStreamEvent(token = "answer", is_final = false),
+                    LLMStreamEvent(token = "answer", is_final = true, finish_reason = "stop"),
                 )
 
             val events = mapLLMStreamEvents("req-4", "model-a", raw).toList()
             val completed = events.last() as GenerationEvent.Completed
-            assertEquals("answer", completed.result.text)
             assertEquals("thinking...", completed.result.thinkingText)
         }
 
     @Test
-    fun `an in-flight error event still throws instead of being swallowed by synthesis`() =
+    fun `an in-flight error event emits failed rather than a fabricated completion`() =
         runBlocking {
             val raw =
                 flowOf(
@@ -132,11 +124,17 @@ class LlmStreamEventsTest {
                     ),
                 )
 
-            try {
-                mapLLMStreamEvents("req-5", "model-a", raw).toList()
-                fail("expected an SDKException")
-            } catch (e: SDKException) {
-                assertTrue(e.message.orEmpty().contains("backend crashed"))
-            }
+            val events = mapLLMStreamEvents("req-5", "model-a", raw).toList()
+
+            assertEquals(
+                listOf(
+                    GenerationEvent.Started::class,
+                    GenerationEvent.TextDelta::class,
+                    GenerationEvent.Failed::class,
+                ),
+                events.map { it::class },
+            )
+            val failed = events.last() as GenerationEvent.Failed
+            assertTrue(failed.error.message.orEmpty().contains("backend crashed"))
         }
 }

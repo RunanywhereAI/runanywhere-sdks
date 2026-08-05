@@ -136,19 +136,23 @@ class TTSViewModel extends VoiceComponentViewModelBase {
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      final result = await sdk.RunAnywhere.tts.speak(
-        text,
-        options: sdk.TtsOptions(speed: _speechRate, pitch: pitch),
-      );
-
-      duration = result.durationMs / 1000.0;
+      final options = sdk.TtsOptions(speed: _speechRate, pitch: pitch);
+      // `speak()` returns a playback `SpeechHandle`, not audio bytes, so the
+      // metadata card comes from a separate `synthesize()` call — the same
+      // request commons would otherwise run once inside `speak()`.
+      final audio = await sdk.RunAnywhere.tts.synthesize(text, options: options);
+      duration = audio.durationMs / 1000.0;
       metadata = TTSMetadata(
-        durationMs: result.durationMs.toDouble(),
-        audioSize: result.data.length,
-        sampleRate: result.sampleRate,
+        durationMs: audio.durationMs.toDouble(),
+        audioSize: audio.data.length,
+        sampleRate: audio.sampleRate,
       );
-      debugPrint(
-          'Speak complete: ${result.sampleRate} Hz, ${result.durationMs}ms');
+      debugPrint('Synthesized: ${audio.sampleRate} Hz, ${audio.durationMs}ms');
+
+      final handle = sdk.RunAnywhere.tts.speak(text, options: options);
+      await handle.waitForPlayout();
+      final speakError = handle.error;
+      if (speakError != null) throw speakError;
     } catch (e) {
       debugPrint('Speech generation failed: $e');
       errorMessage = 'Speech generation failed: $e';

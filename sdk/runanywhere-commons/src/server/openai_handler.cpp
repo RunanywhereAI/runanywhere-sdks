@@ -300,12 +300,24 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/, httplib::R
                 const std::string* modelId;
                 int64_t created;
                 int32_t tokenCount;
+                std::string finishReason;
             };
 
-            StreamCtx ctx = {&sink, &requestId, &modelId_, created, 0};
+            StreamCtx ctx = {&sink, &requestId, &modelId_, created, 0, {}};
 
-            auto streamCallback = [](const char* token, void* user_data) -> rac_bool_t {
+            auto streamCallback = [](const char* token, rac_bool_t is_final,
+                                     const char* finish_reason, void* user_data) -> rac_bool_t {
                 auto* ctx = static_cast<StreamCtx*>(user_data);
+
+                if (is_final) {
+                    if (finish_reason != nullptr && finish_reason[0] != '\0') {
+                        ctx->finishReason = finish_reason;
+                    }
+                    // Empty finals are terminal signals — do not emit SSE content.
+                    if (token == nullptr || token[0] == '\0') {
+                        return RAC_TRUE;
+                    }
+                }
 
                 if (token && token[0] != '\0') {
                     // Send content chunk with this token
@@ -358,7 +370,15 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/, httplib::R
                 rac_openai_stream_choice_t choice = {};
                 choice.index = 0;
                 choice.delta = delta;
-                choice.finish_reason = RAC_OPENAI_FINISH_STOP;
+                if (ctx.finishReason == "length") {
+                    choice.finish_reason = RAC_OPENAI_FINISH_LENGTH;
+                } else if (ctx.finishReason == "tool_calls") {
+                    choice.finish_reason = RAC_OPENAI_FINISH_TOOL_CALLS;
+                } else if (ctx.finishReason == "error") {
+                    choice.finish_reason = RAC_OPENAI_FINISH_ERROR;
+                } else {
+                    choice.finish_reason = RAC_OPENAI_FINISH_STOP;
+                }
 
                 chunk.choices = &choice;
                 chunk.num_choices = 1;

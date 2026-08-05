@@ -144,9 +144,11 @@ class RAGViewModel extends ChangeNotifier {
       final result = await session.query(
         question,
         options: _llmSupportsThinking && !thinkingModeEnabled
-            ? LlmOptions(
-                reasoning: const ReasoningOptions(
-                  mode: ReasoningMode.REASONING_MODE_OFF,
+            ? RagQueryOptions(
+                generation: LlmOptions(
+                  reasoning: const ReasoningOptions(
+                    mode: ReasoningMode.REASONING_MODE_OFF,
+                  ),
                 ),
               )
             : null,

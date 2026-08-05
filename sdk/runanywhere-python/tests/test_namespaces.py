@@ -43,6 +43,14 @@ def sherpa_dir(tmp_path) -> str:
     return str(directory)
 
 
+@pytest.fixture()
+def sortformer_dir(tmp_path) -> str:
+    """A local directory path standing in for an unpacked ONNX diarization model."""
+    directory = tmp_path / "sortformer-model"
+    directory.mkdir()
+    return str(directory)
+
+
 def _wav(seconds: float = 1.0, rate: int = 16000, amplitude: float = 0.0) -> AudioInput:
     samples = np.full(int(rate * seconds), amplitude, dtype=np.float32)
     return AudioInput.wav(encode_wav(samples, rate))
@@ -280,37 +288,164 @@ def test_rerank_reports_the_missing_symbols(sdk) -> None:
     assert "rac_rerank_component_rerank_proto" in str(error.value)
 
 
-def test_images_report_the_missing_symbols(sdk) -> None:
+# --------------------------------------------------------------------------- images
+# native/module.cpp exports load_diffusion_model only when RAC_HAVE_BACKEND_COREML;
+# the fake core simulates a CoreML-enabled build so generate() smokes the real shape.
+def test_images_generate_returns_rgba(sdk, tmp_path) -> None:
+    model_dir = tmp_path / "sd-model"
+    model_dir.mkdir()
+    result = ra.images.generate(
+        "a cat", ImageOptions(model=str(model_dir), width=32, height=32, seed=7)
+    )
+    assert len(result.images) == 1
+    assert result.images[0].width == 32 and result.images[0].height == 32
+    assert len(result.images[0].data) == 32 * 32 * 4
+    assert result.seed == 7
+
+
+def test_images_generate_stream_still_unsupported(sdk) -> None:
     with pytest.raises(SDKException) as error:
-        ra.images.generate("a cat", ImageOptions())
-    assert "rac_diffusion_generate_proto" in str(error.value)
-    with pytest.raises(SDKException):
-        ra.images.generate_stream("a cat")
+        next(ra.images.generate_stream("a cat"))
+    assert "generate_stream" in str(error.value)
 
 
-def test_diarization_reports_the_missing_symbols(sdk) -> None:
+def test_images_report_unavailable_when_symbols_missing(sdk, monkeypatch, tmp_path) -> None:
+    monkeypatch.delattr(type(sdk), "load_diffusion_model")
+    model_dir = tmp_path / "sd-model"
+    model_dir.mkdir()
     with pytest.raises(SDKException) as error:
-        ra.diarization.diarize(_wav(0.1), DiarizationOptions())
-    assert "rac_diarization_component_diarize_proto" in str(error.value)
+        ra.images.generate("a cat", ImageOptions(model=str(model_dir)))
+    assert "RAC_HAVE_BACKEND_COREML" in str(error.value) or "diffusion" in str(error.value).lower()
 
 
-def test_segmentation_reports_the_missing_symbols(sdk, tmp_path) -> None:
+# --------------------------------------------------------------------------- segmentation
+# native/module.cpp binds load_segmentation_model/segment (rac_segmentation_create/
+# initialize/segment) — same smoke-vs-stub split as diarization.
+def test_segmentation_returns_mask_and_classes(sdk, tmp_path) -> None:
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    pixels = bytes([255, 0, 0]) * (8 * 8)
+    result = ra.segmentation.segment(
+        ImageInput.raw_rgb(pixels, 8, 8),
+        SegmentationOptions(model=str(model_dir)),
+    )
+    assert result.width == 8 and result.height == 8
+    assert len(result.class_mask) == 8 * 8 * 2  # uint16 LE
+    assert [c.label for c in result.classes] == ["bg", "fg"]
+
+
+def test_segmentation_requires_raw_rgb(sdk, tmp_path) -> None:
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
     image = tmp_path / "x.png"
     image.write_bytes(b"\x89PNG")
     with pytest.raises(SDKException) as error:
-        ra.segmentation.segment(ImageInput.file(str(image)), SegmentationOptions())
-    assert "rac_segmentation_component_segment_proto" in str(error.value)
+        ra.segmentation.segment(
+            ImageInput.file(str(image)), SegmentationOptions(model=str(model_dir))
+        )
+    assert "raw RGB" in str(error.value)
 
 
-def test_lora_reports_the_missing_symbols(sdk) -> None:
-    for call in (lambda: ra.lora.apply("a"), lambda: ra.lora.remove(), lambda: ra.lora.list()):
-        with pytest.raises(SDKException) as error:
-            call()
-        assert "rac_lora_apply_proto" in str(error.value)
+def test_segmentation_report_unavailable_when_symbols_missing(
+    sdk, monkeypatch, tmp_path
+) -> None:
+    monkeypatch.delattr(type(sdk), "load_segmentation_model")
+    model_dir = tmp_path / "seg-model"
+    model_dir.mkdir()
+    pixels = bytes([0, 0, 0]) * 4
+    with pytest.raises(SDKException) as error:
+        ra.segmentation.segment(
+            ImageInput.raw_rgb(pixels, 2, 2), SegmentationOptions(model=str(model_dir))
+        )
+    assert "rebuild the native extension" in str(error.value)
 
 
-def test_voice_session_reports_the_missing_symbols(sdk) -> None:
+# --------------------------------------------------------------------------- diarization
+# native/module.cpp binds load_diarization_model/diarize (rac_diarization_create/
+# initialize/diarize) — the fake core simulates a "bound" build, so these smoke the real
+# call shapes rather than the capability gap.
+def test_diarize_returns_segments_and_speaker_count(sdk, sortformer_dir) -> None:
+    result = ra.diarization.diarize(_wav(1.0), DiarizationOptions(model=sortformer_dir))
+    assert result.speaker_count == 2
+    assert [s.speaker_id for s in result.segments] == ["speaker_0", "speaker_1"]
+    assert result.segments[0].start_ms == 0 and result.segments[0].end_ms == 500
+
+
+def test_diarize_requires_a_model_the_first_time(sdk) -> None:
+    with pytest.raises(SDKException):
+        ra.diarization.diarize(_wav(0.1))
+
+
+def test_diarize_passes_options_through(sdk, sortformer_dir) -> None:
+    ra.diarization.diarize(
+        _wav(0.2),
+        DiarizationOptions(
+            model=sortformer_dir, threshold=0.7, minimum_duration_ms=250, merge_gap_ms=100
+        ),
+    )
+    _handle, _n, sample_rate_hz, threshold, min_dur, merge_gap = sdk.args_of("diarize")
+    assert sample_rate_hz == 16000
+    assert threshold == 0.7 and min_dur == 250 and merge_gap == 100
+
+
+# --------------------------------------------------------------------------- lora
+# native/module.cpp binds lora_apply/lora_remove/lora_remove_all (rac_llm_component_
+# {load,remove,clear}_lora) — same smoke-vs-stub split as diarization above. list() has
+# no native read-back, so it mirrors the applied set client-side (see _handles.LLMModel).
+def test_lora_apply_remove_and_list_round_trip(sdk, gguf) -> None:
+    ra.llm.generate("hi", LlmOptions(model=gguf))  # a resident LLM is required
+    assert ra.lora.list().applied == []
+
+    ra.lora.apply("adapter.gguf", scale=0.5)
+    state = ra.lora.list()
+    assert len(state.applied) == 1
+    assert state.applied[0].id == "adapter.gguf" and state.applied[0].scale == 0.5
+    handle, adapter_path, scale = sdk.args_of("lora_apply")
+    assert adapter_path == "adapter.gguf" and scale == 0.5
+
+    ra.lora.remove("adapter.gguf")
+    assert ra.lora.list().applied == []
+    assert sdk.args_of("lora_remove") == (handle, "adapter.gguf")
+
+    ra.lora.apply("a.gguf")
+    ra.lora.apply("b.gguf")
+    ra.lora.remove_all()
+    assert ra.lora.list().applied == []
+    assert sdk.count("lora_remove_all") == 1
+
+
+def test_lora_list_is_empty_without_a_resident_llm(sdk) -> None:
+    assert ra.lora.list().applied == []
+
+
+def test_lora_apply_requires_a_resident_llm(sdk) -> None:
+    with pytest.raises(SDKException):
+        ra.lora.apply("adapter.gguf")
+
+
+# --------------------------------------------------------------------------- voice
+# native/module.cpp binds create_voice_agent / initialize_voice_agent /
+# process_voice_turn (file-PCM STT→LLM→TTS — no mic).
+def test_voice_session_process_turn(sdk, sherpa_dir, gguf, tmp_path) -> None:
+    tts_dir = tmp_path / "tts-model"
+    tts_dir.mkdir()
+    session = ra.voice.create_session(
+        ModelRef(sherpa_dir), ModelRef(gguf), ModelRef(str(tts_dir))
+    )
+    try:
+        result = session.process_turn(_wav(0.2))
+        assert result.transcription == "hello there"
+        assert result.response == "hi from the agent"
+        assert result.speech_detected is True
+        assert result.audio.data[:4] == b"RIFF"
+        assert sdk.count("process_voice_turn") == 1
+    finally:
+        session.close()
+    assert sdk.count("destroy_voice_agent") == 1
+
+
+def test_voice_session_reports_unavailable_when_symbols_missing(sdk, monkeypatch) -> None:
+    monkeypatch.delattr(type(sdk), "create_voice_agent")
     with pytest.raises(SDKException) as error:
         ra.voice.create_session(ModelRef("stt"), ModelRef("llm"), ModelRef("tts"))
-    assert "rac_voice_agent_initialize_proto" in str(error.value)
-    assert "microphone" in str(error.value)
+    assert "rebuild the native extension" in str(error.value)

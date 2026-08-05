@@ -14,6 +14,8 @@ from typing import List, Optional
 from .inputs import AudioFormat, ImageInput, InferenceFramework, JsonSchema, ToolDefinition
 
 __all__ = [
+    "AcceleratorPolicy",
+    "BackendPreference",
     "DiarizationOptions",
     "EmbedOptions",
     "Endpointing",
@@ -26,10 +28,13 @@ __all__ = [
     "LoadOptions",
     "PoolingMode",
     "RagConfig",
+    "RagQueryOptions",
+    "RagRetrievalOptions",
     "ReasoningMode",
     "ReasoningOptions",
     "SegmentationOptions",
     "StructuredOutput",
+    "StructuredOutputMode",
     "SttOptions",
     "ToolChoice",
     "ToolChoiceMode",
@@ -72,6 +77,17 @@ class StructuredOutput:
 
     schema: JsonSchema
     strict: bool = True
+
+
+class StructuredOutputMode(IntEnum):
+    """Enforcement level ``llm.generate_structured`` applies to its schema."""
+
+    #: Engine-constrained decoding; fails preflight until wired in.
+    CONSTRAINED = 0
+    #: Generate freely, then validate against the schema.
+    VALIDATION_ONLY = 1
+    #: Validate, then retry once with a repair instruction when invalid.
+    REPAIR = 2
 
 
 class ToolChoiceMode(IntEnum):
@@ -267,10 +283,70 @@ class RagConfig:
 
 
 @dataclass
+class RagRetrievalOptions:
+    """Per-query retrieval overrides for ``RagSession.query``/``query_stream``."""
+
+    top_k: Optional[int] = None
+    similarity_threshold: Optional[float] = None
+
+
+@dataclass
+class RagQueryOptions:
+    """Per-query knobs for ``RagSession.query``/``query_stream``."""
+
+    retrieval: Optional[RagRetrievalOptions] = None
+    generation: Optional[LlmOptions] = None
+
+
+class AcceleratorPolicy(IntEnum):
+    """Hardware class :attr:`LoadOptions.accelerator` requests."""
+
+    AUTO = 0
+    CPU = 1
+    GPU = 2
+    NPU = 3
+
+
+@dataclass(frozen=True)
+class BackendPreference:
+    """One ranked backend choice for :attr:`LoadOptions.backend_preferences`."""
+
+    backend: InferenceFramework
+    #: ``True`` fails the load instead of falling back past this entry.
+    required: bool = False
+
+
+@dataclass
 class LoadOptions:
     """Placement knobs applied when a model is loaded."""
 
-    framework: Optional[InferenceFramework] = None
+    #: Ranked backend choices; the first entry the platform can honor wins.
+    backend_preferences: List[BackendPreference] = field(default_factory=list)
+    #: Hardware class to run on.
+    accelerator: Optional[AcceleratorPolicy] = None
     context_length: Optional[int] = None
     threads: Optional[int] = None
+    #: Reload even when the model is already resident.
+    force_reload: bool = False
+    #: Deprecated: use ``backend_preferences``; kept as a thin adapter for one release.
+    framework: Optional[InferenceFramework] = None
+    #: Deprecated: use ``accelerator``; kept as a thin adapter for one release.
     use_gpu: Optional[bool] = None
+
+    @property
+    def resolved_backend_preferences(self) -> List[BackendPreference]:
+        """:attr:`backend_preferences`, folding in the deprecated :attr:`framework` alias."""
+        if self.backend_preferences:
+            return self.backend_preferences
+        if self.framework is not None:
+            return [BackendPreference(self.framework)]
+        return []
+
+    @property
+    def resolved_accelerator(self) -> Optional[AcceleratorPolicy]:
+        """:attr:`accelerator`, folding in the deprecated :attr:`use_gpu` alias."""
+        if self.accelerator is not None:
+            return self.accelerator
+        if self.use_gpu is not None:
+            return AcceleratorPolicy.GPU if self.use_gpu else AcceleratorPolicy.CPU
+        return None

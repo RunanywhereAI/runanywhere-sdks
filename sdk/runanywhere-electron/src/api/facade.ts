@@ -8,6 +8,7 @@
 import { SDKException } from '../errors';
 import { bus } from '../events';
 import {
+  IMAGES_GAP,
   createImagesNamespace,
   createLoraNamespace,
   createModelsNamespace,
@@ -38,8 +39,8 @@ import type {
 } from './speech';
 import { createLlmNamespace, createVlmNamespace } from './text';
 import type { LlmNamespace, VlmNamespace } from './text';
-import { Environment, audio, image, ragDocument } from './types';
-import type { SdkEvent } from './types';
+import { AudioFormat, Environment, InferenceFramework, audio, image, ragDocument } from './types';
+import type { SDKCapabilities, SdkEvent, UnavailableCapability } from './types';
 
 /** Everything {@link RunAnywhereApi.initialize} accepts. */
 export interface InitializeOptions {
@@ -90,6 +91,14 @@ export interface RunAnywhereApi {
   readonly deviceId: string;
   /** The configured deployment environment. */
   readonly environment: Environment;
+  /**
+   * Installed, packaged, and executable surface of this build. Generated
+   * from packaging facts about the linked addon, never from namespace
+   * presence alone — an unavailable modality is reported honestly in
+   * `unavailable` instead of failing with a generic error the first time
+   * it is used.
+   */
+  capabilities(): Promise<SDKCapabilities>;
   /** Lifecycle, model, and error breadcrumbs. */
   readonly events: AsyncIterableIterator<SdkEvent>;
 
@@ -119,6 +128,64 @@ export interface RunAnywhereApi {
   readonly image: typeof image;
   /** Constructors for {@link RagDocument}. */
   readonly ragDocument: typeof ragDocument;
+}
+
+// Modality ids not part of the v4 public API surface on any platform, plus the
+// mobile-only runtimes this native addon never links — honest even before
+// `initialize()` runs, since these are packaging facts, not runtime state.
+const UNAVAILABLE_CAPABILITIES: UnavailableCapability[] = [
+  { name: 'agents', reason: 'RunAnywhere.agents is not part of the v4 public API surface.' },
+  { name: 'wakeword', reason: 'RunAnywhere.wakeword is not part of the v4 public API surface.' },
+  {
+    name: 'realtime',
+    reason: 'RunAnywhere.realtime is not part of the v4 public API surface (no WebRTC/SIP/S2S transport namespace).',
+  },
+  {
+    name: 'litert',
+    reason: 'LiteRT is an Android/mobile inference runtime; the Electron addon links llama.cpp, ONNX Runtime, and sherpa-onnx only.',
+  },
+  {
+    name: 'executorch',
+    reason: 'ExecuTorch is a mobile inference runtime; the Electron addon links llama.cpp, ONNX Runtime, and sherpa-onnx only.',
+  },
+  { name: 'images', reason: IMAGES_GAP },
+];
+
+/**
+ * Honest snapshot of what this Electron build can actually reach.
+ *
+ * The three engines (`InferenceFramework.LLAMA_CPP`/`ONNX`/`SHERPA`) and the
+ * modalities built on them are statically linked into every build of this
+ * addon (see `native-backend.ts`'s per-slot `load()`/`unloadHandle()`), so
+ * their presence is a packaging fact rather than something that needs a
+ * runtime probe. `images` is the one modality with namespace code but no
+ * linked backend — reported in `unavailable` with the exact missing symbol,
+ * matching the gap `images.ts` itself throws for.
+ */
+function capabilitiesSnapshot(): SDKCapabilities {
+  return {
+    modalities: [
+      'llm', 'vlm', 'stt', 'tts', 'vad', 'embeddings', 'rerank',
+      'diarization', 'segmentation', 'rag', 'lora',
+    ],
+    backends: [InferenceFramework.LLAMA_CPP, InferenceFramework.ONNX, InferenceFramework.SHERPA],
+    // Only formats this SDK can actually round-trip: raw PCM for live streams,
+    // plus WAV through the built-in RIFF codec (audio.ts's encodeWav/decodeWav).
+    audioFormats: [AudioFormat.PCM, AudioFormat.WAV],
+    streaming: { llm: true, vlm: true, stt: true, tts: true, vad: true, rag: true, images: false },
+    tools: {
+      registry: true,
+      // llm.tools runs one grammar-constrained selection round at a time (text.ts's runToolLoop).
+      parallel: false,
+      cancellation: true,
+    },
+    rag: {
+      // Each rag.open() gets its own native session handle (native-backend.ts's ragSessions map).
+      multiSession: true,
+      persistent: true,
+    },
+    unavailable: UNAVAILABLE_CAPABILITIES,
+  };
 }
 
 const DEVICE_ID_KEY = 'runanywhere.deviceId';
@@ -228,6 +295,7 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
     get environment() {
       return environment;
     },
+    capabilities: () => Promise.resolve(capabilitiesSnapshot()),
     get events() {
       return hub.stream();
     },
