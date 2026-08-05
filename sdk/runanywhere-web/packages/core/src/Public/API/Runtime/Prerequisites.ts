@@ -59,6 +59,7 @@ export async function ensureModelForCategory(
     framework: model.framework,
     forceReload: false,
     validateAvailability: true,
+    backendPreferences: [],
   });
   if (!result || result.error) {
     throw result?.error

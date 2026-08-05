@@ -320,6 +320,7 @@ export const models = {
       framework,
       forceReload: options?.forceReload ?? false,
       validateAvailability: true,
+      backendPreferences: [],
     });
     if (!result || result.error) {
       throw result?.error

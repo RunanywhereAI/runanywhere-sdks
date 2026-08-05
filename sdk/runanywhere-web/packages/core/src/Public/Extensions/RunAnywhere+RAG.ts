@@ -1397,6 +1397,7 @@ async function loadRagArtifactModel(
     ...(model?.framework !== undefined ? { framework: model.framework } : {}),
     forceReload: false,
     validateAvailability: false,
+    backendPreferences: [],
   });
   if (!result || result.error) {
     const message = result?.error?.message

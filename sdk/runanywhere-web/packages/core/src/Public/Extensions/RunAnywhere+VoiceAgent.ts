@@ -382,6 +382,7 @@ export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       forceReload: false,
       validateAvailability: false,
+      backendPreferences: [],
     });
     if (!result || result.error) {
       logger.warning(

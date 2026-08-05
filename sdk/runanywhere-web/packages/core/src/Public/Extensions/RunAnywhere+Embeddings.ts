@@ -95,6 +95,7 @@ async function ensureLoaded(modelID: string): Promise<InferenceFramework | undef
     category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
     forceReload: true,
     validateAvailability: true,
+    backendPreferences: [],
   });
 
   if (!result || result.error) {
