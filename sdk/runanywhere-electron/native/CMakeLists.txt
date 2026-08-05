@@ -111,6 +111,19 @@ if(RAC_BUILD_ELECTRON_ADDON)
     endforeach()
     message(STATUS "runanywhere-electron: engine backends -> ${_ra_linked_backends}")
 
+    # Desktop control plane (telemetry + auth). When the desktop adapter is built
+    # into commons (RAC_DESKTOP_ADAPTER=ON), it carries the libcurl HTTP transport
+    # that auth/model-assignments/telemetry POST through; commons links CURL::libcurl
+    # PUBLIC, so our link on rac_commons inherits it. Tell addon.cpp the
+    # rac_desktop_* + two-phase-init surface is available.
+    if(RAC_DESKTOP_ADAPTER)
+        target_compile_definitions(runanywhere_native PRIVATE RAC_ELECTRON_HAVE_DESKTOP)
+        message(STATUS "runanywhere-electron: desktop control plane enabled (telemetry + auth)")
+    else()
+        message(STATUS "runanywhere-electron: desktop control plane OFF "
+                       "(pass -DRAC_DESKTOP_ADAPTER=ON to enable telemetry/auth)")
+    endif()
+
     if(MSVC)
         target_link_directories(runanywhere_native PRIVATE "${_ra_bundled_dir}")
         target_compile_definitions(runanywhere_native PRIVATE

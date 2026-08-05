@@ -27,6 +27,28 @@ export interface NativeGenerationMetrics {
 export interface NativeAddon {
   readonly version: string;
   initialize(secureDir: string, baseDir?: string): void;
+  // Desktop control plane (telemetry + auth). Present only when the addon is
+  // built with the desktop libcurl transport (RAC_DESKTOP_ADAPTER=ON); guarded
+  // by `hasControlPlane`. `configureControlPlane` runs the two-phase init off the
+  // JS thread and resolves the serialized SdkInitResult bytes. `environment` is a
+  // rac_environment_t (0=dev, 2=prod); phase bytes are SdkInit{Phase1,Phase2}Request.
+  readonly hasControlPlane?: boolean;
+  devicePersistentId?(): string;
+  devStagingBaseUrl?(): string;
+  configureControlPlane?(
+    environment: number,
+    apiKey: string,
+    baseUrl: string,
+    deviceId: string,
+    platform: string,
+    sdkVersion: string,
+    sdkBinding: string,
+    appIdentifier: string,
+    appName: string,
+    appVersion: string,
+    phase1Bytes: Uint8Array,
+    phase2Bytes: Uint8Array
+  ): Promise<Uint8Array>;
   secureSet(key: string, value: string): void;
   secureGet(key: string): string | null;
   secureDelete(key: string): void;

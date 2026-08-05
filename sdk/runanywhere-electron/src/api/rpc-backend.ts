@@ -16,6 +16,7 @@ import type {
 import { rpcMethodFor } from './backend';
 import type {
   BackendLoadOptions,
+  ControlPlaneRequest,
   LoadSlot,
   LoadedModel,
   NativeAudio,
@@ -58,6 +59,20 @@ export class RpcBackend implements RaBackend {
   }
   shutdown(): Promise<void> {
     return this.call('shutdown', []);
+  }
+
+  // ---- desktop control plane (telemetry + auth) ----
+  hasControlPlane(): Promise<boolean> {
+    return this.call('hasControlPlane', []);
+  }
+  devicePersistentId(): Promise<string> {
+    return this.call('devicePersistentId', []);
+  }
+  devStagingBaseUrl(): Promise<string> {
+    return this.call('devStagingBaseUrl', []);
+  }
+  configureControlPlane(req: ControlPlaneRequest): Promise<Uint8Array> {
+    return this.call('configureControlPlane', [req]);
   }
 
   // ---- model store ----

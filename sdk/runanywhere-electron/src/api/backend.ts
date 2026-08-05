@@ -154,12 +154,39 @@ export interface StorageReport {
   freeBytes: number;
 }
 
+/** Inputs for {@link RaBackend.configureControlPlane}. Phase bytes are serialized
+ * SdkInit{Phase1,Phase2}Request; `environment` is a rac_environment_t (0=dev, 2=prod). */
+export interface ControlPlaneRequest {
+  environment: number;
+  apiKey: string;
+  baseUrl: string;
+  deviceId: string;
+  platform: string;
+  sdkVersion: string;
+  sdkBinding: string;
+  appIdentifier: string;
+  appName: string;
+  appVersion: string;
+  phase1Bytes: Uint8Array;
+  phase2Bytes: Uint8Array;
+}
+
 /** Everything a v3 namespace needs from its host. */
 export interface RaBackend {
   // ---- lifecycle ----
   version(): Promise<string>;
   initialize(opts: { secureDir?: string; baseDir?: string }): Promise<void>;
   shutdown(): Promise<void>;
+
+  // ---- desktop control plane (telemetry + auth) ----
+  /** Whether this build carries the desktop libcurl transport (auth + telemetry). */
+  hasControlPlane(): Promise<boolean>;
+  /** The persistent per-device UUID commons mints (empty if unavailable). */
+  devicePersistentId(): Promise<string>;
+  /** Baked staging backend URL for keyless development (empty when none). */
+  devStagingBaseUrl(): Promise<string>;
+  /** Register the transport, seed state, and run two-phase init. Returns SdkInitResult bytes. */
+  configureControlPlane(req: ControlPlaneRequest): Promise<Uint8Array>;
 
   // ---- model store ----
   resolveModel(source: string, onProgress?: (p: DownloadProgress) => void): Promise<ResolvedModel>;
@@ -272,6 +299,10 @@ export const BACKEND_METHODS: readonly string[] = [
   'version',
   'initialize',
   'shutdown',
+  'hasControlPlane',
+  'devicePersistentId',
+  'devStagingBaseUrl',
+  'configureControlPlane',
   'resolveModel',
   'modelStatus',
   'pathExists',

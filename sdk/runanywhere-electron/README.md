@@ -49,9 +49,11 @@ for await (const event of RunAnywhere.llm.generateStream(
 await RunAnywhere.reset();
 ```
 
-`apiKey` and `baseUrl` are accepted by `initialize` and currently ignored: this SDK
-has no control plane yet, so it does not authenticate, register a device, or report
-telemetry. `deviceId` is minted locally.
+`apiKey` and `baseUrl` drive authentication and telemetry on a desktop-control-plane
+build (`RAC_DESKTOP_ADAPTER=ON`): `initialize` runs the two-phase handshake over the
+bundled libcurl transport. On an inference-only build they are accepted and ignored.
+`deviceId` is the persistent id commons mints once the control plane runs, otherwise a
+locally-minted fallback.
 
 Point at a custom native build with `RUNANYWHERE_NATIVE_PATH` if you are not using
 the bundled prebuild.

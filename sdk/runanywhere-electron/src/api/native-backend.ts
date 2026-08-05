@@ -41,6 +41,7 @@ import type {
   NativeSttInfo,
   NativeSttPartial,
   NativeTranscription,
+  ControlPlaneRequest,
   NativeTtsInfo,
   RaBackend,
   StorageReport,
@@ -141,6 +142,40 @@ export class NativeBackend implements RaBackend {
     this.vadHandle = null;
     this.ragSessions.clear();
     this.addon.shutdown();
+  }
+
+  // ---- desktop control plane (telemetry + auth) ----
+
+  async hasControlPlane(): Promise<boolean> {
+    return this.addon.hasControlPlane === true;
+  }
+
+  async devicePersistentId(): Promise<string> {
+    return this.addon.devicePersistentId ? this.addon.devicePersistentId() : '';
+  }
+
+  async devStagingBaseUrl(): Promise<string> {
+    return this.addon.devStagingBaseUrl ? this.addon.devStagingBaseUrl() : '';
+  }
+
+  async configureControlPlane(req: ControlPlaneRequest): Promise<Uint8Array> {
+    if (!this.addon.configureControlPlane) {
+      throw new Error('control plane unavailable: addon built without RAC_DESKTOP_ADAPTER');
+    }
+    return this.addon.configureControlPlane(
+      req.environment,
+      req.apiKey,
+      req.baseUrl,
+      req.deviceId,
+      req.platform,
+      req.sdkVersion,
+      req.sdkBinding,
+      req.appIdentifier,
+      req.appName,
+      req.appVersion,
+      req.phase1Bytes,
+      req.phase2Bytes
+    );
   }
 
   // ---- model store ----

@@ -40,16 +40,21 @@ import type {
 import { createLlmNamespace, createVlmNamespace } from './text';
 import type { LlmNamespace, VlmNamespace } from './text';
 import { AudioFormat, Environment, InferenceFramework, audio, image, ragDocument } from './types';
+import {
+  SdkInitEnvironment,
+  SdkInitPhase1Request,
+  SdkInitPhase2Request,
+} from '../proto/sdk_init';
 import type { SDKCapabilities, SdkEvent, UnavailableCapability } from './types';
 
 /** Everything {@link RunAnywhereApi.initialize} accepts. */
 export interface InitializeOptions {
   /**
-   * Control-plane key. Accepted and stored, but unused: Electron has no control
-   * plane yet, so nothing authenticates, registers a device, or reports telemetry.
+   * Control-plane API key. On a desktop-control-plane build (RAC_DESKTOP_ADAPTER=ON)
+   * with a `baseUrl`, this drives authentication + telemetry via the two-phase init.
    */
   apiKey?: string;
-  /** Control-plane base URL. Accepted and stored, but unused for the same reason. */
+  /** Control-plane base URL. Required (with `apiKey`) to enable auth + telemetry. */
   baseUrl?: string;
   /** Deployment environment. Defaults to production. */
   environment?: Environment;
@@ -190,6 +195,77 @@ function capabilitiesSnapshot(): SDKCapabilities {
 
 const DEVICE_ID_KEY = 'runanywhere.deviceId';
 
+/** The host OS as the backend's platform enum (macos/linux/windows) — NOT the
+ * SDK binding name. The binding ("electron") is reported separately as sdk_binding. */
+function osPlatform(): string {
+  if (process.platform === 'darwin') return 'macos';
+  if (process.platform === 'win32') return 'windows';
+  return 'linux';
+}
+
+/** Run the desktop two-phase init (telemetry + auth) when creds allow. Best-effort:
+ * HTTP/auth failures are non-fatal (the SDK stays usable offline). Returns the
+ * persistent device id when the control plane ran, else null. */
+async function runControlPlane(
+  backend: RaBackend,
+  options: InitializeOptions,
+  environment: Environment,
+  version: string
+): Promise<string | null> {
+  if (!(await backend.hasControlPlane())) {
+    if (options.apiKey || options.baseUrl) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'RunAnywhere.initialize: apiKey/baseUrl supplied but this build has no desktop ' +
+          'control plane (RAC_DESKTOP_ADAPTER=OFF) — no auth or telemetry'
+      );
+    }
+    return null;
+  }
+  const isProd = environment === Environment.PRODUCTION;
+  let baseUrl = (options.baseUrl ?? '').trim();
+  if (!baseUrl && !isProd) baseUrl = await backend.devStagingBaseUrl();
+  const apiKey = (options.apiKey ?? '').trim();
+  if (!baseUrl) return null;
+  if (isProd && !apiKey) return null;
+
+  const deviceId = await backend.devicePersistentId();
+  const platform = osPlatform();
+  const protoEnv = isProd
+    ? SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION
+    : SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+  const phase1 = SdkInitPhase1Request.encode({
+    environment: protoEnv,
+    apiKey,
+    baseUrl,
+    deviceId,
+    platform,
+    sdkVersion: version,
+  }).finish();
+  const phase2 = SdkInitPhase2Request.encode({
+    buildToken: '',
+    forceRefreshAssignments: false,
+    flushTelemetry: true,
+    discoverDownloadedModels: true,
+    rescanLocalModels: true,
+  }).finish();
+  await backend.configureControlPlane({
+    environment: isProd ? 2 : 0,
+    apiKey,
+    baseUrl,
+    deviceId,
+    platform,
+    sdkVersion: version,
+    sdkBinding: 'electron',
+    appIdentifier: 'ai.runanywhere.electron',
+    appName: 'RunAnywhere Electron',
+    appVersion: version,
+    phase1Bytes: phase1,
+    phase2Bytes: phase2,
+  });
+  return deviceId || null;
+}
+
 /** Build the public surface over `backend`. */
 export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
   const hub = new SdkEventHub();
@@ -252,6 +328,15 @@ export function createRunAnywhere(backend: RaBackend): RunAnywhereApi {
       } catch {
         // A secure store that is unavailable must not block local inference.
         deviceId = '';
+      }
+      // Desktop control plane: telemetry + auth via the two-phase init. Prefer the
+      // persistent device id commons mints (what the backend keys on) over the
+      // locally-minted fallback above. Best-effort — never blocks local inference.
+      try {
+        const persistentId = await runControlPlane(backend, options, environment, version);
+        if (persistentId) deviceId = persistentId;
+      } catch {
+        // telemetry/auth failure must not block local inference
       }
       hub.emit({ type: 'ready' });
       bus.emit({ type: 'initialized' });

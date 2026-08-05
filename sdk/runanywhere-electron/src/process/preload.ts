@@ -20,6 +20,11 @@ import {
   RAGResult,
   RAGStatistics,
 } from '../proto/rag';
+import {
+  SdkInitEnvironment,
+  SdkInitPhase1Request,
+  SdkInitPhase2Request,
+} from '../proto/sdk_init';
 import { createRagSessionFromCatalog } from '../rag';
 import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
 import type { JsonSchema } from '../grammar';
@@ -64,7 +69,7 @@ function rejectAllPending(err: Error): void {
 // The native addon's initialised state is per-process, so a re-forked host starts
 // uninitialised: without this, one host crash leaves the app alive but every
 // feature failing "not initialized" until the user restarts it.
-let initArgs: [string | undefined, string | undefined] | null = null;
+let initArgs: { secureDir?: string; baseDir?: string; cp?: ControlPlaneOptions } | null = null;
 let sawFirstPort = false;
 
 ipcRenderer.on('runanywhere-port', (event) => {
@@ -90,12 +95,13 @@ ipcRenderer.on('runanywhere-port', (event) => {
     // Re-initialise BEFORE opening the gate, so calls queued behind `ready` do not
     // race the init and fail. If it fails there is nothing further we can do here;
     // the next call surfaces the error.
-    const [secureDir, baseDir] = initArgs;
+    const { secureDir, baseDir, cp } = initArgs;
     new Promise<void>((resolve, reject) => {
       const id = nextId++;
       pending.set(id, { resolve: () => resolve(), reject });
       port!.postMessage({ id, method: 'initialize', args: [secureDir, baseDir] });
     })
+      .then(() => runControlPlane(cp)) // re-run auth + telemetry on the fresh host
       .then(() => bus.emit({ type: 'initialized' }))
       .catch(() => { /* surfaced by the caller's next request */ })
       .finally(() => markReady());
@@ -135,15 +141,92 @@ function emitAfter<T>(p: Promise<T>, event: () => void): Promise<T> {
   });
 }
 
+/** Control-plane credentials for {@link initialize}. */
+type ControlPlaneOptions = { apiKey?: string; baseUrl?: string; environment?: string };
+
+/** The host OS as the backend's platform enum (macos/linux/windows) — the binding
+ * ("electron") is reported separately as sdk_binding. */
+function osPlatform(): string {
+  if (process.platform === 'darwin') return 'macos';
+  if (process.platform === 'win32') return 'windows';
+  return 'linux';
+}
+
+/** Run the desktop two-phase init (telemetry + auth) over the host's v3 RPCs.
+ * Best-effort: HTTP/auth failures are non-fatal and never block local inference. */
+async function runControlPlane(cp?: ControlPlaneOptions): Promise<void> {
+  if (!cp) return;
+  const apiKey = (cp.apiKey ?? '').trim();
+  let baseUrl = (cp.baseUrl ?? '').trim();
+  if (!apiKey && !baseUrl) return;
+  const isProd = (cp.environment ?? 'production') === 'production';
+  try {
+    const has = (await send('v3.hasControlPlane', [])) as boolean;
+    if (!has) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'RunAnywhere.initialize: apiKey/baseUrl supplied but this build has no desktop ' +
+          'control plane (RAC_DESKTOP_ADAPTER=OFF) — no auth or telemetry'
+      );
+      return;
+    }
+    if (!baseUrl && !isProd) baseUrl = (await send('v3.devStagingBaseUrl', [])) as string;
+    if (!baseUrl || (isProd && !apiKey)) return;
+    const deviceId = (await send('v3.devicePersistentId', [])) as string;
+    const version = (await send('version', [])) as string;
+    const platform = osPlatform();
+    const protoEnv = isProd
+      ? SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION
+      : SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+    const phase1Bytes = SdkInitPhase1Request.encode({
+      environment: protoEnv,
+      apiKey,
+      baseUrl,
+      deviceId,
+      platform,
+      sdkVersion: version,
+    }).finish();
+    const phase2Bytes = SdkInitPhase2Request.encode({
+      buildToken: '',
+      forceRefreshAssignments: false,
+      flushTelemetry: true,
+      discoverDownloadedModels: true,
+      rescanLocalModels: true,
+    }).finish();
+    await send('v3.configureControlPlane', [
+      {
+        environment: isProd ? 2 : 0,
+        apiKey,
+        baseUrl,
+        deviceId,
+        platform,
+        sdkVersion: version,
+        sdkBinding: 'electron',
+        appIdentifier: 'ai.runanywhere.electron',
+        appName: 'RunAnywhere Electron',
+        appVersion: version,
+        phase1Bytes,
+        phase2Bytes,
+      },
+    ]);
+  } catch {
+    // telemetry/auth failure must not block local inference
+  }
+}
+
 contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
   version: () => send('version', []),
-  initialize: (secureDir?: string, baseDir?: string) =>
-    emitAfter(send('initialize', [secureDir, baseDir]), () => {
-      // Remembered so a re-forked host is initialised automatically (see above).
-      initArgs = [secureDir, baseDir];
-      bus.emit({ type: 'initialized' });
-    }),
+  initialize: (secureDir?: string, baseDir?: string, controlPlane?: ControlPlaneOptions) =>
+    emitAfter(
+      // Base bring-up first, then the desktop control plane (auth + telemetry).
+      send('initialize', [secureDir, baseDir]).then(() => runControlPlane(controlPlane)),
+      () => {
+        // Remembered so a re-forked host is initialised automatically (see above).
+        initArgs = { secureDir, baseDir, cp: controlPlane };
+        bus.emit({ type: 'initialized' });
+      }
+    ),
 
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),

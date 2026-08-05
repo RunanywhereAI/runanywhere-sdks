@@ -52,6 +52,24 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/features/rag/rac_rag.h"
 #include "rac/foundation/rac_proto_buffer.h"
+// Desktop control plane (telemetry + auth). Compiled only when the desktop
+// adapter — which carries the libcurl HTTP transport — is linked into commons
+// (RAC_ELECTRON_HAVE_DESKTOP, set by native/CMakeLists.txt when RAC_DESKTOP_ADAPTER=ON).
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+#include "rac/core/rac_sdk_state.h"
+#include "rac/desktop/rac_desktop.h"
+#include "rac/infrastructure/device/rac_device_identity.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_environment.h"
+#include "rac/infrastructure/network/rac_client_info.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/lifecycle/rac_sdk_init.h"
+#endif
 
 // Engine backends — linked when present (see native/CMakeLists.txt foreach).
 // Required backends keep their commons headers; optional ones declare register only.
@@ -93,6 +111,13 @@ namespace {
 // The adapter struct is caller-owned and must outlive rac_shutdown().
 rac_platform_adapter_t g_adapter;
 std::atomic<bool> g_initialized{false};
+
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+// Owns the telemetry manager for the process lifetime so the flush at shutdown
+// can deliver through our HTTP callback before teardown. Guarded by
+// g_handles_mutex on create/destroy.
+rac_telemetry_manager_t* g_telemetry_manager = nullptr;
+#endif
 
 // Handles are exposed to JS as small integer ids. LLM and VLM components use
 // distinct rac_*_component_destroy calls, so they live in separate maps.
@@ -269,6 +294,278 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
     g_initialized.store(true);
     return env.Undefined();
 }
+
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+// =============================================================================
+// Desktop control plane: telemetry + auth over the libcurl HTTP transport.
+//
+// A behavioral port of rcli's bootstrap (sdk/runanywhere-cli/src/bootstrap.cpp)
+// and the Electron/Python-mirrored module.cpp. The desktop adapter linked into
+// commons provides the libcurl transport, so telemetry HTTP is delivered
+// entirely in C++ (rac_http_client_* over the registered transport) — never on
+// the JS thread. Phase-1/2 proto requests are built in TS (ts-proto sdk_init)
+// and handed in as Buffers. The two-phase init runs on an AsyncWorker so the
+// auth network round-trip never blocks the utility-host JS event loop.
+// =============================================================================
+
+// Delivers a queued telemetry batch over the desktop HTTP transport. Wired via
+// rac_telemetry_manager_set_http_callback (user_data = the manager); reports the
+// outcome back through rac_telemetry_manager_http_complete. Runs on commons'
+// telemetry thread — pure C++, never touches JS or a ThreadSafeFunction.
+void electron_telemetry_http_callback(void* user_data, const char* endpoint, const char* json_body,
+                                      size_t json_length, rac_bool_t requires_auth) {
+    auto* manager = static_cast<rac_telemetry_manager_t*>(user_data);
+    const char* base_url = rac_state_get_base_url();
+    if (base_url == nullptr || base_url[0] == '\0' ||
+        rac_http_transport_is_registered() != RAC_TRUE) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry transport unavailable");
+        return;
+    }
+
+    char url[2048] = {};
+    if (rac_build_url(base_url, endpoint, url, sizeof(url)) < 0) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry URL build failed");
+        return;
+    }
+
+    std::vector<rac_http_header_kv_t> headers;
+    const rac_http_header_kv_t* defaults = nullptr;
+    size_t default_count = 0;
+    if (rac_http_default_headers(&defaults, &default_count) == RAC_SUCCESS && defaults) {
+        headers.assign(defaults, defaults + default_count);
+    }
+    std::string auth_value;
+    if (requires_auth == RAC_TRUE) {
+        const char* token = rac_auth_get_access_token();
+        if (token && token[0] != '\0') {
+            auth_value = std::string("Bearer ") + token;
+            headers.push_back({"Authorization", auth_value.c_str()});
+        }
+    }
+
+    rac_http_client_t* client = nullptr;
+    if (rac_http_client_create(&client) != RAC_SUCCESS) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry client create failed");
+        return;
+    }
+
+    rac_http_request_t request = {};
+    request.method = "POST";
+    request.url = url;
+    request.headers = headers.empty() ? nullptr : headers.data();
+    request.header_count = headers.size();
+    request.body_bytes = reinterpret_cast<const uint8_t*>(json_body);
+    request.body_len = json_length;
+    request.timeout_ms = rac_env_default_http_timeout_ms(rac_state_get_environment());
+    request.follow_redirects = RAC_FALSE;
+
+    rac_http_response_t response = {};
+    const rac_result_t rc = rac_http_request_send(client, &request, &response);
+    rac_http_client_destroy(client);
+
+    const bool ok = rc == RAC_SUCCESS && response.status >= 200 && response.status < 300;
+    std::string body;
+    if (response.body_bytes && response.body_len > 0) {
+        body.assign(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
+    }
+    if (manager) {
+        rac_telemetry_manager_http_complete(manager, ok ? RAC_TRUE : RAC_FALSE,
+                                            body.empty() ? nullptr : body.c_str(),
+                                            ok ? nullptr : "telemetry POST failed");
+    }
+    rac_http_response_free(&response);
+}
+
+// Detach + destroy the telemetry manager. Flush first (while the transport is up)
+// so the last batch is delivered; then detach the sink so no shutdown-time event
+// routes to a torn-down transport.
+void telemetry_teardown_flush() {
+    std::lock_guard<std::mutex> lock(g_handles_mutex);
+    if (g_telemetry_manager) rac_events_flush_telemetry_sink();
+}
+void telemetry_teardown_destroy() {
+    rac_telemetry_manager_t* mgr = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        mgr = g_telemetry_manager;
+        g_telemetry_manager = nullptr;
+    }
+    if (mgr) {
+        rac_events_set_telemetry_sink(nullptr);
+        rac_telemetry_manager_destroy(mgr);
+    }
+}
+
+// devicePersistentId(): the persistent per-device UUID commons mints.
+Napi::Value DevicePersistentId(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    char device_id[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {};
+    if (rac_device_get_or_create_persistent_id(device_id, sizeof(device_id)) != RAC_SUCCESS) {
+        return Napi::String::New(env, "");
+    }
+    return Napi::String::New(env, device_id);
+}
+
+// devStagingBaseUrl(): baked staging backend URL for keyless dev (empty if none).
+Napi::Value DevStagingBaseUrl(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    const char* baked = rac_dev_config_get_staging_base_url();
+    if (baked && rac_dev_config_is_usable_http_url(baked)) return Napi::String::New(env, baked);
+    return Napi::String::New(env, "");
+}
+
+// Runs transport-register + state seed + telemetry sink + two-phase init off the
+// JS thread; resolves with the serialized SdkInitResult bytes.
+class ControlPlaneWorker : public Napi::AsyncWorker {
+ public:
+    ControlPlaneWorker(Napi::Env env, int32_t environment, std::string api_key,
+                       std::string base_url, std::string device_id, std::string platform,
+                       std::string sdk_version,
+                       std::string sdk_binding, std::string app_identifier, std::string app_name,
+                       std::string app_version, std::vector<uint8_t> phase1, std::vector<uint8_t> phase2)
+        : Napi::AsyncWorker(env),
+          deferred_(Napi::Promise::Deferred::New(env)),
+          env_(environment),
+          api_key_(std::move(api_key)),
+          base_url_(std::move(base_url)),
+          device_id_(std::move(device_id)),
+          platform_(std::move(platform)),
+          sdk_version_(std::move(sdk_version)),
+          sdk_binding_(std::move(sdk_binding)),
+          app_identifier_(std::move(app_identifier)),
+          app_name_(std::move(app_name)),
+          app_version_(std::move(app_version)),
+          phase1_(std::move(phase1)),
+          phase2_(std::move(phase2)) {}
+
+    Napi::Promise Promise() { return deferred_.Promise(); }
+
+    void Execute() override {
+        const auto env = static_cast<rac_environment_t>(env_);
+        rac_desktop_http_transport_register();
+
+        // Runtime state first (auth/device/telemetry read env + creds from it),
+        // then the copied SDK configuration + client info.
+        rac_state_initialize(env, api_key_.c_str(), base_url_.c_str(), device_id_.c_str());
+
+        rac_sdk_config_t cfg = {};
+        cfg.environment = env;
+        cfg.api_key = api_key_.c_str();
+        cfg.base_url = base_url_.c_str();
+        cfg.device_id = device_id_.c_str();
+        cfg.platform = platform_.c_str();
+        cfg.sdk_version = sdk_version_.c_str();
+        cfg.client_info.sdk_binding = sdk_binding_.c_str();
+        cfg.client_info.app_identifier = app_identifier_.c_str();
+        cfg.client_info.app_name = app_name_.c_str();
+        cfg.client_info.app_version = app_version_.c_str();
+        rac_sdk_init(&cfg);
+
+        rac_auth_init(nullptr);  // per-run auth; tokens not persisted across runs
+
+        {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            if (!g_telemetry_manager) {
+                g_telemetry_manager = rac_telemetry_manager_create(env, device_id_.c_str(),
+                                                                   platform_.c_str(),
+                                                                   sdk_version_.c_str());
+                if (g_telemetry_manager) {
+                    rac_telemetry_manager_set_http_callback(g_telemetry_manager,
+                                                            electron_telemetry_http_callback,
+                                                            g_telemetry_manager);
+                    rac_events_set_telemetry_sink(g_telemetry_manager);
+                }
+            }
+        }
+
+        rac_proto_buffer_t p1out;
+        rac_proto_buffer_init(&p1out);
+        rac_result_t rc =
+            rac_sdk_init_phase1_proto(phase1_.data(), phase1_.size(), &p1out);
+        rac_proto_buffer_free(&p1out);
+        if (rc != RAC_SUCCESS) {
+            code_ = rc;
+            err_ = "sdk_init_phase1 failed: " + std::to_string(rc);
+            return;
+        }
+
+        rac_proto_buffer_t p2out;
+        rac_proto_buffer_init(&p2out);
+        rc = rac_sdk_init_phase2_proto(phase2_.data(), phase2_.size(), &p2out);
+        if (rc != RAC_SUCCESS) {
+            rac_proto_buffer_free(&p2out);
+            code_ = rc;
+            err_ = "sdk_init_phase2 failed: " + std::to_string(rc);
+            return;
+        }
+        if (p2out.data && p2out.size > 0) {
+            result_.assign(p2out.data, p2out.data + p2out.size);
+        }
+        rac_proto_buffer_free(&p2out);
+        ok_ = true;
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        if (ok_) {
+            deferred_.Resolve(Napi::Buffer<uint8_t>::Copy(Env(), result_.data(), result_.size()));
+        } else {
+            deferred_.Reject(make_rac_error(Env(), code_, err_).Value());
+        }
+    }
+
+    void OnError(const Napi::Error& e) override {
+        Napi::HandleScope scope(Env());
+        deferred_.Reject(e.Value());
+    }
+
+ private:
+    Napi::Promise::Deferred deferred_;
+    int32_t env_;
+    std::string api_key_, base_url_, device_id_, platform_, sdk_version_, sdk_binding_;
+    std::string app_identifier_, app_name_, app_version_;
+    std::vector<uint8_t> phase1_, phase2_, result_;
+    std::string err_;
+    bool ok_ = false;
+    rac_result_t code_ = RAC_SUCCESS;
+};
+
+// configureControlPlane(env, apiKey, baseUrl, deviceId, platform, sdkVersion,
+//   sdkBinding, appIdentifier, appName, appVersion, phase1Bytes, phase2Bytes)
+//   -> Promise<Buffer>  (serialized SdkInitResult)
+Napi::Value ConfigureControlPlane(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 12 || !info[0].IsNumber() || !info[10].IsTypedArray() ||
+        !info[11].IsTypedArray()) {
+        Napi::TypeError::New(env, "configureControlPlane(env, apiKey, baseUrl, deviceId, platform, "
+                                  "sdkVersion, sdkBinding, appIdentifier, appName, appVersion, "
+                                  "phase1Bytes, phase2Bytes) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    auto str = [&](int i) {
+        return info[i].IsString() ? info[i].As<Napi::String>().Utf8Value() : std::string();
+    };
+    Napi::Uint8Array p1 = info[10].As<Napi::Uint8Array>();
+    Napi::Uint8Array p2 = info[11].As<Napi::Uint8Array>();
+    std::vector<uint8_t> phase1(p1.Data(), p1.Data() + p1.ByteLength());
+    std::vector<uint8_t> phase2(p2.Data(), p2.Data() + p2.ByteLength());
+
+    auto* worker = new ControlPlaneWorker(
+        env, info[0].As<Napi::Number>().Int32Value(), str(1), str(2), str(3), str(4), str(5),
+        str(6), str(7), str(8), str(9), std::move(phase1), std::move(phase2));
+    Napi::Promise promise = worker->Promise();
+    worker->Queue();
+    return promise;
+}
+#endif  // RAC_ELECTRON_HAVE_DESKTOP
 
 // =============================================================================
 // Streaming core — shared by LLM generate + VLM process (both stream a char*
@@ -1651,7 +1948,16 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
             g_rag_handles.clear();
             g_inflight.clear();
         }
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+        // Flush queued telemetry while the HTTP transport is still registered
+        // (rac_shutdown() tears it down first, which would drop the last batch).
+        telemetry_teardown_flush();
+#endif
         rac_shutdown();
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+        // Detach + destroy the telemetry manager after the runtime is down.
+        telemetry_teardown_destroy();
+#endif
     }
     return info.Env().Undefined();
 }
@@ -2621,6 +2927,16 @@ Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("initialize", Napi::Function::New(env, Initialize));
+#ifdef RAC_ELECTRON_HAVE_DESKTOP
+    // Desktop control plane (telemetry + auth). Present only when the desktop
+    // libcurl transport is linked into commons (RAC_DESKTOP_ADAPTER=ON).
+    exports.Set("hasControlPlane", Napi::Boolean::New(env, true));
+    exports.Set("devicePersistentId", Napi::Function::New(env, DevicePersistentId));
+    exports.Set("devStagingBaseUrl", Napi::Function::New(env, DevStagingBaseUrl));
+    exports.Set("configureControlPlane", Napi::Function::New(env, ConfigureControlPlane));
+#else
+    exports.Set("hasControlPlane", Napi::Boolean::New(env, false));
+#endif
     exports.Set("secureSet", Napi::Function::New(env, SecureSet));
     exports.Set("secureGet", Napi::Function::New(env, SecureGet));
     exports.Set("secureDelete", Napi::Function::New(env, SecureDelete));
