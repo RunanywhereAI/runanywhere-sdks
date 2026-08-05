@@ -43,12 +43,10 @@ struct ModelPolicy {
     uint8_t arch_mask;
     // Fail-closed gate: when true, register_for_arch_proto() skips the row until an
     // HF token is configured, which is what drives the per-SDK "bring your own HF
-    // token" preflight UX. Every RunAnywhere-hosted QHexRT repo referenced below is
-    // currently PUBLIC, so all rows set this false. The field, its accessor
-    // (rac_qhexrt_catalog_model_requires_hf_auth), the gate at line ~345, and the
-    // downstream token-prompt UI are deliberately RETAINED for future gated models:
-    // flip a single row to true if/when a model is re-hosted behind a gated HF repo
-    // and the token preflight fires again with no other code change.
+    // token" preflight UX. Most RunAnywhere-hosted QHexRT repos are PUBLIC and set this
+    // false; only kitten_nano_0_8_varlen is gated today. The exact set is pinned by
+    // test_qhexrt_model_catalog's private_ids, so hosting a model behind a gated HF repo
+    // means flipping this row AND that set — nothing else changes.
     bool requires_hf_auth;
 };
 
@@ -58,6 +56,8 @@ struct ModelPolicy {
 constexpr ModelPolicy kModelPolicies[] = {
     {"lfm2_5_230m", kAllSupportedArches, false},
     {"lfm2_5_350m", kAllSupportedArches, false},
+    // Only v79 context binaries are published for this one; the repo is public, so no HF auth gate.
+    {"lfm2_5_2_6b", kV79, false},
     {"qwen3_5_0_8b", kAllSupportedArches, false},
     {"qwen3_5_2b", kAllSupportedArches, false},
     {"qwen3_5_4b", kV79V81, false},
