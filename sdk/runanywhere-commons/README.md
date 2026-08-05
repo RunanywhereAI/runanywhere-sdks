@@ -143,9 +143,9 @@ Online speech-to-text over HTTP. Offline STT is served by Sherpa; a hybrid route
 
 Apple Foundation Models (LLM) and System TTS via Swift callbacks on iOS/macOS.
 
-### Core ML
+### NeuRT
 
-Image generation (diffusion) on Apple platforms. Registration: `rac/plugin/rac_plugin_entry_coreml.h`.
+ANE text generation + image generation (diffusion) on Apple platforms, via Apple's Core ML framework. Registration: `rac/plugin/rac_plugin_entry_neurt.h`.
 
 ## Platform SDK integration
 

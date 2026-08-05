@@ -85,7 +85,7 @@ const char* engine_name_for_framework(runanywhere::v1::InferenceFramework framew
         case runanywhere::v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
             return RAC_ENGINE_ID_PLATFORM;
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
-            return RAC_ENGINE_ID_COREML;
+            return RAC_ENGINE_ID_NEURT;
         default:
             return nullptr;
     }

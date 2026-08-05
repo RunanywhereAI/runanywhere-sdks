@@ -1216,6 +1216,80 @@ enum ModelCatalogBootstrap {
         // QHexRT/HNPU bundles are Qualcomm-Android-only and are intentionally
         // not registered on Apple platforms.
 
+        // --- Apple Neural Engine (neurt engine, COREML framework) ---------------
+        // The Apple peer of the Android HNPU entries above: a prebuilt Core ML
+        // bundle that decodes entirely on the Neural Engine.
+        //
+        // The URL is an HF FOLDER ref (last segment has no extension), so the SDK
+        // downloads every file under it with nested paths preserved — required
+        // here because a .mlpackage is a DIRECTORY, not a file. Do not "fix" this
+        // into a /resolve/ file URL; that degrades to a single-file download.
+        //
+        // 8-bit weight-only is the shipped precision, and on a phone it is the
+        // ENABLING one rather than an optimization: fp16 needs 5.72 GiB resident
+        // with a 1240 MB single weight file (over the ~1 GB iOS per-file cap),
+        // while this measures 3.20 GiB peak RSS.
+        //
+        // `_c6` is the SIX-chunk build and that suffix is load-bearing, not
+        // cosmetic. The 4-chunk sibling (lut8_g32) is the identical precision but
+        // peaks at a 654 MB graph, which sits in the 500 MB-1 GB band measured
+        // NON-DETERMINISTIC on a real iPhone — the same file passed once and was
+        // SIGKILLed twice with nothing else changed. Every graph here is under
+        // 411 MB, inside the tier measured 100% reliable (Gate P PASS). Splitting
+        // deeper cost no throughput: 38.9 vs 39.1 tok/s.
+        await registerLLM(
+            id: "lfm2.5-2.6b-ane",
+            name: "LFM2.5 2.6B (NeuRT / Neural Engine)",
+            // Repo casing is EXACT on purpose. The HF tree API answers 200 for
+            // runanywhere/LFM2.5-2.6B_ANE and 307 for the lowercase spelling, so a
+            // lowercased id only works if the transport follows redirects.
+            url: "hf.co/runanywhere/LFM2.5-2.6B_ANE/lut8_g32_c6",
+            framework: .coreml,
+            modality: .language,
+            // Peak RSS, NOT a download-size claim, even though the URL-form
+            // registerModel mirrors memoryRequirement into downloadSizeBytes
+            // (RunAnywhere+Storage.swift). For an HF FOLDER ref commons throws
+            // that mirrored value away and stamps the resolver's live tree
+            // total instead — register_model_from_url.cpp `register_from_hf_folder`,
+            // "prefer the resolver's live folder total" — which is 3_257_702_729 B
+            // (3.03 GiB) for this folder. So the post-finalize size floor
+            // (80% of expected, download_orchestrator.cpp `validate_downloaded_sizes`)
+            // compares against the true total and cannot reject this bundle.
+            memoryRequirement: 3_450_000_000,
+            supportsThinking: true
+        )
+        logger.info("Apple Neural Engine models registered")
+
+        // --- The SAME model on the other two accelerators -----------------------
+        // LFM2.5-2.6B is registered three ways on purpose, so one model can be
+        // compared across CPU (llama.cpp), GPU (MLX) and the Neural Engine
+        // (neurt) on identical hardware. 4-bit for both: it is the smallest
+        // quantization either backend ships for this model and keeps each under
+        // ~1.6 GB, well below the ANE bundle's 3.03 GiB download.
+        #if canImport(LlamaCPPRuntime)
+        await registerLLM(
+            id: "lfm2.5-2.6b-q4-k-m",
+            name: "LFM2.5 2.6B Q4_K_M (CPU)",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF/resolve/main/LFM2.5-2.6B-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 1_674_575_872,
+            supportsThinking: true
+        )
+        #endif
+        // MLX ships each precision in its OWN SUBFOLDER, so this is a folder ref
+        // (last segment has no extension) — the SDK pulls config, tokenizer and
+        // weights together. A /resolve/ URL to the .safetensors alone would omit
+        // the config and tokenizer and fail to load.
+        await registerLLM(
+            id: "lfm2.5-2.6b-mlx-4bit",
+            name: "LFM2.5 2.6B 4-bit (GPU/MLX)",
+            url: "hf.co/LiquidAI/LFM2.5-2.6B-MLX/4bit",
+            framework: .mlx,
+            memoryRequirement: 1_583_349_760,
+            supportsThinking: true
+        )
+        logger.info("LFM2.5-2.6B registered on all three accelerators")
+
         // --- LoRA adapters ------------------------------------------------------
         // Mirrors Android `ModelBootstrap.seedLora` / `ModelCatalog.loraAdapters`.
         #if canImport(LlamaCPPRuntime)

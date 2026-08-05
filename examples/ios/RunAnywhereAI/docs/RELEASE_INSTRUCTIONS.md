@@ -272,10 +272,59 @@ rg -No '"(rac|ra_mlx)_[A-Za-z0-9_]+"' "${SRC_DIRS[@]}" --glob '*.swift' \
   | perl -ne 'while (/"((?:rac|ra_mlx)_[A-Za-z0-9_]+)"/g) { print "$1\n" }' \
   | sort -u > /tmp/runanywhere_expected_swift_native_symbols.from_strings
 
+# Symbols declared ONLY inside a build-configuration guard the archive does not
+# compile. The rg pass above is a plain text scan and does not evaluate `#if`, so
+# without this filter it reports a symbol that is CORRECTLY absent and the gate
+# fails on every good archive.
+#
+#   ra_mlx_metal_resource_anchor — MLXRuntime/MLX.swift, inside
+#   `#if RUNANYWHERE_MLX_DISTRIBUTION`. That flag is set only for the CocoaPods
+#   distribution build (Package.swift keys it off
+#   RUNANYWHERE_BUILD_MLX_DISTRIBUTION_FRAMEWORK); a normal SwiftPM archive uses
+#   mlx-swift's own resource bundle and never compiles the declaration.
+#
+# Add to this list only for a symbol you have confirmed is guarded out of THIS
+# archive's configuration — never to silence a genuinely missing export.
+#
+# THE FILTER IS PER-CONFIGURATION, and that is the whole point: in the CocoaPods
+# distribution archive `RUNANYWHERE_MLX_DISTRIBUTION` IS set, so
+# ra_mlx_metal_resource_anchor MUST be exported there. Filtering it
+# unconditionally would let a genuinely missing export pass the audit in exactly
+# the build that needs it — the failure this gate exists to catch. So the
+# exclusion applies only to a SwiftPM archive; a distribution archive filters
+# nothing and fails on the missing symbol.
+ARCHIVE_FLAVOR="${RUNANYWHERE_ARCHIVE_FLAVOR:-swiftpm}"   # swiftpm | distribution
+case "$ARCHIVE_FLAVOR" in
+  swiftpm)
+    PACKAGING_ONLY_SYMBOLS=(
+      ra_mlx_metal_resource_anchor
+    )
+    ;;
+  distribution)
+    # Nothing is guarded out of this configuration — audit the full expected set.
+    PACKAGING_ONLY_SYMBOLS=()
+    ;;
+  *)
+    echo "unknown RUNANYWHERE_ARCHIVE_FLAVOR='$ARCHIVE_FLAVOR' (expected swiftpm|distribution)" >&2
+    exit 2
+    ;;
+esac
+
 {
   cat /tmp/runanywhere_expected_swift_native_symbols.from_strings
   printf '%s\n' "${REQUIRED_SYMBOLS[@]}"
-} | sort -u > /tmp/runanywhere_expected_swift_native_symbols.txt
+} | sort -u > /tmp/runanywhere_expected_swift_native_symbols.all
+
+# `grep -vxF` with an empty pattern list would be a no-op filter that silently
+# drops nothing OR everything depending on the shell, so branch explicitly.
+if [ ${#PACKAGING_ONLY_SYMBOLS[@]} -eq 0 ]; then
+  cp /tmp/runanywhere_expected_swift_native_symbols.all \
+     /tmp/runanywhere_expected_swift_native_symbols.txt
+else
+  grep -vxF "$(printf '%s\n' "${PACKAGING_ONLY_SYMBOLS[@]}")" \
+    /tmp/runanywhere_expected_swift_native_symbols.all \
+    > /tmp/runanywhere_expected_swift_native_symbols.txt
+fi
 
 comm -23 \
   /tmp/runanywhere_expected_swift_native_symbols.txt \

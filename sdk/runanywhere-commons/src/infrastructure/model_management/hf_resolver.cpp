@@ -23,6 +23,8 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 
+#include "../http/rac_http_hf_auth.h"
+
 namespace rac::infra::model_management::hf {
 
 namespace {
@@ -220,6 +222,19 @@ rac_result_t fetch_repo_tree(const std::string& org, const std::string& repo, st
     request.timeout_ms = kTreeRequestTimeoutMs;
     request.follow_redirects = RAC_TRUE;
 
+    // Attach the HF bearer when we have one. Without this the tree call is always anonymous, so a
+    // PRIVATE or GATED repo returns 401 and the caller reported "gated-repo tokens are not wired up
+    // yet" — on machines where `hf auth whoami` succeeded. The token plumbing already existed
+    // (rac::http::hf_bearer_for_url); this request simply never used it.
+    const std::string bearer = rac::http::hf_bearer_for_url(url.c_str(), /*has_auth_header=*/false);
+    rac_http_header_kv_t auth_header{};
+    if (!bearer.empty()) {
+        auth_header.name = "Authorization";
+        auth_header.value = bearer.c_str();
+        request.headers = &auth_header;
+        request.header_count = 1;
+    }
+
     rac_http_response_t response = {};
     rc = rac_http_request_send(client, &request, &response);
     rac_http_client_destroy(client);
@@ -396,8 +411,13 @@ rac_result_t resolve_repo(const std::string& ref, ResolvedModel* out, std::strin
     if (status == 401 || status == 403) {
         *error = "Hugging Face repo " + parsed.org + "/" + parsed.repo +
                  " is gated or private (HTTP " + std::to_string(status) +
-                 "); gated-repo tokens are not wired up yet — download the file manually or use "
-                 "a public repo";
+                 ")" +
+                 (!rac::http::hf_bearer_for_url("https://huggingface.co/api/models",
+                                                /*has_auth_header=*/false)
+                       .empty()
+                      ? " — a token WAS sent but does not grant access to this repo; check `hf auth "
+                        "whoami` and that the account can see it"
+                      : " — no Hugging Face token found; run `hf auth login` or set HF_TOKEN");
         return RAC_ERROR_PERMISSION_DENIED;
     }
     if (status == 404) {
@@ -644,6 +664,17 @@ static std::unordered_set<std::string> manifest_referenced_paths(
     request.url = manifest_url.c_str();
     request.timeout_ms = kTreeRequestTimeoutMs;
     request.follow_redirects = RAC_TRUE;
+    // Same bearer plumbing as fetch_repo_tree: without it a PRIVATE/GATED repo answers 401 here,
+    // the manifest can't be parsed, and the caller falls back to registering the WHOLE folder.
+    const std::string bearer =
+        rac::http::hf_bearer_for_url(manifest_url.c_str(), /*has_auth_header=*/false);
+    rac_http_header_kv_t auth_header{};
+    if (!bearer.empty()) {
+        auth_header.name = "Authorization";
+        auth_header.value = bearer.c_str();
+        request.headers = &auth_header;
+        request.header_count = 1;
+    }
     rac_http_response_t response = {};
     const rac_result_t rc = rac_http_request_send(client, &request, &response);
     rac_http_client_destroy(client);

@@ -1291,16 +1291,21 @@ endif()
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
 
-if(APPLE AND RAC_BACKEND_COREML AND TARGET rac_backend_coreml)
+# RAC_NEURT_ENGINE_AVAILABLE, not just the target: with RAC_BACKEND_NEURT=ON but no neurun
+# checkout the engine still builds — as a non-routable shell — so `TARGET rac_backend_neurt` is
+# true while the neurun include dirs are absent. This test includes rac_diffusion_coreml.h and
+# would fail to compile. That is exactly what broke every Apple CI job's Build step.
+if(APPLE AND RAC_BACKEND_NEURT AND TARGET rac_backend_neurt AND RAC_NEURT_ENGINE_AVAILABLE)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
+    # rac_diffusion_coreml.h lives in neurun (NeuRT/src/sdk/); it arrives
+    # transitively through rac_backend_neurt's PUBLIC include dirs.
     target_include_directories(test_diffusion_coreml_generate PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/coreml
     )
     target_link_libraries(test_diffusion_coreml_generate PRIVATE
         rac_commons
-        rac_backend_coreml
+        rac_backend_neurt
     )
     rac_link_archive_deps(test_diffusion_coreml_generate)
     target_compile_features(test_diffusion_coreml_generate PRIVATE cxx_std_17)
@@ -1570,6 +1575,8 @@ add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
 # generic folder resolver without any private runtime headers or binaries.
 get_filename_component(QHEXRT_ENGINE_DIR
     "${CMAKE_CURRENT_LIST_DIR}/../../../engines/qhexrt" ABSOLUTE)
+get_filename_component(NEURT_ENGINE_DIR
+    "${CMAKE_CURRENT_LIST_DIR}/../../../engines/neurt" ABSOLUTE)
 add_executable(test_bundle_policy
     test_bundle_policy.cpp
     ${QHEXRT_ENGINE_DIR}/qhexrt_device_capability.cpp
@@ -1579,6 +1586,10 @@ target_include_directories(test_bundle_policy PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${QHEXRT_ENGINE_DIR}
     ${QHEXRT_ENGINE_DIR}/include
+    # The NeuRT policy is header-only for the same reason QHexRT's is: it can be
+    # included here with no engine target and no Apple SDK, so the predicate is
+    # gated on every runner rather than only on a Mac.
+    ${NEURT_ENGINE_DIR}
 )
 target_link_libraries(test_bundle_policy PRIVATE rac_commons)
 rac_link_archive_deps(test_bundle_policy)

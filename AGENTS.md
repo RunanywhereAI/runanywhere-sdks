@@ -85,7 +85,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Directory | Contents |
 |-----------|----------|
 | `sdk/runanywhere-commons/` | C/C++ core library — all AI logic, plugin registry, event system |
-| `engines/` | 6 backend plugins: llamacpp, sherpa, onnx, cloud, qhexrt, coreml |
+| `engines/` | 7 backend plugins: llamacpp, sherpa, onnx, cloud, mlx, qhexrt, neurt |
 | `runtimes/` | 3 runtime adapters: cpu (always), onnxrt, coreml |
 | `idl/` | 23 Protobuf schemas + per-language codegen scripts |
 
@@ -134,8 +134,8 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                                     │ rac_engine_vtable_t (v8)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
-      llamacpp      sherpa-onnx  qhexrt     coreml/cloud       onnx
-     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP)   (Embed,Segment)
+      llamacpp      sherpa-onnx  qhexrt      neurt/cloud       onnx
+     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (ANE/HTTP)     (Embed,Segment)
 ```
 
 ### Key Architectural Patterns

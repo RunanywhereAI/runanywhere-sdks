@@ -52,11 +52,12 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/qhexrt/CMakeLists.txt")
     add_subdirectory(qhexrt)
 endif()
 
-# coreml engine — Apple-only engine that runs ON Apple CoreML (serves the
-# DIFFUSION modality today via MLModel). Named by the FRAMEWORK, not the
-# modality, mirroring the `cloud` engine. Self-gates to return() on non-Apple
-# platforms. Coexists with the runtime `coreml` (runtimes/coreml) — separate
+# neurt engine — Apple-only engine implemented by NeuRT (the Apple half of the
+# sibling `neurun` repo). Serves GENERATE_TEXT on the Neural Engine and
+# DIFFUSION via MLModel. Named by the IMPLEMENTING RUNTIME, not the modality and
+# not Apple's framework, mirroring the `cloud` engine. Self-gates to return() on
+# non-Apple platforms. It USES the runtime `coreml` (runtimes/coreml) — separate
 # registry/dir/symbols.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/coreml/CMakeLists.txt")
-    add_subdirectory(coreml)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/neurt/CMakeLists.txt")
+    add_subdirectory(neurt)
 endif()

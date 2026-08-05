@@ -43,6 +43,9 @@
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 #include "rac/plugin/rac_plugin_entry_onnx.h"
+#ifdef RAC_HAVE_BACKEND_NEURT
+#include "rac/plugin/rac_plugin_entry_neurt.h"
+#endif
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -91,9 +94,6 @@ rac_result_t rac_backend_qhexrt_register(void);  // Qualcomm Hexagon NPU (Snapdr
 #endif
 #ifdef RAC_HAVE_BACKEND_MLX
 rac_result_t rac_backend_mlx_register(void);  // Apple MLX
-#endif
-#ifdef RAC_HAVE_BACKEND_COREML
-rac_result_t rac_backend_coreml_register(void);  // Apple Core ML
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
 rac_result_t rac_backend_cloud_register(void);  // Cloud STT provider
@@ -319,8 +319,10 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
 #ifdef RAC_HAVE_BACKEND_MLX
         rac_backend_mlx_register();  // Apple MLX (Apple Silicon)
 #endif
-#ifdef RAC_HAVE_BACKEND_COREML
-        rac_backend_coreml_register();  // Apple Core ML
+#ifdef RAC_HAVE_BACKEND_NEURT
+        // No bespoke rac_backend_*_register() fn for this engine — register the
+        // plugin entry directly, like rcli's bootstrap does.
+        rac_plugin_register(rac_plugin_entry_neurt());  // Apple Neural Engine + CoreML diffusion
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
         rac_backend_cloud_register();  // cloud STT provider fallback
@@ -1188,8 +1190,10 @@ std::string version() {
 }
 
 // The engine backends compiled into this build (from the RAC_HAVE_BACKEND_<X> defines the
-// CMake backend loop emits). The plugin registry auto-selects the highest-priority registered
-// backend per modality, so this is what a loaded model can route to on this host.
+// CMake backend loop emits). This is COMPILE-TIME availability only, not proof of registration:
+// an engine's capability_check can still refuse registration at runtime (e.g. neurt returns
+// RAC_ERROR_CAPABILITY_UNSUPPORTED off Apple, RAC_ERROR_BACKEND_UNAVAILABLE in a stub build), in
+// which case it is listed here but nothing routes to it.
 std::vector<std::string> backends() {
     std::vector<std::string> out;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
@@ -1207,8 +1211,8 @@ std::vector<std::string> backends() {
 #ifdef RAC_HAVE_BACKEND_MLX
     out.push_back("mlx");
 #endif
-#ifdef RAC_HAVE_BACKEND_COREML
-    out.push_back("coreml");
+#ifdef RAC_HAVE_BACKEND_NEURT
+    out.push_back("neurt");
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
     out.push_back("cloud");
@@ -1225,7 +1229,9 @@ PYBIND11_MODULE(_core, m) {
     m.doc() = "RunAnywhere native core (rac_* C ABI bound via pybind11).";
 
     m.def("version", &version, "Return the RunAnywhere SDK version string.");
-    m.def("backends", &backends, "List the engine backends compiled into this build.");
+    m.def("backends", &backends,
+          "List the engine backends compiled into this build (compile-time availability; a "
+          "listed engine may still refuse registration at runtime).");
 
     m.def("initialize", &initialize, py::arg("secure_dir"), py::arg("base_dir") = py::none(),
           "Initialize the runtime: fill the platform adapter, set the base dir, "

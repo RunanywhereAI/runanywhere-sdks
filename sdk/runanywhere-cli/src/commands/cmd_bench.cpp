@@ -43,6 +43,8 @@
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
+#include "catalog/model_ref.h"
+#include "commands/engine_options.h"
 #include "io/output.h"
 #include "io/proto.h"
 
@@ -229,11 +231,17 @@ void unload_category(v1::ModelCategory category) {
 }
 
 double load_model_timed(const std::string& model_id, v1::ModelCategory category,
-                        std::string* out_error) {
+                        v1::InferenceFramework framework, std::string* out_error) {
     v1::ModelLoadRequest request;
     request.set_model_id(model_id);
     request.set_category(category);
     request.set_validate_availability(true);
+    // An explicit --engine is honoured whatever the ref resolved to (catalog
+    // entries included); absent the flag this stays UNSPECIFIED and the model's
+    // own declared framework is used, exactly as before. Mirrors cmd_run.cpp.
+    if (framework != v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+        request.set_framework(framework);
+    }
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -355,12 +363,13 @@ struct TrialCtx {
     v1::ModelCategory category;
     Scenario scenario;
     std::string vlm_image;
+    v1::InferenceFramework framework = v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
 };
 
 bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     unload_category(c.category);
     const int64_t mem_before = available_ram_bytes();
-    m->load_ms = load_model_timed(c.model_id, c.category, err);
+    m->load_ms = load_model_timed(c.model_id, c.category, c.framework, err);
     if (m->load_ms < 0.0) {
         return false;
     }
@@ -410,7 +419,7 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
 bool stt_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     unload_category(c.category);
     const int64_t mem_before = available_ram_bytes();
-    m->load_ms = load_model_timed(c.model_id, c.category, err);
+    m->load_ms = load_model_timed(c.model_id, c.category, c.framework, err);
     if (m->load_ms < 0.0) {
         return false;
     }
@@ -438,7 +447,7 @@ bool stt_trial(const TrialCtx& c, Metrics* m, std::string* err) {
 bool tts_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     unload_category(c.category);
     const int64_t mem_before = available_ram_bytes();
-    m->load_ms = load_model_timed(c.model_id, c.category, err);
+    m->load_ms = load_model_timed(c.model_id, c.category, c.framework, err);
     if (m->load_ms < 0.0) {
         return false;
     }
@@ -468,7 +477,7 @@ bool vlm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     unload_category(v1::MODEL_CATEGORY_MULTIMODAL);
     unload_category(v1::MODEL_CATEGORY_LANGUAGE);
     const int64_t mem_before = available_ram_bytes();
-    m->load_ms = load_model_timed(c.model_id, c.category, err);
+    m->load_ms = load_model_timed(c.model_id, c.category, c.framework, err);
     if (m->load_ms < 0.0) {
         return false;
     }
@@ -619,14 +628,41 @@ bool collect_models(const std::string& only_model, std::vector<BenchModel>* out,
     return true;
 }
 
-int run_bench(const GlobalOptions& options, const std::string& only_model, int trials,
-              const std::string& vlm_image) {
+int run_bench(const GlobalOptions& options, const std::string& model_ref_arg, int trials,
+              const std::string& vlm_image, const std::string& engine) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
     }
     if (trials < 1) {
         trials = 1;
+    }
+
+    // Parsed once, up front: an explicit --engine both narrows ref resolution and
+    // pins the framework every trial loads with, whether one model was named or
+    // the whole registry is being benchmarked.
+    commands::EngineHintResolution engine_hint;
+    std::string engine_error;
+    if (!commands::resolve_engine_hint(engine, &engine_hint, &engine_error)) {
+        out::error_line(engine_error);
+        return 2;
+    }
+
+    // Resolve the argument the same way every other command does, so a local
+    // bundle directory, an HF ref or a URL all work here too. collect_models
+    // only ever scans the registry, so without this an unregistered ref — which
+    // is what a freshly staged bundle on disk is — reported "not a downloaded
+    // benchmarkable model" even though `rcli run` could load it fine.
+    std::string only_model = model_ref_arg;
+    if (!model_ref_arg.empty()) {
+        model_ref::Resolved resolved;
+        std::string resolve_error;
+        if (model_ref::resolve(model_ref_arg, &resolved, &resolve_error,
+                               &engine_hint.resolve_options) != RAC_SUCCESS) {
+            out::error_line(resolve_error);
+            return 1;
+        }
+        only_model = resolved.model_id;
     }
 
     std::vector<BenchModel> models;
@@ -648,7 +684,7 @@ int run_bench(const GlobalOptions& options, const std::string& only_model, int t
             out::status_line(std::string("benchmarking ") + modality_label(model.modality) + " " +
                              model.id + " — " + scenario.label + " (" + std::to_string(trials) +
                              " trials)");
-            TrialCtx ctx{model.id, model.category, scenario, vlm_image};
+            TrialCtx ctx{model.id, model.category, scenario, vlm_image, engine_hint.framework};
             TrialFn fn;
             switch (model.modality) {
                 case Modality::kLlm:
@@ -726,12 +762,16 @@ void register_bench(CLI::App& app, GlobalOptions& options) {
     auto model = std::make_shared<std::string>();
     auto trials = std::make_shared<int>(3);
     auto vlm_image = std::make_shared<std::string>("docs/gifs/npu-model-tag-screenshot.png");
-    cmd->add_option("model", *model, "Model id to benchmark (default: all downloaded models)");
+    auto engine = std::make_shared<std::string>();
+    cmd->add_option("model", *model,
+                    "Model id, local bundle path, hf.co/... or URL (default: all downloaded)");
+    cmd->add_option("--engine", *engine,
+                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa)");
     cmd->add_option("--trials,-n", *trials, "Measured trials per scenario (median reported)")
         ->default_val(3);
     cmd->add_option("--vlm-image", *vlm_image, "Image file for VLM benchmarking");
-    cmd->callback([&options, model, trials, vlm_image]() {
-        const int exit_code = run_bench(options, *model, *trials, *vlm_image);
+    cmd->callback([&options, model, trials, vlm_image, engine]() {
+        const int exit_code = run_bench(options, *model, *trials, *vlm_image, *engine);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

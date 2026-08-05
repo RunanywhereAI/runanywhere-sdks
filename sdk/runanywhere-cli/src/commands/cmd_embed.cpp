@@ -152,9 +152,13 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
         return 1;
     }
 
-    const v1::InferenceFramework load_framework =
-        resolved.from_catalog ? v1::INFERENCE_FRAMEWORK_UNSPECIFIED : engine_hint.framework;
-    if (!load_embeddings_model(options, resolved.model_id, load_framework)) {
+    // An explicit --engine is honoured whatever the ref resolved to. This used to
+    // read `resolved.from_catalog ? UNSPECIFIED : engine_hint.framework`, which
+    // silently DISCARDED the flag for built-in catalog entries — contradicting the
+    // `--engine` help text. When the flag is absent engine_hint.framework is
+    // UNSPECIFIED, so catalog entries still fall back to their own declared
+    // framework exactly as before. Mirrors cmd_run.cpp.
+    if (!load_embeddings_model(options, resolved.model_id, engine_hint.framework)) {
         return 1;
     }
 
@@ -202,7 +206,8 @@ void register_embed(CLI::App& app, GlobalOptions& options) {
                     "Embedding model (default: " + std::string(kDefaultEmbeddingModel) + ")")
         ->default_val(kDefaultEmbeddingModel);
     cmd->add_option("--engine", *engine,
-                    "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
+                    "catalog models too, not just URL/HF refs.");
     cmd->add_option("--text,-t", *option_texts,
                     "Additional text to embed; repeat for batch embeddings");
     cmd->callback([&options, model, engine, positional_text, option_texts]() {

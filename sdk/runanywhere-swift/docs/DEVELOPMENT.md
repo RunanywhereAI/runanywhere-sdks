@@ -39,7 +39,7 @@ sdk/runanywhere-swift/Binaries/
 ├── RABackendLLAMACPP.xcframework
 ├── RABackendONNX.xcframework
 ├── RABackendSherpa.xcframework
-├── RABackendCoreML.xcframework
+├── RABackendNeuRT.xcframework
 ├── RABackendMLX.xcframework
 ├── RunAnywhereMLXRuntime.xcframework
 ├── RunAnywhereMLXMetal.xcframework

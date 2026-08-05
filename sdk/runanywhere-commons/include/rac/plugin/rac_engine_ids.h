@@ -11,7 +11,7 @@
 #define RAC_ENGINE_ID_SHERPA "sherpa"
 #define RAC_ENGINE_ID_ONNX "onnx"
 #define RAC_ENGINE_ID_PLATFORM "platform"
-#define RAC_ENGINE_ID_COREML "coreml"
+#define RAC_ENGINE_ID_NEURT "neurt"
 #define RAC_ENGINE_ID_QHEXRT "qhexrt"
 
 #endif /* RAC_PLUGIN_RAC_ENGINE_IDS_H */

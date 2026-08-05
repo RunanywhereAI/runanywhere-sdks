@@ -31,5 +31,11 @@
     <true/>
     <key>com.apple.developer.healthkit.access</key>
     <array/>
+    <!-- iOS raised jetsam ceiling. An on-device LLM is resident weights, not
+         transient allocation: the 2.6B ANE bundle measures 3.21 GiB peak RSS
+         (8-bit; the fp16 build is 5.72 GiB and does not fit a phone at all).
+         Without this the app is jetsam-killed mid-load with no catchable error. -->
+    <key>com.apple.developer.kernel.increased-memory-limit</key>
+    <true/>
 </dict>
 </plist>

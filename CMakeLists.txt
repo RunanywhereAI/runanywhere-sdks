@@ -8,7 +8,7 @@
 #   - idl/                     — protobuf IDL schemas + codegen (no CMake
 #                                target; see idl/codegen/)
 #   - engines/                 — engine plugins (llamacpp, onnx, sherpa,
-#                                qhexrt, coreml). Each publishes
+#                                qhexrt, neurt). Each publishes
 #                                a `rac_engine_vtable_t` at
 #                                `RAC_PLUGIN_API_VERSION=7u` via
 #                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
@@ -46,7 +46,7 @@ project(runanywhere
 )
 
 # Enable Objective-C AND Objective-C++ at the root project level.
-#   - OBJCXX: engines/coreml/*.mm and any Apple-framework bridge TU.
+#   - OBJCXX: engines/neurt/*.mm and any Apple-framework bridge TU.
 #   - OBJC:   vendored llama.cpp ggml-metal *.m. These are plain Objective-C
 #             (C-style implicit void*->T* conversions, e.g. `calloc`). Without
 #             OBJC enabled, the Makefiles/Ninja generators have no Objective-C
@@ -621,19 +621,25 @@ if(RAC_BUILD_TESTS)
         set_tests_properties(stt_tests PROPERTIES LABELS "native;sherpa;stt")
     endif()
 
-    if(APPLE AND RAC_BACKEND_COREML
-       AND TARGET rac_backend_coreml
+    # RAC_NEURT_ENGINE_AVAILABLE, not just the target: without the neurun checkout the engine
+    # builds as a non-routable shell, so the target exists but rac_diffusion_coreml.h is on no
+    # include path and this test cannot compile.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
        AND NOT TARGET test_diffusion_coreml_generate)
         add_executable(test_diffusion_coreml_generate
             sdk/runanywhere-commons/tests/test_diffusion_coreml_generate.cpp)
+        # rac_diffusion_coreml.h lives in neurun (NeuRT/src/sdk/) and reaches
+        # this target transitively: rac_add_engine_plugin exports the engine's
+        # INCLUDE_DIRECTORIES as PUBLIC on rac_backend_neurt, linked below.
         target_include_directories(test_diffusion_coreml_generate PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/coreml
         )
         target_link_libraries(test_diffusion_coreml_generate PRIVATE
             rac_commons
-            rac_backend_coreml
+            rac_backend_neurt
         )
         if(TARGET archive_static)
             target_link_libraries(test_diffusion_coreml_generate PRIVATE archive_static)
@@ -648,38 +654,39 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
     endif()
 
-    # coreml engine plugin-entry smoke test. Same wiring rationale as sherpa:
-    # rac_backend_coreml is built by engines/ which is
-    # configured after sdk/runanywhere-commons/. The coreml engine is the sole
+    # neurt engine plugin-entry smoke test. Same wiring rationale as sherpa:
+    # rac_backend_neurt is built by engines/ which is configured after
+    # sdk/runanywhere-commons/. The neurt engine is the sole
     # RAC_PRIMITIVE_DIFFUSION provider, so this locks the manifest's COREML
-    # runtime/format + diffusion_ops slot that the EngineRouter routes against;
-    # test_diffusion_coreml_generate.cpp only exercises the backend directly and
-    # bypasses the plugin-entry/vtable path. Apple-only because the backend is.
-    if(APPLE AND RAC_BACKEND_COREML
-       AND TARGET rac_backend_coreml
-       AND NOT TARGET test_plugin_entry_coreml)
-        add_executable(test_plugin_entry_coreml
-            sdk/runanywhere-commons/tests/test_plugin_entry_coreml.cpp)
-        target_include_directories(test_plugin_entry_coreml PRIVATE
+    # runtime/format + the diffusion_ops AND llm_ops slots the router routes
+    # against; test_diffusion_coreml_generate.cpp only exercises the backend
+    # directly and bypasses the plugin-entry/vtable path. Apple-only because the
+    # backend is.
+    if(APPLE AND RAC_BACKEND_NEURT
+       AND TARGET rac_backend_neurt
+       AND NOT TARGET test_plugin_entry_neurt)
+        add_executable(test_plugin_entry_neurt
+            sdk/runanywhere-commons/tests/test_plugin_entry_neurt.cpp)
+        target_include_directories(test_plugin_entry_neurt PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
         )
-        target_link_libraries(test_plugin_entry_coreml PRIVATE
+        target_link_libraries(test_plugin_entry_neurt PRIVATE
             rac_commons
-            rac_backend_coreml
+            rac_backend_neurt
         )
         if(TARGET archive_static)
-            target_link_libraries(test_plugin_entry_coreml PRIVATE archive_static)
+            target_link_libraries(test_plugin_entry_neurt PRIVATE archive_static)
         endif()
         if(TARGET zlibstatic)
-            target_link_libraries(test_plugin_entry_coreml PRIVATE zlibstatic)
+            target_link_libraries(test_plugin_entry_neurt PRIVATE zlibstatic)
         endif()
         if(TARGET bz2_bundled)
-            target_link_libraries(test_plugin_entry_coreml PRIVATE bz2_bundled)
+            target_link_libraries(test_plugin_entry_neurt PRIVATE bz2_bundled)
         endif()
-        target_compile_features(test_plugin_entry_coreml PRIVATE cxx_std_17)
-        add_test(NAME plugin_entry_coreml_tests
-                 COMMAND test_plugin_entry_coreml)
+        target_compile_features(test_plugin_entry_neurt PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_neurt_tests
+                 COMMAND test_plugin_entry_neurt)
     endif()
 
     # Cross-SDK parity test harness.

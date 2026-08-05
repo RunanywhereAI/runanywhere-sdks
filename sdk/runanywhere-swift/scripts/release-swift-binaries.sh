@@ -3,7 +3,7 @@
 #
 # release-swift-binaries.sh — builds + zips + checksums all eight Apple
 # XCFrameworks (RACommons / RABackendLLAMACPP / RABackendONNX /
-# RABackendSherpa / RABackendCoreML / RABackendMLX /
+# RABackendSherpa / RABackendNeuRT / RABackendMLX /
 # RunAnywhereMLXRuntime / RunAnywhereMLXMetal), packages the separate MLX resource payload, and
 # patches the root/Flutter manifests and Flutter MLX podspec checksums to match.
 #
@@ -29,7 +29,7 @@
 #   release-artifacts/native-ios-macos/RABackendLLAMACPP-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendONNX-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendSherpa-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RABackendCoreML-ios-v${VERSION}.zip
+#   release-artifacts/native-ios-macos/RABackendNeuRT-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendMLX-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RunAnywhereMLXRuntime-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RunAnywhereMLXMetal-ios-v${VERSION}.zip
@@ -61,12 +61,12 @@ fi
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
 RAC_BACKEND_SHERPA="${RAC_BACKEND_SHERPA:-ON}"
-RAC_BACKEND_COREML="${RAC_BACKEND_COREML:-ON}"
+RAC_BACKEND_NEURT="${RAC_BACKEND_NEURT:-ON}"
 RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
-export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_SHERPA RAC_BACKEND_COREML RAC_BACKEND_MLX
+export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_SHERPA RAC_BACKEND_NEURT RAC_BACKEND_MLX
 
 if [ "${RAC_BACKEND_ONNX}" != "ON" ] || [ "${RAC_BACKEND_SHERPA}" != "ON" ] || \
-   [ "${RAC_BACKEND_COREML}" != "ON" ] || [ "${RAC_BACKEND_MLX}" != "ON" ]; then
+   [ "${RAC_BACKEND_NEURT}" != "ON" ] || [ "${RAC_BACKEND_MLX}" != "ON" ]; then
     echo "error: a Swift release requires every Apple binary/resource payload (ONNX, Sherpa, CoreML, and MLX must be ON)" >&2
     exit 1
 fi
@@ -188,10 +188,10 @@ zip_target "RACommons.xcframework"          "RACommons-ios"
 zip_target "RABackendLLAMACPP.xcframework"  "RABackendLLAMACPP-ios"
 # CoreML Stable-Diffusion engine — Apple-only, always produced by
 # build-core-xcframework.sh. The Swift ONNXRuntime target declares an
-# unconditional dependency on RABackendCoreMLBinary, so external SPM consumers
-# need this zip + the matching `.binaryTarget(name: "RABackendCoreMLBinary", …)`
+# unconditional dependency on RABackendNeuRTBinary, so external SPM consumers
+# need this zip + the matching `.binaryTarget(name: "RABackendNeuRTBinary", …)`
 # entry in the root Package.swift to resolve the manifest.
-zip_target "RABackendCoreML.xcframework"    "RABackendCoreML-ios"
+zip_target "RABackendNeuRT.xcframework"    "RABackendNeuRT-ios"
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     zip_target "RABackendONNX.xcframework"  "RABackendONNX-ios"
     # Sherpa-ONNX ships as a peer xcframework alongside RABackendONNX. The

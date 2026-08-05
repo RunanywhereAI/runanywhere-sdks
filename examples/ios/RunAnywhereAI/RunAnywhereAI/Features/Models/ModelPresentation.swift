@@ -151,7 +151,11 @@ extension InferenceFramework {
         case .fluidAudio:
             return "Fluid Audio"
         case .coreml:
-            return "Core ML"
+            // Named for the ENGINE that runs it, not Apple's framework — the same
+            // choice `.qhexrt` makes below by showing "Hexagon NPU". `.coreml` is
+            // the wire enum; NeuRT is what actually executes these models, on the
+            // Neural Engine, for both LLM and diffusion.
+            return "NeuRT (Neural Engine)"
         case .mlx:
             return "MLX"
         case .sherpa:
@@ -196,7 +200,7 @@ extension InferenceFramework {
         case .fluidAudio:
             return "Fluid"
         case .coreml:
-            return "Core ML"
+            return "NeuRT"
         case .mlx:
             return "MLX"
         case .sherpa:
@@ -678,7 +682,7 @@ extension InferenceFramework {
         case .sherpa: return "Sherpa"
         case .foundationModels, .systemTts, .builtIn: return "Apple"
         case .piperTts: return "Piper"
-        case .coreml: return "Core ML"
+        case .coreml: return "NeuRT"
         default: return consumerBackendShortLabel
         }
     }

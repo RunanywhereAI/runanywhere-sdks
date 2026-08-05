@@ -115,7 +115,7 @@ const N = [
   ["sherpa","sherpa-onnx\nSTT · TTS · VAD","engine", 300, 1010, "Sherpa-ONNX C API. Priority 90. Serves transcribe/synthesize/detect_voice. (Needs the Linux sherpa-onnx libs downloaded.)", ["a","b"]],
   ["onnx","onnx\nEmbeddings","engine", 540, 1010, "Sherpa-ONNX embeddings. Priority 50.", ["a","b"]],
   ["qhexrt","qhexrt (NPU)\nLLM·VLM·STT·TTS·Diffusion","engine", 780, 1010, "Qualcomm Hexagon NPU. Priority 150 (QNN-context models). Runs diffusion/inpaint on Android.", ["a","b"]],
-  ["coreml","coreml / platform\nApple FM · TTS · Diffusion","engine", 1080, 1010, "Apple-only via Swift callbacks. CoreML Stable-Diffusion, Foundation Models, System TTS.", ["a","b"]],
+  ["neurt","neurt / platform\nANE LLM · Apple FM · TTS · Diffusion","engine", 1080, 1010, "Apple-only. NeuRT runs prebuilt Core ML graphs on the Neural Engine; CoreML Stable-Diffusion; Foundation Models + System TTS via Swift callbacks.", ["a","b"]],
 
   // two-phase init + telemetry pipeline
   ["phase1","Phase 1  init\nrac_sdk_init_phase1_proto","init", 1000, 150,
@@ -140,7 +140,7 @@ const E = [
   ["comp_entry","component","b"],
   ["component","service","a"], ["component","service","b2"],
   ["service","registry","ab"],
-  ["registry","llamacpp","ab"],["registry","sherpa","ab"],["registry","onnx","ab"],["registry","qhexrt","ab"],["registry","coreml","ab"],
+  ["registry","llamacpp","ab"],["registry","sherpa","ab"],["registry","onnx","ab"],["registry","qhexrt","ab"],["registry","neurt","ab"],
   ["adapter","cabi","dep"],
   // two-phase init
   ["phase1","phase2","tel"], ["phase2","telmgr","tel"],

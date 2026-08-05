@@ -635,7 +635,7 @@ runanywhere-sdks/
 │   ├── runanywhere-cli/            # rcli, the terminal SDK
 │   └── runanywhere-commons/        # Shared C/C++ core behind a C ABI
 │
-├── engines/                        # llamacpp, mlx, sherpa, onnx, coreml, qhexrt, cloud
+├── engines/                        # llamacpp, mlx, sherpa, onnx, neurt, qhexrt, cloud
 ├── runtimes/                       # cpu, coreml, onnxrt compute adapters
 ├── idl/                            # Protobuf schemas, generated bindings per language
 ├── examples/                       # Full example apps

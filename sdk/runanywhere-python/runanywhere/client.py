@@ -116,9 +116,11 @@ class RunAnywhere:
     def available_backends(self) -> list[str]:
         """The engine backends compiled into this build, e.g. ``['llamacpp', 'onnx', 'sherpa']``.
 
-        Does not require :meth:`initialize` — it reflects the wheel's build config. The plugin
-        registry auto-selects the highest-priority registered backend for each modality, so an
-        An Android QHexRT-linked build reports ``'qhexrt'`` here (priority 150) and
+        Does not require :meth:`initialize` — it reflects the wheel's build config, i.e.
+        compile-time availability only. A listed engine can still refuse registration at runtime
+        (``'neurt'`` is Apple-only, so a non-Apple build lists it but never routes to it). The
+        plugin registry auto-selects the highest-priority *registered* backend for each modality,
+        so an Android QHexRT-linked build reports ``'qhexrt'`` here (priority 150) and
         ``load_llm`` routes to it for HNPU bundles. Windows Snapdragon HNPU is not
         available yet — desktop wheels report CPU backends (llamacpp/onnx/sherpa).
         """

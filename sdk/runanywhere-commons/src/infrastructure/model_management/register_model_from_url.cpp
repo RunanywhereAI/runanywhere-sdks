@@ -241,7 +241,19 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     }
     if (request.has_category()) {
         multi_file.set_category(request.category());
-    } else if (framework == RAC_FRAMEWORK_MLX) {
+    } else if (framework == RAC_FRAMEWORK_MLX || framework == RAC_FRAMEWORK_COREML) {
+        // A caller that supplies no category leaves it UNSPECIFIED, and
+        // component_for_category maps ONLY unspecified to no component — so the
+        // model registers and downloads fine and then fails at load with
+        // "model category is not supported by lifecycle routing". Measured on a
+        // published ANE bundle pulled by URL.
+        //
+        // Both of these frameworks reach here as folder bundles whose LLM form is
+        // the overwhelmingly common case, and every in-tree caller that registers
+        // a non-LLM modality (diffusion, TTS) passes an explicit category, so this
+        // default only applies where there is nothing better to infer. It is a
+        // default, not an assertion: an ANE ASR bundle pulled by bare URL would
+        // still need its category passed.
         multi_file.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     }
     if (request.has_source()) {

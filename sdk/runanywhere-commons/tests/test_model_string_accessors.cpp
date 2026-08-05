@@ -154,8 +154,11 @@ int test_inference_framework_canonical_names() {
     EXPECT_RC(rac_inference_framework_display_name(RAC_FRAMEWORK_LLAMACPP, &s), RAC_SUCCESS);
     EXPECT_TRUE(std::strcmp(s, "llama.cpp") == 0);
 
+    // Named for the ENGINE that executes these models (NeuRT), not Apple's framework — the same
+    // convention RAC_FRAMEWORK_QHEXRT follows by displaying "QHexRT". The enum tag stays COREML
+    // because that is the wire value; only the human-readable label changed.
     EXPECT_RC(rac_inference_framework_display_name(RAC_FRAMEWORK_COREML, &s), RAC_SUCCESS);
-    EXPECT_TRUE(std::strcmp(s, "Core ML") == 0);
+    EXPECT_TRUE(std::strcmp(s, "NeuRT") == 0);
 
     EXPECT_RC(rac_inference_framework_analytics_key(RAC_FRAMEWORK_LLAMACPP, &s), RAC_SUCCESS);
     EXPECT_TRUE(std::strcmp(s, "llama_cpp") == 0);
@@ -197,8 +200,19 @@ int test_inference_framework_from_string_alias_inputs() {
     EXPECT_RC(rac_inference_framework_from_string("llama.cpp", &parsed), RAC_SUCCESS);
     EXPECT_TRUE(parsed == RAC_FRAMEWORK_LLAMACPP);
 
-    // Display name with different casing
+    // Current display name for the Apple engine.
+    EXPECT_RC(rac_inference_framework_from_string("NeuRT", &parsed), RAC_SUCCESS);
+    EXPECT_TRUE(parsed == RAC_FRAMEWORK_COREML);
+
+    // LEGACY display name, case-insensitive. "Core ML" was this framework's display string before
+    // the Apple engine was renamed to NeuRT, so it is what older persisted records and API payloads
+    // still carry. from_string is the only way back from a stored string, so a value that parsed
+    // before must keep parsing — this asserts the rename did not silently narrow accepted input.
     EXPECT_RC(rac_inference_framework_from_string("CORE ML", &parsed), RAC_SUCCESS);
+    EXPECT_TRUE(parsed == RAC_FRAMEWORK_COREML);
+
+    // The spaceless spelling still resolves via the analytics key.
+    EXPECT_RC(rac_inference_framework_from_string("coreml", &parsed), RAC_SUCCESS);
     EXPECT_TRUE(parsed == RAC_FRAMEWORK_COREML);
 
     // Wire string with mixed casing (Swift's caseInsensitive init guarantees this).

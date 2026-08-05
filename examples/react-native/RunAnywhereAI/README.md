@@ -66,7 +66,7 @@ cd ../../..
 cd examples/react-native/RunAnywhereAI
 ```
 
-One run stages every Apple artifact the app can link: `RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`, `onnxruntime`, `onnx`, `RABackendCoreML`, and the three MLX frameworks (`RABackendMLX`, `RunAnywhereMLXRuntime`, `RunAnywhereMLXMetal`). Any of them missing means this step was skipped.
+One run stages every Apple artifact the app can link: `RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`, `onnxruntime`, `onnx`, `RABackendNeuRT`, and the three MLX frameworks (`RABackendMLX`, `RunAnywhereMLXRuntime`, `RunAnywhereMLXMetal`). Any of them missing means this step was skipped.
 
 ### 3. Install iOS pods and verify builds
 

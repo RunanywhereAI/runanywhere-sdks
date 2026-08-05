@@ -264,7 +264,8 @@ void register_pull(CLI::App &app, GlobalOptions &options) {
   cmd->add_option("model", *ref, "Model id, alias, hf.co/org/repo/file or URL")
       ->required();
   cmd->add_option("--engine", *engine,
-                  "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                  "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
+                  "catalog models too, not just URL/HF refs.");
   cmd->callback([&options, ref, engine]() {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {

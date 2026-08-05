@@ -19,6 +19,7 @@
 
 #include "../src/infrastructure/model_management/bundle_policy_registry_internal.h"
 #include "../src/infrastructure/model_management/hf_resolver.h"
+#include "neurt_bundle_policy.h"
 #include "qhexrt_bundle_policy.h"
 
 namespace hf = rac::infra::model_management::hf;
@@ -139,12 +140,59 @@ void test_qhexrt_end_to_end(std::vector<TestResult>& results) {
 
 }  // namespace
 
+// The NeuRT (Apple ANE) policy. Its predicate differs from QHexRT's in one way that is unique to
+// this backend and was a REAL failure: an ANE bundle ships one `<graph>.iodesc.json` sidecar PER
+// GRAPH, all top-level. A QHexRT-style "any top-level .json that is not tokenizer.json" predicate
+// matches a sidecar, and since the bundle list is sorted alphabetically, `..._chunk0.iodesc.json`
+// wins over the real manifest. These cases lock that exclusion.
+void test_neurt_predicate(std::vector<TestResult>& results) {
+    results.push_back(expect("neurt: manifest json accepted",
+                             neurt_is_bundle_manifest("lfm2-5-2-6b.json") == RAC_TRUE));
+    results.push_back(
+        expect("neurt: iodesc sidecar rejected",
+               neurt_is_bundle_manifest("lfm2_5_2_6b_decode_chunk0.iodesc.json") == RAC_FALSE));
+    results.push_back(
+        expect("neurt: lmhead iodesc rejected",
+               neurt_is_bundle_manifest("lfm2_5_2_6b_lmhead.iodesc.json") == RAC_FALSE));
+    results.push_back(expect("neurt: tokenizer.json rejected",
+                             neurt_is_bundle_manifest("tokenizer.json") == RAC_FALSE));
+    results.push_back(expect("neurt: PRECISION.json rejected",
+                             neurt_is_bundle_manifest("PRECISION.json") == RAC_FALSE));
+    // A .mlpackage is a DIRECTORY and carries its own nested Manifest.json.
+    results.push_back(
+        expect("neurt: nested mlpackage manifest rejected",
+               neurt_is_bundle_manifest("x.mlpackage/Manifest.json") == RAC_FALSE));
+    results.push_back(
+        expect("neurt: binary rejected", neurt_is_bundle_manifest("embed_f16.bin") == RAC_FALSE));
+    results.push_back(
+        expect("neurt: NULL rejected", neurt_is_bundle_manifest(nullptr) == RAC_FALSE));
+}
+
+void test_neurt_policy_shape(std::vector<TestResult>& results) {
+    const rac_bundle_policy_t* p = neurt_bundle_policy();
+    results.push_back(expect("neurt policy: framework", p->framework == RAC_FRAMEWORK_COREML));
+    results.push_back(expect("neurt policy: format", p->model_format == RAC_MODEL_FORMAT_COREML));
+    results.push_back(
+        expect("neurt policy: manifest ext", std::string(p->manifest_extension) == ".json"));
+    results.push_back(
+        expect("neurt policy: leaf names bundle", p->manifest_leaf_names_bundle == RAC_TRUE));
+    results.push_back(expect("neurt policy: struct size",
+                             p->struct_size == (uint32_t)sizeof(rac_bundle_policy_t)));
+    // Apple has ONE portable bundle for every device (rule 61) — there is no architecture to
+    // resolve, unlike QHexRT's v75/v79/v81. A non-NULL resolver here would silently pick a
+    // precision folder the caller never asked for.
+    results.push_back(
+        expect("neurt policy: no variant resolver", p->resolve_variant == nullptr));
+}
+
 int main() {
     std::vector<TestResult> results;
     test_registry(results);
     test_qhexrt_predicate(results);
     test_qhexrt_policy_shape(results);
     test_qhexrt_end_to_end(results);
+    test_neurt_predicate(results);
+    test_neurt_policy_shape(results);
     for (const TestResult& r : results) {
         print_result(r);
     }
