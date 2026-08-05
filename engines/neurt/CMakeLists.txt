@@ -71,14 +71,42 @@ if(NOT DEFINED NEURT_ROOT)
 endif()
 
 set(_neurt_sdk_dir "${NEURT_ROOT}/NeuRT/src/sdk")
-if(NOT NEURT_ROOT OR NOT EXISTS "${_neurt_sdk_dir}/rac_llm_ops_neurt.cpp")
-    message(FATAL_ERROR
-        "RAC_BACKEND_NEURT=ON but the neurun checkout was not found.\n"
-        "  looked for: ${_neurt_sdk_dir}/rac_llm_ops_neurt.cpp\n"
-        "  NEURT_ROOT: '${NEURT_ROOT}'\n"
-        "Pass -DNEURT_ROOT=/path/to/neurun (or export NEURT_ROOT), or build "
-        "without the Apple engine using -DRAC_BACKEND_NEURT=OFF.")
+if(NEURT_ROOT AND EXISTS "${_neurt_sdk_dir}/rac_llm_ops_neurt.cpp")
+    set(_neurt_available TRUE)
+else()
+    set(_neurt_available FALSE)
 endif()
+
+# ---------------------------------------------------------------------------
+# TWO MODES, mirroring the QHexRT engine — the other closed-source, RunAnywhere-
+# owned dependency whose source never enters this repo.
+#
+#   1) Engine NOT available (no neurun checkout — the case on every CI host):
+#      only the shell (rac_plugin_entry_neurt.cpp) compiles. It publishes a
+#      NOT-ROUTABLE, all-NULL vtable and its capability check returns
+#      RAC_ERROR_BACKEND_UNAVAILABLE, so registration is REJECTED rather than
+#      accepted-and-useless. Nothing references a neurun symbol, so it links.
+#
+#   2) Engine IS available (NEURT_ROOT resolves): the full engine, unchanged.
+#
+# This replaces a FATAL_ERROR. The error was defending against a real hazard —
+# "an engine that registers, claims Apple availability, and then serves nothing"
+# — but a hard stop is the wrong instrument for it, and it made every Apple job
+# in CI unbuildable (macos-debug/release, ios-device, rcli-macos, swift-spm,
+# python-macos all died at configure) because `neurun` is a separate PRIVATE
+# repo that CI cannot clone. The stub closes the hazard directly instead: an
+# unavailable engine refuses registration, which is strictly stronger than
+# refusing to build. Same argument QHexRT already settled the same way.
+# ---------------------------------------------------------------------------
+if(NOT _neurt_available)
+    message(STATUS
+        "  neurt: neurun checkout NOT found — building the non-routable shell "
+        "(registration will be refused with RAC_ERROR_BACKEND_UNAVAILABLE).")
+    message(STATUS
+        "  neurt: pass -DNEURT_ROOT=/path/to/neurun for the full Apple engine.")
+endif()
+
+if(_neurt_available)
 
 # ---------------------------------------------------------------------------
 # rac_neurt_core — NeuRT's runtime, compiled from neurun's own source list.
@@ -192,6 +220,13 @@ target_compile_options(rac_neurt_llm_ops PRIVATE ${_neurt_prefix_maps})
 set_target_properties(rac_neurt_llm_ops PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(rac_neurt_llm_ops PUBLIC rac_neurt_core)
 
+else()
+    # Shell mode: no neurun sources to derive, so no rac_neurt_core /
+    # rac_neurt_llm_ops targets exist. `_neurt_prefix_maps` is still referenced
+    # unconditionally below, so define it empty rather than leaving it unset.
+    set(_neurt_prefix_maps "")
+endif()  # _neurt_available
+
 # ---------------------------------------------------------------------------
 # The engine plugin itself.
 #
@@ -214,10 +249,23 @@ target_link_libraries(rac_neurt_llm_ops PUBLIC rac_neurt_core)
 #         `rac_registry_load_plugin(librunanywhere_neurt.*)` actually installs
 #         the vtable into the registry.
 # ---------------------------------------------------------------------------
-set(NEURT_SOURCES
-    ${_neurt_sdk_dir}/rac_diffusion_coreml.mm
-    rac_plugin_entry_neurt.cpp
-)
+if(_neurt_available)
+    set(NEURT_SOURCES
+        ${_neurt_sdk_dir}/rac_diffusion_coreml.mm
+        rac_plugin_entry_neurt.cpp
+    )
+    set(_neurt_extra_includes ${_neurt_sdk_dir})
+    set(_neurt_generate_available 1)
+    set(_neurt_extra_links rac_neurt_llm_ops)
+else()
+    # Shell only. No neurun source, no private include dir, no rac_neurt_llm_ops
+    # to link — RAC_NEURT_GENERATE_AVAILABLE=0 makes the entry file compile its
+    # not-routable arm, which references none of those.
+    set(NEURT_SOURCES rac_plugin_entry_neurt.cpp)
+    set(_neurt_extra_includes "")
+    set(_neurt_generate_available 0)
+    set(_neurt_extra_links "")
+endif()
 
 rac_add_engine_plugin(neurt
     TARGET_NAME         rac_backend_neurt
@@ -226,13 +274,13 @@ rac_add_engine_plugin(neurt
     SOURCES             ${NEURT_SOURCES}
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
-                        ${_neurt_sdk_dir}
-    COMPILE_DEFINITIONS RAC_NEURT_GENERATE_AVAILABLE=1
+                        ${_neurt_extra_includes}
+    COMPILE_DEFINITIONS RAC_NEURT_GENERATE_AVAILABLE=${_neurt_generate_available}
     LINK_LIBRARIES      "-framework Foundation"
                         "-framework CoreML"
                         "-framework Accelerate"
                         rac_runtime_coreml
-                        rac_neurt_llm_ops
+                        ${_neurt_extra_links}
 )
 
 # NEURT_SOURCES pulls rac_diffusion_coreml.mm straight out of NEURT_ROOT, so this

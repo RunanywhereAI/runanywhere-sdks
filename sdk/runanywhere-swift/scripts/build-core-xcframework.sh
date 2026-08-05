@@ -55,6 +55,25 @@ if [ "${RAC_BACKEND_SHERPA}" != "ON" ] || [ "${RAC_BACKEND_NEURT}" != "ON" ]; th
     echo "error: the Swift package unconditionally requires Sherpa and NeuRT binaries; RAC_BACKEND_SHERPA and RAC_BACKEND_NEURT must be ON" >&2
     exit 1
 fi
+
+# RAC_BACKEND_NEURT=ON no longer implies a WORKING engine. Without the sibling `neurun` checkout
+# the engine now builds as a non-routable shell (engines/neurt/CMakeLists.txt) instead of failing
+# configure — which is what lets CI build the Apple targets at all, since neurun is a separate
+# PRIVATE repo. But PACKAGING that shell would ship a Swift SDK whose ANE engine refuses every
+# registration, silently and with no build error. That is the one place the old hard failure was
+# genuinely protecting something, so the check moves here rather than disappearing.
+#
+# CI sets RAC_ALLOW_NEURT_STUB=1: it only needs to prove the build compiles and links.
+if [ "${RAC_ALLOW_NEURT_STUB:-0}" != "1" ]; then
+    _neurt_root_probe="${NEURT_ROOT:-${REPO_ROOT}/../neurun}"
+    if [ ! -f "${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp" ]; then
+        echo "error: packaging the Swift SDK requires a real NeuRT engine, but the neurun checkout was not found." >&2
+        echo "  looked for: ${_neurt_root_probe}/NeuRT/src/sdk/rac_llm_ops_neurt.cpp" >&2
+        echo "  Set NEURT_ROOT=/path/to/neurun, or set RAC_ALLOW_NEURT_STUB=1 to package a" >&2
+        echo "  non-routable stub on purpose (build verification only — NOT shippable)." >&2
+        exit 1
+    fi
+fi
 COMMONS_HEADERS="${REPO_ROOT}/sdk/runanywhere-commons/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 BUILD_JOBS="${RAC_BUILD_JOBS:-$(sysctl -n hw.logicalcpu)}"

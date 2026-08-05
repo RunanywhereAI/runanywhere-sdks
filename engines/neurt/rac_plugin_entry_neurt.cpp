@@ -28,8 +28,6 @@
  * both routable and stub builds.
  */
 
-#include "rac_diffusion_coreml.h"
-
 #include "neurt_bundle_policy.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
@@ -47,6 +45,15 @@
 #define RAC_NEURT_ROUTABLE 0
 #endif
 
+// Both modalities are implemented in the sibling `neurun` checkout, so EVERY reference to them —
+// the header, the forwarders and the op table — is confined to the routable build. Without this
+// the stub still names `rac_diffusion_coreml_*` and fails to LINK, which is why a shell build was
+// impossible before: the vtable slots were already conditional, but the symbols behind them were
+// not. Mirrors the QHexRT engine, whose shell compiles in the public repo with no private header.
+#if RAC_NEURT_ROUTABLE
+#include "rac_diffusion_coreml.h"
+#endif
+
 namespace {
 
 // -----------------------------------------------------------------------------
@@ -56,7 +63,10 @@ namespace {
 // -framework implementation of the modality, parallel to rac_stt_cloud_*).
 // Keeping the forwarders visible as file-scope statics makes backtraces point
 // at the primitive operation rather than into the .mm TU.
+//
+// Routable builds only: these are the sole users of the neurun-provided symbols.
 // -----------------------------------------------------------------------------
+#if RAC_NEURT_ROUTABLE
 
 rac_result_t ops_initialize(void* impl, const char* model_path,
                             const rac_diffusion_config_t* config) {
@@ -111,6 +121,10 @@ rac_result_t ops_create(const char* model_id, const char* config_json, void** ou
     return RAC_SUCCESS;
 }
 
+#endif  // RAC_NEURT_ROUTABLE
+
+// Compiled in BOTH modes: the registry calls this before registration, and a stub build must be
+// able to say "unavailable" rather than silently registering an engine that serves nothing.
 rac_result_t neurt_capability_check(void) {
 #if !defined(__APPLE__)
     return RAC_ERROR_CAPABILITY_UNSUPPORTED;
@@ -127,6 +141,7 @@ rac_result_t neurt_capability_check(void) {
 // g_cloud_stt_ops). The `coreml` in the name is the Apple FRAMEWORK the
 // modality is implemented over, not the engine identity; it is wired into the
 // vtable's diffusion_ops slot below.
+#if RAC_NEURT_ROUTABLE
 extern "C" const rac_diffusion_service_ops_t g_coreml_diffusion_ops = {
     .initialize = ops_initialize,
     .generate = ops_generate,
@@ -138,6 +153,7 @@ extern "C" const rac_diffusion_service_ops_t g_coreml_diffusion_ops = {
     .destroy = ops_destroy,
     .create = ops_create,
 };
+#endif  // RAC_NEURT_ROUTABLE
 
 extern "C" {
 
