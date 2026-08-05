@@ -3,6 +3,7 @@
  */
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { AsyncQueue } from '../../../Foundation/AsyncQueue.js';
 import { detectVoice, streamVoiceActivity } from '../../Extensions/RunAnywhere+VAD.js';
@@ -13,8 +14,8 @@ import type { VadResult, VadStream } from '../Results.js';
 import { toProtoVadOptions, toVadResult } from '../Mapping.js';
 import { ensureModelForCategory, ensureReady } from '../Runtime/Prerequisites.js';
 
-/** Native lifecycle VAD streaming is fixed at 16kHz PCM. */
-const NATIVE_STREAM_SAMPLE_RATE = 16_000;
+/** Native lifecycle VAD streaming is fixed at the mic capture rate (16kHz PCM). */
+const NATIVE_STREAM_SAMPLE_RATE = audioCaptureDefaults.micSampleRateHz;
 
 function toDetectOptions(options?: VadOptions) {
   const proto = toProtoVadOptions(options);

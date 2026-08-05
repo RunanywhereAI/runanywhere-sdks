@@ -199,7 +199,7 @@ class Vad:
 
         Example:
             >>> stream = runanywhere.vad.open_stream(
-            ...     AudioFormatSpec(AudioEncoding.PCM16, sample_rate=16000))
+            ...     AudioFormatSpec(AudioEncoding.PCM16, sample_rate=STT_SAMPLE_RATE))
             >>> stream.push_frame(AudioFrame(samples=pcm16, sample_count=len(pcm16) // 2))
             >>> stream.finish()
             >>> for event in stream.events():
