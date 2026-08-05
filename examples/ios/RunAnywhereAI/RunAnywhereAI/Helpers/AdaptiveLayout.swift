@@ -561,34 +561,33 @@ struct AdaptiveMicButton: View {
     var body: some View {
         Group {
             if #available(iOS 26.0, macOS 26.0, *) {
-                micContent
-                    .onLongPressGesture(minimumDuration: 0.5) { onLongPress?() ?? action() }
-                    .onTapGesture(perform: action)
+                micButton
                     .glassEffect(.regular.interactive())
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("Microphone")
-                    .accessibilityHint(
-                        onLongPress != nil
-                            ? "Double tap to toggle recording. Long press for alternate action."
-                            : "Double tap to toggle recording."
-                    )
-                    .accessibilityAction(.default, action)
-                    .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             } else {
-                micContent
-                    .onLongPressGesture(minimumDuration: 0.5) { onLongPress?() ?? action() }
-                    .onTapGesture(perform: action)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("Microphone")
-                    .accessibilityHint(
-                        onLongPress != nil
-                            ? "Double tap to toggle recording. Long press for alternate action."
-                            : "Double tap to toggle recording."
-                    )
-                    .accessibilityAction(.default, action)
-                    .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
+                micButton
             }
         }
+    }
+
+    // A real Button hit-tests reliably under `.glassEffect(.interactive())`;
+    // a bare `.onTapGesture` gets swallowed by the interactive glass layer,
+    // which made the mic untappable on iOS 26.
+    private var micButton: some View {
+        Button(action: action) {
+            micContent
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5)
+                .onEnded { _ in onLongPress?() ?? action() }
+        )
+        .accessibilityLabel("Microphone")
+        .accessibilityHint(
+            onLongPress != nil
+                ? "Double tap to toggle recording. Long press for alternate action."
+                : "Double tap to toggle recording."
+        )
+        .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
     }
 }
 
