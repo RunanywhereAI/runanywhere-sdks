@@ -18,6 +18,7 @@ import 'package:fixnum/fixnum.dart' show Int64;
 
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCallValidationRequest,
@@ -183,8 +184,7 @@ class DartBridgeToolCalling {
   bool cancelSession(int sessionHandle) {
     final fn = RacNative.bindings.rac_tool_calling_session_cancel_proto;
     try {
-      fn(sessionHandle);
-      return true;
+      return fn(sessionHandle) == RacResultCodes.success;
     } catch (e) {
       _logger.warning('session cancel failed: $e');
       return false;
