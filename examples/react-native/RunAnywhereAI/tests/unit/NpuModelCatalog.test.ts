@@ -15,11 +15,11 @@ import {
 } from '../../src/services/NpuModelCatalog';
 
 describe('React Native QHexRT catalog', () => {
-  it('keeps 48 unique app-owned URL and presentation rows', () => {
-    expect(NPU_BUNDLES).toHaveLength(48);
+  it('keeps 49 unique app-owned URL and presentation rows', () => {
+    expect(NPU_BUNDLES).toHaveLength(49);
     expect(new Set(NPU_BUNDLES.map((bundle) => bundle.id))).toHaveProperty(
       'size',
-      48
+      49
     );
     expect(
       NPU_BUNDLES.every((bundle) => bundle.url.startsWith('https://'))
@@ -36,6 +36,7 @@ describe('React Native QHexRT catalog', () => {
     ).toEqual({
       lfm2_5_230m: 512,
       lfm2_5_350m: 2_048,
+      lfm2_5_2_6b: 512,
       qwen3_5_0_8b: 1_024,
       qwen3_5_2b: 1_024,
       qwen3_5_4b: 1_024,
@@ -50,6 +51,7 @@ describe('React Native QHexRT catalog', () => {
         (bundle) => bundle.id
       )
     ).toEqual([
+      'lfm2_5_2_6b',
       'qwen3_5_0_8b',
       'deepseek_r1_distill_qwen_1_5b',
       'deepseek_r1_distill_qwen_7b',

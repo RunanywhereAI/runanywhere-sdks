@@ -760,7 +760,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ?: if (totalMs > 0 && result.tokens_generated > 0) result.tokens_generated * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
-                text = result.text,
+                text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
                 // Mirrors iOS buildMessageAnalytics: prefer the result's TTFT and
                 // fall back to the value recorded from the SDK's first-token event;
@@ -799,7 +799,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     updateReply(request, index) { it.copy(thinking = accumulated) }
                 },
                 onToken = { accumulated ->
-                    updateReply(request, index) { it.copy(text = accumulated) }
+                    // Tool-trained models emit call syntax unprompted even with no tools registered; on the
+                    // standard route those markers are noise, so never let them reach the bubble.
+                    updateReply(request, index) {
+                        it.copy(text = ChatToolResultNormalizer.stripStrayToolCall(accumulated))
+                    }
                 },
             )
 
@@ -819,7 +823,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
-                text = result.text,
+                text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
                 stats = GenerationStats(
                     tokens = tokens,

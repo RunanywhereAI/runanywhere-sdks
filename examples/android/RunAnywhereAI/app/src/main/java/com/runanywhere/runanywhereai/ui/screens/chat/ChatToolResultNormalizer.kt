@@ -29,6 +29,13 @@ internal object ChatToolResultNormalizer {
     // The full-word alternation keeps the prior behavior of trimming an unclosed
     // `<think ...` that carries attributes. A lone trailing `<` stays untouched so
     // a legitimate less-than at the end of an answer is preserved.
+    // LFM2 `<|tool_call_start|>…<|tool_call_end|>` and the DEFAULT `<tool_call>…</tool_call>` form.
+    private val strayToolCall = Regex(
+        """<\|tool_call_start\|>(.*?)<\|tool_call_end\|>|<tool_call>(.*?)</tool_call>""",
+        RegexOption.DOT_MATCHES_ALL,
+    )
+    private val firstStringLiteral = Regex("\"([^\"]+)\"")
+
     private val incompleteThinkingTag = Regex(
         pattern = "<\\s*/?\\s*(?:(?:think|thinking)\\b[^>]*|t(?:h(?:i(?:n(?:k(?:i(?:n(?:g)?)?)?)?)?)?)?)$",
         options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
@@ -55,6 +62,30 @@ internal object ChatToolResultNormalizer {
             text = visibleOnly(text).ifBlank { "The model did not produce a visible answer." },
             thinking = thinking,
         )
+    }
+
+    /**
+     * Strip stray tool-call markup from a reply produced on the STANDARD (no-tools) route.
+     *
+     * Tool-trained models emit their call syntax unprompted even when no tools are registered — LFM2.5
+     * answers a plain "Hi my name is Aman" with
+     * `<|tool_call_start|>[ask_user("What would you like to do today, Aman?")]<|tool_call_end|>`.
+     * Commons parses that into LLMStreamEvent.tool_call regardless of whether tools were requested, but the
+     * raw text still carries the markers, so on the standard route the user sees the literal tags.
+     *
+     * The call's first string literal is the model's intended user-facing sentence (that is the whole point
+     * of an ask_user-style call), so surface it when the block is all there is; otherwise just remove the
+     * block and keep the surrounding prose.
+     */
+    fun stripStrayToolCall(raw: String): String {
+        if (raw.isBlank() || !strayToolCall.containsMatchIn(raw)) return raw
+        var salvaged: String? = null
+        val withoutCalls = strayToolCall.replace(raw) { match ->
+            if (salvaged == null) salvaged = firstStringLiteral.find(match.groupValues[1])?.groupValues?.get(1)
+            ""
+        }
+        val remaining = withoutCalls.trim()
+        return if (remaining.isNotEmpty()) remaining else salvaged?.trim().orEmpty()
     }
 
     internal fun splitThinking(raw: String): ThinkingSplit {
