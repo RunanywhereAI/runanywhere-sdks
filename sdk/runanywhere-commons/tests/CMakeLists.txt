@@ -1291,7 +1291,11 @@ endif()
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
 
-if(APPLE AND RAC_BACKEND_NEURT AND TARGET rac_backend_neurt)
+# RAC_NEURT_ENGINE_AVAILABLE, not just the target: with RAC_BACKEND_NEURT=ON but no neurun
+# checkout the engine still builds — as a non-routable shell — so `TARGET rac_backend_neurt` is
+# true while the neurun include dirs are absent. This test includes rac_diffusion_coreml.h and
+# would fail to compile. That is exactly what broke every Apple CI job's Build step.
+if(APPLE AND RAC_BACKEND_NEURT AND TARGET rac_backend_neurt AND RAC_NEURT_ENGINE_AVAILABLE)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
     # rac_diffusion_coreml.h lives in neurun (NeuRT/src/sdk/); it arrives
     # transitively through rac_backend_neurt's PUBLIC include dirs.

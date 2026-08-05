@@ -621,8 +621,12 @@ if(RAC_BUILD_TESTS)
         set_tests_properties(stt_tests PROPERTIES LABELS "native;sherpa;stt")
     endif()
 
+    # RAC_NEURT_ENGINE_AVAILABLE, not just the target: without the neurun checkout the engine
+    # builds as a non-routable shell, so the target exists but rac_diffusion_coreml.h is on no
+    # include path and this test cannot compile.
     if(APPLE AND RAC_BACKEND_NEURT
        AND TARGET rac_backend_neurt
+       AND RAC_NEURT_ENGINE_AVAILABLE
        AND NOT TARGET test_diffusion_coreml_generate)
         add_executable(test_diffusion_coreml_generate
             sdk/runanywhere-commons/tests/test_diffusion_coreml_generate.cpp)

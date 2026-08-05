@@ -77,6 +77,14 @@ else()
     set(_neurt_available FALSE)
 endif()
 
+# Exported because consumers OUTSIDE this directory must distinguish "the engine target exists"
+# from "the engine is routable" — in shell mode `TARGET rac_backend_neurt` is true but the neurun
+# headers are not on any include path. sdk/runanywhere-commons/tests gates
+# test_diffusion_coreml_generate on this: it includes rac_diffusion_coreml.h, which arrives only
+# through the routable build's include dirs.
+set(RAC_NEURT_ENGINE_AVAILABLE ${_neurt_available}
+    CACHE INTERNAL "neurt engine is routable (the neurun checkout was found)")
+
 # ---------------------------------------------------------------------------
 # TWO MODES, mirroring the QHexRT engine — the other closed-source, RunAnywhere-
 # owned dependency whose source never enters this repo.
