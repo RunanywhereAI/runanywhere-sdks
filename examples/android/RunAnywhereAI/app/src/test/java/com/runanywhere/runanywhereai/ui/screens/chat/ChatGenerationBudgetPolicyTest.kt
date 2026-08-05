@@ -7,24 +7,38 @@ import org.junit.Test
 
 class ChatGenerationBudgetPolicyTest {
     @Test
-    fun `512 context model keeps half its window for input`() {
+    fun `context-bound 512 model reserves half its window for input`() {
         val budget = ChatGenerationBudgetPolicy.resolve(
             requestedMaxTokens = 4_096,
             modelContextTokens = 512,
         )
 
         assertEquals(4_096, budget.requestedMaxTokens)
-        assertEquals(256, budget.effectiveMaxTokens)
+        assertEquals(256, budget.effectiveMaxTokens) // 512 / 2
         assertTrue(budget.isCapped)
         assertTrue(budget.explanation("LFM").contains("preference stays saved"))
     }
 
     @Test
-    fun `1024 context model cannot inherit a 4096 output decode`() {
-        val budget = ChatGenerationBudgetPolicy.resolve(4_096, 1_024)
+    fun `sliding-window model is not bounded by its small context`() {
+        // QHexRT NPU (KV ring) keeps generating coherently past its context, so output caps at the global
+        // ceiling instead of the context window.
+        val budget = ChatGenerationBudgetPolicy.resolve(
+            requestedMaxTokens = 4_096,
+            modelContextTokens = 512,
+            slidingWindow = true,
+        )
 
         assertEquals(ChatGenerationBudgetPolicy.MAX_NORMAL_OUTPUT_TOKENS, budget.effectiveMaxTokens)
-        assertEquals(512, budget.effectiveMaxTokens)
+        assertEquals(1_024, budget.effectiveMaxTokens)
+        assertTrue(budget.isCapped)
+    }
+
+    @Test
+    fun `context-bound 1024 model reserves half its window`() {
+        val budget = ChatGenerationBudgetPolicy.resolve(4_096, 1_024)
+
+        assertEquals(512, budget.effectiveMaxTokens) // 1024 / 2
     }
 
     @Test
@@ -39,7 +53,7 @@ class ChatGenerationBudgetPolicyTest {
     fun `unknown context fails to the bounded normal chat maximum`() {
         val budget = ChatGenerationBudgetPolicy.resolve(4_096, 0)
 
-        assertEquals(512, budget.effectiveMaxTokens)
+        assertEquals(ChatGenerationBudgetPolicy.MAX_NORMAL_OUTPUT_TOKENS, budget.effectiveMaxTokens)
         assertEquals(null, budget.modelContextTokens)
         assertTrue(budget.explanation("Model").contains("until it reports a context size"))
     }

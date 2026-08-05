@@ -35,12 +35,23 @@ internal data class ChatGenerationBudget(
  * other consumers and future larger-budget modes.
  */
 internal object ChatGenerationBudgetPolicy {
-    const val MAX_NORMAL_OUTPUT_TOKENS: Int = 512
+    // Global ceiling for one normal chat response. Raised 512 -> 1024 so sliding-window NPU models can produce
+    // longer answers (a ~7 tok/s NPU reaches this in ~2.5 min worst case; EOS usually stops it much sooner).
+    const val MAX_NORMAL_OUTPUT_TOKENS: Int = 1024
 
-    fun resolve(requestedMaxTokens: Int, modelContextTokens: Int): ChatGenerationBudget {
+    fun resolve(
+        requestedMaxTokens: Int,
+        modelContextTokens: Int,
+        // QHexRT NPU decoders use a KV RING (sliding window): they keep generating coherently PAST the context
+        // size — the ring just forgets the oldest tokens, it never corrupts (verified: LFM2.5-2.6B streams
+        // 600+ coherent tokens on a 512 window). So their output is NOT bounded by the context. Only
+        // context-bound decoders (llama.cpp n_ctx, cloud) reserve half the window for the prompt.
+        slidingWindow: Boolean = false,
+    ): ChatGenerationBudget {
         val requested = requestedMaxTokens.coerceAtLeast(1)
         val context = modelContextTokens.takeIf { it > 0 }
-        val contextOutputLimit = context?.let { (it / 2).coerceAtLeast(1) }
+        val contextOutputLimit =
+            if (slidingWindow) null else context?.let { (it / 2).coerceAtLeast(1) }
         val effective = minOf(
             requested,
             MAX_NORMAL_OUTPUT_TOKENS,

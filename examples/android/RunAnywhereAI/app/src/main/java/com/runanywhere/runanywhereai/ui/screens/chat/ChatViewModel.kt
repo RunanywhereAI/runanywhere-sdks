@@ -652,6 +652,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             contextTokens = activeModel.model.context_length,
             modelName = activeModel.model.name,
             forceGreedy = forceGreedy,
+            // QHexRT NPU models decode through a sliding-window KV ring, so their output isn't bounded by the
+            // (small) context window — let the budget policy skip the context clamp for them.
+            slidingWindow = forceGreedy,
         )
         val s = SettingsRepository.settings
         return options.copy(
@@ -666,11 +669,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         contextTokens: Int,
         modelName: String,
         forceGreedy: Boolean = false,
+        slidingWindow: Boolean = false,
     ): RALLMGenerationOptions {
         val s = SettingsRepository.settings
         val budget = ChatGenerationBudgetPolicy.resolve(
             requestedMaxTokens = s.maxTokens,
             modelContextTokens = contextTokens,
+            slidingWindow = slidingWindow,
         )
         if (budget.isCapped) {
             RACLog.i(
