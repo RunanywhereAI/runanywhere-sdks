@@ -56,8 +56,9 @@ struct ModelPolicy {
 constexpr ModelPolicy kModelPolicies[] = {
     {"lfm2_5_230m", kAllSupportedArches, false},
     {"lfm2_5_350m", kAllSupportedArches, false},
-    // Only v79 context binaries are published for this one; the repo is public, so no HF auth gate.
-    {"lfm2_5_2_6b", kV79, false},
+    // v75/v79/v81 context binaries are published (public repo, no HF auth gate). v75 + v81 ship the 2-part
+    // hybrid decode split (each part < 2 GiB); v79 ships the monolithic decode.
+    {"lfm2_5_2_6b", kAllSupportedArches, false},
     {"qwen3_5_0_8b", kAllSupportedArches, false},
     {"qwen3_5_2b", kAllSupportedArches, false},
     {"qwen3_5_4b", kV79V81, false},
