@@ -81,7 +81,10 @@ internal object ChatToolResultNormalizer {
         if (raw.isBlank() || !strayToolCall.containsMatchIn(raw)) return raw
         var salvaged: String? = null
         val withoutCalls = strayToolCall.replace(raw) { match ->
-            if (salvaged == null) salvaged = firstStringLiteral.find(match.groupValues[1])?.groupValues?.get(1)
+            // Group 1 carries the LFM2 form's body, group 2 the `<tool_call>` form's, and
+            // only one alternative matches per hit, so read whichever is populated.
+            val body = match.groupValues[1].ifEmpty { match.groupValues[2] }
+            if (salvaged == null) salvaged = firstStringLiteral.find(body)?.groupValues?.get(1)
             ""
         }
         val remaining = withoutCalls.trim()
