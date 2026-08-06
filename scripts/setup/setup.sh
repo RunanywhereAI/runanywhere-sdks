@@ -40,7 +40,9 @@ case "${OS}" in
 esac
 
 NDK_VERSION=$(grep -E '^racNdkVersion=' "${REPO_ROOT}/sdk/runanywhere-kotlin/gradle.properties" 2>/dev/null | cut -d= -f2 | tr -d ' \r' || true)
-NDK_VERSION="${NDK_VERSION:-27.0.12077973}"
+# Keep this in step with NDK_VERSION in sdk/runanywhere-commons/VERSIONS
+# (currently r27d), which racNdkVersion above is read from.
+NDK_VERSION="${NDK_VERSION:-27.3.13750724}"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
