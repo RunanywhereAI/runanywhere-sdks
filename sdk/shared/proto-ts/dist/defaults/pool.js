@@ -9,7 +9,7 @@
 // here; the C header and the other three SDK languages are generated from
 // the same annotations, so editing this copy only desynchronizes one SDK.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.storageDefaults = exports.structuredOutputDefaults = exports.environmentDefaults = exports.fFIDefaults = exports.workerDefaults = exports.voiceAgentDefaults = exports.audioCaptureDefaults = exports.connectDefaults = exports.networkDefaults = void 0;
+exports.storageDefaults = exports.structuredOutputDefaults = exports.environmentDefaults = exports.fFIDefaults = exports.workerDefaults = exports.hybridDefaults = exports.voiceAgentDefaults = exports.audioCaptureDefaults = exports.connectDefaults = exports.networkDefaults = void 0;
 /** Central default pool. Read these instead of retyping a literal. */
 exports.networkDefaults = Object.freeze({
     requestTimeoutMs: 60000,
@@ -37,6 +37,9 @@ exports.voiceAgentDefaults = Object.freeze({
     defaultVadModelId: "silero-vad",
     speechRmsThreshold: 0.015,
     speechFloorMultiplier: 2.0,
+});
+exports.hybridDefaults = Object.freeze({
+    sttConfidenceThreshold: 0.5,
 });
 exports.workerDefaults = Object.freeze({
     handshakeTimeoutMs: 10000,

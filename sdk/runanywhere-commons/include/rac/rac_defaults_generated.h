@@ -109,6 +109,9 @@
 #define RAC_DEFAULT_VOICE_AGENT_SPEECH_RMS_THRESHOLD    0.015f
 #define RAC_DEFAULT_VOICE_AGENT_SPEECH_FLOOR_MULTIPLIER 2.0f
 
+// HybridDefaults (sdk_defaults.proto)
+#define RAC_DEFAULT_HYBRID_STT_CONFIDENCE_THRESHOLD 0.5f
+
 // WorkerDefaults (sdk_defaults.proto)
 #define RAC_DEFAULT_WORKER_HANDSHAKE_TIMEOUT_MS    10000
 #define RAC_DEFAULT_WORKER_BACKEND_INIT_TIMEOUT_MS 120000
@@ -158,5 +161,5 @@
 #define RAC_DEFAULT_TTS_OPTIONS_VOLUME        1.0f
 #define RAC_DEFAULT_TTS_OPTIONS_SAMPLE_RATE   0
 
-// 85 defaults across 30 messages.
+// 86 defaults across 31 messages.
 #endif  // RAC_DEFAULTS_GENERATED_H

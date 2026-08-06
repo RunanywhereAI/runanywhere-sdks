@@ -41,6 +41,10 @@ public enum RADefaults {
         public static let speechFloorMultiplier: Float = 2.0
     }
 
+    public enum Hybrid {
+        public static let sttConfidenceThreshold: Float = 0.5
+    }
+
     public enum Worker {
         public static let handshakeTimeoutMs: Int = 10000
         public static let backendInitTimeoutMs: Int = 120000

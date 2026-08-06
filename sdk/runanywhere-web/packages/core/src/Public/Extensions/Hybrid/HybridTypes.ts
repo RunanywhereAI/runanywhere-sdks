@@ -28,6 +28,7 @@ import {
   HybridSttTranscribeRequest,
   HybridSttTranscribeResponse,
 } from '@runanywhere/proto-ts/hybrid_router';
+import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import type {
   BatteryFilter,
   ConfidenceCascade,
@@ -74,13 +75,11 @@ export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
 /** Suggested default confidence threshold for an STT confidence cascade.
  * Mirrors `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` in rac_hybrid_types.h — the
  * router uses the threshold carried in the installed policy; this is only the
- * recommended value to build it with. There is no longer a generated
- * `hybridDefaults` pool entry for this (idl/hybrid_router.proto's
- * `ConfidenceCascade.threshold` carries an annotated default of 0.5, but
- * `idl/codegen` does not emit a JS defaults pool for this message), so the
- * commons header constant is inlined here directly, matching Swift's
- * `RAHybridSTTConfidenceThreshold`. */
-export const HYBRID_STT_CONFIDENCE_THRESHOLD = 0.5;
+ * recommended value to build it with. Sourced from the generated pool
+ * (`idl/sdk_defaults.proto`'s `HybridDefaults.stt_confidence_threshold`),
+ * which mirrors — but does not wire-share — `hybrid_router.proto`'s
+ * `ConfidenceCascade.threshold` rac_default. */
+export const HYBRID_STT_CONFIDENCE_THRESHOLD = hybridDefaults.sttConfidenceThreshold;
 
 // ---------------------------------------------------------------------------
 // Filter

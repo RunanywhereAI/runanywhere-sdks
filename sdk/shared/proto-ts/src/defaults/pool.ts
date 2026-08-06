@@ -41,6 +41,10 @@ export const voiceAgentDefaults = Object.freeze({
   speechFloorMultiplier: 2.0 as number,
 });
 
+export const hybridDefaults = Object.freeze({
+  sttConfidenceThreshold: 0.5 as number,
+});
+
 export const workerDefaults = Object.freeze({
   handshakeTimeoutMs: 10000 as number,
   backendInitTimeoutMs: 120000 as number,

@@ -50,6 +50,12 @@ class VoiceAgentDefaults:
     SPEECH_FLOOR_MULTIPLIER: Final[float] = 2.0
 
 
+class HybridDefaults:
+    """Generated from HybridDefaults in idl/sdk_defaults.proto."""
+
+    STT_CONFIDENCE_THRESHOLD: Final[float] = 0.5
+
+
 class WorkerDefaults:
     """Generated from WorkerDefaults in idl/sdk_defaults.proto."""
 
@@ -84,4 +90,4 @@ class StorageDefaults:
     CONTEXT_LENGTH: Final[int] = 2048
 
 
-__all__ = ["NetworkDefaults", "ConnectDefaults", "AudioCaptureDefaults", "VoiceAgentDefaults", "WorkerDefaults", "FFIDefaults", "EnvironmentDefaults", "StructuredOutputDefaults", "StorageDefaults"]
+__all__ = ["NetworkDefaults", "ConnectDefaults", "AudioCaptureDefaults", "VoiceAgentDefaults", "HybridDefaults", "WorkerDefaults", "FFIDefaults", "EnvironmentDefaults", "StructuredOutputDefaults", "StorageDefaults"]

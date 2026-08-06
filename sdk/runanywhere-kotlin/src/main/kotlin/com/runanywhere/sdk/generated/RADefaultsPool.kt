@@ -43,6 +43,10 @@ public object RADefaults {
         public const val SPEECH_FLOOR_MULTIPLIER: Float = 2.0f
     }
 
+    public object Hybrid {
+        public const val STT_CONFIDENCE_THRESHOLD: Float = 0.5f
+    }
+
     public object Worker {
         public const val HANDSHAKE_TIMEOUT_MS: Int = 10000
         public const val BACKEND_INIT_TIMEOUT_MS: Int = 120000

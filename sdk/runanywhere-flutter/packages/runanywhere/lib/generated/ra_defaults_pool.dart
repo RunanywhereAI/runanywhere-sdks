@@ -42,6 +42,10 @@ abstract final class RADefaultsVoiceAgent {
   static const double speechFloorMultiplier = 2.0;
 }
 
+abstract final class RADefaultsHybrid {
+  static const double sttConfidenceThreshold = 0.5;
+}
+
 abstract final class RADefaultsWorker {
   static const int handshakeTimeoutMs = 10000;
   static const int backendInitTimeoutMs = 120000;

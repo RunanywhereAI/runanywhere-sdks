@@ -26,6 +26,9 @@ export declare const voiceAgentDefaults: Readonly<{
     speechRmsThreshold: number;
     speechFloorMultiplier: number;
 }>;
+export declare const hybridDefaults: Readonly<{
+    sttConfidenceThreshold: number;
+}>;
 export declare const workerDefaults: Readonly<{
     handshakeTimeoutMs: number;
     backendInitTimeoutMs: number;

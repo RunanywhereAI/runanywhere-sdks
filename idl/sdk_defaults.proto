@@ -227,11 +227,29 @@ message VoiceAgentDefaults {
 // HybridRoutingPolicy.ts:114 (RN); HybridTypes.ts:62 (Web). Swift and Kotlin
 // carried the number only inside doc comments
 // (HybridSTTRouter.swift:51, HybridSTTRouter.kt:54).
+//
+// This message is declaration-only (nothing sends a HybridDefaults over the
+// wire): hybrid_router.ConfidenceCascade.threshold carries the same value as
+// its own rac_default annotation, which is what commons' all-protos C
+// generator (generate_cpp_defaults.py) reads. But the other four languages'
+// pool generator (generate_defaults_pool.py) only scans this file by design
+// (see the file header: a full descriptor walk over every .proto to find
+// stray rac_default annotations would defeat the point of having one pool
+// file), so Swift/Kotlin/Dart/TS need their own declaration here to generate
+// a constant from at all. Keep this field's value in sync with
+// ConfidenceCascade.threshold's own rac_default by hand; they are
+// independent annotations describing the same number for two different
+// generators, not a wire-shared field.
 // ---------------------------------------------------------------------------
-// HybridDefaults is deleted: its one field duplicated
-// hybrid_router.ConfidenceCascade.threshold, which carries the same
-// rac_default/rac_min_float/rac_max_float annotations directly on the field
-// it configures.
+message HybridDefaults {
+    // Suggested default confidence threshold for an STT confidence cascade.
+    // Mirrors hybrid_router.proto's ConfidenceCascade.threshold rac_default.
+    float stt_confidence_threshold = 1 [
+        (runanywhere.v1.rac_default) = "0.5",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
+}
 
 // ---------------------------------------------------------------------------
 // Web-only: worker and WASM instantiation timings.
