@@ -89,21 +89,21 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, T* out) {
 // helpers: selecting a modality sets its `*_model_path` so `config_from_proto`
 // loads it, and `initialize_proto` runs the full VAD+STT+LLM+TTS init sequence.
 void init_mock_voice_agent(rac_voice_agent_handle_t agent, bool stt, bool llm, bool tts) {
+    // stt_model_name / llm_model_name / tts_voice_name were deleted from
+    // VoiceAgentComposeConfig: id (resolved via the model registry) and path
+    // (the escape hatch for a self-staged artifact) are the sole selectors now.
     runanywhere::v1::VoiceAgentComposeConfig cfg;
     if (stt) {
         cfg.set_stt_model_path("mock-stt");
         cfg.set_stt_model_id("mock-stt");
-        cfg.set_stt_model_name("Mock STT");
     }
     if (llm) {
         cfg.set_llm_model_path("mock-llm");
         cfg.set_llm_model_id("mock-llm");
-        cfg.set_llm_model_name("Mock LLM");
     }
     if (tts) {
         cfg.set_tts_voice_path("mock-tts");
         cfg.set_tts_voice_id("mock-voice");
-        cfg.set_tts_voice_name("Mock Voice");
     }
     std::vector<uint8_t> bytes;
     serialize(cfg, &bytes);
@@ -122,14 +122,14 @@ int test_tts_stream_event_shape() {
     if (kind) {
         CHECK(kind->FindValueByName("TTS_STREAM_EVENT_KIND_AUDIO_CHUNK") != nullptr,
               "TTS stream supports audio chunk events");
-        CHECK(kind->FindValueByName("TTS_STREAM_EVENT_KIND_PROGRESS") != nullptr,
-              "TTS stream supports progress events");
+        // PROGRESS was reserved (never emitted by any backend); dropped from
+        // the enum in the API-simplification pass.
     }
 
     const google::protobuf::Descriptor* event = runanywhere::v1::TTSStreamEvent::descriptor();
     CHECK(event->FindFieldByName("output") != nullptr,
           "TTS stream event carries audio output chunks");
-    CHECK(event->FindFieldByName("progress") != nullptr, "TTS stream event carries progress");
+    // `progress` was reserved (dead field, never populated) and is gone.
 
     return 0;
 }
@@ -472,7 +472,9 @@ bool poll_sdk_until_failure() {
         runanywhere::v1::SDKEvent decoded;
         const bool ok = decoded.ParseFromArray(event.data, static_cast<int>(event.size));
         rac_proto_buffer_free(&event);
-        if (ok && decoded.has_failure())
+        // FailureEvent was deleted: a failure is any event whose envelope
+        // `error` is set, not a separate oneof arm.
+        if (ok && decoded.has_error())
             return true;
     }
     return false;
@@ -586,7 +588,8 @@ int test_mocked_tts() {
     runanywhere::v1::TTSOutput result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "TTSOutput parses");
     CHECK(result.duration_ms() == 1234, "TTS duration remains milliseconds");
-    CHECK(result.metadata().audio_duration_ms() == 1234, "TTS metadata duration is ms");
+    // TTSSynthesisMetadata.audio_duration_ms was reserved: it always equalled
+    // the parent TTSOutput.duration_ms, already checked above.
     rac_proto_buffer_free(&out);
 
     int chunks = 0;
@@ -805,16 +808,18 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
     CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
           "D-7 voice agent initializes");
 
+    // VoiceAgentTurnRequest is now just {request_id, session_id, audio_data,
+    // language, metadata} -- sample_rate_hz/channels/encoding and
+    // session_config were dropped. audio_data must be PCM S16LE mono 16kHz
+    // (commons rejects any other encoding but does not check/resample rate
+    // or channel count); `language` is the per-turn override, replacing the
+    // deleted VoiceSessionConfig.language_code.
     runanywhere::v1::VoiceAgentTurnRequest request;
     request.set_request_id("req-d7-1");
     request.set_session_id("session-d7-1");
-    request.set_sample_rate_hz(16000);
-    request.set_channels(1);
-    request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
     const int16_t audio[] = {0, 1, 2, 3};
     request.set_audio_data(audio, sizeof(audio));
-    auto* session_config = request.mutable_session_config();
-    session_config->set_language_code("en-US");
+    request.set_language("en-US");
     (*request.mutable_metadata())["source"] = "unit-test";
 
     std::vector<uint8_t> request_bytes;
@@ -926,9 +931,6 @@ int test_voice_agent_d7_queued_cancel_and_next_request_isolation() {
     cancelled_request.set_session_id("session-cancel-queued");
     const int16_t audio[] = {0, 1, 2, 3};
     cancelled_request.set_audio_data(audio, sizeof(audio));
-    cancelled_request.set_sample_rate_hz(16000);
-    cancelled_request.set_channels(1);
-    cancelled_request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     std::vector<uint8_t> cancelled_bytes;
     CHECK(serialize(cancelled_request, &cancelled_bytes), "D-7 queued-cancel request serializes");
 
@@ -993,9 +995,6 @@ int test_voice_agent_d7_active_llm_cancel() {
     request.set_session_id("session-cancel-active-llm");
     const int16_t audio[] = {0, 1, 2, 3};
     request.set_audio_data(audio, sizeof(audio));
-    request.set_sample_rate_hz(16000);
-    request.set_channels(1);
-    request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     std::vector<uint8_t> request_bytes;
     CHECK(serialize(request, &request_bytes), "D-7 active-cancel request serializes");
 
@@ -1050,12 +1049,13 @@ int test_voice_agent_d7_transcribe_proto() {
     CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "D-7 transcribe agent creates");
     init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/false, /*tts=*/false);
 
+    // VoiceAgentTranscribeProtoRequest is {audio_data, session_id, language};
+    // sample_rate/channels were dropped and language_hint renamed to
+    // `language` (BCP-47, empty = auto-detect).
     runanywhere::v1::VoiceAgentTranscribeProtoRequest request;
     const int16_t audio[] = {0, 1, 2, 3};
     request.set_audio_data(audio, sizeof(audio));
-    request.set_sample_rate(16000);
-    request.set_channels(1);
-    request.set_language_hint("en-US");
+    request.set_language("en-US");
 
     std::vector<uint8_t> bytes;
     CHECK(serialize(request, &bytes), "D-7 VoiceAgentTranscribeProtoRequest serializes");

@@ -133,7 +133,6 @@ int test_synthetic_token_schedule() {
                                            static_cast<int>(g_capture.events[i].size())));
         ASSERT_TRUE(decoded.seq() > prev_seq);
         prev_seq = decoded.seq();
-        ASSERT_EQ(decoded.kind(), runanywhere::v1::TOKEN_KIND_ANSWER);
         if (i == 0)
             ASSERT_EQ(decoded.token(), "Hello");
         if (i == 1)
@@ -141,11 +140,13 @@ int test_synthetic_token_schedule() {
         if (i == 2)
             ASSERT_EQ(decoded.token(), "world");
         if (i < 3) {
-            ASSERT_EQ(decoded.is_final(), false);
-            ASSERT_TRUE(decoded.finish_reason().empty());
+            // is_final/kind were deleted; event_kind is the sole
+            // discriminator now (idl/llm_service.proto).
+            ASSERT_EQ(decoded.event_kind(), runanywhere::v1::LLM_STREAM_EVENT_KIND_TOKEN);
+            ASSERT_EQ(decoded.finish_reason(), runanywhere::v1::FINISH_REASON_UNSPECIFIED);
         } else {
-            ASSERT_EQ(decoded.is_final(), true);
-            ASSERT_EQ(decoded.finish_reason(), "stop");
+            ASSERT_EQ(decoded.event_kind(), runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED);
+            ASSERT_EQ(decoded.finish_reason(), runanywhere::v1::FINISH_REASON_STOP);
             ASSERT_TRUE(decoded.token().empty());
         }
     }
@@ -167,8 +168,8 @@ int test_error_termination() {
     runanywhere::v1::LLMStreamEvent terminal;
     ASSERT_TRUE(terminal.ParseFromArray(g_capture.events.back().data(),
                                         static_cast<int>(g_capture.events.back().size())));
-    ASSERT_EQ(terminal.is_final(), true);
-    ASSERT_EQ(terminal.finish_reason(), "error");
+    ASSERT_EQ(terminal.event_kind(), runanywhere::v1::LLM_STREAM_EVENT_KIND_ERROR);
+    ASSERT_EQ(terminal.finish_reason(), runanywhere::v1::FINISH_REASON_ERROR);
     ASSERT_EQ(terminal.error().message(), "engine backend vanished");
 
     rac_llm_unset_stream_proto_callback(fake_handle());
@@ -200,13 +201,17 @@ int test_finish_reason_length_on_max_tokens() {
     runanywhere::v1::LLMStreamEvent terminal;
     ASSERT_TRUE(terminal.ParseFromArray(g_capture.events.back().data(),
                                         static_cast<int>(g_capture.events.back().size())));
-    ASSERT_EQ(terminal.is_final(), true);
-    ASSERT_EQ(terminal.finish_reason(), "length");
+    ASSERT_EQ(terminal.event_kind(), runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED);
+    ASSERT_EQ(terminal.finish_reason(), runanywhere::v1::FINISH_REASON_LENGTH);
 
     rac_llm_unset_stream_proto_callback(fake_handle());
     return 0;
 }
 
+// token_id/logprob were both deleted from LLMStreamEvent
+// (idl/llm_service.proto); the remaining thing to verify here is that a
+// THOUGHT-kind param still classifies as LLM_STREAM_EVENT_KIND_THINKING on
+// the wire via event_kind, the sole discriminator now.
 int test_optional_fields_round_trip() {
     reset_capture();
     rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
@@ -217,9 +222,8 @@ int test_optional_fields_round_trip() {
     runanywhere::v1::LLMStreamEvent decoded;
     ASSERT_TRUE(decoded.ParseFromArray(g_capture.events.back().data(),
                                        static_cast<int>(g_capture.events.back().size())));
-    ASSERT_EQ(decoded.kind(), runanywhere::v1::TOKEN_KIND_THOUGHT);
-    ASSERT_EQ(decoded.token_id(), 12345U);
-    ASSERT_TRUE(decoded.logprob() < 0.0f);
+    ASSERT_EQ(decoded.event_kind(), runanywhere::v1::LLM_STREAM_EVENT_KIND_THINKING);
+    ASSERT_EQ(decoded.token(), "think");
 
     rac_llm_unset_stream_proto_callback(fake_handle());
     return 0;

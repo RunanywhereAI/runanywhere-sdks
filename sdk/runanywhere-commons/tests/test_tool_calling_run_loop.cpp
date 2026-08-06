@@ -267,7 +267,9 @@ runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework f
     // the mock ops while loaded->framework reports QHEXRT.
     model.set_framework(framework);
     model.set_local_path("/tmp/toolloop-test.gguf");
-    model.set_is_downloaded(true);
+    // ModelInfo.is_downloaded (tag 32) was deleted outright: registry_status
+    // is now the single downloaded-ness signal (idl/model_types.proto).
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     model.set_is_available(true);
     return model;
 }
@@ -329,15 +331,16 @@ bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
 // Tool definition + helpers.
 // ---------------------------------------------------------------------------
 
+// ToolDefinition.parameters is now ONE JSON Schema object string
+// (idl/tool_calling.proto, tools-one-json-schema) — the typed ToolParameter
+// message / ToolParameterType enum were deleted outright.
 runanywhere::v1::ToolDefinition make_weather_tool() {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name("get_weather");
     tool.set_description("Get weather for a city");
-    auto* param = tool.add_parameters();
-    param->set_name("location");
-    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_description("City name");
-    param->set_required(true);
+    tool.set_parameters(R"({"type":"object","properties":{)"
+                        R"("location":{"type":"string","description":"City name"}},)"
+                        R"("required":["location"]})");
     return tool;
 }
 
@@ -345,11 +348,10 @@ runanywhere::v1::ToolDefinition make_calculate_tool() {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name("calculate");
     tool.set_description("Evaluates a math expression");
-    auto* param = tool.add_parameters();
-    param->set_name("expression");
-    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_description("Expression such as 45 * 12");
-    param->set_required(true);
+    tool.set_parameters(
+        R"({"type":"object","properties":{)"
+        R"("expression":{"type":"string","description":"Expression such as 45 * 12"}},)"
+        R"("required":["expression"]})");
     return tool;
 }
 
@@ -357,32 +359,42 @@ runanywhere::v1::ToolDefinition make_search_web_tool() {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name("search_web");
     tool.set_description("Searches the web for current information and source links");
-    auto* param = tool.add_parameters();
-    param->set_name("query");
-    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_description("A concise web search query");
-    param->set_required(true);
+    tool.set_parameters(
+        R"({"type":"object","properties":{)"
+        R"("query":{"type":"string","description":"A concise web search query"}},)"
+        R"("required":["query"]})");
     return tool;
 }
 
 runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string& prompt,
                                                               uint32_t max_tool_calls = 0) {
+    // ToolCallingSessionCreateRequest collapsed to 3 fields — prompt(1),
+    // history(2), ToolCallingOptions options(3)
+    // (tools-collapse-options-and-session-request, idl/tool_calling.proto).
+    // max_tokens/temperature were deleted outright with no replacement home
+    // (they duplicated the enclosing LLMGenerationOptions this standalone
+    // request has none of); callers now get GenerationState's own defaults
+    // (max_tokens unset -> RAC_LLM_OPTIONS_DEFAULT.max_tokens, temperature
+    // 0.0f -> explicit greedy) unless a per-turn override (e.g. the forced
+    // tool-decision step) applies.
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
-    request.set_max_tokens(64);
-    request.set_temperature(0.5f);
-    *request.add_tools() = make_weather_tool();
-    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
-    request.set_auto_execute(true);
+    *request.mutable_options()->add_tools() = make_weather_tool();
+    request.mutable_options()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    request.mutable_options()->set_auto_execute(true);
     if (max_tool_calls > 0)
-        request.set_max_tool_calls(max_tool_calls);
+        request.mutable_options()->set_max_tool_calls(max_tool_calls);
     return request;
 }
 
 void add_history_turn(runanywhere::v1::ToolCallingSessionCreateRequest& request,
                       runanywhere::v1::MessageRole role, const char* content) {
-    (void)role;  // history is now a flat repeated-string of alternating message contents
-    request.add_history(content);
+    (void)role;  // history is now `repeated ToolCallingHistoryTurn` (role + content)
+    auto* turn = request.add_history();
+    turn->set_role(role == runanywhere::v1::MESSAGE_ROLE_ASSISTANT
+                       ? runanywhere::v1::TOOL_CALLING_ROLE_ASSISTANT
+                       : runanywhere::v1::TOOL_CALLING_ROLE_USER);
+    turn->set_content(content);
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +432,9 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
     runanywhere::v1::ToolResult tr;
     tr.set_tool_call_id(received.id());
     tr.set_name(received.name());
-    tr.set_success(true);
+    // ToolResult.success -> is_error is a POLARITY INVERSION, not a rename
+    // (idl/tool_calling.proto). A successful executor result is is_error=false.
+    tr.set_is_error(false);
     {
         std::lock_guard<std::mutex> lg(state->mu);
         if (!state->result_jsons.empty()) {
@@ -465,7 +479,8 @@ rac_result_t mismatched_executor_callback(const uint8_t* in_bytes, size_t in_siz
     runanywhere::v1::ToolResult result;
     result.set_tool_call_id(received.id() + "_wrong");
     result.set_name(received.name());
-    result.set_success(true);
+    // ToolResult.success -> is_error is a POLARITY INVERSION (idl/tool_calling.proto).
+    result.set_is_error(false);
     result.set_result_json("{}");
     std::vector<uint8_t> bytes;
     serialize(result, &bytes);
@@ -575,13 +590,16 @@ int test_forced_tool_name_only_is_narrowed_and_independently_budgeted() {
     });
 
     auto request = make_request("Use calculate to multiply 45 by 12.");
-    request.clear_tools();
-    *request.add_tools() = make_calculate_tool();
-    request.set_max_tokens(96);
-    request.set_temperature(0.7f);
-    request.set_top_p(0.9f);
-    request.set_forced_tool_name("calculate");
-    auto* unrelated = request.add_tools();
+    request.mutable_options()->clear_tools();
+    *request.mutable_options()->add_tools() = make_calculate_tool();
+    // max_tokens/temperature were deleted outright from this request
+    // (idl/tool_calling.proto, llm-tool-options-no-shadow) with no
+    // replacement home — the synthesis turn below now runs at the
+    // GenerationState/RAC_LLM_OPTIONS_DEFAULT values (512 tokens, 0.0
+    // explicit-greedy temperature) rather than a caller override.
+    request.mutable_options()->set_top_p(0.9f);
+    request.mutable_options()->set_forced_tool_name("calculate");
+    auto* unrelated = request.mutable_options()->add_tools();
     unrelated->set_name("unrelated_tool");
     unrelated->set_description("Must not be advertised");
     std::vector<uint8_t> bytes;
@@ -630,8 +648,11 @@ int test_forced_tool_name_only_is_narrowed_and_independently_budgeted() {
               "forced decision omits unrelated generic rules");
         CHECK(captures[0].prompt.size() < 800, "forced decision prompt stays compact");
 
-        CHECK(captures[1].max_tokens == 96, "synthesis retains final-answer token budget");
-        CHECK(captures[1].temperature == 0.7f, "synthesis retains caller sampling temperature");
+        // max_tokens/temperature have no request-level home anymore
+        // (deleted outright, idl/tool_calling.proto) — the synthesis turn
+        // now runs at GenerationState/RAC_LLM_OPTIONS_DEFAULT values.
+        CHECK(captures[1].max_tokens == 512, "synthesis uses the default token budget");
+        CHECK(captures[1].temperature == 0.0f, "synthesis uses the default (greedy) temperature");
         CHECK(captures[1].top_p == 0.9f, "synthesis retains caller top-p");
         CHECK(!captures[1].disable_thinking, "synthesis retains caller thinking policy");
         CHECK(captures[1].stop_sequences.empty(), "synthesis does not inherit decision stop");
@@ -656,8 +677,8 @@ int test_none_vetoes_forced_tool_name() {
     set_responses({"No tool call is needed."});
 
     auto request = make_request("Answer directly without tools.");
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
-    request.set_forced_tool_name("get_weather");
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.mutable_options()->set_forced_tool_name("get_weather");
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -694,8 +715,8 @@ int test_none_blocks_hallucinated_call_when_validation_disabled() {
     });
 
     auto request = make_request("Answer directly without tools.");
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
-    request.set_validate_calls(false);
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.mutable_options()->set_validate_calls(false);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -729,9 +750,9 @@ int test_forced_target_blocks_wrong_call_when_validation_disabled() {
     });
 
     auto request = make_request("Use calculate only.");
-    *request.add_tools() = make_calculate_tool();
-    request.set_forced_tool_name("calculate");
-    request.set_validate_calls(false);
+    *request.mutable_options()->add_tools() = make_calculate_tool();
+    request.mutable_options()->set_forced_tool_name("calculate");
+    request.mutable_options()->set_validate_calls(false);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -782,13 +803,13 @@ int test_specific_target_must_be_nonempty_and_present() {
     };
 
     auto empty_target = make_request("Use a specific tool.");
-    empty_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    empty_target.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
     run_invalid_request(empty_target, "tool_choice=SPECIFIC requires a non-empty forced_tool_name",
                         "SPECIFIC without target is rejected");
 
     auto missing_target = make_request("Use the missing tool.");
-    missing_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
-    missing_target.set_forced_tool_name("missing_tool");
+    missing_target.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    missing_target.mutable_options()->set_forced_tool_name("missing_tool");
     run_invalid_request(missing_target,
                         "tool_choice=SPECIFIC target is not present in request.tools: missing_tool",
                         "SPECIFIC target absent from tools is rejected");
@@ -806,9 +827,9 @@ int test_specific_and_required_reject_initial_no_call() {
                                         const std::string& expected_message, const char* label) {
         set_responses({"I decided not to call a tool."});
         auto request = make_request("A tool call is mandatory.", /*max_tool_calls=*/1);
-        request.set_tool_choice(mode);
+        request.mutable_options()->set_tool_choice(mode);
         if (mode == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC) {
-            request.set_forced_tool_name("get_weather");
+            request.mutable_options()->set_forced_tool_name("get_weather");
         }
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
@@ -854,12 +875,15 @@ int test_search_web_synthesis_is_current_compact_and_attributed() {
     auto request = make_request(
         "Use search_web to find the current Google Play target API requirement for a new mobile "
         "app. Include a source URL.");
-    request.clear_tools();
-    *request.add_tools() = make_search_web_tool();
-    request.set_max_tokens(96);
-    request.set_disable_thinking(true);
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
-    request.set_forced_tool_name("search_web");
+    request.mutable_options()->clear_tools();
+    *request.mutable_options()->add_tools() = make_search_web_tool();
+    // max_tokens was deleted outright from this request with no replacement
+    // home (idl/tool_calling.proto, llm-tool-options-no-shadow); the
+    // synthesis turn now runs at the GenerationState/RAC_LLM_OPTIONS_DEFAULT
+    // token budget instead of a caller-supplied concise-answer cap.
+    request.mutable_options()->set_disable_thinking(true);
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    request.mutable_options()->set_forced_tool_name("search_web");
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -901,8 +925,9 @@ int test_search_web_synthesis_is_current_compact_and_attributed() {
     if (captures.size() == 2) {
         CHECK(captures[0].max_tokens == 192,
               "search decision keeps independent 192-token safety ceiling");
-        CHECK(captures[1].max_tokens == 96,
-              "search synthesis keeps independent concise answer budget");
+        // max_tokens has no request-level home anymore (deleted outright,
+        // idl/tool_calling.proto) — synthesis now runs at the default budget.
+        CHECK(captures[1].max_tokens == 512, "search synthesis uses the default token budget");
         CHECK(captures[1].disable_thinking, "search synthesis disables thinking");
         CHECK(captures[1].prompt.find("Current UTC date:") != std::string::npos,
               "search synthesis receives the current UTC date");
@@ -931,7 +956,7 @@ int test_tool_name_mentions_do_not_force_execution() {
     set_responses({"I will explain calculate without calling it."});
 
     auto request = make_request("Do not call calculate. Explain what calculate does.");
-    *request.add_tools() = make_calculate_tool();
+    *request.mutable_options()->add_tools() = make_calculate_tool();
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -952,8 +977,11 @@ int test_tool_name_mentions_do_not_force_execution() {
     const auto captures = generation_captures();
     CHECK(captures.size() == 1, "negated mention uses one AUTO generation");
     if (captures.size() == 1) {
-        CHECK(captures[0].max_tokens == 64, "AUTO generation keeps caller token budget");
-        CHECK(captures[0].temperature == 0.5f, "AUTO generation keeps caller temperature");
+        // max_tokens/temperature have no request-level home anymore (deleted
+        // outright, idl/tool_calling.proto) — make_request() no longer sets
+        // them, so this AUTO generation runs at GenerationState's defaults.
+        CHECK(captures[0].max_tokens == 512, "AUTO generation uses the default token budget");
+        CHECK(captures[0].temperature == 0.0f, "AUTO generation uses the default (greedy) temperature");
         CHECK(captures[0].prompt.find("get_weather") != std::string::npos,
               "AUTO prompt keeps all registered tools");
         CHECK(captures[0].prompt.find("calculate") != std::string::npos,
@@ -978,7 +1006,7 @@ int test_max_tool_calls_capped() {
     });
 
     auto request = make_request("weather everywhere", /*max_tool_calls=*/2);
-    request.set_keep_tools_available(true);
+    request.mutable_options()->set_keep_tools_available(true);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -1054,7 +1082,7 @@ int test_auto_execute_false_returns_call_without_side_effect() {
         R"(<tool_call>{"tool":"get_weather","arguments":{"location":"A"}}</tool_call>)",
     });
     auto request = make_request("weather");
-    request.set_auto_execute(false);
+    request.mutable_options()->set_auto_execute(false);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
     ExecutorState exec;
@@ -1103,7 +1131,9 @@ int test_validation_failure_short_circuits() {
     CHECK(result.tool_results_size() == 1, "one failed tool_result recorded");
     CHECK(exec.invocation_count == 0, "executor NOT invoked");
     if (result.tool_results_size() > 0) {
-        CHECK(result.tool_results(0).success() == false, "tool_result.success == false");
+        // ToolResult.success -> is_error is a POLARITY INVERSION
+        // (idl/tool_calling.proto): a failed result is is_error == true.
+        CHECK(result.tool_results(0).is_error() == true, "tool_result.is_error == true");
         CHECK(!result.tool_results(0).error().empty(), "tool_result has error message");
     }
     CHECK(result.error_code() == RAC_ERROR_VALIDATION_FAILED, "error_code = VALIDATION_FAILED");
@@ -1149,7 +1179,9 @@ int test_executor_result_contract_is_fail_closed() {
         CHECK(result.error_code() == test_case.expected_code, test_case.label);
         CHECK(result.tool_results_size() == 1, "failed executor result is recorded once");
         if (result.tool_results_size() == 1) {
-            CHECK(!result.tool_results(0).success(), "failed executor result is unsuccessful");
+            // ToolResult.success -> is_error is a POLARITY INVERSION
+            // (idl/tool_calling.proto): a failed result IS an error.
+            CHECK(result.tool_results(0).is_error(), "failed executor result is an error");
             CHECK(!result.tool_results(0).error().empty(),
                   "failed executor result has a deterministic error");
         }
@@ -1340,7 +1372,7 @@ int test_tools_present_but_unused_makes_no_call() {
     set_responses({"The capital of France is Paris."});
 
     auto request = make_request("What is the capital of France?");
-    *request.add_tools() = make_calculate_tool();  // weather + calculate offered
+    *request.mutable_options()->add_tools() = make_calculate_tool();  // weather + calculate offered
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -1370,7 +1402,9 @@ int test_tools_present_but_unused_makes_no_call() {
               "offered tools are still advertised (calculate)");
         CHECK(captures[0].prompt.find("ALWAYS use the tool") == std::string::npos,
               "the aggressive ALWAYS-use-the-tool bias is gone");
-        CHECK(captures[0].temperature == 0.5f, "AUTO keeps caller temperature");
+        // temperature has no request-level home anymore (deleted outright,
+        // idl/tool_calling.proto) — make_request() no longer sets it.
+        CHECK(captures[0].temperature == 0.0f, "AUTO uses the default (greedy) temperature");
         CHECK(!captures[0].disable_thinking, "AUTO leaves thinking enabled");
         CHECK(captures[0].grammar.empty(), "non-grammar backend attaches no grammar");
     }
@@ -1388,8 +1422,8 @@ int test_none_suppresses_tools_and_never_calls() {
     set_responses({"Here is a direct answer."});
 
     auto request = make_request("Answer directly.");
-    *request.add_tools() = make_calculate_tool();
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    *request.mutable_options()->add_tools() = make_calculate_tool();
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -1432,7 +1466,7 @@ int test_grammar_attached_only_for_grammar_backend() {
     set_responses({"Paris is the capital of France."});
     {
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();  // tools: get_weather, calculate
+        *request.mutable_options()->add_tools() = make_calculate_tool();  // tools: get_weather, calculate
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1455,7 +1489,7 @@ int test_grammar_attached_only_for_grammar_backend() {
     set_responses({"Paris is the capital of France."});
     {
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();
+        *request.mutable_options()->add_tools() = make_calculate_tool();
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1489,7 +1523,7 @@ int test_disable_thinking_directive_is_engine_gated() {
     set_responses({"Plain answer."});
     {
         auto request = make_request("Hi");
-        request.set_disable_thinking(true);
+        request.mutable_options()->set_disable_thinking(true);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1533,7 +1567,7 @@ int test_disable_thinking_directive_is_engine_gated() {
     set_responses({"Plain answer."});
     {
         auto request = make_request("Hi");
-        request.set_disable_thinking(true);
+        request.mutable_options()->set_disable_thinking(true);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1564,8 +1598,8 @@ int test_none_attaches_no_grammar_on_grammar_backend() {
     set_responses({"Here is a direct answer."});
 
     auto request = make_request("Answer directly.");
-    *request.add_tools() = make_calculate_tool();
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    *request.mutable_options()->add_tools() = make_calculate_tool();
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -1635,7 +1669,7 @@ int test_grammar_dropped_on_synthesis_turn() {
     });
     {
         auto request = make_request("Weather in Tokyo?");
-        request.set_keep_tools_available(true);
+        request.mutable_options()->set_keep_tools_available(true);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1673,7 +1707,7 @@ int test_tool_decision_hint_gated_on_auto_path() {
     set_responses({"The capital of France is Paris."});
     {
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();
+        *request.mutable_options()->add_tools() = make_calculate_tool();
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1696,8 +1730,8 @@ int test_tool_decision_hint_gated_on_auto_path() {
     set_responses({"The capital of France is Paris."});
     {
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();
-        request.set_system_prompt("You are Halo, a concise assistant.");
+        *request.mutable_options()->add_tools() = make_calculate_tool();
+        request.mutable_options()->set_system_prompt("You are Halo, a concise assistant.");
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1723,7 +1757,7 @@ int test_tool_decision_hint_gated_on_auto_path() {
     set_responses({"Here is a direct answer."});
     {
         auto request = make_request("Answer directly.");
-        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1746,7 +1780,7 @@ int test_tool_decision_hint_gated_on_auto_path() {
     set_responses({"I decided not to call a tool."});
     {
         auto request = make_request("A tool call is mandatory.", /*max_tool_calls=*/1);
-        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+        request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1941,9 +1975,9 @@ int test_specific_narrows_grammar_spec() {
     set_responses({R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)"});
     {
         auto request = make_request("Weather?");  // tools: get_weather ...
-        *request.add_tools() = make_calculate_tool();  // ... + calculate
-        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
-        request.set_forced_tool_name("get_weather");
+        *request.mutable_options()->add_tools() = make_calculate_tool();  // ... + calculate
+        request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+        request.mutable_options()->set_forced_tool_name("get_weather");
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;
@@ -1977,8 +2011,7 @@ int test_required_with_no_tools_rejected() {
     set_responses({"unused"});
     runanywhere::v1::ToolCallingSessionCreateRequest request;  // deliberately NO tools
     request.set_prompt("Do something.");
-    request.set_max_tokens(64);
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
     ExecutorState exec;
@@ -2001,7 +2034,7 @@ int test_required_on_grammar_backend() {
     set_responses({"[get_weather(location=\"Tokyo\")]", "The weather in Tokyo is sunny."});
     {
         auto request = make_request("Weather?");  // one tool: get_weather
-        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+        request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         ExecutorState exec;

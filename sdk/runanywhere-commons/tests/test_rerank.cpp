@@ -152,15 +152,15 @@ rac_engine_vtable_t make_fake_vtable() {
     return vt;
 }
 
-std::string build_request(const std::string& query,
-                          const std::vector<std::pair<std::string, std::string>>& candidates,
+// RerankRequest.candidates (repeated RerankCandidate) was deleted in favor of
+// a flat `repeated string documents`; each candidate's id is now derivable
+// from its array position, so this helper takes plain document text.
+std::string build_request(const std::string& query, const std::vector<std::string>& documents,
                           uint32_t top_n) {
     runanywhere::v1::RerankRequest request;
     request.set_query(query);
-    for (const auto& [id, text] : candidates) {
-        auto* candidate = request.add_candidates();
-        candidate->set_id(id);
-        candidate->set_text(text);
+    for (const auto& text : documents) {
+        request.add_documents(text);
     }
     if (top_n > 0) {
         request.mutable_options()->set_top_n(top_n);
@@ -204,8 +204,7 @@ int main() {
 
     // Missing-model: reranking before a model is loaded fails gracefully.
     {
-        const std::string request_bytes =
-            build_request("q", {{"a", "alpha"}}, /*top_n=*/0);
+        const std::string request_bytes = build_request("q", {"alpha"}, /*top_n=*/0);
         rac_proto_buffer_t out = {};
         rac_proto_buffer_init(&out);
         const rac_result_t rc = rac_rerank_component_rerank_proto(
@@ -221,10 +220,11 @@ int main() {
     check(rac_rerank_component_is_loaded(component) == RAC_TRUE, "component reports loaded");
 
     {
-        // Text lengths: "short"=5, "a considerably longer passage"=30, "medium len"=10.
+        // Text lengths: documents[0]="short"=5, documents[1]="a considerably longer
+        // passage"=30, documents[2]="medium len"=10.
         const std::string request_bytes = build_request(
             "which is most relevant",
-            {{"a", "short"}, {"b", "a considerably longer passage"}, {"c", "medium len"}},
+            {"short", "a considerably longer passage", "medium len"},
             /*top_n=*/0);
         rac_proto_buffer_t out = {};
         rac_proto_buffer_init(&out);
@@ -241,16 +241,15 @@ int main() {
         check(result.ParseFromArray(data, static_cast<int>(size)), "RerankResult parses");
         check(result.items_size() == 3, "all three candidates returned, ranked");
         if (result.items_size() == 3) {
-            // Expected descending order: b (30) > c (10) > a (5).
-            check(result.items(0).id() == "b" && result.items(0).index() == 1 &&
-                      result.items(0).rank() == 0,
-                  "rank 0 is candidate b (longest)");
-            check(result.items(1).id() == "c" && result.items(1).index() == 2 &&
-                      result.items(1).rank() == 1,
-                  "rank 1 is candidate c");
-            check(result.items(2).id() == "a" && result.items(2).index() == 0 &&
-                      result.items(2).rank() == 2,
-                  "rank 2 is candidate a (shortest)");
+            // Expected descending order by score: documents[1] (30) > documents[2]
+            // (10) > documents[0] (5). RerankScoredItem.id/.rank were both deleted
+            // (id echoed the removed RerankCandidate.id; rank always equalled the
+            // item's position in this already-sorted-descending array) -- position
+            // in `items` is rank, and `index` is the only surviving identity field,
+            // pointing back at the original documents[] position.
+            check(result.items(0).index() == 1, "position 0 is documents[1] (longest)");
+            check(result.items(1).index() == 2, "position 1 is documents[2]");
+            check(result.items(2).index() == 0, "position 2 is documents[0] (shortest)");
             check(result.items(0).relevance_score() >= result.items(1).relevance_score() &&
                       result.items(1).relevance_score() >= result.items(2).relevance_score(),
                   "scores are monotonically non-increasing");
@@ -266,7 +265,7 @@ int main() {
     // top_n truncation.
     {
         const std::string request_bytes = build_request(
-            "q", {{"a", "short"}, {"b", "a considerably longer passage"}, {"c", "medium len"}},
+            "q", {"short", "a considerably longer passage", "medium len"},
             /*top_n=*/2);
         rac_proto_buffer_t out = {};
         rac_proto_buffer_init(&out);
@@ -309,7 +308,7 @@ int main() {
     // top_n larger than the candidate count clamps to all available candidates.
     {
         const std::string request_bytes =
-            build_request("q", {{"a", "short"}, {"b", "longer text"}}, /*top_n=*/9);
+            build_request("q", {"short", "longer text"}, /*top_n=*/9);
         rac_proto_buffer_t out = {};
         rac_proto_buffer_init(&out);
         const rac_result_t rc = rac_rerank_component_rerank_proto(
@@ -328,10 +327,11 @@ int main() {
     }
 
     // A candidate with empty text is still ranked (scored by length 0) and kept
-    // in the result, ordered below any longer candidate.
+    // in the result, ordered below any longer candidate. documents[0]="" (empty),
+    // documents[1]="meaningful passage" (full).
     {
         const std::string request_bytes =
-            build_request("q", {{"empty", ""}, {"full", "meaningful passage"}}, /*top_n=*/0);
+            build_request("q", {"", "meaningful passage"}, /*top_n=*/0);
         rac_proto_buffer_t out = {};
         rac_proto_buffer_init(&out);
         const rac_result_t rc = rac_rerank_component_rerank_proto(
@@ -346,7 +346,7 @@ int main() {
                 result.ParseFromArray(data, static_cast<int>(size)) && result.items_size() == 2;
             check(shape, "empty-text candidate is still returned, ranked");
             if (shape) {
-                check(result.items(0).id() == "full" && result.items(1).id() == "empty",
+                check(result.items(0).index() == 1 && result.items(1).index() == 0,
                       "empty-text candidate ranks below a longer candidate");
             }
             std::free(data);
@@ -356,7 +356,7 @@ int main() {
 
     // Invalid request (empty query) is rejected gracefully with an error buffer.
     {
-        const std::string request_bytes = build_request("", {{"a", "alpha"}}, 0);
+        const std::string request_bytes = build_request("", {"alpha"}, 0);
         rac_proto_buffer_t out = {};
         rac_proto_buffer_init(&out);
         const rac_result_t rc = rac_rerank_component_rerank_proto(
@@ -370,24 +370,22 @@ int main() {
 
     // (5) Standalone request/result proto round-trip (no backend involved).
     {
-        const std::string request_bytes = build_request("hello", {{"x", "world"}}, 5);
+        const std::string request_bytes = build_request("hello", {"world"}, 5);
         runanywhere::v1::RerankRequest parsed;
         check(parsed.ParseFromString(request_bytes) && parsed.query() == "hello" &&
-                  parsed.candidates_size() == 1 && parsed.candidates(0).id() == "x" &&
+                  parsed.documents_size() == 1 && parsed.documents(0) == "world" &&
                   parsed.options().top_n() == 5,
               "RerankRequest proto round-trips");
 
         runanywhere::v1::RerankResult result;
         auto* item = result.add_items();
-        item->set_id("x");
         item->set_relevance_score(1.5f);
         item->set_index(0);
-        item->set_rank(0);
         result.set_model_id("m");
         std::string result_bytes = result.SerializeAsString();
         runanywhere::v1::RerankResult reparsed;
         check(reparsed.ParseFromString(result_bytes) && reparsed.items_size() == 1 &&
-                  reparsed.items(0).id() == "x" && reparsed.items(0).relevance_score() == 1.5f,
+                  reparsed.items(0).index() == 0 && reparsed.items(0).relevance_score() == 1.5f,
               "RerankResult proto round-trips");
     }
 

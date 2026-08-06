@@ -273,7 +273,7 @@ static const rac_vlm_options_t RAC_VLM_OPTIONS_DEFAULT = {
     .top_k = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_K,
     .seed = 0,
     .repetition_penalty = RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPEAT_PENALTY,
-    .min_p = 0.0f,
+    .min_p = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MIN_P,
     .emit_image_embeddings = RAC_FALSE};
 
 // =============================================================================

@@ -651,10 +651,10 @@ bool parse_cancel(const rac_proto_buffer_t& buffer, rav1::DownloadCancelResult* 
            out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
-bool parse_resume(const rac_proto_buffer_t& buffer, rav1::DownloadResumeResult* out) {
-    return out != nullptr && buffer.status == RAC_SUCCESS && buffer.data != nullptr &&
-           out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
-}
+// parse_resume (rav1::DownloadResumeResult) deleted: DownloadResumeRequest /
+// DownloadResumeResult were removed from idl/download_service.proto.
+// Starting a download IS resuming it now -- rac_download_start_proto always
+// continues from any valid on-disk partial automatically.
 
 rav1::ModelInfo make_download_model(const std::string& model_id, const std::string& url,
                                     int64_t size) {
@@ -683,12 +683,14 @@ bool make_plan(const std::string& model_id, const std::string& url, int64_t size
     return ok;
 }
 
-bool start_from_plan(const rav1::DownloadPlanResult& plan, bool resume,
+// `resume` parameter removed: DownloadStartRequest.resume (former tag 3) was
+// reserved -- starting a download IS resuming it now, there is no separate
+// resume verb (rac_download_start_proto always picks up on-disk partials).
+bool start_from_plan(const rav1::DownloadPlanResult& plan,
                      rav1::DownloadStartResult* out_start) {
     rav1::DownloadStartRequest request;
     request.set_model_id(plan.model_id());
     *request.mutable_plan() = plan;
-    request.set_resume(resume);
     std::string bytes = serialize_msg(request);
 
     rac_proto_buffer_t buffer;
@@ -858,7 +860,7 @@ static TestResult test_proto_plan_multifile_uses_declared_aggregate_when_head_un
         rav1::ModelFileDescriptor* file = model->mutable_multi_file()->add_files();
         file->set_url(std::string("http://fake/no-content-length/") + filename);
         file->set_filename(filename);
-        file->set_is_required(true);
+        file->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
     }
 
     std::string unknown_bytes = serialize_msg(request);
@@ -951,13 +953,15 @@ static TestResult test_proto_plan_resume_metadata() {
     // complete. Seed the partial there so the planner can detect it for resume.
     write_dummy_file(dest_path + ".part", std::string(128, 'p'));
 
+    // resume_existing / verify_checksums: both reserved on DownloadPlanRequest.
+    // Starting a download IS resuming it (no opt-out), and checksums are
+    // verified whenever the catalog has one (no opt-in) -- see idl comment on
+    // DownloadPlanRequest.reserved 3 and .skip_checksum_verification (8).
     rav1::DownloadPlanRequest request;
     request.set_model_id(model_id);
     *request.mutable_model() = make_download_model(model_id, model_url, 1024);
     request.mutable_model()->set_checksum_sha256(std::string(64, 'a'));
-    request.set_resume_existing(true);
     request.set_validate_existing_bytes(true);
-    request.set_verify_checksums(true);
     request.set_storage_namespace("cpp04");
     request.set_required_free_bytes_after_download(256);
     // Free space must clear the planner's free-space margin (a 128 MiB floor for
@@ -979,7 +983,8 @@ static TestResult test_proto_plan_resume_metadata() {
     ASSERT_TRUE(plan.can_start(), "Validated partial bytes should be startable");
     ASSERT_TRUE(plan.can_resume(), "Plan should be resumable");
     ASSERT_TRUE(plan.resume_from_bytes() == 128, "Resume offset should match partial bytes");
-    ASSERT_TRUE(!plan.resume_token().empty(), "Plan should include a logical resume token");
+    // plan.resume_token(): reserved on DownloadPlanResult (tag 11) -- resume is
+    // now implicit (starting IS resuming), so there is no logical token to check.
     ASSERT_TRUE(plan.storage_namespace() == "cpp04", "Plan should preserve namespace");
     ASSERT_TRUE(plan.required_free_bytes_after_download() == 256,
                 "Plan should preserve post-download free-space requirement");
@@ -1024,10 +1029,11 @@ static TestResult test_proto_plan_self_heals_oversized_existing_bytes() {
     // location); the planner self-heals by deleting that sidecar and replanning fresh.
     write_dummy_file(dest_path + ".part", std::string(256, 'p'));
 
+    // resume_existing: reserved on DownloadPlanRequest -- starting a download
+    // IS resuming it now, there is no opt-out.
     rav1::DownloadPlanRequest request;
     request.set_model_id(model_id);
     *request.mutable_model() = make_download_model(model_id, model_url, 128);
-    request.set_resume_existing(true);
     request.set_validate_existing_bytes(true);
     std::string bytes = serialize_msg(request);
 
@@ -1096,11 +1102,14 @@ static TestResult test_proto_plan_rejects_path_traversal_destination() {
         model->set_framework(rav1::INFERENCE_FRAMEWORK_LLAMA_CPP);
         model->set_format(rav1::MODEL_FORMAT_GGUF);
 
-        rav1::ExpectedModelFiles* expected = model->mutable_expected_files();
+        // ModelInfo.expected_files (top-level) was removed -- the manifest now
+        // hangs off the artifact oneof that owns it. download_url is a
+        // .tar.gz, so this is an ArchiveArtifact.
+        rav1::ExpectedModelFiles* expected = model->mutable_archive()->mutable_expected_files();
         rav1::ModelFileDescriptor* file = expected->add_files();
         file->set_url("http://fake/success/inner.gguf");
         file->set_filename("inner.gguf");
-        file->set_is_required(true);
+        file->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
         if (!bad_path.empty()) {
             file->set_destination_path(bad_path);
         } else {
@@ -1170,10 +1179,11 @@ static TestResult test_proto_start_skips_traversal_unsafe_plan_entry() {
     f->set_destination_path("/tmp/../../etc/passwd");
     f->set_expected_bytes(static_cast<int64_t>(fake.payload.size()));
 
+    // DownloadStartRequest.resume (former tag 3) is reserved -- starting a
+    // download IS resuming it now, there is no separate resume flag.
     rav1::DownloadStartRequest request;
     request.set_model_id("ptrav-start");
     *request.mutable_plan() = plan;
-    request.set_resume(false);
 
     std::string bytes = serialize_msg(request);
     rac_proto_buffer_t buffer;
@@ -1209,7 +1219,7 @@ static TestResult test_proto_start_no_adapter() {
                 "Plan should succeed");
 
     rav1::DownloadStartResult start;
-    ASSERT_TRUE(start_from_plan(plan, false, &start), "Start should return a result proto");
+    ASSERT_TRUE(start_from_plan(plan, &start), "Start should return a result proto");
     ASSERT_TRUE(!start.accepted(), "Start should be rejected without HTTP adapter");
     ASSERT_TRUE(start.error().message().find("HTTP transport") != std::string::npos,
                 "Start should explain missing adapter");
@@ -1238,11 +1248,11 @@ static TestResult test_proto_start_progress_callback_complete() {
                 "Plan should succeed");
 
     rav1::DownloadStartResult start;
-    ASSERT_TRUE(start_from_plan(plan, false, &start), "Start should serialize and parse");
+    ASSERT_TRUE(start_from_plan(plan, &start), "Start should serialize and parse");
     ASSERT_TRUE(start.accepted(), "Start should be accepted");
-    ASSERT_TRUE(!start.resume_token().empty(), "Start should return a logical resume token");
-    ASSERT_TRUE(start.initial_progress().resume_token() == start.resume_token(),
-                "Initial progress should carry the same resume token");
+    // resume_token: reserved on both DownloadStartResult and DownloadProgress --
+    // starting a download IS resuming it, so there is no separate logical
+    // resume token to check anymore.
     ASSERT_TRUE(wait_for_any_progress(&capture), "Progress callback should fire");
 
     rav1::DownloadProgress terminal;
@@ -1252,8 +1262,6 @@ static TestResult test_proto_start_progress_callback_complete() {
     ASSERT_TRUE(!terminal.local_path().empty(), "Completed progress should include local_path");
     ASSERT_TRUE(terminal.overall_progress() == 1.0f,
                 "Completed progress should report overall progress");
-    ASSERT_TRUE(!terminal.resume_token().empty(),
-                "Completed progress should preserve resume token");
     ASSERT_TRUE(terminal.updated_at_unix_ms() >= terminal.started_at_unix_ms(),
                 "Progress timestamps should be populated");
 
@@ -1303,7 +1311,7 @@ static TestResult test_proto_nested_multifile_reports_model_root() {
         file->set_url(model_url + "/" + relative);
         file->set_filename(relative.substr(relative.find_last_of('/') + 1));
         file->set_relative_path(relative);
-        file->set_is_required(true);
+        file->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
         file->set_size_bytes(static_cast<int64_t>(fake.payload.size()));
     }
 
@@ -1320,7 +1328,7 @@ static TestResult test_proto_nested_multifile_reports_model_root() {
                 "Nested multi-file plan should contain both files");
 
     rav1::DownloadStartResult start;
-    ASSERT_TRUE(start_from_plan(plan, false, &start), "Nested multi-file start should parse");
+    ASSERT_TRUE(start_from_plan(plan, &start), "Nested multi-file start should parse");
     ASSERT_TRUE(start.accepted(), "Nested multi-file start should be accepted");
     rav1::DownloadProgress terminal;
     ASSERT_TRUE(wait_for_terminal(start.task_id(), &terminal),
@@ -1377,7 +1385,7 @@ static bool plan_and_start_parallel_bundle(FakeTransport& fake, const std::strin
         file->set_url(url_base + "/" + relative);
         file->set_filename(relative);
         file->set_relative_path(relative);
-        file->set_is_required(true);
+        file->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
         file->set_size_bytes(per_file_bytes);
     }
 
@@ -1395,7 +1403,7 @@ static bool plan_and_start_parallel_bundle(FakeTransport& fake, const std::strin
     if (!parsed || !plan.can_start() || plan.files_size() != 2)
         return false;
 
-    return start_from_plan(plan, /*resume=*/false, out_start);
+    return start_from_plan(plan, out_start);
 }
 
 // #4 parallel retry: a transient network drop on a bundle file must NOT fail the
@@ -1497,6 +1505,15 @@ static TestResult test_proto_parallel_permanent_error_fails_after_retries() {
     return r;
 }
 
+// NOTE: DownloadResumeRequest/DownloadResumeResult and the resume_token field
+// (on DownloadCancelResult/DownloadStartResult/DownloadProgress) were all
+// deleted from idl/download_service.proto. Starting a download IS resuming
+// it now: rac_download_start_proto{model_id} always picks up any valid
+// on-disk partial automatically, and there is no separate resume verb or
+// logical token to echo. This test now exercises that implicit-resume path:
+// cancel a download (preserving partial bytes), then re-issue
+// rac_download_start_proto with the SAME plan/model_id and confirm it
+// resumes from the preserved partial and completes.
 static TestResult test_proto_cancel_resume() {
     TestResult r;
     r.test_name = "proto_cancel_resume";
@@ -1517,7 +1534,7 @@ static TestResult test_proto_cancel_resume() {
                 "Plan should succeed");
 
     rav1::DownloadStartResult start;
-    ASSERT_TRUE(start_from_plan(plan, false, &start), "Start should succeed");
+    ASSERT_TRUE(start_from_plan(plan, &start), "Start should succeed");
     ASSERT_TRUE(start.accepted(), "Start should be accepted");
     ASSERT_TRUE(wait_for_downloaded_progress(&capture),
                 "Downloaded progress should arrive before cancel");
@@ -1537,8 +1554,6 @@ static TestResult test_proto_cancel_resume() {
     ASSERT_TRUE(cancel_result.was_running(), "Cancel should observe a running task");
     ASSERT_TRUE(cancel_result.partial_bytes_preserved(),
                 "Cancel without deletion should preserve partial bytes");
-    ASSERT_TRUE(!cancel_result.resume_token().empty(),
-                "Cancel result should preserve the resume token");
     rac_proto_buffer_free(&cancel_buffer);
 
     rav1::DownloadProgress cancelled;
@@ -1547,8 +1562,6 @@ static TestResult test_proto_cancel_resume() {
                 "Task should be cancelled, not completed");
     ASSERT_TRUE(cancelled.bytes_downloaded() > 0,
                 "Cancelled progress should preserve partial byte count");
-    ASSERT_TRUE(cancelled.resume_token() == cancel_result.resume_token(),
-                "Cancelled progress should carry the resume token");
 
     int64_t partial_size = 0;
     if (plan.files_size() > 0) {
@@ -1561,47 +1574,19 @@ static TestResult test_proto_cancel_resume() {
     ASSERT_TRUE(partial_size > 0 && std::cmp_less(partial_size, fake.payload.size()),
                 "Cancel should leave partial bytes for resume");
 
-    rav1::DownloadResumeRequest stale_resume;
-    stale_resume.set_task_id(start.task_id());
-    stale_resume.set_resume_token(cancel_result.resume_token());
-    stale_resume.set_resume_from_bytes(partial_size + 8192);
-    stale_resume.set_validate_partial_bytes(true);
-    std::string stale_resume_bytes = serialize_msg(stale_resume);
-    rac_proto_buffer_t stale_resume_buffer;
-    rac_proto_buffer_init(&stale_resume_buffer);
-    ASSERT_TRUE(
-        rac_download_resume_proto(reinterpret_cast<const uint8_t*>(stale_resume_bytes.data()),
-                                  stale_resume_bytes.size(), &stale_resume_buffer) == RAC_SUCCESS,
-        "Stale resume call should return a result proto");
-    rav1::DownloadResumeResult stale_resume_result;
-    ASSERT_TRUE(parse_resume(stale_resume_buffer, &stale_resume_result),
-                "Stale resume result should parse");
-    ASSERT_TRUE(!stale_resume_result.accepted(),
-                "Stale resume offset should be rejected when validation is requested");
-    rac_proto_buffer_free(&stale_resume_buffer);
-
-    rav1::DownloadResumeRequest resume;
-    resume.set_task_id(start.task_id());
-    resume.set_resume_token(cancel_result.resume_token());
-    resume.set_resume_from_bytes(partial_size);
-    resume.set_validate_partial_bytes(true);
-    std::string resume_bytes = serialize_msg(resume);
-    rac_proto_buffer_t resume_buffer;
-    rac_proto_buffer_init(&resume_buffer);
-    ASSERT_TRUE(rac_download_resume_proto(reinterpret_cast<const uint8_t*>(resume_bytes.data()),
-                                          resume_bytes.size(), &resume_buffer) == RAC_SUCCESS,
-                "Resume call should succeed");
-    rav1::DownloadResumeResult resume_result;
-    ASSERT_TRUE(parse_resume(resume_buffer, &resume_result), "Resume result should parse");
-    ASSERT_TRUE(resume_result.accepted(), "Resume should be accepted");
-    ASSERT_TRUE(resume_result.resume_token() == cancel_result.resume_token(),
-                "Resume should preserve the logical resume token");
-    ASSERT_TRUE(resume_result.initial_progress().bytes_downloaded() == partial_size,
-                "Resume initial progress should preserve partial byte count");
-    rac_proto_buffer_free(&resume_buffer);
+    // Re-issuing rac_download_start_proto for the same plan/model_id IS the
+    // resume verb now. The previous task is terminal (CANCELLED), so this
+    // spawns a fresh task that picks up the ".part" sidecar automatically.
+    rav1::DownloadStartResult resumed_start;
+    ASSERT_TRUE(start_from_plan(plan, &resumed_start), "Restart-as-resume should succeed");
+    ASSERT_TRUE(resumed_start.accepted(), "Restart-as-resume should be accepted");
+    ASSERT_TRUE(resumed_start.initial_progress().bytes_downloaded() == partial_size,
+                "Resumed start's initial progress should preserve partial byte count");
+    ASSERT_TRUE(resumed_start.initial_progress().state() == rav1::DOWNLOAD_STATE_RESUMING,
+                "Resumed start should report the RESUMING state");
 
     rav1::DownloadProgress completed;
-    ASSERT_TRUE(wait_for_state(start.task_id(), rav1::DOWNLOAD_STATE_COMPLETED, &completed),
+    ASSERT_TRUE(wait_for_state(resumed_start.task_id(), rav1::DOWNLOAD_STATE_COMPLETED, &completed),
                 "Resumed task should finish");
     ASSERT_TRUE(completed.state() == rav1::DOWNLOAD_STATE_COMPLETED,
                 "Resumed task should complete");
@@ -1628,7 +1613,7 @@ static TestResult test_proto_failed_transfer_no_stale_completion() {
                 "Plan should succeed");
 
     rav1::DownloadStartResult start;
-    ASSERT_TRUE(start_from_plan(plan, false, &start), "Start should return result");
+    ASSERT_TRUE(start_from_plan(plan, &start), "Start should return result");
     ASSERT_TRUE(start.accepted(), "Start should be accepted");
 
     rav1::DownloadProgress terminal;
@@ -1636,7 +1621,7 @@ static TestResult test_proto_failed_transfer_no_stale_completion() {
     ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_FAILED,
                 "Failed transfer must not be marked completed");
     ASSERT_TRUE(terminal.local_path().empty(), "Failed transfer should not publish final path");
-    ASSERT_TRUE(!terminal.resume_token().empty(), "Failed progress should preserve resume token");
+    // resume_token: reserved on DownloadProgress -- resume is implicit now.
 
     remove_dir(base_dir);
     r.passed = true;

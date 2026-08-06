@@ -493,11 +493,14 @@ rac_bool_t vlm_stream_capture(const uint8_t* bytes, size_t size, void* user_data
 int test_vlm_process_stream_events() {
     rac_sdk_event_clear_queue();
 
+    // VLMImage.format was deleted -- the format is now inferred from which
+    // `oneof source` field is set (file_path here), not a separate enum.
+    // VLMGenerationOptions was deleted entirely: sampling knobs move onto
+    // LLMGenerationOptions, and prompt is now VLMGenerationRequest.prompt
+    // directly rather than living on the options message.
     runanywhere::v1::VLMImage image;
     image.set_file_path("/tmp/test-image.png");
-    image.set_format(runanywhere::v1::VLM_IMAGE_FORMAT_FILE_PATH);
-    runanywhere::v1::VLMGenerationOptions options;
-    options.set_prompt("describe");
+    runanywhere::v1::LLMGenerationOptions options;
     options.set_max_output_tokens(16);
     rac_proto_buffer_t out;
     rac_result_t rc = RAC_SUCCESS;
@@ -526,7 +529,7 @@ int test_vlm_process_stream_events() {
     stream_model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     stream_model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     stream_model.set_local_path(stream_model_path.string());
-    stream_model.set_is_downloaded(true);
+    stream_model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     stream_model.set_is_available(true);
     std::vector<uint8_t> stream_model_bytes;
     CHECK(serialize(stream_model, &stream_model_bytes), "VLM stream ModelInfo serializes");
@@ -549,6 +552,9 @@ int test_vlm_process_stream_events() {
 
     runanywhere::v1::VLMGenerationRequest stream_request;
     stream_request.set_request_id("vlm-stream-test");
+    // prompt now lives directly on VLMGenerationRequest, not on the options
+    // message (VLMGenerationOptions, which carried it, was deleted).
+    stream_request.set_prompt("describe");
     *stream_request.add_images() = image;
     *stream_request.mutable_options() = options;
     std::vector<uint8_t> stream_request_bytes;
@@ -561,7 +567,9 @@ int test_vlm_process_stream_events() {
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VLM generate returns VLMResult");
     CHECK(result.text() == "vlm:describe", "VLM generate preserves prompt path");
     CHECK(result.image_tokens() == 256, "VLM generate preserves image token count");
-    CHECK(result.time_to_first_token_ms() == 4, "VLM generate preserves time to first token");
+    // time_to_first_token_ms was deleted from VLMResult; TokenUsage.ttft_ms
+    // (usage=15) is the one canonical spelling now.
+    CHECK(result.usage().ttft_ms() == 4, "VLM generate preserves time to first token");
     CHECK(result.image_encode_time_ms() == 6, "VLM generate preserves image encode time");
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED),
           "VLM generate emits started capability event");
@@ -586,11 +594,15 @@ int test_vlm_process_stream_events() {
               token_event.kind() == runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN &&
               token_event.token() == "hello",
           "VLM typed stream delivers token deltas");
+    // is_final/tokens_per_second were both deleted from VLMStreamEvent: kind
+    // (COMPLETED/ERROR) is the sole terminal discriminator now, and rate
+    // comes from result.usage().decode_tokens_per_second() on the terminal
+    // event instead of a second copy on the event itself.
     runanywhere::v1::VLMStreamEvent terminal_event;
     CHECK(terminal_event.ParseFromArray(capture.events.back().data(),
                                         static_cast<int>(capture.events.back().size())) &&
               terminal_event.kind() == runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED &&
-              terminal_event.is_final() && terminal_event.result().text() == "hello vision",
+              terminal_event.result().text() == "hello vision",
           "VLM typed stream terminal COMPLETED carries the aggregate result");
 
     rac_proto_buffer_init(&out);
@@ -680,7 +692,9 @@ int test_embeddings_mocked_result() {
           "embeddings proto returns EmbeddingsResult");
     CHECK(result.vectors_size() == 2, "embeddings result has one vector per text");
     CHECK(result.dimension() == 3, "embeddings result carries dimension");
-    CHECK(result.vectors(0).text() == "alpha", "embeddings result preserves text ordering");
+    // EmbeddingVector.text was deleted outright (dead surface, no consumer);
+    // vectors[i] corresponds to texts[i] by position, not by echoed text.
+    CHECK(result.vectors(0).input_index() == 0, "embeddings result preserves positional ordering");
     CHECK(result.vectors(0).values_size() == 3 && result.vectors(0).values(0) == 1.0f,
           "embeddings result carries mocked values");
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED),
@@ -758,7 +772,11 @@ int test_diffusion_progress_cancel_and_unsupported() {
     runanywhere::v1::DiffusionResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "diffusion progress proto returns DiffusionResult");
-    CHECK(result.image_data().size() == 4, "diffusion result carries image bytes");
+    // DiffusionResult.image_data was replaced by a repeated `images` field
+    // (one DiffusionImage per requested image; commons emits exactly one
+    // until the C ABI grows a list), with its own `data` per entry.
+    CHECK(result.images_size() == 1 && result.images(0).data().size() == 4,
+          "diffusion result carries image bytes");
     CHECK(capture.progress.size() == 1, "diffusion progress callback receives event");
     runanywhere::v1::DiffusionProgress progress;
     CHECK(progress.ParseFromArray(capture.progress[0].data(),
@@ -829,7 +847,7 @@ int test_rag_ingest_query_mocked_path() {
     config.set_llm_model_id("rag.llm.mock");
     config.set_embedding_dimension(3);
     config.set_top_k(1);
-    config.set_similarity_threshold(0.0f);
+    config.set_score_threshold(0.0f);
     config.set_chunk_size(256);
     config.set_chunk_overlap(0);
     std::vector<uint8_t> config_bytes;
@@ -868,8 +886,10 @@ int test_rag_ingest_query_mocked_path() {
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED),
           "RAG ingest publishes RAG_INGESTION_COMPLETED");
 
+    // RAGQueryOptions.question was renamed to `query` (matching
+    // RAGSearchRequest and RAGRetrievalOptions naming).
     runanywhere::v1::RAGQueryOptions query;
-    query.set_question("Where does RAG live?");
+    query.set_query("Where does RAG live?");
     query.mutable_generation()->set_max_output_tokens(32);
     query.mutable_generation()->set_temperature(0.0f);
     query.mutable_generation()->mutable_reasoning()->set_mode(runanywhere::v1::REASONING_MODE_OFF);
@@ -1201,7 +1221,7 @@ int test_rag_auto_embedding_dimension(size_t output_dimension, size_t reported_d
     runanywhere::v1::RAGConfiguration config;
     config.set_embedding_model_id(model_id);
     config.set_top_k(1);
-    config.set_similarity_threshold(0.0f);
+    config.set_score_threshold(0.0f);
     config.set_chunk_size(256);
     config.set_chunk_overlap(0);
     CHECK(!config.has_embedding_dimension(),
@@ -1370,7 +1390,7 @@ int test_rag_search_retrieval_only() {
     embed_only_config.set_embedding_model_id("rag.embedding.search");
     embed_only_config.set_embedding_dimension(3);
     embed_only_config.set_top_k(3);
-    embed_only_config.set_similarity_threshold(0.0f);
+    embed_only_config.set_score_threshold(0.0f);
     embed_only_config.set_chunk_size(256);
     embed_only_config.set_chunk_overlap(0);
     std::vector<uint8_t> embed_only_bytes;
@@ -1382,8 +1402,10 @@ int test_rag_search_retrieval_only() {
               embed_session != nullptr,
           "embed-only RAG session creates");
 
+    // RAGSearchRequest.question was renamed to `query`, matching
+    // RAGQueryOptions/RAGRetrievalOptions naming.
     runanywhere::v1::RAGSearchRequest empty_index_req;
-    empty_index_req.set_question("anything");
+    empty_index_req.set_query("anything");
     std::vector<uint8_t> empty_index_bytes;
     CHECK(serialize(empty_index_req, &empty_index_bytes), "empty-index RAGSearchRequest serializes");
     rac_proto_buffer_t out;
@@ -1428,9 +1450,11 @@ int test_rag_search_retrieval_only() {
           "embed-only ingest B succeeds");
     rac_proto_buffer_free(&out);
 
+    // enable_multi_query / multi_query_count moved onto the shared
+    // RAGRetrievalOptions message (RAGSearchRequest.retrieval).
     runanywhere::v1::RAGSearchRequest multi_q;
-    multi_q.set_question("retrieval-only");
-    multi_q.set_enable_multi_query(true);
+    multi_q.set_query("retrieval-only");
+    multi_q.mutable_retrieval()->set_enable_multi_query(true);
     std::vector<uint8_t> multi_q_bytes;
     CHECK(serialize(multi_q, &multi_q_bytes), "multi-query RAGSearchRequest serializes");
     rac_proto_buffer_init(&out);
@@ -1439,11 +1463,13 @@ int test_rag_search_retrieval_only() {
           "multi-query search without session LLM returns INVALID_STATE");
     rac_proto_buffer_free(&out);
 
+    // The flat retrieval_top_k/score_threshold/scope_prefix fields moved onto
+    // the shared RAGRetrievalOptions message.
     runanywhere::v1::RAGSearchRequest search_req;
-    search_req.set_question("retrieval-only RAG search");
-    search_req.set_retrieval_top_k(1);
-    search_req.set_similarity_threshold(0.0f);
-    search_req.set_scope_prefix("docs/");
+    search_req.set_query("retrieval-only RAG search");
+    search_req.mutable_retrieval()->set_top_k(1);
+    search_req.mutable_retrieval()->set_score_threshold(0.0f);
+    search_req.mutable_retrieval()->set_scope_prefix("docs/");
     std::vector<uint8_t> search_bytes;
     CHECK(serialize(search_req, &search_bytes), "RAGSearchRequest serializes");
     rac_proto_buffer_init(&out);
@@ -1472,7 +1498,7 @@ int test_rag_search_retrieval_only() {
     full_config.set_llm_model_id("rag.llm.search");
     full_config.set_embedding_dimension(3);
     full_config.set_top_k(2);
-    full_config.set_similarity_threshold(0.0f);
+    full_config.set_score_threshold(0.0f);
     full_config.set_chunk_size(256);
     full_config.set_chunk_overlap(0);
     std::vector<uint8_t> full_bytes;
@@ -1490,8 +1516,8 @@ int test_rag_search_retrieval_only() {
     rac_proto_buffer_free(&out);
 
     runanywhere::v1::RAGSearchRequest full_search;
-    full_search.set_question("Where does RAG live?");
-    full_search.set_retrieval_top_k(1);
+    full_search.set_query("Where does RAG live?");
+    full_search.mutable_retrieval()->set_top_k(1);
     std::vector<uint8_t> full_search_bytes;
     CHECK(serialize(full_search, &full_search_bytes), "full-session RAGSearchRequest serializes");
     rac_proto_buffer_init(&out);
@@ -1508,7 +1534,7 @@ int test_rag_search_retrieval_only() {
 
     // Query path still generates (regression guard).
     runanywhere::v1::RAGQueryOptions query;
-    query.set_question("Where does RAG live?");
+    query.set_query("Where does RAG live?");
     query.mutable_generation()->set_max_output_tokens(16);
     query.mutable_generation()->set_temperature(0.0f);
     std::vector<uint8_t> query_bytes;
@@ -1554,7 +1580,7 @@ runanywhere::v1::ModelInfo build_lora_test_model(const std::string& id, const st
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/" + id + ".gguf");
     model.set_supports_lora(true);
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     model.set_is_available(true);
     return model;
 }
@@ -1600,10 +1626,13 @@ int test_lora_register_compat_apply_remove_clear() {
     rac_lora_registry_handle_t lora_registry = nullptr;
     CHECK(rac_lora_registry_create(&lora_registry) == RAC_SUCCESS && lora_registry != nullptr,
           "LoRA registry creates");
+    // LoraAdapterCatalogEntry.filename was deleted; local_path (non-empty =
+    // "the adapter file is on disk") is the single definition of downloaded
+    // now.
     runanywhere::v1::LoraAdapterCatalogEntry entry;
     entry.set_id("style.adapter");
     entry.set_name("Style Adapter");
-    entry.set_filename("adapter.gguf");
+    entry.set_local_path(adapter_path.string());
     entry.add_compatible_models("mock-llm");
     std::vector<uint8_t> entry_bytes;
     CHECK(serialize(entry, &entry_bytes), "LoRA catalog entry serializes");
@@ -1640,12 +1669,12 @@ int test_lora_register_compat_apply_remove_clear() {
           "mock-llm registers in model registry");
     CHECK(lifecycle_load_lora_model(model_registry, "mock-llm"), "lifecycle loads mock LLM model");
 
-    runanywhere::v1::LoRAAdapterConfig config;
+    runanywhere::v1::LoraAdapterConfig config;
     config.set_adapter_path(adapter_path.string());
     config.set_adapter_id("style.adapter");
     config.set_scale(0.5f);
     std::vector<uint8_t> config_bytes;
-    CHECK(serialize(config, &config_bytes), "LoRAAdapterConfig serializes");
+    CHECK(serialize(config, &config_bytes), "LoraAdapterConfig serializes");
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_compatibility_proto(config_bytes.data(), config_bytes.size(), &out);
@@ -1654,14 +1683,14 @@ int test_lora_register_compat_apply_remove_clear() {
     CHECK(compat.is_compatible(), "LoRA compatibility succeeds for capable backend");
     rac_proto_buffer_free(&out);
 
-    runanywhere::v1::LoRAApplyRequest apply;
+    runanywhere::v1::LoraApplyRequest apply;
     apply.set_request_id("advanced-lora-apply");
     *apply.add_adapters() = config;
     std::vector<uint8_t> apply_bytes;
-    CHECK(serialize(apply, &apply_bytes), "LoRAApplyRequest serializes");
+    CHECK(serialize(apply, &apply_bytes), "LoraApplyRequest serializes");
     rac_proto_buffer_init(&out);
     rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
-    runanywhere::v1::LoRAApplyResult apply_result;
+    runanywhere::v1::LoraApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "LoRA apply returns generated result");
     CHECK(apply_result.has_error() == false && apply_result.adapters_size() == 1,
@@ -1671,17 +1700,19 @@ int test_lora_register_compat_apply_remove_clear() {
           "LoRA apply marks adapter applied");
     rac_proto_buffer_free(&out);
 
-    runanywhere::v1::LoRARemoveRequest clear;
-    clear.set_request_id("advanced-lora-clear");
+    // LoraRemoveRequest has no request_id field (only adapter_ids + clear_all).
+    runanywhere::v1::LoraRemoveRequest clear;
     clear.set_clear_all(true);
     std::vector<uint8_t> clear_bytes;
-    CHECK(serialize(clear, &clear_bytes), "LoRARemoveRequest clear serializes");
+    CHECK(serialize(clear, &clear_bytes), "LoraRemoveRequest clear serializes");
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(clear_bytes.data(), clear_bytes.size(), &out);
-    runanywhere::v1::LoRAState state;
+    runanywhere::v1::LoraState state;
+    // LoraState.has_active_adapters was deleted; derivable from
+    // loaded_adapters being non-empty.
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "LoRA remove clear_all returns generated state");
-    CHECK(!state.has_active_adapters() && state.loaded_adapters_size() == 0,
+    CHECK(state.loaded_adapters_size() == 0,
           "LoRA remove clear_all returns empty state");
     rac_proto_buffer_free(&out);
 

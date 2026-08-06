@@ -174,7 +174,9 @@ runanywhere::v1::ModelInfo build_test_llm(const std::string& id, const std::stri
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/" + id + ".gguf");
     model.set_supports_lora(true);
-    model.set_is_downloaded(true);
+    // is_downloaded (tag 32) was reserved -- registry_status is the single
+    // downloaded-ness signal now.
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     model.set_is_available(true);
     return model;
 }
@@ -220,10 +222,10 @@ void reset_environment() {
     (void)rac_plugin_unregister("llamacpp");
 }
 
-bool state_carries(const runanywhere::v1::LoRAState& state, const std::string& adapter_id,
+bool state_carries(const runanywhere::v1::LoraState& state, const std::string& adapter_id,
                    const std::string& adapter_path) {
     return std::ranges::any_of(state.loaded_adapters(),
-                               [&](const runanywhere::v1::LoRAAdapterInfo& info) {
+                               [&](const runanywhere::v1::LoraAdapterInfo& info) {
                                    return info.adapter_id() == adapter_id &&
                                           info.adapter_path() == adapter_path && info.applied();
                                });
@@ -236,7 +238,7 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     reset_environment();
 
     // Lifecycle not ready → COMPONENT_NOT_READY surfaced on the typed result.
-    runanywhere::v1::LoRAApplyRequest precheck;
+    runanywhere::v1::LoraApplyRequest precheck;
     precheck.set_request_id("precheck");
     auto* precheck_adapter = precheck.add_adapters();
     precheck_adapter->set_adapter_path("/tmp/precheck.gguf");
@@ -246,9 +248,9 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_lora_apply_proto(precheck_bytes.data(), precheck_bytes.size(), &out);
-    runanywhere::v1::LoRAApplyResult precheck_result;
+    runanywhere::v1::LoraApplyResult precheck_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &precheck_result),
-          "apply without lifecycle returns typed LoRAApplyResult");
+          "apply without lifecycle returns typed LoraApplyResult");
     CHECK(!precheck_result.has_error() == false, "apply without lifecycle is unsuccessful");
     CHECK(precheck_result.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "apply without lifecycle reports COMPONENT_NOT_READY");
@@ -268,9 +270,11 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
           "secondary adapter registers for lifecycle.lora");
     CHECK(lifecycle_load(registry, "lifecycle.lora"), "lifecycle service loads lifecycle.lora");
 
-    runanywhere::v1::LoRAApplyRequest apply;
+    // LoraApplyRequest.replace_existing was inverted to keep_existing: the
+    // old replace_existing=true (replace the active set) is now the default
+    // (keep_existing=false), so this apply call doesn't need to set anything.
+    runanywhere::v1::LoraApplyRequest apply;
     apply.set_request_id("apply-lifecycle");
-    apply.set_replace_existing(true);
     auto* primary = apply.add_adapters();
     primary->set_adapter_id("primary");
     primary->set_adapter_path("/tmp/primary.gguf");
@@ -284,7 +288,7 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
-    runanywhere::v1::LoRAApplyResult apply_result;
+    runanywhere::v1::LoraApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "lifecycle apply returns typed result");
     CHECK(apply_result.has_error() == false, "lifecycle apply succeeds");
@@ -292,27 +296,28 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     CHECK(apply_result.request_id() == "apply-lifecycle", "lifecycle apply preserves request id");
     rac_proto_buffer_free(&out);
 
-    runanywhere::v1::LoRAState state_request;
+    runanywhere::v1::LoraState state_request;
     std::vector<uint8_t> state_bytes;
     CHECK(serialize(state_request, &state_bytes), "state request serializes");
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_state_proto(state_bytes.data(), state_bytes.size(), &out);
-    runanywhere::v1::LoRAState state;
+    runanywhere::v1::LoraState state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "lifecycle state returns LoRAState after apply");
+          "lifecycle state returns LoraState after apply");
     CHECK(state.base_model_id() == "lifecycle.lora", "state carries lifecycle base model id");
-    CHECK(state.has_active_adapters() && state.loaded_adapters_size() == 2,
-          "state mirrors applied adapter count");
+    // LoraState.has_active_adapters was deleted outright: it is fully
+    // recoverable as loaded_adapters being non-empty.
+    CHECK(state.loaded_adapters_size() == 2, "state mirrors applied adapter count");
     CHECK(state_carries(state, "primary", "/tmp/primary.gguf"), "state contains primary adapter");
     CHECK(state_carries(state, "secondary", "/tmp/secondary.gguf"),
           "state contains secondary adapter");
     rac_proto_buffer_free(&out);
 
     // Remove by adapter id (resolved through the tracked-state map keyed on
-    // the lifecycle backend impl pointer).
-    runanywhere::v1::LoRARemoveRequest remove_by_id;
-    remove_by_id.set_request_id("remove-primary");
+    // the lifecycle backend impl pointer). LoraRemoveRequest has no
+    // request_id field (only adapter_ids/clear_all).
+    runanywhere::v1::LoraRemoveRequest remove_by_id;
     remove_by_id.add_adapter_ids("primary");
     std::vector<uint8_t> remove_by_id_bytes;
     CHECK(serialize(remove_by_id, &remove_by_id_bytes), "remove-by-id request serializes");
@@ -320,29 +325,31 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(remove_by_id_bytes.data(), remove_by_id_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "lifecycle remove-by-id returns LoRAState");
+          "lifecycle remove-by-id returns LoraState");
     CHECK(state.loaded_adapters_size() == 1, "remove-by-id leaves remaining adapter");
     CHECK(!state_carries(state, "primary", "/tmp/primary.gguf"), "remove-by-id removes primary");
     CHECK(state_carries(state, "secondary", "/tmp/secondary.gguf"), "remove-by-id keeps secondary");
     rac_proto_buffer_free(&out);
 
-    // Remove by path then clear_all.
-    runanywhere::v1::LoRARemoveRequest remove_by_path;
-    remove_by_path.add_adapter_paths("/tmp/secondary.gguf");
-    std::vector<uint8_t> remove_by_path_bytes;
-    CHECK(serialize(remove_by_path, &remove_by_path_bytes), "remove-by-path request serializes");
+    // Remove the remaining adapter by id. LoraRemoveRequest.adapter_paths was
+    // deleted outright: clear_all and adapter_ids are the only identity path
+    // now (resolved to a path internally via resolve_lora_id_to_path).
+    runanywhere::v1::LoraRemoveRequest remove_secondary;
+    remove_secondary.add_adapter_ids("secondary");
+    std::vector<uint8_t> remove_secondary_bytes;
+    CHECK(serialize(remove_secondary, &remove_secondary_bytes),
+          "remove-secondary request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_remove_proto(remove_by_path_bytes.data(), remove_by_path_bytes.size(), &out);
+    rc = rac_lora_remove_proto(remove_secondary_bytes.data(), remove_secondary_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "lifecycle remove-by-path returns LoRAState");
-    CHECK(state.loaded_adapters_size() == 0 && !state.has_active_adapters(),
-          "remove-by-path empties state");
+          "lifecycle remove-secondary returns LoraState");
+    CHECK(state.loaded_adapters_size() == 0, "remove-secondary empties state");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_list_proto(state_bytes.data(), state_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "lifecycle list returns LoRAState after full remove");
+          "lifecycle list returns LoraState after full remove");
     CHECK(state.loaded_adapters_size() == 0, "lifecycle list reflects no remaining adapters");
     CHECK(state.base_model_id() == "lifecycle.lora", "list still reports base model id");
     rac_proto_buffer_free(&out);
@@ -367,7 +374,7 @@ int test_unload_reverts_to_not_ready(rac_model_registry_handle_t registry) {
           "temp adapter registers for unload.lora");
     CHECK(lifecycle_load(registry, "unload.lora"), "lifecycle loads unload.lora");
 
-    runanywhere::v1::LoRAApplyRequest apply;
+    runanywhere::v1::LoraApplyRequest apply;
     apply.set_request_id("apply-before-unload");
     auto* adapter = apply.add_adapters();
     adapter->set_adapter_id("temp");
@@ -379,23 +386,23 @@ int test_unload_reverts_to_not_ready(rac_model_registry_handle_t registry) {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_lora_apply_proto(bytes.data(), bytes.size(), &out);
-    runanywhere::v1::LoRAApplyResult apply_result;
+    runanywhere::v1::LoraApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
-          "apply-before-unload returns LoRAApplyResult");
+          "apply-before-unload returns LoraApplyResult");
     CHECK(apply_result.has_error() == false, "apply-before-unload succeeds");
     rac_proto_buffer_free(&out);
 
     rac_model_lifecycle_reset();
 
-    runanywhere::v1::LoRAState state_request;
+    runanywhere::v1::LoraState state_request;
     std::vector<uint8_t> state_bytes;
     CHECK(serialize(state_request, &state_bytes), "state request serializes for post-unload");
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_state_proto(state_bytes.data(), state_bytes.size(), &out);
-    runanywhere::v1::LoRAState state;
+    runanywhere::v1::LoraState state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "lifecycle state after unload returns typed LoRAState");
+          "lifecycle state after unload returns typed LoraState");
     CHECK(state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "lifecycle state after unload reports COMPONENT_NOT_READY");
     CHECK(state.error().message().find("LoRA service is not loaded") != std::string::npos,
@@ -456,7 +463,7 @@ int test_null_inputs_return_typed_errors() {
 int test_malformed_proto_bytes_return_decoding_error() {
     reset_environment();
 
-    // Bytes that are highly unlikely to parse as a valid LoRAApplyRequest:
+    // Bytes that are highly unlikely to parse as a valid LoraApplyRequest:
     // 0xFF tags with bogus varint lengths.
     const uint8_t garbage[] = {0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
 
@@ -494,8 +501,8 @@ int test_apis_before_load_report_component_not_ready() {
     reset_environment();
 
     // Apply against the empty lifecycle — must return a typed
-    // LoRAApplyResult with error_code == COMPONENT_NOT_READY.
-    runanywhere::v1::LoRAApplyRequest apply;
+    // LoraApplyResult with error_code == COMPONENT_NOT_READY.
+    runanywhere::v1::LoraApplyRequest apply;
     apply.set_request_id("apply-before-load");
     auto* adapter = apply.add_adapters();
     adapter->set_adapter_id("never");
@@ -506,50 +513,50 @@ int test_apis_before_load_report_component_not_ready() {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
-    runanywhere::v1::LoRAApplyResult apply_result;
+    runanywhere::v1::LoraApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
-          "apply-before-load returns typed LoRAApplyResult");
+          "apply-before-load returns typed LoraApplyResult");
     CHECK(!apply_result.has_error() == false, "apply-before-load reports failure");
     CHECK(apply_result.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "apply-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
 
     // Remove (clear_all) against the empty lifecycle — must return a typed
-    // LoRAState with error_code == COMPONENT_NOT_READY.
-    runanywhere::v1::LoRARemoveRequest remove;
+    // LoraState with error_code == COMPONENT_NOT_READY.
+    runanywhere::v1::LoraRemoveRequest remove;
     remove.set_clear_all(true);
     std::vector<uint8_t> remove_bytes;
     CHECK(serialize(remove, &remove_bytes), "remove-before-load serializes");
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(remove_bytes.data(), remove_bytes.size(), &out);
-    runanywhere::v1::LoRAState remove_state;
+    runanywhere::v1::LoraState remove_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &remove_state),
-          "remove-before-load returns typed LoRAState");
+          "remove-before-load returns typed LoraState");
     CHECK(remove_state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "remove-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
 
     // list_proto and state_proto on a never-loaded lifecycle must surface the
-    // same typed COMPONENT_NOT_READY on the LoRAState message.
-    runanywhere::v1::LoRAState state_request;
+    // same typed COMPONENT_NOT_READY on the LoraState message.
+    runanywhere::v1::LoraState state_request;
     std::vector<uint8_t> state_bytes;
     CHECK(serialize(state_request, &state_bytes), "state request serializes");
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_list_proto(state_bytes.data(), state_bytes.size(), &out);
-    runanywhere::v1::LoRAState list_state;
+    runanywhere::v1::LoraState list_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &list_state),
-          "list-before-load returns typed LoRAState");
+          "list-before-load returns typed LoraState");
     CHECK(list_state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "list-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_state_proto(state_bytes.data(), state_bytes.size(), &out);
-    runanywhere::v1::LoRAState lora_state;
+    runanywhere::v1::LoraState lora_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &lora_state),
-          "state-before-load returns typed LoRAState");
+          "state-before-load returns typed LoraState");
     CHECK(lora_state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "state-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
@@ -559,7 +566,7 @@ int test_apis_before_load_report_component_not_ready() {
 }
 
 // Removing/clearing twice in a row must be idempotent — the second call
-// returns a successful (error-free) LoRAState reflecting the same empty
+// returns a successful (error-free) LoraState reflecting the same empty
 // adapter set as the first. This guards against the ABI silently regressing
 // to "double-unload returns INVALID_HANDLE" or similar.
 int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
@@ -575,7 +582,7 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     CHECK(lifecycle_load(registry, "double.clear"), "lifecycle loads double.clear");
 
     // Apply one adapter so we have non-empty state to clear.
-    runanywhere::v1::LoRAApplyRequest apply;
+    runanywhere::v1::LoraApplyRequest apply;
     apply.set_request_id("apply-pre-clear");
     auto* adapter = apply.add_adapters();
     adapter->set_adapter_id("only");
@@ -587,39 +594,37 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
-    runanywhere::v1::LoRAApplyResult apply_result;
+    runanywhere::v1::LoraApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
-          "apply-pre-clear returns LoRAApplyResult");
+          "apply-pre-clear returns LoraApplyResult");
     CHECK(apply_result.has_error() == false, "apply-pre-clear succeeds");
     rac_proto_buffer_free(&out);
 
     // First clear_all → state empties.
-    runanywhere::v1::LoRARemoveRequest clear_request;
+    runanywhere::v1::LoraRemoveRequest clear_request;
     clear_request.set_clear_all(true);
     std::vector<uint8_t> clear_bytes;
     CHECK(serialize(clear_request, &clear_bytes), "clear request serializes");
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(clear_bytes.data(), clear_bytes.size(), &out);
-    runanywhere::v1::LoRAState first_state;
+    runanywhere::v1::LoraState first_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &first_state),
-          "first clear_all returns LoRAState");
+          "first clear_all returns LoraState");
     CHECK(first_state.error().c_abi_code() == 0, "first clear_all carries no error");
     CHECK(first_state.loaded_adapters_size() == 0, "first clear_all empties tracked adapters");
-    CHECK(!first_state.has_active_adapters(), "first clear_all sets has_active_adapters=false");
     rac_proto_buffer_free(&out);
 
     // Second clear_all on already-empty state must remain idempotent — no
     // error code, no adapters, no INVALID_HANDLE leak.
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(clear_bytes.data(), clear_bytes.size(), &out);
-    runanywhere::v1::LoRAState second_state;
+    runanywhere::v1::LoraState second_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &second_state),
-          "second clear_all returns LoRAState");
+          "second clear_all returns LoraState");
     CHECK(second_state.error().c_abi_code() == 0, "second clear_all carries no error (idempotent)");
     CHECK(second_state.loaded_adapters_size() == 0,
           "second clear_all leaves tracked adapters empty");
-    CHECK(!second_state.has_active_adapters(), "second clear_all keeps has_active_adapters=false");
     CHECK(second_state.base_model_id() == "double.clear",
           "second clear_all preserves base model id");
     rac_proto_buffer_free(&out);

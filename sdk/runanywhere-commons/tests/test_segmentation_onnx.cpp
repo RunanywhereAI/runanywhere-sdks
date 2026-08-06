@@ -190,9 +190,13 @@ bool valid_fixture_result(const runanywhere::v1::SegmentationResult& result, uin
             return false;
         }
     }
+    // SegmentationClassSummary.fraction was deleted -- derivable as
+    // pixel_count / (width * height); commons no longer wires a setter.
     const auto& summary = result.class_summaries(0);
+    const float derived_fraction = static_cast<float>(summary.pixel_count()) /
+                                   static_cast<float>(pixels);
     return summary.class_id() == 149 && summary.pixel_count() == pixels &&
-           summary.fraction() == 1.0f && summary.label() == "class_149";
+           derived_fraction == 1.0f && summary.label() == "class_149";
 }
 
 struct OperationGate {
@@ -332,7 +336,7 @@ int main() {
         model.set_format(runanywhere::v1::MODEL_FORMAT_ONNX);
         model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_ONNX);
         model.set_local_path(RAC_SEGMENTATION_FIXTURE_DIR);
-        model.set_is_downloaded(true);
+        model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
         model.set_is_available(true);
         std::string model_bytes;
         CHECK(model.SerializeToString(&model_bytes) &&

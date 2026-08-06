@@ -270,7 +270,7 @@ int test_register_gguf_round_trip() {
     ASSERT_EQ(saved.download_url(), args.url);
     ASSERT_EQ(saved.source(), runanywhere::v1::MODEL_SOURCE_REMOTE);
     ASSERT_TRUE(saved.has_single_file());
-    ASSERT_EQ(saved.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
+    ASSERT_EQ(saved.artifact_case(), runanywhere::v1::ModelInfo::kSingleFile);
     ASSERT_TRUE(saved.created_at_unix_ms() > 0);
     ASSERT_TRUE(saved.updated_at_unix_ms() > 0);
 
@@ -288,7 +288,7 @@ int test_register_gguf_round_trip() {
     ASSERT_EQ(retrieved.download_url(), saved.download_url());
     ASSERT_EQ(retrieved.source(), saved.source());
     ASSERT_EQ(retrieved.has_single_file(), saved.has_single_file());
-    ASSERT_EQ(retrieved.artifact_type(), saved.artifact_type());
+    ASSERT_EQ(retrieved.artifact_case(), saved.artifact_case());
 
     remove_by_id(saved.id());
     clear_adapter();
@@ -314,7 +314,6 @@ int test_register_archive_round_trip() {
     ASSERT_EQ(saved.artifact_case(), runanywhere::v1::ModelInfo::kArchive);
     ASSERT_TRUE(saved.has_archive());
     ASSERT_EQ(saved.archive().type(), runanywhere::v1::ARCHIVE_TYPE_TAR_GZ);
-    ASSERT_EQ(saved.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE);
 
     // Round-trip via registry get.
     runanywhere::v1::ModelInfo retrieved;
@@ -375,7 +374,7 @@ int test_register_mlx_repo_root_uses_folder_bundle_policy() {
     ASSERT_EQ(saved.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_MLX);
     ASSERT_EQ(saved.format(), runanywhere::v1::MODEL_FORMAT_SAFETENSORS);
     ASSERT_EQ(saved.category(), runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
-    ASSERT_EQ(saved.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
+    ASSERT_EQ(saved.artifact_case(), runanywhere::v1::ModelInfo::kMultiFile);
     ASSERT_TRUE(saved.has_multi_file());
     ASSERT_EQ(saved.multi_file().files_size(), 3);
     ASSERT_EQ(saved.multi_file().files(0).filename(), std::string("config.json"));
@@ -508,17 +507,18 @@ int test_re_register_preserves_download_state() {
     args.url = "https://example.test/preserve-llama.Q4_K_M.gguf";
     args.name = "Preserve Test";
 
+    // is_downloaded (tag 32) was reserved -- registry_status is the single
+    // downloaded-ness signal now.
     runanywhere::v1::ModelInfo first;
     ASSERT_TRUE(register_proto(args, &first));
-    ASSERT_TRUE(!first.is_downloaded());
+    ASSERT_EQ(first.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
     ASSERT_TRUE(first.local_path().empty());
 
-    // Simulate the post-download self-heal: mark is_downloaded + local_path
+    // Simulate the post-download self-heal: mark registry_status + local_path
     // + checksum_sha256 via the canonical update path.
     {
         runanywhere::v1::ModelInfo mutated = first;
         mutated.set_local_path("/tmp/preserve-llama.Q4_K_M.gguf");
-        mutated.set_is_downloaded(true);
         mutated.set_is_available(true);
         mutated.set_checksum_sha256(
             "abc123def4567890abc123def4567890abc123def4567890abc123def4567890");
@@ -535,18 +535,18 @@ int test_re_register_preserves_download_state() {
     // Sanity check the mutation landed.
     runanywhere::v1::ModelInfo after_update;
     ASSERT_TRUE(read_back_by_id(first.id(), &after_update));
-    ASSERT_TRUE(after_update.is_downloaded());
+    ASSERT_EQ(after_update.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     ASSERT_EQ(after_update.local_path(), std::string("/tmp/preserve-llama.Q4_K_M.gguf"));
     ASSERT_EQ(after_update.checksum_sha256(),
               std::string("abc123def4567890abc123def4567890abc123def4567890abc123def4567890"));
 
     // Second register: same URL/name (re-seed). Without the merge fix this
-    // would reset is_downloaded=false, clear local_path, and drop the
-    // checksum. With the fix all three survive.
+    // would reset registry_status back to REGISTERED, clear local_path, and
+    // drop the checksum. With the fix all three survive.
     runanywhere::v1::ModelInfo re_registered;
     ASSERT_TRUE(register_proto(args, &re_registered));
     ASSERT_EQ(re_registered.id(), first.id());
-    ASSERT_TRUE(re_registered.is_downloaded());
+    ASSERT_EQ(re_registered.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     ASSERT_EQ(re_registered.local_path(), std::string("/tmp/preserve-llama.Q4_K_M.gguf"));
     ASSERT_EQ(re_registered.checksum_sha256(),
               std::string("abc123def4567890abc123def4567890abc123def4567890abc123def4567890"));
@@ -554,7 +554,7 @@ int test_re_register_preserves_download_state() {
     // Round-trip via registry get — same invariants.
     runanywhere::v1::ModelInfo retrieved;
     ASSERT_TRUE(read_back_by_id(first.id(), &retrieved));
-    ASSERT_TRUE(retrieved.is_downloaded());
+    ASSERT_EQ(retrieved.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     ASSERT_EQ(retrieved.local_path(), std::string("/tmp/preserve-llama.Q4_K_M.gguf"));
     ASSERT_EQ(retrieved.checksum_sha256(),
               std::string("abc123def4567890abc123def4567890abc123def4567890abc123def4567890"));
@@ -580,7 +580,7 @@ int test_re_register_allows_explicit_override() {
     {
         runanywhere::v1::ModelInfo mutated = first;
         mutated.set_local_path("/tmp/old-path.gguf");
-        mutated.set_is_downloaded(true);
+        mutated.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
         std::string mutated_bytes;
         ASSERT_TRUE(mutated.SerializeToString(&mutated_bytes));
         rac_model_registry_handle_t registry = rac_get_model_registry();
@@ -597,7 +597,6 @@ int test_re_register_allows_explicit_override() {
     {
         runanywhere::v1::ModelInfo replacement = first;
         replacement.set_local_path("");
-        replacement.set_is_downloaded(false);
         replacement.set_is_available(false);
         replacement.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
         std::string bytes;
@@ -610,7 +609,7 @@ int test_re_register_allows_explicit_override() {
 
     runanywhere::v1::ModelInfo retrieved;
     ASSERT_TRUE(read_back_by_id(first.id(), &retrieved));
-    ASSERT_TRUE(!retrieved.is_downloaded());
+    ASSERT_EQ(retrieved.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
     ASSERT_TRUE(retrieved.local_path().empty());
 
     remove_by_id(first.id());

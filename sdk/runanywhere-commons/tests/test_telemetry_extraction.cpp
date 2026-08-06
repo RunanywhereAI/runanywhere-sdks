@@ -113,9 +113,12 @@ int main() {
         g->set_kind(v1::GENERATION_EVENT_KIND_COMPLETED);
         g->set_model_id("qwen3-0.6b");
         g->set_input_tokens(61);
-        g->set_tokens_used(256);
+        // tokens_used folded into output_tokens; prompt_eval_time_ms folded
+        // into prefill_duration_ms (telemetry_manager.cpp reads
+        // g.prefill_duration_ms() into payload.prompt_eval_time_ms).
+        g->set_output_tokens(256);
         g->set_tokens_per_second(44.4);
-        g->set_prompt_eval_time_ms(437);
+        g->set_prefill_duration_ms(437);
         track(mgr, &cap, ev);
         CHECK(cap.called, "llm: event delivered to sink");
         CHECK(cap.endpoint == "/api/v2/sdk/telemetry/llm", "llm: routed to llm endpoint");
@@ -134,7 +137,8 @@ int main() {
         vo->set_confidence(std::nanf(""));  // whisper-tiny emits NaN confidence
         vo->set_real_time_factor(0.5);
         vo->set_word_count(4);
-        vo->set_audio_length_ms(2000);
+        // audio_length_ms renamed to input_audio_duration_ms.
+        vo->set_input_audio_duration_ms(2000);
         track(mgr, &cap, ev);
         CHECK(cap.called, "stt: event delivered to sink");
         CHECK(cap.endpoint == "/api/v2/sdk/telemetry/stt", "stt: routed to stt endpoint");

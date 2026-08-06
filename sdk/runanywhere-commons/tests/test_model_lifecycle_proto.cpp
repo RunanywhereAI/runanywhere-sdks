@@ -248,7 +248,7 @@ runanywhere::v1::ModelInfo build_llm_model() {
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/lifecycle-test.gguf");
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
     return model;
 }
@@ -261,7 +261,7 @@ runanywhere::v1::ModelInfo build_llm_model_alt() {
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/lifecycle-test-alt.gguf");
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
     return model;
 }
@@ -275,7 +275,7 @@ runanywhere::v1::ModelInfo build_foundation_model() {
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS);
     model.set_local_path("builtin://foundation-models");
     model.set_built_in(true);
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
     return model;
 }
@@ -304,19 +304,19 @@ runanywhere::v1::ModelInfo build_vlm_model(const std::filesystem::path& root) {
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path(root.string());
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
 
     auto* primary = model.mutable_multi_file()->add_files();
     primary->set_filename("vision.gguf");
     primary->set_destination_path("vision.gguf");
-    primary->set_is_required(true);
+    primary->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
     primary->set_role(runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
 
     auto* projector = model.mutable_multi_file()->add_files();
     projector->set_filename("projector.gguf");
     projector->set_destination_path("projector.gguf");
-    projector->set_is_required(true);
+    projector->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
     projector->set_role(runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
     return model;
 }

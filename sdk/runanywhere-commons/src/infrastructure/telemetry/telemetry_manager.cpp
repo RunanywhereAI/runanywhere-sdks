@@ -851,6 +851,18 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
             }
         }
         default:
+            // FailureEvent was deleted: a bare failure (e.g.
+            // rac_sdk_event_publish_failure) carries no oneof payload arm at
+            // all -- event_case() is EVENT_NOT_SET -- with component/operation/
+            // error living directly on the envelope. Without this check every
+            // such event fell to "unknown" and was silently dropped by
+            // rac_telemetry_manager_track_proto (see telemetry_records/the
+            // "unknown" early-return below), making bare-failure telemetry
+            // invisible and starving any flush() that is only waiting on one.
+            if (ev.has_error()) {
+                out_is_completion = true;
+                return "failure";
+            }
             return "unknown";
     }
 }
