@@ -251,7 +251,11 @@ final class BenchmarkRunner {
         return workItems
     }
 
-    /// Models whose artifacts exist on disk (registry `isDownloaded` may be stale).
+    /// Models whose artifacts exist on disk. `ModelInfo.isDownloaded` was
+    /// deleted outright (idl/model_types.proto: "reserved 32; // was
+    /// is_downloaded: a bool cannot express DOWNLOADING") -- a non-empty
+    /// `localPath` is the simplest local proxy, same as every other read
+    /// site in the SDK (see ModelsNamespace.swift).
     static func downloadedModels(
         for category: BenchmarkCategory,
         in allModels: [RAModelInfo]
@@ -260,7 +264,7 @@ final class BenchmarkRunner {
             guard model.category == category.modelCategory, !model.isBuiltIn else { return false }
             if model.isDownloadedOnDisk { return true }
             // Post-download registry may mark downloaded before artifact probe catches up.
-            return model.isDownloaded && !model.localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return !model.localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 }

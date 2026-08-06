@@ -76,12 +76,19 @@ extension LLMViewModel {
 
         switch event.generation.kind {
         case .firstTokenGenerated:
-            let ttft = Double(event.generation.firstTokenLatencyMs)
+            // `firstTokenLatencyMs` was deleted outright (idl/sdk_events.proto):
+            // `timeToFirstTokenMs` ("Time to first token, whichever kind
+            // reports it.") is the single field for both FIRST_TOKEN_GENERATED
+            // and COMPLETED now.
+            let ttft = Double(event.generation.timeToFirstTokenMs)
             handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
 
-        case .completed, .streamCompleted:
-            let outputTokens = Int(event.generation.tokensUsed)
-            let durationMs = Double(event.generation.latencyMs)
+        case .completed:
+            // `tokensUsed`/`latencyMs` were renamed `outputTokens`/`totalDurationMs`
+            // (idl/sdk_events.proto); `streamCompleted` was deleted outright —
+            // `.completed` is the single success terminal for both paths now.
+            let outputTokens = Int(event.generation.outputTokens)
+            let durationMs = Double(event.generation.totalDurationMs)
             let tps = durationMs > 0 && outputTokens > 0
                 ? Double(outputTokens) / (durationMs / 1000.0)
                 : 0

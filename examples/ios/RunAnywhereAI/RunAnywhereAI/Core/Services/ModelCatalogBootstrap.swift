@@ -1391,22 +1391,37 @@ enum ModelCatalogBootstrap {
         logger.info("All modules and models registered")
     }
 
-    /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the
-    /// catalog entry plus its downloadable artifact record (no bytes fetched);
-    /// safe to re-run on every cold launch.
+    /// Seed the curated LoRA adapter catalog. `RALoraAdapterCatalogEntry` no
+    /// longer carries url/filename/size/description (idl/lora_options.proto:
+    /// "everything generic about the artifact ... lives on the ModelInfo
+    /// record for this adapter"), so the downloadable bytes are described by
+    /// a companion `RAModelInfo` artifact registered under the SDK's
+    /// `lora-adapter:{id}` convention. `registerArtifact` registers both the
+    /// catalog entry and that artifact record (no bytes fetched); safe to
+    /// re-run on every cold launch.
     private static func registerLoraAdapters() async {
         var adapter = RALoraAdapterCatalogEntry()
         adapter.id = "abliterated-lora"
         adapter.name = "Abliterated LoRA (F16)"
-        adapter.description_p = "Removes refusal behavior — model answers directly without disclaimers"
-        adapter.url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf"
-        adapter.filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf"
         adapter.compatibleModels = ["qwen2.5-0.5b-instruct-q6_k"]
-        adapter.sizeBytes = 17_620_224
         adapter.defaultScale = 1.0
 
+        let downloadURL = URL(
+            string: "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf"
+        )
+        let artifact = RAModelInfo.make(
+            id: adapter.loraArtifactModelID,
+            name: adapter.name,
+            category: .language,
+            format: .gguf,
+            framework: .llamaCpp,
+            downloadURL: downloadURL,
+            downloadSizeBytes: 17_620_224,
+            description: "Removes refusal behavior — model answers directly without disclaimers"
+        )
+
         do {
-            _ = try await RunAnywhere.lora.registerArtifact(adapter)
+            _ = try await RunAnywhere.lora.registerArtifact(adapter, artifact: artifact)
         } catch {
             logger.warning(
                 "Failed to register LoRA adapter: \(error.localizedDescription, privacy: .public)"

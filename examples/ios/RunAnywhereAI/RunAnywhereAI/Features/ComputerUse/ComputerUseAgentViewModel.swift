@@ -123,27 +123,26 @@ final class ComputerUseAgentViewModel {
         }
 
         do {
-            guard let image = Self.vlmImage(from: screenshot) else {
+            guard let image = Self.imageInput(from: screenshot) else {
                 error = "Could not convert the screenshot for the model"
                 return
             }
 
-            var options = RAVLMGenerationOptions.defaults(prompt: task)
-            options.systemPrompt = systemPrompt
-            options.maxOutputTokens = Self.maxTokens
+            // `RAVLMGenerationOptions` was deleted outright (idl/vlm_options.proto):
+            // sampling now lives on the shared `LlmOptions`, and the prompt is a
+            // separate call parameter rather than a field on the options.
+            let options = LlmOptions(
+                maxOutputTokens: Int(Self.maxTokens),
+                systemPrompt: systemPrompt
+            )
 
-            let stream = try await RunAnywhere.processImageStream(image, options: options)
-            for await event in stream {
-                switch event.kind {
-                case .token:
-                    if !event.token.isEmpty { rawOutput += event.token }
-                case .error:
-                    throw NSError(
-                        domain: "com.runanywhere.RunAnywhereAI",
-                        code: Int(event.error.cAbiCode),
-                        userInfo: [NSLocalizedDescriptionKey:
-                            event.error.message.isEmpty ? "VLM stream failed" : event.error.message]
-                    )
+            let stream = try await RunAnywhere.vlm.generateStream(image: image, prompt: task, options: options)
+            for try await event in stream {
+                switch event {
+                case .textDelta(_, _, _, _, let text):
+                    if !text.isEmpty { rawOutput += text }
+                case .failed(_, _, let sdkError):
+                    throw sdkError
                 default:
                     break
                 }
@@ -181,11 +180,11 @@ final class ComputerUseAgentViewModel {
 
     // MARK: - Platform image helpers
 
-    private static func vlmImage(from image: AgentImage) -> RAVLMImage? {
+    private static func imageInput(from image: AgentImage) -> ImageInput? {
         #if canImport(UIKit)
-        return RAVLMImage.fromUIImage(image)
+        return try? ImageInput.uiImage(image)
         #else
-        return RAVLMImage.fromNSImage(image)
+        return try? ImageInput.nsImage(image)
         #endif
     }
 

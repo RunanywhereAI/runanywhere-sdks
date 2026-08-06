@@ -31,7 +31,7 @@ final class ConnectHostController: ObservableObject {
                 self?.objectWillChange.send()
             }
 
-        lifecycleCancellable = RunAnywhere.events.modelLifecycle
+        lifecycleCancellable = RunAnywhere.eventBus.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 self?.handleModelLifecycle(change)

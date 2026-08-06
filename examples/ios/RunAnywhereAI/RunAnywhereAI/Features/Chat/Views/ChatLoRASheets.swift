@@ -130,20 +130,18 @@ struct LoRAManagementSheetView: View {
         let isAlreadyApplied = viewModel.loraAdapters.contains {
             $0.adapterPath == viewModel.localPath(for: adapter)
         }
-        let fileSizeText = ByteCountFormatter.string(fromByteCount: adapter.sizeBytes, countStyle: .file)
 
+        // `RALoraAdapterCatalogEntry.description_p`/`.sizeBytes` were deleted
+        // outright (idl/lora_options.proto: "everything generic about the
+        // artifact ... lives on the ModelInfo record for this adapter" now)
+        // -- the catalog entry itself no longer carries display/size
+        // metadata to show here.
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(adapter.name)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    Text(adapter.description_p)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(fileSizeText)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
                 }
 
                 Spacer()

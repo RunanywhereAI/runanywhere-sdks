@@ -105,16 +105,19 @@ enum ToolCallingExecutionPolicy {
 
     /// Tool-loop options mirroring the Android ToolCallingExecutionPolicy:
     /// auto-execute the registered tools (the v3 generate path leaves this false,
-    /// so it only leaks a raw tool call), a small final-synthesis cap (the
-    /// decision keeps commons' own ceiling), greedy + thinking-off for
+    /// so it only leaks a raw tool call), greedy + thinking-off for
     /// reproducible calls, and parallel tool calls so one turn can request
     /// several tools before a single follow-up reply.
+    ///
+    /// `temperature`/`maxTokens` were deleted outright from
+    /// `ToolCallingOptions` (idl/tool_calling.proto: "Sampling temperature
+    /// and per-turn output-token cap are NOT duplicated here: the enclosing
+    /// LLMGenerationOptions.temperature / max_output_tokens are the one
+    /// value for both") -- they now live on `generationOptions(from:)` below.
     static func toolOptions() -> RAToolCallingOptions {
         var options = RAToolCallingOptions()
         options.autoExecute = true
         options.maxToolCalls = Int32(maxToolCalls)
-        options.maxTokens = Int32(maxFinalResponseTokens)
-        options.temperature = 0
         options.keepToolsAvailable = false
         options.parallelToolCalls = true
         options.disableThinking = true
@@ -122,12 +125,13 @@ enum ToolCallingExecutionPolicy {
     }
 
     /// Greedy, reasoning-off generation options; final length is bounded by
-    /// toolOptions().maxTokens, so the decision phase stays unconstrained.
+    /// `maxFinalResponseTokens`, so the decision phase stays unconstrained.
     static func generationOptions(from options: LlmOptions) -> RALLMGenerationOptions {
         var generation = RALLMGenerationOptions()
         if let systemPrompt = options.systemPrompt, !systemPrompt.isEmpty {
             generation.systemPrompt = systemPrompt
         }
+        generation.maxOutputTokens = Int32(maxFinalResponseTokens)
         generation.temperature = 0
         generation.topP = 1
         var reasoning = RAReasoningOptions()
