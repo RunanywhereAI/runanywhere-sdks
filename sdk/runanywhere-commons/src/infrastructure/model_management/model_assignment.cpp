@@ -632,33 +632,20 @@ static ModelFormat proto_format_from_struct(rac_model_format_t format) {
                                                        : runanywhere::v1::MODEL_FORMAT_UNKNOWN;
 }
 
+// ModelInfo.is_downloaded (tag 32) was deleted: registry_status is now the
+// only downloaded-ness signal. A non-empty local_path is location data, not
+// state, so it is no longer consulted here.
 static ModelRegistryStatus effective_assignment_status(const ModelInfo& model) {
     if (model.has_registry_status()) {
         return model.registry_status();
-    }
-    if (!model.local_path().empty() || (model.has_is_downloaded() && model.is_downloaded())) {
-        return runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED;
     }
     return runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED;
 }
 
 static bool assignment_model_is_downloaded(const ModelInfo& model) {
-    if (!model.local_path().empty()) {
-        return true;
-    }
-    if (model.has_is_downloaded()) {
-        return model.is_downloaded();
-    }
     const ModelRegistryStatus status = effective_assignment_status(model);
     return status == runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED ||
            status == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED;
-}
-
-static bool assignment_model_is_available(const ModelInfo& model) {
-    if (model.has_is_available()) {
-        return model.is_available();
-    }
-    return assignment_model_is_downloaded(model);
 }
 
 static void normalize_assignment_model(ModelInfo* model) {
@@ -699,10 +686,7 @@ static void normalize_assignment_model(ModelInfo* model) {
     }
 
     if (model->source() == runanywhere::v1::MODEL_SOURCE_UNSPECIFIED) {
-        const bool built_in =
-            (model->has_artifact_type() &&
-             model->artifact_type() == runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN) ||
-            model->artifact_case() == ModelInfo::kBuiltIn;
+        const bool built_in = model->artifact_case() == ModelInfo::kBuiltIn;
         model->set_source(built_in ? runanywhere::v1::MODEL_SOURCE_BUILT_IN
                                    : runanywhere::v1::MODEL_SOURCE_REMOTE);
     }
@@ -711,30 +695,11 @@ static void normalize_assignment_model(ModelInfo* model) {
         model->set_download_size_bytes(0);
     }
 
+    // artifact_type (top-level) was reserved -- the artifact oneof is the
+    // only declaration of bundle shape now; default an unset oneof to
+    // single_file rather than deriving a parallel artifact_type value.
     if (model->artifact_case() == ModelInfo::ARTIFACT_NOT_SET) {
         model->mutable_single_file();
-    }
-    if (!model->has_artifact_type() ||
-        model->artifact_type() == runanywhere::v1::MODEL_ARTIFACT_TYPE_UNSPECIFIED) {
-        switch (model->artifact_case()) {
-            case ModelInfo::kArchive:
-                model->set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_ARCHIVE);
-                break;
-            case ModelInfo::kMultiFile:
-                model->set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
-                break;
-            case ModelInfo::kCustomStrategyId:
-                model->set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_CUSTOM);
-                break;
-            case ModelInfo::kBuiltIn:
-                model->set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN);
-                break;
-            case ModelInfo::kSingleFile:
-            case ModelInfo::ARTIFACT_NOT_SET:
-            default:
-                model->set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
-                break;
-        }
     }
 
     if (!model->has_compatibility()) {
@@ -747,9 +712,6 @@ static void normalize_assignment_model(ModelInfo* model) {
     }
 
     const bool downloaded = assignment_model_is_downloaded(*model);
-    if (!model->has_is_downloaded()) {
-        model->set_is_downloaded(downloaded);
-    }
     if (!model->has_is_available()) {
         model->set_is_available(downloaded);
     }
@@ -1219,10 +1181,12 @@ static rac_result_t parse_assignment_response_models(const char* data, size_t le
         return RAC_ERROR_INVALID_RESPONSE;
     }
 
+    // registered_count/updated_count were reserved off ModelRegistryRefreshResult
+    // (pure derivations over `models`); models_size()/warnings_size()/has_error()
+    // are sufficient to detect a genuine (if empty) refresh response.
     ModelRegistryRefreshResult refresh;
     if (refresh.ParseFromArray(data, static_cast<int>(len)) &&
         (refresh.has_error() || refresh.models().models_size() > 0 ||
-         refresh.registered_count() > 0 || refresh.updated_count() > 0 ||
          refresh.warnings_size() > 0)) {
         if (refresh.has_error()) {
             if (error_message) {
@@ -1264,33 +1228,15 @@ static rac_result_t parse_assignment_response_models(const char* data, size_t le
     return RAC_ERROR_INVALID_FORMAT;
 }
 
-struct AssignmentCounts {
-    int32_t total = 0;
-    int32_t downloaded = 0;
-    int32_t available = 0;
-    int32_t errors = 0;
-};
-
-static AssignmentCounts count_assignment_models(const std::vector<ModelInfo>& models) {
-    AssignmentCounts counts;
-    counts.total = static_cast<int32_t>(models.size());
-    for (const ModelInfo& model : models) {
-        if (assignment_model_is_downloaded(model)) {
-            ++counts.downloaded;
-        }
-        if (assignment_model_is_available(model)) {
-            ++counts.available;
-        }
-        if (effective_assignment_status(model) == runanywhere::v1::MODEL_REGISTRY_STATUS_ERROR) {
-            ++counts.errors;
-        }
-    }
-    return counts;
-}
-
+// registered_count/discovered_count/pruned_count/downloaded_count/
+// available_count/error_count were all reserved off ModelRegistryRefreshResult
+// (pure derivations over `models`, no remaining consumer) -- count helpers
+// that only fed those fields were removed. `updated_count` is accepted for
+// API-shape compatibility with existing call sites but no longer has a
+// result field to populate.
 static void populate_assignment_refresh_result(ModelRegistryRefreshResult* result,
                                                std::vector<ModelInfo> models, bool success,
-                                               int32_t updated_count,
+                                               int32_t /*updated_count*/,
                                                const std::vector<std::string>& warnings,
                                                const std::string& error_message) {
     if (!result) {
@@ -1299,15 +1245,7 @@ static void populate_assignment_refresh_result(ModelRegistryRefreshResult* resul
     for (ModelInfo& model : models) {
         normalize_assignment_model(&model);
     }
-    const AssignmentCounts counts = count_assignment_models(models);
-    result->set_registered_count(counts.total);
-    result->set_updated_count(updated_count);
-    result->set_discovered_count(0);
-    result->set_pruned_count(0);
     result->set_refreshed_at_unix_ms(rac_get_current_time_ms());
-    result->set_downloaded_count(counts.downloaded);
-    result->set_available_count(counts.available);
-    result->set_error_count(counts.errors);
     if (!success) {
         rac::foundation::populate_sdk_error(result->mutable_error(), RAC_ERROR_REQUEST_FAILED);
         if (!error_message.empty()) {

@@ -89,6 +89,7 @@ using runanywhere::v1::ArchiveArtifact;
 using runanywhere::v1::ArchiveStructure;
 using runanywhere::v1::ArchiveType;
 using runanywhere::v1::DiscoveredModel;
+using runanywhere::v1::ExpectedModelFiles;
 using runanywhere::v1::InferenceFramework;
 using runanywhere::v1::ModelCategory;
 using runanywhere::v1::ModelDeleteResult;
@@ -106,21 +107,13 @@ using runanywhere::v1::ModelInfoList;
 using runanywhere::v1::ModelListRequest;
 using runanywhere::v1::ModelListResult;
 using runanywhere::v1::ModelQuery;
-using runanywhere::v1::ModelQuerySortField;
+// ModelQuerySortField: deleted -- sorting is the client's job now.
 using runanywhere::v1::ModelRegistryRefreshRequest;
 using runanywhere::v1::ModelRegistryRefreshResult;
 using runanywhere::v1::ModelRegistryStatus;
 using runanywhere::v1::ModelSource;
 using runanywhere::v1::MultiFileArtifact;
 using runanywhere::v1::SingleFileArtifact;
-
-// Aggregate counts emitted by list/refresh entry points.
-struct ModelCounts {
-    int32_t total{0};
-    int32_t downloaded{0};
-    int32_t available{0};
-    int32_t errors{0};
-};
 
 // proto<->C conversion + (de)serialization + parse helpers.
 char* dup_optional_proto_string(const std::string& value);
@@ -239,7 +232,6 @@ int64_t imported_size_for_request(const ModelImportRequest& request, const Model
 // -----------------------------------------------------------------------------
 
 bool model_is_downloaded_proto(const ModelInfo& model);
-bool model_is_available_proto(const ModelInfo& model);
 bool model_matches_query(const ModelInfo& model, const ModelQuery& query);
 void sort_query_results(const ModelQuery& query, std::vector<ModelInfo>* models);
 void append_query_results_locked(rac_model_registry_handle_t handle, const ModelQuery& query,
@@ -248,7 +240,6 @@ std::vector<ModelInfo> collect_model_snapshots_locked(rac_model_registry_handle_
 std::vector<ModelInfo> query_model_snapshots_locked(rac_model_registry_handle_t handle,
                                                     const ModelQuery& query);
 void move_models_to_list(std::vector<ModelInfo>* models, ModelInfoList* out);
-ModelCounts count_models(const std::vector<ModelInfo>& models);
 
 // -----------------------------------------------------------------------------
 // Filesystem discovery / reconciliation (defined in model_registry_discovery.cpp)

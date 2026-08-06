@@ -390,7 +390,6 @@ void dispatch_stream_result(const char* text, rac_bool_t is_final, void* opaque)
         partial.set_text(text);
     }
     partial.set_is_final(is_final == RAC_TRUE);
-    partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
     if (!context->language.empty()) {
         partial.set_language(context->language);
     }
@@ -476,7 +475,7 @@ void publish_session_summary(const SessionCleanupSnapshot& snapshot,
         }
     }
     voice.set_is_streaming(true);
-    voice.set_audio_size_bytes(static_cast<int32_t>(snapshot.audio_bytes));
+    voice.set_input_audio_bytes(static_cast<int32_t>(snapshot.audio_bytes));
     if (snapshot.started_at_ms > 0 && now_ms > snapshot.started_at_ms) {
         voice.set_duration_ms(now_ms - snapshot.started_at_ms);
     }
@@ -1019,8 +1018,8 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
             s.detect_language = true;
         }
         s.enable_punctuation = parsed.enable_punctuation();
-        s.enable_diarization = parsed.enable_diarization();
-        s.max_speakers = parsed.max_speakers();
+        s.enable_diarization = parsed.diarize();
+        s.max_speakers = parsed.has_speakers_expected() ? parsed.speakers_expected() : 0;
         s.enable_timestamps = parsed.enable_word_timestamps();
         // Audio properties live on STTAudioSource now; the persistent session
         // feeds raw PCM at the component default rate until the stream-start

@@ -73,19 +73,6 @@ bool is_builtin_pseudo_model(const rac_model_info_t* model) {
            std::strncmp(model->local_path, "builtin://", 10) == 0;
 }
 
-float used_percent(int64_t total, int64_t used) {
-    if (total <= 0 || used <= 0) {
-        return 0.0f;
-    }
-    double percent = (static_cast<double>(used) / static_cast<double>(total)) * 100.0;
-    if (percent < 0.0) {
-        percent = 0.0;
-    } else if (percent > 100.0) {
-        percent = 100.0;
-    }
-    return static_cast<float>(percent);
-}
-
 std::string status_message(rac_result_t status, const char* fallback) {
     char message[160];
     std::snprintf(message, sizeof(message), "%s (status %d)", fallback, static_cast<int>(status));
@@ -494,9 +481,8 @@ build_delete_plan(rac_storage_analyzer_handle_t handle, rac_model_registry_handl
         auto* candidate = plan.add_candidates();
         candidate->set_model_id(row.model_id);
         candidate->set_reclaimable_bytes(clamp_non_negative(row.reclaimable_bytes));
-        if (row.has_last_used) {
-            candidate->set_last_used_ms(row.last_used);
-        }
+        // last_used_ms (tag 3) was reserved off StorageDeleteCandidate --
+        // ModelInfo.last_used_at_unix_ms is the one home for this now.
         candidate->set_is_loaded(row.is_loaded);
         candidate->set_local_path(row.local_path);
         candidate->set_requires_unload(row.requires_unload);
@@ -508,7 +494,7 @@ build_delete_plan(rac_storage_analyzer_handle_t handle, rac_model_registry_handl
     }
 
     plan.set_reclaimable_bytes(reclaimable);
-    plan.set_candidate_count(plan.candidates_size());
+    // candidate_count (tag 9) was reserved -- callers read candidates_size().
     plan.set_requires_unload(requires_unload);
     plan.set_requires_platform_delete(requires_platform_delete);
     plan.set_can_reclaim_required_bytes(plan.required_bytes() <= 0 ||
@@ -862,8 +848,8 @@ rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handl
         device->set_total_bytes(clamp_non_negative(info.device_storage.total_space));
         device->set_free_bytes(clamp_non_negative(info.device_storage.free_space));
         device->set_used_bytes(clamp_non_negative(info.device_storage.used_space));
-        device->set_used_percent(
-            used_percent(info.device_storage.total_space, info.device_storage.used_space));
+        // used_percent (tag 4) was reserved -- derivable from
+        // used_bytes/total_bytes.
     }
 
     if (include_app) {
@@ -882,19 +868,10 @@ rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handl
             auto* metrics = storage->add_models();
             metrics->set_model_id(model.model_id ? model.model_id : "");
             metrics->set_size_on_disk_bytes(clamp_non_negative(model.size_on_disk));
-            if (model.model_id && model.model_id[0] != '\0') {
-                rac_model_info_t* registry_model = nullptr;
-                if (RAC_SUCCEEDED(
-                        rac_model_registry_get(registry_handle, model.model_id, &registry_model)) &&
-                    registry_model) {
-                    if (registry_model->last_used > 0) {
-                        metrics->set_last_used_ms(registry_model->last_used);
-                    }
-                    rac_model_info_free(registry_model);
-                }
-            }
+            // last_used_ms (tag 3) was reserved off ModelStorageMetrics --
+            // ModelInfo.last_used_at_unix_ms is the one home for this now.
         }
-        storage->set_total_models(static_cast<int32_t>(info.model_count));
+        // total_models (tag 4) was reserved -- derivable as models_size().
         storage->set_total_models_bytes(clamp_non_negative(info.total_models_size));
     }
 
@@ -935,10 +912,13 @@ rac_result_t rac_storage_analyzer_availability_proto(rac_storage_analyzer_handle
         return finish_availability_result(result_proto, RAC_ERROR_INVALID_ARGUMENT, out_buffer);
     }
 
+    // safety_margin (tag 3, a multiplier that a 0.0 default silently
+    // nullified) was reserved in favor of required_free_bytes_after_download
+    // (tag 7): an absolute headroom byte count, same idea as
+    // DownloadPlanRequest's field of the same name -- no multiplier math.
     int64_t required = clamp_non_negative(request.required_bytes());
-    if (request.safety_margin() > 0.0) {
-        required =
-            static_cast<int64_t>(static_cast<double>(required) * (1.0 + request.safety_margin()));
+    if (request.required_free_bytes_after_download() > 0) {
+        required += request.required_free_bytes_after_download();
     }
 
     if (request.include_existing_model_bytes() && !request.model_id().empty()) {
@@ -971,12 +951,9 @@ rac_result_t rac_storage_analyzer_availability_proto(rac_storage_analyzer_handle
     availability->set_required_bytes(required);
     availability->set_available_bytes(available);
     availability->set_is_available(available >= required);
+    // shortfall_bytes/required_to_available_ratio (tags 6, 7) were reserved
+    // -- both derivable from required_bytes/available_bytes.
     const int64_t shortfall = required > available ? required - available : 0;
-    availability->set_shortfall_bytes(shortfall);
-    availability->set_required_to_available_ratio(
-        available > 0
-            ? static_cast<float>(static_cast<double>(required) / static_cast<double>(available))
-            : (required > 0 ? 1.0f : 0.0f));
 
     if (available < required) {
         char message[192];
@@ -1207,7 +1184,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
         // reclaim. An interrupted download leaves a folder with just a ".part"
         // partial (and an empty local_path), so absence of the exact file is not
         // fatal — the recursive folder delete below removes whatever is present.
-        if (request.delete_files() && has_local_path && model_folder.empty() &&
+        if (!request.keep_files_on_disk() && has_local_path && model_folder.empty() &&
             !path_exists_if_callback_present(handle, delete_target.c_str())) {
             result_proto.add_failed_model_ids(id);
             add_warning_once(&result_proto, &warnings, "Model path is missing: " + id);
@@ -1218,7 +1195,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
         }
 
         int64_t model_size = model_metric_size(handle, model, delete_target.c_str());
-        if (request.delete_files() && !request.dry_run() && !request.allow_platform_delete()) {
+        if (!request.keep_files_on_disk() && !request.dry_run() && !request.allow_platform_delete()) {
             result_proto.add_skipped_model_ids(id);
             add_warning_once(&result_proto, &warnings,
                              "Model file deletion requires platform adapter execution: " + id);
@@ -1272,7 +1249,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
         }
 
         bool file_delete_succeeded = false;
-        if (request.delete_files() && !request.dry_run()) {
+        if (!request.keep_files_on_disk() && !request.dry_run()) {
             if (!handle->callbacks.delete_path) {
                 result_proto.add_failed_model_ids(id);
                 add_warning_once(&result_proto, &warnings,
@@ -1322,21 +1299,23 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
             registry_updated = true;
         }
 
-        const bool requested_action = request.delete_files() || request.clear_registry_paths();
+        const bool requested_action = !request.keep_files_on_disk() || request.clear_registry_paths();
         if (request.dry_run() && requested_action) {
             result_proto.add_deleted_model_ids(id);
-            if (request.delete_files()) {
+            if (!request.keep_files_on_disk()) {
                 deleted_bytes += model_size;
             }
         } else if (file_delete_succeeded || registry_updated_for_model) {
             result_proto.add_deleted_model_ids(id);
-            if (request.delete_files()) {
+            if (!request.keep_files_on_disk()) {
                 deleted_bytes += model_size;
             }
         } else {
             result_proto.add_skipped_model_ids(id);
             add_warning_once(&result_proto, &warnings,
-                             "No delete_files or clear_registry_paths action requested: " + id);
+                             "No file-delete (keep_files_on_disk=false) or "
+                             "clear_registry_paths action requested: " +
+                                 id);
             had_skipped = true;
             remember_error(RAC_ERROR_INVALID_ARGUMENT);
         }

@@ -87,9 +87,6 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category, runanywhere::v1::ModelEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
-                     runanywhere::v1::PerformanceEvent payload);
-rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
                      runanywhere::v1::NetworkEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
@@ -99,9 +96,6 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::FrameworkEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category, runanywhere::v1::DeviceEvent payload);
-rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
-                     runanywhere::v1::ComponentInitializationEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::VoiceLifecycleEvent payload);
@@ -118,15 +112,6 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category, runanywhere::v1::AuthEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
-                     runanywhere::v1::ModelRegistryEvent payload);
-rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
-                     runanywhere::v1::DownloadEvent payload);
-rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
-                     runanywhere::v1::StorageLifecycleEvent payload);
-rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
                      runanywhere::v1::HardwareRoutingEvent payload);
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
@@ -137,9 +122,6 @@ rac_result_t publish(runanywhere::v1::SDKComponent component,
 rac_result_t publish(runanywhere::v1::SDKComponent component,
                      runanywhere::v1::EventCategory category,
                      runanywhere::v1::CancellationEvent payload);
-rac_result_t publish(runanywhere::v1::SDKComponent component,
-                     runanywhere::v1::EventCategory category,
-                     runanywhere::v1::FailureEvent payload);
 
 // ---------------------------------------------------------------------------
 // Destination bitmask helpers. The proto EventDestination values are powers of

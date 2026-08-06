@@ -602,8 +602,9 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                     return std::string(p) + ".generation.first_token";
                 case runanywhere::v1::GENERATION_EVENT_KIND_STREAMING_UPDATE:
                     return std::string(p) + ".generation.streaming";
+                // STREAM_COMPLETED was deleted -- COMPLETED + is_streaming now
+                // covers both the one-shot and streaming terminal case.
                 case runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED:
-                case runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED:
                     out_is_completion = true;
                     return std::string(p) + ".generation.completed";
                 case runanywhere::v1::GENERATION_EVENT_KIND_FAILED:
@@ -612,10 +613,9 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                 case runanywhere::v1::GENERATION_EVENT_KIND_CANCELLED:
                     out_is_completion = true;
                     return std::string(p) + ".generation.cancelled";
-                case runanywhere::v1::GENERATION_EVENT_KIND_CANCEL_REQUESTED:
-                    return std::string(p) + ".generation.cancel_requested";
-                case runanywhere::v1::GENERATION_EVENT_KIND_MODEL_UNLOADED:
-                    return std::string(p) + ".model.unloaded";
+                // CANCEL_REQUESTED deleted -- CancellationEventKind owns that
+                // now. MODEL_UNLOADED deleted -- ModelEventKind owns model
+                // load/unload lifecycle.
                 default:
                     return std::string(p) + ".generation";
             }
@@ -808,8 +808,11 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                     return "capability";
             }
         }
-        case SDKEvent::kFailure:
-            return "sdk.error";
+        // FailureEvent (SDKEvent::kFailure) was deleted: a failure is now any
+        // event with SDKEvent.error set, not a separate payload arm. Callers
+        // that used to reach this via kFailure now fall through to whichever
+        // oneof case they actually carry; error-ness is read off ev.has_error()
+        // elsewhere (see telemetry_records() above), not this type-name switch.
         case SDKEvent::kCancellation: {
             // Cancel-operation lifecycle (the terminal generation.cancelled row
             // comes via kGeneration); previously fell to "unknown" and was
@@ -1002,12 +1005,18 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload_error = &ev.capability().error();
             break;
         case SDKEvent::kVoicePipeline:
-            // VAD / voice-agent failures ride the VoiceEvent ErrorEvent arm, not
-            // the envelope SDKError — without this they were recorded as failures
-            // (category=FAILURE) but with no error_message/error_code.
-            if (ev.voice_pipeline().payload_case() == runanywhere::v1::VoiceEvent::kError) {
-                payload_error = &ev.voice_pipeline().error().message();
-                payload_error_code = ev.voice_pipeline().error().code();
+            // VAD / voice-agent failures ride the VoiceEvent session_error arm
+            // (renamed from a bare ErrorEvent -- "the one error payload in
+            // this domain", VoiceSessionError), not the envelope SDKError —
+            // without this they were recorded as failures (category=FAILURE)
+            // but with no error_message/error_code.
+            if (ev.voice_pipeline().payload_case() == runanywhere::v1::VoiceEvent::kSessionError) {
+                payload_error = &ev.voice_pipeline().session_error().message();
+                // c_abi_code is the raw ra_status_t, matching the negative
+                // rac_result_t convention error_code_num uses elsewhere in
+                // this function (SDKError.c_abi_code preferred over the
+                // ErrorCode enum value).
+                payload_error_code = ev.voice_pipeline().session_error().c_abi_code();
             }
             break;
         default:
@@ -1049,18 +1058,20 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                                      ? g.model_name().c_str()
                                      : (!g.model_id().empty() ? g.model_id().c_str() : nullptr);
             payload.input_tokens = g.input_tokens();
-            payload.output_tokens = g.tokens_used() != 0 ? g.tokens_used() : g.tokens_count();
+            // tokens_used/tokens_count folded into output_tokens.
+            payload.output_tokens = g.output_tokens();
             payload.total_tokens = payload.input_tokens + payload.output_tokens;
-            const double dur =
-                g.duration_ms() != 0.0 ? g.duration_ms() : static_cast<double>(g.latency_ms());
+            // duration_ms/latency_ms (two spellings) collapsed into
+            // total_duration_ms; prefill_duration_ms is the new prompt-eval
+            // spelling.
+            const double dur = static_cast<double>(g.total_duration_ms());
             payload.processing_time_ms = dur;
             payload.has_processing_time_ms = RAC_TRUE;
             payload.generation_time_ms = dur;
             payload.tokens_per_second = g.tokens_per_second();
-            payload.prompt_eval_time_ms = static_cast<double>(g.prompt_eval_time_ms());
-            payload.time_to_first_token_ms = g.time_to_first_token_ms() != 0
-                                                 ? static_cast<double>(g.time_to_first_token_ms())
-                                                 : static_cast<double>(g.first_token_latency_ms());
+            payload.prompt_eval_time_ms = static_cast<double>(g.prefill_duration_ms());
+            // first_token_latency_ms folded into time_to_first_token_ms.
+            payload.time_to_first_token_ms = static_cast<double>(g.time_to_first_token_ms());
             payload.is_streaming = g.is_streaming() ? RAC_TRUE : RAC_FALSE;
             payload.has_is_streaming = RAC_TRUE;
             framework_str = framework_proto_to_string(g.framework());
@@ -1076,9 +1087,9 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.temperature = g.temperature();
             payload.max_tokens = g.max_tokens();
             payload.context_length = g.context_length();
-            if ((ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED ||
-                 ev.generation().kind() ==
-                     runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED) &&
+            // STREAM_COMPLETED deleted -- COMPLETED + is_streaming now covers
+            // both the one-shot and streaming terminal case.
+            if (ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED &&
                 !ev.has_error()) {
                 payload.success = RAC_TRUE;
                 payload.has_success = RAC_TRUE;
@@ -1126,8 +1137,10 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                                          : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
                 payload.processing_time_ms = static_cast<double>(v.duration_ms());
                 payload.has_processing_time_ms = RAC_TRUE;
-                payload.audio_duration_ms = static_cast<double>(v.audio_length_ms());
-                payload.audio_size_bytes = v.audio_size_bytes();
+                // audio_length_ms/audio_size_bytes renamed to
+                // input_audio_duration_ms/input_audio_bytes.
+                payload.audio_duration_ms = static_cast<double>(v.input_audio_duration_ms());
+                payload.audio_size_bytes = static_cast<int32_t>(v.input_audio_bytes());
                 payload.word_count = v.word_count();
                 payload.confidence = v.confidence();
                 if (!v.language().empty())
@@ -1169,8 +1182,10 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                                          ? v.model_name().c_str()
                                          : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
                 payload.character_count = v.character_count();
-                payload.output_duration_ms = static_cast<double>(v.audio_duration_ms());
-                payload.audio_size_bytes = v.audio_size_bytes_tts();
+                // audio_duration_ms/audio_size_bytes_tts renamed to
+                // output_audio_duration_ms/output_audio_bytes.
+                payload.output_duration_ms = static_cast<double>(v.output_audio_duration_ms());
+                payload.audio_size_bytes = static_cast<int32_t>(v.output_audio_bytes());
                 payload.processing_time_ms = static_cast<double>(v.processing_duration_ms());
                 payload.has_processing_time_ms = RAC_TRUE;
                 payload.sample_rate = v.sample_rate();

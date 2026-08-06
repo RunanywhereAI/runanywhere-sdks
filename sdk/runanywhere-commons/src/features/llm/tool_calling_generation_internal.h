@@ -152,8 +152,7 @@ inline void publish_generation_completed_event(
         gen->set_model_id(ref.model_id);
     }
     if (raw.completion_tokens > 0) {
-        gen->set_tokens_count(raw.completion_tokens);
-        gen->set_tokens_used(raw.completion_tokens);
+        gen->set_output_tokens(raw.completion_tokens);
     }
     if (raw.prompt_tokens > 0) {
         gen->set_input_tokens(raw.prompt_tokens);
@@ -201,8 +200,7 @@ inline void publish_tool_loop_telemetry(const GenerationTelemetryAgg& agg) {
         gen->set_model_id(agg.model_id);
     }
     if (agg.output_tokens > 0) {
-        gen->set_tokens_count(static_cast<int32_t>(agg.output_tokens));
-        gen->set_tokens_used(static_cast<int32_t>(agg.output_tokens));
+        gen->set_output_tokens(static_cast<int32_t>(agg.output_tokens));
     }
     if (agg.input_tokens > 0) {
         gen->set_input_tokens(static_cast<int32_t>(agg.input_tokens));
@@ -235,7 +233,7 @@ inline void set_tool_result_usage(runanywhere::v1::ToolCallingResult* result,
     usage->set_input_tokens(static_cast<int32_t>(agg.input_tokens));
     usage->set_output_tokens(static_cast<int32_t>(agg.output_tokens));
     usage->set_total_tokens(static_cast<int32_t>(agg.input_tokens + agg.output_tokens));
-    usage->set_tokens_per_second(agg.tokens_per_second);
+    usage->set_decode_tokens_per_second(agg.tokens_per_second);
 }
 #endif  // RAC_HAVE_PROTOBUF
 

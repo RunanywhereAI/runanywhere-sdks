@@ -119,10 +119,12 @@ namespace rac::vad {
 // concurrent sessions on one component handle do not cross-attribute their
 // request_ids. session_id == 0 falls back to legacy handle-only first-match
 // scan.
+// VADStreamEvent.statistics was deleted (VADOptions.include_statistics is
+// gone too), so this dispatcher no longer threads a VADStatistics payload
+// through.
 void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
-                               const runanywhere::v1::VADStatistics* statistics,
                                const char* error_message, int error_code, uint64_t session_id = 0);
 }  // namespace rac::vad
 #endif
@@ -305,7 +307,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::VADResult err_payload;
         err_payload.set_is_speech(false);
-        err_payload.set_confidence(0.0f);
+        err_payload.set_probability(0.0f);
         err_payload.set_energy(0.0f);
         err_payload.set_duration_ms(0);
         err_payload.set_timestamp_ms(rac_get_current_time_ms());
@@ -314,8 +316,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         rac::vad::dispatch_vad_stream_event(component_handle,
                                             runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR,
                                             /*result=*/nullptr,
-                                            /*activity=*/nullptr,
-                                            /*statistics=*/nullptr, msg, rc, session_id);
+                                            /*activity=*/nullptr, msg, rc, session_id);
         return rc;
     }
 
@@ -327,7 +328,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
 
     runanywhere::v1::VADResult payload;
     payload.set_is_speech(is_speech == RAC_TRUE);
-    payload.set_confidence(is_speech == RAC_TRUE ? 1.0f : 0.0f);
+    payload.set_probability(is_speech == RAC_TRUE ? 1.0f : 0.0f);
     payload.set_energy(energy);
     payload.set_duration_ms(duration_ms);
     payload.set_timestamp_ms(rac_get_current_time_ms());
@@ -335,7 +336,6 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     rac::vad::dispatch_vad_stream_event(component_handle,
                                         runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME, &payload,
                                         /*activity=*/nullptr,
-                                        /*statistics=*/nullptr,
                                         /*error_message=*/nullptr,
                                         /*error_code=*/0, session_id);
     return RAC_SUCCESS;
@@ -382,7 +382,6 @@ namespace rac::vad {
 void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
-                               const runanywhere::v1::VADStatistics* statistics,
                                const char* error_message, int error_code, uint64_t session_id) {
     // Hold the InFlightGuard across the whole
     // dispatch so rac_vad_proto_quiesce() can spin-wait on the counter
@@ -433,9 +432,6 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
     }
     if (activity) {
         *proto_event.mutable_activity() = *activity;
-    }
-    if (statistics) {
-        *proto_event.mutable_statistics() = *statistics;
     }
     if (error_code != 0 || (error_message && error_message[0] != '\0')) {
         rac::foundation::populate_sdk_error(

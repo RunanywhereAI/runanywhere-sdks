@@ -114,8 +114,8 @@ void publish_storage_info_event(const runanywhere::v1::StorageInfoResult& result
     runanywhere::v1::SDKEvent event;
     populate_storage_event_envelope(&event,
                                     storage_event_severity(error_code, result.warnings_size()));
-    auto* storage = event.mutable_storage_lifecycle();
-    storage->set_kind(runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED);
+    auto* storage = event.mutable_storage();
+    storage->set_kind(runanywhere::v1::STORAGE_EVENT_KIND_INFO_RETRIEVED);
     storage->set_bytes(result.info().total_models_bytes());
     storage->mutable_info_result()->CopyFrom(result);
     if (failed) {
@@ -134,9 +134,9 @@ void publish_storage_availability_event(const runanywhere::v1::StorageAvailabili
     runanywhere::v1::SDKEvent event;
     populate_storage_event_envelope(&event,
                                     storage_event_severity(error_code, result.warnings_size()));
-    auto* storage = event.mutable_storage_lifecycle();
-    storage->set_kind(failed ? runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED
-                             : runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED);
+    auto* storage = event.mutable_storage();
+    storage->set_kind(failed ? runanywhere::v1::STORAGE_EVENT_KIND_AVAILABILITY_FAILED
+                             : runanywhere::v1::STORAGE_EVENT_KIND_AVAILABILITY_CHECKED);
     storage->set_bytes(result.availability().available_bytes());
     storage->mutable_availability_result()->CopyFrom(result);
     if (failed) {
@@ -155,9 +155,9 @@ void publish_storage_delete_plan_event(const runanywhere::v1::StorageDeletePlan&
     runanywhere::v1::SDKEvent event;
     populate_storage_event_envelope(&event,
                                     storage_event_severity(error_code, plan.warnings_size()));
-    auto* storage = event.mutable_storage_lifecycle();
-    storage->set_kind(failed ? runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED
-                             : runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED);
+    auto* storage = event.mutable_storage();
+    storage->set_kind(failed ? runanywhere::v1::STORAGE_EVENT_KIND_DELETE_PLAN_FAILED
+                             : runanywhere::v1::STORAGE_EVENT_KIND_DELETE_PLAN_CREATED);
     storage->set_bytes(plan.reclaimable_bytes());
     storage->mutable_delete_plan()->CopyFrom(plan);
     if (failed) {
@@ -176,12 +176,12 @@ void publish_storage_delete_result_event(const runanywhere::v1::StorageDeleteRes
     runanywhere::v1::SDKEvent event;
     populate_storage_event_envelope(&event,
                                     storage_event_severity(error_code, result.warnings_size()));
-    auto* storage = event.mutable_storage_lifecycle();
+    auto* storage = event.mutable_storage();
     if (result.dry_run() && !result.has_error()) {
-        storage->set_kind(runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED);
+        storage->set_kind(runanywhere::v1::STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED);
     } else {
-        storage->set_kind(failed ? runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED
-                                 : runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED);
+        storage->set_kind(failed ? runanywhere::v1::STORAGE_EVENT_KIND_DELETE_MODEL_FAILED
+                                 : runanywhere::v1::STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED);
     }
     if (result.deleted_model_ids_size() == 1) {
         storage->set_model_id(result.deleted_model_ids(0));

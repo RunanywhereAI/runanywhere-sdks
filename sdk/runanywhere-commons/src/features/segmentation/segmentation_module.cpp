@@ -249,7 +249,8 @@ rac_result_t result_to_proto(const rac_segmentation_result_t& source, uint32_t e
         auto* destination = out->add_class_summaries();
         destination->set_class_id(summary.class_id);
         destination->set_pixel_count(summary.pixel_count);
-        destination->set_fraction(summary.fraction);
+        // SegmentationClassSummary.fraction was deleted outright: it is
+        // pixel_count / (width * height), derivable by the caller.
         if (summary.label) {
             destination->set_label(summary.label);
         }

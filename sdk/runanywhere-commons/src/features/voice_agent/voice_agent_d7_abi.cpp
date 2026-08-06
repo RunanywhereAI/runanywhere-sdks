@@ -70,8 +70,9 @@ void d7_emit_voice_event(rac_voice_agent_handle_t handle, runanywhere::v1::Voice
                          void* user_data) {
     if (!event)
         return;
-    if (event->timestamp_us() == 0) {
-        event->set_timestamp_us(rac_get_current_time_ms() * 1000);
+    // VoiceEvent.timestamp_us was renamed to timestamp_ms.
+    if (event->timestamp_ms() == 0) {
+        event->set_timestamp_ms(rac_get_current_time_ms());
     }
     if (!session_id.empty() && event->session_id().empty())
         event->set_session_id(session_id);
@@ -176,7 +177,7 @@ void d7_emit_user_said(rac_voice_agent_handle_t handle, const char* text, const 
         u->set_text(text);
     u->set_is_final(true);
     if (!lang.empty())
-        u->set_language_code(lang);
+        u->set_language(lang);
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
@@ -222,11 +223,16 @@ void d7_emit_error(rac_voice_agent_handle_t handle, rac_result_t code, const cha
     event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
-    auto* e = event.mutable_error();
-    e->set_code(static_cast<int32_t>(code));
+    // VoiceEvent.error was deleted; the one error payload in this domain is
+    // now the session_error oneof arm (VoiceSessionError).
+    auto* e = event.mutable_session_error();
+    const int32_t signed_code = static_cast<int32_t>(code);
+    const int32_t abs_code = signed_code < 0 ? -signed_code : signed_code;
+    e->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
     e->set_message(message ? message : rac_error_message(code));
-    e->set_component(component_name ? component_name : "voice_agent");
-    e->set_is_recoverable(false);
+    e->set_failed_component(component_name ? component_name : "voice_agent");
+    e->set_c_abi_code(signed_code);
+    e->set_recoverable(false);
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
@@ -977,9 +983,10 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
 
     // The VAD -> STT -> LLM -> TTS pipeline + event emission is shared with
     // the streaming feed-audio ingress path (rac_voice_agent_feed_audio_proto).
-    const std::string language_code = request.session_config().has_language_code()
-                                          ? request.session_config().language_code()
-                                          : std::string();
+    // VoiceAgentTurnRequest.language is the per-turn override directly
+    // (VoiceSessionConfig was deleted).
+    const std::string language_code =
+        request.has_language() ? request.language() : std::string();
     return rac::voice_agent::detail::d7_process_utterance(
         handle, request.audio_data(), session_id, turn_id, request_id, language_code,
         event_callback, user_data, /*out_result=*/nullptr);
@@ -1186,7 +1193,6 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
     output.set_duration_ms(tts.duration_ms);
     output.set_timestamp_ms(rac_get_current_time_ms());
     output.set_is_final(true);
-    output.set_audio_size_bytes(static_cast<int64_t>(tts.audio_size));
     rac_tts_result_free(&tts);
     if (have_lifecycle_tts) {
         rac::lifecycle::release_lifecycle_tts(&tts_ref);

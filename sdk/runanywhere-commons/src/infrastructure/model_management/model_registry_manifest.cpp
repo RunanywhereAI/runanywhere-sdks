@@ -109,17 +109,27 @@ void sanitize_for_manifest(runanywhere::v1::ModelInfo* model, bool downloaded) {
             file.clear_local_path();
         }
     }
-    if (model->has_expected_files()) {
+    // ModelInfo.expected_files (top-level) was deleted; the manifest now
+    // lives solely on SingleFileArtifact.expected_files / ArchiveArtifact.
+    // expected_files inside the artifact oneof.
+    if (model->has_single_file() && model->single_file().has_expected_files()) {
         for (runanywhere::v1::ModelFileDescriptor& file :
-             *model->mutable_expected_files()->mutable_files()) {
+             *model->mutable_single_file()->mutable_expected_files()->mutable_files()) {
             file.clear_local_path();
         }
     }
-    model->set_is_downloaded(downloaded);
+    if (model->has_archive() && model->archive().has_expected_files()) {
+        for (runanywhere::v1::ModelFileDescriptor& file :
+             *model->mutable_archive()->mutable_expected_files()->mutable_files()) {
+            file.clear_local_path();
+        }
+    }
+    // is_downloaded (tag 32) was deleted: registry_status below is the one
+    // downloaded-ness signal now.
     model->set_is_available(downloaded);
     model->set_registry_status(downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
                                           : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
-    model->clear_sync_pending();
+    // sync_pending (tag 36) was reserved -- no producer ever set it.
 }
 
 }  // namespace

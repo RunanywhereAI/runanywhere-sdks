@@ -1679,69 +1679,88 @@ tool_format_proto_from_rac(rac_tool_call_format_t format) {
     }
 }
 
-static std::string tool_parameter_type_name_from_proto(runanywhere::v1::ToolParameterType type) {
-    switch (type) {
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER:
-            return "number";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN:
-            return "boolean";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT:
-            return "object";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY:
-            return "array";
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_STRING:
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED:
-        default:
-            return "string";
+// idl/tool_calling.proto (API-realignment tools-one-json-schema) deleted the
+// typed ToolParameter message and ToolParameterType enum outright:
+// ToolDefinition.parameters is now ONE JSON Schema object STRING (matching
+// OpenAI `parameters` / Anthropic `input_schema` / MCP `inputSchema`), not a
+// repeated ToolParameter list. The rest of this file's prompt-formatting and
+// validation logic still works over an array of
+// {name,type,description,required,enum_values} objects (the historical
+// tool_calling_internal.h rac_tool_parameter_t shape); this converts a JSON
+// Schema **object** (type=object, properties, required) into that array so
+// nothing downstream of this one conversion point needs to change. A
+// non-object schema (a zero-argument tool advertises "" or "{}") yields an
+// empty array.
+static json parameters_json_schema_to_legacy_array(const std::string& parameters_schema_json) {
+    json params = json::array();
+    if (parameters_schema_json.empty()) {
+        return params;
     }
+    json schema = json::parse(parameters_schema_json, nullptr, false);
+    if (schema.is_discarded() || !schema.is_object() || !schema.contains("properties") ||
+        !schema["properties"].is_object()) {
+        return params;
+    }
+
+    std::vector<std::string> required_names;
+    if (schema.contains("required") && schema["required"].is_array()) {
+        for (const auto& name : schema["required"]) {
+            if (name.is_string()) {
+                required_names.push_back(name.get<std::string>());
+            }
+        }
+    }
+
+    const json& properties = schema["properties"];
+    for (auto it = properties.begin(); it != properties.end(); ++it) {
+        const json& prop = it.value();
+        json param_object = json::object();
+        param_object["name"] = it.key();
+        param_object["type"] = (prop.is_object() && prop.contains("type") && prop["type"].is_string())
+                                   ? prop["type"].get<std::string>()
+                                   : std::string("string");
+        param_object["description"] =
+            (prop.is_object() && prop.contains("description") && prop["description"].is_string())
+                ? prop["description"].get<std::string>()
+                : std::string();
+        param_object["required"] = std::find(required_names.begin(), required_names.end(),
+                                             it.key()) != required_names.end();
+        if (prop.is_object() && prop.contains("enum") && prop["enum"].is_array()) {
+            param_object["enum_values"] = prop["enum"];
+        }
+        params.push_back(std::move(param_object));
+    }
+    return params;
 }
 
 static json tool_definition_proto_to_json(const runanywhere::v1::ToolDefinition& tool) {
     json object = json::object();
     object["name"] = tool.name();
     object["description"] = tool.description();
-    object["parameters"] = json::array();
-    for (const auto& param : tool.parameters()) {
-        json param_object = json::object();
-        param_object["name"] = param.name();
-        param_object["type"] = tool_parameter_type_name_from_proto(param.type());
-        param_object["description"] = param.description();
-        param_object["required"] = param.required();
-        if (param.enum_values_size() > 0) {
-            param_object["enum_values"] = json::array();
-            for (const auto& enum_value : param.enum_values()) {
-                param_object["enum_values"].push_back(enum_value);
-            }
-        }
-        if (param.has_json_schema()) {
-            param_object["json_schema"] = param.json_schema();
-        }
-        object["parameters"].push_back(std::move(param_object));
-    }
+    object["parameters"] = parameters_json_schema_to_legacy_array(tool.parameters());
     if (tool.has_category()) {
         object["category"] = tool.category();
-    }
-    if (tool.has_json_schema()) {
-        object["json_schema"] = tool.json_schema();
     }
     return object;
 }
 
-static json compact_tool_argument_placeholder(const runanywhere::v1::ToolParameter& parameter) {
-    switch (parameter.type()) {
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER:
-            return 0;
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN:
-            return false;
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT:
-            return json::object();
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY:
-            return json::array();
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_STRING:
-        case runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED:
-        default:
-            return "<value from user request>";
+// `parameter` is one entry of the legacy {name,type,...} array produced by
+// parameters_json_schema_to_legacy_array() above.
+static json compact_tool_argument_placeholder(const json& parameter) {
+    const std::string type = parameter.value("type", std::string("string"));
+    if (type == "number" || type == "integer") {
+        return 0;
     }
+    if (type == "boolean") {
+        return false;
+    }
+    if (type == "object") {
+        return json::object();
+    }
+    if (type == "array") {
+        return json::array();
+    }
+    return "<value from user request>";
 }
 
 // A SPECIFIC decision already knows which tool must be called. Reusing the
@@ -1751,6 +1770,8 @@ static json compact_tool_argument_placeholder(const runanywhere::v1::ToolParamet
 static std::string compact_specific_tool_prompt(const std::string& user_prompt,
                                                 const runanywhere::v1::ToolDefinition& tool,
                                                 rac_tool_call_format_t format) {
+    const json legacy_params = parameters_json_schema_to_legacy_array(tool.parameters());
+
     std::string call_example;
     if (format == RAC_TOOL_FORMAT_LFM2 || format == RAC_TOOL_FORMAT_PYTHONIC) {
         // Pythonic call syntax. LFM2 wraps it in tags; the bare grammar format
@@ -1759,46 +1780,40 @@ static std::string compact_specific_tool_prompt(const std::string& user_prompt,
         call_example = bare ? "[" : "<|tool_call_start|>[";
         call_example += tool.name() + "(";
         bool first = true;
-        for (const auto& parameter : tool.parameters()) {
-            if (!parameter.required()) {
+        for (const auto& parameter : legacy_params) {
+            if (!parameter.value("required", false)) {
                 continue;
             }
             if (!first) {
                 call_example += ", ";
             }
             first = false;
-            call_example += parameter.name();
+            call_example += parameter.value("name", std::string());
             call_example += "=";
-            switch (parameter.type()) {
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER:
-                    call_example += "0";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN:
-                    call_example += "true";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT:
-                    call_example += "{}";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY:
-                    call_example += "[]";
-                    break;
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_STRING:
-                case runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED:
-                default:
-                    call_example += "\"<value from user request>\"";
-                    break;
+            const std::string type = parameter.value("type", std::string("string"));
+            if (type == "number" || type == "integer") {
+                call_example += "0";
+            } else if (type == "boolean") {
+                call_example += "true";
+            } else if (type == "object") {
+                call_example += "{}";
+            } else if (type == "array") {
+                call_example += "[]";
+            } else {
+                call_example += "\"<value from user request>\"";
             }
         }
         call_example += bare ? ")]" : ")]<|tool_call_end|>";
     } else {
         json arguments = json::object();
-        for (const auto& parameter : tool.parameters()) {
-            if (parameter.required()) {
-                arguments[parameter.name()] = compact_tool_argument_placeholder(parameter);
+        for (const auto& parameter : legacy_params) {
+            if (parameter.value("required", false)) {
+                arguments[parameter.value("name", std::string())] =
+                    compact_tool_argument_placeholder(parameter);
             }
         }
         call_example = "<tool_call>{\"tool\":" + json(tool.name()).dump();
-        if (!tool.parameters().empty()) {
+        if (!legacy_params.empty()) {
             call_example += ",\"arguments\":" + arguments.dump();
         }
         call_example += "}</tool_call>";
@@ -1871,12 +1886,13 @@ tool_calling_options_from_proto(const runanywhere::v1::ToolCallingOptions& proto
     // therefore indistinguishable on this specific field; restoring real
     // presence would need an IDL change, out of scope here.
     converted.options.auto_execute = proto.auto_execute() ? RAC_TRUE : RAC_FALSE;
-    if (proto.has_temperature()) {
-        converted.options.temperature = proto.temperature();
-    }
-    if (proto.has_max_tokens()) {
-        converted.options.max_tokens = proto.max_tokens();
-    }
+    // ToolCallingOptions.temperature/max_tokens were deleted outright
+    // (idl/tool_calling.proto, llm-tool-options-no-shadow): they duplicated
+    // the enclosing LLMGenerationOptions.temperature/max_output_tokens in
+    // every embedding that had one, and were meaningless on the 3 standalone
+    // verbs that don't. converted.options.{temperature,max_tokens} now keep
+    // their RAC_TOOL_CALLING_OPTIONS_DEFAULT values from this struct's own
+    // (unrelated) default init.
     if (proto.has_system_prompt()) {
         converted.system_prompt = proto.system_prompt();
     }
@@ -2124,7 +2140,9 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
         tool_call->set_id(call_id);
         tool_call->set_name(call.tool_name ? call.tool_name : "");
         tool_call->set_arguments_json(call.arguments_json ? call.arguments_json : "{}");
-        tool_call->set_type("function");
+        // ToolCall.type (was the constant "function") was deleted outright
+        // (idl/tool_calling.proto, tools-reserve-dead-fields) — no code reads
+        // it, so there is nothing to set.
         tool_call->set_created_at_ms(created_at_ms);
         tool_call->set_raw_text(request.text());
     };

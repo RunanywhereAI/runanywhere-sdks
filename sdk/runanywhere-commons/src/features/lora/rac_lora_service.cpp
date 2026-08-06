@@ -68,7 +68,7 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
 
 struct TrackedLoRAState {
     std::string base_model_id;
-    std::vector<runanywhere::v1::LoRAAdapterInfo> adapters;
+    std::vector<runanywhere::v1::LoraAdapterInfo> adapters;
 };
 
 // Per-backend tracked LoRA state. The key is the lifecycle backend instance
@@ -110,18 +110,19 @@ void forget_tracked_lora_state(void* backend_impl) {
 }
 
 void populate_state_from_snapshot(const TrackedLoRAState& snapshot,
-                                  runanywhere::v1::LoRAState* state) {
+                                  runanywhere::v1::LoraState* state) {
     if (!snapshot.base_model_id.empty()) {
         state->set_base_model_id(snapshot.base_model_id);
     }
     for (const auto& adapter : snapshot.adapters) {
         *state->add_loaded_adapters() = adapter;
     }
-    state->set_has_active_adapters(!snapshot.adapters.empty());
+    // has_active_adapters was deleted outright: it is fully recoverable as
+    // loaded_adapters being non-empty.
 }
 
 void populate_tracked_state(void* backend_impl, const std::string& base_model_id,
-                            runanywhere::v1::LoRAState* state) {
+                            runanywhere::v1::LoraState* state) {
     populate_state_from_snapshot(snapshot_tracked_lora_state(backend_impl, base_model_id), state);
 }
 
@@ -132,11 +133,11 @@ void track_lora_cleared(void* backend_impl, const std::string& base_model_id) {
 }
 
 void track_lora_applied(void* backend_impl, const std::string& base_model_id,
-                        const runanywhere::v1::LoRAAdapterInfo& info) {
+                        const runanywhere::v1::LoraAdapterInfo& info) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     auto& state = ensure_tracked_lora_state_locked(backend_impl, base_model_id);
     auto existing =
-        std::ranges::find_if(state.adapters, [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
+        std::ranges::find_if(state.adapters, [&](const runanywhere::v1::LoraAdapterInfo& adapter) {
             return adapter.adapter_path() == info.adapter_path();
         });
     if (existing != state.adapters.end()) {
@@ -152,7 +153,7 @@ void track_lora_removed_path(void* backend_impl, const std::string& base_model_i
     auto& state = ensure_tracked_lora_state_locked(backend_impl, base_model_id);
     state.adapters.erase(
         std::ranges::remove_if(state.adapters,
-                               [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
+                               [&](const runanywhere::v1::LoraAdapterInfo& adapter) {
                                    return adapter.adapter_path() == adapter_path;
                                })
             .begin(),
@@ -170,7 +171,7 @@ rac_result_t resolve_lora_id_to_path(void* backend_impl, const std::string& base
 
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     const auto& state = ensure_tracked_lora_state_locked(backend_impl, base_model_id);
-    const runanywhere::v1::LoRAAdapterInfo* match = nullptr;
+    const runanywhere::v1::LoraAdapterInfo* match = nullptr;
     for (const auto& adapter : state.adapters) {
         if (adapter.adapter_id() != adapter_id)
             continue;
@@ -257,7 +258,7 @@ int64_t adapter_file_size(const std::string& path) {
 // adapter_id for telemetry attribution: prefer the catalog-linked id, else fall
 // back to the adapter file's basename (without directory or .gguf extension) so
 // the field is never blank when only a raw path was supplied.
-std::string adapter_id_for(const runanywhere::v1::LoRAAdapterConfig& config) {
+std::string adapter_id_for(const runanywhere::v1::LoraAdapterConfig& config) {
     if (!config.adapter_id().empty())
         return config.adapter_id();
     const std::string& path = config.adapter_path();
@@ -283,7 +284,7 @@ void publish_failure(rac_result_t code, const char* operation, const char* messa
 }
 
 rac_result_t parse_config(const uint8_t* bytes, size_t size,
-                          runanywhere::v1::LoRAAdapterConfig* out, rac_proto_buffer_t* error_out) {
+                          runanywhere::v1::LoraAdapterConfig* out, rac_proto_buffer_t* error_out) {
     if (!valid_bytes(bytes, size)) {
         return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR,
                                           "LoRAAdapterConfig bytes are invalid");
@@ -313,11 +314,13 @@ rac_result_t parse_message(const uint8_t* bytes, size_t size, Message* out,
     return RAC_SUCCESS;
 }
 
-runanywhere::v1::LoRAAdapterInfo make_info(const runanywhere::v1::LoRAAdapterConfig& config,
+runanywhere::v1::LoraAdapterInfo make_info(const runanywhere::v1::LoraAdapterConfig& config,
                                            bool applied, const char* error_message = nullptr,
                                            rac_result_t error_code = RAC_SUCCESS) {
-    runanywhere::v1::LoRAAdapterInfo info;
-    if (config.has_adapter_id())
+    runanywhere::v1::LoraAdapterInfo info;
+    // LoraAdapterConfig.adapter_id is now the required handle (plain string,
+    // no presence) rather than optional.
+    if (!config.adapter_id().empty())
         info.set_adapter_id(config.adapter_id());
     info.set_adapter_path(config.adapter_path());
     info.set_scale(config.scale() > 0.0f ? config.scale() : 1.0f);
@@ -332,14 +335,14 @@ runanywhere::v1::LoRAAdapterInfo make_info(const runanywhere::v1::LoRAAdapterCon
     return info;
 }
 
-void mark_apply_error(runanywhere::v1::LoRAApplyResult* result, rac_result_t code,
+void mark_apply_error(runanywhere::v1::LoraApplyResult* result, rac_result_t code,
                       const char* message) {
     rac::foundation::populate_sdk_error(result->mutable_error(), code);
     if ((message != nullptr) && message[0] != '\0')
         result->mutable_error()->set_message(message);
 }
 
-void mark_state_error(runanywhere::v1::LoRAState* state, rac_result_t code, const char* message) {
+void mark_state_error(runanywhere::v1::LoraState* state, rac_result_t code, const char* message) {
     rac::foundation::populate_sdk_error(state->mutable_error(), code);
     if ((message != nullptr) && message[0] != '\0')
         state->mutable_error()->set_message(message);
@@ -385,8 +388,8 @@ std::string base_model_id_for_message(const rac::llm::LifecycleLlmRef& ref) {
     return (ref.model_id != nullptr && ref.model_id[0] != '\0') ? ref.model_id : "<unknown>";
 }
 
-bool config_has_adapter_id(const runanywhere::v1::LoRAAdapterConfig& config) {
-    return config.has_adapter_id() && !config.adapter_id().empty();
+bool config_has_adapter_id(const runanywhere::v1::LoraAdapterConfig& config) {
+    return !config.adapter_id().empty();
 }
 
 bool catalog_entry_supports_model(const rac_lora_entry_t* entry, const std::string& model_id) {
@@ -417,7 +420,7 @@ std::string first_compatible_model_id(const rac_lora_entry_t* entry) {
 
 LoraConfigValidation
 validate_lora_config_for_loaded_model(const rac::llm::LifecycleLlmRef& ref,
-                                      const runanywhere::v1::LoRAAdapterConfig& config) {
+                                      const runanywhere::v1::LoraAdapterConfig& config) {
     if (config.adapter_path().empty()) {
         return lora_validation_error(RAC_ERROR_INVALID_ARGUMENT,
                                      "LoRAAdapterConfig.adapter_path is required");
@@ -517,7 +520,7 @@ rac_result_t rac_lora_compatibility_proto(const uint8_t* config_proto_bytes,
     (void)config_proto_size;
     return feature_unavailable(out_result);
 #else
-    runanywhere::v1::LoRAAdapterConfig config;
+    runanywhere::v1::LoraAdapterConfig config;
     rac_result_t rc = parse_config(config_proto_bytes, config_proto_size, &config, out_result);
     if (rc != RAC_SUCCESS)
         return rc;
@@ -578,13 +581,13 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
     (void)request_proto_size;
     return feature_unavailable(out_result);
 #else
-    runanywhere::v1::LoRAApplyRequest request;
+    runanywhere::v1::LoraApplyRequest request;
     rac_result_t rc = parse_message(request_proto_bytes, request_proto_size, &request,
                                     "LoRAApplyRequest", out_result);
     if (rc != RAC_SUCCESS)
         return rc;
 
-    runanywhere::v1::LoRAApplyResult result;
+    runanywhere::v1::LoraApplyResult result;
     result.set_request_id(request.request_id());
 
     rac::llm::LifecycleLlmRef ref;
@@ -621,7 +624,11 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         }
     }
 
-    if (request.replace_existing()) {
+    // LoraApplyRequest.replace_existing was inverted to keep_existing: the
+    // zero value is now total replacement (SET semantics, matching Diffusers
+    // set_adapters / llama_set_adapters_lora), and stacking on top of the
+    // currently-applied set is the opt-in.
+    if (!request.keep_existing()) {
         if (!ref.ops->clear_lora) {
             mark_apply_error(&result, RAC_ERROR_NOT_SUPPORTED,
                              "Backend does not support LoRA clear");
@@ -656,7 +663,7 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
             return copy_proto(result, out_result);
         }
 
-        runanywhere::v1::LoRAAdapterInfo applied_info = make_info(config, true);
+        runanywhere::v1::LoraAdapterInfo applied_info = make_info(config, true);
         track_lora_applied(backend_impl, base_model_id, applied_info);
         auto* info = result.add_adapters();
         *info = applied_info;
@@ -680,13 +687,13 @@ rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes, size_t re
     (void)request_proto_size;
     return feature_unavailable(out_state);
 #else
-    runanywhere::v1::LoRARemoveRequest request;
+    runanywhere::v1::LoraRemoveRequest request;
     rac_result_t rc = parse_message(request_proto_bytes, request_proto_size, &request,
                                     "LoRARemoveRequest", out_state);
     if (rc != RAC_SUCCESS)
         return rc;
 
-    runanywhere::v1::LoRAState state;
+    runanywhere::v1::LoraState state;
 
     rac::llm::LifecycleLlmRef ref;
     rc = acquire_lifecycle_llm_for_lora(&ref);
@@ -741,20 +748,11 @@ rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes, size_t re
         add_unique_path(&paths, path);
     }
 
-    for (const auto& adapter_path : request.adapter_paths()) {
-        if (adapter_path.empty()) {
-            const char* message = "LoRARemoveRequest.adapter_paths cannot contain empty paths";
-            populate_tracked_state(backend_impl, base_model_id, &state);
-            mark_state_error(&state, RAC_ERROR_INVALID_ARGUMENT, message);
-            publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.remove", message);
-            return finish(copy_proto(state, out_state));
-        }
-        add_unique_path(&paths, adapter_path);
-    }
-
+    // LoraRemoveRequest.adapter_paths was deleted: clear_all and adapter_ids
+    // are the only identity path now (adapter_id is the required handle on
+    // LoraAdapterConfig too).
     if (paths.empty()) {
-        const char* message =
-            "LoRARemoveRequest.clear_all, adapter_ids, or adapter_paths is required";
+        const char* message = "LoraRemoveRequest.clear_all or adapter_ids is required";
         populate_tracked_state(backend_impl, base_model_id, &state);
         mark_state_error(&state, RAC_ERROR_INVALID_ARGUMENT, message);
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.remove", message);
@@ -796,14 +794,14 @@ rac_result_t rac_lora_list_proto(const uint8_t* state_proto_bytes, size_t state_
     (void)state_proto_size;
     return feature_unavailable(out_state);
 #else
-    runanywhere::v1::LoRAState request;
+    runanywhere::v1::LoraState request;
     rac_result_t rc =
         parse_message(state_proto_bytes, state_proto_size, &request, "LoRAState", out_state);
     if (rc != RAC_SUCCESS)
         return rc;
     (void)request;
 
-    runanywhere::v1::LoRAState state;
+    runanywhere::v1::LoraState state;
 
     rac::llm::LifecycleLlmRef ref;
     rc = acquire_lifecycle_llm_for_lora(&ref);
@@ -828,7 +826,7 @@ rac_result_t rac_lora_state_proto(const uint8_t* state_proto_bytes, size_t state
     (void)state_proto_size;
     return feature_unavailable(out_state);
 #else
-    runanywhere::v1::LoRAState request;
+    runanywhere::v1::LoraState request;
     rac_result_t rc =
         parse_message(state_proto_bytes, state_proto_size, &request, "LoRAState", out_state);
     if (rc != RAC_SUCCESS) {
@@ -836,7 +834,7 @@ rac_result_t rac_lora_state_proto(const uint8_t* state_proto_bytes, size_t state
     }
     (void)request;
 
-    runanywhere::v1::LoRAState state;
+    runanywhere::v1::LoraState state;
 
     rac::llm::LifecycleLlmRef ref;
     rc = acquire_lifecycle_llm_for_lora(&ref);

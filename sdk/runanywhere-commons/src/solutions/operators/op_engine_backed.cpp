@@ -207,12 +207,15 @@ class GenerateTextNode final : public OperatorNode {
             return;
         }
 
+        // LLMGenerateRequest.prompt was deleted: the whole conversation now
+        // rides on `messages` (never empty), single-turn here.
         runanywhere::v1::LLMGenerateRequest request;
-        request.set_prompt(item.text());
+        auto* message = request.add_messages();
+        message->set_role(runanywhere::v1::MESSAGE_ROLE_USER);
+        message->set_content(item.text());
         auto* options = request.mutable_options();
         options->set_temperature(temperature_ > 0.0f ? temperature_ : 0.8f);
         options->set_top_p(1.0f);
-        options->set_repetition_penalty(1.0f);
         if (!system_prompt_.empty()) {
             options->set_system_prompt(system_prompt_);
         }
@@ -315,23 +318,29 @@ class AgentLoopNode final : public OperatorNode {
             return;
         }
 
+        // ToolCallingSessionCreateRequest.prompt is now the current turn's
+        // user prompt (still a plain string, unchanged), and every tool
+        // policy knob (tools/auto_execute/system_prompt/max_tool_calls) moved
+        // onto the single ToolCallingOptions home instead of being re-published
+        // directly on the request.
         runanywhere::v1::ToolCallingSessionCreateRequest request;
         request.set_prompt(item.text());
+        auto* options = request.mutable_options();
         if (!system_prompt_.empty()) {
-            request.set_system_prompt(system_prompt_);
+            options->set_system_prompt(system_prompt_);
         }
         if (max_iterations_ > 0) {
-            request.set_max_tool_calls(static_cast<uint32_t>(max_iterations_));
+            options->set_max_tool_calls(max_iterations_);
         }
         // No host executor exists in the Solutions DAG context; parse and
         // validate the call, then hand it back instead of invoking anything.
-        request.set_auto_execute(false);
+        options->set_auto_execute(false);
         for (const ToolSpecParams& tool : tools_) {
-            auto* def = request.add_tools();
+            auto* def = options->add_tools();
             def->set_name(tool.name);
             def->set_description(tool.description);
             if (!tool.json_schema.empty()) {
-                def->set_json_schema(tool.json_schema);
+                def->set_parameters(tool.json_schema);
             }
         }
 
@@ -421,7 +430,8 @@ class TranscribeNode final : public OperatorNode {
         audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
         audio->set_sample_rate(sample_rate_);
         audio->set_channels(1);
-        audio->set_bits_per_sample(16);
+        // STTAudioSource.bits_per_sample was deleted: sample width is
+        // determined by `encoding` (PCM_S16_LE already implies 16-bit).
         if (!model_id_.empty()) {
             (*request.mutable_metadata())["model_id"] = model_id_;
         }
@@ -490,9 +500,12 @@ class SynthesizeNode final : public OperatorNode {
             return;
         }
 
+        // TTSSynthesisRequest.metadata was deleted outright (no code ever
+        // read it). TTSOptions.model is the intended channel for a voice/model
+        // id, so model_id rides there instead.
         runanywhere::v1::TTSSynthesisRequest request;
         request.set_text(item.text());
-        if (!voice_.empty() || !language_.empty()) {
+        if (!voice_.empty() || !language_.empty() || !model_id_.empty()) {
             auto* options = request.mutable_options();
             if (!voice_.empty()) {
                 options->set_voice(voice_);
@@ -500,9 +513,9 @@ class SynthesizeNode final : public OperatorNode {
             if (!language_.empty()) {
                 options->set_language_code(language_);
             }
-        }
-        if (!model_id_.empty()) {
-            (*request.mutable_metadata())["model_id"] = model_id_;
+            if (!model_id_.empty()) {
+                options->set_model(model_id_);
+            }
         }
 
         std::vector<uint8_t> bytes(request.ByteSizeLong());
@@ -676,12 +689,8 @@ class EmbedNode final : public OperatorNode {
             cancel_graph(this->cancel_token());
             return;
         }
-
-        if (result.has_error()) {
-            set_error_detail(name(), "embeddings call failed: " + result.error().message());
-            cancel_graph(this->cancel_token());
-            return;
-        }
+        // EmbeddingsResult.error was deleted (never populated); the rc check
+        // above is the only failure signal for this call.
 
         if (result.vectors_size() == 0) {
             set_error_detail(name(), "embeddings result has no vectors");
@@ -756,16 +765,21 @@ class RetrieveNode final : public OperatorNode {
             return;
         }
 
+        // RAGQueryOptions was collapsed onto the shared RAGRetrievalOptions
+        // message: query=1, retrieval=2, generation=3. `question` is now
+        // `query`; the flat retrieval_top_k/similarity_threshold fields moved
+        // onto `retrieval` (and similarity_threshold was renamed
+        // score_threshold).
         runanywhere::v1::RAGQueryOptions request;
-        request.set_question(item.text());
+        request.set_query(item.text());
         if (!system_prompt_.empty()) {
             request.mutable_generation()->set_system_prompt(system_prompt_);
         }
         if (retrieval_top_k_ > 0) {
-            request.set_retrieval_top_k(retrieval_top_k_);
+            request.mutable_retrieval()->set_top_k(retrieval_top_k_);
         }
         if (similarity_threshold_ > 0.0f) {
-            request.set_similarity_threshold(similarity_threshold_);
+            request.mutable_retrieval()->set_score_threshold(similarity_threshold_);
         }
         // Per the RAG service contract, retrieve does not generate. Setting
         // max_tokens to 0 still produces a RAGResult with retrieved_chunks

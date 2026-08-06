@@ -20,16 +20,26 @@
 #ifdef __cplusplus
 
 namespace runanywhere::v1 {
-class VLMConfiguration;
-class VLMGenerationOptions;
+class LLMGenerationOptions;
+class VLMVisionOptions;
 class VLMResult;
 class VLMImage;
 }  // namespace runanywhere::v1
 
 namespace rac::foundation {
 
-bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
-                                rac_vlm_options_t* out, const char** out_prompt);
+// VLMGenerationOptions was deleted from idl/vlm_options.proto: its sampling
+// fields were name-for-name copies of LLMGenerationOptions, so
+// VLMGenerationRequest.options is now LLMGenerationOptions directly ("same
+// names, same defaults, same validation as the text API"). `vision` carries
+// the four genuinely vision-specific knobs that survived into the new
+// VLMVisionOptions message (may be nullptr when the request has none). The
+// prompt is now VLMGenerationRequest.prompt (a top-level string), not part of
+// the options message, so this adapter no longer produces it -- callers read
+// request.prompt() directly.
+bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& in,
+                                const ::runanywhere::v1::VLMVisionOptions* vision,
+                                rac_vlm_options_t* out);
 
 void rac_vlm_options_free_owned(rac_vlm_options_t* options);
 

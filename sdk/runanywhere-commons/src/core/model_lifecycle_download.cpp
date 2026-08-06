@@ -27,16 +27,18 @@ namespace rac::core::model_lifecycle::detail {
 #if defined(RAC_HAVE_PROTOBUF)
 
 // Detect models whose registry entry has not yet resolved into a local
-// artifact. Both classic single-file and multi-file/expected-files entries
-// surface "missing" the same way: `is_downloaded` flips to true only after
-// the orchestrator landed the bytes, and `local_path` is set to the
-// resolved primary artifact at the same time. Built-in models are
-// considered always-available.
+// artifact. registry_status is the single downloaded-ness signal now
+// (is_downloaded was deleted -- a bool cannot express DOWNLOADING); a
+// non-empty local_path remains a secondary present-on-disk signal since it
+// stays populated even for an entry whose registry_status has not been
+// normalized yet. Built-in models are considered always-available.
 bool model_artifact_present(const runanywhere::v1::ModelInfo& model) {
     if (model.has_built_in() && model.built_in()) {
         return true;
     }
-    if (model.is_downloaded()) {
+    if (model.has_registry_status() &&
+        (model.registry_status() == runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED ||
+         model.registry_status() == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED)) {
         return true;
     }
     if (!model.local_path().empty()) {
@@ -45,6 +47,9 @@ bool model_artifact_present(const runanywhere::v1::ModelInfo& model) {
     return false;
 }
 
+// expected_files (top-level) was deleted; the per-file URL check now walks
+// the artifact oneof's own expected_files (single_file/archive) alongside
+// multi_file.
 bool model_has_download_source(const runanywhere::v1::ModelInfo& model) {
     if (!model.download_url().empty()) {
         return true;
@@ -56,18 +61,25 @@ bool model_has_download_source(const runanywhere::v1::ModelInfo& model) {
             }
         }
     }
-    if (model.has_expected_files()) {
-        for (const runanywhere::v1::ModelFileDescriptor& file : model.expected_files().files()) {
+    if (model.has_single_file() && model.single_file().has_expected_files()) {
+        for (const runanywhere::v1::ModelFileDescriptor& file :
+             model.single_file().expected_files().files()) {
             if (!file.url().empty()) {
                 return true;
             }
         }
     }
-    // ArchiveArtifact carries extraction metadata; the canonical download
-    // URL still lives on ModelInfo.download_url. has_archive() alone is
-    // not a download signal — only the top-level download_url field plus
-    // the per-file URLs in multi_file/expected_files indicate a fetchable
-    // source.
+    if (model.has_archive() && model.archive().has_expected_files()) {
+        for (const runanywhere::v1::ModelFileDescriptor& file :
+             model.archive().expected_files().files()) {
+            if (!file.url().empty()) {
+                return true;
+            }
+        }
+    }
+    // ArchiveArtifact's own extraction metadata is not itself a download
+    // signal — only the top-level download_url field plus the per-file URLs
+    // in multi_file/expected_files indicate a fetchable source.
     return false;
 }
 
@@ -144,14 +156,14 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
         return RAC_ERROR_BACKEND_NOT_FOUND;
     }
 
-    // Step 2 — start the download. update_registry_on_completion=true so the
-    // worker updates the registry entry with the resolved local_path; the
+    // Step 2 — start the download. The registry is updated on completion by
+    // default (skip_registry_update defaults to false), so the worker
+    // updates the registry entry with the resolved local_path; the
     // subsequent get_proto reread (in the outer load path) will then see
     // the populated artifact.
     runanywhere::v1::DownloadStartRequest start_request;
     start_request.set_model_id(model_id);
     start_request.mutable_plan()->CopyFrom(plan_result);
-    start_request.set_update_registry_on_completion(true);
     std::vector<uint8_t> start_bytes(start_request.ByteSizeLong());
     if (!start_bytes.empty() &&
         !start_request.SerializeToArray(start_bytes.data(), static_cast<int>(start_bytes.size()))) {

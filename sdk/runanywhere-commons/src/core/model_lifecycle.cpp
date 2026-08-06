@@ -650,9 +650,6 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         if (request.has_context_length()) {
             unsupported.push_back("context_length");
         }
-        if (request.has_threads()) {
-            unsupported.push_back("threads");
-        }
         if (request.has_use_gpu()) {
             unsupported.push_back("use_gpu");
         }

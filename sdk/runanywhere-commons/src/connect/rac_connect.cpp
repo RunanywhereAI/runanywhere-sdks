@@ -577,7 +577,9 @@ rac_result_t rac_connect_host_validate_invocation_proto(const uint8_t* request_b
                host.session_clients.find(request.session_id()) == host.session_clients.end()) {
         validation.set_rejection_reason("Connect session is not active");
     } else if (request.request_id().empty() || !request.has_generation() ||
-               request.generation().prompt().empty()) {
+               request.generation().messages_size() == 0) {
+        // prompt was deleted from LLMGenerateRequest; the conversation now
+        // travels as `messages` (repeated ChatMessage), never empty.
         validation.set_rejection_reason("Connect generation request is incomplete");
     } else if (request.generation().model_id() != host.model.model_id()) {
         validation.set_rejection_reason("Requested model is not shared by this host");
