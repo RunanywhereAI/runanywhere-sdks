@@ -129,15 +129,19 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         }
     }
 
+    /// `RASTTPartialResult` collapsed to `text`/`isFinal`/`language`
+    /// (idl/stt_options.proto): `finalOutput`/`hasFinalOutput` no longer
+    /// exist, so a synthetic failure now carries its message on `text`
+    /// alone. The error itself is still reported to the stream consumer
+    /// via `SDKException` at the call sites that read `yieldFailure`'s
+    /// side effects (see `STTNamespace.swift`'s `.failed` mapping), which
+    /// derives its own `SDKException` rather than reading it off the
+    /// partial.
     func yieldFailure(_ message: String, code: rac_result_t = RAC_ERROR_STREAM_CANCELLED) {
         guard !isCancelled else { return }
         var partial = RASTTPartialResult()
         partial.isFinal = true
         partial.text = message
-        var error = RASDKError.from(rcResult: code)
-            ?? RASDKError.make(code: .streamCancelled, message: message, category: .component)
-        error.message = message
-        partial.finalOutput.error = error
         continuation.yield(partial)
     }
 
@@ -150,11 +154,8 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         case .final:
             var partial = event.hasPartial ? event.partial : RASTTPartialResult()
             partial.isFinal = true
-            if event.hasFinalOutput {
-                partial.finalOutput = event.finalOutput
-                if partial.text.isEmpty {
-                    partial.text = event.finalOutput.text
-                }
+            if event.hasFinalOutput, partial.text.isEmpty {
+                partial.text = event.finalOutput.text
             }
             continuation.yield(partial)
         case .error:

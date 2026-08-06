@@ -424,7 +424,10 @@ extension RunAnywhere {
     internal static func performDelete(_ modelId: String) async -> RAStorageDeleteResult {
         var request = RAStorageDeleteRequest()
         request.modelIds = [modelId]
-        request.deleteFiles = true
+        // deleteFiles was deleted and replaced by the inverted
+        // keepFilesOnDisk (idl/storage_types.proto): files are deleted by
+        // default now, so the old "delete files" intent is simply the
+        // proto3 zero value (leave keepFilesOnDisk unset/false).
         request.clearRegistryPaths_p = true
         request.unloadIfLoaded = true
         request.allowPlatformDelete = true
@@ -492,9 +495,14 @@ private extension RunAnywhere {
         var request = RADownloadPlanRequest()
         request.modelID = model.id
         request.model = model
-        request.resumeExisting = true
+        // resumeExisting was deleted outright (idl/download_service.proto):
+        // resume is now planner-driven, not a caller opt-in flag.
         request.validateExistingBytes = true
-        request.verifyChecksums = !model.checksumSha256.isEmpty
+        // verifyChecksums -> skipChecksumVerification, inverted to opt-OUT.
+        // The proto3 zero value (false, left unset here) already means
+        // "verify whenever the catalog has one" — the exact old intent of
+        // `verifyChecksums = !model.checksumSha256.isEmpty` — so there is
+        // nothing to opt out of.
         return request
     }
 
@@ -509,13 +517,16 @@ private extension RunAnywhere {
         var startRequest = RADownloadStartRequest()
         startRequest.modelID = model.id
         startRequest.plan = plan
-        startRequest.resume = plan.canResume
-        startRequest.resumeToken = plan.resumeToken
+        // resume/resumeToken were deleted outright (idl/download_service.proto)
+        // — resume is now planner-driven from `plan` alone.
+        //
         // Commons owns the completion registry mutation: the orchestrator's
         // self-heal calls rac_model_registry_update_download_status, which
         // also persists the durable .rac-manifest.binpb sidecar that restores
-        // the entry on the next cold launch.
-        startRequest.updateRegistryOnCompletion = true
+        // the entry on the next cold launch. updateRegistryOnCompletion=true
+        // was renamed+inverted to skipRegistryUpdate, whose zero-value
+        // default (false) already means "update the registry", so leaving
+        // it unset preserves the old behavior with no line needed.
 
         let startResult = await CppBridge.Download.shared.start(startRequest)
         guard startResult.accepted else {
@@ -605,7 +616,9 @@ private extension RunAnywhere {
         case .cancelled:
             throw SDKException(code: .cancelled, message: "Download cancelled", category: .network)
         default:
-            return progress.stage == .completed
+            // RADownloadStage was folded into RADownloadState — `.completed`
+            // is already handled above, so no other state means "done".
+            return false
         }
     }
 

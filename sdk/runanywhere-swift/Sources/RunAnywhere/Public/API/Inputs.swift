@@ -35,14 +35,16 @@ import AppKit
 /// Tool the model may call, described by name, purpose, and parameters.
 public typealias ToolDefinition = RAToolDefinition
 
-/// One parameter on a `ToolDefinition`.
-public typealias ToolParameter = RAToolParameter
-
 /// A tool invocation the model asked for.
 public typealias ToolCall = RAToolCall
 
 /// JSON schema constraining structured output.
-public typealias JsonSchema = RAJSONSchema
+///
+/// `RAJSONSchema` was deleted outright (idl/structured_output.proto):
+/// `RAStructuredOutputOptions.schema` is now a single raw JSON Schema
+/// STRING (the `oneof constraint` arm), so this is a plain `String` alias
+/// rather than a typed proto message.
+public typealias JsonSchema = String
 
 /// A registry entry describing one model.
 public typealias ModelInfo = RAModelInfo
@@ -113,13 +115,14 @@ public struct AudioInput: Sendable {
         if sampleRate > 0 { source.sampleRate = Int32(sampleRate) }
         switch encoding {
         case .pcm16:
+            // bits_per_sample was deleted outright (idl/stt_options.proto):
+            // sample width is now determined by `encoding` alone
+            // (pcmS16Le implies 16-bit, pcmF32Le implies 32-bit).
             source.audioData = data
             source.encoding = .pcmS16Le
-            source.bitsPerSample = 16
         case .float32:
             source.audioData = data
             source.encoding = .pcmF32Le
-            source.bitsPerSample = 32
         case .wav:
             source.audioData = data
             source.encoding = .container
@@ -352,7 +355,7 @@ public struct ImageInput: Sendable {
         case .file(let path):
             return RAVLMImage.fromFilePath(path)
         case .encoded(let data):
-            return RAVLMImage.fromEncoded(data, format: ImageInput.encodedFormat(of: data))
+            return RAVLMImage.fromEncoded(data, mediaType: ImageInput.mediaType(of: data))
         case .rawRgb(let data, let width, let height):
             return RAVLMImage.fromRawRGB(data, width: width, height: height)
         }
@@ -373,7 +376,7 @@ public struct ImageInput: Sendable {
 
     func toSegmentationImage() throws -> RASegmentationImage {
         let pixels = try rawPixels()
-        var image = RASegmentationImage.defaults()
+        var image = RASegmentationImage()
         image.data = pixels.data
         image.width = UInt32(pixels.width)
         image.height = UInt32(pixels.height)
@@ -381,15 +384,37 @@ public struct ImageInput: Sendable {
         return image
     }
 
+    /// Encoded PNG/JPEG container bytes plus their sniffed media type, for
+    /// diffusion's `image`/`mask_image` fields — which the proto documents as
+    /// requiring "an encoded PNG or JPEG container", not raw pixels
+    /// (idl/diffusion_options.proto). `.rawRgb` inputs are PNG-encoded on
+    /// the fly since that source only ever carries unencoded pixels.
+    func encodedImageBytes() throws -> (data: Data, mediaType: String) {
+        switch source {
+        case .encoded(let data):
+            return (data, ImageInput.mediaType(of: data))
+        case .file(let path):
+            let data = try Data(contentsOf: URL(fileURLWithPath: path))
+            return (data, ImageInput.mediaType(of: data))
+        case .rawRgb(let data, let width, let height):
+            let encoded = try ImageInput.encodePNG(rgb: data, width: width, height: height)
+            return (encoded, "image/png")
+        }
+    }
+
     // MARK: Decoding
 
-    private static func encodedFormat(of data: Data) -> RAVLMImageFormat {
-        guard data.count >= 4 else { return .unspecified }
+    /// RAVLMImageFormat was deleted along with the rest of the closed VLM
+    /// image-format enum (idl/vlm_options.proto); `mediaType` is now a plain
+    /// MIME string, so magic-byte sniffing resolves directly to one instead
+    /// of to an enum case.
+    private static func mediaType(of data: Data) -> String {
+        guard data.count >= 4 else { return "application/octet-stream" }
         let prefix = [UInt8](data.prefix(4))
-        if prefix[0] == 0xFF, prefix[1] == 0xD8 { return .jpeg }
-        if prefix[0] == 0x89, prefix[1] == 0x50 { return .png }
-        if prefix[0] == 0x52, prefix[1] == 0x49 { return .webp }
-        return .unspecified
+        if prefix[0] == 0xFF, prefix[1] == 0xD8 { return "image/jpeg" }
+        if prefix[0] == 0x89, prefix[1] == 0x50 { return "image/png" }
+        if prefix[0] == 0x52, prefix[1] == 0x49 { return "image/webp" }
+        return "application/octet-stream"
     }
 
     private static func decode(_ data: Data) throws -> (data: Data, width: Int, height: Int) {
@@ -450,6 +475,60 @@ public struct ImageInput: Sendable {
         return rgb
     }
     #endif
+
+    /// Encode packed 24-bit RGB pixels as a PNG container, for diffusion's
+    /// `image`/`mask_image` fields (which require an encoded container, not
+    /// raw pixels).
+    private static func encodePNG(rgb: Data, width: Int, height: Int) throws -> Data {
+        #if canImport(CoreGraphics)
+        let bytesPerRow = 3 * width
+        guard let provider = CGDataProvider(data: rgb as CFData),
+              let cgImage = CGImage(
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bitsPerPixel: 24,
+                  bytesPerRow: bytesPerRow,
+                  space: CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                  provider: provider,
+                  decode: nil,
+                  shouldInterpolate: false,
+                  intent: .defaultIntent
+              ) else {
+            throw SDKException(
+                code: .invalidInput,
+                message: "Could not build a CGImage from the supplied raw RGB pixels",
+                category: .validation
+            )
+        }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            output, "public.png" as CFString, 1, nil
+        ) else {
+            throw SDKException(
+                code: .invalidInput,
+                message: "Could not create a PNG image destination",
+                category: .validation
+            )
+        }
+        CGImageDestinationAddImage(destination, cgImage, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            throw SDKException(
+                code: .invalidInput,
+                message: "Could not finalize the PNG encoding",
+                category: .validation
+            )
+        }
+        return output as Data
+        #else
+        throw SDKException(
+            code: .featureNotAvailable,
+            message: "PNG encoding needs CoreGraphics/ImageIO; supply ImageInput.bytes or .file instead",
+            category: .validation
+        )
+        #endif
+    }
 }
 
 // MARK: - ChatMessage

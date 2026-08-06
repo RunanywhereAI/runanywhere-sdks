@@ -105,34 +105,47 @@ extension CppBridge {
                 // Commons reads these `const char*` fields after this callback
                 // returns, so back them with strdup'd storage that outlives the
                 // call. The previous fill is freed before this one is staged.
+                // deviceInfo is now the generated RADeviceInfo proto
+                // (idl/device_info.proto): platform/formFactor/batteryState
+                // are closed enums instead of bare strings, deviceName and
+                // efficiencyCores have no proto field at all, and the
+                // memory/NPU fields carry the *Bytes/npu* wire names. The C
+                // struct (rac_device_registration_info_t) this callback
+                // populates is untouched by that realignment, so every
+                // write below re-derives the C struct's original string/
+                // scalar shape from the proto's new shape.
                 CppBridge.Device.deviceInfoStrings.withLockUnchecked { store in
                     store.reset()
 
                     // Required fields (backend schema)
                     outInfo.pointee.device_id = store.dup(deviceId)
                     outInfo.pointee.device_model = store.dup(deviceInfo.deviceModel)
-                    outInfo.pointee.device_name = store.dup(deviceInfo.deviceName)
-                    outInfo.pointee.platform = store.dup(deviceInfo.platform)
+                    // deviceName has no proto field; the model name is the
+                    // closest available substitute for this telemetry slot.
+                    outInfo.pointee.device_name = store.dup(deviceInfo.deviceModel)
+                    outInfo.pointee.platform = store.dup(DeviceInfoFactory.wireString(deviceInfo.platform))
                     outInfo.pointee.os_version = store.dup(deviceInfo.osVersion)
-                    outInfo.pointee.form_factor = store.dup(deviceInfo.formFactor)
+                    outInfo.pointee.form_factor = store.dup(DeviceInfoFactory.wireString(deviceInfo.formFactor))
                     outInfo.pointee.architecture = store.dup(deviceInfo.architecture)
                     outInfo.pointee.chip_name = store.dup(deviceInfo.chipName)
                     outInfo.pointee.gpu_family = store.dup(deviceInfo.gpuFamily)
                     if deviceInfo.hasBatteryState {
-                        outInfo.pointee.battery_state = store.dup(deviceInfo.batteryState)
+                        outInfo.pointee.battery_state = store.dup(DeviceInfoFactory.wireString(deviceInfo.batteryState))
                     }
                     outInfo.pointee.device_fingerprint = store.dup(DeviceInfoFactory.hardwareFingerprint)
                 }
 
-                outInfo.pointee.total_memory = deviceInfo.totalMemory
-                outInfo.pointee.available_memory = deviceInfo.availableMemory
-                outInfo.pointee.has_neural_engine = deviceInfo.hasNeuralEngine_p ? RAC_TRUE : RAC_FALSE
-                outInfo.pointee.neural_engine_cores = deviceInfo.neuralEngineCores
+                outInfo.pointee.total_memory = deviceInfo.totalMemoryBytes
+                outInfo.pointee.available_memory = deviceInfo.availableMemoryBytes
+                outInfo.pointee.has_neural_engine = deviceInfo.hasNpu_p ? RAC_TRUE : RAC_FALSE
+                outInfo.pointee.neural_engine_cores = deviceInfo.npuCores
                 outInfo.pointee.battery_level = deviceInfo.hasBatteryLevel ? Double(deviceInfo.batteryLevel) : -1.0
                 outInfo.pointee.is_low_power_mode = deviceInfo.isLowPowerMode ? RAC_TRUE : RAC_FALSE
                 outInfo.pointee.core_count = deviceInfo.coreCount
                 outInfo.pointee.performance_cores = deviceInfo.performanceCores
-                outInfo.pointee.efficiency_cores = deviceInfo.efficiencyCores
+                // efficiencyCores has no proto field; derive it from the two
+                // that survive, matching the getCoreDistribution split.
+                outInfo.pointee.efficiency_cores = max(0, deviceInfo.coreCount - deviceInfo.performanceCores)
             }
 
             // Get device ID callback

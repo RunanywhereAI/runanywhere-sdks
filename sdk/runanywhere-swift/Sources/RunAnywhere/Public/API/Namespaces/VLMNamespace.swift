@@ -36,8 +36,7 @@ public extension RunAnywhere {
                 fallbackCategories: [.vision]
             )
             let result = try await CppBridge.VLM.shared.process(
-                image: image.toVLMImage(),
-                options: effective.toVLMProto(prompt: prompt)
+                effective.toVLMRequest(prompt: prompt, images: [image.toVLMImage()])
             )
             try RunAnywhere.throwIfVLMFailed(result)
             return GenerationResult(proto: result, requestId: "", model: model)
@@ -59,8 +58,7 @@ public extension RunAnywhere {
                 fallbackCategories: [.vision]
             )
             let events = try await CppBridge.VLM.shared.processStream(
-                image: image.toVLMImage(),
-                options: effective.toVLMProto(prompt: prompt)
+                effective.toVLMRequest(prompt: prompt, images: [image.toVLMImage()])
             )
 
             return mapVLMStream(events, model: model)

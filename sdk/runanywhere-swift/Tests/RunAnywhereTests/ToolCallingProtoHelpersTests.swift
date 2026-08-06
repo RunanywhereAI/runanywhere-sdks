@@ -51,14 +51,18 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
         // (`result_json`). The previous typed `result` map field was removed as
         // part of the proto contract simplification; callers JSON-encode the
         // payload themselves and downstream consumers decode it on read.
+        //
+        // `success` was deleted and replaced by `isError` with inverted
+        // polarity (idl/tool_calling.proto): a ToolResult nobody touched
+        // (isError == false, the proto3 zero value) reads as a good result.
         var result = RAToolResult()
         result.name = "get_weather"
-        result.success = true
+        result.isError = false
         result.resultJson = "{\"temperature\":72}"
         result.toolCallID = "call_1"
 
         XCTAssertEqual(result.name, "get_weather")
-        XCTAssertTrue(result.success)
+        XCTAssertFalse(result.isError)
         XCTAssertEqual(result.toolCallID, "call_1")
 
         let data = try XCTUnwrap(result.resultJson.data(using: .utf8))
@@ -77,8 +81,8 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
 
     func testExecuteToolSurfacesParseFailureWhenArgumentsJsonIsInvalid() async {
         // parseObjectJSON used to silently swallow malformed JSON
-        // into an empty dict, so executeTool reported success=true with no
-        // arguments. Now the parse failure must propagate as success=false
+        // into an empty dict, so executeTool reported isError=false with no
+        // arguments. Now the parse failure must propagate as isError=true
         // with a non-empty error message regardless of whether the native
         // ABI symbol is resolvable in the test environment.
         let definition = RAToolDefinition(
@@ -96,7 +100,7 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
 
         // Tool execution has no public v3 verb: the SDK runs the loop itself.
         let result = await RunAnywhere.executeTool(toolCall)
-        XCTAssertFalse(result.success)
+        XCTAssertTrue(result.isError)
         XCTAssertFalse(result.error.isEmpty)
     }
 }

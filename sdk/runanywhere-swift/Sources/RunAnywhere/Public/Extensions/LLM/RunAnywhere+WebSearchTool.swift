@@ -78,7 +78,7 @@ private enum WebSearchTool {
         name: Tool.name,
         description: Tool.description,
         parameters: [
-            RAToolParameter(
+            ToolParameter(
                 name: Parameter.query,
                 type: .string,
                 description: Parameter.queryDescription

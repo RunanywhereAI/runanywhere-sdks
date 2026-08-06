@@ -25,7 +25,7 @@ public extension RunAnywhere {
     @available(*, deprecated, renamed: "llm.generateStructured(prompt:schema:options:)")
     static func generateStructured(
         prompt: String,
-        schema: RAJSONSchema,
+        schema: JsonSchema,
         options: RALLMGenerationOptions? = nil
     ) async throws -> RAStructuredOutputResult {
         guard isReady else {
@@ -39,76 +39,15 @@ public extension RunAnywhere {
         return try parseStructuredOutput(text: generation.text, schema: schema)
     }
 
-    /// Stream structured output generation using a JSON schema (CANONICAL_API §3).
-    ///
-    /// Caller-supplied `options` are forwarded to `generateStream(_:)` so
-    /// generation knobs (maxOutputTokens, temperature, topP, preferredFramework,
-    /// systemPrompt, …) take effect. Token events from the LLM are
-    /// translated into `.token` `RAStructuredOutputStreamEvent`s; on the
-    /// final token the accumulated text is parsed via
-    /// `extractStructuredOutput` and emitted as a `.completed` event with
-    /// the validated `RAStructuredOutputResult` attached.
-    ///
-    /// Pre-flight failures (e.g. uninitialised SDK) throw synchronously from
-    /// the `throws` caller; in-flight failures (LLM driver errors,
-    /// parse/validation errors) terminate the returned
-    /// `AsyncThrowingStream` so consumers receive them via `for try await`
-    /// or the iterator's `throw`, matching the cross-SDK contract (Kotlin
-    /// `Flow` exception propagation, Web `AsyncIterable` throw).
-    /// (See comment record `swift-public-features-007`.)
-    @available(*, deprecated, renamed: "llm.generateStructured(prompt:schema:options:)")
-    static func generateStructuredStream(
-        prompt: String,
-        schema: RAJSONSchema,
-        options: RALLMGenerationOptions? = nil
-    ) throws -> AsyncThrowingStream<RAStructuredOutputStreamEvent, Error> {
-        guard isReady else {
-            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
-        }
-
-        var internalOptions = options ?? RALLMGenerationOptions.defaults()
-        internalOptions.structuredOutput = .defaults(schema: schema)
-        let request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
-
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                do {
-                    let stream = try await generateStreamProto(request)
-                    var accumulated = ""
-                    for await event in stream {
-                        if Task.isCancelled { break }
-                        if !event.token.isEmpty {
-                            accumulated += event.token
-                            var emitted = RAStructuredOutputStreamEvent()
-                            emitted.kind = .token
-                            emitted.token = event.token
-                            continuation.yield(emitted)
-                        }
-                    }
-                    let parsed = try parseStructuredOutput(text: accumulated, schema: schema)
-                    var terminal = RAStructuredOutputStreamEvent()
-                    terminal.kind = .completed
-                    terminal.result = parsed
-                    continuation.yield(terminal)
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            // Cancelling this wrapper task drops the inner generated stream;
-            // its canonical onCancel hook invokes rac_llm_cancel_proto.
-            continuation.onTermination = { termination in
-                switch termination {
-                case .cancelled:
-                    task.cancel()
-                case .finished:
-                    break
-                @unknown default:
-                    break
-                }
-            }
-        }
-    }
+    // generateStructuredStream(_:schema:options:) is deleted: its return
+    // type, RAStructuredOutputStreamEvent (and StructuredOutputStreamEventKind),
+    // was removed outright from idl/structured_output.proto with no
+    // replacement -- structured GENERATION now streams through the ordinary
+    // `RunAnywhere.llm.generateStream`/`generateStream(request)` path with
+    // `LLMGenerationOptions.structuredOutput` set, using the surviving
+    // RALLMStreamEvent shape. Had zero live callers (verified against the
+    // example app and this module's tests) at the time of the API
+    // realignment. Mirrors the Kotlin SDK's identical deletion.
 
     /// Generate raw text via the LLM with a structured-output configuration
     /// applied to the request. Returns the raw `RALLMGenerationResult`; callers

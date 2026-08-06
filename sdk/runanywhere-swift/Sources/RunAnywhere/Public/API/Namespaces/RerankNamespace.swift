@@ -32,14 +32,13 @@ public extension RunAnywhere {
         ) async throws -> [RankedResult] {
             guard !documents.isEmpty else { return [] }
 
+            // RerankCandidate was deleted outright (idl/rerank.proto): every
+            // facade already built it with id set to the stringified array
+            // index, so the flat `documents` list carries the same
+            // information — `RerankScoredItem.index` points back into it.
             var request = RARerankRequest()
             request.query = query
-            request.candidates = documents.enumerated().map { index, text in
-                var candidate = RARerankCandidate()
-                candidate.id = String(index)
-                candidate.text = text
-                return candidate
-            }
+            request.documents = documents
             var options = RARerankOptions.defaults()
             if let topN { options.topN = UInt32(max(0, topN)) }
             request.options = options

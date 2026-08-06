@@ -15,7 +15,6 @@ import Foundation
 public typealias VoiceAgentResult = RAVoiceAgentResult
 public typealias VoiceAgentComponentStates = RAVoiceAgentComponentStates
 public typealias VoiceAgentConfig = RAVoiceAgentComposeConfig
-public typealias VoiceSessionConfig = RAVoiceSessionConfig
 public typealias VoiceSessionError = RAVoiceSessionError
 
 // MARK: - RAComponentLifecycleState
@@ -26,17 +25,16 @@ public extension RAComponentLifecycleState {
     var isLoading: Bool { self == .loading }
 }
 
-// MARK: - RAVoiceSessionConfig (ms <-> TimeInterval bridges)
+// MARK: - RATurnDetection (ms <-> TimeInterval bridge)
 
-public extension RAVoiceSessionConfig {
+// `VoiceSessionConfig`/`RAVoiceSessionConfig` were deleted outright
+// (idl/voice_agent_service.proto): turn-taking now flows entirely through
+// `TurnDetection.silenceDurationMs`. `autoPlayTts` has no replacement field —
+// device playback in `VoiceSession` is unconditional now.
+public extension RATurnDetection {
     var silenceDuration: TimeInterval {
         get { TimeInterval(silenceDurationMs) / 1000.0 }
         set { silenceDurationMs = Int32((newValue * 1000.0).rounded()) }
-    }
-
-    var autoPlayTTS: Bool {
-        get { autoPlayTts }
-        set { autoPlayTts = newValue }
     }
 }
 

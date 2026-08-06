@@ -69,16 +69,17 @@ extension CppBridge {
             try getCatalogEntry(handle: requireHandle(), request)
         }
 
-        public func markDownloadCompleted(
-            _ request: RALoraAdapterDownloadCompletedRequest
-        ) throws -> RALoraAdapterDownloadCompletedResult {
-            try markDownloadCompleted(handle: requireHandle(), request)
-        }
-
-        public func importAdapter(
-            _ request: RALoraAdapterImportRequest
-        ) throws -> RALoraAdapterImportResult {
-            try importAdapter(handle: requireHandle(), request)
-        }
+        // markDownloadCompleted(_:) / importAdapter(_:) were deleted:
+        // LoraAdapterDownloadCompletedRequest/Result and
+        // LoraAdapterImportRequest/Result were removed outright from
+        // idl/lora_options.proto (lora-delete-download-import-bookkeeping).
+        // Adapter files are now acquired exclusively through the models
+        // domain's download/import verbs; this LoRA domain carries no
+        // download/import state of its own — a non-empty
+        // RALoraAdapterCatalogEntry.localPath is the only "downloaded"
+        // signal that survives. The corresponding C ABI entry points
+        // (rac_lora_catalog_mark_download_completed_proto /
+        // rac_lora_adapter_import_proto) are retired stubs that always
+        // report RAC_ERROR_NOT_IMPLEMENTED.
     }
 }

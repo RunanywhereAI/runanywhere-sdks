@@ -345,8 +345,10 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
 
         var progress = RADownloadProgress()
         progress.modelID = modelID
+        // RADownloadStage was folded into RADownloadState
+        // (idl/download_service.proto); `.state` alone now carries what
+        // `.stage` used to.
         progress.state = .downloading
-        progress.stage = .downloading
         progress.bytesDownloaded = done
         progress.totalBytes = total
         progress.totalFiles = Int32(plan.files.count)

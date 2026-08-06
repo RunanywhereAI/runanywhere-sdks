@@ -18,13 +18,24 @@ public enum FinishReason: Sendable {
     case toolCalls
     case cancelled
 
-    /// Decode the backend's finish-reason label.
+    /// Decode the backend's finish-reason label (VLM/voice-agent paths,
+    /// which still carry finishReason as a free-form String).
     static func parse(_ raw: String) -> FinishReason {
         switch raw.lowercased() {
         case "length", "max_tokens", "max_output_tokens": return .length
         case "tool_calls", "toolcalls", "tool_call": return .toolCalls
         case "cancelled", "canceled": return .cancelled
         default: return .stop
+        }
+    }
+
+    /// Decode the canonical `RAFinishReason` enum (LLM generate/stream path).
+    init(proto: RAFinishReason) {
+        switch proto {
+        case .length: self = .length
+        case .toolCalls: self = .toolCalls
+        case .cancelled: self = .cancelled
+        default: self = .stop
         }
     }
 }
@@ -73,26 +84,31 @@ public struct GenerationResult: Sendable {
             text: proto.text,
             thinkingText: proto.hasThinkingContent && !proto.thinkingContent.isEmpty ? proto.thinkingContent : nil,
             toolCalls: proto.toolCalls,
-            finishReason: FinishReason.parse(proto.finishReason),
+            finishReason: FinishReason(proto: proto.finishReason),
             inputTokens: Int(proto.usage.inputTokens),
             outputTokens: Int(proto.usage.outputTokens),
-            timeToFirstTokenMs: Int64(proto.ttftMs.rounded()),
-            tokensPerSecond: Float(proto.usage.tokensPerSecond),
+            timeToFirstTokenMs: proto.usage.ttftMs,
+            tokensPerSecond: Float(proto.usage.decodeTokensPerSecond),
             requestId: requestId,
             model: proto.modelUsed
         )
     }
 
-    init(proto: RALLMStreamFinalResult, requestId: String, model: String) {
+    // LLMStreamFinalResult was deleted outright (idl/llm_service.proto): the
+    // stream now terminates with the same RALLMGenerationResult the unary
+    // call returns (RALLMStreamEvent.result). This overload takes the
+    // caller's known `model` instead of `proto.modelUsed`, which the
+    // streaming terminal event does not reliably populate.
+    init(proto: RALLMGenerationResult, requestId: String, model: String) {
         self.init(
             text: proto.text,
             thinkingText: proto.hasThinkingContent && !proto.thinkingContent.isEmpty ? proto.thinkingContent : nil,
             toolCalls: proto.toolCalls,
-            finishReason: FinishReason.parse(proto.finishReason),
+            finishReason: FinishReason(proto: proto.finishReason),
             inputTokens: Int(proto.usage.inputTokens),
             outputTokens: Int(proto.usage.outputTokens),
-            timeToFirstTokenMs: Int64(proto.timeToFirstTokenMs),
-            tokensPerSecond: Float(proto.usage.tokensPerSecond),
+            timeToFirstTokenMs: proto.usage.ttftMs,
+            tokensPerSecond: Float(proto.usage.decodeTokensPerSecond),
             requestId: requestId,
             model: model
         )
@@ -106,8 +122,8 @@ public struct GenerationResult: Sendable {
             finishReason: FinishReason.parse(proto.finishReason),
             inputTokens: Int(proto.usage.inputTokens),
             outputTokens: Int(proto.usage.outputTokens),
-            timeToFirstTokenMs: Int64(proto.timeToFirstTokenMs),
-            tokensPerSecond: Float(proto.usage.tokensPerSecond),
+            timeToFirstTokenMs: proto.usage.ttftMs,
+            tokensPerSecond: Float(proto.usage.decodeTokensPerSecond),
             requestId: requestId,
             model: model
         )
@@ -121,8 +137,8 @@ public struct GenerationResult: Sendable {
             finishReason: proto.toolCalls.isEmpty ? .stop : .toolCalls,
             inputTokens: Int(proto.usage.inputTokens),
             outputTokens: Int(proto.usage.outputTokens),
-            timeToFirstTokenMs: 0,
-            tokensPerSecond: Float(proto.usage.tokensPerSecond),
+            timeToFirstTokenMs: proto.usage.ttftMs,
+            tokensPerSecond: Float(proto.usage.decodeTokensPerSecond),
             requestId: requestId,
             model: model
         )
@@ -151,7 +167,9 @@ public struct StructuredResult: Sendable {
         generation: GenerationResult,
         mode: StructuredEnforcementMode = .validationOnly
     ) {
-        self.value = proto.parsedJson
+        // RAStructuredOutputResult.json (String) replaced the deleted
+        // parsedJson (Data) field (idl/structured_output.proto).
+        self.value = Data(proto.json.utf8)
         self.raw = proto.hasRawText ? proto.rawText : generation.text
         self.valid = proto.hasValidation ? proto.validation.isValid : false
         self.mode = mode
@@ -249,11 +267,19 @@ public struct VadResult: Sendable {
     public let probability: Float
     public let segments: [Segment]
 
+    // RAVADResult.confidence/startTimeMs/endTimeMs were deleted outright
+    // (idl/vad_options.proto): confidence is renamed probability, and the
+    // start/end pair has no replacement — the result now only carries
+    // timestampMs (frame start) + durationMs (frame length). Derive the one
+    // segment this frame represents from that pair instead of a span.
     init(proto: RAVADResult) {
         self.isSpeech = proto.isSpeech
-        self.probability = proto.confidence
-        if proto.isSpeech, proto.endTimeMs >= proto.startTimeMs, proto.endTimeMs > 0 {
-            self.segments = [Segment(startMs: Int64(proto.startTimeMs), endMs: Int64(proto.endTimeMs))]
+        self.probability = proto.probability
+        if proto.isSpeech, proto.durationMs > 0 {
+            self.segments = [Segment(
+                startMs: proto.timestampMs,
+                endMs: proto.timestampMs + Int64(proto.durationMs)
+            )]
         } else {
             self.segments = []
         }
@@ -299,18 +325,16 @@ public struct ImageResult: Sendable {
     public let seed: Int64
     public let steps: Int
 
+    // idl/diffusion_options.proto reshaped DiffusionResult from a flat
+    // width/height/imageData/batchImages/seedUsed quintuple into
+    // `repeated DiffusionImage images` (each carrying its own
+    // data/width/height/seedUsed/mediaType) + totalTimeMs. `seed` surfaces
+    // the first image's seed for backward-compatible single-image callers.
     init(proto: RADiffusionResult, requestedSteps: Int) {
-        var collected: [ImageData] = []
-        let width = Int(proto.width)
-        let height = Int(proto.height)
-        if !proto.imageData.isEmpty {
-            collected.append(ImageData(data: proto.imageData, width: width, height: height))
+        self.images = proto.images.map {
+            ImageData(data: $0.data, width: Int($0.width), height: Int($0.height))
         }
-        for extra in proto.batchImages where !extra.isEmpty {
-            collected.append(ImageData(data: extra, width: width, height: height))
-        }
-        self.images = collected
-        self.seed = proto.seedUsed
+        self.seed = proto.images.first?.seedUsed ?? 0
         self.steps = requestedSteps
     }
 }
@@ -350,11 +374,15 @@ public struct ClassInfo: Sendable {
     public let pixelCount: Int
     public let fraction: Float
 
-    init(proto: RASegmentationClassSummary) {
+    // RASegmentationClassSummary.fraction was deleted outright
+    // (idl/segmentation.proto: class_id/pixel_count/label only) with no
+    // replacement field. Derive it locally from the mask's total pixel
+    // count instead of dropping it from the public surface.
+    init(proto: RASegmentationClassSummary, totalPixels: Int) {
         self.classId = Int(proto.classID)
         self.label = proto.label
         self.pixelCount = Int(proto.pixelCount)
-        self.fraction = proto.fraction
+        self.fraction = totalPixels > 0 ? Float(proto.pixelCount) / Float(totalPixels) : 0
     }
 }
 
@@ -370,7 +398,8 @@ public struct SegmentationResult: Sendable {
         self.classMask = proto.classMaskU16Le
         self.width = Int(proto.width)
         self.height = Int(proto.height)
-        self.classes = proto.classSummaries.map(ClassInfo.init(proto:))
+        let totalPixels = Int(proto.width) * Int(proto.height)
+        self.classes = proto.classSummaries.map { ClassInfo(proto: $0, totalPixels: totalPixels) }
     }
 }
 
@@ -384,7 +413,7 @@ public struct Match: Sendable {
 
     init(proto: RARAGSearchResult) {
         self.text = proto.text
-        self.score = proto.similarityScore
+        self.score = proto.score
         self.metadata = proto.metadata
     }
 }
@@ -458,7 +487,7 @@ public struct AppliedAdapter: Sendable {
     public let id: String
     public let scale: Float
 
-    init(proto: RALoRAAdapterInfo) {
+    init(proto: RALoraAdapterInfo) {
         self.id = proto.adapterID
         self.scale = proto.scale
     }
@@ -468,7 +497,7 @@ public struct AppliedAdapter: Sendable {
 public struct LoraState: Sendable {
     public let applied: [AppliedAdapter]
 
-    init(proto: RALoRAState) {
+    init(proto: RALoraState) {
         self.applied = proto.loadedAdapters.filter(\.applied).map(AppliedAdapter.init(proto:))
     }
 }

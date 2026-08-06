@@ -9,16 +9,22 @@ import Foundation
 
 public extension RunAnywhere {
 
-    /// Score candidates against a query with the loaded cross-encoder.
+    /// Score documents against a query with the loaded cross-encoder.
+    ///
+    /// `RerankCandidate` was deleted outright (idl/rerank.proto: "every
+    /// facade already builds it with id set to the stringified array
+    /// index, so the wrapper carried no information the flat `documents`
+    /// list below does not") — `RerankRequest.documents` is now a plain
+    /// `repeated string`, and `RerankScoredItem.index` points back into it.
     @available(*, deprecated, renamed: "rerank.rerank(query:documents:topN:)")
     static func rerank(
         query: String,
-        candidates: [RARerankCandidate],
+        documents: [String],
         options: RARerankOptions = RARerankOptions()
     ) async throws -> RARerankResult {
         var request = RARerankRequest()
         request.query = query
-        request.candidates = candidates
+        request.documents = documents
         request.options = options
         return try await rerankProto(request)
     }

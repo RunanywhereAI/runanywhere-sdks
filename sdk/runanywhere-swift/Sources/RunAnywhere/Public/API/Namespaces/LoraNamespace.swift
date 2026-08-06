@@ -41,7 +41,7 @@ public extension RunAnywhere.LoRA {
     ///
     /// - Throws: `SDKException` when the removal is rejected.
     func remove(adapterId: String) async throws {
-        var request = RALoRARemoveRequest()
+        var request = RALoraRemoveRequest()
         request.adapterIds = [adapterId]
         let state = try await remove(request)
         if state.hasError {
@@ -53,7 +53,7 @@ public extension RunAnywhere.LoRA {
     ///
     /// - Throws: `SDKException` when the removal is rejected.
     func removeAll() async throws {
-        var request = RALoRARemoveRequest()
+        var request = RALoraRemoveRequest()
         request.clearAll_p = true
         let state = try await remove(request)
         if state.hasError {

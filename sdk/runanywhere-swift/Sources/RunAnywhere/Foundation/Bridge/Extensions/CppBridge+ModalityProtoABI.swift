@@ -492,7 +492,8 @@ extension CppBridge.VoiceAgent {
         }
         var frame = RAVoiceAgentAudioFrame()
         frame.audioData = audio
-        frame.sampleRate = sampleRate
+        // sampleRate -> sampleRateHz (idl voice_agent_service.proto rename).
+        frame.sampleRateHz = sampleRate
         frame.channels = channels
         frame.encoding = encoding
         frame.isFinal = isFinal
@@ -512,14 +513,19 @@ extension CppBridge.VoiceAgent {
 // MARK: - VLM custom
 
 extension CppBridge.VLM {
-    public func process(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> RAVLMResult {
+    /// Run one lifecycle-owned VLM generation from a fully-built request.
+    ///
+    /// `RAVLMGenerationOptions` was deleted outright (idl/vlm_options.proto):
+    /// sampling now lives on the shared `RALLMGenerationOptions.options`
+    /// field, with only the four genuinely vision-specific knobs surviving
+    /// on `RAVLMVisionOptions.vision`. Callers build the full
+    /// `RAVLMGenerationRequest` (images/messages/prompt/options/vision) and
+    /// pass it straight through.
+    public func process(_ request: RAVLMGenerationRequest) async throws -> RAVLMResult {
         let process = try NativeProtoABI.require(
             VLMCustomProtoABI.process,
             named: VLMCustomProtoABI.processName
         )
-        var request = RAVLMGenerationRequest()
-        request.images = [image]
-        request.options = options
         return try decodeBuffer(
             responseType: RAVLMResult.self,
             symbolName: VLMCustomProtoABI.processName
@@ -538,14 +544,11 @@ extension CppBridge.VLM {
     /// is resolved from the commons lifecycle, so no component handle is
     /// threaded; `request.modelID` is left empty (commons only validates it
     /// against the loaded model when non-empty).
-    public func processStream(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> AsyncStream<RAVLMStreamEvent> {
+    public func processStream(_ request: RAVLMGenerationRequest) async throws -> AsyncStream<RAVLMStreamEvent> {
         _ = try NativeProtoABI.require(
             VLMCustomProtoABI.stream,
             named: VLMCustomProtoABI.streamName
         )
-        var request = RAVLMGenerationRequest()
-        request.images = [image]
-        request.options = options
         let requestData = try request.serializedData()
         return AsyncStream { continuation in
             let context = ProtoStreamContext<RAVLMStreamEvent>(

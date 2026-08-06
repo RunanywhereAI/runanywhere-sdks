@@ -15,12 +15,15 @@ import Foundation
 // MARK: - RAEmbeddingVector
 
 extension RAEmbeddingVector {
+    /// `EmbeddingVector.norm` was deleted outright (idl/embeddings_options.proto)
+    /// with no replacement — there is no cached norm to read, so this always
+    /// computes it fresh (cheap, `O(dimension)`).
     public func cosineSimilarity(with other: RAEmbeddingVector) -> Float {
         guard values.count == other.values.count, !values.isEmpty else { return 0 }
         var dot: Float = 0
         for i in 0..<values.count { dot += values[i] * other.values[i] }
-        let aNorm = hasNorm ? norm : Self.l2(values)
-        let bNorm = other.hasNorm ? other.norm : Self.l2(other.values)
+        let aNorm = Self.l2(values)
+        let bNorm = Self.l2(other.values)
         guard aNorm > 0 && bNorm > 0 else { return 0 }
         return dot / (aNorm * bNorm)
     }

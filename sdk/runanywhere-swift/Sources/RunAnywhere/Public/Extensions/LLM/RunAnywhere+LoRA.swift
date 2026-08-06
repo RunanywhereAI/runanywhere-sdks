@@ -33,7 +33,7 @@ public extension RunAnywhere {
         /// - Parameter request: Generated apply request carrying adapter configs.
         /// - Returns: Generated apply result from commons.
         @discardableResult
-        public func apply(_ request: RALoRAApplyRequest) async throws -> RALoRAApplyResult {
+        public func apply(_ request: RALoraApplyRequest) async throws -> RALoraApplyResult {
             return try await CppBridge.LLM.shared.applyLoraAdapters(request)
         }
 
@@ -41,13 +41,22 @@ public extension RunAnywhere {
         ///
         /// This preserves the catalog adapter id in the generated apply request,
         /// allowing commons to validate the adapter against the loaded base model.
+        ///
+        /// `replaceExisting` keeps its historical name and `false` default for
+        /// public API stability. Internally it inverts onto the wire field
+        /// `keepExisting` (idl/lora_options.proto polarity flip: zero-value
+        /// `keepExisting=false` now means SET-semantics replacement, matching
+        /// Diffusers `set_adapters`/llama.cpp `llama_set_adapters_lora`, while
+        /// the old zero-value `replaceExisting=false` meant "stack"). So the
+        /// default `replaceExisting: false` (stack, unchanged behavior) maps
+        /// to `keepExisting: true`.
         @discardableResult
         public func apply(
             _ entry: RALoraAdapterCatalogEntry,
             localPath: String? = nil,
             scale: Float? = nil,
             replaceExisting: Bool = false
-        ) async throws -> RALoRAApplyResult {
+        ) async throws -> RALoraApplyResult {
             let adapterPath = localPath ?? entry.localPath
             guard !adapterPath.isEmpty else {
                 throw SDKException(
@@ -57,16 +66,16 @@ public extension RunAnywhere {
                 )
             }
 
-            var config = RALoRAAdapterConfig()
+            var config = RALoraAdapterConfig()
             config.adapterPath = adapterPath
             config.scale = scale ?? (entry.defaultScale > 0 ? entry.defaultScale : 1.0)
             if !entry.id.isEmpty {
                 config.adapterID = entry.id
             }
 
-            var request = RALoRAApplyRequest()
+            var request = RALoraApplyRequest()
             request.adapters = [config]
-            request.replaceExisting = replaceExisting
+            request.keepExisting = !replaceExisting
             return try await apply(request)
         }
 
@@ -78,7 +87,7 @@ public extension RunAnywhere {
             localPath: String? = nil,
             scale: Float? = nil,
             replaceExisting: Bool = false
-        ) async throws -> RALoRAApplyResult {
+        ) async throws -> RALoraApplyResult {
             try await apply(entry, localPath: localPath, scale: scale, replaceExisting: replaceExisting)
         }
 
@@ -88,7 +97,7 @@ public extension RunAnywhere {
         ///   adapter paths, or `clearAll_p`.
         /// - Returns: Generated LoRA state after removal.
         @discardableResult
-        public func remove(_ request: RALoRARemoveRequest) async throws -> RALoRAState {
+        public func remove(_ request: RALoraRemoveRequest) async throws -> RALoraState {
             return try await CppBridge.LLM.shared.removeLoraAdapters(request)
         }
 
@@ -96,19 +105,19 @@ public extension RunAnywhere {
         ///
         /// - Throws: `SDKException` when the adapter list cannot be read.
         public func list() async throws -> LoraState {
-            LoraState(proto: try await CppBridge.LLM.shared.listLoraAdapters(RALoRAState()))
+            LoraState(proto: try await CppBridge.LLM.shared.listLoraAdapters(RALoraState()))
         }
 
         /// Get the LoRA service state reported by commons.
-        public func state() async throws -> RALoRAState {
-            return try await CppBridge.LLM.shared.getLoraState(RALoRAState())
+        public func state() async throws -> RALoraState {
+            return try await CppBridge.LLM.shared.getLoraState(RALoraState())
         }
 
         /// Check whether a LoRA adapter is compatible with a model.
         ///
         /// The lifecycle-aware C ABI resolves the active LLM component
         /// internally; callers no longer need to thread a handle.
-        public func checkCompatibility(_ config: RALoRAAdapterConfig) async -> RALoraCompatibilityResult {
+        public func checkCompatibility(_ config: RALoraAdapterConfig) async -> RALoraCompatibilityResult {
             do {
                 return try await CppBridge.LLM.shared.checkLoraCompatibility(config)
             } catch {
@@ -157,36 +166,15 @@ public extension RunAnywhere {
             return try await CppBridge.LoraRegistry.shared.getCatalogEntry(request)
         }
 
-        /// Persist native-reported LoRA adapter download completion in commons.
-        ///
-        /// Swift owns the URLSession/file work. Commons owns the generated catalog
-        /// state update once the stable local path is known.
-        @discardableResult
-        public func markDownloadCompleted(
-            _ request: RALoraAdapterDownloadCompletedRequest
-        ) async throws -> RALoraAdapterDownloadCompletedResult {
-            guard RunAnywhere.isReady else {
-                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
-            }
-            return try await CppBridge.LoraRegistry.shared.markDownloadCompleted(request)
-        }
-
-        /// Persist native-reported LoRA adapter import completion in commons.
-        ///
-        /// This uses the generated download-completed message with `imported`
-        /// asserted, matching the IDL contract for platform file-picker/import
-        /// completion.
-        @discardableResult
-        public func markImportCompleted(
-            _ request: RALoraAdapterDownloadCompletedRequest
-        ) async throws -> RALoraAdapterDownloadCompletedResult {
-            var importRequest = request
-            importRequest.imported = true
-            if importRequest.statusMessage.isEmpty {
-                importRequest.statusMessage = "import completed"
-            }
-            return try await markDownloadCompleted(importRequest)
-        }
+        // markDownloadCompleted(_:) / markImportCompleted(_:) were deleted:
+        // LoraAdapterDownloadCompletedRequest/Result was removed outright
+        // from idl/lora_options.proto (lora-delete-download-import-bookkeeping)
+        // with no replacement message. Adapter files are now acquired
+        // exclusively through the models domain's download/import verbs
+        // (see RunAnywhere+LoRADownload.swift's `download`/`importAdapter`);
+        // a non-empty `RALoraAdapterCatalogEntry.localPath` is the only
+        // "downloaded" signal that survives. Any caller of the old verbs
+        // needs to migrate to the models-domain download/import path.
 
         /// Get all LoRA adapters compatible with a specific model (CANONICAL_API §3).
         ///

@@ -35,7 +35,10 @@ private enum DownloadProtoABI {
     static let plan = NativeProtoABI.load("rac_download_plan_proto", as: ProtoFunction.self)
     static let start = NativeProtoABI.load("rac_download_start_proto", as: ProtoFunction.self)
     static let cancel = NativeProtoABI.load("rac_download_cancel_proto", as: ProtoFunction.self)
-    static let resume = NativeProtoABI.load("rac_download_resume_proto", as: ProtoFunction.self)
+    // rac_download_resume_proto is retired in commons (start resumes
+    // automatically); RADownloadResumeRequest/Result were deleted outright
+    // (idl/download_service.proto). See the deleted `resume(_:)` method
+    // below.
     static let pollProgress = NativeProtoABI.load(
         "rac_download_progress_poll_proto",
         as: ProtoFunction.self
@@ -211,27 +214,10 @@ extension CppBridge {
             }
         }
 
-        public func resume(_ request: RADownloadResumeRequest) -> RADownloadResumeResult {
-            do {
-                return try NativeProtoABI.invoke(
-                    request,
-                    symbol: DownloadProtoABI.resume,
-                    symbolName: "rac_download_resume_proto",
-                    responseType: RADownloadResumeResult.self
-                )
-            } catch {
-                var result = RADownloadResumeResult()
-                result.accepted = false
-                result.modelID = request.modelID
-                result.taskID = request.taskID
-                result.error = RASDKError.make(
-                    code: .internal,
-                    message: String(describing: error),
-                    category: .internal
-                )
-                return result
-            }
-        }
+        // resume(_:) was deleted: RADownloadResumeRequest/Result were
+        // removed outright (idl/download_service.proto), and
+        // rac_download_resume_proto is a retired stub in commons —
+        // rac_download_start_proto resumes automatically now.
 
         public func pollProgress(_ request: RADownloadSubscribeRequest) -> RADownloadProgress {
             do {

@@ -135,6 +135,11 @@ public extension RunAnywhere {
             let registered = await ToolRegistry.shared.getAll()
             let activeTools = effective.tools.isEmpty ? registered : effective.tools
             if !activeTools.isEmpty, !LLM.isToolChoiceNone(effective.toolChoice) {
+                // idl/tool_calling.proto deleted RAToolCallingResult's
+                // conversation-id-bearing predecessor outright; the result
+                // carries no correlation id at all now, so mint one locally
+                // purely for GenerationResult's requestId field.
+                let requestId = UUID().uuidString
                 let loop = try await RunAnywhere.generateWithTools(
                     prompt: prompt,
                     options: effective.toProto(),
@@ -148,13 +153,12 @@ public extension RunAnywhere {
                         category: .component
                     )
                 }
-                return GenerationResult(proto: loop, requestId: loop.conversationID, model: model)
+                return GenerationResult(proto: loop, requestId: requestId, model: model)
             }
 
             var request = RALLMGenerateRequest()
-            request.prompt = prompt
             request.options = effective.toProto()
-            request.history = history
+            request.messages = LLM.makeMessages(history: history, prompt: prompt)
             request.modelID = model
 
             let result = try await CppBridge.LLM.shared.generate(request)
@@ -176,13 +180,25 @@ public extension RunAnywhere {
             )
 
             var request = RALLMGenerateRequest()
-            request.prompt = prompt
             request.options = effective.toProto()
-            request.history = history
+            request.messages = LLM.makeMessages(history: history, prompt: prompt)
             request.modelID = model
 
             let events = try await CppBridge.LLM.shared.generateStream(request)
             return RunAnywhere.mapGenerationStream(events, model: model)
+        }
+
+        /// Fold prior turns plus the current prompt into the single
+        /// `messages` array `RALLMGenerateRequest` now carries — oldest
+        /// first, ending with the turn the model must answer. Replaces the
+        /// deleted `RALLMGenerateRequest.prompt`/`.history` pair.
+        private static func makeMessages(history: [RAChatMessage], prompt: String) -> [RAChatMessage] {
+            var messages = history
+            var userTurn = RAChatMessage()
+            userTurn.role = .user
+            userTurn.content = prompt
+            messages.append(userTurn)
+            return messages
         }
 
         private static func isToolChoiceNone(_ choice: ToolChoice) -> Bool {
@@ -273,8 +289,11 @@ extension RunAnywhere {
                     guard !event.token.isEmpty else { return }
                     if firstTokenAt == nil { firstTokenAt = Date() }
                     tokenCount += 1
-                    let kind = TokenKind(proto: event.kind)
-                    if kind == .thought {
+                    // RALLMStreamEvent's discriminator is event-level
+                    // (eventKind: RALLMStreamEventKind — started/token/
+                    // thinking/toolCall/progress/completed/error), not a
+                    // per-token RATokenKind field.
+                    if event.eventKind == .thinking {
                         accumulatedThinking += event.token
                         continuation.yield(.reasoningDelta(
                             requestId: requestId,
@@ -283,7 +302,7 @@ extension RunAnywhere {
                             index: 0,
                             text: event.token
                         ))
-                    } else if event.kind != .toolCall {
+                    } else if event.eventKind != .toolCall {
                         accumulatedText += event.token
                         continuation.yield(.textDelta(
                             requestId: requestId,
@@ -329,7 +348,10 @@ extension RunAnywhere {
 
                     emitToken(event, sequence: sequence)
 
-                    if event.isFinal {
+                    // LLMStreamFinalResult is deleted: the stream terminates
+                    // with event_kind == COMPLETED (result set) — there is
+                    // no separate isFinal flag anymore.
+                    if event.eventKind == .completed {
                         let result: GenerationResult
                         if event.hasResult {
                             result = GenerationResult(
@@ -403,7 +425,7 @@ extension RunAnywhere {
         tokenCount: Int,
         startedAt: Date,
         firstTokenAt: Date?,
-        finishReason: String,
+        finishReason: RAFinishReason,
         requestId: String,
         model: String
     ) -> GenerationResult {
@@ -414,7 +436,7 @@ extension RunAnywhere {
             text: text,
             thinkingText: thinking.isEmpty ? nil : thinking,
             toolCalls: [],
-            finishReason: FinishReason.parse(finishReason),
+            finishReason: FinishReason(proto: finishReason),
             inputTokens: 0,
             outputTokens: tokenCount,
             timeToFirstTokenMs: ttft,
@@ -426,7 +448,7 @@ extension RunAnywhere {
 
     internal static func parseStructuredOutput(
         text: String,
-        schema: RAJSONSchema
+        schema: JsonSchema
     ) throws -> RAStructuredOutputResult {
         try CppBridge.StructuredOutput.parse(
             CppBridge.StructuredOutput.makeParseRequest(text: text, schema: schema)
@@ -438,14 +460,14 @@ extension RunAnywhere {
     internal static func structuredRepairPrompt(
         original: String,
         invalidOutput: String,
-        schema: RAJSONSchema
+        schema: JsonSchema
     ) -> String {
         """
         \(original)
 
         Your previous answer did not match the required JSON schema. Reply again with ONLY JSON that satisfies this schema.
 
-        Schema: \((try? schema.jsonString()) ?? "")
+        Schema: \(schema)
         Previous invalid answer: \(invalidOutput)
         """
     }

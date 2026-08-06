@@ -26,7 +26,11 @@ extension RATTSSpeakResult {
         self.audioFormat = output.audioFormat
         self.sampleRate = output.sampleRate
         self.durationMs = output.durationMs
-        self.audioSizeBytes = output.audioSizeBytes > 0 ? output.audioSizeBytes : Int64(output.audioData.count)
+        // RATTSOutput.audioSizeBytes was deleted outright
+        // (idl/tts_options.proto); RATTSSpeakResult.audioSizeBytes (this
+        // message, a distinct field) survives, so derive it from the raw
+        // audio buffer length instead of a source field that no longer exists.
+        self.audioSizeBytes = Int64(output.audioData.count)
         if output.hasMetadata {
             self.metadata = output.metadata
         }

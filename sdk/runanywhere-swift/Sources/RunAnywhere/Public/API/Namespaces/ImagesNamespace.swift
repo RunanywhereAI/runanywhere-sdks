@@ -30,10 +30,11 @@ public extension RunAnywhere {
         ) async throws -> ImageResult {
             let effective = options ?? ImageOptions()
             let protoOptions = try effective.toProto(prompt: prompt)
+            // DiffusionResult carries no error field on the unary path
+            // (idl/diffusion_options.proto): failures travel out-of-band via
+            // rac_proto_buffer_t status, which NativeProtoABI.invoke already
+            // throws from inside generateImageProto.
             let result = try await RunAnywhere.generateImageProto(protoOptions)
-            if result.hasError {
-                throw SDKException(proto: result.error)
-            }
             return ImageResult(proto: result, requestedSteps: effective.steps ?? Int(protoOptions.steps))
         }
 
@@ -62,13 +63,13 @@ public extension RunAnywhere {
                         case .started:
                             continuation.yield(.started)
                         case .progress, .intermediateImage:
+                            // intermediateImageWidth/Height were deleted
+                            // outright (idl/diffusion_options.proto);
+                            // DiffusionProgress now only carries the raw
+                            // bytes, with no resolved dimensions.
                             let progress = event.progress
                             let partial: ImageData? = progress.hasIntermediateImageData
-                                ? ImageData(
-                                    data: progress.intermediateImageData,
-                                    width: Int(progress.intermediateImageWidth),
-                                    height: Int(progress.intermediateImageHeight)
-                                )
+                                ? ImageData(data: progress.intermediateImageData, width: 0, height: 0)
                                 : nil
                             continuation.yield(.progress(
                                 step: Int(progress.currentStep),

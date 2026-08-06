@@ -31,10 +31,11 @@ public extension RunAnywhere.Embeddings {
         request.options = (options ?? EmbedOptions()).toProto()
         request.modelID = model
 
+        // RAEmbeddingsResult carries no error field at all
+        // (idl/embeddings_options.proto): a failed call already throws
+        // inside embedBatchLifecycle via the native-ABI status check, so
+        // there is nothing left to inspect on a successful return.
         let result = try CppBridge.EmbeddingsProto.embedBatchLifecycle(request)
-        if result.hasError {
-            throw SDKException(proto: result.error)
-        }
         return result.vectors.enumerated().map { index, vector in
             Embedding(proto: vector, fallbackIndex: index)
         }

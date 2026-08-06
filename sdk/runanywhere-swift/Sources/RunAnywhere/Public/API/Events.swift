@@ -83,6 +83,11 @@ public enum VoiceEvent: Sendable {
 
     /// Fold one native voice event onto the spec grammar, or drop it when it
     /// carries no caller-visible meaning.
+    ///
+    /// `OneOf_Payload.error` was deleted outright (idl/voice_events.proto:
+    /// "The one error payload in this domain" is now `sessionError` alone),
+    /// and `agentResponseStarted` collapsed from its own oneof arm into a
+    /// `TurnLifecycleEventKind` value carried on the `turnLifecycle` arm.
     static func from(proto: RAVoiceEvent) -> VoiceEvent? {
         switch proto.payload {
         case .userSaid(let said):
@@ -96,12 +101,16 @@ public enum VoiceEvent: Sendable {
                 return vad.isSpeech ? .speechStarted : .speechEnded
             }
             return nil
-        case .error(let error):
-            return .error(message: error.message, recoverable: error.isRecoverable)
         case .sessionError(let error):
             return .error(message: error.message, recoverable: error.recoverable)
-        case .agentResponseStarted:
-            return .agentStateChanged(.speaking)
+        case .turnLifecycle(let turn):
+            if turn.kind == .agentResponseStarted {
+                return .agentStateChanged(.speaking)
+            }
+            if turn.kind == .failed, turn.hasError {
+                return .error(message: turn.error.message, recoverable: turn.error.recoverable)
+            }
+            return nil
         default:
             return nil
         }
@@ -162,14 +171,15 @@ public enum SdkEvent: Sendable {
         if proto.category == .initialization, proto.initialization.stage == .completed {
             return .ready
         }
-        if proto.category == .failure {
-            let failure = proto.failure
-            let message = failure.hasError ? failure.error.message : "SDK operation failed"
-            return .error(message: message, recoverable: failure.recoverable)
-        }
-        if proto.category == .error {
+        // FailureEvent was deleted outright (idl/sdk_events.proto: "every
+        // field already exists on the envelope -- component ->
+        // SDKEvent.component, operation -> SDKEvent.operation_id, error ->
+        // SDKEvent.error, recoverable -> SDKError.retryable. A failure is
+        // any event whose envelope `error` is set"). `.failure` and `.error`
+        // categories both now read off the same top-level `error` field.
+        if proto.category == .failure || proto.category == .error {
             let message = proto.hasError ? proto.error.message : "SDK error"
-            return .error(message: message, recoverable: false)
+            return .error(message: message, recoverable: proto.hasError ? proto.error.retryable : false)
         }
         guard let change = EventBus.modelLifecycleChange(from: proto) else { return nil }
         switch change.kind {

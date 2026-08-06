@@ -24,8 +24,12 @@ public struct CuaAction: Sendable {
     public let text: String
     /// Chain-of-thought the model emitted before the tool call, if any.
     public let reasoning: String
-    /// Scroll amount for scroll/hscroll (+up / -down).
-    public let scrollPixels: Int
+    /// Horizontal scroll amount, for `hscroll`. Raw model output, sign
+    /// unverified against any real device trace.
+    public let scrollX: Int
+    /// Vertical scroll amount, for `scroll`. Raw model output, sign
+    /// unverified against any real device trace.
+    public let scrollY: Int
     /// Seconds to wait for `wait`.
     public let waitSeconds: Double
     /// Whether a valid tool call was found.
@@ -88,15 +92,20 @@ extension RunAnywhere {
             let bytes = buffer.size > 0 ? Data(bytes: data, count: buffer.size) : Data()
             guard let proto = try? RACuaAction(serializedBytes: bytes) else { return nil }
 
-            let coordinate = proto.coordinateValid ? (x: Int(proto.x), y: Int(proto.y)) : nil
+            // coordinateValid/scrollPixels/parseOk were deleted outright
+            // (idl/cua.proto): x/y presence IS "has a coordinate" now
+            // (hasX/hasY), scroll_pixels split into scroll_x/scroll_y, and
+            // parseOk was renamed is_valid.
+            let coordinate = (proto.hasX && proto.hasY) ? (x: Int(proto.x), y: Int(proto.y)) : nil
             return CuaAction(
                 kind: CuaAction.Kind(rawValue: proto.type.rawValue) ?? .unknown,
                 coordinate: coordinate,
                 text: proto.text,
                 reasoning: proto.reasoning,
-                scrollPixels: Int(proto.scrollPixels),
+                scrollX: Int(proto.scrollX),
+                scrollY: Int(proto.scrollY),
                 waitSeconds: proto.waitSeconds,
-                isValid: proto.parseOk
+                isValid: proto.isValid
             )
         }
     }

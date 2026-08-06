@@ -31,7 +31,6 @@ final class SegmentationPublicSurfaceTests: XCTestCase {
         var summary = RASegmentationClassSummary()
         summary.classID = 12
         summary.pixelCount = 2
-        summary.fraction = 1
         summary.label = "person"
 
         var result = RASegmentationResult()
