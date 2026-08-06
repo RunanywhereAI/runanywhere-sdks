@@ -87,7 +87,7 @@ export async function answerImageAttachment(
   try {
     for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
       const event = step.value;
-      if (event.type === 'token') {
+      if (event.type === 'textDelta') {
         content += event.text;
         onProgress({ content });
       }
@@ -151,7 +151,7 @@ export async function answerDocumentAttachment(
         ? { mode: 'off' }
         : { mode: 'on', includeInOutput: true },
     };
-    const result = await session.query(question, generation);
+    const result = await session.query(question, { generation });
     throwIfDocumentCancelled(cancellation.signal);
 
     const split = splitThinking(result.answer);

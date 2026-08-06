@@ -46,7 +46,7 @@ export class VLMProtoAdapter {
   async process(
     image: ProtoVLMImage,
     prompt: string,
-    options: ProtoLLMGenerationOptions,
+    options: Partial<ProtoLLMGenerationOptions>,
     vision?: ProtoVLMVisionOptions,
   ): Promise<ProtoVLMResult | null> {
     const requestBytes = VLMGenerationRequest.encode(
@@ -76,7 +76,7 @@ export class VLMProtoAdapter {
   async processAsync(
     image: ProtoVLMImage,
     prompt: string,
-    options: ProtoLLMGenerationOptions,
+    options: Partial<ProtoLLMGenerationOptions>,
     vision?: ProtoVLMVisionOptions,
   ): Promise<ProtoVLMResult | null> {
     return this.process(image, prompt, options, vision);
@@ -92,7 +92,7 @@ export class VLMProtoAdapter {
   streamEvents(
     image: ProtoVLMImage,
     prompt: string,
-    options: ProtoLLMGenerationOptions,
+    options: Partial<ProtoLLMGenerationOptions>,
     vision?: ProtoVLMVisionOptions,
   ): AsyncIterable<ProtoVLMStreamEvent> {
     const requestBytes = VLMGenerationRequest.encode(

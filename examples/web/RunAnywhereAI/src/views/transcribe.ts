@@ -263,11 +263,14 @@ async function runTranscribeStream(samples: Float32Array): Promise<void> {
   try {
     transcript = '';
     for await (const event of RunAnywhere.stt.transcribeStream(chunks())) {
-      if (event.type === 'partial' && event.text.trim()) {
-        transcript = event.text.trim();
-        updateOutput();
-      } else if (event.type === 'final') {
-        transcript = event.transcription.text.trim();
+      if (event.type === 'partial') {
+        const text = event.alternatives[0]?.text.trim();
+        if (text) {
+          transcript = text;
+          updateOutput();
+        }
+      } else if (event.type === 'transcriptFinal') {
+        transcript = event.segment.text.trim();
         updateOutput();
       }
     }

@@ -28,7 +28,7 @@ import {
   type LlmOptions,
   type ToolDefinition,
 } from '@runanywhere/web';
-import { ToolParameterType, type ToolValue } from '@runanywhere/proto-ts/tool_calling';
+import type { ToolValue } from '@runanywhere/proto-ts/tool_calling';
 import {
   buildGetStartedOverlay,
   findLoadedModelForCategory,
@@ -736,16 +736,17 @@ async function generateStreaming(
     // matches the shape the RN SDK requires, so the two demos read alike.
     for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
       const event = step.value;
-      if (event.type === 'token') {
+      if (event.type === 'reasoningDelta') {
         sawAnyToken = true;
         window.clearTimeout(firstTokenTimer);
-        if (event.kind === 'thought') {
-          thinking += event.text;
-          assistantMsg.thinking = thinking;
-        } else {
-          answer += event.text;
-          assistantMsg.content = answer;
-        }
+        thinking += event.text;
+        assistantMsg.thinking = thinking;
+        renderLastMessage(messagesEl, assistantMsg);
+      } else if (event.type === 'textDelta') {
+        sawAnyToken = true;
+        window.clearTimeout(firstTokenTimer);
+        answer += event.text;
+        assistantMsg.content = answer;
         renderLastMessage(messagesEl, assistantMsg);
       } else if (event.type === 'completed') {
         answer = event.result.text || answer;
@@ -915,28 +916,42 @@ function registerDemoTools(): void {
   );
 }
 
+/** A single required string parameter, described as a JSON Schema property. */
+interface DemoToolStringParameter {
+  name: string;
+  description: string;
+}
+
+/**
+ * `ToolDefinition.parameters` is one JSON-Schema-object string now (OpenAI
+ * `parameters` / Anthropic `input_schema` / MCP `inputSchema` shape), not a
+ * structured `ToolParameter[]`. Build that schema string here rather than
+ * hand-rolling proto types the app has no business constructing.
+ */
 function toolDefinition(
   name: string,
   description: string,
-  parameters: ToolDefinition['parameters'],
+  parameters: DemoToolStringParameter[],
 ): ToolDefinition {
+  const properties: Record<string, { type: 'string'; description: string }> = {};
+  for (const param of parameters) {
+    properties[param.name] = { type: 'string', description: param.description };
+  }
+  const schema = {
+    type: 'object',
+    properties,
+    required: parameters.map((param) => param.name),
+  };
   return {
     name,
     description,
-    parameters,
+    parameters: JSON.stringify(schema),
     category: 'Utility',
-    metadata: {},
   };
 }
 
-function stringParameter(name: string, description: string): ToolDefinition['parameters'][number] {
-  return {
-    name,
-    type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-    description,
-    required: true,
-    enumValues: [],
-  };
+function stringParameter(name: string, description: string): DemoToolStringParameter {
+  return { name, description };
 }
 
 function tv(value: string | number | boolean): ToolValue {
