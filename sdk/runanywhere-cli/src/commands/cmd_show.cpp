@@ -59,7 +59,8 @@ int run_show(const GlobalOptions &options, const std::string &ref) {
     return 1;
   }
 
-  const bool downloaded = model.is_downloaded() || !model.local_path().empty();
+  const bool downloaded = model.registry_status() == v1::MODEL_REGISTRY_STATUS_DOWNLOADED ||
+                         !model.local_path().empty();
 
   if (options.json) {
     out::JsonWriter json;

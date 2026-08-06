@@ -109,7 +109,8 @@ int run_register(const GlobalOptions& options, const std::string& ref, const std
             .field("modality", model_labels::category(model.category()))
             .field("backend", model_labels::backend(model.framework()))
             .field("download_url", model.download_url())
-            .field("downloaded", model.is_downloaded())
+            .field("downloaded",
+                   model.registry_status() == v1::MODEL_REGISTRY_STATUS_DOWNLOADED)
             .end_object();
         out::result_line(json.str());
     } else {

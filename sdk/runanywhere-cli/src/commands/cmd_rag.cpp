@@ -124,7 +124,7 @@ bool open_and_ingest(const GlobalOptions& options, const RagParams& params,
         config.set_chunk_overlap(params.chunk_overlap);
     }
     if (params.similarity_threshold >= 0.0f) {
-        config.set_similarity_threshold(params.similarity_threshold);
+        config.set_score_threshold(params.similarity_threshold);
     }
 
     const std::string config_bytes = proto::serialize(config);
@@ -189,7 +189,7 @@ int run_rag_query(const GlobalOptions& options, const RagParams& params,
     }
 
     v1::RAGQueryOptions query;
-    query.set_question(question);
+    query.set_query(question);
     if (params.max_output_tokens > 0) {
         query.mutable_generation()->set_max_output_tokens(params.max_output_tokens);
     }
@@ -200,10 +200,10 @@ int run_rag_query(const GlobalOptions& options, const RagParams& params,
         query.mutable_generation()->set_system_prompt(params.system_prompt);
     }
     if (params.similarity_threshold >= 0.0f) {
-        query.set_similarity_threshold(params.similarity_threshold);
+        query.mutable_retrieval()->set_score_threshold(params.similarity_threshold);
     }
     if (params.top_k > 0) {
-        query.set_retrieval_top_k(params.top_k);
+        query.mutable_retrieval()->set_top_k(params.top_k);
     }
 
     const std::string query_bytes = proto::serialize(query);
@@ -229,18 +229,22 @@ int run_rag_query(const GlobalOptions& options, const RagParams& params,
 
     if (options.json) {
         out::JsonWriter json;
+        // RAGResult carries no total_time_ms of its own (deleted in the API
+        // realignment pass) -- retrieval_time_ms + generation_time_ms is the
+        // whole measured wall-clock, so sum them rather than drop the field.
         json.begin_object()
             .field("answer", result.answer())
             .field("retrieval_time_ms", static_cast<int64_t>(result.retrieval_time_ms()))
             .field("generation_time_ms", static_cast<int64_t>(result.generation_time_ms()))
-            .field("total_time_ms", static_cast<int64_t>(result.total_time_ms()))
+            .field("total_time_ms", static_cast<int64_t>(result.retrieval_time_ms() +
+                                                        result.generation_time_ms()))
             .field("prompt_tokens", static_cast<int64_t>(result.usage().input_tokens()))
             .field("completion_tokens", static_cast<int64_t>(result.usage().output_tokens()));
         json.begin_array("matches");
         for (const v1::RAGSearchResult& match : result.retrieved_chunks()) {
             json.begin_array_object()
                 .field("text", match.text())
-                .field("score", static_cast<double>(match.similarity_score()))
+                .field("score", static_cast<double>(match.score()))
                 .field("source", match.source_document())
                 .end_object();
         }
@@ -282,12 +286,12 @@ int run_rag_search(const GlobalOptions& options, const RagParams& params,
     }
 
     v1::RAGSearchRequest request;
-    request.set_question(question);
+    request.set_query(question);
     if (params.top_k > 0) {
-        request.set_retrieval_top_k(params.top_k);
+        request.mutable_retrieval()->set_top_k(params.top_k);
     }
     if (params.similarity_threshold >= 0.0f) {
-        request.set_similarity_threshold(params.similarity_threshold);
+        request.mutable_retrieval()->set_score_threshold(params.similarity_threshold);
     }
 
     const std::string request_bytes = proto::serialize(request);
@@ -320,7 +324,7 @@ int run_rag_search(const GlobalOptions& options, const RagParams& params,
         for (const v1::RAGSearchResult& match : response.chunks()) {
             json.begin_array_object()
                 .field("text", match.text())
-                .field("score", static_cast<double>(match.similarity_score()))
+                .field("score", static_cast<double>(match.score()))
                 .field("source", match.source_document())
                 .end_object();
         }

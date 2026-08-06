@@ -27,6 +27,7 @@
 #include "rac/lifecycle/rac_sdk_init.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
+#include "model_types.pb.h"
 #include "sdk_init.pb.h"
 
 #include "catalog/catalog.h"
@@ -181,13 +182,16 @@ bool parse_environment_name(const std::string &name, rac_environment_t *out) {
   return false;
 }
 
-::runanywhere::v1::SdkInitEnvironment
+// SdkInitEnvironment is gone: SdkInitPhase1Request.environment now takes
+// model_types.proto's SDKEnvironment directly (the single environment
+// vocabulary across the whole IDL).
+::runanywhere::v1::SDKEnvironment
 proto_environment_from_rac(rac_environment_t env) {
   switch (rac_env_normalize(env)) {
   case RAC_ENV_PRODUCTION:
-    return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_PRODUCTION;
+    return ::runanywhere::v1::SDK_ENVIRONMENT_PRODUCTION;
   default:
-    return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+    return ::runanywhere::v1::SDK_ENVIRONMENT_DEVELOPMENT;
   }
 }
 
@@ -420,10 +424,11 @@ void initialize_telemetry_auth(const Connection &connection) {
     return;
   }
 
+  // flush_telemetry/discover_downloaded_models/rescan_local_models were
+  // deleted from SdkInitPhase2Request outright: telemetry flushing and
+  // registry/local-file reconciliation are now unconditional commons
+  // behavior on every Phase 2 call, not per-call hints.
   ::runanywhere::v1::SdkInitPhase2Request phase2;
-  phase2.set_flush_telemetry(true);
-  phase2.set_discover_downloaded_models(true);
-  phase2.set_rescan_local_models(true);
 
   std::string phase2_bytes;
   if (!phase2.SerializeToString(&phase2_bytes)) {
@@ -451,10 +456,12 @@ void initialize_telemetry_auth(const Connection &connection) {
   }
 
   if (parsed) {
-    std::string note = std::string("telemetry ready | http_configured=") +
-                       (result.http_configured() ? "yes" : "no") +
-                       " device_registered=" +
-                       (result.device_registered() ? "yes" : "no");
+    // http_configured/device_registered were deleted outright from
+    // SdkInitResult; has_completed_http_setup is the cross-phase latched bit
+    // that survives (the per-call http_configured signal has no replacement).
+    std::string note =
+        std::string("telemetry ready | has_completed_http_setup=") +
+        (result.has_completed_http_setup() ? "yes" : "no");
     if (!result.warning().empty()) {
       note += " | " + result.warning();
     }

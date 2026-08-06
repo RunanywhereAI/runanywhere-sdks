@@ -70,7 +70,8 @@ int run_list(const GlobalOptions& options, bool show_all) {
         json.begin_object().begin_array("models");
         for (const v1::ModelInfo& model : all_models.models()) {
             const bool is_downloaded =
-                downloaded_ids.count(model.id()) > 0 || model.is_downloaded();
+                downloaded_ids.count(model.id()) > 0 ||
+                model.registry_status() == v1::MODEL_REGISTRY_STATUS_DOWNLOADED;
             if (!show_all && !is_downloaded) {
                 continue;
             }
@@ -91,7 +92,9 @@ int run_list(const GlobalOptions& options, bool show_all) {
 
     std::vector<std::vector<std::string>> rows;
     for (const v1::ModelInfo& model : all_models.models()) {
-        const bool is_downloaded = downloaded_ids.count(model.id()) > 0 || model.is_downloaded();
+        const bool is_downloaded =
+            downloaded_ids.count(model.id()) > 0 ||
+            model.registry_status() == v1::MODEL_REGISTRY_STATUS_DOWNLOADED;
         if (!show_all && !is_downloaded) {
             continue;
         }

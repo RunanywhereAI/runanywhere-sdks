@@ -69,12 +69,14 @@ bool parse_tool_choice(const std::string& mode, v1::ToolChoiceMode* out) {
 // use for the cancellable handle.
 void ignore_published_handle(uint64_t /*handle*/, void* /*user_data*/) {}
 
-void add_string_param(v1::ToolDefinition* tool, const char* name, const char* description) {
-    v1::ToolParameter* param = tool->add_parameters();
-    param->set_name(name);
-    param->set_type(v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_description(description);
-    param->set_required(true);
+// ToolParameter is gone: ToolDefinition.parameters is now one OpenAI-style
+// JSON Schema object describing all of a tool's arguments (the same shape
+// solutions.proto's ToolSpec already carries).
+void set_single_string_param_schema(v1::ToolDefinition* tool, const char* name,
+                                    const char* description) {
+    tool->set_parameters(std::string(R"({"type":"object","properties":{")") + name +
+                         R"(":{"type":"string","description":")" + description +
+                         R"("}},"required":[")" + name + R"("]})");
 }
 
 // Synchronous host executor: commons hands us a serialized ToolCall and expects
@@ -92,7 +94,7 @@ rac_result_t demo_executor(const uint8_t* in_bytes, size_t in_size, rac_proto_bu
     v1::ToolResult result;
     result.set_tool_call_id(call.id());
     result.set_name(call.name());
-    result.set_success(true);
+    result.set_is_error(false);
     if (call.name() == "get_weather") {
         result.set_result_json(R"({"temperature_c":18,"condition":"cloudy"})");
     } else if (call.name() == "calculate") {
@@ -168,23 +170,29 @@ int run_tool_call(const GlobalOptions& options, const ToolCallParams& params) {
         return 1;
     }
 
+    // ToolCallingSessionCreateRequest collapsed to {prompt, history, options}:
+    // max_tokens/auto_execute/max_tool_calls/tools/tool_choice/forced_tool_name
+    // all now live on the nested ToolCallingOptions (there is no standalone
+    // max_tokens/temperature slot anywhere on this request any more --
+    // sampling for the tool loop comes from the enclosing generation state's
+    // own defaults).
     v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(params.prompt);
-    request.set_max_tokens(256);
-    request.set_auto_execute(true);
+    v1::ToolCallingOptions* options_pb = request.mutable_options();
+    options_pb->set_auto_execute(true);
     if (params.max_tool_calls > 0) {
-        request.set_max_tool_calls(params.max_tool_calls);
+        options_pb->set_max_tool_calls(params.max_tool_calls);
     }
 
-    v1::ToolDefinition* weather = request.add_tools();
+    v1::ToolDefinition* weather = options_pb->add_tools();
     weather->set_name("get_weather");
     weather->set_description("Get the current weather for a city");
-    add_string_param(weather, "location", "City name, e.g. Tokyo");
+    set_single_string_param_schema(weather, "location", "City name, e.g. Tokyo");
 
-    v1::ToolDefinition* calc = request.add_tools();
+    v1::ToolDefinition* calc = options_pb->add_tools();
     calc->set_name("calculate");
     calc->set_description("Evaluate an arithmetic expression");
-    add_string_param(calc, "expression", "Expression such as 45 * 12");
+    set_single_string_param_schema(calc, "expression", "Expression such as 45 * 12");
 
     v1::ToolChoiceMode choice = v1::TOOL_CHOICE_MODE_AUTO;
     if (!parse_tool_choice(params.tool_choice, &choice)) {
@@ -192,10 +200,10 @@ int run_tool_call(const GlobalOptions& options, const ToolCallParams& params) {
         return 2;
     }
     if (!params.force_tool.empty()) {
-        request.set_tool_choice(v1::TOOL_CHOICE_MODE_SPECIFIC);
-        request.set_forced_tool_name(params.force_tool);
+        options_pb->set_tool_choice(v1::TOOL_CHOICE_MODE_SPECIFIC);
+        options_pb->set_forced_tool_name(params.force_tool);
     } else if (choice != v1::TOOL_CHOICE_MODE_AUTO) {
-        request.set_tool_choice(choice);
+        options_pb->set_tool_choice(choice);
     }
 
     const std::string bytes = proto::serialize(request);

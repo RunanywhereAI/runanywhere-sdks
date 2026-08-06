@@ -1,14 +1,17 @@
 /**
  * @file cmd_lora.cpp
- * @brief `rcli lora apply|remove|list` (+ `catalog` and `import`) — LoRA
- *        adapters on the loaded LLM.
+ * @brief `rcli lora apply|remove|list|catalog` — LoRA adapters on the loaded
+ *        LLM.
  *
  * `list` reports the adapters currently attached (rac_lora_state_proto) — the
- * spec's LoraState — while `catalog` lists registered adapter metadata. Import
- * places a local adapter file through the canonical commons entry point
- * (rac_lora_adapter_import_proto): catalog matching, canonical placement,
- * artifact registration, and manifest persistence all happen in commons. This
- * file only translates argv ↔ proto bytes, per the repo layering rule.
+ * spec's LoraState — while `catalog` lists registered adapter metadata. This
+ * file only translates argv <-> proto bytes, per the repo layering rule.
+ *
+ * `import` is retired: idl/lora_options.proto deleted
+ * LoraAdapterImportRequest/Result outright, and commons permanently stubs
+ * rac_lora_adapter_import_proto to RAC_ERROR_NOT_IMPLEMENTED (see
+ * src/infrastructure/model_management/lora_import.cpp). No replacement verb
+ * exists yet.
  */
 
 #include "commands/commands.h"
@@ -38,56 +41,6 @@ rac_lora_registry_handle_t require_lora_registry() {
     out::error_line("LoRA registry unavailable (SDK not initialized)");
   }
   return registry;
-}
-
-int run_lora_import(const GlobalOptions &options, const std::string &file) {
-  Bootstrapped env;
-  if (bootstrap(options, &env) != RAC_SUCCESS) {
-    return 1;
-  }
-  rac_lora_registry_handle_t registry = require_lora_registry();
-  if (!registry) {
-    return 1;
-  }
-
-  v1::LoraAdapterImportRequest request;
-  request.set_source_path(file);
-  const std::string request_bytes = proto::serialize(request);
-
-  rac_proto_buffer_t out_buffer;
-  rac_proto_buffer_init(&out_buffer);
-  const rac_result_t rc = rac_lora_adapter_import_proto(
-      registry, reinterpret_cast<const uint8_t *>(request_bytes.data()),
-      request_bytes.size(), &out_buffer);
-  v1::LoraAdapterImportResult result;
-  std::string error;
-  if (!proto::parse_proto_buffer(&out_buffer, &result, &error) ||
-      rc != RAC_SUCCESS) {
-    out::error_line("import failed: " + error);
-    return 1;
-  }
-  if (!result.has_error() == false) {
-    out::error_line("import failed: " + result.error().message());
-    return 1;
-  }
-
-  if (options.json) {
-    out::JsonWriter json;
-    json.begin_object()
-        .field("local_path", result.local_path())
-        .field("matched", result.matched());
-    if (result.matched()) {
-      json.field("adapter_id", result.entry().id());
-    }
-    json.end_object();
-    out::result_line(json.str());
-  } else {
-    out::result_line("imported " + result.local_path() +
-                     (result.matched()
-                          ? " (catalog entry: " + result.entry().id() + ")"
-                          : ""));
-  }
-  return 0;
 }
 
 int run_lora_catalog(const GlobalOptions &options) {
@@ -123,9 +76,7 @@ int run_lora_catalog(const GlobalOptions &options) {
         .field("count", static_cast<int64_t>(result.entries_size()))
         .begin_array("entries");
     for (const v1::LoraAdapterCatalogEntry &entry : result.entries()) {
-      const bool downloaded =
-          (entry.has_is_downloaded() && entry.is_downloaded()) ||
-          !entry.local_path().empty();
+      const bool downloaded = !entry.local_path().empty();
       json.begin_array_object()
           .field("id", entry.id())
           .field("name", entry.name())
@@ -142,23 +93,20 @@ int run_lora_catalog(const GlobalOptions &options) {
     return 0;
   }
   for (const v1::LoraAdapterCatalogEntry &entry : result.entries()) {
-    const bool downloaded =
-        (entry.has_is_downloaded() && entry.is_downloaded()) ||
-        !entry.local_path().empty();
+    const bool downloaded = !entry.local_path().empty();
     out::result_line(entry.id() + "  " + entry.name() +
                      (downloaded ? "  [downloaded]" : ""));
   }
   return 0;
 }
 
-void print_lora_state(const GlobalOptions &options, const v1::LoRAState &state) {
+void print_lora_state(const GlobalOptions &options, const v1::LoraState &state) {
   if (options.json) {
     out::JsonWriter json;
     json.begin_object()
-        .field("has_active_adapters", state.has_active_adapters())
         .field("base_model_id", state.base_model_id())
         .begin_array("applied");
-    for (const v1::LoRAAdapterInfo &adapter : state.loaded_adapters()) {
+    for (const v1::LoraAdapterInfo &adapter : state.loaded_adapters()) {
       json.begin_array_object()
           .field("id", adapter.adapter_id())
           .field("path", adapter.adapter_path())
@@ -175,7 +123,7 @@ void print_lora_state(const GlobalOptions &options, const v1::LoRAState &state) 
     return;
   }
   std::vector<std::vector<std::string>> rows;
-  for (const v1::LoRAAdapterInfo &adapter : state.loaded_adapters()) {
+  for (const v1::LoraAdapterInfo &adapter : state.loaded_adapters()) {
     rows.push_back({adapter.adapter_id().empty() ? adapter.adapter_path()
                                                  : adapter.adapter_id(),
                     std::to_string(adapter.scale()),
@@ -190,14 +138,15 @@ int run_lora_list(const GlobalOptions &options) {
     return 1;
   }
 
-  v1::LoRAState request;
-  const std::string request_bytes = proto::serialize(request);
+  // rac_lora_state_proto ignores its input payload (state is a pure read);
+  // an empty serialized LoraState is the canonical "no request" shape.
+  const v1::LoraState empty_request;
+  const std::string request_bytes = proto::serialize(empty_request);
   rac_proto_buffer_t out_buffer;
   rac_proto_buffer_init(&out_buffer);
   const rac_result_t rc = rac_lora_state_proto(
-      reinterpret_cast<const uint8_t *>(request_bytes.data()),
-      request_bytes.size(), &out_buffer);
-  v1::LoRAState state;
+      reinterpret_cast<const uint8_t *>(request_bytes.data()), request_bytes.size(), &out_buffer);
+  v1::LoraState state;
   std::string error;
   if (!proto::parse_proto_buffer(&out_buffer, &state, &error) ||
       rc != RAC_SUCCESS) {
@@ -214,12 +163,12 @@ int run_lora_remove(const GlobalOptions &options, const std::string &adapter) {
     return 1;
   }
 
-  v1::LoRARemoveRequest request;
+  // LoraRemoveRequest.adapter_paths was deleted: adapter_ids is the only
+  // identity path now besides clear_all, so a bare path can no longer be
+  // named directly here.
+  v1::LoraRemoveRequest request;
   if (adapter.empty()) {
     request.set_clear_all(true);
-  } else if (adapter.find('/') != std::string::npos ||
-             adapter.ends_with(".gguf")) {
-    request.add_adapter_paths(adapter);
   } else {
     request.add_adapter_ids(adapter);
   }
@@ -230,7 +179,7 @@ int run_lora_remove(const GlobalOptions &options, const std::string &adapter) {
   const rac_result_t rc = rac_lora_remove_proto(
       reinterpret_cast<const uint8_t *>(request_bytes.data()),
       request_bytes.size(), &out_buffer);
-  v1::LoRAState state;
+  v1::LoraState state;
   std::string error;
   if (!proto::parse_proto_buffer(&out_buffer, &state, &error) ||
       rc != RAC_SUCCESS) {
@@ -283,9 +232,10 @@ int run_lora_apply(const GlobalOptions &options, const std::string &model_id,
     return 1;
   }
 
-  v1::LoRAApplyRequest request;
-  request.set_replace_existing(true);
-  v1::LoRAAdapterConfig *adapter = request.add_adapters();
+  // keep_existing left unset (false): SET semantics -- `adapters` becomes the
+  // complete active set, matching the removed explicit replace_existing(true).
+  v1::LoraApplyRequest request;
+  v1::LoraAdapterConfig *adapter = request.add_adapters();
   adapter->set_adapter_path(adapter_path);
   adapter->set_scale(scale);
 
@@ -294,7 +244,7 @@ int run_lora_apply(const GlobalOptions &options, const std::string &model_id,
   rac_proto_buffer_init(&out_buffer);
   const rac_result_t rc = rac_lora_apply_proto(
       reinterpret_cast<const uint8_t *>(request_bytes.data()), request_bytes.size(), &out_buffer);
-  v1::LoRAApplyResult result;
+  v1::LoraApplyResult result;
   std::string error;
   if (!proto::parse_proto_buffer(&out_buffer, &result, &error) || rc != RAC_SUCCESS) {
     out::error_line("apply failed: " + error);
@@ -374,17 +324,13 @@ void register_lora(CLI::App &app, GlobalOptions &options) {
     }
   });
 
-  CLI::App *import_cmd =
-      cmd->add_subcommand("import", "Copy a local adapter file into SDK storage");
-  auto file = std::make_shared<std::string>();
-  import_cmd->add_option("file", *file, "Path to the adapter file (.gguf)")
-      ->required();
-  import_cmd->callback([&options, file]() {
-    const int exit_code = run_lora_import(options, *file);
-    if (exit_code != 0) {
-      throw CLI::RuntimeError(exit_code);
-    }
-  });
+  // `import` is retired: idl/lora_options.proto deleted
+  // LoraAdapterImportRequest/Result outright (adapter files are acquired
+  // through the models domain's download/import verbs now), and
+  // rac_lora_adapter_import_proto in commons is a permanent stub returning
+  // RAC_ERROR_NOT_IMPLEMENTED (see lora_import.cpp). No replacement verb
+  // exists on this namespace yet, so the command is left out per this
+  // package's own rule: never wire a flag/verb the C ABI cannot serve.
 }
 
 } // namespace rcli::commands

@@ -56,14 +56,16 @@ void print_json_result(const std::string& model_id, const std::vector<std::strin
         .field("tokens_used", static_cast<int64_t>(result.tokens_used()))
         .field("total_ms", static_cast<int64_t>(result.processing_time_ms()));
     json.begin_array("vectors");
+    // EmbeddingVector.text/dimension are gone: text is looked up by
+    // input_index (the batch position this vector answers, always set) and
+    // dimension is the one shared EmbeddingsResult.dimension above.
     for (int i = 0; i < result.vectors_size(); ++i) {
         const auto& vector = result.vectors(i);
-        const std::string text = vector.has_text() ? vector.text()
-                                 : (static_cast<size_t>(i) < texts.size() ? texts[static_cast<size_t>(i)]
-                                                                          : std::string());
+        const size_t index = static_cast<size_t>(vector.input_index());
+        const std::string text = index < texts.size() ? texts[index] : std::string();
         json.begin_array_object()
             .field("text", text)
-            .field("dimension", static_cast<int64_t>(vector.dimension()));
+            .field("dimension", static_cast<int64_t>(result.dimension()));
         json.begin_array("values");
         for (const float value : vector.values()) {
             json.value(static_cast<double>(value));
@@ -216,17 +218,12 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
     rac_proto_buffer_t out_buffer;
     rac_proto_buffer_init(&out_buffer);
     v1::EmbeddingsResult result;
+    // EmbeddingsResult carries no error field: failures travel out-of-band on
+    // the rac_proto_buffer_t status envelope, already checked here.
     if (rac_embeddings_embed_batch_lifecycle_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
                                                    bytes.size(), &out_buffer) != RAC_SUCCESS ||
         !proto::parse_proto_buffer(&out_buffer, &result, &error)) {
         out::error_line("embedding failed: " + error);
-        return 1;
-    }
-
-    if (result.error().c_abi_code() != 0 || !result.error().message().empty()) {
-        out::error_line("embedding failed: " +
-                        (result.error().message().empty() ? std::to_string(result.error().c_abi_code())
-                                                        : result.error().message()));
         return 1;
     }
     if (options.json) {
