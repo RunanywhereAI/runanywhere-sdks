@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
+  EmbeddingsRequest,
   EmbeddingsResult,
   EmbeddingVector,
 } from '@runanywhere/proto-ts/embeddings_options';
-import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import { FinishReason, type LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
   InferenceFramework,
   ModelCategory,
+  type ModelLoadRequest,
   type ModelLoadResult,
 } from '@runanywhere/proto-ts/model_types';
 import { EmbeddingsProtoAdapter } from '../../../../src/Adapters/ModalityProtoAdapter';
@@ -36,11 +38,13 @@ describe('CrossWasmRAGProvider', () => {
     vi.spyOn(Embeddings, 'embedBatch').mockResolvedValue(
       embeddingsResult([vector([1, 0], 'Persistent Zephyr note', 0)]),
     );
+    // `persistIndex`/`indexPath` were deleted outright from RAGConfiguration
+    // -- the RAG index is in-memory only on the wire now. PersistentRAGProvider
+    // derives its own Web-only IndexedDB storage key from embedding/LLM model
+    // ids instead (see RunAnywhere+RAG.ts's `ragCreatePipeline()`).
     const config = createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',
-      persistIndex: true,
-      indexPath: 'vitest-persistent-rag',
     });
 
     __testing__.clearPersistentRAGStore();
@@ -64,8 +68,8 @@ describe('CrossWasmRAGProvider', () => {
   it('routes embeddings and grounded generation across independent backends', async () => {
     const { loadModel } = installBackendSpies();
     const embedBatch = vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
-      async (request): Promise<EmbeddingsResult> => embeddingsResult(
-        request.texts.map((text, index) => vector(
+      async (request: EmbeddingsRequest): Promise<EmbeddingsResult> => embeddingsResult(
+        request.texts.map((text: string, index: number) => vector(
           text.includes('Zephyr') ? [1, 0] : [0, 1],
           text,
           index,
@@ -102,22 +106,31 @@ describe('CrossWasmRAGProvider', () => {
     loadModel.mockClear();
 
     const result = await provider.ragQuery('What is the Zephyr launch code?', {
-      retrievalTopK: 1,
+      // The flat `retrievalTopK` knob was collapsed onto nested
+      // `RAGRetrievalOptions.topK` (idl/rag.proto realignment).
+      retrieval: { topK: 1, enableMultiQuery: false },
       generation: {
         maxOutputTokens: 64,
         reasoning: {
           mode: ReasoningMode.REASONING_MODE_OFF,
           includeInOutput: false,
         },
+        // LLMGenerationOptions has no optional presence for these four --
+        // every explicit `generation` override must supply them.
+        stopSequences: [],
+        preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+        repeatLastN: 0,
+        echoPrompt: false,
       },
     });
 
     expect(embedBatch).toHaveBeenCalledTimes(2);
     expect(result.answer).toContain('ORBIT-7');
     expect(result.retrievedChunks).toHaveLength(1);
+    // RAGSearchResult.rank was deleted outright (idl/rag.proto) -- callers
+    // reconstruct rank from array position, there is no wire-carried field.
     expect(result.retrievedChunks[0]).toMatchObject({
       sourceDocument: 'Zephyr Notes',
-      rank: 1,
     });
     expect(result.contextUsed).toContain('ORBIT-7');
     expect(generate).toHaveBeenCalledWith(expect.objectContaining({
@@ -142,8 +155,8 @@ describe('CrossWasmRAGProvider', () => {
   it('supports typed document removal, clear, and statistics', async () => {
     installBackendSpies();
     vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
-      async (request): Promise<EmbeddingsResult> => embeddingsResult(
-        request.texts.map((text, index) => vector([1, 0], text, index)),
+      async (request: EmbeddingsRequest): Promise<EmbeddingsResult> => embeddingsResult(
+        request.texts.map((text: string, index: number) => vector([1, 0], text, index)),
       ),
     );
 
@@ -155,10 +168,11 @@ describe('CrossWasmRAGProvider', () => {
     await provider.ragIngest('A short document.', JSON.stringify({ docId: 'doc-1', docName: 'One' }));
 
     await expect(provider.ragGetDocumentCount()).resolves.toBe(1);
+    // RAGStatistics (idl/rag.proto) has no isPersistent field -- persistence
+    // is reported by RAGProviderCapabilities.persistent, asserted below.
     await expect(provider.ragGetStatistics?.()).resolves.toMatchObject({
       indexedDocuments: 1,
       indexedChunks: 1,
-      isPersistent: false,
     });
     expect(provider.ragGetCapabilities?.()).toEqual({
       native: false,
@@ -272,6 +286,7 @@ describe('CrossWasmRAGProvider', () => {
       async ragQuery() {
         return { answer: '', retrievedChunks: [] } as never;
       },
+      async ragClearDocuments() {},
       async ragGetDocumentCount() {
         return 0;
       },
@@ -330,14 +345,14 @@ function installBackendSpies() {
   vi.spyOn(ModelRegistry, 'getModel').mockReturnValue(null);
   vi.spyOn(WebModelLifecycle, 'currentModel').mockReturnValue(null);
   const loadModel = vi.spyOn(WebModelLifecycle, 'loadModelAsync').mockImplementation(
-    async (request): Promise<ModelLoadResult> => ({
-      success: true,
+    async (request: ModelLoadRequest): Promise<ModelLoadResult> => ({
+      // `ModelLoadResult.success` was deleted outright -- an absent `error`
+      // is the sole success signal now.
       modelId: request.modelId,
       category: request.category ?? ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
       framework: request.framework ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
       resolvedPath: `/models/${request.modelId}`,
       loadedAtUnixMs: Date.now(),
-      errorMessage: '',
       warnings: [],
       alreadyLoaded: false,
       resolvedArtifacts: [],
@@ -346,51 +361,45 @@ function installBackendSpies() {
   return { loadModel, supportsLLM };
 }
 
-function vector(values: number[], text: string, inputIndex: number): EmbeddingVector {
-  return {
-    values,
-    norm: Math.sqrt(values.reduce((sum, value) => sum + value * value, 0)),
-    text,
-    dimension: values.length,
-    inputIndex,
-    metadata: {},
-  };
+// `EmbeddingVector.norm`/`.dimension` and `.text` were deleted outright
+// (idl/embeddings_options.proto): dimension lives solely on the enclosing
+// EmbeddingsResult now, and only `values`/`inputIndex` remain per-vector.
+// `text` is dropped from this test helper's signature too since nothing on
+// the wire carries it back.
+function vector(values: number[], _text: string, inputIndex: number): EmbeddingVector {
+  return { values, inputIndex };
 }
 
+// `EmbeddingsResult.errorMessage`/`.errorCode` were deleted outright.
 function embeddingsResult(vectors: EmbeddingVector[]): EmbeddingsResult {
   return {
     vectors,
-    dimension: vectors[0]?.dimension ?? 0,
+    dimension: vectors[0]?.values.length ?? 0,
     processingTimeMs: 1,
     tokensUsed: vectors.length,
     modelId: 'all-minilm-l6-v2',
-    errorMessage: undefined,
-    errorCode: 0,
     requestId: 'test-embeddings',
   };
 }
 
+// `LLMGenerationResult.finishReason` is the `FinishReason` enum now, not a
+// bare string; `tokensPerSecond`/`inputTokens`/`totalTokens`/`errorMessage`/
+// `errorCode` were all deleted outright (TokenUsage on `usage` is the
+// canonical replacement, unused by this in-memory RAG test double).
 function generationResult(text: string): LLMGenerationResult {
   return {
     text,
     thinkingContent: undefined,
-    inputTokens: 12,
-    tokensGenerated: 8,
     modelUsed: 'lfm2-350m-q4_k_m',
     generationTimeMs: 2,
-    ttftMs: undefined,
-    tokensPerSecond: 10,
     framework: 'llamacpp',
-    finishReason: 'stop',
+    finishReason: FinishReason.FINISH_REASON_STOP,
     thinkingTokens: 0,
     responseTokens: 8,
     jsonOutput: undefined,
     performance: undefined,
     executedOn: undefined,
     structuredOutputValidation: undefined,
-    totalTokens: 20,
-    errorMessage: undefined,
-    errorCode: 0,
     cachedPromptTokens: 0,
     promptEvalTimeMs: 1,
     decodeTimeMs: 1,

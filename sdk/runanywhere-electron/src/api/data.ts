@@ -160,13 +160,13 @@ export interface RagNamespace {
 
 function toMatch(chunk: {
   text: string;
-  similarityScore: number;
+  score: number;
   metadata: { [key: string]: string };
   sourceDocument?: string;
 }): Match {
   const metadata = { ...chunk.metadata };
   if (chunk.sourceDocument) metadata.sourceDocument = chunk.sourceDocument;
-  return { text: chunk.text, score: chunk.similarityScore, metadata };
+  return { text: chunk.text, score: chunk.score, metadata };
 }
 
 function toRagResult(raw: RAGResult, requestId: string, model: string): PublicRagResult {
@@ -282,9 +282,7 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
           topK: config.topK ?? RAG_DEFAULTS.topK,
           chunkSize: config.chunkSize ?? RAG_DEFAULTS.chunkSize,
           chunkOverlap: config.chunkOverlap ?? RAG_DEFAULTS.chunkOverlap,
-          similarityThreshold: config.similarityThreshold,
-          persistIndex: !!config.persistPath,
-          indexPath: config.persistPath,
+          scoreThreshold: config.scoreThreshold,
         })
       ).finish();
 
@@ -296,14 +294,12 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
         if (closed) throw SDKException.invalidState('RagSession is closed');
       };
 
-      const queryBytes = (question: string, options: LlmOptions, topK: number, stream: boolean) =>
+      const queryBytes = (question: string, options: LlmOptions, topK: number) =>
         RAGQueryOptions.encode(
           RAGQueryOptions.fromPartial({
-            question,
+            query: question,
             generation: toRagGeneration(options),
-            retrievalTopK: topK,
-            similarityThreshold: config.similarityThreshold,
-            stream,
+            retrieval: { topK, scoreThreshold: config.scoreThreshold },
           })
         ).finish();
 
@@ -321,9 +317,8 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
             handle,
             RAGSearchRequest.encode(
               RAGSearchRequest.fromPartial({
-                question: query,
-                retrievalTopK: topK ?? defaultTopK,
-                similarityThreshold: config.similarityThreshold,
+                query,
+                retrieval: { topK: topK ?? defaultTopK, scoreThreshold: config.scoreThreshold },
               })
             ).finish()
           );
@@ -339,7 +334,7 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
             handle,
             // Retrieval depth is a session-config knob; LlmOptions.topK is the
             // sampling top-k and must not be mistaken for it.
-            queryBytes(question, options, defaultTopK, false)
+            queryBytes(question, options, defaultTopK)
           );
           const raw = RAGResult.decode(bytes);
           if (raw.error) {
@@ -352,24 +347,26 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
           const requestId = newRequestId('rag');
           return bridgeStream<RagEvent>(
             async (sink) => {
-              const retrieved: Match[] = [];
               await deps.backend.ragQueryStream(
                 handle,
-                queryBytes(question, options, defaultTopK, true),
+                queryBytes(question, options, defaultTopK),
                 (eventBytes) => {
                   const event = RAGStreamEvent.decode(eventBytes);
                   switch (event.kind) {
-                    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED:
-                      if (event.chunk) retrieved.push(toMatch(event.chunk));
-                      break;
-                    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY:
-                      sink.push({ type: 'retrieved', matches: [...retrieved] });
-                      break;
                     case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN:
                       sink.push({ type: 'token', text: event.token, kind: TokenKind.TEXT });
                       break;
                     case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED:
+                      // Commons no longer emits a separate mid-stream retrieval-progress
+                      // signal (CHUNK_RETRIEVED/CONTEXT_READY were collapsed away) — the
+                      // terminal COMPLETED event carries the full result, including
+                      // retrievedChunks, in one shot. Derive 'retrieved' from it so
+                      // existing consumers still see a sources-before-answer event.
                       if (event.result) {
+                        sink.push({
+                          type: 'retrieved',
+                          matches: event.result.retrievedChunks.map(toMatch),
+                        });
                         sink.push({
                           type: 'completed',
                           result: toRagResult(event.result, requestId, llmId || embeddingId),

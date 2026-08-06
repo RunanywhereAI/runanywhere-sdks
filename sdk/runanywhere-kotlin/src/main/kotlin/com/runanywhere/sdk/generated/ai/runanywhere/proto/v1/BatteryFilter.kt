@@ -29,6 +29,12 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class BatteryFilter(
+  /**
+   * Charge floor, 0-100, below which the on-device candidate is dropped.
+   */
+  @RacDefaultOption("20")
+  @RacMinOption(0)
+  @RacMaxOption(100)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

@@ -9,6 +9,8 @@
 // MARK: - RATTSOptions: C-bridge + convenience
 
 public extension RATTSOptions {
+    // enableSsml/useSSML deleted outright (idl/tts_options.proto), zero
+    // live callers of either. Kept only so this initializer still compiles.
     init(
         voice: String = "",
         language: String = "",
@@ -16,8 +18,7 @@ public extension RATTSOptions {
         pitch: Float = 1.0,
         volume: Float = 1.0,
         audioFormat: RAAudioFormat = .pcm,
-        sampleRate: Int = 22050,
-        useSSML: Bool = false
+        sampleRate: Int = 22050
     ) {
         var options = RATTSOptions()
         options.voice = voice
@@ -26,7 +27,6 @@ public extension RATTSOptions {
         options.pitch = pitch
         options.volume = volume
         options.audioFormat = audioFormat
-        options.enableSsml = useSSML
         options.sampleRate = Int32(sampleRate)
         self = options
     }
@@ -39,11 +39,6 @@ public extension RATTSOptions {
     var language: String {
         get { languageCode }
         set { languageCode = newValue }
-    }
-
-    var useSSML: Bool {
-        get { enableSsml }
-        set { enableSsml = newValue }
     }
 
 }

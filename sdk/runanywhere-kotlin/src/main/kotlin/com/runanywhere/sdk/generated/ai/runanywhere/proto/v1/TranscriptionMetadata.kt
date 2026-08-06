@@ -29,6 +29,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * Which model ran, and how long it took.
+ */
 public class TranscriptionMetadata(
   @field:WireField(
     tag = 1,
@@ -46,14 +49,6 @@ public class TranscriptionMetadata(
     schemaIndex = 1,
   )
   public val processing_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioLengthMs",
-    schemaIndex = 2,
-  )
-  public val audio_length_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TranscriptionMetadata, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -68,7 +63,6 @@ public class TranscriptionMetadata(
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
     if (processing_time_ms != other.processing_time_ms) return false
-    if (audio_length_ms != other.audio_length_ms) return false
     return true
   }
 
@@ -78,7 +72,6 @@ public class TranscriptionMetadata(
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + processing_time_ms.hashCode()
-      result = result * 37 + audio_length_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -88,16 +81,14 @@ public class TranscriptionMetadata(
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
     result += """processing_time_ms=$processing_time_ms"""
-    result += """audio_length_ms=$audio_length_ms"""
     return result.joinToString(prefix = "TranscriptionMetadata{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     model_id: String = this.model_id,
     processing_time_ms: Long = this.processing_time_ms,
-    audio_length_ms: Long = this.audio_length_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): TranscriptionMetadata = TranscriptionMetadata(model_id, processing_time_ms, audio_length_ms, unknownFields)
+  ): TranscriptionMetadata = TranscriptionMetadata(model_id, processing_time_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -118,9 +109,6 @@ public class TranscriptionMetadata(
         if (value.processing_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.processing_time_ms)
         }
-        if (value.audio_length_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.audio_length_ms)
-        }
         return size
       }
 
@@ -131,17 +119,11 @@ public class TranscriptionMetadata(
         if (value.processing_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.processing_time_ms)
         }
-        if (value.audio_length_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.audio_length_ms)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TranscriptionMetadata) {
         writer.writeBytes(value.unknownFields)
-        if (value.audio_length_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 3, value.audio_length_ms)
-        }
         if (value.processing_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.processing_time_ms)
         }
@@ -153,19 +135,16 @@ public class TranscriptionMetadata(
       override fun decode(reader: ProtoReader): TranscriptionMetadata {
         var model_id: String = ""
         var processing_time_ms: Long = 0L
-        var audio_length_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
-            3 -> audio_length_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return TranscriptionMetadata(
           model_id = model_id,
           processing_time_ms = processing_time_ms,
-          audio_length_ms = audio_length_ms,
           unknownFields = unknownFields
         )
       }

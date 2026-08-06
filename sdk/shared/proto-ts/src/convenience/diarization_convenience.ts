@@ -28,10 +28,10 @@ export const diarizationOptionsDefaults = (): DiarizationOptions => ({
 });
 
 export const validateDiarizationOptions = (m: DiarizationOptions): void => {
-  if (m.sampleRate !== undefined && (m.sampleRate < 8000 || m.sampleRate > 48000)) {
+  if (m.sampleRate !== undefined && (m.sampleRate < 16000 || m.sampleRate > 16000)) {
     throw new ValidationError({
       fieldPath: 'DiarizationOptions.sample_rate',
-      message: `sample_rate must be in 8000...48000 (got ${m.sampleRate})`,
+      message: `sample_rate must be in 16000...16000 (got ${m.sampleRate})`,
     });
   }
   if (m.channels !== undefined && (m.channels < 1 || m.channels > 1)) {
@@ -56,6 +56,12 @@ export const validateDiarizationOptions = (m: DiarizationOptions): void => {
     throw new ValidationError({
       fieldPath: 'DiarizationOptions.merge_gap_ms',
       message: `merge_gap_ms must be >= 0 (got ${m.mergeGapMs})`,
+    });
+  }
+  if (m.maxSpeakers !== undefined && (m.maxSpeakers < 1)) {
+    throw new ValidationError({
+      fieldPath: 'DiarizationOptions.max_speakers',
+      message: `max_speakers must be >= 1 (got ${m.maxSpeakers})`,
     });
   }
 };

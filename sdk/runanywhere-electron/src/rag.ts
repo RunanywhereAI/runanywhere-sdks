@@ -21,14 +21,10 @@ export interface RagConfig {
   chunkOverlap?: number;
   /** Cap on retrieved context tokens fed to the LLM. */
   maxContextTokens?: number;
-  /** Minimum cosine similarity for a chunk to be retrieved (0–1). */
-  similarityThreshold?: number;
+  /** Drop hits scoring below this (0–1). 0 = no filtering. */
+  scoreThreshold?: number;
   /** Prompt template override (uses "{context}" / "{query}" placeholders). */
   promptTemplate?: string;
-  /** Persist the vector index to disk (default in-memory). */
-  persistIndex?: boolean;
-  /** On-disk index path when `persistIndex` is set. */
-  indexPath?: string;
 }
 
 /** A document to ingest. `text` is chunked + embedded. */
@@ -48,21 +44,22 @@ export interface RagGenerationOptions {
   systemPrompt?: string;
 }
 
-/** Per-query overrides. `question` is required. */
+/** Per-query overrides. `query` is required. */
 export interface RagQuery {
-  question: string;
+  query: string;
   /** Sampling/system-prompt overrides. Unset = RAG pipeline defaults. */
   generation?: RagGenerationOptions;
   /** Retrieval count for this query (overrides the session default). */
   retrievalTopK?: number;
-  similarityThreshold?: number;
+  /** Drop hits scoring below this (0–1). Unset inherits the session default. */
+  scoreThreshold?: number;
 }
 
 /** A retrieved chunk used as grounding context. */
 export interface RagChunk {
   chunkId: string;
   text: string;
-  similarityScore: number;
+  score: number;
   sourceDocument?: string;
 }
 
@@ -91,7 +88,6 @@ export interface RagStats {
   indexedChunks: number;
   totalTokensIndexed: number;
   lastUpdatedMs: number;
-  indexPath?: string;
 }
 
 /** The low-level bridge surface a RagSession drives (window.runanywhere). */
@@ -233,7 +229,7 @@ export class RagSession {
   /** Ask a grounded question (a string, or a {@link RagQuery}). */
   async query(query: string | RagQuery): Promise<RagResult> {
     this.assertOpen();
-    return this.bridge.ragQuery(this.handle, typeof query === 'string' ? { question: query } : query);
+    return this.bridge.ragQuery(this.handle, typeof query === 'string' ? { query } : query);
   }
 
   /** Current index statistics. */

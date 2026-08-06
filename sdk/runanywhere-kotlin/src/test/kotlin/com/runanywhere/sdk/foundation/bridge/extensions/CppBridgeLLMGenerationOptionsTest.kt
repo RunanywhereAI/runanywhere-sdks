@@ -30,7 +30,7 @@ class CppBridgeLLMGenerationOptionsTest {
         assertEquals(defaults.temperature, canonical.temperature)
         assertEquals(defaults.max_output_tokens, canonical.max_output_tokens)
         assertEquals(defaults.top_p, canonical.top_p)
-        assertEquals(defaults.repetition_penalty, canonical.repetition_penalty)
+        assertEquals(defaults.repeat_penalty, canonical.repeat_penalty)
     }
 
     @Test

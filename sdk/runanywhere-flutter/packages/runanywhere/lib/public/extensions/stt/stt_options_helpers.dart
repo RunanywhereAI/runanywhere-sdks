@@ -35,20 +35,15 @@ extension WordTimestampHelpers on WordTimestamp {
 
 /// Helpers on the proto [TranscriptionMetadata] message — convert the
 /// Int64-millisecond fields into idiomatic seconds doubles.
+///
+/// `audio_length_ms` was deleted outright (idl/stt_options.proto):
+/// `TranscriptionMetadata` shrunk to `model_id`/`processing_time_ms`, so the
+/// audio-length-derived helpers that used to live here
+/// (`audioLengthSeconds`, `computedRealTimeFactor`) have no wire input left
+/// and were removed rather than silently returning a meaningless 0.0.
 extension TranscriptionMetadataHelpers on TranscriptionMetadata {
   /// Wall-clock processing time in seconds.
   double get processingTimeSeconds => processingTimeMs.toInt() / 1000.0;
-
-  /// Total audio length in seconds.
-  double get audioLengthSeconds => audioLengthMs.toInt() / 1000.0;
-
-  /// Real-time factor (`processingTime / audioLength`). Zero when audio
-  /// length is unknown, since the ratio is undefined.
-  double get computedRealTimeFactor {
-    final audio = audioLengthMs.toInt();
-    if (audio <= 0) return 0.0;
-    return processingTimeMs.toInt() / audio;
-  }
 }
 
 /// Convenience constructor wrappers — Int64 ergonomics.

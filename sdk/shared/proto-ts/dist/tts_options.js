@@ -5,9 +5,7 @@
 //   protoc               v7.35.1
 // source: tts_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TTSServiceState = exports.TTSStreamEvent = exports.TTSVoiceList = exports.TTSVoiceInfo = exports.TTSSpeakResult = exports.TTSOutput = exports.TTSSynthesisMetadata = exports.TTSPhonemeTimestamp = exports.TTSSynthesisRequest_MetadataEntry = exports.TTSSynthesisRequest = exports.TTSOptions = exports.TTSConfiguration = exports.TTSStreamEventKind = exports.TTSVoiceGender = exports.protobufPackage = void 0;
-exports.tTSVoiceGenderFromJSON = tTSVoiceGenderFromJSON;
-exports.tTSVoiceGenderToJSON = tTSVoiceGenderToJSON;
+exports.TTSServiceState = exports.TTSStreamEvent = exports.TTSVoiceList = exports.TTSVoiceInfo = exports.TTSSpeakResult = exports.TTSOutput = exports.TTSSynthesisMetadata = exports.TTSSynthesisRequest = exports.TTSOptions = exports.TTSStreamEventKind = exports.protobufPackage = void 0;
 exports.tTSStreamEventKindFromJSON = tTSStreamEventKindFromJSON;
 exports.tTSStreamEventKindToJSON = tTSStreamEventKindToJSON;
 /* eslint-disable */
@@ -15,58 +13,13 @@ const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-var TTSVoiceGender;
-(function (TTSVoiceGender) {
-    TTSVoiceGender[TTSVoiceGender["TTS_VOICE_GENDER_UNSPECIFIED"] = 0] = "TTS_VOICE_GENDER_UNSPECIFIED";
-    TTSVoiceGender[TTSVoiceGender["TTS_VOICE_GENDER_MALE"] = 1] = "TTS_VOICE_GENDER_MALE";
-    TTSVoiceGender[TTSVoiceGender["TTS_VOICE_GENDER_FEMALE"] = 2] = "TTS_VOICE_GENDER_FEMALE";
-    TTSVoiceGender[TTSVoiceGender["TTS_VOICE_GENDER_NEUTRAL"] = 3] = "TTS_VOICE_GENDER_NEUTRAL";
-    TTSVoiceGender[TTSVoiceGender["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(TTSVoiceGender || (exports.TTSVoiceGender = TTSVoiceGender = {}));
-function tTSVoiceGenderFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "TTS_VOICE_GENDER_UNSPECIFIED":
-            return TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED;
-        case 1:
-        case "TTS_VOICE_GENDER_MALE":
-            return TTSVoiceGender.TTS_VOICE_GENDER_MALE;
-        case 2:
-        case "TTS_VOICE_GENDER_FEMALE":
-            return TTSVoiceGender.TTS_VOICE_GENDER_FEMALE;
-        case 3:
-        case "TTS_VOICE_GENDER_NEUTRAL":
-            return TTSVoiceGender.TTS_VOICE_GENDER_NEUTRAL;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return TTSVoiceGender.UNRECOGNIZED;
-    }
-}
-function tTSVoiceGenderToJSON(object) {
-    switch (object) {
-        case TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED:
-            return "TTS_VOICE_GENDER_UNSPECIFIED";
-        case TTSVoiceGender.TTS_VOICE_GENDER_MALE:
-            return "TTS_VOICE_GENDER_MALE";
-        case TTSVoiceGender.TTS_VOICE_GENDER_FEMALE:
-            return "TTS_VOICE_GENDER_FEMALE";
-        case TTSVoiceGender.TTS_VOICE_GENDER_NEUTRAL:
-            return "TTS_VOICE_GENDER_NEUTRAL";
-        case TTSVoiceGender.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var TTSStreamEventKind;
 (function (TTSStreamEventKind) {
     TTSStreamEventKind[TTSStreamEventKind["TTS_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "TTS_STREAM_EVENT_KIND_UNSPECIFIED";
     TTSStreamEventKind[TTSStreamEventKind["TTS_STREAM_EVENT_KIND_STARTED"] = 1] = "TTS_STREAM_EVENT_KIND_STARTED";
     TTSStreamEventKind[TTSStreamEventKind["TTS_STREAM_EVENT_KIND_AUDIO_CHUNK"] = 2] = "TTS_STREAM_EVENT_KIND_AUDIO_CHUNK";
-    TTSStreamEventKind[TTSStreamEventKind["TTS_STREAM_EVENT_KIND_PHONEME"] = 3] = "TTS_STREAM_EVENT_KIND_PHONEME";
     TTSStreamEventKind[TTSStreamEventKind["TTS_STREAM_EVENT_KIND_COMPLETED"] = 4] = "TTS_STREAM_EVENT_KIND_COMPLETED";
     TTSStreamEventKind[TTSStreamEventKind["TTS_STREAM_EVENT_KIND_ERROR"] = 5] = "TTS_STREAM_EVENT_KIND_ERROR";
-    TTSStreamEventKind[TTSStreamEventKind["TTS_STREAM_EVENT_KIND_PROGRESS"] = 6] = "TTS_STREAM_EVENT_KIND_PROGRESS";
     TTSStreamEventKind[TTSStreamEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(TTSStreamEventKind || (exports.TTSStreamEventKind = TTSStreamEventKind = {}));
 function tTSStreamEventKindFromJSON(object) {
@@ -80,18 +33,12 @@ function tTSStreamEventKindFromJSON(object) {
         case 2:
         case "TTS_STREAM_EVENT_KIND_AUDIO_CHUNK":
             return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK;
-        case 3:
-        case "TTS_STREAM_EVENT_KIND_PHONEME":
-            return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PHONEME;
         case 4:
         case "TTS_STREAM_EVENT_KIND_COMPLETED":
             return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED;
         case 5:
         case "TTS_STREAM_EVENT_KIND_ERROR":
             return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
-        case 6:
-        case "TTS_STREAM_EVENT_KIND_PROGRESS":
-            return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PROGRESS;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -106,153 +53,34 @@ function tTSStreamEventKindToJSON(object) {
             return "TTS_STREAM_EVENT_KIND_STARTED";
         case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK:
             return "TTS_STREAM_EVENT_KIND_AUDIO_CHUNK";
-        case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PHONEME:
-            return "TTS_STREAM_EVENT_KIND_PHONEME";
         case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED:
             return "TTS_STREAM_EVENT_KIND_COMPLETED";
         case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR:
             return "TTS_STREAM_EVENT_KIND_ERROR";
-        case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PROGRESS:
-            return "TTS_STREAM_EVENT_KIND_PROGRESS";
         case TTSStreamEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
 }
-function createBaseTTSConfiguration() {
-    return { modelId: "", enableNeuralVoice: false, preferredFramework: undefined, defaultOptions: undefined };
-}
-exports.TTSConfiguration = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.modelId !== "") {
-            writer.uint32(10).string(message.modelId);
-        }
-        if (message.enableNeuralVoice !== false) {
-            writer.uint32(72).bool(message.enableNeuralVoice);
-        }
-        if (message.preferredFramework !== undefined) {
-            writer.uint32(88).int32(message.preferredFramework);
-        }
-        if (message.defaultOptions !== undefined) {
-            exports.TTSOptions.encode(message.defaultOptions, writer.uint32(98).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseTTSConfiguration();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.enableNeuralVoice = reader.bool();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.preferredFramework = reader.int32();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.defaultOptions = exports.TTSOptions.decode(reader, reader.uint32());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            enableNeuralVoice: isSet(object.enableNeuralVoice)
-                ? globalThis.Boolean(object.enableNeuralVoice)
-                : isSet(object.enable_neural_voice)
-                    ? globalThis.Boolean(object.enable_neural_voice)
-                    : false,
-            preferredFramework: isSet(object.preferredFramework)
-                ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferredFramework)
-                : isSet(object.preferred_framework)
-                    ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferred_framework)
-                    : undefined,
-            defaultOptions: isSet(object.defaultOptions)
-                ? exports.TTSOptions.fromJSON(object.defaultOptions)
-                : isSet(object.default_options)
-                    ? exports.TTSOptions.fromJSON(object.default_options)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.enableNeuralVoice !== false) {
-            obj.enableNeuralVoice = message.enableNeuralVoice;
-        }
-        if (message.preferredFramework !== undefined) {
-            obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
-        }
-        if (message.defaultOptions !== undefined) {
-            obj.defaultOptions = exports.TTSOptions.toJSON(message.defaultOptions);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.TTSConfiguration.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseTTSConfiguration();
-        message.modelId = object.modelId ?? "";
-        message.enableNeuralVoice = object.enableNeuralVoice ?? false;
-        message.preferredFramework = object.preferredFramework ?? undefined;
-        message.defaultOptions = (object.defaultOptions !== undefined && object.defaultOptions !== null)
-            ? exports.TTSOptions.fromPartial(object.defaultOptions)
-            : undefined;
-        return message;
-    },
-};
 function createBaseTTSOptions() {
     return {
         voice: "",
+        model: undefined,
         languageCode: "",
         speed: 0,
         pitch: 0,
         volume: 0,
-        enableSsml: false,
         audioFormat: 0,
         sampleRate: 0,
-        speakerId: 0,
-        style: undefined,
     };
 }
 exports.TTSOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.voice !== "") {
             writer.uint32(10).string(message.voice);
+        }
+        if (message.model !== undefined) {
+            writer.uint32(106).string(message.model);
         }
         if (message.languageCode !== "") {
             writer.uint32(18).string(message.languageCode);
@@ -266,20 +94,11 @@ exports.TTSOptions = {
         if (message.volume !== 0) {
             writer.uint32(45).float(message.volume);
         }
-        if (message.enableSsml !== false) {
-            writer.uint32(48).bool(message.enableSsml);
-        }
         if (message.audioFormat !== 0) {
             writer.uint32(56).int32(message.audioFormat);
         }
         if (message.sampleRate !== 0) {
             writer.uint32(64).int32(message.sampleRate);
-        }
-        if (message.speakerId !== 0) {
-            writer.uint32(72).int32(message.speakerId);
-        }
-        if (message.style !== undefined) {
-            writer.uint32(90).string(message.style);
         }
         return writer;
     },
@@ -295,6 +114,13 @@ exports.TTSOptions = {
                         break;
                     }
                     message.voice = reader.string();
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.model = reader.string();
                     continue;
                 }
                 case 2: {
@@ -325,13 +151,6 @@ exports.TTSOptions = {
                     message.volume = reader.float();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.enableSsml = reader.bool();
-                    continue;
-                }
                 case 7: {
                     if (tag !== 56) {
                         break;
@@ -346,20 +165,6 @@ exports.TTSOptions = {
                     message.sampleRate = reader.int32();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.speakerId = reader.int32();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.style = reader.string();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -371,6 +176,7 @@ exports.TTSOptions = {
     fromJSON(object) {
         return {
             voice: isSet(object.voice) ? globalThis.String(object.voice) : "",
+            model: isSet(object.model) ? globalThis.String(object.model) : undefined,
             languageCode: isSet(object.languageCode)
                 ? globalThis.String(object.languageCode)
                 : isSet(object.language_code)
@@ -379,11 +185,6 @@ exports.TTSOptions = {
             speed: isSet(object.speed) ? globalThis.Number(object.speed) : 0,
             pitch: isSet(object.pitch) ? globalThis.Number(object.pitch) : 0,
             volume: isSet(object.volume) ? globalThis.Number(object.volume) : 0,
-            enableSsml: isSet(object.enableSsml)
-                ? globalThis.Boolean(object.enableSsml)
-                : isSet(object.enable_ssml)
-                    ? globalThis.Boolean(object.enable_ssml)
-                    : false,
             audioFormat: isSet(object.audioFormat)
                 ? (0, model_types_1.audioFormatFromJSON)(object.audioFormat)
                 : isSet(object.audio_format)
@@ -394,18 +195,15 @@ exports.TTSOptions = {
                 : isSet(object.sample_rate)
                     ? globalThis.Number(object.sample_rate)
                     : 0,
-            speakerId: isSet(object.speakerId)
-                ? globalThis.Number(object.speakerId)
-                : isSet(object.speaker_id)
-                    ? globalThis.Number(object.speaker_id)
-                    : 0,
-            style: isSet(object.style) ? globalThis.String(object.style) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.voice !== "") {
             obj.voice = message.voice;
+        }
+        if (message.model !== undefined) {
+            obj.model = message.model;
         }
         if (message.languageCode !== "") {
             obj.languageCode = message.languageCode;
@@ -419,20 +217,11 @@ exports.TTSOptions = {
         if (message.volume !== 0) {
             obj.volume = message.volume;
         }
-        if (message.enableSsml !== false) {
-            obj.enableSsml = message.enableSsml;
-        }
         if (message.audioFormat !== 0) {
             obj.audioFormat = (0, model_types_1.audioFormatToJSON)(message.audioFormat);
         }
         if (message.sampleRate !== 0) {
             obj.sampleRate = Math.round(message.sampleRate);
-        }
-        if (message.speakerId !== 0) {
-            obj.speakerId = Math.round(message.speakerId);
-        }
-        if (message.style !== undefined) {
-            obj.style = message.style;
         }
         return obj;
     },
@@ -442,20 +231,18 @@ exports.TTSOptions = {
     fromPartial(object) {
         const message = createBaseTTSOptions();
         message.voice = object.voice ?? "";
+        message.model = object.model ?? undefined;
         message.languageCode = object.languageCode ?? "";
         message.speed = object.speed ?? 0;
         message.pitch = object.pitch ?? 0;
         message.volume = object.volume ?? 0;
-        message.enableSsml = object.enableSsml ?? false;
         message.audioFormat = object.audioFormat ?? 0;
         message.sampleRate = object.sampleRate ?? 0;
-        message.speakerId = object.speakerId ?? 0;
-        message.style = object.style ?? undefined;
         return message;
     },
 };
 function createBaseTTSSynthesisRequest() {
-    return { requestId: "", text: "", ssml: undefined, options: undefined, metadata: {} };
+    return { requestId: "", text: "", options: undefined };
 }
 exports.TTSSynthesisRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -465,15 +252,9 @@ exports.TTSSynthesisRequest = {
         if (message.text !== "") {
             writer.uint32(18).string(message.text);
         }
-        if (message.ssml !== undefined) {
-            writer.uint32(26).string(message.ssml);
-        }
         if (message.options !== undefined) {
             exports.TTSOptions.encode(message.options, writer.uint32(34).fork()).join();
         }
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.TTSSynthesisRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(42).fork()).join();
-        });
         return writer;
     },
     decode(input, length) {
@@ -497,28 +278,11 @@ exports.TTSSynthesisRequest = {
                     message.text = reader.string();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.ssml = reader.string();
-                    continue;
-                }
                 case 4: {
                     if (tag !== 34) {
                         break;
                     }
                     message.options = exports.TTSOptions.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    const entry5 = exports.TTSSynthesisRequest_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry5.value !== undefined) {
-                        message.metadata[entry5.key] = entry5.value;
-                    }
                     continue;
                 }
             }
@@ -537,14 +301,7 @@ exports.TTSSynthesisRequest = {
                     ? globalThis.String(object.request_id)
                     : "",
             text: isSet(object.text) ? globalThis.String(object.text) : "",
-            ssml: isSet(object.ssml) ? globalThis.String(object.ssml) : undefined,
             options: isSet(object.options) ? exports.TTSOptions.fromJSON(object.options) : undefined,
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
         };
     },
     toJSON(message) {
@@ -555,20 +312,8 @@ exports.TTSSynthesisRequest = {
         if (message.text !== "") {
             obj.text = message.text;
         }
-        if (message.ssml !== undefined) {
-            obj.ssml = message.ssml;
-        }
         if (message.options !== undefined) {
             obj.options = exports.TTSOptions.toJSON(message.options);
-        }
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
         }
         return obj;
     },
@@ -579,180 +324,14 @@ exports.TTSSynthesisRequest = {
         const message = createBaseTTSSynthesisRequest();
         message.requestId = object.requestId ?? "";
         message.text = object.text ?? "";
-        message.ssml = object.ssml ?? undefined;
         message.options = (object.options !== undefined && object.options !== null)
             ? exports.TTSOptions.fromPartial(object.options)
             : undefined;
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
-        return message;
-    },
-};
-function createBaseTTSSynthesisRequest_MetadataEntry() {
-    return { key: "", value: "" };
-}
-exports.TTSSynthesisRequest_MetadataEntry = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseTTSSynthesisRequest_MetadataEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== "") {
-            obj.value = message.value;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.TTSSynthesisRequest_MetadataEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseTTSSynthesisRequest_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
-        return message;
-    },
-};
-function createBaseTTSPhonemeTimestamp() {
-    return { phoneme: "", startMs: 0, endMs: 0 };
-}
-exports.TTSPhonemeTimestamp = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.phoneme !== "") {
-            writer.uint32(10).string(message.phoneme);
-        }
-        if (message.startMs !== 0) {
-            writer.uint32(16).int64(message.startMs);
-        }
-        if (message.endMs !== 0) {
-            writer.uint32(24).int64(message.endMs);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseTTSPhonemeTimestamp();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.phoneme = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.startMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.endMs = longToNumber(reader.int64());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            phoneme: isSet(object.phoneme) ? globalThis.String(object.phoneme) : "",
-            startMs: isSet(object.startMs)
-                ? globalThis.Number(object.startMs)
-                : isSet(object.start_ms)
-                    ? globalThis.Number(object.start_ms)
-                    : 0,
-            endMs: isSet(object.endMs)
-                ? globalThis.Number(object.endMs)
-                : isSet(object.end_ms)
-                    ? globalThis.Number(object.end_ms)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.phoneme !== "") {
-            obj.phoneme = message.phoneme;
-        }
-        if (message.startMs !== 0) {
-            obj.startMs = Math.round(message.startMs);
-        }
-        if (message.endMs !== 0) {
-            obj.endMs = Math.round(message.endMs);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.TTSPhonemeTimestamp.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseTTSPhonemeTimestamp();
-        message.phoneme = object.phoneme ?? "";
-        message.startMs = object.startMs ?? 0;
-        message.endMs = object.endMs ?? 0;
         return message;
     },
 };
 function createBaseTTSSynthesisMetadata() {
-    return { voiceId: "", languageCode: "", processingTimeMs: 0, characterCount: 0, audioDurationMs: 0 };
+    return { voiceId: "", languageCode: "", processingTimeMs: 0, inputBytes: 0 };
 }
 exports.TTSSynthesisMetadata = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -765,11 +344,8 @@ exports.TTSSynthesisMetadata = {
         if (message.processingTimeMs !== 0) {
             writer.uint32(24).int64(message.processingTimeMs);
         }
-        if (message.characterCount !== 0) {
-            writer.uint32(32).int32(message.characterCount);
-        }
-        if (message.audioDurationMs !== 0) {
-            writer.uint32(40).int64(message.audioDurationMs);
+        if (message.inputBytes !== 0) {
+            writer.uint32(32).int32(message.inputBytes);
         }
         return writer;
     },
@@ -805,14 +381,7 @@ exports.TTSSynthesisMetadata = {
                     if (tag !== 32) {
                         break;
                     }
-                    message.characterCount = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.audioDurationMs = longToNumber(reader.int64());
+                    message.inputBytes = reader.int32();
                     continue;
                 }
             }
@@ -840,15 +409,10 @@ exports.TTSSynthesisMetadata = {
                 : isSet(object.processing_time_ms)
                     ? globalThis.Number(object.processing_time_ms)
                     : 0,
-            characterCount: isSet(object.characterCount)
-                ? globalThis.Number(object.characterCount)
-                : isSet(object.character_count)
-                    ? globalThis.Number(object.character_count)
-                    : 0,
-            audioDurationMs: isSet(object.audioDurationMs)
-                ? globalThis.Number(object.audioDurationMs)
-                : isSet(object.audio_duration_ms)
-                    ? globalThis.Number(object.audio_duration_ms)
+            inputBytes: isSet(object.inputBytes)
+                ? globalThis.Number(object.inputBytes)
+                : isSet(object.input_bytes)
+                    ? globalThis.Number(object.input_bytes)
                     : 0,
         };
     },
@@ -863,11 +427,8 @@ exports.TTSSynthesisMetadata = {
         if (message.processingTimeMs !== 0) {
             obj.processingTimeMs = Math.round(message.processingTimeMs);
         }
-        if (message.characterCount !== 0) {
-            obj.characterCount = Math.round(message.characterCount);
-        }
-        if (message.audioDurationMs !== 0) {
-            obj.audioDurationMs = Math.round(message.audioDurationMs);
+        if (message.inputBytes !== 0) {
+            obj.inputBytes = Math.round(message.inputBytes);
         }
         return obj;
     },
@@ -879,8 +440,7 @@ exports.TTSSynthesisMetadata = {
         message.voiceId = object.voiceId ?? "";
         message.languageCode = object.languageCode ?? "";
         message.processingTimeMs = object.processingTimeMs ?? 0;
-        message.characterCount = object.characterCount ?? 0;
-        message.audioDurationMs = object.audioDurationMs ?? 0;
+        message.inputBytes = object.inputBytes ?? 0;
         return message;
     },
 };
@@ -890,12 +450,10 @@ function createBaseTTSOutput() {
         audioFormat: 0,
         sampleRate: 0,
         durationMs: 0,
-        phonemeTimestamps: [],
         metadata: undefined,
         timestampMs: 0,
         chunkIndex: 0,
         isFinal: false,
-        audioSizeBytes: 0,
         error: undefined,
     };
 }
@@ -913,9 +471,6 @@ exports.TTSOutput = {
         if (message.durationMs !== 0) {
             writer.uint32(32).int64(message.durationMs);
         }
-        for (const v of message.phonemeTimestamps) {
-            exports.TTSPhonemeTimestamp.encode(v, writer.uint32(42).fork()).join();
-        }
         if (message.metadata !== undefined) {
             exports.TTSSynthesisMetadata.encode(message.metadata, writer.uint32(50).fork()).join();
         }
@@ -927,9 +482,6 @@ exports.TTSOutput = {
         }
         if (message.isFinal !== false) {
             writer.uint32(72).bool(message.isFinal);
-        }
-        if (message.audioSizeBytes !== 0) {
-            writer.uint32(80).int64(message.audioSizeBytes);
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(106).fork()).join();
@@ -971,13 +523,6 @@ exports.TTSOutput = {
                     message.durationMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.phonemeTimestamps.push(exports.TTSPhonemeTimestamp.decode(reader, reader.uint32()));
-                    continue;
-                }
                 case 6: {
                     if (tag !== 50) {
                         break;
@@ -1004,13 +549,6 @@ exports.TTSOutput = {
                         break;
                     }
                     message.isFinal = reader.bool();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.audioSizeBytes = longToNumber(reader.int64());
                     continue;
                 }
                 case 13: {
@@ -1050,11 +588,6 @@ exports.TTSOutput = {
                 : isSet(object.duration_ms)
                     ? globalThis.Number(object.duration_ms)
                     : 0,
-            phonemeTimestamps: globalThis.Array.isArray(object?.phonemeTimestamps)
-                ? object.phonemeTimestamps.map((e) => exports.TTSPhonemeTimestamp.fromJSON(e))
-                : globalThis.Array.isArray(object?.phoneme_timestamps)
-                    ? object.phoneme_timestamps.map((e) => exports.TTSPhonemeTimestamp.fromJSON(e))
-                    : [],
             metadata: isSet(object.metadata) ? exports.TTSSynthesisMetadata.fromJSON(object.metadata) : undefined,
             timestampMs: isSet(object.timestampMs)
                 ? globalThis.Number(object.timestampMs)
@@ -1071,11 +604,6 @@ exports.TTSOutput = {
                 : isSet(object.is_final)
                     ? globalThis.Boolean(object.is_final)
                     : false,
-            audioSizeBytes: isSet(object.audioSizeBytes)
-                ? globalThis.Number(object.audioSizeBytes)
-                : isSet(object.audio_size_bytes)
-                    ? globalThis.Number(object.audio_size_bytes)
-                    : 0,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -1093,9 +621,6 @@ exports.TTSOutput = {
         if (message.durationMs !== 0) {
             obj.durationMs = Math.round(message.durationMs);
         }
-        if (message.phonemeTimestamps?.length) {
-            obj.phonemeTimestamps = message.phonemeTimestamps.map((e) => exports.TTSPhonemeTimestamp.toJSON(e));
-        }
         if (message.metadata !== undefined) {
             obj.metadata = exports.TTSSynthesisMetadata.toJSON(message.metadata);
         }
@@ -1107,9 +632,6 @@ exports.TTSOutput = {
         }
         if (message.isFinal !== false) {
             obj.isFinal = message.isFinal;
-        }
-        if (message.audioSizeBytes !== 0) {
-            obj.audioSizeBytes = Math.round(message.audioSizeBytes);
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -1125,14 +647,12 @@ exports.TTSOutput = {
         message.audioFormat = object.audioFormat ?? 0;
         message.sampleRate = object.sampleRate ?? 0;
         message.durationMs = object.durationMs ?? 0;
-        message.phonemeTimestamps = object.phonemeTimestamps?.map((e) => exports.TTSPhonemeTimestamp.fromPartial(e)) || [];
         message.metadata = (object.metadata !== undefined && object.metadata !== null)
             ? exports.TTSSynthesisMetadata.fromPartial(object.metadata)
             : undefined;
         message.timestampMs = object.timestampMs ?? 0;
         message.chunkIndex = object.chunkIndex ?? 0;
         message.isFinal = object.isFinal ?? false;
-        message.audioSizeBytes = object.audioSizeBytes ?? 0;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -1315,17 +835,7 @@ exports.TTSSpeakResult = {
     },
 };
 function createBaseTTSVoiceInfo() {
-    return {
-        id: "",
-        displayName: "",
-        languageCode: "",
-        gender: 0,
-        description: "",
-        isNeural: false,
-        isSystem: false,
-        sampleRate: 0,
-        supportedStyles: [],
-    };
+    return { id: "", displayName: "", languageCode: "", sampleRate: 0 };
 }
 exports.TTSVoiceInfo = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1338,23 +848,8 @@ exports.TTSVoiceInfo = {
         if (message.languageCode !== "") {
             writer.uint32(26).string(message.languageCode);
         }
-        if (message.gender !== 0) {
-            writer.uint32(32).int32(message.gender);
-        }
-        if (message.description !== "") {
-            writer.uint32(42).string(message.description);
-        }
-        if (message.isNeural !== false) {
-            writer.uint32(48).bool(message.isNeural);
-        }
-        if (message.isSystem !== false) {
-            writer.uint32(56).bool(message.isSystem);
-        }
         if (message.sampleRate !== 0) {
             writer.uint32(64).int32(message.sampleRate);
-        }
-        for (const v of message.supportedStyles) {
-            writer.uint32(74).string(v);
         }
         return writer;
     },
@@ -1386,46 +881,11 @@ exports.TTSVoiceInfo = {
                     message.languageCode = reader.string();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.gender = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.description = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.isNeural = reader.bool();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.isSystem = reader.bool();
-                    continue;
-                }
                 case 8: {
                     if (tag !== 64) {
                         break;
                     }
                     message.sampleRate = reader.int32();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.supportedStyles.push(reader.string());
                     continue;
                 }
             }
@@ -1449,28 +909,11 @@ exports.TTSVoiceInfo = {
                 : isSet(object.language_code)
                     ? globalThis.String(object.language_code)
                     : "",
-            gender: isSet(object.gender) ? tTSVoiceGenderFromJSON(object.gender) : 0,
-            description: isSet(object.description) ? globalThis.String(object.description) : "",
-            isNeural: isSet(object.isNeural)
-                ? globalThis.Boolean(object.isNeural)
-                : isSet(object.is_neural)
-                    ? globalThis.Boolean(object.is_neural)
-                    : false,
-            isSystem: isSet(object.isSystem)
-                ? globalThis.Boolean(object.isSystem)
-                : isSet(object.is_system)
-                    ? globalThis.Boolean(object.is_system)
-                    : false,
             sampleRate: isSet(object.sampleRate)
                 ? globalThis.Number(object.sampleRate)
                 : isSet(object.sample_rate)
                     ? globalThis.Number(object.sample_rate)
                     : 0,
-            supportedStyles: globalThis.Array.isArray(object?.supportedStyles)
-                ? object.supportedStyles.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.supported_styles)
-                    ? object.supported_styles.map((e) => globalThis.String(e))
-                    : [],
         };
     },
     toJSON(message) {
@@ -1484,23 +927,8 @@ exports.TTSVoiceInfo = {
         if (message.languageCode !== "") {
             obj.languageCode = message.languageCode;
         }
-        if (message.gender !== 0) {
-            obj.gender = tTSVoiceGenderToJSON(message.gender);
-        }
-        if (message.description !== "") {
-            obj.description = message.description;
-        }
-        if (message.isNeural !== false) {
-            obj.isNeural = message.isNeural;
-        }
-        if (message.isSystem !== false) {
-            obj.isSystem = message.isSystem;
-        }
         if (message.sampleRate !== 0) {
             obj.sampleRate = Math.round(message.sampleRate);
-        }
-        if (message.supportedStyles?.length) {
-            obj.supportedStyles = message.supportedStyles;
         }
         return obj;
     },
@@ -1512,12 +940,7 @@ exports.TTSVoiceInfo = {
         message.id = object.id ?? "";
         message.displayName = object.displayName ?? "";
         message.languageCode = object.languageCode ?? "";
-        message.gender = object.gender ?? 0;
-        message.description = object.description ?? "";
-        message.isNeural = object.isNeural ?? false;
-        message.isSystem = object.isSystem ?? false;
         message.sampleRate = object.sampleRate ?? 0;
-        message.supportedStyles = object.supportedStyles?.map((e) => e) || [];
         return message;
     },
 };
@@ -1575,20 +998,7 @@ exports.TTSVoiceList = {
     },
 };
 function createBaseTTSStreamEvent() {
-    return {
-        timestampUs: 0,
-        requestId: "",
-        kind: 0,
-        output: undefined,
-        phoneme: undefined,
-        speakResult: undefined,
-        progress: 0,
-        chunkIndex: 0,
-        totalChunks: 0,
-        elapsedMs: 0,
-        statusMessage: "",
-        error: undefined,
-    };
+    return { timestampUs: 0, requestId: "", kind: 0, output: undefined, error: undefined };
 }
 exports.TTSStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1603,27 +1013,6 @@ exports.TTSStreamEvent = {
         }
         if (message.output !== undefined) {
             exports.TTSOutput.encode(message.output, writer.uint32(42).fork()).join();
-        }
-        if (message.phoneme !== undefined) {
-            exports.TTSPhonemeTimestamp.encode(message.phoneme, writer.uint32(50).fork()).join();
-        }
-        if (message.speakResult !== undefined) {
-            exports.TTSSpeakResult.encode(message.speakResult, writer.uint32(58).fork()).join();
-        }
-        if (message.progress !== 0) {
-            writer.uint32(85).float(message.progress);
-        }
-        if (message.chunkIndex !== 0) {
-            writer.uint32(88).int32(message.chunkIndex);
-        }
-        if (message.totalChunks !== 0) {
-            writer.uint32(96).int32(message.totalChunks);
-        }
-        if (message.elapsedMs !== 0) {
-            writer.uint32(104).int64(message.elapsedMs);
-        }
-        if (message.statusMessage !== "") {
-            writer.uint32(114).string(message.statusMessage);
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(122).fork()).join();
@@ -1665,55 +1054,6 @@ exports.TTSStreamEvent = {
                     message.output = exports.TTSOutput.decode(reader, reader.uint32());
                     continue;
                 }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.phoneme = exports.TTSPhonemeTimestamp.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.speakResult = exports.TTSSpeakResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 85) {
-                        break;
-                    }
-                    message.progress = reader.float();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.chunkIndex = reader.int32();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.totalChunks = reader.int32();
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 104) {
-                        break;
-                    }
-                    message.elapsedMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 114) {
-                        break;
-                    }
-                    message.statusMessage = reader.string();
-                    continue;
-                }
                 case 15: {
                     if (tag !== 122) {
                         break;
@@ -1743,33 +1083,6 @@ exports.TTSStreamEvent = {
                     : "",
             kind: isSet(object.kind) ? tTSStreamEventKindFromJSON(object.kind) : 0,
             output: isSet(object.output) ? exports.TTSOutput.fromJSON(object.output) : undefined,
-            phoneme: isSet(object.phoneme) ? exports.TTSPhonemeTimestamp.fromJSON(object.phoneme) : undefined,
-            speakResult: isSet(object.speakResult)
-                ? exports.TTSSpeakResult.fromJSON(object.speakResult)
-                : isSet(object.speak_result)
-                    ? exports.TTSSpeakResult.fromJSON(object.speak_result)
-                    : undefined,
-            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-            chunkIndex: isSet(object.chunkIndex)
-                ? globalThis.Number(object.chunkIndex)
-                : isSet(object.chunk_index)
-                    ? globalThis.Number(object.chunk_index)
-                    : 0,
-            totalChunks: isSet(object.totalChunks)
-                ? globalThis.Number(object.totalChunks)
-                : isSet(object.total_chunks)
-                    ? globalThis.Number(object.total_chunks)
-                    : 0,
-            elapsedMs: isSet(object.elapsedMs)
-                ? globalThis.Number(object.elapsedMs)
-                : isSet(object.elapsed_ms)
-                    ? globalThis.Number(object.elapsed_ms)
-                    : 0,
-            statusMessage: isSet(object.statusMessage)
-                ? globalThis.String(object.statusMessage)
-                : isSet(object.status_message)
-                    ? globalThis.String(object.status_message)
-                    : "",
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -1787,27 +1100,6 @@ exports.TTSStreamEvent = {
         if (message.output !== undefined) {
             obj.output = exports.TTSOutput.toJSON(message.output);
         }
-        if (message.phoneme !== undefined) {
-            obj.phoneme = exports.TTSPhonemeTimestamp.toJSON(message.phoneme);
-        }
-        if (message.speakResult !== undefined) {
-            obj.speakResult = exports.TTSSpeakResult.toJSON(message.speakResult);
-        }
-        if (message.progress !== 0) {
-            obj.progress = message.progress;
-        }
-        if (message.chunkIndex !== 0) {
-            obj.chunkIndex = Math.round(message.chunkIndex);
-        }
-        if (message.totalChunks !== 0) {
-            obj.totalChunks = Math.round(message.totalChunks);
-        }
-        if (message.elapsedMs !== 0) {
-            obj.elapsedMs = Math.round(message.elapsedMs);
-        }
-        if (message.statusMessage !== "") {
-            obj.statusMessage = message.statusMessage;
-        }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
         }
@@ -1824,17 +1116,6 @@ exports.TTSStreamEvent = {
         message.output = (object.output !== undefined && object.output !== null)
             ? exports.TTSOutput.fromPartial(object.output)
             : undefined;
-        message.phoneme = (object.phoneme !== undefined && object.phoneme !== null)
-            ? exports.TTSPhonemeTimestamp.fromPartial(object.phoneme)
-            : undefined;
-        message.speakResult = (object.speakResult !== undefined && object.speakResult !== null)
-            ? exports.TTSSpeakResult.fromPartial(object.speakResult)
-            : undefined;
-        message.progress = object.progress ?? 0;
-        message.chunkIndex = object.chunkIndex ?? 0;
-        message.totalChunks = object.totalChunks ?? 0;
-        message.elapsedMs = object.elapsedMs ?? 0;
-        message.statusMessage = object.statusMessage ?? "";
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -1842,7 +1123,7 @@ exports.TTSStreamEvent = {
     },
 };
 function createBaseTTSServiceState() {
-    return { isReady: false, currentVoice: undefined, voices: [], supportedLanguageCodes: [], error: undefined };
+    return { isReady: false, currentVoice: undefined, supportedLanguageCodes: [], error: undefined };
 }
 exports.TTSServiceState = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1851,9 +1132,6 @@ exports.TTSServiceState = {
         }
         if (message.currentVoice !== undefined) {
             writer.uint32(18).string(message.currentVoice);
-        }
-        for (const v of message.voices) {
-            exports.TTSVoiceInfo.encode(v, writer.uint32(26).fork()).join();
         }
         for (const v of message.supportedLanguageCodes) {
             writer.uint32(34).string(v);
@@ -1882,13 +1160,6 @@ exports.TTSServiceState = {
                         break;
                     }
                     message.currentVoice = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.voices.push(exports.TTSVoiceInfo.decode(reader, reader.uint32()));
                     continue;
                 }
                 case 4: {
@@ -1925,7 +1196,6 @@ exports.TTSServiceState = {
                 : isSet(object.current_voice)
                     ? globalThis.String(object.current_voice)
                     : undefined,
-            voices: globalThis.Array.isArray(object?.voices) ? object.voices.map((e) => exports.TTSVoiceInfo.fromJSON(e)) : [],
             supportedLanguageCodes: globalThis.Array.isArray(object?.supportedLanguageCodes)
                 ? object.supportedLanguageCodes.map((e) => globalThis.String(e))
                 : globalThis.Array.isArray(object?.supported_language_codes)
@@ -1942,9 +1212,6 @@ exports.TTSServiceState = {
         if (message.currentVoice !== undefined) {
             obj.currentVoice = message.currentVoice;
         }
-        if (message.voices?.length) {
-            obj.voices = message.voices.map((e) => exports.TTSVoiceInfo.toJSON(e));
-        }
         if (message.supportedLanguageCodes?.length) {
             obj.supportedLanguageCodes = message.supportedLanguageCodes;
         }
@@ -1960,7 +1227,6 @@ exports.TTSServiceState = {
         const message = createBaseTTSServiceState();
         message.isReady = object.isReady ?? false;
         message.currentVoice = object.currentVoice ?? undefined;
-        message.voices = object.voices?.map((e) => exports.TTSVoiceInfo.fromPartial(e)) || [];
         message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
@@ -1992,9 +1258,6 @@ function longToNumber(int64) {
         throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
     }
     return num;
-}
-function isObject(value) {
-    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

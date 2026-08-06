@@ -125,6 +125,14 @@ std::string descriptor_relative_path(const runanywhere::v1::ModelFileDescriptor&
     return "";
 }
 
+// ModelInfo.expected_files (top-level) was deleted; the manifest now lives
+// solely on SingleFileArtifact.expected_files / ArchiveArtifact.expected_files
+// inside the artifact oneof. True whichever arm declares a manifest.
+bool model_has_expected_files_manifest(const runanywhere::v1::ModelInfo& model) {
+    return (model.has_single_file() && model.single_file().has_expected_files()) ||
+           (model.has_archive() && model.archive().has_expected_files());
+}
+
 bool descriptor_is_mmproj(const runanywhere::v1::ModelFileDescriptor& file) {
     if (file.role() == runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR) {
         return true;
@@ -195,13 +203,23 @@ void synthesize_artifact_resolution_from_descriptors(const runanywhere::v1::Mode
         }
     };
 
+    // ModelInfo.expected_files (top-level) was deleted; the manifest now
+    // lives solely on SingleFileArtifact.expected_files / ArchiveArtifact.
+    // expected_files inside the artifact oneof.
     if (model.has_multi_file()) {
         for (const runanywhere::v1::ModelFileDescriptor& file : model.multi_file().files()) {
             visit_descriptor(file);
         }
     }
-    if (model.has_expected_files()) {
-        for (const runanywhere::v1::ModelFileDescriptor& file : model.expected_files().files()) {
+    if (model.has_single_file() && model.single_file().has_expected_files()) {
+        for (const runanywhere::v1::ModelFileDescriptor& file :
+             model.single_file().expected_files().files()) {
+            visit_descriptor(file);
+        }
+    }
+    if (model.has_archive() && model.archive().has_expected_files()) {
+        for (const runanywhere::v1::ModelFileDescriptor& file :
+             model.archive().expected_files().files()) {
             visit_descriptor(file);
         }
     }
@@ -224,9 +242,20 @@ void synthesize_artifact_resolution_from_descriptors(const runanywhere::v1::Mode
                 select_primary_candidate(file);
             }
         }
-        if (out->resolved_path == artifact_root && model.has_expected_files()) {
+        if (out->resolved_path == artifact_root && model.has_single_file() &&
+            model.single_file().has_expected_files()) {
             for (const runanywhere::v1::ModelFileDescriptor& file :
-                 model.expected_files().files()) {
+                 model.single_file().expected_files().files()) {
+                if (out->resolved_path != artifact_root) {
+                    break;
+                }
+                select_primary_candidate(file);
+            }
+        }
+        if (out->resolved_path == artifact_root && model.has_archive() &&
+            model.archive().has_expected_files()) {
+            for (const runanywhere::v1::ModelFileDescriptor& file :
+                 model.archive().expected_files().files()) {
                 if (out->resolved_path != artifact_root) {
                     break;
                 }
@@ -301,27 +330,16 @@ struct ProtoModelPathBridge {
         }
     }
 
+    // ModelInfo.expected_files (top-level) was deleted, and
+    // required_patterns/optional_patterns were reserved off SingleFileArtifact/
+    // ArchiveArtifact directly -- the manifest now lives solely on each
+    // artifact's own expected_files (which still carries required_patterns/
+    // optional_patterns).
     void populate_expected_files(const runanywhere::v1::ModelInfo& proto) {
-        if (proto.has_expected_files()) {
-            add_expected_from_message(proto.expected_files());
-        } else if (proto.has_single_file() && proto.single_file().has_expected_files()) {
+        if (proto.has_single_file() && proto.single_file().has_expected_files()) {
             add_expected_from_message(proto.single_file().expected_files());
         } else if (proto.has_archive() && proto.archive().has_expected_files()) {
             add_expected_from_message(proto.archive().expected_files());
-        } else if (proto.has_single_file()) {
-            for (const std::string& pattern : proto.single_file().required_patterns()) {
-                add_pattern(&required_patterns, pattern);
-            }
-            for (const std::string& pattern : proto.single_file().optional_patterns()) {
-                add_pattern(&optional_patterns, pattern);
-            }
-        } else if (proto.has_archive()) {
-            for (const std::string& pattern : proto.archive().required_patterns()) {
-                add_pattern(&required_patterns, pattern);
-            }
-            for (const std::string& pattern : proto.archive().optional_patterns()) {
-                add_pattern(&optional_patterns, pattern);
-            }
         }
         finalize_patterns();
     }
@@ -343,10 +361,24 @@ struct ProtoModelPathBridge {
         descriptor_destination_paths.push_back(destination);
     }
 
+    // ModelInfo.expected_files (top-level) was deleted; the effective
+    // manifest now comes from whichever artifact oneof arm declares one.
+    static const runanywhere::v1::ExpectedModelFiles* effective_expected_files(
+        const runanywhere::v1::ModelInfo& proto) {
+        if (proto.has_single_file() && proto.single_file().has_expected_files()) {
+            return &proto.single_file().expected_files();
+        }
+        if (proto.has_archive() && proto.archive().has_expected_files()) {
+            return &proto.archive().expected_files();
+        }
+        return nullptr;
+    }
+
     void populate_descriptors(const runanywhere::v1::ModelInfo& proto) {
+        const runanywhere::v1::ExpectedModelFiles* expected = effective_expected_files(proto);
         int descriptor_count = proto.has_multi_file() ? proto.multi_file().files_size() : 0;
-        if (proto.has_expected_files()) {
-            descriptor_count += proto.expected_files().files_size();
+        if (expected != nullptr) {
+            descriptor_count += expected->files_size();
         }
         descriptor_relative_paths.reserve(static_cast<size_t>(descriptor_count));
         descriptor_destination_paths.reserve(static_cast<size_t>(descriptor_count));
@@ -356,17 +388,16 @@ struct ProtoModelPathBridge {
             for (const runanywhere::v1::ModelFileDescriptor& file : proto.multi_file().files()) {
                 add_descriptor(file);
                 rac_model_file_descriptor_t descriptor{};
-                descriptor.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
+                descriptor.is_required = file.is_optional() ? RAC_FALSE : RAC_TRUE;
                 descriptor.role = c_file_role_from_proto(file.role());
                 descriptors.push_back(descriptor);
             }
         }
-        if (proto.has_expected_files()) {
-            for (const runanywhere::v1::ModelFileDescriptor& file :
-                 proto.expected_files().files()) {
+        if (expected != nullptr) {
+            for (const runanywhere::v1::ModelFileDescriptor& file : expected->files()) {
                 add_descriptor(file);
                 rac_model_file_descriptor_t descriptor{};
-                descriptor.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
+                descriptor.is_required = file.is_optional() ? RAC_FALSE : RAC_TRUE;
                 descriptor.role = c_file_role_from_proto(file.role());
                 descriptors.push_back(descriptor);
             }
@@ -388,12 +419,13 @@ struct ProtoModelPathBridge {
     }
 
     void populate_artifact_kind(const runanywhere::v1::ModelInfo& proto) {
+        // custom_strategy_id was deleted from the artifact oneof (the
+        // undocumented custom-strategy registry it backed had no remaining
+        // callers); the oneof is now the only source of truth for shape.
         if (proto.has_archive()) {
             model.artifact_info.kind = RAC_ARTIFACT_KIND_ARCHIVE;
         } else if (proto.has_multi_file() || !descriptors.empty()) {
             model.artifact_info.kind = RAC_ARTIFACT_KIND_MULTI_FILE;
-        } else if (proto.has_custom_strategy_id()) {
-            model.artifact_info.kind = RAC_ARTIFACT_KIND_CUSTOM;
         } else if (proto.has_built_in() && proto.built_in()) {
             model.artifact_info.kind = RAC_ARTIFACT_KIND_BUILT_IN;
         } else {
@@ -413,7 +445,7 @@ descriptor_from_resolved_file(const rac_resolved_model_file_t& file) {
         descriptor.set_local_path(file.path);
         descriptor.set_filename(basename_of_path(file.path));
     }
-    descriptor.set_is_required(file.is_required == RAC_TRUE);
+    descriptor.set_is_optional(file.is_required != RAC_TRUE);
     descriptor.set_role(proto_file_role_from_resolved(file.role));
     return descriptor;
 }
@@ -475,8 +507,8 @@ ModelArtifactResolution resolve_model_artifacts(const runanywhere::v1::ModelInfo
     // infer_file_role() recover the primary `.gguf` AND the `mmproj`
     // projector. Cross-platform: the same commons path backs iOS/Android/
     // Flutter/RN VLM loads.
-    if (!model.local_path().empty() && !model.has_multi_file() && !model.has_expected_files() &&
-        !model.has_archive() &&
+    if (!model.local_path().empty() && !model.has_multi_file() &&
+        !model_has_expected_files_manifest(model) && !model.has_archive() &&
         rac_framework_uses_directory_based_models(c_framework_from_proto(model.framework())) !=
             RAC_TRUE) {
         return out;
@@ -529,7 +561,7 @@ ModelArtifactResolution resolve_model_artifacts(const runanywhere::v1::ModelInfo
     }
     rac_model_path_resolution_free(&resolution);
 
-    if (model.has_multi_file() || model.has_expected_files()) {
+    if (model.has_multi_file() || model_has_expected_files_manifest(model)) {
         synthesize_artifact_resolution_from_descriptors(model, artifact_root, &out);
     }
     return out;

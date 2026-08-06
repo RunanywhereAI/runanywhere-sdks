@@ -79,17 +79,6 @@ public extension RunAnywhere {
 
                     for await partial in partials {
                         if Task.isCancelled { break }
-                        // The bridge reports stream failures on the terminal
-                        // partial's `finalOutput`; surface them as `.failed`
-                        // instead of leaking them through `text`.
-                        if partial.hasFinalOutput, partial.finalOutput.hasError {
-                            continuation.yield(.failed(
-                                requestId: requestId,
-                                error: SDKException(proto: partial.finalOutput.error)
-                            ))
-                            sawTerminal = true
-                            break
-                        }
                         if partial.isFinal {
                             continuation.yield(.transcriptFinal(
                                 requestId: requestId,
@@ -248,17 +237,14 @@ extension RunAnywhere {
         return try await CppBridge.STT.shared.stateProto()
     }
 
-    /// Prefer the backend's terminal `RASTTOutput`; fall back to the partial's
-    /// own transcript when the session ended without one.
+    /// Build a terminal `RASTTOutput` from a partial. `RASTTPartialResult`
+    /// collapsed to `text`/`isFinal`/`language` (idl/stt_options.proto):
+    /// `finalOutput`/`confidence`/`audioStartMs`/`audioEndMs` no longer
+    /// exist on it, so this now only carries `text`/`language` forward.
     internal static func transcription(from partial: RASTTPartialResult) -> Transcription {
-        if partial.hasFinalOutput {
-            return Transcription(proto: partial.finalOutput)
-        }
         var synthesized = RASTTOutput()
         synthesized.text = partial.text
-        synthesized.confidence = partial.confidence
         if partial.hasLanguage { synthesized.language = partial.language }
-        synthesized.durationMs = max(0, partial.audioEndMs - partial.audioStartMs)
         return Transcription(proto: synthesized)
     }
 }

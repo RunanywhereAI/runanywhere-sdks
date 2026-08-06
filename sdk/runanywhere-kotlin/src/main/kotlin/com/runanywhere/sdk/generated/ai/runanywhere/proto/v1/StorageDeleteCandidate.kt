@@ -47,18 +47,11 @@ public class StorageDeleteCandidate(
   )
   public val reclaimable_bytes: Long = 0L,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    jsonName = "lastUsedMs",
-    schemaIndex = 2,
-  )
-  public val last_used_ms: Long? = null,
-  @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isLoaded",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val is_loaded: Boolean = false,
   @field:WireField(
@@ -66,7 +59,7 @@ public class StorageDeleteCandidate(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "localPath",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val local_path: String = "",
   /**
@@ -77,7 +70,7 @@ public class StorageDeleteCandidate(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requiresUnload",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val requires_unload: Boolean = false,
   @field:WireField(
@@ -85,7 +78,7 @@ public class StorageDeleteCandidate(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requiresPlatformDelete",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val requires_platform_delete: Boolean = false,
   @field:WireField(
@@ -93,7 +86,7 @@ public class StorageDeleteCandidate(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "storageKey",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val storage_key: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
@@ -110,7 +103,6 @@ public class StorageDeleteCandidate(
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
     if (reclaimable_bytes != other.reclaimable_bytes) return false
-    if (last_used_ms != other.last_used_ms) return false
     if (is_loaded != other.is_loaded) return false
     if (local_path != other.local_path) return false
     if (requires_unload != other.requires_unload) return false
@@ -125,7 +117,6 @@ public class StorageDeleteCandidate(
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + reclaimable_bytes.hashCode()
-      result = result * 37 + (last_used_ms?.hashCode() ?: 0)
       result = result * 37 + is_loaded.hashCode()
       result = result * 37 + local_path.hashCode()
       result = result * 37 + requires_unload.hashCode()
@@ -140,7 +131,6 @@ public class StorageDeleteCandidate(
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
     result += """reclaimable_bytes=$reclaimable_bytes"""
-    if (last_used_ms != null) result += """last_used_ms=$last_used_ms"""
     result += """is_loaded=$is_loaded"""
     result += """local_path=${sanitize(local_path)}"""
     result += """requires_unload=$requires_unload"""
@@ -152,14 +142,13 @@ public class StorageDeleteCandidate(
   public fun copy(
     model_id: String = this.model_id,
     reclaimable_bytes: Long = this.reclaimable_bytes,
-    last_used_ms: Long? = this.last_used_ms,
     is_loaded: Boolean = this.is_loaded,
     local_path: String = this.local_path,
     requires_unload: Boolean = this.requires_unload,
     requires_platform_delete: Boolean = this.requires_platform_delete,
     storage_key: String = this.storage_key,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageDeleteCandidate = StorageDeleteCandidate(model_id, reclaimable_bytes, last_used_ms, is_loaded, local_path, requires_unload, requires_platform_delete, storage_key, unknownFields)
+  ): StorageDeleteCandidate = StorageDeleteCandidate(model_id, reclaimable_bytes, is_loaded, local_path, requires_unload, requires_platform_delete, storage_key, unknownFields)
 
   public companion object {
     @JvmField
@@ -180,7 +169,6 @@ public class StorageDeleteCandidate(
         if (value.reclaimable_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.reclaimable_bytes)
         }
-        size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.last_used_ms)
         if (value.is_loaded != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.is_loaded)
         }
@@ -206,7 +194,6 @@ public class StorageDeleteCandidate(
         if (value.reclaimable_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.reclaimable_bytes)
         }
-        ProtoAdapter.INT64.encodeWithTag(writer, 3, value.last_used_ms)
         if (value.is_loaded != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_loaded)
         }
@@ -242,7 +229,6 @@ public class StorageDeleteCandidate(
         if (value.is_loaded != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_loaded)
         }
-        ProtoAdapter.INT64.encodeWithTag(writer, 3, value.last_used_ms)
         if (value.reclaimable_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.reclaimable_bytes)
         }
@@ -254,7 +240,6 @@ public class StorageDeleteCandidate(
       override fun decode(reader: ProtoReader): StorageDeleteCandidate {
         var model_id: String = ""
         var reclaimable_bytes: Long = 0L
-        var last_used_ms: Long? = null
         var is_loaded: Boolean = false
         var local_path: String = ""
         var requires_unload: Boolean = false
@@ -264,7 +249,6 @@ public class StorageDeleteCandidate(
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> reclaimable_bytes = ProtoAdapter.INT64.decode(reader)
-            3 -> last_used_ms = ProtoAdapter.INT64.decode(reader)
             4 -> is_loaded = ProtoAdapter.BOOL.decode(reader)
             5 -> local_path = ProtoAdapter.STRING.decode(reader)
             6 -> requires_unload = ProtoAdapter.BOOL.decode(reader)
@@ -276,7 +260,6 @@ public class StorageDeleteCandidate(
         return StorageDeleteCandidate(
           model_id = model_id,
           reclaimable_bytes = reclaimable_bytes,
-          last_used_ms = last_used_ms,
           is_loaded = is_loaded,
           local_path = local_path,
           requires_unload = requires_unload,

@@ -78,10 +78,17 @@ public struct ReasoningOptions: Sendable {
 
 /// Force generation to satisfy a JSON schema.
 public struct StructuredOutput: Sendable {
-    /// Schema the output must validate against.
+    /// Schema the output must validate against, as raw JSON Schema text.
     public var schema: JsonSchema
 
     /// Reject output that does not validate instead of returning it raw.
+    ///
+    /// `RAStructuredOutputOptions.strictMode` was deleted outright
+    /// (idl/structured_output.proto shrunk the message to
+    /// `includeSchemaInPrompt` + a `schema`/`grammar`/`regex` oneof); this
+    /// knob has no wire home anymore. Kept on the public struct for API
+    /// stability but currently has no effect on the built proto — every
+    /// generation is validated the same way regardless of this flag.
     public var strict: Bool = true
 
     /// Build a structured-output constraint.
@@ -91,7 +98,7 @@ public struct StructuredOutput: Sendable {
     }
 
     func toProto() -> RAStructuredOutputOptions {
-        RAStructuredOutputOptions.defaults(schema: schema, includeSchemaInPrompt: true, strict: strict)
+        RAStructuredOutputOptions.defaults(schema: schema, includeSchemaInPrompt: true)
     }
 }
 
@@ -176,7 +183,9 @@ public struct LlmOptions: Sendable {
         if let minP { proto.minP = minP }
         if let frequencyPenalty { proto.frequencyPenalty = frequencyPenalty }
         if let presencePenalty { proto.presencePenalty = presencePenalty }
-        if let repetitionPenalty { proto.repetitionPenalty = repetitionPenalty }
+        // idl/llm_options.proto renamed repetition_penalty -> repeat_penalty
+        // (industry name: llama.cpp / Ollama both spell it repeat_penalty).
+        if let repetitionPenalty { proto.repeatPenalty = repetitionPenalty }
         if let seed { proto.seed = Int64(seed) }
         proto.stopSequences = stopSequences
         if let systemPrompt { proto.systemPrompt = systemPrompt }
@@ -207,21 +216,19 @@ public struct LlmOptions: Sendable {
         return options
     }
 
-    /// VLM shares this options shape; lower onto the VLM proto instead.
-    func toVLMProto(prompt: String) -> RAVLMGenerationOptions {
-        var proto = RAVLMGenerationOptions.defaults()
-        proto.prompt = prompt
-        proto.maxOutputTokens = Int32(maxOutputTokens)
-        proto.temperature = temperature
-        proto.topP = topP
-        if let topK { proto.topK = Int32(topK) }
-        if let minP { proto.minP = minP }
-        if let repetitionPenalty { proto.repetitionPenalty = repetitionPenalty }
-        if let seed { proto.seed = Int64(seed) }
-        proto.stopSequences = stopSequences
-        if let systemPrompt { proto.systemPrompt = systemPrompt }
-        if let reasoning { proto.reasoning = reasoning.toProto() }
-        return proto
+    /// Build the VLM request envelope. `RAVLMGenerationOptions` was deleted
+    /// outright (idl/vlm_options.proto): its 11 sampling fields were
+    /// name-for-name copies of `LLMGenerationOptions` with drifted
+    /// defaults, so VLM now shares the exact same `toProto()` options this
+    /// struct already builds for `llm`. `vision`/`images` carry the four
+    /// genuinely vision-specific knobs and the image payload; neither has a
+    /// public `LlmOptions` knob yet, so `vision` stays default.
+    func toVLMRequest(prompt: String, images: [RAVLMImage]) -> RAVLMGenerationRequest {
+        var request = RAVLMGenerationRequest()
+        request.prompt = prompt
+        request.images = images
+        request.options = toProto()
+        return request
     }
 }
 
@@ -237,6 +244,11 @@ public struct SttOptions: Sendable {
     public var wordTimestamps: Bool = RASTTOptions.defaults().enableWordTimestamps
     public var diarization: Bool = false
     public var maxSpeakers: Int?
+
+    /// `translateToEnglish` was reserved off the wire outright
+    /// (idl/stt_options.proto: "None were ever read by any backend") with
+    /// no replacement. Kept on the public struct for API stability but
+    /// currently has no effect on the built proto.
     public var translateToEnglish: Bool = false
 
     /// Build transcription options.
@@ -261,9 +273,11 @@ public struct SttOptions: Sendable {
         if let language { proto.language = language }
         proto.enablePunctuation = punctuation
         proto.enableWordTimestamps = wordTimestamps
-        proto.enableDiarization = diarization
-        if let maxSpeakers { proto.maxSpeakers = Int32(maxSpeakers) }
-        proto.translateToEnglish = translateToEnglish
+        // enableDiarization -> diarize (idl/stt_options.proto rename).
+        proto.diarize = diarization
+        // maxSpeakers -> speakersExpected (idl/stt_options.proto rename,
+        // now presence-tracked optional int32).
+        if let maxSpeakers { proto.speakersExpected = Int32(maxSpeakers) }
         return proto
     }
 }
@@ -383,7 +397,11 @@ public struct ImageOptions: Sendable {
     public var seed: Int?
     public var mode: ImageMode = .generate
 
-    /// Emit intermediate step images on the event stream.
+    /// `RADiffusionGenerationOptions.reportIntermediateImages` was deleted
+    /// outright (idl/diffusion_options.proto) with no replacement. Kept on
+    /// the public struct for API stability but currently has no effect on
+    /// the built proto — `DiffusionProgress.intermediateImageData` is
+    /// populated purely at the backend's discretion now.
     public var reportPartials: Bool = false
 
     /// Build image-generation options.
@@ -416,18 +434,22 @@ public struct ImageOptions: Sendable {
         if let steps { proto.steps = Int32(steps) }
         if let guidanceScale { proto.guidanceScale = guidanceScale }
         if let seed { proto.seed = Int64(seed) }
-        proto.reportIntermediateImages = reportPartials
+        // mode/inputImage/inputImageWidth/inputImageHeight/
+        // reportIntermediateImages were all deleted outright
+        // (idl/diffusion_options.proto): mode is now INFERRED from field
+        // presence alone (no image = text-to-image, image = image-to-image,
+        // image + maskImage = inpainting), and there is no toggle left for
+        // intermediate-image reporting.
         switch mode {
         case .generate:
-            proto.mode = .textToImage
+            break
         case .inpaint(let input, let mask):
-            proto.mode = .inpainting
-            let inputPixels = try input.rawPixels()
-            let maskPixels = try mask.rawPixels()
-            proto.inputImage = inputPixels.data
-            proto.inputImageWidth = Int32(inputPixels.width)
-            proto.inputImageHeight = Int32(inputPixels.height)
-            proto.maskImage = maskPixels.data
+            let inputEncoded = try input.encodedImageBytes()
+            let maskEncoded = try mask.encodedImageBytes()
+            proto.image = inputEncoded.data
+            proto.imageMediaType = inputEncoded.mediaType
+            proto.maskImage = maskEncoded.data
+            proto.maskImageMediaType = maskEncoded.mediaType
         }
         return proto
     }
@@ -540,6 +562,11 @@ public struct RagConfig: Sendable {
     public var chunkSize = Int(RARAGConfiguration.defaults().chunkSize)
     public var chunkOverlap = Int(RARAGConfiguration.defaults().chunkOverlap)
     public var similarityThreshold: Float?
+
+    /// `RAGConfiguration.index_path`/`persist_index` were deleted outright
+    /// (idl/rag.proto) with no replacement — vector-index persistence has no
+    /// wire home anymore. Kept on the public struct for API stability but
+    /// currently has no effect on the built proto.
     public var persistPath: String?
 
     /// Deprecated alias for `retrievalTopK`.
@@ -570,11 +597,8 @@ public struct RagConfig: Sendable {
         proto.topK = Int32(retrievalTopK)
         proto.chunkSize = Int32(chunkSize)
         proto.chunkOverlap = Int32(chunkOverlap)
-        if let similarityThreshold { proto.similarityThreshold = similarityThreshold }
-        if let persistPath {
-            proto.indexPath = persistPath
-            proto.persistIndex = true
-        }
+        // similarityThreshold -> scoreThreshold (idl/rag.proto rename).
+        if let similarityThreshold { proto.scoreThreshold = similarityThreshold }
         return proto
     }
 }

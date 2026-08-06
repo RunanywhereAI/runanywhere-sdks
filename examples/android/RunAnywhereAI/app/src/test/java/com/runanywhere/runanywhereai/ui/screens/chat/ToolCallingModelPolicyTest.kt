@@ -112,8 +112,9 @@ class ToolCallingModelPolicyTest {
         assertEquals(null, plan.forcedToolName)
         assertEquals(ToolCallingExecutionPolicy.MAX_TOOL_CALLS, plan.toolOptions.max_tool_calls)
         assertEquals(64, plan.generationOptions.max_output_tokens)
-        assertEquals(64, plan.toolOptions.max_tokens)
-        assertEquals(0f, plan.toolOptions.temperature)
+        // ToolCallingOptions.max_tokens/temperature were deleted outright; the
+        // enclosing LLMGenerationOptions is the sole value for both now.
+        assertEquals(0f, plan.generationOptions.temperature)
         assertTrue(plan.toolOptions.disable_thinking == true)
         assertFalse(plan.toolOptions.keep_tools_available)
         assertTrue(plan.toolOptions.parallel_tool_calls)

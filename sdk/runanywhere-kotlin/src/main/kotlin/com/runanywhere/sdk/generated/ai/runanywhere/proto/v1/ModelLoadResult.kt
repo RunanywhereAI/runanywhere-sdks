@@ -145,6 +145,17 @@ public class ModelLoadResult(
     schemaIndex = 15,
   )
   public val fallback_reason: String? = null,
+  /**
+   * What context length the runtime actually allocated -- a request is
+   * not a promise.
+   */
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "allocatedContextLength",
+    schemaIndex = 16,
+  )
+  public val allocated_context_length: Int? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelLoadResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -196,6 +207,7 @@ public class ModelLoadResult(
     if (runtime_version != other.runtime_version) return false
     if (abi_version != other.abi_version) return false
     if (fallback_reason != other.fallback_reason) return false
+    if (allocated_context_length != other.allocated_context_length) return false
     return true
   }
 
@@ -219,6 +231,7 @@ public class ModelLoadResult(
       result = result * 37 + (runtime_version?.hashCode() ?: 0)
       result = result * 37 + (abi_version?.hashCode() ?: 0)
       result = result * 37 + (fallback_reason?.hashCode() ?: 0)
+      result = result * 37 + (allocated_context_length?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -242,6 +255,7 @@ public class ModelLoadResult(
     if (runtime_version != null) result += """runtime_version=${sanitize(runtime_version)}"""
     if (abi_version != null) result += """abi_version=${sanitize(abi_version)}"""
     if (fallback_reason != null) result += """fallback_reason=${sanitize(fallback_reason)}"""
+    if (allocated_context_length != null) result += """allocated_context_length=$allocated_context_length"""
     return result.joinToString(prefix = "ModelLoadResult{", separator = ", ", postfix = "}")
   }
 
@@ -262,8 +276,9 @@ public class ModelLoadResult(
     runtime_version: String? = this.runtime_version,
     abi_version: String? = this.abi_version,
     fallback_reason: String? = this.fallback_reason,
+    allocated_context_length: Int? = this.allocated_context_length,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelLoadResult = ModelLoadResult(model_id, category, framework, resolved_path, loaded_at_unix_ms, warnings, already_loaded, resolved_artifacts, error, requested_backend, actual_device_id, actual_device_name, actual_device_kind, runtime_version, abi_version, fallback_reason, unknownFields)
+  ): ModelLoadResult = ModelLoadResult(model_id, category, framework, resolved_path, loaded_at_unix_ms, warnings, already_loaded, resolved_artifacts, error, requested_backend, actual_device_id, actual_device_name, actual_device_kind, runtime_version, abi_version, fallback_reason, allocated_context_length, unknownFields)
 
   public companion object {
     @JvmField
@@ -305,6 +320,7 @@ public class ModelLoadResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.runtime_version)
         size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.abi_version)
         size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.fallback_reason)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(19, value.allocated_context_length)
         return size
       }
 
@@ -337,11 +353,13 @@ public class ModelLoadResult(
         ProtoAdapter.STRING.encodeWithTag(writer, 16, value.runtime_version)
         ProtoAdapter.STRING.encodeWithTag(writer, 17, value.abi_version)
         ProtoAdapter.STRING.encodeWithTag(writer, 18, value.fallback_reason)
+        ProtoAdapter.INT32.encodeWithTag(writer, 19, value.allocated_context_length)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelLoadResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.INT32.encodeWithTag(writer, 19, value.allocated_context_length)
         ProtoAdapter.STRING.encodeWithTag(writer, 18, value.fallback_reason)
         ProtoAdapter.STRING.encodeWithTag(writer, 17, value.abi_version)
         ProtoAdapter.STRING.encodeWithTag(writer, 16, value.runtime_version)
@@ -389,6 +407,7 @@ public class ModelLoadResult(
         var runtime_version: String? = null
         var abi_version: String? = null
         var fallback_reason: String? = null
+        var allocated_context_length: Int? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -419,6 +438,7 @@ public class ModelLoadResult(
             16 -> runtime_version = ProtoAdapter.STRING.decode(reader)
             17 -> abi_version = ProtoAdapter.STRING.decode(reader)
             18 -> fallback_reason = ProtoAdapter.STRING.decode(reader)
+            19 -> allocated_context_length = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -439,6 +459,7 @@ public class ModelLoadResult(
           runtime_version = runtime_version,
           abi_version = abi_version,
           fallback_reason = fallback_reason,
+          allocated_context_length = allocated_context_length,
           unknownFields = unknownFields
         )
       }

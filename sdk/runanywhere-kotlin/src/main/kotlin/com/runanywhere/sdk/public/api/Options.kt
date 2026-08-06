@@ -108,9 +108,9 @@ public data class LlmOptions(
     public companion object {
         private val generationDefaults = LLMGenerationOptions.defaults()
 
-        public val DEFAULT_MAX_OUTPUT_TOKENS: Int = generationDefaults.max_output_tokens
-        public val DEFAULT_TEMPERATURE: Float = generationDefaults.temperature
-        public val DEFAULT_TOP_P: Float = generationDefaults.top_p
+        public val DEFAULT_MAX_OUTPUT_TOKENS: Int = generationDefaults.max_output_tokens ?: 512
+        public val DEFAULT_TEMPERATURE: Float = generationDefaults.temperature ?: 0.7f
+        public val DEFAULT_TOP_P: Float = generationDefaults.top_p ?: 1.0f
 
         // main's ToolCallingOptions carries no rac_default, so max_tool_calls has
         // no generated default. Restate the contract value as a literal.
@@ -270,13 +270,20 @@ public data class RagQueryOptions(
     val generation: LlmOptions? = null,
 )
 
-/** Chunking and retrieval knobs for a RAG session. */
+/**
+ * Chunking and retrieval knobs for a RAG session.
+ *
+ * `persistPath` (idl RAGConfiguration.index_path/persist_index) is deleted
+ * outright, not renamed: commons dropped on-disk index persistence entirely
+ * (rag_backend.cpp's save_index()/load_index() were removed) in favor of
+ * just-in-time in-memory retrieval, so there is no wire field to carry a
+ * path to any more. Sessions are in-memory for their lifetime only.
+ */
 public data class RagConfig(
     val topK: Int = DEFAULT_TOP_K,
     val chunkSize: Int = DEFAULT_CHUNK_SIZE,
     val chunkOverlap: Int = DEFAULT_CHUNK_OVERLAP,
     val similarityThreshold: Float? = null,
-    val persistPath: String? = null,
     /** Rerank retrieved chunks with the loaded cross-encoder before generating. */
     val rerank: Boolean = false,
     /** Expand each question into several retrieval queries before ranking. */
@@ -330,11 +337,18 @@ public data class LoadOptions(
         get() = accelerator ?: useGpu?.let { if (it) AcceleratorPolicy.GPU else AcceleratorPolicy.CPU }
 }
 
-/** Narrows a model listing. */
+/**
+ * Narrows a model listing.
+ *
+ * No `availableOnly`: `ModelQuery.available_only` was deleted outright
+ * (idl/model_types.proto) with no replacement field, and Swift's
+ * `ModelFilter` (the source of truth for this refactor) dropped the public
+ * knob entirely rather than mapping it onto `registry_status`. Mirrored here
+ * for cross-SDK symmetry.
+ */
 public data class ModelFilter(
     val category: ModelCategory? = null,
     val framework: InferenceFramework? = null,
     val downloadedOnly: Boolean? = null,
-    val availableOnly: Boolean? = null,
     val search: String? = null,
 )

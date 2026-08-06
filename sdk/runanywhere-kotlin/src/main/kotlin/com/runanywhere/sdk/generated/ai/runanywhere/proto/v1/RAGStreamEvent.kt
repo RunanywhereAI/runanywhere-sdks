@@ -30,8 +30,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class RAGStreamEvent(
+  /**
+   * Microseconds since the Unix epoch, matching every other modality.
+   */
   @field:WireField(
-    tag = 2,
+    tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
@@ -39,7 +42,7 @@ public class RAGStreamEvent(
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
-    tag = 3,
+    tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
@@ -47,35 +50,29 @@ public class RAGStreamEvent(
   )
   public val request_id: String = "",
   @field:WireField(
-    tag = 4,
+    tag = 3,
     adapter = "ai.runanywhere.proto.v1.RAGStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
   public val kind: RAGStreamEventKind = RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
-    tag = 5,
-    adapter = "ai.runanywhere.proto.v1.RAGSearchResult#ADAPTER",
-    schemaIndex = 3,
-  )
-  public val chunk: RAGSearchResult? = null,
-  @field:WireField(
-    tag = 6,
+    tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val token: String = "",
   @field:WireField(
-    tag = 7,
+    tag = 5,
     adapter = "ai.runanywhere.proto.v1.RAGResult#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val result: RAGResult? = null,
   @field:WireField(
-    tag = 10,
+    tag = 6,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -93,7 +90,6 @@ public class RAGStreamEvent(
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
-    if (chunk != other.chunk) return false
     if (token != other.token) return false
     if (result != other.result) return false
     if (error != other.error) return false
@@ -107,7 +103,6 @@ public class RAGStreamEvent(
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + request_id.hashCode()
       result_ = result_ * 37 + kind.hashCode()
-      result_ = result_ * 37 + (chunk?.hashCode() ?: 0)
       result_ = result_ * 37 + token.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
       result_ = result_ * 37 + (error?.hashCode() ?: 0)
@@ -121,7 +116,6 @@ public class RAGStreamEvent(
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """request_id=${sanitize(request_id)}"""
     result_ += """kind=$kind"""
-    if (chunk != null) result_ += """chunk=$chunk"""
     result_ += """token=${sanitize(token)}"""
     if (result != null) result_ += """result=$result"""
     if (error != null) result_ += """error=$error"""
@@ -132,12 +126,11 @@ public class RAGStreamEvent(
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: RAGStreamEventKind = this.kind,
-    chunk: RAGSearchResult? = this.chunk,
     token: String = this.token,
     result: RAGResult? = this.result,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGStreamEvent = RAGStreamEvent(timestamp_us, request_id, kind, chunk, token, result, error, unknownFields)
+  ): RAGStreamEvent = RAGStreamEvent(timestamp_us, request_id, kind, token, result, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -152,58 +145,55 @@ public class RAGStreamEvent(
       override fun encodedSize(`value`: RAGStreamEvent): Int {
         var size = value.unknownFields.size
         if (value.timestamp_us != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(1, value.timestamp_us)
         }
         if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.request_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.request_id)
         }
         if (value.kind != ai.runanywhere.proto.v1.RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED) {
-          size += RAGStreamEventKind.ADAPTER.encodedSizeWithTag(4, value.kind)
+          size += RAGStreamEventKind.ADAPTER.encodedSizeWithTag(3, value.kind)
         }
-        size += RAGSearchResult.ADAPTER.encodedSizeWithTag(5, value.chunk)
         if (value.token != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.token)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.token)
         }
-        size += RAGResult.ADAPTER.encodedSizeWithTag(7, value.result)
-        size += SDKError.ADAPTER.encodedSizeWithTag(10, value.error)
+        size += RAGResult.ADAPTER.encodedSizeWithTag(5, value.result)
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: RAGStreamEvent) {
         if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
+          ProtoAdapter.INT64.encodeWithTag(writer, 1, value.timestamp_us)
         }
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.request_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.request_id)
         }
         if (value.kind != ai.runanywhere.proto.v1.RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED) {
-          RAGStreamEventKind.ADAPTER.encodeWithTag(writer, 4, value.kind)
+          RAGStreamEventKind.ADAPTER.encodeWithTag(writer, 3, value.kind)
         }
-        RAGSearchResult.ADAPTER.encodeWithTag(writer, 5, value.chunk)
         if (value.token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.token)
+          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.token)
         }
-        RAGResult.ADAPTER.encodeWithTag(writer, 7, value.result)
-        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
+        RAGResult.ADAPTER.encodeWithTag(writer, 5, value.result)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
-        RAGResult.ADAPTER.encodeWithTag(writer, 7, value.result)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
+        RAGResult.ADAPTER.encodeWithTag(writer, 5, value.result)
         if (value.token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.token)
+          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.token)
         }
-        RAGSearchResult.ADAPTER.encodeWithTag(writer, 5, value.chunk)
         if (value.kind != ai.runanywhere.proto.v1.RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED) {
-          RAGStreamEventKind.ADAPTER.encodeWithTag(writer, 4, value.kind)
+          RAGStreamEventKind.ADAPTER.encodeWithTag(writer, 3, value.kind)
         }
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.request_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.request_id)
         }
         if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
+          ProtoAdapter.INT64.encodeWithTag(writer, 1, value.timestamp_us)
         }
       }
 
@@ -211,23 +201,21 @@ public class RAGStreamEvent(
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: RAGStreamEventKind = RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED
-        var chunk: RAGSearchResult? = null
         var token: String = ""
         var result: RAGResult? = null
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
-            3 -> request_id = ProtoAdapter.STRING.decode(reader)
-            4 -> try {
+            1 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
+            2 -> request_id = ProtoAdapter.STRING.decode(reader)
+            3 -> try {
               kind = RAGStreamEventKind.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            5 -> chunk = RAGSearchResult.ADAPTER.decode(reader)
-            6 -> token = ProtoAdapter.STRING.decode(reader)
-            7 -> result = RAGResult.ADAPTER.decode(reader)
-            10 -> error = SDKError.ADAPTER.decode(reader)
+            4 -> token = ProtoAdapter.STRING.decode(reader)
+            5 -> result = RAGResult.ADAPTER.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -235,7 +223,6 @@ public class RAGStreamEvent(
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,
-          chunk = chunk,
           token = token,
           result = result,
           error = error,
@@ -244,7 +231,6 @@ public class RAGStreamEvent(
       }
 
       override fun redact(`value`: RAGStreamEvent): RAGStreamEvent = value.copy(
-        chunk = value.chunk?.let(RAGSearchResult.ADAPTER::redact),
         result = value.result?.let(RAGResult.ADAPTER::redact),
         error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY

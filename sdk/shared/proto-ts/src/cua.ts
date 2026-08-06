@@ -155,37 +155,69 @@ export function cuaActionTypeToJSON(object: CuaActionType): string {
  * TYPE->text, VISIT_URL->url, WEB_SEARCH->query, TERMINATE->answer,
  * ASK_USER/READ_PAGE_ANSWER->question, PAUSE_MEMORIZE->fact, KEY->space-joined
  * keys. `reasoning` holds any chain-of-thought preceding the tool_call.
+ *
+ * COORDINATE CONTRACT: x/y are integers in the SAME pixel space as the
+ * viewport you passed to parse_action, origin at the TOP-LEFT. That viewport
+ * must be the pixel dimensions of the exact image you handed to the VLM — if
+ * you downscaled the screenshot before sending it, pass the downscaled
+ * dimensions. On a DPR-2/3/4 display, passing logical points while sending a
+ * physical-pixel screenshot offsets every click by that factor, silently (see
+ * examples/ios/.../ComputerUseAgentViewModel.swift for the correct
+ * computation). parse_action has already rescaled out of the profile's own
+ * space (1000x1000 for `fara`), so no further scaling is ever correct.
+ *
+ * LEFT_CLICK_DRAG: x/y are the drag DESTINATION only. Fara emits no origin (it
+ * drags from the current cursor), and a touch screen has no cursor, so the
+ * HOST must supply the press point — typically the last MOUSE_MOVE target.
+ *
+ * LENGTH: `text` and `reasoning` are TRUNCATED at 2047 bytes on a UTF-8 lead
+ * byte by the fixed C buffers behind them (rac_cua_action_t.text[2048]); no
+ * field records that truncation happened. This also caps a TERMINATE answer.
  */
 export interface CuaAction {
   type: CuaActionType;
-  /** true if x/y are valid */
-  coordinateValid: boolean;
-  /** viewport-scaled pixels */
-  x: number;
-  y: number;
-  /** SCROLL/HSCROLL: +up / -down */
-  scrollPixels: number;
-  /** WAIT */
+  /** viewport pixels from the LEFT edge; presence = "has a coordinate" */
+  x?:
+    | number
+    | undefined;
+  /** viewport pixels from the TOP edge */
+  y?:
+    | number
+    | undefined;
+  /**
+   * HSCROLL/SCROLL axis split. Value is the model's raw `pixels` output,
+   * copied verbatim per axis — the sign is UNVERIFIED against any real
+   * device trace, so no direction convention is asserted here.
+   */
+  scrollX: number;
+  /** SCROLL */
+  scrollY: number;
+  /**
+   * WAIT: fractional seconds. Clamped by commons to [0, 100] because the
+   * value comes from untrusted model output; an unbounded parse would wedge
+   * the agent loop. 100s is a RunAnywhere-chosen ceiling, not inherited from
+   * any vendor API.
+   */
   waitSeconds: number;
   /** primary string arg (see above) */
   text: string;
   /** CoT before the tool_call, if any */
   reasoning: string;
   /** true if a valid tool_call was found */
-  parseOk: boolean;
+  isValid: boolean;
 }
 
 function createBaseCuaAction(): CuaAction {
   return {
     type: 0,
-    coordinateValid: false,
-    x: 0,
-    y: 0,
-    scrollPixels: 0,
+    x: undefined,
+    y: undefined,
+    scrollX: 0,
+    scrollY: 0,
     waitSeconds: 0,
     text: "",
     reasoning: "",
-    parseOk: false,
+    isValid: false,
   };
 }
 
@@ -194,17 +226,17 @@ export const CuaAction: MessageFns<CuaAction> = {
     if (message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
-    if (message.coordinateValid !== false) {
-      writer.uint32(16).bool(message.coordinateValid);
+    if (message.x !== undefined) {
+      writer.uint32(16).int32(message.x);
     }
-    if (message.x !== 0) {
-      writer.uint32(24).int32(message.x);
+    if (message.y !== undefined) {
+      writer.uint32(24).int32(message.y);
     }
-    if (message.y !== 0) {
-      writer.uint32(32).int32(message.y);
+    if (message.scrollX !== 0) {
+      writer.uint32(32).int32(message.scrollX);
     }
-    if (message.scrollPixels !== 0) {
-      writer.uint32(40).int32(message.scrollPixels);
+    if (message.scrollY !== 0) {
+      writer.uint32(40).int32(message.scrollY);
     }
     if (message.waitSeconds !== 0) {
       writer.uint32(49).double(message.waitSeconds);
@@ -215,8 +247,8 @@ export const CuaAction: MessageFns<CuaAction> = {
     if (message.reasoning !== "") {
       writer.uint32(66).string(message.reasoning);
     }
-    if (message.parseOk !== false) {
-      writer.uint32(72).bool(message.parseOk);
+    if (message.isValid !== false) {
+      writer.uint32(72).bool(message.isValid);
     }
     return writer;
   },
@@ -241,7 +273,7 @@ export const CuaAction: MessageFns<CuaAction> = {
             break;
           }
 
-          message.coordinateValid = reader.bool();
+          message.x = reader.int32();
           continue;
         }
         case 3: {
@@ -249,7 +281,7 @@ export const CuaAction: MessageFns<CuaAction> = {
             break;
           }
 
-          message.x = reader.int32();
+          message.y = reader.int32();
           continue;
         }
         case 4: {
@@ -257,7 +289,7 @@ export const CuaAction: MessageFns<CuaAction> = {
             break;
           }
 
-          message.y = reader.int32();
+          message.scrollX = reader.int32();
           continue;
         }
         case 5: {
@@ -265,7 +297,7 @@ export const CuaAction: MessageFns<CuaAction> = {
             break;
           }
 
-          message.scrollPixels = reader.int32();
+          message.scrollY = reader.int32();
           continue;
         }
         case 6: {
@@ -297,7 +329,7 @@ export const CuaAction: MessageFns<CuaAction> = {
             break;
           }
 
-          message.parseOk = reader.bool();
+          message.isValid = reader.bool();
           continue;
         }
       }
@@ -312,17 +344,17 @@ export const CuaAction: MessageFns<CuaAction> = {
   fromJSON(object: any): CuaAction {
     return {
       type: isSet(object.type) ? cuaActionTypeFromJSON(object.type) : 0,
-      coordinateValid: isSet(object.coordinateValid)
-        ? globalThis.Boolean(object.coordinateValid)
-        : isSet(object.coordinate_valid)
-        ? globalThis.Boolean(object.coordinate_valid)
-        : false,
-      x: isSet(object.x) ? globalThis.Number(object.x) : 0,
-      y: isSet(object.y) ? globalThis.Number(object.y) : 0,
-      scrollPixels: isSet(object.scrollPixels)
-        ? globalThis.Number(object.scrollPixels)
-        : isSet(object.scroll_pixels)
-        ? globalThis.Number(object.scroll_pixels)
+      x: isSet(object.x) ? globalThis.Number(object.x) : undefined,
+      y: isSet(object.y) ? globalThis.Number(object.y) : undefined,
+      scrollX: isSet(object.scrollX)
+        ? globalThis.Number(object.scrollX)
+        : isSet(object.scroll_x)
+        ? globalThis.Number(object.scroll_x)
+        : 0,
+      scrollY: isSet(object.scrollY)
+        ? globalThis.Number(object.scrollY)
+        : isSet(object.scroll_y)
+        ? globalThis.Number(object.scroll_y)
         : 0,
       waitSeconds: isSet(object.waitSeconds)
         ? globalThis.Number(object.waitSeconds)
@@ -331,10 +363,10 @@ export const CuaAction: MessageFns<CuaAction> = {
         : 0,
       text: isSet(object.text) ? globalThis.String(object.text) : "",
       reasoning: isSet(object.reasoning) ? globalThis.String(object.reasoning) : "",
-      parseOk: isSet(object.parseOk)
-        ? globalThis.Boolean(object.parseOk)
-        : isSet(object.parse_ok)
-        ? globalThis.Boolean(object.parse_ok)
+      isValid: isSet(object.isValid)
+        ? globalThis.Boolean(object.isValid)
+        : isSet(object.is_valid)
+        ? globalThis.Boolean(object.is_valid)
         : false,
     };
   },
@@ -344,17 +376,17 @@ export const CuaAction: MessageFns<CuaAction> = {
     if (message.type !== 0) {
       obj.type = cuaActionTypeToJSON(message.type);
     }
-    if (message.coordinateValid !== false) {
-      obj.coordinateValid = message.coordinateValid;
-    }
-    if (message.x !== 0) {
+    if (message.x !== undefined) {
       obj.x = Math.round(message.x);
     }
-    if (message.y !== 0) {
+    if (message.y !== undefined) {
       obj.y = Math.round(message.y);
     }
-    if (message.scrollPixels !== 0) {
-      obj.scrollPixels = Math.round(message.scrollPixels);
+    if (message.scrollX !== 0) {
+      obj.scrollX = Math.round(message.scrollX);
+    }
+    if (message.scrollY !== 0) {
+      obj.scrollY = Math.round(message.scrollY);
     }
     if (message.waitSeconds !== 0) {
       obj.waitSeconds = message.waitSeconds;
@@ -365,8 +397,8 @@ export const CuaAction: MessageFns<CuaAction> = {
     if (message.reasoning !== "") {
       obj.reasoning = message.reasoning;
     }
-    if (message.parseOk !== false) {
-      obj.parseOk = message.parseOk;
+    if (message.isValid !== false) {
+      obj.isValid = message.isValid;
     }
     return obj;
   },
@@ -377,14 +409,14 @@ export const CuaAction: MessageFns<CuaAction> = {
   fromPartial<I extends Exact<DeepPartial<CuaAction>, I>>(object: I): CuaAction {
     const message = createBaseCuaAction();
     message.type = object.type ?? 0;
-    message.coordinateValid = object.coordinateValid ?? false;
-    message.x = object.x ?? 0;
-    message.y = object.y ?? 0;
-    message.scrollPixels = object.scrollPixels ?? 0;
+    message.x = object.x ?? undefined;
+    message.y = object.y ?? undefined;
+    message.scrollX = object.scrollX ?? 0;
+    message.scrollY = object.scrollY ?? 0;
     message.waitSeconds = object.waitSeconds ?? 0;
     message.text = object.text ?? "";
     message.reasoning = object.reasoning ?? "";
-    message.parseOk = object.parseOk ?? false;
+    message.isValid = object.isValid ?? false;
     return message;
   },
 };

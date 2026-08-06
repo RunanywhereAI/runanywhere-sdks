@@ -48,11 +48,11 @@ constexpr TokenUsage::ParseTableT_ TokenUsage::InternalGenerateParseTable_(const
     {
       PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967232,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
+      6,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -62,10 +62,7 @@ constexpr TokenUsage::ParseTableT_ TokenUsage::InternalGenerateParseTable_(const
       ::_pbi::TcParser::GetTable<::runanywhere::v1::TokenUsage>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // double tokens_per_second = 4;
-      {::_pbi::TcParser::FastF64S1,
-       {33, 2, 0,
-        PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.tokens_per_second_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // int32 input_tokens = 1;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(TokenUsage, _impl_.input_tokens_), 0>(),
        {8, 0, 0,
@@ -75,9 +72,22 @@ constexpr TokenUsage::ParseTableT_ TokenUsage::InternalGenerateParseTable_(const
        {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.output_tokens_)}},
       // int32 total_tokens = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(TokenUsage, _impl_.total_tokens_), 3>(),
-       {24, 3, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(TokenUsage, _impl_.total_tokens_), 5>(),
+       {24, 5, 0,
         PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.total_tokens_)}},
+      // double decode_tokens_per_second = 4;
+      {::_pbi::TcParser::FastF64S1,
+       {33, 2, 0,
+        PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.decode_tokens_per_second_)}},
+      // int64 prefill_ms = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(TokenUsage, _impl_.prefill_ms_), 3>(),
+       {40, 3, 0,
+        PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.prefill_ms_)}},
+      // int64 ttft_ms = 6;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(TokenUsage, _impl_.ttft_ms_), 4>(),
+       {48, 4, 0,
+        PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.ttft_ms_)}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
@@ -86,9 +96,13 @@ constexpr TokenUsage::ParseTableT_ TokenUsage::InternalGenerateParseTable_(const
       // int32 output_tokens = 2;
       {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.output_tokens_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 total_tokens = 3;
-      {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.total_tokens_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // double tokens_per_second = 4;
-      {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.tokens_per_second_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+      {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.total_tokens_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // double decode_tokens_per_second = 4;
+      {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.decode_tokens_per_second_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+      // int64 prefill_ms = 5;
+      {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.prefill_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 ttft_ms = 6;
+      {PROTOBUF_FIELD_OFFSET(TokenUsage, _impl_.ttft_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
     // no aux_entries
     {{
@@ -103,7 +117,9 @@ inline constexpr TokenUsage::Impl_::Impl_(
       : _cached_size_{0},
         input_tokens_{0},
         output_tokens_{0},
-        tokens_per_second_{0},
+        decode_tokens_per_second_{0},
+        prefill_ms_{::int64_t{0}},
+        ttft_ms_{::int64_t{0}},
         total_tokens_{0} {}
 
 template <typename>
@@ -209,15 +225,19 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_._has_bits_),
-        7, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_.input_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_.output_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_.total_tokens_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_.tokens_per_second_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_.decode_tokens_per_second_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_.prefill_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TokenUsage, _impl_.ttft_ms_),
         0,
         1,
-        3,
+        5,
         2,
+        3,
+        4,
 };
 
 static const ::_pbi::MigrationSchema
@@ -230,20 +250,21 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_token_5fusage_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\021token_usage.proto\022\016runanywhere.v1\"j\n\nT"
-    "okenUsage\022\024\n\014input_tokens\030\001 \001(\005\022\025\n\routpu"
-    "t_tokens\030\002 \001(\005\022\024\n\014total_tokens\030\003 \001(\005\022\031\n\021"
-    "tokens_per_second\030\004 \001(\001B\212\001\n\027ai.runanywhe"
-    "re.proto.v1B\017TokenUsageProtoP\001Z<github.c"
-    "om/runanywhere/runanywhere-sdks/idl/v1;r"
-    "unanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272"
-    "\002\002RAb\006proto3"
+    "\n\021token_usage.proto\022\016runanywhere.v1\"\226\001\n\n"
+    "TokenUsage\022\024\n\014input_tokens\030\001 \001(\005\022\025\n\routp"
+    "ut_tokens\030\002 \001(\005\022\024\n\014total_tokens\030\003 \001(\005\022 \n"
+    "\030decode_tokens_per_second\030\004 \001(\001\022\022\n\nprefi"
+    "ll_ms\030\005 \001(\003\022\017\n\007ttft_ms\030\006 \001(\003B\212\001\n\027ai.runa"
+    "nywhere.proto.v1B\017TokenUsageProtoP\001Z<git"
+    "hub.com/runanywhere/runanywhere-sdks/idl"
+    "/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywher"
+    "e.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_token_5fusage_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_token_5fusage_2eproto = {
     false,
     false,
-    292,
+    337,
     descriptor_table_protodef_token_5fusage_2eproto,
     "token_usage.proto",
     &descriptor_table_token_5fusage_2eproto_once,
@@ -342,7 +363,7 @@ PROTOBUF_NOINLINE void TokenUsage::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     ::memset(&_impl_.input_tokens_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.total_tokens_) -
         reinterpret_cast<char*>(&_impl_.input_tokens_)) + sizeof(_impl_.total_tokens_));
@@ -389,7 +410,7 @@ PROTOBUF_NOINLINE void TokenUsage::Clear() {
   }
 
   // int32 total_tokens = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_total_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
@@ -397,12 +418,30 @@ PROTOBUF_NOINLINE void TokenUsage::Clear() {
     }
   }
 
-  // double tokens_per_second = 4;
+  // double decode_tokens_per_second = 4;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (::absl::bit_cast<::uint64_t>(this_._internal_tokens_per_second()) != 0) {
+    if (::absl::bit_cast<::uint64_t>(this_._internal_decode_tokens_per_second()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteDoubleToArray(
-          4, this_._internal_tokens_per_second(), target);
+          4, this_._internal_decode_tokens_per_second(), target);
+    }
+  }
+
+  // int64 prefill_ms = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_prefill_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<5>(
+              stream, this_._internal_prefill_ms(), target);
+    }
+  }
+
+  // int64 ttft_ms = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_ttft_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<6>(
+              stream, this_._internal_ttft_ms(), target);
     }
   }
 
@@ -431,7 +470,7 @@ PROTOBUF_NOINLINE void TokenUsage::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // int32 input_tokens = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (this_._internal_input_tokens() != 0) {
@@ -446,14 +485,28 @@ PROTOBUF_NOINLINE void TokenUsage::Clear() {
             this_._internal_output_tokens());
       }
     }
-    // double tokens_per_second = 4;
+    // double decode_tokens_per_second = 4;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (::absl::bit_cast<::uint64_t>(this_._internal_tokens_per_second()) != 0) {
+      if (::absl::bit_cast<::uint64_t>(this_._internal_decode_tokens_per_second()) != 0) {
         total_size += 9;
       }
     }
-    // int32 total_tokens = 3;
+    // int64 prefill_ms = 5;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_prefill_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_prefill_ms());
+      }
+    }
+    // int64 ttft_ms = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_ttft_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_ttft_ms());
+      }
+    }
+    // int32 total_tokens = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_total_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_total_tokens());
@@ -477,7 +530,7 @@ void TokenUsage::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (from._internal_input_tokens() != 0) {
         _this->_impl_.input_tokens_ = from._impl_.input_tokens_;
@@ -489,11 +542,21 @@ void TokenUsage::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (::absl::bit_cast<::uint64_t>(from._internal_tokens_per_second()) != 0) {
-        _this->_impl_.tokens_per_second_ = from._impl_.tokens_per_second_;
+      if (::absl::bit_cast<::uint64_t>(from._internal_decode_tokens_per_second()) != 0) {
+        _this->_impl_.decode_tokens_per_second_ = from._impl_.decode_tokens_per_second_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_prefill_ms() != 0) {
+        _this->_impl_.prefill_ms_ = from._impl_.prefill_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_ttft_ms() != 0) {
+        _this->_impl_.ttft_ms_ = from._impl_.ttft_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_total_tokens() != 0) {
         _this->_impl_.total_tokens_ = from._impl_.total_tokens_;
       }

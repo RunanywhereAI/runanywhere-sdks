@@ -209,12 +209,13 @@ class VoiceAgentMicDriver {
     var ttsSampleRate = 0;
     var ttsEncoding = model_pb.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
     try {
+      // `VoiceAgentTurnRequest` carries a fixed input contract (bytes only,
+      // no sample-rate/channels/encoding fields) — the same 16 kHz mono
+      // PCM16 [_sampleRateHz]/[_bytesPerSample] this driver already
+      // captures at (idl/voice_agent_service.proto).
       final request = voice_agent_pb.VoiceAgentTurnRequest(
         requestId: 'turn-${DateTime.now().microsecondsSinceEpoch}',
         audioData: audio,
-        sampleRateHz: _sampleRateHz,
-        channels: 1,
-        encoding: model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       );
       _logger.info('Submitting voice turn (${audio.length} bytes)');
 

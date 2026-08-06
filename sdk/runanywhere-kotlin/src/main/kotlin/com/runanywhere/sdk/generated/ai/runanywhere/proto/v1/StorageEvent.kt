@@ -16,6 +16,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.countNonNull
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -30,6 +31,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * ModelRegistryEvent and DownloadEvent were deleted: their kinds moved into
+ * ModelEventKind and their result oneofs into ModelEvent.result (see above).
+ * A model download/registry op is one subject; it now has one event message.
  * ---------------------------------------------------------------------------
  * Storage events. Mirrors RN
  *   events.ts:213-226 (SDKStorageEvent: 13 variants).
@@ -134,8 +138,56 @@ public class StorageEvent(
     schemaIndex = 9,
   )
   public val freed_bytes: Long = 0L,
+  /**
+   * Absorbed from StorageLifecycleEvent.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 10,
+  )
+  public val bytes: Long = 0L,
+  @field:WireField(
+    tag = 20,
+    adapter = "ai.runanywhere.proto.v1.StorageInfoResult#ADAPTER",
+    jsonName = "infoResult",
+    oneofName = "result",
+    schemaIndex = 11,
+  )
+  public val info_result: StorageInfoResult? = null,
+  @field:WireField(
+    tag = 21,
+    adapter = "ai.runanywhere.proto.v1.StorageAvailabilityResult#ADAPTER",
+    jsonName = "availabilityResult",
+    oneofName = "result",
+    schemaIndex = 12,
+  )
+  public val availability_result: StorageAvailabilityResult? = null,
+  @field:WireField(
+    tag = 22,
+    adapter = "ai.runanywhere.proto.v1.StorageDeletePlan#ADAPTER",
+    jsonName = "deletePlan",
+    oneofName = "result",
+    schemaIndex = 13,
+  )
+  public val delete_plan: StorageDeletePlan? = null,
+  @field:WireField(
+    tag = 23,
+    adapter = "ai.runanywhere.proto.v1.StorageDeleteResult#ADAPTER",
+    jsonName = "deleteResult",
+    oneofName = "result",
+    schemaIndex = 14,
+  )
+  public val delete_result: StorageDeleteResult? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageEvent, Nothing>(ADAPTER, unknownFields) {
+  init {
+    require(countNonNull(info_result, availability_result, delete_plan, delete_result) <= 1) {
+      "At most one of info_result, availability_result, delete_plan, delete_result may be non-null"
+    }
+  }
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -156,6 +208,11 @@ public class StorageEvent(
     if (cache_key != other.cache_key) return false
     if (evicted_bytes != other.evicted_bytes) return false
     if (freed_bytes != other.freed_bytes) return false
+    if (bytes != other.bytes) return false
+    if (info_result != other.info_result) return false
+    if (availability_result != other.availability_result) return false
+    if (delete_plan != other.delete_plan) return false
+    if (delete_result != other.delete_result) return false
     return true
   }
 
@@ -173,6 +230,11 @@ public class StorageEvent(
       result = result * 37 + cache_key.hashCode()
       result = result * 37 + evicted_bytes.hashCode()
       result = result * 37 + freed_bytes.hashCode()
+      result = result * 37 + bytes.hashCode()
+      result = result * 37 + (info_result?.hashCode() ?: 0)
+      result = result * 37 + (availability_result?.hashCode() ?: 0)
+      result = result * 37 + (delete_plan?.hashCode() ?: 0)
+      result = result * 37 + (delete_result?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -190,6 +252,11 @@ public class StorageEvent(
     result += """cache_key=${sanitize(cache_key)}"""
     result += """evicted_bytes=$evicted_bytes"""
     result += """freed_bytes=$freed_bytes"""
+    result += """bytes=$bytes"""
+    if (info_result != null) result += """info_result=$info_result"""
+    if (availability_result != null) result += """availability_result=$availability_result"""
+    if (delete_plan != null) result += """delete_plan=$delete_plan"""
+    if (delete_result != null) result += """delete_result=$delete_result"""
     return result.joinToString(prefix = "StorageEvent{", separator = ", ", postfix = "}")
   }
 
@@ -204,8 +271,13 @@ public class StorageEvent(
     cache_key: String = this.cache_key,
     evicted_bytes: Long = this.evicted_bytes,
     freed_bytes: Long = this.freed_bytes,
+    bytes: Long = this.bytes,
+    info_result: StorageInfoResult? = this.info_result,
+    availability_result: StorageAvailabilityResult? = this.availability_result,
+    delete_plan: StorageDeletePlan? = this.delete_plan,
+    delete_result: StorageDeleteResult? = this.delete_result,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageEvent = StorageEvent(kind, model_id, error, total_bytes, available_bytes, used_bytes, stored_model_count, cache_key, evicted_bytes, freed_bytes, unknownFields)
+  ): StorageEvent = StorageEvent(kind, model_id, error, total_bytes, available_bytes, used_bytes, stored_model_count, cache_key, evicted_bytes, freed_bytes, bytes, info_result, availability_result, delete_plan, delete_result, unknownFields)
 
   public companion object {
     @JvmField
@@ -249,6 +321,13 @@ public class StorageEvent(
         if (value.freed_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(10, value.freed_bytes)
         }
+        if (value.bytes != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(11, value.bytes)
+        }
+        size += StorageInfoResult.ADAPTER.encodedSizeWithTag(20, value.info_result)
+        size += StorageAvailabilityResult.ADAPTER.encodedSizeWithTag(21, value.availability_result)
+        size += StorageDeletePlan.ADAPTER.encodedSizeWithTag(22, value.delete_plan)
+        size += StorageDeleteResult.ADAPTER.encodedSizeWithTag(23, value.delete_result)
         return size
       }
 
@@ -283,11 +362,25 @@ public class StorageEvent(
         if (value.freed_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 10, value.freed_bytes)
         }
+        if (value.bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 11, value.bytes)
+        }
+        StorageInfoResult.ADAPTER.encodeWithTag(writer, 20, value.info_result)
+        StorageAvailabilityResult.ADAPTER.encodeWithTag(writer, 21, value.availability_result)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 22, value.delete_plan)
+        StorageDeleteResult.ADAPTER.encodeWithTag(writer, 23, value.delete_result)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageEvent) {
         writer.writeBytes(value.unknownFields)
+        StorageDeleteResult.ADAPTER.encodeWithTag(writer, 23, value.delete_result)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 22, value.delete_plan)
+        StorageAvailabilityResult.ADAPTER.encodeWithTag(writer, 21, value.availability_result)
+        StorageInfoResult.ADAPTER.encodeWithTag(writer, 20, value.info_result)
+        if (value.bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 11, value.bytes)
+        }
         if (value.freed_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 10, value.freed_bytes)
         }
@@ -331,6 +424,11 @@ public class StorageEvent(
         var cache_key: String = ""
         var evicted_bytes: Long = 0L
         var freed_bytes: Long = 0L
+        var bytes: Long = 0L
+        var info_result: StorageInfoResult? = null
+        var availability_result: StorageAvailabilityResult? = null
+        var delete_plan: StorageDeletePlan? = null
+        var delete_result: StorageDeleteResult? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -347,6 +445,11 @@ public class StorageEvent(
             8 -> cache_key = ProtoAdapter.STRING.decode(reader)
             9 -> evicted_bytes = ProtoAdapter.INT64.decode(reader)
             10 -> freed_bytes = ProtoAdapter.INT64.decode(reader)
+            11 -> bytes = ProtoAdapter.INT64.decode(reader)
+            20 -> info_result = StorageInfoResult.ADAPTER.decode(reader)
+            21 -> availability_result = StorageAvailabilityResult.ADAPTER.decode(reader)
+            22 -> delete_plan = StorageDeletePlan.ADAPTER.decode(reader)
+            23 -> delete_result = StorageDeleteResult.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -361,11 +464,20 @@ public class StorageEvent(
           cache_key = cache_key,
           evicted_bytes = evicted_bytes,
           freed_bytes = freed_bytes,
+          bytes = bytes,
+          info_result = info_result,
+          availability_result = availability_result,
+          delete_plan = delete_plan,
+          delete_result = delete_result,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: StorageEvent): StorageEvent = value.copy(
+        info_result = value.info_result?.let(StorageInfoResult.ADAPTER::redact),
+        availability_result = value.availability_result?.let(StorageAvailabilityResult.ADAPTER::redact),
+        delete_plan = value.delete_plan?.let(StorageDeletePlan.ADAPTER::redact),
+        delete_result = value.delete_result?.let(StorageDeleteResult.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

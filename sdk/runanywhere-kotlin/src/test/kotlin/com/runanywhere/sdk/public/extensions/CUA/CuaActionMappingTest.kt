@@ -7,9 +7,14 @@
  * The parse itself lives in C++ commons and is covered there; what is unique to
  * this SDK — and therefore untestable from commons — is the translation of the
  * decoded `runanywhere.v1.CuaAction` proto into the public [CuaAction] value
- * type. A silent field mix-up here (coordinate_valid, scroll_pixels, parse_ok)
+ * type. A silent field mix-up here (x/y presence, scroll_x/scroll_y, is_valid)
  * would hand callers a well-formed but wrong action, so it is asserted field by
  * field. No JNI required: the mapping is a pure function over the Wire type.
+ *
+ * `coordinate_valid`/`scroll_pixels`/`parse_ok` are deleted outright
+ * (idl/cua.proto): x/y presence IS "has a coordinate" now (both optional
+ * Int?), `scroll_pixels` split into `scroll_x`/`scroll_y`, and `parse_ok` was
+ * renamed `is_valid`.
  */
 
 package com.runanywhere.sdk.public.extensions.CUA
@@ -28,11 +33,10 @@ class CuaActionMappingTest {
             CuaAction.from(
                 CuaActionProto(
                     type = CuaActionType.CUA_ACTION_TYPE_LEFT_CLICK,
-                    coordinate_valid = true,
                     x = 720,
                     y = 344,
                     reasoning = "I will click the search box.",
-                    parse_ok = true,
+                    is_valid = true,
                 ),
             )
 
@@ -43,18 +47,15 @@ class CuaActionMappingTest {
     }
 
     @Test
-    fun `coordinate is null when the proto does not mark it valid`() {
-        // x/y still carry proto3 defaults; the facade must gate on
-        // coordinate_valid rather than on the numbers being present.
+    fun `coordinate is null when the proto has no x or y`() {
+        // x/y are optional Int? now; presence IS "has a coordinate" -- there
+        // is no separate coordinate_valid gate any more.
         val action =
             CuaAction.from(
                 CuaActionProto(
                     type = CuaActionType.CUA_ACTION_TYPE_TYPE,
-                    coordinate_valid = false,
-                    x = 11,
-                    y = 22,
                     text = "hello world",
-                    parse_ok = true,
+                    is_valid = true,
                 ),
             )
 
@@ -81,13 +82,14 @@ class CuaActionMappingTest {
             CuaAction.from(
                 CuaActionProto(
                     type = CuaActionType.CUA_ACTION_TYPE_SCROLL,
-                    scroll_pixels = -3,
+                    scroll_y = -3,
                     wait_seconds = 2.5,
-                    parse_ok = true,
+                    is_valid = true,
                 ),
             )
 
-        assertEquals(-3, action.scrollPixels)
+        assertEquals(0, action.scrollX)
+        assertEquals(-3, action.scrollY)
         assertEquals(2.5, action.waitSeconds)
     }
 
@@ -98,7 +100,7 @@ class CuaActionMappingTest {
                 CuaActionProto(
                     type = CuaActionType.CUA_ACTION_TYPE_KEY,
                     text = "ctrl l",
-                    parse_ok = true,
+                    is_valid = true,
                 ),
             )
 

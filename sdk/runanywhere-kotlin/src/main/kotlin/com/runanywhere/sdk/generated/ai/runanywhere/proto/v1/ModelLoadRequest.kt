@@ -73,7 +73,9 @@ public class ModelLoadRequest(
   )
   public val validate_availability: Boolean = false,
   /**
-   * v4 placement knobs (honored end-to-end; never silently dropped).
+   * The one load knob every on-device runtime exposes. Unset or 0 means
+   * "take it from the model" (llama.cpp --ctx-size semantics) -- never a
+   * hardcoded small default. Carried by the native load ABI.
    */
   @field:WireField(
     tag = 6,
@@ -82,34 +84,25 @@ public class ModelLoadRequest(
     schemaIndex = 5,
   )
   public val context_length: Int? = null,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    schemaIndex = 6,
-  )
-  public val threads: Int? = null,
   /**
+   * a hard runtime guarantee
    * deprecated adapter; maps to accelerator
    */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "useGpu",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val use_gpu: Boolean? = null,
   backend_preferences: List<InferenceFramework> = emptyList(),
-  /**
-   * AcceleratorPolicy values live in public_api_v4.proto; stored as int32
-   * here to avoid a circular import with LoadedModelInfo helpers.
-   */
   @field:WireField(
     tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    adapter = "ai.runanywhere.proto.v1.AcceleratorPolicy#ADAPTER",
     jsonName = "acceleratorPolicy",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
-  public val accelerator_policy: Int? = null,
+  public val accelerator_policy: AcceleratorPolicy? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelLoadRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -117,7 +110,7 @@ public class ModelLoadRequest(
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "backendPreferences",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val backend_preferences: List<InferenceFramework> =
       immutableCopyOf("backend_preferences", backend_preferences)
@@ -138,7 +131,6 @@ public class ModelLoadRequest(
     if (force_reload != other.force_reload) return false
     if (validate_availability != other.validate_availability) return false
     if (context_length != other.context_length) return false
-    if (threads != other.threads) return false
     if (use_gpu != other.use_gpu) return false
     if (backend_preferences != other.backend_preferences) return false
     if (accelerator_policy != other.accelerator_policy) return false
@@ -155,7 +147,6 @@ public class ModelLoadRequest(
       result = result * 37 + force_reload.hashCode()
       result = result * 37 + validate_availability.hashCode()
       result = result * 37 + (context_length?.hashCode() ?: 0)
-      result = result * 37 + (threads?.hashCode() ?: 0)
       result = result * 37 + (use_gpu?.hashCode() ?: 0)
       result = result * 37 + backend_preferences.hashCode()
       result = result * 37 + (accelerator_policy?.hashCode() ?: 0)
@@ -172,7 +163,6 @@ public class ModelLoadRequest(
     result += """force_reload=$force_reload"""
     result += """validate_availability=$validate_availability"""
     if (context_length != null) result += """context_length=$context_length"""
-    if (threads != null) result += """threads=$threads"""
     if (use_gpu != null) result += """use_gpu=$use_gpu"""
     if (backend_preferences.isNotEmpty()) result += """backend_preferences=$backend_preferences"""
     if (accelerator_policy != null) result += """accelerator_policy=$accelerator_policy"""
@@ -186,12 +176,11 @@ public class ModelLoadRequest(
     force_reload: Boolean = this.force_reload,
     validate_availability: Boolean = this.validate_availability,
     context_length: Int? = this.context_length,
-    threads: Int? = this.threads,
     use_gpu: Boolean? = this.use_gpu,
     backend_preferences: List<InferenceFramework> = this.backend_preferences,
-    accelerator_policy: Int? = this.accelerator_policy,
+    accelerator_policy: AcceleratorPolicy? = this.accelerator_policy,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelLoadRequest = ModelLoadRequest(model_id, category, framework, force_reload, validate_availability, context_length, threads, use_gpu, backend_preferences, accelerator_policy, unknownFields)
+  ): ModelLoadRequest = ModelLoadRequest(model_id, category, framework, force_reload, validate_availability, context_length, use_gpu, backend_preferences, accelerator_policy, unknownFields)
 
   public companion object {
     @JvmField
@@ -217,10 +206,9 @@ public class ModelLoadRequest(
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.validate_availability)
         }
         size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.context_length)
-        size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.threads)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.use_gpu)
         size += InferenceFramework.ADAPTER.asRepeated().encodedSizeWithTag(9, value.backend_preferences)
-        size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.accelerator_policy)
+        size += AcceleratorPolicy.ADAPTER.encodedSizeWithTag(10, value.accelerator_policy)
         return size
       }
 
@@ -237,19 +225,17 @@ public class ModelLoadRequest(
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.validate_availability)
         }
         ProtoAdapter.INT32.encodeWithTag(writer, 6, value.context_length)
-        ProtoAdapter.INT32.encodeWithTag(writer, 7, value.threads)
         ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.use_gpu)
         InferenceFramework.ADAPTER.asRepeated().encodeWithTag(writer, 9, value.backend_preferences)
-        ProtoAdapter.INT32.encodeWithTag(writer, 10, value.accelerator_policy)
+        AcceleratorPolicy.ADAPTER.encodeWithTag(writer, 10, value.accelerator_policy)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelLoadRequest) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.INT32.encodeWithTag(writer, 10, value.accelerator_policy)
+        AcceleratorPolicy.ADAPTER.encodeWithTag(writer, 10, value.accelerator_policy)
         InferenceFramework.ADAPTER.asRepeated().encodeWithTag(writer, 9, value.backend_preferences)
         ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.use_gpu)
-        ProtoAdapter.INT32.encodeWithTag(writer, 7, value.threads)
         ProtoAdapter.INT32.encodeWithTag(writer, 6, value.context_length)
         if (value.validate_availability != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.validate_availability)
@@ -271,10 +257,9 @@ public class ModelLoadRequest(
         var force_reload: Boolean = false
         var validate_availability: Boolean = false
         var context_length: Int? = null
-        var threads: Int? = null
         var use_gpu: Boolean? = null
         val backend_preferences = mutableListOf<InferenceFramework>()
-        var accelerator_policy: Int? = null
+        var accelerator_policy: AcceleratorPolicy? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -291,14 +276,17 @@ public class ModelLoadRequest(
             4 -> force_reload = ProtoAdapter.BOOL.decode(reader)
             5 -> validate_availability = ProtoAdapter.BOOL.decode(reader)
             6 -> context_length = ProtoAdapter.INT32.decode(reader)
-            7 -> threads = ProtoAdapter.INT32.decode(reader)
             8 -> use_gpu = ProtoAdapter.BOOL.decode(reader)
             9 -> try {
               InferenceFramework.ADAPTER.tryDecode(reader, backend_preferences)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            10 -> accelerator_policy = ProtoAdapter.INT32.decode(reader)
+            10 -> try {
+              accelerator_policy = AcceleratorPolicy.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -309,7 +297,6 @@ public class ModelLoadRequest(
           force_reload = force_reload,
           validate_availability = validate_availability,
           context_length = context_length,
-          threads = threads,
           use_gpu = use_gpu,
           backend_preferences = backend_preferences,
           accelerator_policy = accelerator_policy,

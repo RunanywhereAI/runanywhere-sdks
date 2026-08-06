@@ -340,7 +340,8 @@ async function downloadFile(repoId: string, file: HfRepoFile): Promise<void> {
 
     for await (const event of RunAnywhere.models.download(model.id)) {
       if (event.type === 'progress') {
-        setFileState(file.path, { status: 'downloading', progress: event.percent / 100 });
+        const progress = event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0;
+        setFileState(file.path, { status: 'downloading', progress });
       } else if (event.type === 'extracting') {
         setFileState(file.path, { status: 'downloading', progress: 1 });
       } else {

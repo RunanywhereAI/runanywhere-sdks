@@ -31,8 +31,6 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
-import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.sdk.public.types.RAVLMResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
@@ -98,36 +96,29 @@ object CppBridgeVLM {
         }
     }
 
-    suspend fun process(
-        image: RAVLMImage,
-        options: RAVLMGenerationOptions,
-    ): RAVLMResult = processBlocking(image, options)
+    /**
+     * `RAVLMGenerationOptions` was deleted outright (idl/vlm_options.proto):
+     * sampling now lives on the shared `LLMGenerationOptions.options` field,
+     * with only the four genuinely vision-specific knobs surviving on
+     * `VLMVisionOptions.vision`. Callers build the full
+     * [VLMGenerationRequest] (images/messages/prompt/options/vision) and
+     * pass it straight through, mirroring Swift's
+     * `CppBridge.VLM.process(_ request: RAVLMGenerationRequest)`.
+     */
+    suspend fun process(request: VLMGenerationRequest): RAVLMResult = processBlocking(request)
 
     /** Blocking JNI implementation; public coroutine APIs own dispatch/cancel. */
-    internal fun processBlocking(
-        image: RAVLMImage,
-        options: RAVLMGenerationOptions,
-    ): RAVLMResult =
+    internal fun processBlocking(request: VLMGenerationRequest): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
-            RunAnywhereBridge.racVlmGenerateProto(
-                VLMGenerationRequest.ADAPTER.encode(
-                    VLMGenerationRequest(images = listOf(image), options = options),
-                ),
-            ),
+            RunAnywhereBridge.racVlmGenerateProto(VLMGenerationRequest.ADAPTER.encode(request)),
             "racVlmGenerateProto",
         )
 
     /** Encode before cancellable admission so JNI is the next throwing boundary. */
-    internal fun prepareProcessRequest(
-        image: RAVLMImage,
-        options: RAVLMGenerationOptions,
-    ): NativeVLMProcessRequest =
+    internal fun prepareProcessRequest(request: VLMGenerationRequest): NativeVLMProcessRequest =
         NativeVLMProcessRequest(
-            requestProto =
-                VLMGenerationRequest.ADAPTER.encode(
-                    VLMGenerationRequest(images = listOf(image), options = options),
-                ),
+            requestProto = VLMGenerationRequest.ADAPTER.encode(request),
         )
 
     /** Request-scoped blocking JNI implementation for cancellable public APIs. */
@@ -157,33 +148,25 @@ object CppBridgeVLM {
      * [onEvent] returns false to stop the native stream (consumer cancel).
      */
     suspend fun processStream(
-        image: RAVLMImage,
-        options: RAVLMGenerationOptions,
+        request: VLMGenerationRequest,
         onEvent: (VLMStreamEvent) -> Boolean,
-    ) = processStreamBlocking(image, options, onEvent)
+    ) = processStreamBlocking(request, onEvent)
 
     /** Blocking JNI implementation; public coroutine APIs own dispatch/cancel. */
     internal fun processStreamBlocking(
-        image: RAVLMImage,
-        options: RAVLMGenerationOptions,
+        request: VLMGenerationRequest,
         onEvent: (VLMStreamEvent) -> Boolean,
     ) {
-        val request = prepareStreamRequest(image, options, onEvent)
-        val rc = RunAnywhereBridge.racVlmStreamProto(request.requestProto, request.listener)
+        val nativeRequest = prepareStreamRequest(request, onEvent)
+        val rc = RunAnywhereBridge.racVlmStreamProto(nativeRequest.requestProto, nativeRequest.listener)
         throwIfStreamFailed("rac_vlm_stream_proto", rc)
     }
 
     /** Encode and allocate the listener before cancellable JNI admission. */
     internal fun prepareStreamRequest(
-        image: RAVLMImage,
-        options: RAVLMGenerationOptions,
+        request: VLMGenerationRequest,
         onEvent: (VLMStreamEvent) -> Boolean,
     ): NativeVLMStreamRequest {
-        val request =
-            VLMGenerationRequest(
-                images = listOf(image),
-                options = options,
-            )
         val requestBytes = VLMGenerationRequest.ADAPTER.encode(request)
         val listener =
             NativeProtoProgressListener { bytes ->
@@ -220,13 +203,15 @@ object CppBridgeVLM {
 
     /**
      * Native-stream continuation policy: stop after the terminal
-     * COMPLETED/ERROR event (or any event flagged `is_final`).
+     * COMPLETED/ERROR event. `VLMStreamEvent.is_final` is deleted outright
+     * (idl/vlm_options.proto) -- `kind` alone determines terminality, same
+     * as Swift's `CppBridge.VLM.processStream`.
      */
     private fun shouldContinueNativeStream(event: VLMStreamEvent): Boolean =
         when (event.kind) {
             VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED,
             VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR,
             -> false
-            else -> !event.is_final
+            else -> true
         }
 }

@@ -11,44 +11,19 @@ import Foundation
 // MARK: - RAStructuredOutputOptions
 
 extension RAStructuredOutputOptions {
+    /// `RAJSONSchema`/`strictMode`/`jsonSchema`/`mode` were all deleted
+    /// outright (idl/structured_output.proto): the message shrunk to just
+    /// `includeSchemaInPrompt` plus a `schema`/`grammar`/`regex` oneof of
+    /// raw strings, so `schema` here is JSON Schema text directly rather
+    /// than a typed tree to serialize.
     public static func defaults(
-        schema: RAJSONSchema,
-        includeSchemaInPrompt: Bool = true,
-        strict: Bool = false
+        schema: String,
+        includeSchemaInPrompt: Bool = true
     ) -> RAStructuredOutputOptions {
         var options = RAStructuredOutputOptions()
         options.schema = schema
         options.includeSchemaInPrompt = includeSchemaInPrompt
-        options.strictMode = strict
-        options.jsonSchema = schema.jsonSchemaString
-        options.mode = .jsonSchema
         return options
-    }
-}
-
-// MARK: - RAJSONSchema
-
-extension RAJSONSchema {
-    /// JSON Schema text consumed by the commons structured-output C ABI.
-    ///
-    /// Delegates to `rac_structured_output_schema_to_json_proto` so
-    /// every SDK shares the same byte-exact, key-sorted, compact serializer.
-    /// Returns `"{}"` when serialization or ABI conversion fails.
-    public var jsonSchemaString: String {
-        guard let serialized = try? self.serializedData() else { return "{}" }
-        var outBuffer = rac_proto_buffer_t()
-        defer { rac_proto_buffer_free(&outBuffer) }
-
-        let status = serialized.withUnsafeBytes { rawBuffer -> rac_result_t in
-            let bytes = rawBuffer.bindMemory(to: UInt8.self).baseAddress
-            return rac_structured_output_schema_to_json_proto(bytes, rawBuffer.count, &outBuffer)
-        }
-        guard status == RAC_SUCCESS, outBuffer.status == RAC_SUCCESS,
-              let data = outBuffer.data, outBuffer.size > 0,
-              let text = String(data: Data(bytes: data, count: outBuffer.size), encoding: .utf8) else {
-            return "{}"
-        }
-        return text
     }
 }
 
@@ -81,23 +56,5 @@ extension RAStructuredOutputResult {
     public var success: Bool { validation.isValid }
 }
 
-// MARK: - RANamedEntity
-
-extension RANamedEntity {
-    public init(
-        text: String,
-        entityType: String,
-        startOffset: Int32,
-        endOffset: Int32,
-        confidence: Float
-    ) {
-        self.init()
-        self.text = text
-        self.entityType = entityType
-        self.startOffset = startOffset
-        self.endOffset = endOffset
-        self.confidence = confidence
-    }
-
-    public var length: Int32 { max(0, endOffset - startOffset) }
-}
+// RANamedEntity was deleted outright (idl/structured_output.proto) with no
+// replacement — named-entity extraction has no proto home anymore.

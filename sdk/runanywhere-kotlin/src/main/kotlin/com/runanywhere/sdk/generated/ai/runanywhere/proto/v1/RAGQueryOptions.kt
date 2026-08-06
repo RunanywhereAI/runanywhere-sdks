@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -38,69 +37,19 @@ public class RAGQueryOptions(
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val question: String = "",
+  public val query: String = "",
   @field:WireField(
-    tag = 14,
-    adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
+    tag = 2,
+    adapter = "ai.runanywhere.proto.v1.RAGRetrievalOptions#ADAPTER",
     schemaIndex = 1,
   )
-  public val generation: LLMGenerationOptions? = null,
-  /**
-   * Retrieval depth for this call, overriding RAGConfiguration.top_k.
-   */
+  public val retrieval: RAGRetrievalOptions? = null,
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "retrievalTopK",
+    tag = 3,
+    adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
     schemaIndex = 2,
   )
-  public val retrieval_top_k: Int = 0,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    jsonName = "similarityThreshold",
-    schemaIndex = 3,
-  )
-  public val similarity_threshold: Float? = null,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val stream: Boolean = false,
-  /**
-   * Expand the question into several queries and merge the results.
-   */
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "enableMultiQuery",
-    schemaIndex = 5,
-  )
-  public val enable_multi_query: Boolean = false,
-  @RacDefaultOption("3")
-  @RacMinOption(1)
-  @RacMaxOption(8)
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    jsonName = "multiQueryCount",
-    schemaIndex = 6,
-  )
-  public val multi_query_count: Int? = null,
-  /**
-   * Restrict retrieval to chunks whose source matches this prefix.
-   */
-  @field:WireField(
-    tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "scopePrefix",
-    schemaIndex = 7,
-  )
-  public val scope_prefix: String? = null,
+  public val generation: LLMGenerationOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGQueryOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -113,14 +62,9 @@ public class RAGQueryOptions(
     if (other === this) return true
     if (other !is RAGQueryOptions) return false
     if (unknownFields != other.unknownFields) return false
-    if (question != other.question) return false
+    if (query != other.query) return false
+    if (retrieval != other.retrieval) return false
     if (generation != other.generation) return false
-    if (retrieval_top_k != other.retrieval_top_k) return false
-    if (similarity_threshold != other.similarity_threshold) return false
-    if (stream != other.stream) return false
-    if (enable_multi_query != other.enable_multi_query) return false
-    if (multi_query_count != other.multi_query_count) return false
-    if (scope_prefix != other.scope_prefix) return false
     return true
   }
 
@@ -128,14 +72,9 @@ public class RAGQueryOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + question.hashCode()
+      result = result * 37 + query.hashCode()
+      result = result * 37 + (retrieval?.hashCode() ?: 0)
       result = result * 37 + (generation?.hashCode() ?: 0)
-      result = result * 37 + retrieval_top_k.hashCode()
-      result = result * 37 + (similarity_threshold?.hashCode() ?: 0)
-      result = result * 37 + stream.hashCode()
-      result = result * 37 + enable_multi_query.hashCode()
-      result = result * 37 + (multi_query_count?.hashCode() ?: 0)
-      result = result * 37 + (scope_prefix?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -143,28 +82,18 @@ public class RAGQueryOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """question=${sanitize(question)}"""
+    result += """query=${sanitize(query)}"""
+    if (retrieval != null) result += """retrieval=$retrieval"""
     if (generation != null) result += """generation=$generation"""
-    result += """retrieval_top_k=$retrieval_top_k"""
-    if (similarity_threshold != null) result += """similarity_threshold=$similarity_threshold"""
-    result += """stream=$stream"""
-    result += """enable_multi_query=$enable_multi_query"""
-    if (multi_query_count != null) result += """multi_query_count=$multi_query_count"""
-    if (scope_prefix != null) result += """scope_prefix=${sanitize(scope_prefix)}"""
     return result.joinToString(prefix = "RAGQueryOptions{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    question: String = this.question,
+    query: String = this.query,
+    retrieval: RAGRetrievalOptions? = this.retrieval,
     generation: LLMGenerationOptions? = this.generation,
-    retrieval_top_k: Int = this.retrieval_top_k,
-    similarity_threshold: Float? = this.similarity_threshold,
-    stream: Boolean = this.stream,
-    enable_multi_query: Boolean = this.enable_multi_query,
-    multi_query_count: Int? = this.multi_query_count,
-    scope_prefix: String? = this.scope_prefix,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGQueryOptions = RAGQueryOptions(question, generation, retrieval_top_k, similarity_threshold, stream, enable_multi_query, multi_query_count, scope_prefix, unknownFields)
+  ): RAGQueryOptions = RAGQueryOptions(query, retrieval, generation, unknownFields)
 
   public companion object {
     @JvmField
@@ -178,101 +107,54 @@ public class RAGQueryOptions(
     ) {
       override fun encodedSize(`value`: RAGQueryOptions): Int {
         var size = value.unknownFields.size
-        if (value.question != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.question)
+        if (value.query != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.query)
         }
-        size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(14, value.generation)
-        if (value.retrieval_top_k != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.retrieval_top_k)
-        }
-        size += ProtoAdapter.FLOAT.encodedSizeWithTag(8, value.similarity_threshold)
-        if (value.stream != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.stream)
-        }
-        if (value.enable_multi_query != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.enable_multi_query)
-        }
-        size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.multi_query_count)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.scope_prefix)
+        size += RAGRetrievalOptions.ADAPTER.encodedSizeWithTag(2, value.retrieval)
+        size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(3, value.generation)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: RAGQueryOptions) {
-        if (value.question != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.question)
+        if (value.query != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.query)
         }
-        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 14, value.generation)
-        if (value.retrieval_top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.retrieval_top_k)
-        }
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.similarity_threshold)
-        if (value.stream != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
-        }
-        if (value.enable_multi_query != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.enable_multi_query)
-        }
-        ProtoAdapter.INT32.encodeWithTag(writer, 12, value.multi_query_count)
-        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.scope_prefix)
+        RAGRetrievalOptions.ADAPTER.encodeWithTag(writer, 2, value.retrieval)
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 3, value.generation)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGQueryOptions) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.scope_prefix)
-        ProtoAdapter.INT32.encodeWithTag(writer, 12, value.multi_query_count)
-        if (value.enable_multi_query != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.enable_multi_query)
-        }
-        if (value.stream != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
-        }
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.similarity_threshold)
-        if (value.retrieval_top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.retrieval_top_k)
-        }
-        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 14, value.generation)
-        if (value.question != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.question)
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 3, value.generation)
+        RAGRetrievalOptions.ADAPTER.encodeWithTag(writer, 2, value.retrieval)
+        if (value.query != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.query)
         }
       }
 
       override fun decode(reader: ProtoReader): RAGQueryOptions {
-        var question: String = ""
+        var query: String = ""
+        var retrieval: RAGRetrievalOptions? = null
         var generation: LLMGenerationOptions? = null
-        var retrieval_top_k: Int = 0
-        var similarity_threshold: Float? = null
-        var stream: Boolean = false
-        var enable_multi_query: Boolean = false
-        var multi_query_count: Int? = null
-        var scope_prefix: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> question = ProtoAdapter.STRING.decode(reader)
-            14 -> generation = LLMGenerationOptions.ADAPTER.decode(reader)
-            7 -> retrieval_top_k = ProtoAdapter.INT32.decode(reader)
-            8 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
-            9 -> stream = ProtoAdapter.BOOL.decode(reader)
-            11 -> enable_multi_query = ProtoAdapter.BOOL.decode(reader)
-            12 -> multi_query_count = ProtoAdapter.INT32.decode(reader)
-            13 -> scope_prefix = ProtoAdapter.STRING.decode(reader)
+            1 -> query = ProtoAdapter.STRING.decode(reader)
+            2 -> retrieval = RAGRetrievalOptions.ADAPTER.decode(reader)
+            3 -> generation = LLMGenerationOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RAGQueryOptions(
-          question = question,
+          query = query,
+          retrieval = retrieval,
           generation = generation,
-          retrieval_top_k = retrieval_top_k,
-          similarity_threshold = similarity_threshold,
-          stream = stream,
-          enable_multi_query = enable_multi_query,
-          multi_query_count = multi_query_count,
-          scope_prefix = scope_prefix,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: RAGQueryOptions): RAGQueryOptions = value.copy(
+        retrieval = value.retrieval?.let(RAGRetrievalOptions.ADAPTER::redact),
         generation = value.generation?.let(LLMGenerationOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )

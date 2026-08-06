@@ -41,6 +41,18 @@ public class SegmentationOptions(
     schemaIndex = 0,
   )
   public val include_diagnostic_rgba: Boolean = false,
+  /**
+   * When true, also return confidence_mask_u8: the model's probability for
+   * the class it chose, per pixel. Costs width * height extra bytes.
+   */
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeConfidence",
+    schemaIndex = 1,
+  )
+  public val include_confidence: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SegmentationOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -54,6 +66,7 @@ public class SegmentationOptions(
     if (other !is SegmentationOptions) return false
     if (unknownFields != other.unknownFields) return false
     if (include_diagnostic_rgba != other.include_diagnostic_rgba) return false
+    if (include_confidence != other.include_confidence) return false
     return true
   }
 
@@ -62,6 +75,7 @@ public class SegmentationOptions(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + include_diagnostic_rgba.hashCode()
+      result = result * 37 + include_confidence.hashCode()
       super.hashCode = result
     }
     return result
@@ -70,10 +84,15 @@ public class SegmentationOptions(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """include_diagnostic_rgba=$include_diagnostic_rgba"""
+    result += """include_confidence=$include_confidence"""
     return result.joinToString(prefix = "SegmentationOptions{", separator = ", ", postfix = "}")
   }
 
-  public fun copy(include_diagnostic_rgba: Boolean = this.include_diagnostic_rgba, unknownFields: ByteString = this.unknownFields): SegmentationOptions = SegmentationOptions(include_diagnostic_rgba, unknownFields)
+  public fun copy(
+    include_diagnostic_rgba: Boolean = this.include_diagnostic_rgba,
+    include_confidence: Boolean = this.include_confidence,
+    unknownFields: ByteString = this.unknownFields,
+  ): SegmentationOptions = SegmentationOptions(include_diagnostic_rgba, include_confidence, unknownFields)
 
   public companion object {
     @JvmField
@@ -91,6 +110,9 @@ public class SegmentationOptions(
         if (value.include_diagnostic_rgba != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.include_diagnostic_rgba)
         }
+        if (value.include_confidence != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.include_confidence)
+        }
         return size
       }
 
@@ -98,11 +120,17 @@ public class SegmentationOptions(
         if (value.include_diagnostic_rgba != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.include_diagnostic_rgba)
         }
+        if (value.include_confidence != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.include_confidence)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SegmentationOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_confidence != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.include_confidence)
+        }
         if (value.include_diagnostic_rgba != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.include_diagnostic_rgba)
         }
@@ -110,14 +138,17 @@ public class SegmentationOptions(
 
       override fun decode(reader: ProtoReader): SegmentationOptions {
         var include_diagnostic_rgba: Boolean = false
+        var include_confidence: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> include_diagnostic_rgba = ProtoAdapter.BOOL.decode(reader)
+            2 -> include_confidence = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return SegmentationOptions(
           include_diagnostic_rgba = include_diagnostic_rgba,
+          include_confidence = include_confidence,
           unknownFields = unknownFields
         )
       }

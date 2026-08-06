@@ -68,13 +68,15 @@ public class TurnLifecycleEvent(
     schemaIndex = 4,
   )
   public val response: String = "",
+  /**
+   * Set on KIND_FAILED. Same payload as VoiceEvent.session_error.
+   */
   @field:WireField(
     tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
+    adapter = "ai.runanywhere.proto.v1.VoiceSessionError#ADAPTER",
     schemaIndex = 5,
   )
-  public val error: String = "",
+  public val error: VoiceSessionError? = null,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -123,7 +125,7 @@ public class TurnLifecycleEvent(
       result = result * 37 + session_id.hashCode()
       result = result * 37 + transcript.hashCode()
       result = result * 37 + response.hashCode()
-      result = result * 37 + error.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       result = result * 37 + started_at_ms.hashCode()
       result = result * 37 + completed_at_ms.hashCode()
       super.hashCode = result
@@ -138,7 +140,7 @@ public class TurnLifecycleEvent(
     result += """session_id=${sanitize(session_id)}"""
     result += """transcript=${sanitize(transcript)}"""
     result += """response=${sanitize(response)}"""
-    result += """error=${sanitize(error)}"""
+    if (error != null) result += """error=$error"""
     result += """started_at_ms=$started_at_ms"""
     result += """completed_at_ms=$completed_at_ms"""
     return result.joinToString(prefix = "TurnLifecycleEvent{", separator = ", ", postfix = "}")
@@ -150,7 +152,7 @@ public class TurnLifecycleEvent(
     session_id: String = this.session_id,
     transcript: String = this.transcript,
     response: String = this.response,
-    error: String = this.error,
+    error: VoiceSessionError? = this.error,
     started_at_ms: Long = this.started_at_ms,
     completed_at_ms: Long = this.completed_at_ms,
     unknownFields: ByteString = this.unknownFields,
@@ -184,9 +186,7 @@ public class TurnLifecycleEvent(
         if (value.response != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.response)
         }
-        if (value.error != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error)
-        }
+        size += VoiceSessionError.ADAPTER.encodedSizeWithTag(6, value.error)
         if (value.started_at_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.started_at_ms)
         }
@@ -212,9 +212,7 @@ public class TurnLifecycleEvent(
         if (value.response != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.response)
         }
-        if (value.error != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error)
-        }
+        VoiceSessionError.ADAPTER.encodeWithTag(writer, 6, value.error)
         if (value.started_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.started_at_ms)
         }
@@ -232,9 +230,7 @@ public class TurnLifecycleEvent(
         if (value.started_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.started_at_ms)
         }
-        if (value.error != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error)
-        }
+        VoiceSessionError.ADAPTER.encodeWithTag(writer, 6, value.error)
         if (value.response != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.response)
         }
@@ -258,7 +254,7 @@ public class TurnLifecycleEvent(
         var session_id: String = ""
         var transcript: String = ""
         var response: String = ""
-        var error: String = ""
+        var error: VoiceSessionError? = null
         var started_at_ms: Long = 0L
         var completed_at_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
@@ -272,7 +268,7 @@ public class TurnLifecycleEvent(
             3 -> session_id = ProtoAdapter.STRING.decode(reader)
             4 -> transcript = ProtoAdapter.STRING.decode(reader)
             5 -> response = ProtoAdapter.STRING.decode(reader)
-            6 -> error = ProtoAdapter.STRING.decode(reader)
+            6 -> error = VoiceSessionError.ADAPTER.decode(reader)
             7 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
             8 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -292,6 +288,7 @@ public class TurnLifecycleEvent(
       }
 
       override fun redact(`value`: TurnLifecycleEvent): TurnLifecycleEvent = value.copy(
+        error = value.error?.let(VoiceSessionError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

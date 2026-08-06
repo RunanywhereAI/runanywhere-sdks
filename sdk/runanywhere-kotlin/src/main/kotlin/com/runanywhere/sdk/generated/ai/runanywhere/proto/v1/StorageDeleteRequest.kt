@@ -33,14 +33,17 @@ import okio.ByteString
 
 public class StorageDeleteRequest(
   model_ids: List<String> = emptyList(),
+  /**
+   * Files are deleted; set this only to opt OUT (catalog-only bookkeeping).
+   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "deleteFiles",
+    jsonName = "keepFilesOnDisk",
     schemaIndex = 1,
   )
-  public val delete_files: Boolean = false,
+  public val keep_files_on_disk: Boolean = false,
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -112,7 +115,7 @@ public class StorageDeleteRequest(
     if (other !is StorageDeleteRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (model_ids != other.model_ids) return false
-    if (delete_files != other.delete_files) return false
+    if (keep_files_on_disk != other.keep_files_on_disk) return false
     if (clear_registry_paths != other.clear_registry_paths) return false
     if (unload_if_loaded != other.unload_if_loaded) return false
     if (dry_run != other.dry_run) return false
@@ -127,7 +130,7 @@ public class StorageDeleteRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_ids.hashCode()
-      result = result * 37 + delete_files.hashCode()
+      result = result * 37 + keep_files_on_disk.hashCode()
       result = result * 37 + clear_registry_paths.hashCode()
       result = result * 37 + unload_if_loaded.hashCode()
       result = result * 37 + dry_run.hashCode()
@@ -142,7 +145,7 @@ public class StorageDeleteRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (model_ids.isNotEmpty()) result += """model_ids=${sanitize(model_ids)}"""
-    result += """delete_files=$delete_files"""
+    result += """keep_files_on_disk=$keep_files_on_disk"""
     result += """clear_registry_paths=$clear_registry_paths"""
     result += """unload_if_loaded=$unload_if_loaded"""
     result += """dry_run=$dry_run"""
@@ -154,7 +157,7 @@ public class StorageDeleteRequest(
 
   public fun copy(
     model_ids: List<String> = this.model_ids,
-    delete_files: Boolean = this.delete_files,
+    keep_files_on_disk: Boolean = this.keep_files_on_disk,
     clear_registry_paths: Boolean = this.clear_registry_paths,
     unload_if_loaded: Boolean = this.unload_if_loaded,
     dry_run: Boolean = this.dry_run,
@@ -162,7 +165,7 @@ public class StorageDeleteRequest(
     require_plan_match: Boolean = this.require_plan_match,
     allow_platform_delete: Boolean = this.allow_platform_delete,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageDeleteRequest = StorageDeleteRequest(model_ids, delete_files, clear_registry_paths, unload_if_loaded, dry_run, plan, require_plan_match, allow_platform_delete, unknownFields)
+  ): StorageDeleteRequest = StorageDeleteRequest(model_ids, keep_files_on_disk, clear_registry_paths, unload_if_loaded, dry_run, plan, require_plan_match, allow_platform_delete, unknownFields)
 
   public companion object {
     @JvmField
@@ -178,8 +181,8 @@ public class StorageDeleteRequest(
       override fun encodedSize(`value`: StorageDeleteRequest): Int {
         var size = value.unknownFields.size
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(1, value.model_ids)
-        if (value.delete_files != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.delete_files)
+        if (value.keep_files_on_disk != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.keep_files_on_disk)
         }
         if (value.clear_registry_paths != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.clear_registry_paths)
@@ -202,8 +205,8 @@ public class StorageDeleteRequest(
 
       override fun encode(writer: ProtoWriter, `value`: StorageDeleteRequest) {
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 1, value.model_ids)
-        if (value.delete_files != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.delete_files)
+        if (value.keep_files_on_disk != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.keep_files_on_disk)
         }
         if (value.clear_registry_paths != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.clear_registry_paths)
@@ -242,15 +245,15 @@ public class StorageDeleteRequest(
         if (value.clear_registry_paths != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.clear_registry_paths)
         }
-        if (value.delete_files != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.delete_files)
+        if (value.keep_files_on_disk != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.keep_files_on_disk)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 1, value.model_ids)
       }
 
       override fun decode(reader: ProtoReader): StorageDeleteRequest {
         val model_ids = mutableListOf<String>()
-        var delete_files: Boolean = false
+        var keep_files_on_disk: Boolean = false
         var clear_registry_paths: Boolean = false
         var unload_if_loaded: Boolean = false
         var dry_run: Boolean = false
@@ -260,7 +263,7 @@ public class StorageDeleteRequest(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_ids.add(ProtoAdapter.STRING.decode(reader))
-            2 -> delete_files = ProtoAdapter.BOOL.decode(reader)
+            2 -> keep_files_on_disk = ProtoAdapter.BOOL.decode(reader)
             3 -> clear_registry_paths = ProtoAdapter.BOOL.decode(reader)
             4 -> unload_if_loaded = ProtoAdapter.BOOL.decode(reader)
             5 -> dry_run = ProtoAdapter.BOOL.decode(reader)
@@ -272,7 +275,7 @@ public class StorageDeleteRequest(
         }
         return StorageDeleteRequest(
           model_ids = model_ids,
-          delete_files = delete_files,
+          keep_files_on_disk = keep_files_on_disk,
           clear_registry_paths = clear_registry_paths,
           unload_if_loaded = unload_if_loaded,
           dry_run = dry_run,

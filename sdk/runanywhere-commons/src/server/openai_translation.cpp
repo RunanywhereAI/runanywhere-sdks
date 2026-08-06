@@ -9,7 +9,6 @@
 
 #include <random>
 #include <sstream>
-#include <unordered_set>
 #include <vector>
 
 #include "rac/features/llm/rac_tool_calling.h"
@@ -20,23 +19,6 @@ namespace server {
 namespace translation {
 
 namespace {
-
-runanywhere::v1::ToolParameterType parameter_type(const Json& schema) {
-    const std::string type = schema.value("type", "string");
-    if (type == "number" || type == "integer") {
-        return runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER;
-    }
-    if (type == "boolean") {
-        return runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN;
-    }
-    if (type == "object") {
-        return runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT;
-    }
-    if (type == "array") {
-        return runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY;
-    }
-    return runanywhere::v1::TOOL_PARAMETER_TYPE_STRING;
-}
 
 void append_openai_tools(const Json& openai_tools, runanywhere::v1::ToolCallingOptions* options) {
     if (!options || !openai_tools.is_array()) {
@@ -58,38 +40,11 @@ void append_openai_tools(const Json& openai_tools, runanywhere::v1::ToolCallingO
         if (!function.contains("parameters") || !function["parameters"].is_object()) {
             continue;
         }
-        const auto& schema = function["parameters"];
-        definition->set_json_schema(schema.dump());
-
-        std::unordered_set<std::string> required;
-        if (schema.contains("required") && schema["required"].is_array()) {
-            for (const auto& name : schema["required"]) {
-                if (name.is_string()) {
-                    required.insert(name.get<std::string>());
-                }
-            }
-        }
-        if (!schema.contains("properties") || !schema["properties"].is_object()) {
-            continue;
-        }
-        for (const auto& [name, property] : schema["properties"].items()) {
-            if (!property.is_object()) {
-                continue;
-            }
-            auto* parameter = definition->add_parameters();
-            parameter->set_name(name);
-            parameter->set_type(parameter_type(property));
-            parameter->set_description(property.value("description", ""));
-            parameter->set_required(required.contains(name));
-            parameter->set_json_schema(property.dump());
-            if (property.contains("enum") && property["enum"].is_array()) {
-                for (const auto& value : property["enum"]) {
-                    if (value.is_string()) {
-                        parameter->add_enum_values(value.get<std::string>());
-                    }
-                }
-            }
-        }
+        // ToolDefinition.parameters is ONE JSON Schema string (OpenAI's own
+        // `parameters` shape) -- the structured ToolParameter list was
+        // deleted outright (idl/tool_calling.proto), so the raw schema
+        // (required/properties/etc.) rides through verbatim.
+        definition->set_parameters(function["parameters"].dump());
     }
 }
 

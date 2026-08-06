@@ -182,12 +182,12 @@ class HybridSttRouter {
     // Pure pass-through: commons owns the entire routing decision AND the
     // raw-PCM16 → WAV payload normalisation (rac_stt_hybrid_router_proto.cpp).
     // Dart marshals the request and decodes the response; it does NOT
-    // pre-filter candidates or toggle slots. HybridRoutingContext is empty on
-    // the wire (device-state lives behind the vtable); it is still emitted
-    // for a stable wire shape.
+    // pre-filter candidates or toggle slots. `HybridRoutingContext` was
+    // deleted outright (idl/hybrid_router.proto) — it carried no fields
+    // (device-state already lives behind the vtable), so there is nothing
+    // left to emit here.
     final request = pb.HybridSttTranscribeRequest(
       audioBytes: audioBytes,
-      context: pb.HybridRoutingContext(),
       options: options ?? pb.HybridSttTranscribeOptions(),
     );
 
@@ -244,12 +244,17 @@ class HybridSttRouter {
     );
   }
 
+  // `HybridBackendKind` and `HybridModelDescriptor.provider` were both
+  // deleted outright (idl/hybrid_router.proto): `backend`/`is_local` are
+  // replaced by `engine` (a plain plugin-registry name string) /
+  // `is_on_device`, and the cloud provider identity travels only through
+  // the create-time `config_json` (see `cloudSttConfigJson`), never the
+  // descriptor.
   Uint8List _descriptorBytes(HybridModel model) {
     final descriptor = pb.HybridModelDescriptor(
       modelId: model.id,
-      isLocal: model.kind.isLocal,
-      backend: model.backend.proto,
-      provider: model.provider,
+      isOnDevice: model.kind.isLocal,
+      engine: model.backend.engineHint,
     );
     return descriptor.writeToBuffer();
   }
@@ -285,11 +290,15 @@ class HybridSttRouter {
   pb.HybridSttTranscribeResponse _decodeResponse(Uint8List bytes) {
     final response = pb.HybridSttTranscribeResponse.fromBuffer(bytes);
     if (response.rc != 0) {
+      // `HybridSttTranscribeResponse.error_msg` was deleted outright
+      // (idl/hybrid_router.proto) — `routing.primaryErrorMessage` (the
+      // failed-primary-attempt message) is the closest surviving signal.
+      final message = response.routing.primaryErrorMessage;
       throw HybridTranscribeException(
         response.rc,
-        response.errorMsg.isEmpty
+        message.isEmpty
             ? 'Hybrid STT transcribe failed (rc=${response.rc})'
-            : response.errorMsg,
+            : message,
       );
     }
     return response;

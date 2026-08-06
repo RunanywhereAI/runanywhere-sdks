@@ -25,18 +25,13 @@ export interface SDKInitOptions {
   /** SDK environment */
   environment?: SDKEnvironment;
 
-  /** Optional development-mode device registration token. */
+  /**
+   * Optional development-mode device registration token.
+   *
+   * `SdkInitPhase2Request` collapsed to this field alone — the
+   * `forceRefreshAssignments`/`flushTelemetry`/`discoverDownloadedModels`/
+   * `rescanLocalModels` knobs it used to carry are deleted outright; commons
+   * now decides those itself rather than taking per-call hints.
+   */
   buildToken?: string;
-
-  /** Bypass cached model assignments during Phase 2. */
-  forceRefreshAssignments?: boolean;
-
-  /** Flush queued telemetry during Phase 2. */
-  flushTelemetry?: boolean;
-
-  /** Reconcile registry rows with local model files during Phase 2. */
-  discoverDownloadedModels?: boolean;
-
-  /** Ask native discovery to rescan local model directories during Phase 2. */
-  rescanLocalModels?: boolean;
 }

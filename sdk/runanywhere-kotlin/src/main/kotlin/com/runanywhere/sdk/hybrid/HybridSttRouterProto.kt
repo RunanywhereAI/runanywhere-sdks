@@ -14,7 +14,6 @@
 
 package com.runanywhere.sdk.hybrid
 
-import ai.runanywhere.proto.v1.HybridRoutingContext
 import ai.runanywhere.proto.v1.HybridSttTranscribeRequest
 import ai.runanywhere.proto.v1.HybridSttTranscribeResponse
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -23,13 +22,13 @@ import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 
 internal object HybridSttRouterProto {
     /**
-     * Build a HybridSttTranscribeRequest carrying the audio bytes, an
-     * (empty, present) routing context, and the transcription options.
+     * Build a HybridSttTranscribeRequest carrying the audio bytes and the
+     * transcription options.
      *
-     * HybridRoutingContext currently has no fields — device-state lives
-     * behind the `rac_hybrid_device_state` vtable. The empty message is still
-     * set explicitly so the wire shape (field 2 present) is stable for future
-     * per-call hints, matching the C++/Swift peers.
+     * `HybridRoutingContext`/`HybridSttTranscribeRequest.context` are
+     * deleted outright (idl/hybrid_router.proto); device-state still lives
+     * entirely behind the `rac_hybrid_device_state` vtable, so there is no
+     * per-call context left to set. Mirrors Swift's `encodeRequest`.
      */
     fun request(
         audio: ByteArray,
@@ -38,7 +37,6 @@ internal object HybridSttRouterProto {
         val msg =
             HybridSttTranscribeRequest(
                 audio_bytes = audio.toByteString(),
-                context = HybridRoutingContext(),
                 options = options,
             )
         return HybridSttTranscribeRequest.ADAPTER.encode(msg)
@@ -48,13 +46,17 @@ internal object HybridSttRouterProto {
      * Decode a HybridSttTranscribeResponse returned by the JNI transcribe
      * thunk into the public [HybridTranscribeResult], raising the native rc
      * as an [SDKException] when non-zero (mirrors Swift's decodeResponse).
+     *
+     * `error_msg` is deleted outright (idl/hybrid_router.proto): the
+     * response now carries only the bare `rc` on failure, with no
+     * human-readable message field.
      */
     fun parseResponse(bytes: ByteArray): HybridTranscribeResult {
         val msg = HybridSttTranscribeResponse.ADAPTER.decode(bytes)
         if (msg.rc != 0) {
             throw SDKException.make(
                 code = ProtoErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE,
-                message = msg.error_msg.ifEmpty { "Hybrid STT transcribe failed (rc=${msg.rc})" },
+                message = "Hybrid STT transcribe failed (rc=${msg.rc})",
             )
         }
         return HybridTranscribeResult(

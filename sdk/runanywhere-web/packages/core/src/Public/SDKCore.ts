@@ -11,6 +11,7 @@ import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
   SDKEnvironment,
   ModelCategory,
+  ModelRegistryStatus,
   type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
@@ -22,7 +23,6 @@ import {
   type DownloadProgress,
 } from '@runanywhere/proto-ts/download_service';
 import {
-  SdkInitEnvironment,
   SdkInitPhase1Request,
   SdkInitPhase2Request,
   SdkInitResult,
@@ -207,13 +207,22 @@ function ensureDeviceId(): string {
   }
 }
 
-function mapSdkInitEnvironment(env: SDKEnvironment): SdkInitEnvironment {
+/**
+ * `_rac_device_manager_register_if_needed` is a raw WASM export taking the
+ * C `rac_environment_t` enum value directly (RAC_ENV_DEVELOPMENT=0,
+ * RAC_ENV_PRODUCTION=2; rac_environment.h) -- not the proto
+ * `SdkInitEnvironment`, which was deleted outright
+ * (idl/sdk_init.proto: "model_types.proto's SDKEnvironment is the single
+ * environment vocabulary"). This maps the proto `SDKEnvironment` onto that
+ * raw C ABI numeric value for this one non-proto call site.
+ */
+function mapToRacEnvironment(env: SDKEnvironment): number {
   switch (env) {
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
+      return 2; // RAC_ENV_PRODUCTION
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
     default:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+      return 0; // RAC_ENV_DEVELOPMENT
   }
 }
 
@@ -274,7 +283,7 @@ async function completePendingDeviceRegistration(
       }
       module.stringToUTF8(token, tokenPtr, size);
     }
-    const result = register.call(module, mapSdkInitEnvironment(environment), tokenPtr);
+    const result = register.call(module, mapToRacEnvironment(environment), tokenPtr);
     if (result !== 0) {
       logger.warning(`Device registration remained deferred (code ${result}).`);
     }
@@ -401,7 +410,7 @@ export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModul
 
   const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
   const bytes = SdkInitPhase1Request.encode({
-    environment: mapSdkInitEnvironment(environment),
+    environment,
     apiKey: _initOptions?.apiKey ?? '',
     baseUrl: _initOptions?.baseURL ?? '',
     deviceId: ensureDeviceId(),
@@ -631,7 +640,7 @@ function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string)
   const importedModel: ModelInfo = {
     ...model,
     localPath,
-    isDownloaded: true,
+    registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
     isAvailable: true,
     updatedAtUnixMs: Date.now(),
   };
@@ -888,7 +897,7 @@ async function retryHTTPSetup(): Promise<void> {
     'rac_sdk_retry_http_proto',
   );
   throwIfSdkInitFailed(result, 'SDK HTTP retry');
-  _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+  _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? false;
   if (result?.warning) {
     logger.debug('HTTP/Auth retry completed with a warning');
   }
@@ -1209,11 +1218,10 @@ export const SDKCore = {
           const bytes = SdkInitPhase2Request.encode({
             // No released SDK bakes or forwards a build token; the backend is
             // reached only through the effective base URL (keyless staging).
+            // `forceRefreshAssignments`/`flushTelemetry`/
+            // `discoverDownloadedModels`/`rescanLocalModels` were deleted
+            // outright -- SdkInitPhase2Request now carries only buildToken.
             buildToken: '',
-            forceRefreshAssignments: false,
-            flushTelemetry: true,
-            discoverDownloadedModels: true,
-            rescanLocalModels: true,
           }).finish();
           const result = invokeSdkInitProto(
             module,
@@ -1229,7 +1237,7 @@ export const SDKCore = {
             lifecycleGeneration,
           );
           if (lifecycleGeneration !== _lifecycleGeneration) return;
-          httpConfigured = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+          httpConfigured = result?.hasCompletedHttpSetup ?? false;
           const linkedModelsCount = result?.linkedModelsCount ?? 0;
           if (linkedModelsCount > 0) {
             logger.info(`Phase 2 linked ${linkedModelsCount} downloaded models`);
@@ -1512,6 +1520,10 @@ export const SDKCore = {
       verifyChecksums:
         request.verifyChecksums ?? (model.checksumSha256?.length ?? 0) > 0,
       requiredFreeBytesAfterDownload: request.requiredFreeBytesAfterDownload ?? 0,
+      // Checksums are verified whenever the catalog has one; this is the
+      // opt-OUT switch (default false = verify when a checksum exists,
+      // matching verifyChecksums above).
+      skipChecksumVerification: false,
     };
     const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
     if (!plan?.canStart) {
@@ -1536,9 +1548,11 @@ export const SDKCore = {
     const start = DownloadsCapability.start({
       modelId: request.modelId,
       plan,
-      resume: request.resumeExisting ?? true,
-      resumeToken: plan.resumeToken,
-      updateRegistryOnCompletion: false,
+      // `DownloadStartRequest.resume`/`.resumeToken` were deleted outright:
+      // resumability is now implicit in `plan` (`canResume`/
+      // `resumeFromBytes`), computed by the plan step above rather than
+      // requested here.
+      skipRegistryUpdate: true,
     });
     if (!start?.accepted) {
       throwDownloadFailure(
@@ -1754,10 +1768,12 @@ export const SDKCore = {
 
       // clearSiteStorage (or manual OPFS purge) — and mid-download refresh —
       // can leave a partial OPFS file while the registry still says
-      // isDownloaded=true. Reconcile: missing OR incomplete bytes clear the
-      // flag so the UI shows Retry instead of a broken Use.
+      // registryStatus=DOWNLOADED. Reconcile: missing OR incomplete bytes
+      // clear the flag so the UI shows Retry instead of a broken Use.
+      const isDownloaded = existing.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+        || existing.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
       if (!exists) {
-        if (existing.localPath || existing.isDownloaded) {
+        if (existing.localPath || isDownloaded) {
           try {
             if (ModelRegistryCapability.updateDownloadStatus(existing.id, null)) patched++;
           } catch { /* ignore */ }
@@ -1765,7 +1781,7 @@ export const SDKCore = {
         continue;
       }
 
-      if (existing.localPath && existing.isDownloaded) continue;
+      if (existing.localPath && isDownloaded) continue;
 
       try {
         if (ModelRegistryCapability.updateDownloadStatus(existing.id, localPath)) patched++;

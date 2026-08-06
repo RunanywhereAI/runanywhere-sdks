@@ -3,35 +3,24 @@
  */
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
-import {
-  VLMGenerationOptions as VLMGenerationOptionsMessage,
-  VLMStreamEventKind,
-  type VLMGenerationOptions,
-} from '@runanywhere/proto-ts/vlm_options';
-import { vLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/vlm_options_convenience';
+import { VLMStreamEventKind } from '@runanywhere/proto-ts/vlm_options';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { VisionLanguage } from '../../Extensions/RunAnywhere+VisionLanguage.js';
 import type { ImageInput } from '../Inputs.js';
 import type { LlmOptions } from '../Options.js';
 import type { GenerationEvent } from '../Events.js';
 import type { GenerationResult } from '../Results.js';
-import { vlmToGenerationResult } from '../Mapping.js';
+import { toProtoLlmOptions, vlmToGenerationResult } from '../Mapping.js';
 import { ensureModelForCategory, ensureReady } from '../Runtime/Prerequisites.js';
 
-function toProtoVlmOptions(prompt: string, options?: LlmOptions): VLMGenerationOptions {
-  const defaults = vLMGenerationOptionsDefaults();
-  return VLMGenerationOptionsMessage.fromPartial({
-    prompt,
-    maxOutputTokens: options?.maxOutputTokens ?? defaults.maxOutputTokens,
-    temperature: options?.temperature ?? defaults.temperature,
-    topP: options?.topP ?? defaults.topP,
-    topK: options?.topK ?? defaults.topK,
-    minP: options?.minP ?? defaults.minP,
-    repetitionPenalty: options?.repetitionPenalty ?? defaults.repetitionPenalty,
-    seed: options?.seed ?? defaults.seed,
-    stopSequences: options?.stopSequences ?? defaults.stopSequences,
-    systemPrompt: options?.systemPrompt,
-  });
+/**
+ * `VLMGenerationRequest.options` is a plain `LLMGenerationOptions` now — same
+ * names, same defaults, same validation as the text API (no separate
+ * `VLMGenerationOptions` message). `prompt` rides the request's own
+ * `prompt` field, so it is not part of the options object.
+ */
+function toProtoVlmOptions(options?: LlmOptions) {
+  return toProtoLlmOptions(options);
 }
 
 /**
@@ -70,7 +59,7 @@ export const vlm = {
     options?: LlmOptions,
   ): Promise<GenerationResult> {
     await ensureVisionModel(options?.model);
-    const result = await VisionLanguage.processImage(image, toProtoVlmOptions(prompt, options));
+    const result = await VisionLanguage.processImage(image, prompt, toProtoVlmOptions(options));
     if (result.error) throw new SDKException(result.error);
     return vlmToGenerationResult(result);
   },
@@ -91,7 +80,8 @@ export const vlm = {
       await ensureVisionModel(options?.model);
       const stream = await VisionLanguage.processImageStream(
         image,
-        toProtoVlmOptions(prompt, options),
+        prompt,
+        toProtoVlmOptions(options),
       );
       const itemId = 'response-0';
       let requestId = '';

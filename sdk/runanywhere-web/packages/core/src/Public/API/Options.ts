@@ -126,7 +126,6 @@ export interface SttOptions {
   wordTimestamps?: boolean;
   diarization?: boolean;
   maxSpeakers?: number;
-  translateToEnglish?: boolean;
 }
 
 /** Synthesis knobs. */

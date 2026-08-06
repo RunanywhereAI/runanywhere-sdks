@@ -382,7 +382,7 @@ runanywhere::v1::DeviceAffinity parse_device(const std::string& s) {
     if (lower == "gpu")
         return DeviceAffinity::DEVICE_AFFINITY_GPU;
     if (lower == "ane" || lower == "npu")
-        return DeviceAffinity::DEVICE_AFFINITY_ANE;
+        return DeviceAffinity::DEVICE_AFFINITY_NPU;
     if (lower == "any")
         return DeviceAffinity::DEVICE_AFFINITY_ANY;
     return DeviceAffinity::DEVICE_AFFINITY_UNSPECIFIED;

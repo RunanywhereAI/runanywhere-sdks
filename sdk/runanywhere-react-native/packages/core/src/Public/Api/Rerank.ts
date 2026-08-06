@@ -4,7 +4,6 @@
 
 import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
 import {
-  RerankCandidate,
   RerankRequest,
   RerankResult,
 } from '@runanywhere/proto-ts/rerank';
@@ -48,9 +47,7 @@ export const rerank = {
 
     const request = RerankRequest.fromPartial({
       query,
-      candidates: documents.map((text, index) =>
-        RerankCandidate.fromPartial({ id: String(index), text })
-      ),
+      documents,
       options: toRerankOptions(topN),
     });
     const resultBytes = await native.rerankProto(

@@ -1661,14 +1661,6 @@ object RunAnywhereBridge {
     external fun racStructuredOutputSchemaToJsonProto(schemaProto: ByteArray): ByteArray?
 
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h)
-    //
-    // ENGINE ROUTER — CAPABILITY QUERIES
-    //
-    // `rac_router_frameworks_for_capability_proto` consumes a serialized
-    // `runanywhere.v1.FrameworksForCapabilityRequest` and returns a serialized
-    // `runanywhere.v1.FrameworksForCapabilityResponse`. Replaces the local
-    // SDKComponent → ModelCategory → framework mapping that used to live in
-    // Kotlin.
 
     // VAD COMPONENT METADATA (Swift-alignment)
 

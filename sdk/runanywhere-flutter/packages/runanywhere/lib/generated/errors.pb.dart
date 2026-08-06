@@ -21,146 +21,38 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'errors.pbenum.dart';
 
-/// Debugging metadata captured at the throw site. Stack traces are deliberately
-/// absent: they are platform-shaped and belong in platform-local logging.
-class ErrorContext extends $pb.GeneratedMessage {
-  factory ErrorContext({
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
-    $core.String? sourceFile,
-    $core.int? sourceLine,
-    $core.String? operation,
-    $core.String? fieldPath,
-  }) {
-    final result = create();
-    if (metadata != null) result.metadata.addEntries(metadata);
-    if (sourceFile != null) result.sourceFile = sourceFile;
-    if (sourceLine != null) result.sourceLine = sourceLine;
-    if (operation != null) result.operation = operation;
-    if (fieldPath != null) result.fieldPath = fieldPath;
-    return result;
-  }
-
-  ErrorContext._();
-
-  factory ErrorContext.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ErrorContext.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ErrorContext',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..m<$core.String, $core.String>(1, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'ErrorContext.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
-    ..aOS(2, _omitFieldNames ? '' : 'sourceFile')
-    ..aI(3, _omitFieldNames ? '' : 'sourceLine')
-    ..aOS(4, _omitFieldNames ? '' : 'operation')
-    ..aOS(5, _omitFieldNames ? '' : 'fieldPath')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ErrorContext clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ErrorContext copyWith(void Function(ErrorContext) updates) =>
-      super.copyWith((message) => updates(message as ErrorContext))
-          as ErrorContext;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ErrorContext create() => ErrorContext._();
-  @$core.override
-  ErrorContext createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ErrorContext getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ErrorContext>(create);
-  static ErrorContext? _defaultInstance;
-
-  /// Telemetry tagging.
-  @$pb.TagNumber(1)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(0);
-
-  @$pb.TagNumber(2)
-  $core.String get sourceFile => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set sourceFile($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasSourceFile() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearSourceFile() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.int get sourceLine => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set sourceLine($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasSourceLine() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearSourceLine() => $_clearField(3);
-
-  /// Logical operation ("loadModel", "generate", "transcribeStream"), so
-  /// clients can route without parsing free text.
-  @$pb.TagNumber(4)
-  $core.String get operation => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set operation($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasOperation() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearOperation() => $_clearField(4);
-
-  /// "<Message>.<field>" for validation errors. The generated validate()
-  /// emits this.
-  @$pb.TagNumber(5)
-  $core.String get fieldPath => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set fieldPath($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasFieldPath() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearFieldPath() => $_clearField(5);
-}
-
 /// The unified error payload every SDK throws or returns.
 ///
 /// `code` is always non-zero: an SDKError implies failure, and success is
 /// signalled by its absence. `message` is non-localized; localization is a
-/// consumer concern.
+/// consumer concern. Stack traces are deliberately absent: they are
+/// platform-shaped and belong in platform-local logging.
 class SDKError extends $pb.GeneratedMessage {
   factory SDKError({
     ErrorCode? code,
     ErrorCategory? category,
     $core.String? message,
-    ErrorContext? context,
     $core.int? cAbiCode,
     $core.String? nestedMessage,
     $fixnum.Int64? timestampMs,
     ErrorSeverity? severity,
     $core.String? component,
     $core.bool? retryable,
-    $core.String? remediationHint,
-    $core.String? correlationId,
+    $core.String? requestId,
+    $core.String? param,
   }) {
     final result = create();
     if (code != null) result.code = code;
     if (category != null) result.category = category;
     if (message != null) result.message = message;
-    if (context != null) result.context = context;
     if (cAbiCode != null) result.cAbiCode = cAbiCode;
     if (nestedMessage != null) result.nestedMessage = nestedMessage;
     if (timestampMs != null) result.timestampMs = timestampMs;
     if (severity != null) result.severity = severity;
     if (component != null) result.component = component;
     if (retryable != null) result.retryable = retryable;
-    if (remediationHint != null) result.remediationHint = remediationHint;
-    if (correlationId != null) result.correlationId = correlationId;
+    if (requestId != null) result.requestId = requestId;
+    if (param != null) result.param = param;
     return result;
   }
 
@@ -182,17 +74,15 @@ class SDKError extends $pb.GeneratedMessage {
     ..aE<ErrorCategory>(2, _omitFieldNames ? '' : 'category',
         enumValues: ErrorCategory.values)
     ..aOS(3, _omitFieldNames ? '' : 'message')
-    ..aOM<ErrorContext>(4, _omitFieldNames ? '' : 'context',
-        subBuilder: ErrorContext.create)
-    ..aI(5, _omitFieldNames ? '' : 'cAbiCode')
-    ..aOS(6, _omitFieldNames ? '' : 'nestedMessage')
-    ..aInt64(7, _omitFieldNames ? '' : 'timestampMs')
-    ..aE<ErrorSeverity>(8, _omitFieldNames ? '' : 'severity',
+    ..aI(4, _omitFieldNames ? '' : 'cAbiCode')
+    ..aOS(5, _omitFieldNames ? '' : 'nestedMessage')
+    ..aInt64(6, _omitFieldNames ? '' : 'timestampMs')
+    ..aE<ErrorSeverity>(7, _omitFieldNames ? '' : 'severity',
         enumValues: ErrorSeverity.values)
-    ..aOS(9, _omitFieldNames ? '' : 'component')
-    ..aOB(10, _omitFieldNames ? '' : 'retryable')
-    ..aOS(11, _omitFieldNames ? '' : 'remediationHint')
-    ..aOS(12, _omitFieldNames ? '' : 'correlationId')
+    ..aOS(8, _omitFieldNames ? '' : 'component')
+    ..aOB(9, _omitFieldNames ? '' : 'retryable')
+    ..aOS(10, _omitFieldNames ? '' : 'requestId')
+    ..aOS(11, _omitFieldNames ? '' : 'param')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -240,94 +130,89 @@ class SDKError extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearMessage() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  ErrorContext get context => $_getN(3);
-  @$pb.TagNumber(4)
-  set context(ErrorContext value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasContext() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearContext() => $_clearField(4);
-  @$pb.TagNumber(4)
-  ErrorContext ensureContext() => $_ensure(3);
-
   /// Signed rac_result_t. Equals -code for codes <= 899. Unset for the
   /// Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
   /// failures originating outside the C ABI.
-  @$pb.TagNumber(5)
-  $core.int get cAbiCode => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set cAbiCode($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasCAbiCode() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearCAbiCode() => $_clearField(5);
+  @$pb.TagNumber(4)
+  $core.int get cAbiCode => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set cAbiCode($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCAbiCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCAbiCode() => $_clearField(4);
 
   /// The "caused by" chain.
-  @$pb.TagNumber(6)
-  $core.String get nestedMessage => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set nestedMessage($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasNestedMessage() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearNestedMessage() => $_clearField(6);
+  @$pb.TagNumber(5)
+  $core.String get nestedMessage => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set nestedMessage($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasNestedMessage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearNestedMessage() => $_clearField(5);
 
-  /// `component` is a stable lowercase key ("llm", "stt", "rag", "download").
-  /// SDKEvent carries the enum-typed component instead.
-  @$pb.TagNumber(7)
-  $fixnum.Int64 get timestampMs => $_getI64(6);
-  @$pb.TagNumber(7)
-  set timestampMs($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasTimestampMs() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearTimestampMs() => $_clearField(7);
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get timestampMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set timestampMs($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTimestampMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTimestampMs() => $_clearField(6);
 
+  @$pb.TagNumber(7)
+  ErrorSeverity get severity => $_getN(6);
+  @$pb.TagNumber(7)
+  set severity(ErrorSeverity value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasSeverity() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSeverity() => $_clearField(7);
+
+  /// Which subsystem raised the error, written as SDKComponent's
+  /// rac_wire_string ("llm", "stt", "rag", "rerank"). Producers MUST write
+  /// the wire string, never the proto constant name. Errors raised outside
+  /// any SDKComponent may carry their own lowercase key.
   @$pb.TagNumber(8)
-  ErrorSeverity get severity => $_getN(7);
+  $core.String get component => $_getSZ(7);
   @$pb.TagNumber(8)
-  set severity(ErrorSeverity value) => $_setField(8, value);
+  set component($core.String value) => $_setString(7, value);
   @$pb.TagNumber(8)
-  $core.bool hasSeverity() => $_has(7);
+  $core.bool hasComponent() => $_has(7);
   @$pb.TagNumber(8)
-  void clearSeverity() => $_clearField(8);
+  void clearComponent() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.String get component => $_getSZ(8);
+  $core.bool get retryable => $_getBF(8);
   @$pb.TagNumber(9)
-  set component($core.String value) => $_setString(8, value);
+  set retryable($core.bool value) => $_setBool(8, value);
   @$pb.TagNumber(9)
-  $core.bool hasComponent() => $_has(8);
+  $core.bool hasRetryable() => $_has(8);
   @$pb.TagNumber(9)
-  void clearComponent() => $_clearField(9);
+  void clearRetryable() => $_clearField(9);
 
+  /// Ties this failure to the operation that produced it. Named for
+  /// Anthropic's body-level `request_id`. Producers MUST set it.
   @$pb.TagNumber(10)
-  $core.bool get retryable => $_getBF(9);
+  $core.String get requestId => $_getSZ(9);
   @$pb.TagNumber(10)
-  set retryable($core.bool value) => $_setBool(9, value);
+  set requestId($core.String value) => $_setString(9, value);
   @$pb.TagNumber(10)
-  $core.bool hasRetryable() => $_has(9);
+  $core.bool hasRequestId() => $_has(9);
   @$pb.TagNumber(10)
-  void clearRetryable() => $_clearField(10);
+  void clearRequestId() => $_clearField(10);
 
+  /// "<Message>.<field>" for validation errors, e.g. "STTOptions.sampleRate".
+  /// OpenAI's `param`. The generated validate() emits this.
   @$pb.TagNumber(11)
-  $core.String get remediationHint => $_getSZ(10);
+  $core.String get param => $_getSZ(10);
   @$pb.TagNumber(11)
-  set remediationHint($core.String value) => $_setString(10, value);
+  set param($core.String value) => $_setString(10, value);
   @$pb.TagNumber(11)
-  $core.bool hasRemediationHint() => $_has(10);
+  $core.bool hasParam() => $_has(10);
   @$pb.TagNumber(11)
-  void clearRemediationHint() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.String get correlationId => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set correlationId($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasCorrelationId() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearCorrelationId() => $_clearField(12);
+  void clearParam() => $_clearField(11);
 }
 
 const $core.bool _omitFieldNames =

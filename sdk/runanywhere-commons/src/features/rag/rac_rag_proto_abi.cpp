@@ -307,8 +307,8 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
         bc.embedding_dimension = static_cast<size_t>(proto.embedding_dimension());
     if (proto.has_top_k())
         bc.top_k = static_cast<size_t>(proto.top_k());
-    if (proto.has_similarity_threshold())
-        bc.similarity_threshold = proto.similarity_threshold();
+    if (proto.has_score_threshold())
+        bc.similarity_threshold = proto.score_threshold();
     if (proto.has_max_context_tokens())
         bc.max_context_tokens = static_cast<size_t>(proto.max_context_tokens());
     if (proto.has_chunk_size())
@@ -340,13 +340,13 @@ bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
         return false;
     }
 
-    const float similarity_threshold = proto.has_similarity_threshold()
-                                           ? proto.similarity_threshold()
+    const float similarity_threshold = proto.has_score_threshold()
+                                           ? proto.score_threshold()
                                            : defaults.similarity_threshold;
     if (!std::isfinite(similarity_threshold) || similarity_threshold < 0.0f ||
         similarity_threshold > 1.0f) {
         if (out_message)
-            *out_message = "RAGConfiguration.similarity_threshold must be in 0.0...1.0";
+            *out_message = "RAGConfiguration.score_threshold must be in 0.0...1.0";
         return false;
     }
 
@@ -409,7 +409,13 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
                                const runanywhere::v1::RAGQueryOptions& query_proto,
                                std::function<bool(const std::string&)> on_token,
                                runanywhere::v1::RAGResult* out_proto, std::string* out_error) {
-    const std::string question = query_proto.question();
+    // RAGQueryOptions was collapsed onto the shared RAGRetrievalOptions
+    // message: query=1, retrieval=2 (RAGRetrievalOptions), generation=3
+    // (LLMGenerationOptions). `question` is now `query`; the old flat
+    // retrieval_top_k/similarity_threshold/enable_multi_query/
+    // multi_query_count/scope_prefix fields live on `retrieval`.
+    const std::string question = query_proto.query();
+    const auto& retrieval = query_proto.retrieval();
     const auto& gen = query_proto.generation();
     const std::string system_prompt = gen.has_system_prompt() ? gen.system_prompt() : std::string();
 
@@ -428,19 +434,19 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     RAGBackend::QueryOverrides overrides;
-    overrides.retrieval_top_k = query_proto.retrieval_top_k();
-    overrides.has_similarity_threshold = query_proto.has_similarity_threshold();
-    overrides.similarity_threshold = query_proto.similarity_threshold();
-    overrides.enable_multi_query = query_proto.enable_multi_query();
+    overrides.retrieval_top_k = retrieval.has_top_k() ? retrieval.top_k() : 0;
+    overrides.has_similarity_threshold = retrieval.has_score_threshold();
+    overrides.similarity_threshold = retrieval.score_threshold();
+    overrides.enable_multi_query = retrieval.enable_multi_query();
     constexpr int32_t kMaxMultiQueryCount = 8;
-    if (query_proto.has_multi_query_count()) {
-        const int32_t n = query_proto.multi_query_count();
+    if (retrieval.has_multi_query_count()) {
+        const int32_t n = retrieval.multi_query_count();
         overrides.multi_query_count = n > kMaxMultiQueryCount ? kMaxMultiQueryCount : n;
     } else {
         overrides.multi_query_count = 0;
     }
-    if (query_proto.has_scope_prefix())
-        overrides.scope_prefix = query_proto.scope_prefix();
+    if (retrieval.has_scope_prefix())
+        overrides.scope_prefix = retrieval.scope_prefix();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.query", 0.0f, 1, 0, nullptr, 0.0,
@@ -509,7 +515,7 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
                 chunk->set_text(s_item["text"].get<std::string>());
             }
             if (s_item.contains("score") && s_item["score"].is_number()) {
-                chunk->set_similarity_score(s_item["score"].get<float>());
+                chunk->set_score(s_item["score"].get<float>());
             }
             if (s_item.contains("source_document") && s_item["source_document"].is_string()) {
                 chunk->set_source_document(s_item["source_document"].get<std::string>());
@@ -523,7 +529,23 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     const double retrieval_ms = std::max(0.0, total_ms - generation_ms);
     proto.set_retrieval_time_ms(static_cast<int64_t>(retrieval_ms));
     proto.set_generation_time_ms(static_cast<int64_t>(generation_ms));
-    proto.set_total_time_ms(static_cast<int64_t>(total_ms));
+    // total_time_ms was deleted from RAGResult (retrieval_time_ms +
+    // generation_time_ms already cover it). request_id and usage are new
+    // fields the proto comment marks MUST be set/copied by this ABI.
+    proto.set_request_id(event_id());
+    auto* usage = proto.mutable_usage();
+    usage->set_input_tokens(llm_result.prompt_tokens);
+    usage->set_output_tokens(llm_result.completion_tokens);
+    usage->set_total_tokens(llm_result.total_tokens);
+    if (llm_result.time_to_first_token_ms > 0) {
+        usage->set_ttft_ms(llm_result.time_to_first_token_ms);
+    }
+    if (llm_result.prompt_eval_time_ms > 0) {
+        usage->set_prefill_ms(llm_result.prompt_eval_time_ms);
+    }
+    if (llm_result.tokens_per_second > 0.0f) {
+        usage->set_decode_tokens_per_second(llm_result.tokens_per_second);
+    }
 
     // Emit the EFFECTIVE retrieval top_k (per-query override, else the session
     // config default) — not query_proto.top_k(), which is the LLM sampling top_k.
@@ -549,12 +571,13 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     return RAC_SUCCESS;
 }
 
-void fill_search_result_proto(const SearchResult& result, int32_t rank,
+// `rank` was deleted from RAGSearchResult: it always equalled this item's
+// array position, which the repeated field's order already carries.
+void fill_search_result_proto(const SearchResult& result,
                               runanywhere::v1::RAGSearchResult* chunk) {
     chunk->set_chunk_id(result.id);
     chunk->set_text(result.text);
-    chunk->set_similarity_score(result.score);
-    chunk->set_rank(rank);
+    chunk->set_score(result.score);
     const std::string source_document = [&]() -> std::string {
         for (const char* key : {"source_document", "source", "filename", "document_id"}) {
             auto it = result.metadata.find(key);
@@ -592,22 +615,24 @@ rac_result_t execute_rag_search(const std::shared_ptr<Session>& s,
                                 const runanywhere::v1::RAGSearchRequest& request_proto,
                                 runanywhere::v1::RAGSearchResponse* out_proto,
                                 std::string* out_error) {
-    const std::string question = request_proto.question();
+    // RAGSearchRequest is now {query=1, retrieval=2 (RAGRetrievalOptions)}.
+    const std::string question = request_proto.query();
+    const auto& retrieval = request_proto.retrieval();
 
     RAGBackend::QueryOverrides overrides;
-    overrides.retrieval_top_k = request_proto.retrieval_top_k();
-    overrides.has_similarity_threshold = request_proto.has_similarity_threshold();
-    overrides.similarity_threshold = request_proto.similarity_threshold();
-    overrides.enable_multi_query = request_proto.enable_multi_query();
+    overrides.retrieval_top_k = retrieval.has_top_k() ? retrieval.top_k() : 0;
+    overrides.has_similarity_threshold = retrieval.has_score_threshold();
+    overrides.similarity_threshold = retrieval.score_threshold();
+    overrides.enable_multi_query = retrieval.enable_multi_query();
     constexpr int32_t kMaxMultiQueryCount = 8;
-    if (request_proto.has_multi_query_count()) {
-        const int32_t n = request_proto.multi_query_count();
+    if (retrieval.has_multi_query_count()) {
+        const int32_t n = retrieval.multi_query_count();
         overrides.multi_query_count = n > kMaxMultiQueryCount ? kMaxMultiQueryCount : n;
     } else {
         overrides.multi_query_count = 0;
     }
-    if (request_proto.has_scope_prefix())
-        overrides.scope_prefix = request_proto.scope_prefix();
+    if (retrieval.has_scope_prefix())
+        overrides.scope_prefix = retrieval.scope_prefix();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.search", 0.0f, 1, 0, nullptr, 0.0, s->embedding_model_id.c_str());
@@ -635,9 +660,8 @@ rac_result_t execute_rag_search(const std::shared_ptr<Session>& s,
     runanywhere::v1::RAGSearchResponse& proto = *out_proto;
     proto.set_request_id(event_id());
     proto.set_retrieval_time_ms(static_cast<int64_t>(retrieval_ms));
-    int32_t rank = 1;
     for (const auto& source : sources) {
-        fill_search_result_proto(source, rank++, proto.add_chunks());
+        fill_search_result_proto(source, proto.add_chunks());
     }
 
     const int64_t effective_top_k =
@@ -710,21 +734,10 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // rerank_results enables LLM-pointwise reranking of fused candidates, run by
-    // rag_pipeline_graph using the session's LLM handle — that path is fully
-    // wired. A dedicated cross-encoder (reranker_model_id → RAC_PRIMITIVE_RERANK)
-    // is NOT yet invoked at query time: RAGBackend/rag_pipeline_graph does not
-    // score fused candidates through the rerank primitive. Accepting the config
-    // and silently ignoring it would mislead callers into believing cross-encoder
-    // reranking is active, so reject it up front with an actionable error until
-    // the query-time wiring lands.
-    if (proto.has_reranker_model_id() && !proto.reranker_model_id().empty()) {
-        const char* msg =
-            "reranker_model_id (dedicated cross-encoder reranking) is not yet supported by the "
-            "RAG query path; use rerank_results for LLM-pointwise reranking with the session LLM";
-        publish_failure(RAC_ERROR_NOT_IMPLEMENTED, "rag.sessionCreate", msg);
-        return RAC_ERROR_NOT_IMPLEMENTED;
-    }
+    // reranker_model_id was deleted from RAGConfiguration outright (a
+    // dedicated cross-encoder reranker was never wired into the query path).
+    // rerank_results (LLM-pointwise reranking with the session LLM) remains
+    // the only reranking path and is fully wired via rag_pipeline_graph.
 
     std::string err_message;
     std::string embedding_path = resolve_rag_model_id_to_path(embedding_model_id, &err_message);
@@ -951,10 +964,9 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
                                           "failed to parse RAGQueryOptions");
     }
 
-    const std::string question = query_proto.question();
-    if (question.empty()) {
+    if (query_proto.query().empty()) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
-                                          "RAGQueryOptions.question is required");
+                                          "RAGQueryOptions.query is required");
     }
 
     runanywhere::v1::RAGResult proto;
@@ -994,9 +1006,9 @@ rac_result_t rac_rag_search_proto(rac_handle_t session, const uint8_t* request_p
         return rac_proto_buffer_set_error(out_response, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse RAGSearchRequest");
     }
-    if (request_proto.question().empty()) {
+    if (request_proto.query().empty()) {
         return rac_proto_buffer_set_error(out_response, RAC_ERROR_INVALID_ARGUMENT,
-                                          "RAGSearchRequest.question is required");
+                                          "RAGSearchRequest.query is required");
     }
 
     runanywhere::v1::RAGSearchResponse proto;
@@ -1034,7 +1046,7 @@ rac_result_t rac_rag_query_stream_proto(rac_handle_t session, const uint8_t* que
     if (!query_proto.ParseFromArray(parse_data(query_proto_bytes, query_proto_size),
                                     static_cast<int>(query_proto_size)))
         return RAC_ERROR_DECODING_ERROR;
-    if (query_proto.question().empty())
+    if (query_proto.query().empty())
         return RAC_ERROR_INVALID_ARGUMENT;
 
     // Serializes one RAGStreamEvent and hands it to the SDK callback. Runs on the

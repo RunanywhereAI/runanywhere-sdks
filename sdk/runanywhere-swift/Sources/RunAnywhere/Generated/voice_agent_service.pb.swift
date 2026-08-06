@@ -30,148 +30,171 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// Subscription parameters for the agent's event stream.
-public nonisolated struct RAVoiceAgentRequest: Sendable {
+public nonisolated struct RAVoiceAgentResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var eventFilter: String = String()
-
-  public var sessionID: String = String()
-
-  public var categories: [RAEventCategory] = []
-
-  public var minSeverity: RAErrorSeverity = .unspecified
-
-  public var replayFromSeq: UInt64 = 0
-
-  public var includeAudio: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var speechDetected: Bool {
-    get {_storage._speechDetected}
-    set {_uniqueStorage()._speechDetected = newValue}
-  }
+  public var speechDetected: Bool = false
 
   public var transcription: String {
-    get {_storage._transcription ?? String()}
-    set {_uniqueStorage()._transcription = newValue}
+    get {_transcription ?? String()}
+    set {_transcription = newValue}
   }
   /// Returns true if `transcription` has been explicitly set.
-  public var hasTranscription: Bool {_storage._transcription != nil}
+  public var hasTranscription: Bool {self._transcription != nil}
   /// Clears the value of `transcription`. Subsequent reads from it will return its default value.
-  public mutating func clearTranscription() {_uniqueStorage()._transcription = nil}
+  public mutating func clearTranscription() {self._transcription = nil}
 
   public var assistantResponse: String {
-    get {_storage._assistantResponse ?? String()}
-    set {_uniqueStorage()._assistantResponse = newValue}
+    get {_assistantResponse ?? String()}
+    set {_assistantResponse = newValue}
   }
   /// Returns true if `assistantResponse` has been explicitly set.
-  public var hasAssistantResponse: Bool {_storage._assistantResponse != nil}
+  public var hasAssistantResponse: Bool {self._assistantResponse != nil}
   /// Clears the value of `assistantResponse`. Subsequent reads from it will return its default value.
-  public mutating func clearAssistantResponse() {_uniqueStorage()._assistantResponse = nil}
+  public mutating func clearAssistantResponse() {self._assistantResponse = nil}
 
   public var thinkingContent: String {
-    get {_storage._thinkingContent ?? String()}
-    set {_uniqueStorage()._thinkingContent = newValue}
+    get {_thinkingContent ?? String()}
+    set {_thinkingContent = newValue}
   }
   /// Returns true if `thinkingContent` has been explicitly set.
-  public var hasThinkingContent: Bool {_storage._thinkingContent != nil}
+  public var hasThinkingContent: Bool {self._thinkingContent != nil}
   /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
-  public mutating func clearThinkingContent() {_uniqueStorage()._thinkingContent = nil}
+  public mutating func clearThinkingContent() {self._thinkingContent = nil}
 
   public var synthesizedAudio: Data {
-    get {_storage._synthesizedAudio ?? Data()}
-    set {_uniqueStorage()._synthesizedAudio = newValue}
+    get {_synthesizedAudio ?? Data()}
+    set {_synthesizedAudio = newValue}
   }
   /// Returns true if `synthesizedAudio` has been explicitly set.
-  public var hasSynthesizedAudio: Bool {_storage._synthesizedAudio != nil}
+  public var hasSynthesizedAudio: Bool {self._synthesizedAudio != nil}
   /// Clears the value of `synthesizedAudio`. Subsequent reads from it will return its default value.
-  public mutating func clearSynthesizedAudio() {_uniqueStorage()._synthesizedAudio = nil}
+  public mutating func clearSynthesizedAudio() {self._synthesizedAudio = nil}
 
   public var finalState: RAVoiceAgentComponentStates {
-    get {_storage._finalState ?? RAVoiceAgentComponentStates()}
-    set {_uniqueStorage()._finalState = newValue}
+    get {_finalState ?? RAVoiceAgentComponentStates()}
+    set {_finalState = newValue}
   }
   /// Returns true if `finalState` has been explicitly set.
-  public var hasFinalState: Bool {_storage._finalState != nil}
+  public var hasFinalState: Bool {self._finalState != nil}
   /// Clears the value of `finalState`. Subsequent reads from it will return its default value.
-  public mutating func clearFinalState() {_uniqueStorage()._finalState = nil}
-
-  /// Required to interpret synthesized_audio.
-  public var synthesizedAudioSampleRateHz: Int32 {
-    get {_storage._synthesizedAudioSampleRateHz}
-    set {_uniqueStorage()._synthesizedAudioSampleRateHz = newValue}
-  }
-
-  public var synthesizedAudioChannels: Int32 {
-    get {_storage._synthesizedAudioChannels}
-    set {_uniqueStorage()._synthesizedAudioChannels = newValue}
-  }
-
-  public var synthesizedAudioEncoding: RAAudioEncoding {
-    get {_storage._synthesizedAudioEncoding}
-    set {_uniqueStorage()._synthesizedAudioEncoding = newValue}
-  }
-
-  public var sessionID: String {
-    get {_storage._sessionID}
-    set {_uniqueStorage()._sessionID = newValue}
-  }
-
-  public var turnID: String {
-    get {_storage._turnID}
-    set {_uniqueStorage()._turnID = newValue}
-  }
-
-  /// Per-stage timings, then the wall-clock total.
-  public var sttTimeMs: Int64 {
-    get {_storage._sttTimeMs}
-    set {_uniqueStorage()._sttTimeMs = newValue}
-  }
-
-  public var llmTimeMs: Int64 {
-    get {_storage._llmTimeMs}
-    set {_uniqueStorage()._llmTimeMs = newValue}
-  }
-
-  public var ttsTimeMs: Int64 {
-    get {_storage._ttsTimeMs}
-    set {_uniqueStorage()._ttsTimeMs = newValue}
-  }
-
-  public var totalTimeMs: Int64 {
-    get {_storage._totalTimeMs}
-    set {_uniqueStorage()._totalTimeMs = newValue}
-  }
-
-  public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearFinalState() {self._finalState = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _transcription: String? = nil
+  fileprivate var _assistantResponse: String? = nil
+  fileprivate var _thinkingContent: String? = nil
+  fileprivate var _synthesizedAudio: Data? = nil
+  fileprivate var _finalState: RAVoiceAgentComponentStates? = nil
+}
+
+/// Turn detection. Field names, units and semantics follow OpenAI Realtime
+/// `session.audio.input.turn_detection`.
+public nonisolated struct RATurnDetection: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var type: RATurnDetection.TypeEnum = .turnDetectionTypeUnspecified
+
+  /// Activation threshold, 0..1 — the same normalized scale as
+  /// VADConfiguration.activation_threshold, and the value that wins on the
+  /// voice-agent path when both are set. Raise it for noisy rooms.
+  /// 0 means unset; commons applies 0.5.
+  public var threshold: Float = 0
+
+  /// Silence after speech before the turn is closed.
+  /// 0 means unset; commons applies 500.
+  public var silenceDurationMs: Int32 = 0
+
+  /// Audio retained before speech onset so the first word is not clipped.
+  /// 0 means unset; commons applies 300.
+  public var prefixPaddingMs: Int32 = 0
+
+  /// Unset means true. False makes the agent finish its sentence
+  /// (kiosk, scripted disclosure).
+  public var interruptResponse: Bool {
+    get {_interruptResponse ?? false}
+    set {_interruptResponse = newValue}
+  }
+  /// Returns true if `interruptResponse` has been explicitly set.
+  public var hasInterruptResponse: Bool {self._interruptResponse != nil}
+  /// Clears the value of `interruptResponse`. Subsequent reads from it will return its default value.
+  public mutating func clearInterruptResponse() {self._interruptResponse = nil}
+
+  /// Unset means true. False means the app drives replies itself via say().
+  public var createResponse: Bool {
+    get {_createResponse ?? false}
+    set {_createResponse = newValue}
+  }
+  /// Returns true if `createResponse` has been explicitly set.
+  public var hasCreateResponse: Bool {self._createResponse != nil}
+  /// Clears the value of `createResponse`. Subsequent reads from it will return its default value.
+  public mutating func clearCreateResponse() {self._createResponse = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum TypeEnum: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+
+    /// treated as VAD
+    case turnDetectionTypeUnspecified // = 0
+
+    /// the VAD decides end-of-turn
+    case turnDetectionTypeVad // = 1
+
+    /// push-to-talk: app closes the turn
+    case turnDetectionTypeManual // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .turnDetectionTypeUnspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .turnDetectionTypeUnspecified
+      case 1: self = .turnDetectionTypeVad
+      case 2: self = .turnDetectionTypeManual
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .turnDetectionTypeUnspecified: return 0
+      case .turnDetectionTypeVad: return 1
+      case .turnDetectionTypeManual: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [RATurnDetection.TypeEnum] = [
+      .turnDetectionTypeUnspecified,
+      .turnDetectionTypeVad,
+      .turnDetectionTypeManual,
+    ]
+
+  }
+
+  public init() {}
+
+  fileprivate var _interruptResponse: Bool? = nil
+  fileprivate var _createResponse: Bool? = nil
 }
 
 /// One-shot turn: audio in, transcription plus response plus audio out.
+///
+/// audio_data must be PCM signed 16-bit little-endian, mono, 16 kHz. Commons
+/// rejects any other encoding, but it does NOT check or resample the sample
+/// rate or the channel count — feeding anything else yields a wrong transcript
+/// rather than an error.
 public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -183,20 +206,17 @@ public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
 
   public var audioData: Data = Data()
 
-  public var sampleRateHz: Int32 = 0
-
-  public var channels: Int32 = 0
-
-  public var encoding: RAAudioEncoding = .unspecified
-
-  public var sessionConfig: RAVoiceSessionConfig {
-    get {_sessionConfig ?? RAVoiceSessionConfig()}
-    set {_sessionConfig = newValue}
+  /// BCP-47 STT language for this turn only. Overrides
+  /// VoiceAgentComposeConfig.language. Unset means the session language, or
+  /// model auto-detection when that is unset too.
+  public var language: String {
+    get {_language ?? String()}
+    set {_language = newValue}
   }
-  /// Returns true if `sessionConfig` has been explicitly set.
-  public var hasSessionConfig: Bool {self._sessionConfig != nil}
-  /// Clears the value of `sessionConfig`. Subsequent reads from it will return its default value.
-  public mutating func clearSessionConfig() {self._sessionConfig = nil}
+  /// Returns true if `language` has been explicitly set.
+  public var hasLanguage: Bool {self._language != nil}
+  /// Clears the value of `language`. Subsequent reads from it will return its default value.
+  public mutating func clearLanguage() {self._language = nil}
 
   public var metadata: Dictionary<String,String> = [:]
 
@@ -204,9 +224,10 @@ public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
 
   public init() {}
 
-  fileprivate var _sessionConfig: RAVoiceSessionConfig? = nil
+  fileprivate var _language: String? = nil
 }
 
+/// Streamed capture frame. Same fixed input contract as VoiceAgentTurnRequest.
 public nonisolated struct RAVoiceAgentAudioFrame: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -214,10 +235,12 @@ public nonisolated struct RAVoiceAgentAudioFrame: Sendable {
 
   public var audioData: Data = Data()
 
-  public var sampleRate: Int32 = 0
+  public var sampleRateHz: Int32 = 0
 
   public var channels: Int32 = 0
 
+  /// Commons accepts AUDIO_ENCODING_UNSPECIFIED and AUDIO_ENCODING_PCM_S16_LE
+  /// and rejects every other value.
   public var encoding: RAAudioEncoding = .unspecified
 
   public var isFinal: Bool = false
@@ -227,76 +250,15 @@ public nonisolated struct RAVoiceAgentAudioFrame: Sendable {
   public init() {}
 }
 
-/// Commons reads silence_duration_ms and max_tokens. The remaining fields are
-/// declared but not consumed by the C++ voice agent.
-public nonisolated struct RAVoiceSessionConfig: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var silenceDurationMs: Int32 = 0
-
-  public var speechThreshold: Float = 0
-
-  public var autoPlayTts: Bool = false
-
-  public var continuousMode: Bool = false
-
-  public var thinkingModeEnabled: Bool = false
-
-  public var maxTokens: Int32 = 0
-
-  public var maxRecordingDurationMs: Int32 = 0
-
-  public var languageCode: String {
-    get {_languageCode ?? String()}
-    set {_languageCode = newValue}
-  }
-  /// Returns true if `languageCode` has been explicitly set.
-  public var hasLanguageCode: Bool {self._languageCode != nil}
-  /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
-  public mutating func clearLanguageCode() {self._languageCode = nil}
-
-  public var voiceID: String {
-    get {_voiceID ?? String()}
-    set {_voiceID = newValue}
-  }
-  /// Returns true if `voiceID` has been explicitly set.
-  public var hasVoiceID: Bool {self._voiceID != nil}
-  /// Clears the value of `voiceID`. Subsequent reads from it will return its default value.
-  public mutating func clearVoiceID() {self._voiceID = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _languageCode: String? = nil
-  fileprivate var _voiceID: String? = nil
-}
-
-public nonisolated struct RAAudioPipelineConfig: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var cooldownDurationMs: Int32 = 0
-
-  public var strictTransitions: Bool = false
-
-  public var maxTtsDurationMs: Int32 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// Each component takes a path, an id, or a name; commons resolves whichever is
-/// present through the model registry.
+/// Each component takes a path or an id; commons resolves the id through the
+/// model registry.
 public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  /// Normal choice is the id (resolved via the model registry); path is the
+  /// escape hatch for an artifact you staged yourself.
   public var sttModelPath: String {
     get {_storage._sttModelPath ?? String()}
     set {_uniqueStorage()._sttModelPath = newValue}
@@ -314,15 +276,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   public var hasSttModelID: Bool {_storage._sttModelID != nil}
   /// Clears the value of `sttModelID`. Subsequent reads from it will return its default value.
   public mutating func clearSttModelID() {_uniqueStorage()._sttModelID = nil}
-
-  public var sttModelName: String {
-    get {_storage._sttModelName ?? String()}
-    set {_uniqueStorage()._sttModelName = newValue}
-  }
-  /// Returns true if `sttModelName` has been explicitly set.
-  public var hasSttModelName: Bool {_storage._sttModelName != nil}
-  /// Clears the value of `sttModelName`. Subsequent reads from it will return its default value.
-  public mutating func clearSttModelName() {_uniqueStorage()._sttModelName = nil}
 
   public var llmModelPath: String {
     get {_storage._llmModelPath ?? String()}
@@ -342,15 +295,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `llmModelID`. Subsequent reads from it will return its default value.
   public mutating func clearLlmModelID() {_uniqueStorage()._llmModelID = nil}
 
-  public var llmModelName: String {
-    get {_storage._llmModelName ?? String()}
-    set {_uniqueStorage()._llmModelName = newValue}
-  }
-  /// Returns true if `llmModelName` has been explicitly set.
-  public var hasLlmModelName: Bool {_storage._llmModelName != nil}
-  /// Clears the value of `llmModelName`. Subsequent reads from it will return its default value.
-  public mutating func clearLlmModelName() {_uniqueStorage()._llmModelName = nil}
-
   public var ttsVoicePath: String {
     get {_storage._ttsVoicePath ?? String()}
     set {_uniqueStorage()._ttsVoicePath = newValue}
@@ -368,15 +312,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   public var hasTtsVoiceID: Bool {_storage._ttsVoiceID != nil}
   /// Clears the value of `ttsVoiceID`. Subsequent reads from it will return its default value.
   public mutating func clearTtsVoiceID() {_uniqueStorage()._ttsVoiceID = nil}
-
-  public var ttsVoiceName: String {
-    get {_storage._ttsVoiceName ?? String()}
-    set {_uniqueStorage()._ttsVoiceName = newValue}
-  }
-  /// Returns true if `ttsVoiceName` has been explicitly set.
-  public var hasTtsVoiceName: Bool {_storage._ttsVoiceName != nil}
-  /// Clears the value of `ttsVoiceName`. Subsequent reads from it will return its default value.
-  public mutating func clearTtsVoiceName() {_uniqueStorage()._ttsVoiceName = nil}
 
   public var vadConfig: RAVADConfiguration {
     get {_storage._vadConfig ?? RAVADConfiguration()}
@@ -396,41 +331,42 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `llmGeneration`. Subsequent reads from it will return its default value.
   public mutating func clearLlmGeneration() {_uniqueStorage()._llmGeneration = nil}
 
-  public var sessionConfig: RAVoiceSessionConfig {
-    get {_storage._sessionConfig ?? RAVoiceSessionConfig()}
-    set {_uniqueStorage()._sessionConfig = newValue}
+  /// System prompt for the agent. Governs persona AND spoken delivery
+  /// ("talk quickly", "sound warm"), not just content. Same name and role as
+  /// OpenAI Realtime `session.instructions`. Unset uses the commons voice
+  /// default (short, spoken, no markdown).
+  ///
+  /// This is the only system prompt the voice path reads:
+  /// llm_generation.system_prompt is IGNORED here.
+  public var instructions: String {
+    get {_storage._instructions ?? String()}
+    set {_uniqueStorage()._instructions = newValue}
   }
-  /// Returns true if `sessionConfig` has been explicitly set.
-  public var hasSessionConfig: Bool {_storage._sessionConfig != nil}
-  /// Clears the value of `sessionConfig`. Subsequent reads from it will return its default value.
-  public mutating func clearSessionConfig() {_uniqueStorage()._sessionConfig = nil}
+  /// Returns true if `instructions` has been explicitly set.
+  public var hasInstructions: Bool {_storage._instructions != nil}
+  /// Clears the value of `instructions`. Subsequent reads from it will return its default value.
+  public mutating func clearInstructions() {_uniqueStorage()._instructions = nil}
 
-  public var audioPipelineConfig: RAAudioPipelineConfig {
-    get {_storage._audioPipelineConfig ?? RAAudioPipelineConfig()}
-    set {_uniqueStorage()._audioPipelineConfig = newValue}
+  public var turnDetection: RATurnDetection {
+    get {_storage._turnDetection ?? RATurnDetection()}
+    set {_uniqueStorage()._turnDetection = newValue}
   }
-  /// Returns true if `audioPipelineConfig` has been explicitly set.
-  public var hasAudioPipelineConfig: Bool {_storage._audioPipelineConfig != nil}
-  /// Clears the value of `audioPipelineConfig`. Subsequent reads from it will return its default value.
-  public mutating func clearAudioPipelineConfig() {_uniqueStorage()._audioPipelineConfig = nil}
+  /// Returns true if `turnDetection` has been explicitly set.
+  public var hasTurnDetection: Bool {_storage._turnDetection != nil}
+  /// Clears the value of `turnDetection`. Subsequent reads from it will return its default value.
+  public mutating func clearTurnDetection() {_uniqueStorage()._turnDetection = nil}
 
-  public var sessionID: String {
-    get {_storage._sessionID ?? String()}
-    set {_uniqueStorage()._sessionID = newValue}
+  /// BCP-47 STT language for the whole session. One spelling across this
+  /// domain and stt_options.proto. Unset means the model auto-detects.
+  /// Per-turn override: VoiceAgentTurnRequest.language.
+  public var language: String {
+    get {_storage._language ?? String()}
+    set {_uniqueStorage()._language = newValue}
   }
-  /// Returns true if `sessionID` has been explicitly set.
-  public var hasSessionID: Bool {_storage._sessionID != nil}
-  /// Clears the value of `sessionID`. Subsequent reads from it will return its default value.
-  public mutating func clearSessionID() {_uniqueStorage()._sessionID = nil}
-
-  public var defaultLanguageCode: String {
-    get {_storage._defaultLanguageCode ?? String()}
-    set {_uniqueStorage()._defaultLanguageCode = newValue}
-  }
-  /// Returns true if `defaultLanguageCode` has been explicitly set.
-  public var hasDefaultLanguageCode: Bool {_storage._defaultLanguageCode != nil}
-  /// Clears the value of `defaultLanguageCode`. Subsequent reads from it will return its default value.
-  public mutating func clearDefaultLanguageCode() {_uniqueStorage()._defaultLanguageCode = nil}
+  /// Returns true if `language` has been explicitly set.
+  public var hasLanguage: Bool {_storage._language != nil}
+  /// Clears the value of `language`. Subsequent reads from it will return its default value.
+  public mutating func clearLanguage() {_uniqueStorage()._language = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -448,13 +384,8 @@ public nonisolated struct RAVoiceAgentTranscribeProtoRequest: Sendable {
 
   public var sessionID: String = String()
 
-  public var sampleRate: Int32 = 0
-
-  public var languageHint: String = String()
-
-  public var channels: Int32 = 0
-
-  public var encoding: RAAudioEncoding = .unspecified
+  /// BCP-47. Empty means auto-detect.
+  public var language: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -490,9 +421,9 @@ public nonisolated struct RAVoiceAgentSynthesizeSpeechProtoRequest: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_filter\0\u{3}session_id\0\u{1}categories\0\u{3}min_severity\0\u{3}replay_from_seq\0\u{3}include_audio\0")
+nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -500,229 +431,121 @@ nonisolated extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.eventFilter) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
-      case 3: try { try decoder.decodeRepeatedEnumField(value: &self.categories) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self.minSeverity) }()
-      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.replayFromSeq) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.includeAudio) }()
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.speechDetected) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._transcription) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._assistantResponse) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
+      case 5: try { try decoder.decodeSingularBytesField(value: &self._synthesizedAudio) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._finalState) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.eventFilter.isEmpty {
-      try visitor.visitSingularStringField(value: self.eventFilter, fieldNumber: 1)
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.speechDetected != false {
+      try visitor.visitSingularBoolField(value: self.speechDetected, fieldNumber: 1)
     }
-    if !self.sessionID.isEmpty {
-      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 2)
-    }
-    if !self.categories.isEmpty {
-      try visitor.visitPackedEnumField(value: self.categories, fieldNumber: 3)
-    }
-    if self.minSeverity != .unspecified {
-      try visitor.visitSingularEnumField(value: self.minSeverity, fieldNumber: 4)
-    }
-    if self.replayFromSeq != 0 {
-      try visitor.visitSingularUInt64Field(value: self.replayFromSeq, fieldNumber: 5)
-    }
-    if self.includeAudio != false {
-      try visitor.visitSingularBoolField(value: self.includeAudio, fieldNumber: 6)
-    }
+    try { if let v = self._transcription {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._assistantResponse {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._thinkingContent {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._synthesizedAudio {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._finalState {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RAVoiceAgentRequest, rhs: RAVoiceAgentRequest) -> Bool {
-    if lhs.eventFilter != rhs.eventFilter {return false}
-    if lhs.sessionID != rhs.sessionID {return false}
-    if lhs.categories != rhs.categories {return false}
-    if lhs.minSeverity != rhs.minSeverity {return false}
-    if lhs.replayFromSeq != rhs.replayFromSeq {return false}
-    if lhs.includeAudio != rhs.includeAudio {return false}
+  public static func ==(lhs: RAVoiceAgentResult, rhs: RAVoiceAgentResult) -> Bool {
+    if lhs.speechDetected != rhs.speechDetected {return false}
+    if lhs._transcription != rhs._transcription {return false}
+    if lhs._assistantResponse != rhs._assistantResponse {return false}
+    if lhs._thinkingContent != rhs._thinkingContent {return false}
+    if lhs._synthesizedAudio != rhs._synthesizedAudio {return false}
+    if lhs._finalState != rhs._finalState {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0\u{3}synthesized_audio_sample_rate_hz\0\u{3}synthesized_audio_channels\0\u{3}synthesized_audio_encoding\0\u{3}session_id\0\u{3}turn_id\0\u{3}stt_time_ms\0\u{3}llm_time_ms\0\u{3}tts_time_ms\0\u{3}total_time_ms\0\u{2}\u{3}error\0")
-
-  fileprivate class _StorageClass {
-    var _speechDetected: Bool = false
-    var _transcription: String? = nil
-    var _assistantResponse: String? = nil
-    var _thinkingContent: String? = nil
-    var _synthesizedAudio: Data? = nil
-    var _finalState: RAVoiceAgentComponentStates? = nil
-    var _synthesizedAudioSampleRateHz: Int32 = 0
-    var _synthesizedAudioChannels: Int32 = 0
-    var _synthesizedAudioEncoding: RAAudioEncoding = .unspecified
-    var _sessionID: String = String()
-    var _turnID: String = String()
-    var _sttTimeMs: Int64 = 0
-    var _llmTimeMs: Int64 = 0
-    var _ttsTimeMs: Int64 = 0
-    var _totalTimeMs: Int64 = 0
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _speechDetected = source._speechDetected
-      _transcription = source._transcription
-      _assistantResponse = source._assistantResponse
-      _thinkingContent = source._thinkingContent
-      _synthesizedAudio = source._synthesizedAudio
-      _finalState = source._finalState
-      _synthesizedAudioSampleRateHz = source._synthesizedAudioSampleRateHz
-      _synthesizedAudioChannels = source._synthesizedAudioChannels
-      _synthesizedAudioEncoding = source._synthesizedAudioEncoding
-      _sessionID = source._sessionID
-      _turnID = source._turnID
-      _sttTimeMs = source._sttTimeMs
-      _llmTimeMs = source._llmTimeMs
-      _ttsTimeMs = source._ttsTimeMs
-      _totalTimeMs = source._totalTimeMs
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+nonisolated extension RATurnDetection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TurnDetection"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}threshold\0\u{3}silence_duration_ms\0\u{3}prefix_padding_ms\0\u{3}interrupt_response\0\u{3}create_response\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._speechDetected) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._transcription) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._assistantResponse) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._thinkingContent) }()
-        case 5: try { try decoder.decodeSingularBytesField(value: &_storage._synthesizedAudio) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._finalState) }()
-        case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._synthesizedAudioSampleRateHz) }()
-        case 8: try { try decoder.decodeSingularInt32Field(value: &_storage._synthesizedAudioChannels) }()
-        case 9: try { try decoder.decodeSingularEnumField(value: &_storage._synthesizedAudioEncoding) }()
-        case 10: try { try decoder.decodeSingularStringField(value: &_storage._sessionID) }()
-        case 11: try { try decoder.decodeSingularStringField(value: &_storage._turnID) }()
-        case 12: try { try decoder.decodeSingularInt64Field(value: &_storage._sttTimeMs) }()
-        case 13: try { try decoder.decodeSingularInt64Field(value: &_storage._llmTimeMs) }()
-        case 14: try { try decoder.decodeSingularInt64Field(value: &_storage._ttsTimeMs) }()
-        case 15: try { try decoder.decodeSingularInt64Field(value: &_storage._totalTimeMs) }()
-        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.threshold) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.silenceDurationMs) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.prefixPaddingMs) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self._interruptResponse) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self._createResponse) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._speechDetected != false {
-        try visitor.visitSingularBoolField(value: _storage._speechDetected, fieldNumber: 1)
-      }
-      try { if let v = _storage._transcription {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._assistantResponse {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._thinkingContent {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._synthesizedAudio {
-        try visitor.visitSingularBytesField(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._finalState {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
-      if _storage._synthesizedAudioSampleRateHz != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._synthesizedAudioSampleRateHz, fieldNumber: 7)
-      }
-      if _storage._synthesizedAudioChannels != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._synthesizedAudioChannels, fieldNumber: 8)
-      }
-      if _storage._synthesizedAudioEncoding != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._synthesizedAudioEncoding, fieldNumber: 9)
-      }
-      if !_storage._sessionID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._sessionID, fieldNumber: 10)
-      }
-      if !_storage._turnID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._turnID, fieldNumber: 11)
-      }
-      if _storage._sttTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._sttTimeMs, fieldNumber: 12)
-      }
-      if _storage._llmTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._llmTimeMs, fieldNumber: 13)
-      }
-      if _storage._ttsTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._ttsTimeMs, fieldNumber: 14)
-      }
-      if _storage._totalTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._totalTimeMs, fieldNumber: 15)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.type != .turnDetectionTypeUnspecified {
+      try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
+    if self.threshold.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.threshold, fieldNumber: 2)
+    }
+    if self.silenceDurationMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.silenceDurationMs, fieldNumber: 3)
+    }
+    if self.prefixPaddingMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.prefixPaddingMs, fieldNumber: 4)
+    }
+    try { if let v = self._interruptResponse {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._createResponse {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RAVoiceAgentResult, rhs: RAVoiceAgentResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._speechDetected != rhs_storage._speechDetected {return false}
-        if _storage._transcription != rhs_storage._transcription {return false}
-        if _storage._assistantResponse != rhs_storage._assistantResponse {return false}
-        if _storage._thinkingContent != rhs_storage._thinkingContent {return false}
-        if _storage._synthesizedAudio != rhs_storage._synthesizedAudio {return false}
-        if _storage._finalState != rhs_storage._finalState {return false}
-        if _storage._synthesizedAudioSampleRateHz != rhs_storage._synthesizedAudioSampleRateHz {return false}
-        if _storage._synthesizedAudioChannels != rhs_storage._synthesizedAudioChannels {return false}
-        if _storage._synthesizedAudioEncoding != rhs_storage._synthesizedAudioEncoding {return false}
-        if _storage._sessionID != rhs_storage._sessionID {return false}
-        if _storage._turnID != rhs_storage._turnID {return false}
-        if _storage._sttTimeMs != rhs_storage._sttTimeMs {return false}
-        if _storage._llmTimeMs != rhs_storage._llmTimeMs {return false}
-        if _storage._ttsTimeMs != rhs_storage._ttsTimeMs {return false}
-        if _storage._totalTimeMs != rhs_storage._totalTimeMs {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+  public static func ==(lhs: RATurnDetection, rhs: RATurnDetection) -> Bool {
+    if lhs.type != rhs.type {return false}
+    if lhs.threshold != rhs.threshold {return false}
+    if lhs.silenceDurationMs != rhs.silenceDurationMs {return false}
+    if lhs.prefixPaddingMs != rhs.prefixPaddingMs {return false}
+    if lhs._interruptResponse != rhs._interruptResponse {return false}
+    if lhs._createResponse != rhs._createResponse {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
+nonisolated extension RATurnDetection.TypeEnum: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TURN_DETECTION_TYPE_UNSPECIFIED\0\u{1}TURN_DETECTION_TYPE_VAD\0\u{1}TURN_DETECTION_TYPE_MANUAL\0")
+}
+
 nonisolated extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentTurnRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}session_id\0\u{3}audio_data\0\u{3}sample_rate_hz\0\u{1}channels\0\u{1}encoding\0\u{3}session_config\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}session_id\0\u{3}audio_data\0\u{1}language\0\u{1}metadata\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -733,11 +556,8 @@ nonisolated extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProto
       case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
       case 3: try { try decoder.decodeSingularBytesField(value: &self.audioData) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.sampleRateHz) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
-      case 7: try { try decoder.decodeSingularMessageField(value: &self._sessionConfig) }()
-      case 8: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._language) }()
+      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       default: break
       }
     }
@@ -757,20 +577,11 @@ nonisolated extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProto
     if !self.audioData.isEmpty {
       try visitor.visitSingularBytesField(value: self.audioData, fieldNumber: 3)
     }
-    if self.sampleRateHz != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRateHz, fieldNumber: 4)
-    }
-    if self.channels != 0 {
-      try visitor.visitSingularInt32Field(value: self.channels, fieldNumber: 5)
-    }
-    if self.encoding != .unspecified {
-      try visitor.visitSingularEnumField(value: self.encoding, fieldNumber: 6)
-    }
-    try { if let v = self._sessionConfig {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    try { if let v = self._language {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
     if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 8)
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 5)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -779,10 +590,7 @@ nonisolated extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProto
     if lhs.requestID != rhs.requestID {return false}
     if lhs.sessionID != rhs.sessionID {return false}
     if lhs.audioData != rhs.audioData {return false}
-    if lhs.sampleRateHz != rhs.sampleRateHz {return false}
-    if lhs.channels != rhs.channels {return false}
-    if lhs.encoding != rhs.encoding {return false}
-    if lhs._sessionConfig != rhs._sessionConfig {return false}
+    if lhs._language != rhs._language {return false}
     if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -791,7 +599,7 @@ nonisolated extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProto
 
 nonisolated extension RAVoiceAgentAudioFrame: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentAudioFrame"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}sample_rate\0\u{1}channels\0\u{1}encoding\0\u{3}is_final\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}sample_rate_hz\0\u{1}channels\0\u{1}encoding\0\u{3}is_final\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -800,7 +608,7 @@ nonisolated extension RAVoiceAgentAudioFrame: SwiftProtobuf.Message, SwiftProtob
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBytesField(value: &self.audioData) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.sampleRateHz) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.isFinal) }()
@@ -813,8 +621,8 @@ nonisolated extension RAVoiceAgentAudioFrame: SwiftProtobuf.Message, SwiftProtob
     if !self.audioData.isEmpty {
       try visitor.visitSingularBytesField(value: self.audioData, fieldNumber: 1)
     }
-    if self.sampleRate != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 2)
+    if self.sampleRateHz != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRateHz, fieldNumber: 2)
     }
     if self.channels != 0 {
       try visitor.visitSingularInt32Field(value: self.channels, fieldNumber: 3)
@@ -830,7 +638,7 @@ nonisolated extension RAVoiceAgentAudioFrame: SwiftProtobuf.Message, SwiftProtob
 
   public static func ==(lhs: RAVoiceAgentAudioFrame, rhs: RAVoiceAgentAudioFrame) -> Bool {
     if lhs.audioData != rhs.audioData {return false}
-    if lhs.sampleRate != rhs.sampleRate {return false}
+    if lhs.sampleRateHz != rhs.sampleRateHz {return false}
     if lhs.channels != rhs.channels {return false}
     if lhs.encoding != rhs.encoding {return false}
     if lhs.isFinal != rhs.isFinal {return false}
@@ -839,140 +647,22 @@ nonisolated extension RAVoiceAgentAudioFrame: SwiftProtobuf.Message, SwiftProtob
   }
 }
 
-nonisolated extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VoiceSessionConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}silence_duration_ms\0\u{3}speech_threshold\0\u{3}auto_play_tts\0\u{3}continuous_mode\0\u{3}thinking_mode_enabled\0\u{3}max_tokens\0\u{3}max_recording_duration_ms\0\u{3}language_code\0\u{3}voice_id\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.silenceDurationMs) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self.speechThreshold) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.autoPlayTts) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.continuousMode) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.thinkingModeEnabled) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
-      case 7: try { try decoder.decodeSingularInt32Field(value: &self.maxRecordingDurationMs) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._voiceID) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.silenceDurationMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.silenceDurationMs, fieldNumber: 1)
-    }
-    if self.speechThreshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.speechThreshold, fieldNumber: 2)
-    }
-    if self.autoPlayTts != false {
-      try visitor.visitSingularBoolField(value: self.autoPlayTts, fieldNumber: 3)
-    }
-    if self.continuousMode != false {
-      try visitor.visitSingularBoolField(value: self.continuousMode, fieldNumber: 4)
-    }
-    if self.thinkingModeEnabled != false {
-      try visitor.visitSingularBoolField(value: self.thinkingModeEnabled, fieldNumber: 5)
-    }
-    if self.maxTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 6)
-    }
-    if self.maxRecordingDurationMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxRecordingDurationMs, fieldNumber: 7)
-    }
-    try { if let v = self._languageCode {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._voiceID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAVoiceSessionConfig, rhs: RAVoiceSessionConfig) -> Bool {
-    if lhs.silenceDurationMs != rhs.silenceDurationMs {return false}
-    if lhs.speechThreshold != rhs.speechThreshold {return false}
-    if lhs.autoPlayTts != rhs.autoPlayTts {return false}
-    if lhs.continuousMode != rhs.continuousMode {return false}
-    if lhs.thinkingModeEnabled != rhs.thinkingModeEnabled {return false}
-    if lhs.maxTokens != rhs.maxTokens {return false}
-    if lhs.maxRecordingDurationMs != rhs.maxRecordingDurationMs {return false}
-    if lhs._languageCode != rhs._languageCode {return false}
-    if lhs._voiceID != rhs._voiceID {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".AudioPipelineConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}cooldown_duration_ms\0\u{3}strict_transitions\0\u{3}max_tts_duration_ms\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.cooldownDurationMs) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.strictTransitions) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxTtsDurationMs) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.cooldownDurationMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.cooldownDurationMs, fieldNumber: 1)
-    }
-    if self.strictTransitions != false {
-      try visitor.visitSingularBoolField(value: self.strictTransitions, fieldNumber: 2)
-    }
-    if self.maxTtsDurationMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxTtsDurationMs, fieldNumber: 3)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAAudioPipelineConfig, rhs: RAAudioPipelineConfig) -> Bool {
-    if lhs.cooldownDurationMs != rhs.cooldownDurationMs {return false}
-    if lhs.strictTransitions != rhs.strictTransitions {return false}
-    if lhs.maxTtsDurationMs != rhs.maxTtsDurationMs {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComposeConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{4}\u{b}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0\u{3}vad_config\0\u{3}llm_generation\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}vad_config\0\u{3}llm_generation\0\u{1}instructions\0\u{3}turn_detection\0\u{1}language\0")
 
   fileprivate class _StorageClass {
     var _sttModelPath: String? = nil
     var _sttModelID: String? = nil
-    var _sttModelName: String? = nil
     var _llmModelPath: String? = nil
     var _llmModelID: String? = nil
-    var _llmModelName: String? = nil
     var _ttsVoicePath: String? = nil
     var _ttsVoiceID: String? = nil
-    var _ttsVoiceName: String? = nil
     var _vadConfig: RAVADConfiguration? = nil
     var _llmGeneration: RALLMGenerationOptions? = nil
-    var _sessionConfig: RAVoiceSessionConfig? = nil
-    var _audioPipelineConfig: RAAudioPipelineConfig? = nil
-    var _sessionID: String? = nil
-    var _defaultLanguageCode: String? = nil
+    var _instructions: String? = nil
+    var _turnDetection: RATurnDetection? = nil
+    var _language: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -985,19 +675,15 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
     init(copying source: _StorageClass) {
       _sttModelPath = source._sttModelPath
       _sttModelID = source._sttModelID
-      _sttModelName = source._sttModelName
       _llmModelPath = source._llmModelPath
       _llmModelID = source._llmModelID
-      _llmModelName = source._llmModelName
       _ttsVoicePath = source._ttsVoicePath
       _ttsVoiceID = source._ttsVoiceID
-      _ttsVoiceName = source._ttsVoiceName
       _vadConfig = source._vadConfig
       _llmGeneration = source._llmGeneration
-      _sessionConfig = source._sessionConfig
-      _audioPipelineConfig = source._audioPipelineConfig
-      _sessionID = source._sessionID
-      _defaultLanguageCode = source._defaultLanguageCode
+      _instructions = source._instructions
+      _turnDetection = source._turnDetection
+      _language = source._language
     }
   }
 
@@ -1018,19 +704,15 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._sttModelPath) }()
         case 2: try { try decoder.decodeSingularStringField(value: &_storage._sttModelID) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._sttModelName) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._llmModelPath) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._llmModelID) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._llmModelName) }()
-        case 7: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoicePath) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceID) }()
-        case 9: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceName) }()
-        case 20: try { try decoder.decodeSingularMessageField(value: &_storage._sessionConfig) }()
-        case 21: try { try decoder.decodeSingularMessageField(value: &_storage._audioPipelineConfig) }()
-        case 22: try { try decoder.decodeSingularStringField(value: &_storage._sessionID) }()
-        case 23: try { try decoder.decodeSingularStringField(value: &_storage._defaultLanguageCode) }()
-        case 24: try { try decoder.decodeSingularMessageField(value: &_storage._vadConfig) }()
-        case 25: try { try decoder.decodeSingularMessageField(value: &_storage._llmGeneration) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._llmModelPath) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._llmModelID) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoicePath) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceID) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._vadConfig) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._llmGeneration) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._instructions) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._turnDetection) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._language) }()
         default: break
         }
       }
@@ -1049,44 +731,32 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
       try { if let v = _storage._sttModelID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 2)
       } }()
-      try { if let v = _storage._sttModelName {
+      try { if let v = _storage._llmModelPath {
         try visitor.visitSingularStringField(value: v, fieldNumber: 3)
       } }()
-      try { if let v = _storage._llmModelPath {
+      try { if let v = _storage._llmModelID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 4)
       } }()
-      try { if let v = _storage._llmModelID {
+      try { if let v = _storage._ttsVoicePath {
         try visitor.visitSingularStringField(value: v, fieldNumber: 5)
       } }()
-      try { if let v = _storage._llmModelName {
+      try { if let v = _storage._ttsVoiceID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 6)
       } }()
-      try { if let v = _storage._ttsVoicePath {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._ttsVoiceID {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-      } }()
-      try { if let v = _storage._ttsVoiceName {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-      } }()
-      try { if let v = _storage._sessionConfig {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
-      } }()
-      try { if let v = _storage._audioPipelineConfig {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
-      } }()
-      try { if let v = _storage._sessionID {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 22)
-      } }()
-      try { if let v = _storage._defaultLanguageCode {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 23)
-      } }()
       try { if let v = _storage._vadConfig {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
       } }()
       try { if let v = _storage._llmGeneration {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 25)
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._instructions {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._turnDetection {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._language {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 11)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1099,19 +769,15 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
         let rhs_storage = _args.1
         if _storage._sttModelPath != rhs_storage._sttModelPath {return false}
         if _storage._sttModelID != rhs_storage._sttModelID {return false}
-        if _storage._sttModelName != rhs_storage._sttModelName {return false}
         if _storage._llmModelPath != rhs_storage._llmModelPath {return false}
         if _storage._llmModelID != rhs_storage._llmModelID {return false}
-        if _storage._llmModelName != rhs_storage._llmModelName {return false}
         if _storage._ttsVoicePath != rhs_storage._ttsVoicePath {return false}
         if _storage._ttsVoiceID != rhs_storage._ttsVoiceID {return false}
-        if _storage._ttsVoiceName != rhs_storage._ttsVoiceName {return false}
         if _storage._vadConfig != rhs_storage._vadConfig {return false}
         if _storage._llmGeneration != rhs_storage._llmGeneration {return false}
-        if _storage._sessionConfig != rhs_storage._sessionConfig {return false}
-        if _storage._audioPipelineConfig != rhs_storage._audioPipelineConfig {return false}
-        if _storage._sessionID != rhs_storage._sessionID {return false}
-        if _storage._defaultLanguageCode != rhs_storage._defaultLanguageCode {return false}
+        if _storage._instructions != rhs_storage._instructions {return false}
+        if _storage._turnDetection != rhs_storage._turnDetection {return false}
+        if _storage._language != rhs_storage._language {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1123,7 +789,7 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
 
 nonisolated extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentTranscribeProtoRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}session_id\0\u{3}sample_rate\0\u{3}language_hint\0\u{1}channels\0\u{1}encoding\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}session_id\0\u{1}language\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1133,10 +799,7 @@ nonisolated extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message,
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBytesField(value: &self.audioData) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.languageHint) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.language) }()
       default: break
       }
     }
@@ -1149,17 +812,8 @@ nonisolated extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message,
     if !self.sessionID.isEmpty {
       try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 2)
     }
-    if self.sampleRate != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 3)
-    }
-    if !self.languageHint.isEmpty {
-      try visitor.visitSingularStringField(value: self.languageHint, fieldNumber: 4)
-    }
-    if self.channels != 0 {
-      try visitor.visitSingularInt32Field(value: self.channels, fieldNumber: 5)
-    }
-    if self.encoding != .unspecified {
-      try visitor.visitSingularEnumField(value: self.encoding, fieldNumber: 6)
+    if !self.language.isEmpty {
+      try visitor.visitSingularStringField(value: self.language, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1167,10 +821,7 @@ nonisolated extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message,
   public static func ==(lhs: RAVoiceAgentTranscribeProtoRequest, rhs: RAVoiceAgentTranscribeProtoRequest) -> Bool {
     if lhs.audioData != rhs.audioData {return false}
     if lhs.sessionID != rhs.sessionID {return false}
-    if lhs.sampleRate != rhs.sampleRate {return false}
-    if lhs.languageHint != rhs.languageHint {return false}
-    if lhs.channels != rhs.channels {return false}
-    if lhs.encoding != rhs.encoding {return false}
+    if lhs.language != rhs.language {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -95,8 +95,8 @@ int ensure_model_ready(const GlobalOptions &options, const std::string &ref,
     if (get_rc == RAC_SUCCESS && parsed) {
       out->display_name = info.name();
       // Commons reconciliation (refresh above) already validated folder
-      // completeness; is_downloaded is the single authority.
-      downloaded = info.is_downloaded();
+      // completeness; registry_status is the single authority.
+      downloaded = info.registry_status() == v1::MODEL_REGISTRY_STATUS_DOWNLOADED;
     }
   }
 

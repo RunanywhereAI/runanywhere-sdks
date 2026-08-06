@@ -41,8 +41,7 @@ import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
-import ai.runanywhere.proto.v1.VLMGenerationOptions
-import ai.runanywhere.proto.v1.VLMImage
+import ai.runanywhere.proto.v1.VLMGenerationRequest
 import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.VLMStreamEvent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
@@ -184,15 +183,11 @@ internal suspend fun legacyDetectVoiceActivity(audio: ByteArray, options: VADOpt
 
 // Vision and other primitives
 
-internal suspend fun legacyProcessImage(
-    image: VLMImage,
-    options: VLMGenerationOptions,
-): VLMResult = RunAnywhere.processImage(image, options)
+internal suspend fun legacyProcessImage(request: VLMGenerationRequest): VLMResult =
+    RunAnywhere.processImage(request)
 
-internal fun legacyProcessImageStream(
-    image: VLMImage,
-    options: VLMGenerationOptions,
-): Flow<VLMStreamEvent> = RunAnywhere.processImageStream(image, options)
+internal fun legacyProcessImageStream(request: VLMGenerationRequest): Flow<VLMStreamEvent> =
+    RunAnywhere.processImageStream(request)
 
 internal suspend fun legacyGenerateImage(options: DiffusionGenerationOptions): DiffusionResult =
     RunAnywhere.generateImage(options)

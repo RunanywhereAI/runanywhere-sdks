@@ -234,6 +234,13 @@ async function consumeDetectionStream(): Promise<void> {
         addLogEntry('Speech Ended');
         continue;
       }
+      if (event.type === 'failed') {
+        lastError = `VAD stream failed: ${formatError(event.error)}`;
+        stopListening();
+        renderVad();
+        continue;
+      }
+      if (event.type !== 'activity') continue;
       lastResult = event;
       isSpeechDetected = event.isSpeech;
       updateStatusRegions();

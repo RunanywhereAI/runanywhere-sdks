@@ -113,11 +113,10 @@ class RagSession:
     def query_stream(
         self, question: str, options: Optional[QueryOptions] = None
     ) -> Iterator[RagEvent]:
-        """Stream retrieved chunks, then answer tokens, then the terminal result.
+        """Stream answer tokens, then the terminal result.
 
-        Commons does not emit ``CHUNK_RETRIEVED`` from ``rac_rag_query_stream_proto`` today,
-        so in practice the stream is token deltas then ``completed``, whose result carries
-        the sources. The ``retrieved`` branch lights up when commons starts emitting it. The
+        ``RAGStreamEventKind`` has no retrieval-progress stage — the stream is token deltas
+        then ``completed``, whose result carries the sources (``RagResult.sources``). The
         streamed ``RAGResult`` also leaves ``prompt_tokens``/``completion_tokens`` at 0, so
         the terminal result's token counts read 0 — :meth:`query` reports them.
 
@@ -127,7 +126,7 @@ class RagSession:
             SDKException: the session is closed or generation fails.
         """
         core = self._live()
-        payload = bridge.build_query(question, _coerce_query_options(options), stream=True)
+        payload = bridge.build_query(question, _coerce_query_options(options))
         handle = self._handle
 
         def native_call(on_event) -> None:
@@ -143,7 +142,7 @@ class RagSession:
     ) -> AsyncIterator[RagEvent]:
         """Async form of :meth:`query_stream`."""
         core = self._live()
-        payload = bridge.build_query(question, _coerce_query_options(options), stream=True)
+        payload = bridge.build_query(question, _coerce_query_options(options))
         handle = self._handle
 
         def native_call(on_event) -> None:

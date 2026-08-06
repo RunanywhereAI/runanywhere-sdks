@@ -397,7 +397,7 @@ class ChatViewModel extends ChangeNotifier {
         modelName: modelName,
         totalGenerationTime: _elapsedGenerationSeconds(),
         outputTokens: result.usage.outputTokens,
-        tokensPerSecond: result.usage.tokensPerSecond,
+        tokensPerSecond: result.usage.decodeTokensPerSecond,
       );
 
       final finalMessage = _messages[messageIndex].copyWith(
@@ -595,9 +595,19 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   String? localPathFor(sdk.LoraAdapterCatalogEntry adapter) {
-    if (!adapter.isDownloaded || adapter.localPath.isEmpty) return null;
+    // `isDownloaded` was deleted; `localPath` non-empty is now the proto's
+    // own documented sole authority for "is this downloaded".
+    if (adapter.localPath.isEmpty) return null;
     return File(adapter.localPath).existsSync() ? adapter.localPath : null;
   }
+
+  /// Stable model-registry id for a LoRA adapter's downloadable artifact.
+  /// `LoraAdapterCatalogEntry` no longer carries url/filename/size
+  /// (idl/lora_options.proto), so its bytes are described by a companion
+  /// [sdk.ModelInfo] artifact keyed by this id — the same
+  /// `lora-adapter:{id}` convention [ModelCatalogBootstrap] used to register
+  /// it, and that the iOS/Web SDK reference LoRA extensions use internally.
+  String _loraArtifactModelId(String adapterId) => 'lora-adapter:$adapterId';
 
   bool isAdapterDownloaded(sdk.LoraAdapterCatalogEntry adapter) =>
       localPathFor(adapter) != null;
@@ -610,7 +620,11 @@ class ChatViewModel extends ChangeNotifier {
       );
 
   /// Download (if needed) and apply a catalog adapter. One SDK call owns
-  /// registration, transfer, placement, and catalog completion.
+  /// transfer, placement, and catalog completion; the caller only supplies
+  /// the companion [sdk.ModelInfo] artifact describing where to fetch the
+  /// adapter bytes — [ModelCatalogBootstrap] already registered that artifact
+  /// under `lora-adapter:{id}` when it seeded the catalog, so the lookup
+  /// below just reads it back from the registry.
   Future<void> downloadAndApplyAdapter(
     sdk.LoraAdapterCatalogEntry adapter,
   ) async {
@@ -620,7 +634,13 @@ class ChatViewModel extends ChangeNotifier {
 
     try {
       if (localPathFor(adapter) == null) {
-        await sdk.RunAnywhere.lora.download(adapter);
+        final artifact = await sdk.RunAnywhere.models.get(
+          _loraArtifactModelId(adapter.id),
+        );
+        if (artifact == null) {
+          throw sdk.SDKException.modelNotFound(adapter.id);
+        }
+        await sdk.RunAnywhere.lora.download(adapter, artifact);
       }
       await sdk.RunAnywhere.lora.apply(adapter.id);
       _loraAdapters = (await sdk.RunAnywhere.lora.list()).applied;

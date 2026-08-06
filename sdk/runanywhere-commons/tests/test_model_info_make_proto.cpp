@@ -192,8 +192,9 @@ int test_make_gguf_single_file() {
     ASSERT_EQ(model.download_size_bytes(), 0);
     ASSERT_TRUE(model.has_single_file());
     ASSERT_EQ(model.artifact_case(), runanywhere::v1::ModelInfo::kSingleFile);
-    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
-    ASSERT_EQ(model.is_downloaded(), false);
+    // ModelInfo.is_downloaded (tag 32) was reserved -- registry_status is the
+    // only downloaded-ness signal now (REGISTERED means not downloaded).
+    ASSERT_EQ(model.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
     ASSERT_EQ(model.is_available(), false);
     ASSERT_TRUE(model.created_at_unix_ms() > 0);
     ASSERT_TRUE(model.updated_at_unix_ms() > 0);
@@ -218,7 +219,7 @@ int test_make_onnx_single_file() {
     // Multimodal requires context length → 2048.
     ASSERT_EQ(model.context_length(), 2048);
     ASSERT_TRUE(model.has_single_file());
-    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
+    ASSERT_EQ(model.artifact_case(), runanywhere::v1::ModelInfo::kSingleFile);
     return 0;
 }
 
@@ -232,7 +233,7 @@ int test_make_mlmodelc_single_file() {
     ASSERT_EQ(model.format(), runanywhere::v1::MODEL_FORMAT_COREML);
     ASSERT_EQ(model.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_COREML);
     ASSERT_TRUE(model.has_single_file());
-    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
+    ASSERT_EQ(model.artifact_case(), runanywhere::v1::ModelInfo::kSingleFile);
     return 0;
 }
 
@@ -264,7 +265,6 @@ int test_make_tar_gz_archive() {
     ASSERT_TRUE(model.has_archive());
     ASSERT_EQ(model.archive().type(), runanywhere::v1::ARCHIVE_TYPE_TAR_GZ);
     ASSERT_EQ(model.archive().structure(), runanywhere::v1::ARCHIVE_STRUCTURE_UNKNOWN);
-    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE);
     // Format is unspecified for a .tar.gz wrapper (Swift's
     // detect_format_from_extension only knows .gz at the lowest layer; the
     // make() factory doesn't strip ".tar." pairs by itself).
@@ -281,7 +281,6 @@ int test_make_zip_archive() {
 
     ASSERT_EQ(model.artifact_case(), runanywhere::v1::ModelInfo::kArchive);
     ASSERT_EQ(model.archive().type(), runanywhere::v1::ARCHIVE_TYPE_ZIP);
-    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE);
     return 0;
 }
 
@@ -297,7 +296,7 @@ int test_make_multi_file_inferred() {
     ASSERT_TRUE(make_proto(args, &model));
 
     ASSERT_TRUE(model.has_single_file());
-    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
+    ASSERT_EQ(model.artifact_case(), runanywhere::v1::ModelInfo::kSingleFile);
     return 0;
 }
 

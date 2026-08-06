@@ -15,10 +15,7 @@ import {
   ReasoningOptions as ReasoningOptionsMessage,
   ThinkingTagPattern,
 } from '@runanywhere/proto-ts/thinking_tag_pattern';
-import {
-  StructuredOutputOptions,
-  type JSONSchema,
-} from '@runanywhere/proto-ts/structured_output';
+import { StructuredOutputOptions } from '@runanywhere/proto-ts/structured_output';
 import {
   ToolCallingOptions,
   ToolChoiceMode,
@@ -36,10 +33,7 @@ import {
   EmbeddingsPoolingStrategy,
 } from '@runanywhere/proto-ts/embeddings_options';
 import { embeddingsOptionsDefaults } from '@runanywhere/proto-ts/convenience/embeddings_options_convenience';
-import {
-  DiffusionGenerationOptions,
-  DiffusionMode,
-} from '@runanywhere/proto-ts/diffusion_options';
+import { DiffusionGenerationOptions } from '@runanywhere/proto-ts/diffusion_options';
 import { diffusionGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/diffusion_options_convenience';
 import { DiarizationOptions as DiarizationOptionsMessage } from '@runanywhere/proto-ts/diarization';
 import { diarizationOptionsDefaults } from '@runanywhere/proto-ts/convenience/diarization_convenience';
@@ -48,8 +42,6 @@ import { RAGConfiguration } from '@runanywhere/proto-ts/rag';
 import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import { RerankOptions } from '@runanywhere/proto-ts/rerank';
 import { rerankOptionsDefaults } from '@runanywhere/proto-ts/convenience/rerank_convenience';
-import { VLMGenerationOptions } from '@runanywhere/proto-ts/vlm_options';
-import { vLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/vlm_options_convenience';
 
 import type {
   AudioFormatName,
@@ -129,12 +121,17 @@ function toReasoningOptions(
   });
 }
 
+/**
+ * `strict_mode` was deleted from `StructuredOutputOptions` outright (idl
+ * comment: "Not read by commons"). `structured.strict` has no wire
+ * counterpart to carry it in; only `schema` and `includeSchemaInPrompt`
+ * survive.
+ */
 function toStructuredOutputOptions(
   structured: StructuredOutput
 ): StructuredOutputOptions {
   return StructuredOutputOptions.fromPartial({
     schema: structured.schema,
-    strictMode: structured.strict ?? true,
     includeSchemaInPrompt: true,
   });
 }
@@ -167,7 +164,11 @@ export function toToolCallingOptions(
   return ToolCallingOptions.fromPartial({
     ...toolCallingOptionsDefaults(),
     tools,
-    ...defined({ maxToolCalls: options?.maxToolCalls }),
+    ...defined({
+      maxToolCalls: options?.maxToolCalls,
+      topP: options?.topP,
+      systemPrompt: options?.systemPrompt,
+    }),
     ...(options?.toolChoice ? toToolChoiceMode(options.toolChoice) : {}),
   });
 }
@@ -184,7 +185,7 @@ export function toLlmOptions(options?: LlmOptions): LLMGenerationOptions {
       minP: options?.minP,
       frequencyPenalty: options?.frequencyPenalty,
       presencePenalty: options?.presencePenalty,
-      repetitionPenalty: options?.repetitionPenalty,
+      repeatPenalty: options?.repetitionPenalty,
       seed: options?.seed,
       systemPrompt: options?.systemPrompt,
       stopSequences: options?.stopSequences,
@@ -198,32 +199,28 @@ export function toLlmOptions(options?: LlmOptions): LLMGenerationOptions {
   });
 }
 
-/** Merge public LLM options over the generated VLM proto defaults. */
-export function toVlmOptions(
-  prompt: string,
-  options?: LlmOptions
-): VLMGenerationOptions {
-  return VLMGenerationOptions.fromPartial({
-    ...vLMGenerationOptionsDefaults(),
-    prompt,
-    ...defined({
-      maxOutputTokens: options?.maxOutputTokens,
-      temperature: options?.temperature,
-      topP: options?.topP,
-      topK: options?.topK,
-      minP: options?.minP,
-      repetitionPenalty: options?.repetitionPenalty,
-      seed: options?.seed,
-      stopSequences: options?.stopSequences,
-      systemPrompt: options?.systemPrompt,
-    }),
-    ...(options?.reasoning
-      ? { reasoning: toReasoningOptions(options.reasoning) }
-      : {}),
-  });
+/**
+ * Build the LLM generation options for a VLM request.
+ *
+ * `VLMGenerationOptions` and its `vLMGenerationOptionsDefaults()` helper are
+ * deleted outright: `VLMGenerationRequest` now carries `prompt` at the
+ * request level and reuses the plain `LLMGenerationOptions` message (same
+ * names, same defaults, same validation as the text API) for everything
+ * else. This is `toLlmOptions` under a VLM-facing name for call-site clarity
+ * in `Vlm.ts`.
+ */
+export function toVlmOptions(options?: LlmOptions): LLMGenerationOptions {
+  return toLlmOptions(options);
 }
 
-/** Merge public STT options over the generated proto defaults. */
+/**
+ * Merge public STT options over the generated proto defaults.
+ *
+ * `enableDiarization`/`maxSpeakers`/`translateToEnglish` are deleted from
+ * `STTOptions` outright (idl: "None were ever read by any backend").
+ * `diarize`/`speakersExpected` are the live replacements for the first two;
+ * `translateToEnglish` has no successor field.
+ */
 export function toSttOptions(options?: SttOptions): STTOptions {
   return STTOptions.fromPartial({
     ...sTTOptionsDefaults(),
@@ -231,9 +228,8 @@ export function toSttOptions(options?: SttOptions): STTOptions {
       language: options?.language,
       enablePunctuation: options?.punctuation,
       enableWordTimestamps: options?.wordTimestamps,
-      enableDiarization: options?.diarization,
-      maxSpeakers: options?.maxSpeakers,
-      translateToEnglish: options?.translateToEnglish,
+      diarize: options?.diarization,
+      speakersExpected: options?.maxSpeakers,
     }),
   });
 }
@@ -290,7 +286,14 @@ export function toRerankOptions(topN?: number): RerankOptions {
   });
 }
 
-/** Merge public image options over the generated proto defaults. */
+/**
+ * Merge public image options over the generated proto defaults.
+ *
+ * `DiffusionMode` and `reportIntermediateImages` are deleted from
+ * `DiffusionGenerationOptions` outright: image-to-image/inpainting is now
+ * driven purely by the presence of `image`/`maskImage` (no explicit mode
+ * enum), and there is no per-request intermediate-image opt-in on the wire.
+ */
 export function toImageOptions(
   prompt: string,
   options?: ImageOptions
@@ -309,15 +312,13 @@ export function toImageOptions(
       steps: options?.steps,
       guidanceScale: options?.guidanceScale,
       seed: options?.seed,
-      reportIntermediateImages: options?.reportPartials,
     }),
     ...(inpaint
       ? {
-          mode: DiffusionMode.DIFFUSION_MODE_INPAINTING,
-          inputImage: encodeImageBytes(inpaint.input),
+          image: encodeImageBytes(inpaint.input),
           maskImage: encodeImageBytes(inpaint.mask),
         }
-      : { mode: DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE }),
+      : {}),
   });
 }
 
@@ -344,7 +345,13 @@ export function toSegmentationOptions(
   );
 }
 
-/** Merge public RAG configuration over the generated proto defaults. */
+/**
+ * Merge public RAG configuration over the generated proto defaults.
+ *
+ * `indexPath`/`persistIndex` are deleted from `RAGConfiguration` outright —
+ * RAG is in-memory only now; `config.persistPath` has no wire counterpart.
+ * `similarityThreshold` was renamed to `scoreThreshold`.
+ */
 export function toRagConfiguration(
   embeddingModelId: string,
   llmModelId: string,
@@ -358,9 +365,7 @@ export function toRagConfiguration(
       topK: config?.topK,
       chunkSize: config?.chunkSize,
       chunkOverlap: config?.chunkOverlap,
-      similarityThreshold: config?.similarityThreshold,
-      indexPath: config?.persistPath,
+      scoreThreshold: config?.similarityThreshold,
     }),
-    ...(config?.persistPath ? { persistIndex: true } : {}),
   });
 }

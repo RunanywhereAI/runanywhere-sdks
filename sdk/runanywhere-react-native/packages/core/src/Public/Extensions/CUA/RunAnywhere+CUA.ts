@@ -93,8 +93,14 @@ export interface CuaAction {
   text: string;
   /** Chain-of-thought the model emitted before the tool call, if any. */
   reasoning: string;
-  /** Scroll amount for Scroll/HScroll (+up / -down). */
-  scrollPixels: number;
+  /**
+   * Horizontal scroll amount for `HScroll`. `CuaAction.scrollPixels` (a
+   * single field) is deleted outright, split into a `scrollX`/`scrollY` pair
+   * on the wire — the model's raw `pixels` output, copied verbatim per axis.
+   */
+  scrollX: number;
+  /** Vertical scroll amount for `Scroll`. */
+  scrollY: number;
   /** Seconds to wait for the `Wait` action. */
   waitSeconds: number;
   /** Whether a valid tool call was found. */
@@ -170,12 +176,19 @@ export function parseAction(
     // Web's range check): a value outside the enum must degrade to Unknown
     // rather than produce a CuaActionKind that matches no member.
     kind: clampKind(proto.type as number),
-    coordinate: proto.coordinateValid ? { x: proto.x, y: proto.y } : undefined,
+    // `coordinateValid` is deleted outright — presence of `x`/`y` (both
+    // optional int32) is itself "has a coordinate" now.
+    coordinate:
+      proto.x !== undefined && proto.y !== undefined
+        ? { x: proto.x, y: proto.y }
+        : undefined,
     text: proto.text,
     reasoning: proto.reasoning,
-    scrollPixels: proto.scrollPixels,
+    scrollX: proto.scrollX,
+    scrollY: proto.scrollY,
     waitSeconds: proto.waitSeconds,
-    isValid: proto.parseOk,
+    // `parseOk` renamed `isValid`.
+    isValid: proto.isValid,
   };
 }
 

@@ -103,9 +103,17 @@ public extension RunAnywhere {
 
         /// List the voices the loaded engine can speak with.
         ///
+        /// `RATTSServiceState.voices` was reserved off the wire outright
+        /// (idl/tts_options.proto): available voices now come from the
+        /// dedicated `rac_tts_list_voices_lifecycle_proto` verb.
+        ///
         /// - Throws: `SDKException` when the SDK has not been initialized.
         public func voices() async throws -> [Voice] {
-            try await RunAnywhere.ttsStateProto().voices
+            guard RunAnywhere.isReady else {
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+            }
+            try await RunAnywhere.ensureServicesReady()
+            return try await CppBridge.TTS.shared.listVoicesProto().voices
         }
     }
 }

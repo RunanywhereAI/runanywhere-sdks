@@ -14,6 +14,7 @@ import {
   ModelInfo as ModelInfoCodec,
   ModelLoadRequest as ModelLoadRequestCodec,
   ModelLoadResult as ModelLoadResultCodec,
+  ModelRegistryStatus,
   ModelUnloadRequest as ModelUnloadRequestCodec,
 } from '@runanywhere/proto-ts/model_types';
 import type {
@@ -496,7 +497,11 @@ export const WebModelLifecycle = {
     if (modelSnapshot && !modelSnapshot.localPath) {
       const resolvedPath = await resolveLocalPathFromOpfs(modelSnapshot);
       if (resolvedPath) {
-        modelSnapshot = { ...modelSnapshot, localPath: resolvedPath, isDownloaded: true };
+        modelSnapshot = {
+          ...modelSnapshot,
+          localPath: resolvedPath,
+          registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
+        };
         ModelRegistry.registerModel(modelSnapshot);
       }
     }

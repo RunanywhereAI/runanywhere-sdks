@@ -13,7 +13,6 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
-import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.public.types.RARAGConfiguration
 import com.runanywhere.sdk.public.types.RARAGStatistics
@@ -39,19 +38,27 @@ fun RARAGConfiguration.resolvingLifecycleArtifacts(
 // MARK: - RAGQueryOptions
 
 /**
- * [RAGQueryOptions.defaults] with the question filled in.
+ * A [RAGQueryOptions] with only [question] filled in.
  *
- * Values come from generated/convenience/RAConvenience.kt, emitted from the
- * rac_default annotations in idl/rag.proto.
+ * `RAGQueryOptions` carries no `rac_default`-annotated fields at the message
+ * level (idl/rag.proto): `question`/`retrieval_top_k`/`similarity_threshold`
+ * are deleted outright, replaced by `query` + the nested optional
+ * `RAGRetrievalOptions`, so there is no generated `defaults()` base to
+ * layer onto -- the all-fields-unset constructor already is the default.
  */
 fun RAGQueryOptions.Companion.defaults(question: String): RAGQueryOptions =
-    defaults().copy(question = question)
+    RAGQueryOptions(query = question)
 
 // MARK: - RAGResult
 
-/** Total query wall-clock time in seconds (derived from `total_time_ms`). */
+/**
+ * Total query wall-clock time in seconds, derived by summing the retrieval
+ * and generation phases: `total_time_ms` is deleted outright (idl/rag.proto)
+ * with no replacement field, since it was always derivable from the two
+ * phase timings this type still carries.
+ */
 val RAGResult.totalTime: Double
-    get() = total_time_ms.toDouble() / 1000.0
+    get() = (retrieval_time_ms + generation_time_ms).toDouble() / 1000.0
 
 /** Retrieval-phase wall-clock time in seconds (derived from `retrieval_time_ms`). */
 val RAGResult.retrievalTime: Double

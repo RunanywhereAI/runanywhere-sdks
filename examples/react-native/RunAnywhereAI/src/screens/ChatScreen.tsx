@@ -62,7 +62,7 @@ import {
   ModelSelectionContext,
 } from '../components/model';
 import { APP_STORAGE_KEYS, GENERATION_SETTINGS_KEYS } from '../types/settings';
-import { getPrimaryFramework } from '../utils/modelDisplay';
+import { getPrimaryFramework, isModelDownloaded } from '../utils/modelDisplay';
 import { registerDemoTools } from '../utils/chatSampleTools';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
@@ -111,7 +111,7 @@ function makeToolCallInfo(result: ToolCallingResult): ToolCallInfo | undefined {
     toolName: firstCall.name,
     arguments: firstCall.argumentsJson || '{}',
     ...(toolResult?.resultJson ? { result: toolResult.resultJson } : {}),
-    success: toolResult ? toolResult.success : true,
+    success: toolResult ? !toolResult.isError : true,
     ...(toolResult?.error ? { error: toolResult.error } : {}),
   };
 }
@@ -129,8 +129,8 @@ function toGenerationResult(
     finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: 0,
-    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
+    timeToFirstTokenMs: result.usage?.ttftMs ?? 0,
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId: '',
     model,
   };
@@ -268,7 +268,7 @@ export const ChatScreen: React.FC = () => {
         '[ChatScreen] Available LLM models:',
         llmModels.map(
           (m: SDKModelInfo) =>
-            `${m.id} (${m.isDownloaded || m.localPath ? 'downloaded' : 'not downloaded'})`
+            `${m.id} (${isModelDownloaded(m) ? 'downloaded' : 'not downloaded'})`
         )
       );
     } catch (error) {
@@ -325,7 +325,7 @@ export const ChatScreen: React.FC = () => {
         `[ChatScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.isDownloaded && !model.localPath) {
+      if (!isModelDownloaded(model)) {
         Alert.alert(
           'Error',
           'Model has not been downloaded. Open the model picker to download it first.'
@@ -342,7 +342,6 @@ export const ChatScreen: React.FC = () => {
         category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
         framework: model.framework || fw,
         preferredFramework: fw,
-        isDownloaded: true,
         isAvailable: true,
         supportsThinking: model.supportsThinking ?? false,
       };
@@ -635,9 +634,14 @@ export const ChatScreen: React.FC = () => {
             performance: {
               latencyMs: Date.now() - generationStartMs,
               memoryBytes: 0,
-              throughputTokensPerSec: result?.tokensPerSecond ?? 0,
-              inputTokens: result?.inputTokens ?? 0,
-              outputTokens: result?.outputTokens ?? 0,
+              usage: {
+                inputTokens: result?.inputTokens ?? 0,
+                outputTokens: result?.outputTokens ?? 0,
+                totalTokens: (result?.inputTokens ?? 0) + (result?.outputTokens ?? 0),
+                decodeTokensPerSecond: result?.tokensPerSecond ?? 0,
+                prefillMs: 0,
+                ttftMs: result?.timeToFirstTokenMs ?? 0,
+              },
             },
             ...(result ? { timeToFirstToken: result.timeToFirstTokenMs } : {}),
             completionStatus: wasStopped ? 'interrupted' : 'completed',
@@ -676,9 +680,14 @@ export const ChatScreen: React.FC = () => {
             performance: {
               latencyMs: 0,
               memoryBytes: 0,
-              throughputTokensPerSec: 0,
-              inputTokens: 0,
-              outputTokens: 0,
+              usage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                decodeTokensPerSecond: 0,
+                prefillMs: 0,
+                ttftMs: 0,
+              },
             },
             completionStatus: wasStopped ? 'interrupted' : 'error',
             wasThinkingMode: false,

@@ -14,34 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class DownloadStage extends $pb.ProtobufEnum {
-  static const DownloadStage DOWNLOAD_STAGE_UNSPECIFIED =
-      DownloadStage._(0, _omitEnumNames ? '' : 'DOWNLOAD_STAGE_UNSPECIFIED');
-  static const DownloadStage DOWNLOAD_STAGE_DOWNLOADING =
-      DownloadStage._(1, _omitEnumNames ? '' : 'DOWNLOAD_STAGE_DOWNLOADING');
-  static const DownloadStage DOWNLOAD_STAGE_EXTRACTING =
-      DownloadStage._(2, _omitEnumNames ? '' : 'DOWNLOAD_STAGE_EXTRACTING');
-  static const DownloadStage DOWNLOAD_STAGE_VALIDATING =
-      DownloadStage._(3, _omitEnumNames ? '' : 'DOWNLOAD_STAGE_VALIDATING');
-  static const DownloadStage DOWNLOAD_STAGE_COMPLETED =
-      DownloadStage._(4, _omitEnumNames ? '' : 'DOWNLOAD_STAGE_COMPLETED');
-
-  static const $core.List<DownloadStage> values = <DownloadStage>[
-    DOWNLOAD_STAGE_UNSPECIFIED,
-    DOWNLOAD_STAGE_DOWNLOADING,
-    DOWNLOAD_STAGE_EXTRACTING,
-    DOWNLOAD_STAGE_VALIDATING,
-    DOWNLOAD_STAGE_COMPLETED,
-  ];
-
-  static final $core.List<DownloadStage?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
-  static DownloadStage? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const DownloadStage._(super.value, super.name);
-}
-
 class DownloadState extends $pb.ProtobufEnum {
   static const DownloadState DOWNLOAD_STATE_UNSPECIFIED =
       DownloadState._(0, _omitEnumNames ? '' : 'DOWNLOAD_STATE_UNSPECIFIED');
@@ -63,6 +35,8 @@ class DownloadState extends $pb.ProtobufEnum {
       DownloadState._(8, _omitEnumNames ? '' : 'DOWNLOAD_STATE_PAUSED');
   static const DownloadState DOWNLOAD_STATE_RESUMING =
       DownloadState._(9, _omitEnumNames ? '' : 'DOWNLOAD_STATE_RESUMING');
+  static const DownloadState DOWNLOAD_STATE_VALIDATING =
+      DownloadState._(10, _omitEnumNames ? '' : 'DOWNLOAD_STATE_VALIDATING');
 
   static const $core.List<DownloadState> values = <DownloadState>[
     DOWNLOAD_STATE_UNSPECIFIED,
@@ -75,10 +49,11 @@ class DownloadState extends $pb.ProtobufEnum {
     DOWNLOAD_STATE_CANCELLED,
     DOWNLOAD_STATE_PAUSED,
     DOWNLOAD_STATE_RESUMING,
+    DOWNLOAD_STATE_VALIDATING,
   ];
 
   static final $core.List<DownloadState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
+      $pb.ProtobufEnum.$_initByValueList(values, 10);
   static DownloadState? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

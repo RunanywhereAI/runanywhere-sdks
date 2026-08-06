@@ -21,6 +21,12 @@ public enum class VLMStreamEventKind(
 ) : WireEnum {
   VLM_STREAM_EVENT_KIND_UNSPECIFIED(0),
   VLM_STREAM_EVENT_KIND_STARTED(1),
+  /**
+   * Emitted when the vision encoder finishes and decoding begins -- the
+   * cue for a UI to switch from "analysing image" to "writing". Emitted
+   * where the backend measures the encode boundary
+   * (VLMResult.image_encode_time_ms comes from the same measurement).
+   */
   VLM_STREAM_EVENT_KIND_IMAGE_ENCODED(2),
   VLM_STREAM_EVENT_KIND_TOKEN(3),
   VLM_STREAM_EVENT_KIND_COMPLETED(4),

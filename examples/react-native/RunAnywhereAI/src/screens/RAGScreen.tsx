@@ -250,11 +250,14 @@ export const RAGScreen: React.FC = () => {
       );
       const thinkingModeEnabled = thinkingStr === 'true';
       const supportsThinking = selectedLLMModel?.supportsThinking ?? false;
-      const options: LlmOptions | undefined =
+      const generation: LlmOptions | undefined =
         supportsThinking && !thinkingModeEnabled
           ? { reasoning: { mode: 'off' } }
           : undefined;
-      const result = await session.query(question, options);
+      const result = await session.query(
+        question,
+        generation ? { generation } : undefined
+      );
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: result.answer },

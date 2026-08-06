@@ -7,7 +7,7 @@
  * sequence `download` then `load` by hand.
  */
 
-import type { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { ModelRegistryStatus, type ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { ModelRegistry } from '../../Extensions/RunAnywhere+ModelRegistry.js';
@@ -49,7 +49,9 @@ export async function ensureModelForCategory(
       `Model '${modelId}' is not in the catalog. Register it with RunAnywhere.models.register(...) first.`,
     );
   }
-  if (!model.isDownloaded || !model.localPath) {
+  const isDownloaded = model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+    || model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
+  if (!isDownloaded || !model.localPath) {
     logger.info(`Downloading '${modelId}' before use`);
     await SDKCore.downloadModel({ modelId });
   }

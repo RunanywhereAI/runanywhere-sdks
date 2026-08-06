@@ -428,10 +428,6 @@ abstract final class RunAnywhere {
       apiKey: params.apiKey,
       baseURL: params.baseURL.toString(),
       deviceId: deviceId,
-      forceRefreshAssignments: false,
-      flushTelemetry: true,
-      discoverDownloadedModels: true,
-      rescanLocalModels: true,
     );
     _hasCompletedHttpSetup = _isHttpSetupComplete(result);
     _httpSetupApplicable = result?.httpApplicable ?? true;
@@ -472,10 +468,13 @@ abstract final class RunAnywhere {
 
   static bool _isHttpSetupComplete(SdkInitResult? result) {
     if (result == null) return false;
+    // `http_configured` was renamed `has_completed_http_setup`
+    // (idl/sdk_init.proto); the field is `optional`, so absence still means
+    // "not yet known" rather than "false".
     if (result.hasHasCompletedHttpSetup()) {
       return result.hasCompletedHttpSetup;
     }
-    return result.httpConfigured;
+    return false;
   }
 
   static void _retryHttpSetup() {

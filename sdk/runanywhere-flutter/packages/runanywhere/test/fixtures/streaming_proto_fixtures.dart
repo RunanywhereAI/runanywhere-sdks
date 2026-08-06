@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show AudioEncoding;
 import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
@@ -74,9 +75,14 @@ List<pb.VoiceEvent> voiceParityEvents() => <pb.VoiceEvent>[
         ),
       ),
       pb.VoiceEvent(
-        error: pb.ErrorEvent(
-          code: -259,
-          component: 'pipeline',
+        // `VoiceEvent.error` (`ErrorEvent`) was renamed `session_error`
+        // (`VoiceSessionError`) (idl/voice_events.proto); `component`
+        // became `failedComponent` and `code` is now the canonical
+        // `ErrorCode` enum, with the raw int preserved as `cAbiCode`.
+        sessionError: pb.VoiceSessionError(
+          code: ErrorCode.ERROR_CODE_UNSPECIFIED,
+          cAbiCode: -259,
+          failedComponent: 'pipeline',
         ),
       ),
       pb.VoiceEvent(
@@ -88,13 +94,16 @@ List<pb.VoiceEvent> voiceParityEvents() => <pb.VoiceEvent>[
     ];
 
 List<String> expectedVoiceParityLines() => <String>[
-      'vad:type=3,is_speech=true',
-      'vad:type=3,is_speech=false',
+      // `VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY` is wire
+      // value 2 now (idl/vad_options.proto added `_FRAME = 1` ahead of it,
+      // shifting SPEECH_ACTIVITY down from the old value 3).
+      'vad:type=2,is_speech=true',
+      'vad:type=2,is_speech=false',
       'user_said:text=what is the weather today,is_final=true',
       'assistant_token:text=the weather is sunny and 72 degrees,is_final=true,kind=1',
       'audio:bytes=16,sample_rate=24000,channels=1,encoding=1',
       'metrics:tokens_generated=0,is_over_budget=false',
-      'error:code=-259,component=pipeline',
+      'session_error:code=-259,component=pipeline',
       'state:previous=1,current=2',
     ];
 
@@ -121,8 +130,9 @@ String formatVoiceEvent(pb.VoiceEvent event) {
     return 'state:previous=${event.state.previous.value},'
         'current=${event.state.current.value}';
   }
-  if (event.hasError()) {
-    return 'error:code=${event.error.code},component=${event.error.component}';
+  if (event.hasSessionError()) {
+    final error = event.sessionError;
+    return 'session_error:code=${error.cAbiCode},component=${error.failedComponent}';
   }
   if (event.hasMetrics()) {
     final metrics = event.metrics;
@@ -202,13 +212,14 @@ List<pb.VoiceEvent> decodeVoiceEventFrames(
 }
 
 Uint8List buildPerfBenchFixture() {
+  // `MetricsEvent.createdAtNs` was deleted outright (idl/voice_events.proto)
+  // — the producer timestamp now lives on the envelope's own `timestampMs`
+  // (`VoiceEvent.timestampMs`), which every event carries regardless of arm.
   final events = List<pb.VoiceEvent>.generate(
     5,
     (index) => pb.VoiceEvent(
-      metrics: pb.MetricsEvent(
-        createdAtNs: Int64((index + 1) * 1000),
-        tokensGenerated: Int64(index + 1),
-      ),
+      timestampMs: Int64((index + 1) * 1000),
+      metrics: pb.MetricsEvent(tokensGenerated: Int64(index + 1)),
     ),
   );
   return encodeVoiceEventFrames(events, magic: perfBenchMagic);
@@ -234,7 +245,13 @@ PerfBenchFixtureResult decodePerfBenchFixture(
     final event = events[index];
     var delta = 0;
     if (event.hasMetrics()) {
-      final producerNs = event.metrics.createdAtNs.toInt();
+      // Producer timestamp lives on the envelope now (`VoiceEvent.
+      // timestampMs`), not `MetricsEvent.createdAtNs` (deleted — idl/
+      // voice_events.proto). This fixture's numbers are synthetic test
+      // units throughout (not real wall-clock ns), so [buildPerfBenchFixture]
+      // keeps the same small-integer scale `timestampMs` used to share with
+      // `receivedAtNs` — no unit conversion here.
+      final producerNs = event.timestampMs.toInt();
       if (producerNs > 0) {
         delta = receivedAtNs[index] - producerNs;
         if (delta > 0) {

@@ -38,17 +38,23 @@ message VADConfiguration {
         (runanywhere.v1.rac_max) = 48000
     ];
 
-    // Milliseconds on the wire; Swift/Kotlin/Dart/C hold seconds, so generated
-    // bindings divide by 1000 when they bind to those types.
+    // Milliseconds, on the wire AND in every generated binding. Only the
+    // internal rac_vad_config_t holds seconds; commons converts there.
     int32  frame_length_ms       = 3 [
         (runanywhere.v1.rac_default) = "100",
         (runanywhere.v1.rac_min) = 20,
         (runanywhere.v1.rac_max) = 1000
     ];
 
-    // Commons rejects values outside [0, 1] and warns below 0.002 or above 0.1.
+    // Normalized activation sensitivity in [0,1]; higher = harder to trigger.
+    // 0.5 is the industry default (OpenAI turn_detection.threshold, Silero,
+    // LiveKit activation_threshold). Each backend maps it onto its own units:
+    // a probability model uses it 1:1, the built-in energy detector converts
+    // it to an RMS bar. That conversion is backend-owned and is NOT fixed
+    // here; the built-in energy path and the voice-agent path calibrate
+    // separately today.
     float  activation_threshold  = 4 [
-        (runanywhere.v1.rac_default) = "0.015",
+        (runanywhere.v1.rac_default) = "0.5",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
@@ -68,57 +74,74 @@ message VADConfiguration {
 
     // For backend-specific VADs such as Silero ONNX.
     optional string model_path = 8;
-
-    // 0 = backend default, for both of these.
-    int32  window_size_samples = 9;
-    int32  max_speech_duration_ms = 10;
 }
 
 // Per-call options. Field vocabulary follows LiveKit/Silero naming.
 message VADOptions {
-    // 0 = keep the configured threshold.
-    float activation_threshold     = 6 [
+    // Unset = keep the loaded detector's calibrated value. Same normalized
+    // [0,1] scale as VADConfiguration.activation_threshold.
+    optional float activation_threshold = 1 [
+        (runanywhere.v1.rac_default) = "0.5",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
 
-    int32 min_speech_duration_ms   = 2 [(runanywhere.v1.rac_default) = "100"];
-    int32 min_silence_duration_ms  = 3 [(runanywhere.v1.rac_default) = "300"];
+    // Debounce: speech shorter than this is discarded (coughs, clicks, taps).
+    int32 min_speech_duration_ms   = 2 [(runanywhere.v1.rac_default) = "250"];
 
-    // 0 = backend default, for both of these.
-    int32 max_speech_duration_ms    = 4 [(runanywhere.v1.rac_default) = "0"];
+    // Hangover: continuous silence this long ends the turn. This is the
+    // primary latency dial. Defaulted for TURN-TAKING (OpenAI
+    // silence_duration_ms = 500), not for ASR segmentation (Silero = 100).
+    int32 min_silence_duration_ms  = 3 [(runanywhere.v1.rac_default) = "500"];
 
-    // Audio retained before SPEECH_STARTED so segments don't clip the first
-    // syllable.
-    int32 prefix_padding_ms          = 7 [(runanywhere.v1.rac_default) = "0"];
+    // Force-split a monologue longer than this. Unset = unbounded.
+    optional int32 max_speech_duration_ms = 4;
 
-    bool include_statistics          = 5;
+    // Pre-roll kept before SPEECH_STARTED so the first phoneme survives.
+    // Included in the emitted segment's audio_start_ms (OpenAI semantics).
+    int32 prefix_padding_ms        = 5 [(runanywhere.v1.rac_default) = "300"];
+
+    // Capture rate of the audio fed to the detector, for the whole session.
+    // Nothing resamples: a mismatch yields wrong segment durations. Bound is
+    // identical to VADConfiguration.sample_rate and the commons validator —
+    // if the project narrows to Silero/LiveKit's {8000,16000}, change all
+    // three together.
+    int32 sample_rate              = 6 [
+        (runanywhere.v1.rac_default) = "16000",
+        (runanywhere.v1.rac_min) = 8000,
+        (runanywhere.v1.rac_max) = 48000
+    ];
 }
 
 message VADAudioSource {
-    oneof source {
-        bytes  audio_data     = 1;
-        string adapter_handle = 2;
-    }
+    bytes audio_data = 1;
 
-    AudioEncoding encoding = 3;
-    int32 sample_rate = 4;
-    int32 channels = 5;
-    int64 frame_offset_ms = 6;
+    AudioEncoding encoding = 2;
+    int32 sample_rate = 3;
+
+    // Kept: commons rejects channels > 1 with RAC_ERROR_NOT_SUPPORTED, and
+    // this is the only signal that a caller pushed interleaved stereo.
+    int32 channels = 4;
+
+    // Position of this chunk on the session timeline; feeds
+    // SpeechActivityEvent.audio_start_ms / audio_end_ms.
+    int64 frame_offset_ms = 5;
 }
 
 message VADProcessRequest {
-    string request_id = 1;
-    optional VADAudioSource audio = 2;
-    optional VADOptions options = 3;
-    map<string, string> metadata = 4;
+    optional VADAudioSource audio = 1;
+    optional VADOptions options = 2;
 }
 
 message VADResult {
     bool  is_speech    = 1;
 
-    // [0.0, 1.0], backend-dependent.
-    float confidence   = 2;
+    // [0.0, 1.0], backend- AND path-dependent. On the one-shot detect path the
+    // built-in energy VAD reports min(1.0, energy/threshold), which saturates
+    // at 1.0; on the streaming per-frame path it is binary 0.0/1.0. A model
+    // backend reports its own speech probability. Not comparable across
+    // backends — do not re-threshold on it.
+    float probability  = 2;
 
     // RMS energy of the analyzed frame.
     float energy       = 3;
@@ -129,12 +152,7 @@ message VADResult {
     // Milliseconds since epoch.
     int64 timestamp_ms = 5;
 
-    // 0 = unset.
-    int64 start_time_ms = 6;
-    int64 end_time_ms   = 7;
-
-    optional VADStatistics statistics = 8;
-    optional SDKError error = 11;
+    optional SDKError error = 6;
 }
 
 // Exposed for debugging and waveform UIs.
@@ -156,53 +174,61 @@ message VADStatistics {
     float peak_energy               = 9;
 }
 
-// Narrow component-level transition. voice_events.proto's VADEvent carries the
-// broader pipeline taxonomy (BARGE_IN, END_OF_UTTERANCE) via VADStreamEventKind.
+// Narrow component-level transition: this detector said speech started or
+// ended. Barge-in is a session-level decision, not a detector verdict — it is
+// reported by InterruptedEvent / InterruptReason in voice_events.proto.
 message SpeechActivityEvent {
     SpeechActivityKind event_type = 1;
 
     // Milliseconds since epoch.
     int64 timestamp_ms            = 2;
 
-    // Length of the just-finished utterance on SPEECH_ENDED; zero on
-    // SPEECH_STARTED.
-    int32 duration_ms             = 3;
+    // Ms from the start of session audio when speech began. Set on both
+    // STARTED and ENDED. Includes prefix_padding_ms (OpenAI audio_start_ms).
+    int64 audio_start_ms          = 3;
 
-    float confidence              = 4;
-    optional VADResult result     = 5;
-    optional string segment_id    = 6;
+    // Ms from the start of session audio when speech ended; 0 on STARTED.
+    // Includes min_silence_duration_ms (OpenAI audio_end_ms).
+    int64 audio_end_ms            = 4;
+
+    // Correlates STARTED with its ENDED (OpenAI item_id).
+    optional string segment_id    = 5;
 }
 
+// Every value here is emitted by commons. Barge-in is a session-level
+// decision, not a detector verdict: it lives on InterruptedEvent /
+// InterruptReason in voice_events.proto.
 enum VADStreamEventKind {
     VAD_STREAM_EVENT_KIND_UNSPECIFIED = 0;
-    VAD_STREAM_EVENT_KIND_STARTED = 1;
-    VAD_STREAM_EVENT_KIND_FRAME = 2;
-    VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY = 3;
-    VAD_STREAM_EVENT_KIND_STATISTICS = 4;
-    VAD_STREAM_EVENT_KIND_STOPPED = 5;
-    VAD_STREAM_EVENT_KIND_ERROR = 6;
-    // Speech that interrupts active assistant playback. Downstream pipeline
-    // also routes this through InterruptedEvent/InterruptReason.
-    VAD_STREAM_EVENT_KIND_BARGE_IN = 7;
+    VAD_STREAM_EVENT_KIND_FRAME = 1;
+    VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY = 2;
+    VAD_STREAM_EVENT_KIND_ERROR = 3;
 }
 
 message VADStreamEvent {
     uint64 seq = 1;
+
+    // Microseconds since epoch. Genuine sub-millisecond precision: the
+    // streaming dispatcher stamps this from a microsecond clock.
     int64 timestamp_us = 2;
+
     string request_id = 3;
     VADStreamEventKind kind = 4;
     optional VADResult result = 5;
     optional SpeechActivityEvent activity = 6;
-    optional VADStatistics statistics = 7;
-    optional SDKError error = 10;
+    optional SDKError error = 7;
 }
 
 message VADServiceState {
     bool is_ready = 1;
     bool is_speech_active = 2;
-    float energy_threshold = 3;
+
+    // The threshold actually in force. After auto-calibration this differs
+    // from what was requested, which is why it is worth reading back.
+    float activation_threshold = 3;
+
     int32 sample_rate = 4;
     int32 frame_length_ms = 5;
     optional string current_model = 6;
-    optional SDKError error = 9;
+    optional SDKError error = 7;
 }

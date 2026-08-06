@@ -3,41 +3,34 @@ import { NPUChip } from "./storage_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
- * Hardware acceleration preference for inference. Canonical single enum —
- * previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
- * file and `AccelerationPreference` in model_types.proto. Consolidated here
- * because it is a pure hardware concept and
- * hardware_profile.proto has no imports (model_types.proto already imports
- * this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
- *   Web    enums.ts:165   (Auto / WebGPU / CPU)
- *   Swift  extensions     (CPU / GPU / NPU / Metal)
- *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
- * Canonicalized union below.
+ * Hardware acceleration preference for inference. Device CLASS, not graphics
+ * API. A hint, never a hard requirement — the runtime may fall back.
+ * UNSPECIFIED means "you choose".
+ *
+ * Canonical single enum. It lives in this file rather than model_types.proto
+ * because model_types.proto already imports this file; placing it here avoids
+ * a cyclic import.
  * ---------------------------------------------------------------------------
  */
 export declare enum AccelerationPreference {
+    /** ACCELERATION_PREFERENCE_UNSPECIFIED - let the runtime choose */
     ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
+    /** ACCELERATION_PREFERENCE_AUTO - DEPRECATED: alias of UNSPECIFIED */
     ACCELERATION_PREFERENCE_AUTO = 1,
     ACCELERATION_PREFERENCE_CPU = 2,
+    /** ACCELERATION_PREFERENCE_GPU - covers Metal / Vulkan / WebGPU */
     ACCELERATION_PREFERENCE_GPU = 3,
+    /**
+     * ACCELERATION_PREFERENCE_NPU - WEBGPU / METAL / VULKAN were removed: they are spellings of GPU, not
+     * device classes. The concrete API is the runtime's choice; pass vendor
+     * knobs as engine options instead.
+     */
     ACCELERATION_PREFERENCE_NPU = 4,
-    ACCELERATION_PREFERENCE_WEBGPU = 5,
-    ACCELERATION_PREFERENCE_METAL = 6,
-    ACCELERATION_PREFERENCE_VULKAN = 7,
     UNRECOGNIZED = -1
 }
 export declare function accelerationPreferenceFromJSON(object: any): AccelerationPreference;
 export declare function accelerationPreferenceToJSON(object: AccelerationPreference): string;
 /**
- * Logical hardware service contract. Mirrors the C ABI in
- * sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
- *   - rac_hardware_profile_get → GetProfile
- *   - rac_hardware_get_accelerators → GetAccelerators
- *   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
- *
- * Native device probes (chip detection, neural engine queries, GPU
- * discovery, memory/cores) remain platform-adapter owned. C++ caches and
- * serves the normalized HardwareProfile/AcceleratorInfo messages.
  * Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
  * (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
  * rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number
@@ -55,51 +48,32 @@ export declare enum HexagonArch {
 }
 export declare function hexagonArchFromJSON(object: any): HexagonArch;
 export declare function hexagonArchToJSON(object: HexagonArch): string;
-export interface HardwareProfile {
-    chip: string;
-    hasNeuralEngine: boolean;
-    /** "ane", "gpu", "cpu" */
-    accelerationMode: string;
-    totalMemoryBytes: number;
-    coreCount: number;
-    performanceCores: number;
-    efficiencyCores: number;
-    /** "arm64", "x86_64" */
-    architecture: string;
-    /** "ios", "android", "web", "macos", "linux", "windows" */
-    platform: string;
-    /** resolved NPU vendor family (commons-classified) */
-    npuChip: NPUChip;
-}
-export interface AcceleratorInfo {
-    name: string;
-    type: AccelerationPreference;
-    available: boolean;
-}
-export interface HardwareProfileResult {
-    profile?: HardwareProfile | undefined;
-    accelerators: AcceleratorInfo[];
-}
+/**
+ * The single NPU-capability description in this IDL. Static device
+ * description lives in exactly one other place: device_info.proto's
+ * DeviceInfo.
+ */
 export interface NpuCapability {
     /** Vendor SoC model (e.g. "SM8750"); empty when unknown. */
     socModel: string;
-    /** /sys/devices/soc0/soc_id value; -1 when unavailable. */
-    socId: number;
+    /**
+     * /sys/devices/soc0/soc_id value. ABSENT when unavailable — never a -1 or 0
+     * sentinel; a default-constructed message is already "unavailable".
+     */
+    socId?: number | undefined;
     hexagonArch: HexagonArch;
     /**
-     * True iff hexagon_arch is in the device-validated QHexRT-supported set
-     * (v75, v79, or v81 today).
+     * True iff this accelerator generation is in the device-validated supported
+     * set (Hexagon v75/v79/v81 today). Engine-agnostic on purpose: a second NPU
+     * engine must not require a second boolean.
      */
-    qhexrtSupported: boolean;
+    supported: boolean;
     /**
-     * rac_qhexrt_arch_name(): "v68" ... "v81", "unknown". Materialized so
-     * SDKs never re-derive the display name from the enum.
+     * NPU vendor family. Re-homed here so a non-Qualcomm device gets a
+     * meaningful answer instead of an empty message.
      */
-    archName: string;
+    npu: NPUChip;
 }
-export declare const HardwareProfile: MessageFns<HardwareProfile>;
-export declare const AcceleratorInfo: MessageFns<AcceleratorInfo>;
-export declare const HardwareProfileResult: MessageFns<HardwareProfileResult>;
 export declare const NpuCapability: MessageFns<NpuCapability>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

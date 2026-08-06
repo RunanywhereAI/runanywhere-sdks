@@ -94,10 +94,8 @@ int run_rerank(const GlobalOptions& options, const std::string& model_ref,
 
     v1::RerankRequest request;
     request.set_query(query);
-    for (size_t i = 0; i < documents.size(); ++i) {
-        v1::RerankCandidate* candidate = request.add_candidates();
-        candidate->set_id("doc-" + std::to_string(i));
-        candidate->set_text(documents[i]);
+    for (const std::string& document : documents) {
+        request.add_documents(document);
     }
     if (top_n > 0) {
         request.mutable_options()->set_top_n(static_cast<uint32_t>(top_n));
@@ -123,10 +121,14 @@ int run_rerank(const GlobalOptions& options, const std::string& model_ref,
             .field("model", result.model_id().empty() ? model.model_id : result.model_id())
             .field("processing_time_ms", static_cast<int64_t>(result.processing_time_ms()))
             .begin_array("results");
+        // RerankScoredItem.rank is gone -- items() is already sorted by score
+        // descending, so the loop position IS the rank (1-based for display).
+        int rank = 0;
         for (const v1::RerankScoredItem& item : result.items()) {
+            ++rank;
             json.begin_array_object()
                 .field("index", static_cast<int64_t>(item.index()))
-                .field("rank", static_cast<int64_t>(item.rank()))
+                .field("rank", static_cast<int64_t>(rank))
                 .field("relevance_score", static_cast<double>(item.relevance_score()))
                 .end_object();
         }
@@ -136,7 +138,9 @@ int run_rerank(const GlobalOptions& options, const std::string& model_ref,
     }
 
     std::vector<std::vector<std::string>> rows;
+    int rank = 0;
     for (const v1::RerankScoredItem& item : result.items()) {
+        ++rank;
         char score[32];
         std::snprintf(score, sizeof(score), "%.4f", static_cast<double>(item.relevance_score()));
         const size_t index = item.index();
@@ -144,7 +148,7 @@ int run_rerank(const GlobalOptions& options, const std::string& model_ref,
         if (preview.size() > 60) {
             preview = preview.substr(0, 57) + "...";
         }
-        rows.push_back({std::to_string(item.rank()), std::to_string(index), score, preview});
+        rows.push_back({std::to_string(rank), std::to_string(index), score, preview});
     }
     out::table({"RANK", "INDEX", "SCORE", "DOCUMENT"}, rows);
     return 0;

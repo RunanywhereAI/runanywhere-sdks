@@ -686,20 +686,20 @@ class DartBridgeModelFormat {
     model_pb.ModelInfo model, [
     String? url,
   ]) {
-    if (model.hasArtifactType() ||
-        model.hasSingleFile() ||
+    // `artifact_type`/`custom_strategy_id` are reserved on `ModelInfo`
+    // (idl/model_types.proto: "restates the oneof" / "undocumented
+    // registry") — the `artifact` oneof (`hasSingleFile`/`hasArchive`/
+    // `hasMultiFile`/`hasBuiltIn`) is the only source of truth for whether
+    // an artifact variant is already set.
+    if (model.hasSingleFile() ||
         model.hasArchive() ||
         model.hasMultiFile() ||
-        model.hasBuiltIn() ||
-        model.hasCustomStrategyId()) {
+        model.hasBuiltIn()) {
       return model;
     }
 
     if (_isBuiltIn(model)) {
-      return model.deepCopy()
-        ..artifactType =
-            model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY
-        ..builtIn = true;
+      return model.deepCopy()..builtIn = true;
     }
 
     final effectiveUrl = url ?? model.downloadUrl;
@@ -707,7 +707,7 @@ class DartBridgeModelFormat {
 
     final inference = inferArtifact(effectiveUrl, modelId: model.id);
 
-    final copy = model.deepCopy()..artifactType = inference.artifactType;
+    final copy = model.deepCopy();
     switch (inference.artifactType) {
       case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
       case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
@@ -736,10 +736,7 @@ class DartBridgeModelFormat {
   }
 
   model_pb.ModelInfo _asSingleFile(model_pb.ModelInfo model) {
-    return model.deepCopy()
-      ..artifactType =
-          model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
-      ..singleFile = model_pb.SingleFileArtifact();
+    return model.deepCopy()..singleFile = model_pb.SingleFileArtifact();
   }
 
   /// Mirrors the `ProtoModelInfoHelpers.isBuiltIn` extension in

@@ -14,7 +14,7 @@
 
 /* eslint-disable */
 
-import { DiffusionGenerationOptions } from '../diffusion_options';
+import { DiffusionGenerationOptions, DiffusionOutputFormat } from '../diffusion_options';
 import { ValidationError } from './_errors';
 
 export const diffusionGenerationOptionsDefaults = (): DiffusionGenerationOptions => ({
@@ -24,16 +24,10 @@ export const diffusionGenerationOptionsDefaults = (): DiffusionGenerationOptions
   height: 0,
   steps: 0,
   guidanceScale: 0.0,
-  seed: -1,
   scheduler: 0,
-  mode: 0,
-  denoiseStrength: 0.75,
-  reportIntermediateImages: false,
-  progressStride: 0,
-  inputImageWidth: 0,
-  inputImageHeight: 0,
-  batchSize: 0,
-  returnLatents: false,
+  strength: 0.75,
+  n: 1,
+  outputFormat: DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_PNG,
 });
 
 export const validateDiffusionGenerationOptions = (m: DiffusionGenerationOptions): void => {
@@ -55,10 +49,16 @@ export const validateDiffusionGenerationOptions = (m: DiffusionGenerationOptions
       message: `guidance_scale must be in 0.0...20.0 (got ${m.guidanceScale})`,
     });
   }
-  if (!Number.isFinite(m.denoiseStrength) || m.denoiseStrength < 0.0 || m.denoiseStrength > 1.0) {
+  if (!Number.isFinite(m.strength) || m.strength < 0.0 || m.strength > 1.0) {
     throw new ValidationError({
-      fieldPath: 'DiffusionGenerationOptions.denoise_strength',
-      message: `denoise_strength must be in 0.0...1.0 (got ${m.denoiseStrength})`,
+      fieldPath: 'DiffusionGenerationOptions.strength',
+      message: `strength must be in 0.0...1.0 (got ${m.strength})`,
+    });
+  }
+  if (m.n !== undefined && (m.n < 1 || m.n > 8)) {
+    throw new ValidationError({
+      fieldPath: 'DiffusionGenerationOptions.n',
+      message: `n must be in 1...8 (got ${m.n})`,
     });
   }
 };

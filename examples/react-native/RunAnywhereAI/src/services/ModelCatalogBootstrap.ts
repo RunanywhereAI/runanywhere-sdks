@@ -3,7 +3,9 @@
  *
  * Mirrors iOS `ModelCatalogBootstrap.swift` (and Android
  * `ModelBootstrap.seedCuratedCatalog`). Uses the canonical SDK methods
- * (`RunAnywhere.models.register(...)` / `RunAnywhere.lora.catalog.registerArtifact(...)`).
+ * (`RunAnywhere.models.register(...)` / `RunAnywhere.lora.catalog.register(...)`
+ * + `registerLoraArtifact` — the RN SDK has no `lora.catalog.registerArtifact`
+ * convenience the way Swift/Kotlin do, see `utils/loraArtifacts.ts`).
  * Safe to re-run on every cold
  * launch — commons merges runtime fields on re-registration.
  *
@@ -21,6 +23,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { LoraAdapterCatalogEntry } from '@runanywhere/proto-ts/lora_options';
 import { logDiagnostic } from '../utils/diagnostics';
+import { registerLoraArtifact } from '../utils/loraArtifacts';
 import {
   NPU_BUNDLES,
   publishNpuCatalogAcceptance,
@@ -554,20 +557,28 @@ export async function registerAll(
 }
 
 async function registerLoraAdapters(): Promise<void> {
+  const id = 'abliterated-lora';
+  const name = 'Abliterated LoRA (F16)';
   try {
-    await RunAnywhere.lora.catalog.registerArtifact(
+    // `LoraAdapterCatalogEntry` no longer carries url/filename/size/
+    // description metadata (idl/lora_options.proto: "everything generic
+    // about the artifact ... lives on the ModelInfo record for this
+    // adapter") — register the catalog entry (compatibility/scale only)
+    // and the downloadable artifact (url/size) separately.
+    await RunAnywhere.lora.catalog.register(
       LoraAdapterCatalogEntry.fromPartial({
-        id: 'abliterated-lora',
-        name: 'Abliterated LoRA (F16)',
-        description:
-          'Removes refusal behavior — model answers directly without disclaimers',
-        url: 'https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf',
-        filename: 'qwen2.5-0.5b-abliterated-lora-f16.gguf',
+        id,
+        name,
         compatibleModels: ['qwen2.5-0.5b-instruct-q6_k'],
-        sizeBytes: 17_620_224,
         defaultScale: 1.0,
       })
     );
+    await registerLoraArtifact({
+      catalogEntryId: id,
+      name,
+      url: 'https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf',
+      sizeBytes: 17_620_224,
+    });
   } catch (error) {
     logDiagnostic(`[App] Failed to register LoRA adapter: ${String(error)}`);
   }
@@ -588,7 +599,7 @@ async function isNpuCatalogReady(): Promise<boolean> {
       QHexRT.isRegistered(),
       QHexRT.probeNpu(),
     ]);
-    return registered && capability.qhexrtSupported;
+    return registered && capability.supported;
   } catch (error) {
     logDiagnostic(`[App] QHexRT readiness check failed: ${String(error)}`);
     return false;

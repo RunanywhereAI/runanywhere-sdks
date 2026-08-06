@@ -362,10 +362,12 @@ TestResult run_proto_roundtrip_golden() {
     ASSERT_TRUE(action.ParseFromArray(buf.data, static_cast<int>(buf.size)), "decode CuaAction");
     ASSERT_EQ(static_cast<int>(action.type()),
               static_cast<int>(runanywhere::v1::CUA_ACTION_TYPE_LEFT_CLICK), "type = left_click");
-    ASSERT_TRUE(action.coordinate_valid(), "has coordinate");
+    // coordinate_valid was deleted: x/y are now `optional int32`, so presence
+    // (has_x/has_y) IS the coordinate-valid signal. parse_ok renamed is_valid.
+    ASSERT_TRUE(action.has_x() && action.has_y(), "has coordinate");
     ASSERT_EQ(action.x(), 720, "x = 500 * 1440/1000 = 720");
     ASSERT_EQ(action.y(), 344, "y = 382 * 900/1000 = 344");
-    ASSERT_TRUE(action.parse_ok(), "parse_ok true");
+    ASSERT_TRUE(action.is_valid(), "is_valid true");
     ASSERT_TRUE(action.reasoning().find("search box") != std::string::npos, "reasoning captured");
     rac_proto_buffer_free(&buf);
     return TEST_PASS();

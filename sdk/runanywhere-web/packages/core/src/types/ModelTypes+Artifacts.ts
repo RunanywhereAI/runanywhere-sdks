@@ -32,6 +32,7 @@ import {
   ModelFormat,
   ModelInfo,
   ModelInfoMakeRequest,
+  ModelRegistryStatus,
   ModelSource,
   ExpectedModelFiles,
   archiveTypeToJSON,
@@ -263,16 +264,22 @@ function lastPathComponent(url: string): string {
  * Build a descriptor from a URL + destination filename.
  * Swift parity: `RAModelFileDescriptor.init(url:filename:isRequired:)`
  * (ModelTypes+Artifacts.swift:46).
+ *
+ * `isRequired` was inverted to `isOptional` on the wire (API-realignment):
+ * the old default `true` for "required" becomes default `false` for
+ * "isOptional" so behavior is preserved -- a caller that didn't pass
+ * `isRequired` got a required file before, and gets a non-optional
+ * (`isOptional: false`) file now.
  */
 export function makeModelFileDescriptor(
   url: string,
   filename: string,
-  isRequired = true,
+  isOptional = false,
 ): ModelFileDescriptor {
   return {
     url,
     filename,
-    isRequired,
+    isOptional,
     relativePath: lastPathComponent(url),
     destinationPath: filename,
   };
@@ -390,11 +397,12 @@ export function artifactTypeDisplayName(type: ModelArtifactType): string {
 // this discriminated union restores Swift's `RAModelInfo.OneOf_Artifact`.
 // ---------------------------------------------------------------------------
 
+// `customStrategyId` was deleted outright from the ModelInfo artifact oneof
+// -- only `singleFile`/`archive`/`multiFile`/`builtIn` arms remain.
 export type ModelInfoArtifact =
   | { case: 'singleFile'; value: SingleFileArtifact }
   | { case: 'archive'; value: ArchiveArtifact }
   | { case: 'multiFile'; value: MultiFileArtifact }
-  | { case: 'customStrategyId'; value: string }
   | { case: 'builtIn'; value: boolean };
 
 /** Returns the active artifact oneof case, or null when unset. */
@@ -402,9 +410,6 @@ export function modelInfoArtifact(model: ModelInfo): ModelInfoArtifact | null {
   if (model.singleFile !== undefined) return { case: 'singleFile', value: model.singleFile };
   if (model.archive !== undefined) return { case: 'archive', value: model.archive };
   if (model.multiFile !== undefined) return { case: 'multiFile', value: model.multiFile };
-  if (model.customStrategyId !== undefined) {
-    return { case: 'customStrategyId', value: model.customStrategyId };
-  }
   if (model.builtIn !== undefined) return { case: 'builtIn', value: model.builtIn };
   return null;
 }
@@ -442,8 +447,6 @@ export function artifactCaseType(artifact: ModelInfoArtifact): ModelArtifactType
       return archiveTypeToArtifactType(artifact.value.type);
     case 'multiFile':
       return ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE;
-    case 'customStrategyId':
-      return ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM;
     case 'builtIn':
       return artifact.value
         ? ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN
@@ -472,8 +475,6 @@ function artifactCaseDisplayName(artifact: ModelInfoArtifact): string {
       return `${archiveTypeDisplayName(artifact.value.type)} Archive`;
     case 'multiFile':
       return `Multi-File (${artifact.value.files.length} files)`;
-    case 'customStrategyId':
-      return artifact.value ? `Custom (${artifact.value})` : 'Custom';
     case 'builtIn':
       return artifactTypeDisplayName(ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN);
   }
@@ -483,10 +484,13 @@ function artifactCaseDisplayName(artifact: ModelInfoArtifact): string {
 // ModelInfo artifact helpers — Swift parity: ModelTypes+Artifacts.swift:242-426
 // ---------------------------------------------------------------------------
 
-/** Swift parity: `RAModelInfo.isBuiltIn` (ModelTypes+Artifacts.swift:326). */
+/**
+ * Swift parity: `RAModelInfo.isBuiltIn` (ModelTypes+Artifacts.swift:326).
+ * `ModelInfo.artifactType` was deleted as a top-level field -- the `builtIn`
+ * oneof arm (checked above) is the only surviving signal for this case.
+ */
 export function modelInfoIsBuiltIn(model: ModelInfo): boolean {
   if (model.builtIn === true) return true;
-  if (model.artifactType === ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN) return true;
   if (model.localPath.startsWith('builtin:')) return true;
   return model.framework === InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
     || model.framework === InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
@@ -555,13 +559,16 @@ export function modelInfoIsAvailableForUse(model: ModelInfo): boolean {
     || model.isAvailable === true;
 }
 
-/** Swift parity: `RAModelInfo.requiresExtraction` (ModelTypes+Artifacts.swift:349). */
+/**
+ * Swift parity: `RAModelInfo.requiresExtraction` (ModelTypes+Artifacts.swift:349).
+ * `ModelInfo.artifactType` was deleted as a top-level field; the artifact
+ * oneof (or `MODEL_ARTIFACT_TYPE_UNSPECIFIED` when unset) is the sole source
+ * of truth now.
+ */
 export function modelInfoRequiresExtraction(model: ModelInfo): boolean {
   const artifact = modelInfoArtifact(model);
   if (artifact) return artifactCaseRequiresExtraction(artifact);
-  return artifactTypeRequiresExtraction(
-    model.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED,
-  );
+  return artifactTypeRequiresExtraction(ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED);
 }
 
 /** Swift parity: `RAModelInfo.requiresDownload` (ModelTypes+Artifacts.swift:353). */
@@ -569,18 +576,14 @@ export function modelInfoRequiresDownload(model: ModelInfo): boolean {
   if (modelInfoIsBuiltIn(model)) return false;
   const artifact = modelInfoArtifact(model);
   if (artifact) return artifactCaseRequiresDownload(artifact);
-  return artifactTypeRequiresDownload(
-    model.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED,
-  );
+  return artifactTypeRequiresDownload(ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED);
 }
 
 /** Swift parity: `RAModelInfo.artifactDisplayName` (ModelTypes+Artifacts.swift:358). */
 export function modelInfoArtifactDisplayName(model: ModelInfo): string {
   const artifact = modelInfoArtifact(model);
   if (artifact) return artifactCaseDisplayName(artifact);
-  return artifactTypeDisplayName(
-    model.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED,
-  );
+  return artifactTypeDisplayName(ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED);
 }
 
 /** Swift parity: `RAModelInfo.archiveArtifact` (ModelTypes+Artifacts.swift:362). */
@@ -604,9 +607,14 @@ export function modelInfoMultiFileDescriptors(model: ModelInfo): ModelFileDescri
  * Swift parity: `RAModelInfo.expectedArtifactFiles`
  * (ModelTypes+Artifacts.swift:379). Like Swift's `try? ... ?? .none`, this
  * degrades to the empty manifest when the ABI is unavailable or fails.
+ *
+ * `ModelInfo.expectedFiles` was deleted as a top-level field: the manifest
+ * now lives one level down, nested under the active `singleFile`/`archive`
+ * artifact arm.
  */
 export function modelInfoExpectedArtifactFiles(model: ModelInfo): ExpectedModelFiles {
-  if (model.expectedFiles !== undefined) return model.expectedFiles;
+  if (model.singleFile?.expectedFiles !== undefined) return model.singleFile.expectedFiles;
+  if (model.archive?.expectedFiles !== undefined) return model.archive.expectedFiles;
   const module = tryCapabilityModule();
   if (!module || typeof module._rac_artifact_expected_files_proto !== 'function') {
     return expectedModelFilesNone();
@@ -632,44 +640,50 @@ export function modelInfoSettingDownloadUrl(model: ModelInfo, url: string | null
  * Swift parity: `RAModelInfo.setLocalPath` (ModelTypes+Artifacts.swift:393) —
  * stamps the registry path and re-runs the on-disk probe. Pure update
  * (returns a new ModelInfo) instead of Swift's `mutating func`.
+ *
+ * `ModelInfo.isDownloaded` was deleted outright: `registryStatus` is the
+ * single durable downloaded-ness signal now.
  */
 export function modelInfoSettingLocalPath(model: ModelInfo, localPath: string | null): ModelInfo {
   const next: ModelInfo = { ...model, localPath: localPath ?? '' };
-  next.isDownloaded = modelInfoIsDownloadedOnDisk(next);
+  next.registryStatus = modelInfoIsDownloadedOnDisk(next)
+    ? ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+    : ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED;
   next.isAvailable = modelInfoIsAvailableForUse(next);
   return next;
 }
 
 /**
  * Swift parity: `RAModelInfo.setArtifact` (ModelTypes+Artifacts.swift:399) —
- * installs the artifact oneof, syncs `artifactType`, and re-derives the
- * expected-files manifest strictly from the new artifact (restoring the
- * prior manifest when derivation yields nothing).
+ * installs the artifact oneof and re-derives the expected-files manifest
+ * strictly from the new artifact (restoring the prior manifest when
+ * derivation yields nothing).
+ *
+ * `ModelInfo.artifactType`/`.customStrategyId`/`.expectedFiles` were all
+ * deleted as top-level fields: the artifact oneof case is the sole type
+ * signal, and the manifest now nests one level down under `singleFile`/
+ * `archive`.
  */
 export function modelInfoSettingArtifact(model: ModelInfo, artifact: ModelInfoArtifact): ModelInfo {
-  let next: ModelInfo = {
+  const next: ModelInfo = {
     ...model,
     singleFile: undefined,
     archive: undefined,
     multiFile: undefined,
-    customStrategyId: undefined,
     builtIn: undefined,
-    artifactType: artifactCaseType(artifact),
   };
   switch (artifact.case) {
     case 'singleFile': next.singleFile = artifact.value; break;
     case 'archive': next.archive = artifact.value; break;
     case 'multiFile': next.multiFile = artifact.value; break;
-    case 'customStrategyId': next.customStrategyId = artifact.value; break;
     case 'builtIn': next.builtIn = artifact.value; break;
   }
-  const prior = model.expectedFiles;
-  next = { ...next, expectedFiles: undefined };
+  const prior = modelInfoExpectedArtifactFiles(model);
   const derived = modelInfoExpectedArtifactFiles(next);
-  if (!isEmptyExpectedFilesManifest(derived)) {
-    next.expectedFiles = derived;
-  } else if (prior !== undefined) {
-    next.expectedFiles = prior;
+  const manifest = !isEmptyExpectedFilesManifest(derived) ? derived : prior;
+  if (!isEmptyExpectedFilesManifest(manifest)) {
+    if (next.singleFile) next.singleFile = { ...next.singleFile, expectedFiles: manifest };
+    else if (next.archive) next.archive = { ...next.archive, expectedFiles: manifest };
   }
   return next;
 }

@@ -8,6 +8,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "rac_options.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -18,18 +20,20 @@ option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
 // Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
-// into COMPONENT; the modality is recoverable from c_abi_code and
-// ErrorContext.operation, so it is not encoded twice.
+// into COMPONENT; use SDKError.component to tell them apart.
+//
+// The rac_wire_string values are the one form every SDK prints, so a crash
+// report written by Swift and one written by Web say the same word.
 enum ErrorCategory {
-    ERROR_CATEGORY_UNSPECIFIED   = 0;
-    ERROR_CATEGORY_NETWORK       = 1;  // wire, HTTP, download, server, timeout
-    ERROR_CATEGORY_VALIDATION    = 2;  // invalid args, empty input, format
-    ERROR_CATEGORY_MODEL         = 3;  // not-found, load-failed, incompatible
-    ERROR_CATEGORY_COMPONENT     = 4;  // STT/TTS/LLM/VAD/VLM/etc. lifecycle
-    ERROR_CATEGORY_IO            = 5;  // file system, storage, audio buffers
-    ERROR_CATEGORY_AUTH          = 6;  // API key, unauthorized, forbidden
-    ERROR_CATEGORY_INTERNAL      = 7;  // unknown, not-implemented, internal
-    ERROR_CATEGORY_CONFIGURATION = 8;  // env mismatch, init not done, bad cfg
+    ERROR_CATEGORY_UNSPECIFIED   = 0 [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    ERROR_CATEGORY_NETWORK       = 1 [(runanywhere.v1.rac_wire_string) = "network_error"];          // wire, HTTP, download, server, timeout
+    ERROR_CATEGORY_VALIDATION    = 2 [(runanywhere.v1.rac_wire_string) = "invalid_request_error"];  // invalid args, empty input, format
+    ERROR_CATEGORY_MODEL         = 3 [(runanywhere.v1.rac_wire_string) = "model_error"];            // not-found, load-failed, incompatible
+    ERROR_CATEGORY_COMPONENT     = 4 [(runanywhere.v1.rac_wire_string) = "component_error"];        // STT/TTS/LLM/VAD/VLM/etc. lifecycle
+    ERROR_CATEGORY_IO            = 5 [(runanywhere.v1.rac_wire_string) = "io_error"];               // file system, storage, audio buffers
+    ERROR_CATEGORY_AUTH          = 6 [(runanywhere.v1.rac_wire_string) = "authentication_error"];   // API key, unauthorized, forbidden
+    ERROR_CATEGORY_INTERNAL      = 7 [(runanywhere.v1.rac_wire_string) = "internal_error"];         // unknown, not-implemented, internal
+    ERROR_CATEGORY_CONFIGURATION = 8 [(runanywhere.v1.rac_wire_string) = "configuration_error"];    // env mismatch, init not done, bad cfg
 }
 
 enum ErrorSeverity {
@@ -230,49 +234,41 @@ enum ErrorCode {
     ERROR_CODE_WASM_MEMORY_ERROR          = 903;
 }
 
-// Debugging metadata captured at the throw site. Stack traces are deliberately
-// absent: they are platform-shaped and belong in platform-local logging.
-message ErrorContext {
-    // Telemetry tagging.
-    map<string, string> metadata = 1;
-
-    optional string source_file = 2;
-    optional int32  source_line = 3;
-
-    // Logical operation ("loadModel", "generate", "transcribeStream"), so
-    // clients can route without parsing free text.
-    optional string operation   = 4;
-
-    // "<Message>.<field>" for validation errors. The generated validate()
-    // emits this.
-    optional string field_path  = 5;
-}
-
 // The unified error payload every SDK throws or returns.
 //
 // `code` is always non-zero: an SDKError implies failure, and success is
 // signalled by its absence. `message` is non-localized; localization is a
-// consumer concern.
+// consumer concern. Stack traces are deliberately absent: they are
+// platform-shaped and belong in platform-local logging.
 message SDKError {
     ErrorCode             code           = 1;
     ErrorCategory         category       = 2;
     string                message        = 3;
-    optional ErrorContext context        = 4;
 
     // Signed rac_result_t. Equals -code for codes <= 899. Unset for the
     // Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
     // failures originating outside the C ABI.
-    optional int32        c_abi_code     = 5;
+    optional int32        c_abi_code     = 4;
 
     // The "caused by" chain.
-    optional string       nested_message = 6;
+    optional string       nested_message = 5;
 
-    // `component` is a stable lowercase key ("llm", "stt", "rag", "download").
-    // SDKEvent carries the enum-typed component instead.
-    int64                 timestamp_ms   = 7;
-    ErrorSeverity         severity       = 8;
-    string                component      = 9;
-    bool                  retryable      = 10;
-    string                remediation_hint = 11;
-    string                correlation_id = 12;
+    int64                 timestamp_ms   = 6;
+    ErrorSeverity         severity       = 7;
+
+    // Which subsystem raised the error, written as SDKComponent's
+    // rac_wire_string ("llm", "stt", "rag", "rerank"). Producers MUST write
+    // the wire string, never the proto constant name. Errors raised outside
+    // any SDKComponent may carry their own lowercase key.
+    string                component      = 8;
+
+    bool                  retryable      = 9;
+
+    // Ties this failure to the operation that produced it. Named for
+    // Anthropic's body-level `request_id`. Producers MUST set it.
+    string                request_id     = 10;
+
+    // "<Message>.<field>" for validation errors, e.g. "STTOptions.sampleRate".
+    // OpenAI's `param`. The generated validate() emits this.
+    optional string       param          = 11;
 }

@@ -56,9 +56,9 @@ int run_auth_login(const GlobalOptions& options) {
         return 1;
     }
 
-    // A staging/production login without a device row is a broken control
-    // plane — surface it as a failure, not a footnote.
-    const bool ok = summary.device_registered;
+    // A staging/production login that never completes HTTP/auth setup is a
+    // broken control plane — surface it as a failure, not a footnote.
+    const bool ok = summary.has_completed_http_setup;
 
     if (options.json) {
         out::JsonWriter json;
@@ -69,7 +69,7 @@ int run_auth_login(const GlobalOptions& options) {
             .field("device_id", summary.backend_device_id)
             .field("device_uuid", summary.persistent_device_id)
             .field("token_expires_at", format_epoch_seconds(summary.token_expires_at))
-            .field("device_registered", summary.device_registered)
+            .field("has_completed_http_setup", summary.has_completed_http_setup)
             .field("assignments", static_cast<int64_t>(summary.assignment_count));
         if (!summary.warning.empty()) {
             json.field("warning", summary.warning);
@@ -83,8 +83,8 @@ int run_auth_login(const GlobalOptions& options) {
         out::result_line("device         " + summary.backend_device_id);
         out::result_line("device-uuid    " + summary.persistent_device_id);
         out::result_line("token expires  " + format_epoch_seconds(summary.token_expires_at));
-        out::result_line(std::string("device row     ") +
-                         (summary.device_registered ? "registered" : "NOT registered"));
+        out::result_line(std::string("http setup     ") +
+                         (summary.has_completed_http_setup ? "completed" : "NOT completed"));
         out::result_line("assignments    " + std::to_string(summary.assignment_count) +
                          " model(s)");
         if (!summary.warning.empty()) {
@@ -93,7 +93,7 @@ int run_auth_login(const GlobalOptions& options) {
     }
 
     if (!ok) {
-        out::error_line("device registration did not complete" +
+        out::error_line("HTTP/auth setup did not complete" +
                         (summary.warning.empty() ? "" : ": " + summary.warning));
         return 1;
     }

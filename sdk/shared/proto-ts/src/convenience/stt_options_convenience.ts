@@ -24,8 +24,6 @@ export const sTTConfigurationDefaults = (): STTConfiguration => ({
   audioFormat: 0,
   enablePunctuation: true,
   enableDiarization: false,
-  vocabularyList: [],
-  maxAlternatives: 0,
   enableWordTimestamps: true,
 });
 
@@ -40,14 +38,7 @@ export const validateSTTConfiguration = (m: STTConfiguration): void => {
 
 export const sTTOptionsDefaults = (): STTOptions => ({
   enablePunctuation: true,
-  enableDiarization: false,
-  maxSpeakers: 0,
-  vocabularyList: [],
+  diarize: false,
   enableWordTimestamps: true,
-  beamSize: 0,
-  maxAlternatives: 0,
-  chunkDurationMs: 0,
-  endpointSilenceMs: 0,
-  suppressBlank: false,
-  translateToEnglish: false,
+  silenceDurationMs: 0,
 });

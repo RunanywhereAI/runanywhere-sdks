@@ -10,12 +10,30 @@
 package com.runanywhere.sdk.hybrid
 
 /**
- * Backend identity for a hybrid candidate. The generated proto enum
- * (`HybridBackendKind` from hybrid_router.proto / `rac_hybrid_backend_kind_t`)
- * is the source of truth; the typealias keeps the wire numbering in one place
- * (mirrors Swift's `HybridBackendKind = RAHybridBackendKind`).
+ * Plugin-registry engine name for a hybrid candidate — a free-form string
+ * (`rac_plugin_find_for_engine`'s lookup key), not a closed enum.
+ * `HybridBackendKind` (the enum) is deleted outright (idl/hybrid_router.proto):
+ * `HybridModelDescriptor.backend` + `.provider` were replaced by a single
+ * `engine: string` field so a new backend name is not a proto change. Mirrors
+ * Swift's `HybridBackendKind = String` typealias.
  */
-typealias HybridBackendKind = ai.runanywhere.proto.v1.HybridBackendKind
+typealias HybridBackendKind = String
+
+/** Well-known engine names, mirroring Swift's `HybridBackendKind` statics. */
+object HybridBackendKinds {
+    const val UNSPECIFIED: HybridBackendKind = ""
+    const val LLAMACPP: HybridBackendKind = "llamacpp"
+
+    /** On-device speech (sherpa-onnx Whisper / Zipformer / Paraformer). */
+    const val SHERPA: HybridBackendKind = "sherpa"
+
+    /**
+     * Generic cloud speech (the "cloud" engine). The concrete HTTP provider
+     * (Sarvam first) is resolved by the cloud engine from its own config,
+     * not carried on the descriptor any more.
+     */
+    const val CLOUD: HybridBackendKind = "cloud"
+}
 
 /**
  * STT options carried through the router (mirror of the C `rac_stt_options_t`
@@ -44,19 +62,17 @@ typealias HybridRoutedMetadata = ai.runanywhere.proto.v1.HybridRoutedMetadata
  *
  * @property id        Registry identifier shared with the SDK.
  * @property isLocal   Whether this side of the pair runs on-device (true) or in the cloud (false).
- * @property backend   Structured backend identity used to pin the engine the
- *                     router creates the service through.
- * @property provider  Concrete cloud provider when [backend] is
- *                     `HYBRID_BACKEND_CLOUD` (e.g. "sarvam"). Empty for
- *                     non-cloud backends; marshalled into the descriptor's
- *                     `provider` field so the cloud engine selects the HTTP
- *                     backend.
+ *                     Marshalled into the descriptor's `is_on_device` field
+ *                     (idl/hybrid_router.proto renamed `is_local` -> `is_on_device`).
+ * @property backend   Plugin-registry engine name (`rac_plugin_find_for_engine`'s
+ *                     lookup key): "sherpa", "llamacpp", "onnx", "qhexrt", "mlx",
+ *                     "cloud", or any name passed to `registerCloudProvider`.
+ *                     Empty lets the registry pick by priority.
  */
 data class HybridModel(
     val id: String,
     val isLocal: Boolean,
     val backend: HybridBackendKind,
-    val provider: String = "",
 ) {
     companion object {
         /** Convenience for an on-device sherpa model. */
@@ -65,25 +81,22 @@ data class HybridModel(
             HybridModel(
                 id = id,
                 isLocal = true,
-                backend = HybridBackendKind.HYBRID_BACKEND_SHERPA,
+                backend = HybridBackendKinds.SHERPA,
             )
 
         /**
          * Convenience for a cloud model (registered via [Cloud.register]).
-         * [provider] defaults to [Cloud.DEFAULT_PROVIDER] ("sarvam") and is
-         * carried in the descriptor so the cloud engine picks the HTTP backend.
+         * The concrete HTTP provider (Sarvam first) is resolved by the cloud
+         * engine from the config the caller registered -- it no longer rides
+         * on this descriptor (idl/hybrid_router.proto deleted `provider`
+         * outright).
          */
         @JvmStatic
-        @JvmOverloads
-        fun onlineCloud(
-            id: String,
-            provider: String = Cloud.DEFAULT_PROVIDER,
-        ): HybridModel =
+        fun onlineCloud(id: String): HybridModel =
             HybridModel(
                 id = id,
                 isLocal = false,
-                backend = HybridBackendKind.HYBRID_BACKEND_CLOUD,
-                provider = provider,
+                backend = HybridBackendKinds.CLOUD,
             )
     }
 }

@@ -12,6 +12,7 @@ import ai.runanywhere.proto.v1.ConnectHeartbeatRequest
 import ai.runanywhere.proto.v1.ConnectHostFrame
 import ai.runanywhere.proto.v1.ConnectInvocationCancelRequest
 import ai.runanywhere.proto.v1.ConnectInvocationRequest
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
@@ -298,7 +299,10 @@ internal class AndroidConnectSocket(
                         throw SDKException.networkError("The Connect host returned a response for another request")
                     }
                     emit(envelope.event)
-                    if (envelope.event.is_final) break
+                    // `RALLMStreamEvent.is_final` is deleted outright
+                    // (idl/llm_service.proto); `event_kind` (COMPLETED/ERROR)
+                    // is the sole terminal discriminator now.
+                    if (envelope.event.isTerminalConnectEvent()) break
                 }
             } catch (error: CancellationException) {
                 // Prefer cancel-over-wire so the host finishes cleanly and the
@@ -383,7 +387,7 @@ internal class AndroidConnectSocket(
                 val frame = ConnectHostFrame.ADAPTER.decode(readFrame())
                 val envelope = frame.invocation_event ?: break
                 if (envelope.request_id != requestId) continue
-                if (envelope.event?.is_final == true) break
+                if (envelope.event?.isTerminalConnectEvent() == true) break
             }
         } catch (_: Exception) {
             // Session may already be closing; keep the connection if possible.
@@ -439,6 +443,14 @@ internal class AndroidConnectSocket(
             is SocketTimeoutException -> SDKException.timeout(message, error)
             else -> SDKException.networkError("$message: ${error.message ?: "network error"}", error)
         }
+
+    /**
+     * `RALLMStreamEvent.is_final` is deleted outright (idl/llm_service.proto):
+     * `event_kind` (COMPLETED/ERROR) is the sole terminal discriminator now.
+     */
+    private fun RALLMStreamEvent.isTerminalConnectEvent(): Boolean =
+        event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+            event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR
 
     private companion object {
         const val MAXIMUM_FRAME_LENGTH = 4 * 1024 * 1024

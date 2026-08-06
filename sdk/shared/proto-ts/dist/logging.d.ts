@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * Mirrors rac_log_level_t exactly so the generated enum round-trips with the
@@ -45,7 +46,7 @@ export interface LogEntry {
     function: string;
     errorCode: number;
     modelId: string;
-    framework: string;
+    framework: InferenceFramework;
 }
 export interface LogEntry_MetadataEntry {
     key: string;

@@ -22,9 +22,11 @@ export declare function nPUChipToJSON(object: NPUChip): string;
 export interface DeviceStorageInfo {
     totalBytes: number;
     freeBytes: number;
+    /**
+     * Distinct from total-minus-free: this is the adapter's own reading of
+     * occupied space, not a derivation. Kept live.
+     */
     usedBytes: number;
-    /** 0.0 to 100.0, and 0.0 when total_bytes is 0. */
-    usedPercent: number;
 }
 export interface AppStorageInfo {
     documentsBytes: number;
@@ -35,14 +37,15 @@ export interface AppStorageInfo {
 export interface ModelStorageMetrics {
     modelId: string;
     sizeOnDiskBytes: number;
-    /** Epoch ms of the last load. */
-    lastUsedMs?: number | undefined;
 }
 export interface StorageInfo {
     app?: AppStorageInfo | undefined;
     device?: DeviceStorageInfo | undefined;
     models: ModelStorageMetrics[];
-    totalModels: number;
+    /**
+     * total_models_bytes (5) is NOT a pure derivation -- kept live; see
+     * storage_event_publisher.cpp and two facade readers.
+     */
     totalModelsBytes: number;
 }
 export interface StorageAvailability {
@@ -51,8 +54,6 @@ export interface StorageAvailability {
     availableBytes: number;
     warningMessage?: string | undefined;
     recommendation?: string | undefined;
-    shortfallBytes: number;
-    requiredToAvailableRatio: number;
 }
 export interface StorageInfoRequest {
     includeDevice: boolean;
@@ -68,8 +69,11 @@ export interface StorageInfoResult {
 export interface StorageAvailabilityRequest {
     modelId: string;
     requiredBytes: number;
-    /** Headroom multiplier applied on top of required_bytes. */
-    safetyMargin: number;
+    /**
+     * Absolute headroom the device must still have after the write. Same
+     * unit and same name as DownloadPlanRequest.required_free_bytes_after_download.
+     */
+    requiredFreeBytesAfterDownload: number;
     /** Count bytes already occupied by this model as reclaimable. */
     includeExistingModelBytes: boolean;
     includeDeletePlan: boolean;
@@ -93,7 +97,6 @@ export interface StorageDeletePlanRequest {
 export interface StorageDeleteCandidate {
     modelId: string;
     reclaimableBytes: number;
-    lastUsedMs?: number | undefined;
     isLoaded: boolean;
     localPath: string;
     /** Deleting this needs an unload first, or a platform-side delete. */
@@ -110,12 +113,12 @@ export interface StorageDeletePlan {
     warnings: string[];
     requiresUnload: boolean;
     requiresPlatformDelete: boolean;
-    candidateCount: number;
     error?: SDKError | undefined;
 }
 export interface StorageDeleteRequest {
     modelIds: string[];
-    deleteFiles: boolean;
+    /** Files are deleted; set this only to opt OUT (catalog-only bookkeeping). */
+    keepFilesOnDisk: boolean;
     clearRegistryPaths: boolean;
     unloadIfLoaded: boolean;
     dryRun: boolean;

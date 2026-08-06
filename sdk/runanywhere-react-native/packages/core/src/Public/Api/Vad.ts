@@ -9,7 +9,7 @@ import {
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 
-import { decode, encode, nextRequestId, preflight } from './Bridge';
+import { decode, encode, preflight } from './Bridge';
 import { ensureModelLoaded } from './Models';
 import { toVadAudioSource } from './Inputs';
 import { toVadOptions } from './Options';
@@ -33,8 +33,9 @@ async function detectOnce(
       ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
     );
   }
+  // `VADProcessRequest.requestId` is deleted outright — the message is now
+  // just `audio`/`options`.
   const request = VADProcessRequest.fromPartial({
-    requestId: nextRequestId('vad'),
     audio: toVadAudioSource(audio),
     options: toVadOptions(options),
   });

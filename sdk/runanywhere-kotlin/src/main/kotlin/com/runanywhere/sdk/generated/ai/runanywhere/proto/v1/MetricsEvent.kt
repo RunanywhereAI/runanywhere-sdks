@@ -94,52 +94,36 @@ public class MetricsEvent(
     schemaIndex = 6,
   )
   public val is_over_budget: Boolean = false,
-  /**
-   * Monotonic producer-side timestamp in nanoseconds. Set by the
-   * producer (C++ dispatcher) at event-emit time; read by consumers
-   * (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
-   * latency without relying on wall-clock sync. Encoded as int64 so
-   * std::chrono::steady_clock::now().time_since_epoch() values fit
-   * directly (2^63 ns ≈ 292 years of runtime headroom).
-   */
   @field:WireField(
     tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "createdAtNs",
+    jsonName = "vadFirstSpeechMs",
     schemaIndex = 7,
   )
-  public val created_at_ns: Long = 0L,
+  public val vad_first_speech_ms: Double = 0.0,
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "vadFirstSpeechMs",
+    jsonName = "sttFirstPartialMs",
     schemaIndex = 8,
   )
-  public val vad_first_speech_ms: Double = 0.0,
+  public val stt_first_partial_ms: Double = 0.0,
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sttFirstPartialMs",
+    jsonName = "llmTotalMs",
     schemaIndex = 9,
   )
-  public val stt_first_partial_ms: Double = 0.0,
+  public val llm_total_ms: Double = 0.0,
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "llmTotalMs",
-    schemaIndex = 10,
-  )
-  public val llm_total_ms: Double = 0.0,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "ttsTotalMs",
-    schemaIndex = 11,
+    schemaIndex = 10,
   )
   public val tts_total_ms: Double = 0.0,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -161,7 +145,6 @@ public class MetricsEvent(
     if (tokens_generated != other.tokens_generated) return false
     if (audio_samples_played != other.audio_samples_played) return false
     if (is_over_budget != other.is_over_budget) return false
-    if (created_at_ns != other.created_at_ns) return false
     if (vad_first_speech_ms != other.vad_first_speech_ms) return false
     if (stt_first_partial_ms != other.stt_first_partial_ms) return false
     if (llm_total_ms != other.llm_total_ms) return false
@@ -180,7 +163,6 @@ public class MetricsEvent(
       result = result * 37 + tokens_generated.hashCode()
       result = result * 37 + audio_samples_played.hashCode()
       result = result * 37 + is_over_budget.hashCode()
-      result = result * 37 + created_at_ns.hashCode()
       result = result * 37 + vad_first_speech_ms.hashCode()
       result = result * 37 + stt_first_partial_ms.hashCode()
       result = result * 37 + llm_total_ms.hashCode()
@@ -199,7 +181,6 @@ public class MetricsEvent(
     result += """tokens_generated=$tokens_generated"""
     result += """audio_samples_played=$audio_samples_played"""
     result += """is_over_budget=$is_over_budget"""
-    result += """created_at_ns=$created_at_ns"""
     result += """vad_first_speech_ms=$vad_first_speech_ms"""
     result += """stt_first_partial_ms=$stt_first_partial_ms"""
     result += """llm_total_ms=$llm_total_ms"""
@@ -215,13 +196,12 @@ public class MetricsEvent(
     tokens_generated: Long = this.tokens_generated,
     audio_samples_played: Long = this.audio_samples_played,
     is_over_budget: Boolean = this.is_over_budget,
-    created_at_ns: Long = this.created_at_ns,
     vad_first_speech_ms: Double = this.vad_first_speech_ms,
     stt_first_partial_ms: Double = this.stt_first_partial_ms,
     llm_total_ms: Double = this.llm_total_ms,
     tts_total_ms: Double = this.tts_total_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): MetricsEvent = MetricsEvent(stt_final_ms, llm_first_token_ms, tts_first_audio_ms, end_to_end_ms, tokens_generated, audio_samples_played, is_over_budget, created_at_ns, vad_first_speech_ms, stt_first_partial_ms, llm_total_ms, tts_total_ms, unknownFields)
+  ): MetricsEvent = MetricsEvent(stt_final_ms, llm_first_token_ms, tts_first_audio_ms, end_to_end_ms, tokens_generated, audio_samples_played, is_over_budget, vad_first_speech_ms, stt_first_partial_ms, llm_total_ms, tts_total_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -256,20 +236,17 @@ public class MetricsEvent(
         if (value.is_over_budget != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.is_over_budget)
         }
-        if (value.created_at_ns != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.created_at_ns)
-        }
         if (!value.vad_first_speech_ms.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(9, value.vad_first_speech_ms)
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(8, value.vad_first_speech_ms)
         }
         if (!value.stt_first_partial_ms.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(10, value.stt_first_partial_ms)
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(9, value.stt_first_partial_ms)
         }
         if (!value.llm_total_ms.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(11, value.llm_total_ms)
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(10, value.llm_total_ms)
         }
         if (!value.tts_total_ms.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(12, value.tts_total_ms)
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(11, value.tts_total_ms)
         }
         return size
       }
@@ -296,20 +273,17 @@ public class MetricsEvent(
         if (value.is_over_budget != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.is_over_budget)
         }
-        if (value.created_at_ns != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.created_at_ns)
-        }
         if (!value.vad_first_speech_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 9, value.vad_first_speech_ms)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.vad_first_speech_ms)
         }
         if (!value.stt_first_partial_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.stt_first_partial_ms)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 9, value.stt_first_partial_ms)
         }
         if (!value.llm_total_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.llm_total_ms)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.llm_total_ms)
         }
         if (!value.tts_total_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 12, value.tts_total_ms)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.tts_total_ms)
         }
         writer.writeBytes(value.unknownFields)
       }
@@ -317,19 +291,16 @@ public class MetricsEvent(
       override fun encode(writer: ReverseProtoWriter, `value`: MetricsEvent) {
         writer.writeBytes(value.unknownFields)
         if (!value.tts_total_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 12, value.tts_total_ms)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.tts_total_ms)
         }
         if (!value.llm_total_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.llm_total_ms)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.llm_total_ms)
         }
         if (!value.stt_first_partial_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.stt_first_partial_ms)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 9, value.stt_first_partial_ms)
         }
         if (!value.vad_first_speech_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 9, value.vad_first_speech_ms)
-        }
-        if (value.created_at_ns != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.created_at_ns)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.vad_first_speech_ms)
         }
         if (value.is_over_budget != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.is_over_budget)
@@ -362,7 +333,6 @@ public class MetricsEvent(
         var tokens_generated: Long = 0L
         var audio_samples_played: Long = 0L
         var is_over_budget: Boolean = false
-        var created_at_ns: Long = 0L
         var vad_first_speech_ms: Double = 0.0
         var stt_first_partial_ms: Double = 0.0
         var llm_total_ms: Double = 0.0
@@ -376,11 +346,10 @@ public class MetricsEvent(
             5 -> tokens_generated = ProtoAdapter.INT64.decode(reader)
             6 -> audio_samples_played = ProtoAdapter.INT64.decode(reader)
             7 -> is_over_budget = ProtoAdapter.BOOL.decode(reader)
-            8 -> created_at_ns = ProtoAdapter.INT64.decode(reader)
-            9 -> vad_first_speech_ms = ProtoAdapter.DOUBLE.decode(reader)
-            10 -> stt_first_partial_ms = ProtoAdapter.DOUBLE.decode(reader)
-            11 -> llm_total_ms = ProtoAdapter.DOUBLE.decode(reader)
-            12 -> tts_total_ms = ProtoAdapter.DOUBLE.decode(reader)
+            8 -> vad_first_speech_ms = ProtoAdapter.DOUBLE.decode(reader)
+            9 -> stt_first_partial_ms = ProtoAdapter.DOUBLE.decode(reader)
+            10 -> llm_total_ms = ProtoAdapter.DOUBLE.decode(reader)
+            11 -> tts_total_ms = ProtoAdapter.DOUBLE.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -392,7 +361,6 @@ public class MetricsEvent(
           tokens_generated = tokens_generated,
           audio_samples_played = audio_samples_played,
           is_over_budget = is_over_budget,
-          created_at_ns = created_at_ns,
           vad_first_speech_ms = vad_first_speech_ms,
           stt_first_partial_ms = stt_first_partial_ms,
           llm_total_ms = llm_total_ms,

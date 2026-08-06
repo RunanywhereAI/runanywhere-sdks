@@ -56,7 +56,6 @@ export 'public/hybrid/hybrid_routing_policy.dart'
         HybridCustomFilter,
         HybridFilter,
         HybridNetworkFilter,
-        HybridQualityFilter,
         HybridRankOrder,
         HybridRoutingPolicy,
         kHybridSttConfidenceThreshold;
@@ -72,9 +71,8 @@ export 'runanywhere_protos.dart'
         HybridRoutedMetadata,
         HybridSttTranscribeOptions,
         InferenceFramework,
-        LoRAAdapterConfig,
-        LoRAAdapterInfo,
-        LoRAState,
+        LoraAdapterConfig,
+        LoraAdapterInfo,
         LoraAdapterCatalogEntry,
         LoraCompatibilityResult,
         MessageRole,
@@ -87,7 +85,5 @@ export 'runanywhere_protos.dart'
         ThinkingTagPattern,
         ToolCall,
         ToolDefinition,
-        ToolParameter,
-        ToolParameterType,
         ToolResult,
         ToolValue;

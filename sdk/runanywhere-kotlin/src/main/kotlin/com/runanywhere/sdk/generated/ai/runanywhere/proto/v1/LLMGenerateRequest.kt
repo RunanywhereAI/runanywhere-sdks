@@ -30,27 +30,24 @@ import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
 import kotlin.collections.List
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 /**
  * The single request envelope for both unary and streaming generation.
  */
 public class LLMGenerateRequest(
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val prompt: String = "",
+  /**
+   * Correlation id, echoed on every LLMStreamEvent for this call. Empty =
+   * commons generates one, which is the normal case and matches industry
+   * practice (provider-generated: OpenAI `id`, Anthropic `request-id`). A
+   * non-empty caller value is honoured verbatim.
+   */
   @field:WireField(
     tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val request_id: String = "",
   @field:WireField(
@@ -58,7 +55,7 @@ public class LLMGenerateRequest(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val model_id: String = "",
   @field:WireField(
@@ -66,38 +63,30 @@ public class LLMGenerateRequest(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "conversationId",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val conversation_id: String = "",
-  metadata: Map<String, String> = emptyMap(),
   @field:WireField(
     tag = 26,
     adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 3,
   )
   public val options: LLMGenerationOptions? = null,
-  history: List<ChatMessage> = emptyList(),
+  messages: List<ChatMessage> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerateRequest, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 25,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 4,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
-
   /**
-   * Prior turns, excluding `prompt` (the live user turn) and
-   * options.system_prompt.
+   * The whole conversation, oldest first, ending with the turn the model
+   * must answer. Never empty. System turns belong in
+   * options.system_prompt, not here.
    */
   @field:WireField(
-    tag = 27,
+    tag = 28,
     adapter = "ai.runanywhere.proto.v1.ChatMessage#ADAPTER",
     label = WireField.Label.REPEATED,
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
-  public val history: List<ChatMessage> = immutableCopyOf("history", history)
+  public val messages: List<ChatMessage> = immutableCopyOf("messages", messages)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -109,13 +98,11 @@ public class LLMGenerateRequest(
     if (other === this) return true
     if (other !is LLMGenerateRequest) return false
     if (unknownFields != other.unknownFields) return false
-    if (prompt != other.prompt) return false
     if (request_id != other.request_id) return false
     if (model_id != other.model_id) return false
     if (conversation_id != other.conversation_id) return false
-    if (metadata != other.metadata) return false
     if (options != other.options) return false
-    if (history != other.history) return false
+    if (messages != other.messages) return false
     return true
   }
 
@@ -123,13 +110,11 @@ public class LLMGenerateRequest(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + prompt.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + conversation_id.hashCode()
-      result = result * 37 + metadata.hashCode()
       result = result * 37 + (options?.hashCode() ?: 0)
-      result = result * 37 + history.hashCode()
+      result = result * 37 + messages.hashCode()
       super.hashCode = result
     }
     return result
@@ -137,26 +122,22 @@ public class LLMGenerateRequest(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """prompt=${sanitize(prompt)}"""
     result += """request_id=${sanitize(request_id)}"""
     result += """model_id=${sanitize(model_id)}"""
     result += """conversation_id=${sanitize(conversation_id)}"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     if (options != null) result += """options=$options"""
-    if (history.isNotEmpty()) result += """history=$history"""
+    if (messages.isNotEmpty()) result += """messages=$messages"""
     return result.joinToString(prefix = "LLMGenerateRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    prompt: String = this.prompt,
     request_id: String = this.request_id,
     model_id: String = this.model_id,
     conversation_id: String = this.conversation_id,
-    metadata: Map<String, String> = this.metadata,
     options: LLMGenerationOptions? = this.options,
-    history: List<ChatMessage> = this.history,
+    messages: List<ChatMessage> = this.messages,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerateRequest = LLMGenerateRequest(prompt, request_id, model_id, conversation_id, metadata, options, history, unknownFields)
+  ): LLMGenerateRequest = LLMGenerateRequest(request_id, model_id, conversation_id, options, messages, unknownFields)
 
   public companion object {
     @JvmField
@@ -169,14 +150,8 @@ public class LLMGenerateRequest(
       null, 
       "llm_service.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: LLMGenerateRequest): Int {
         var size = value.unknownFields.size
-        if (value.prompt != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.prompt)
-        }
         if (value.request_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.request_id)
         }
@@ -186,16 +161,12 @@ public class LLMGenerateRequest(
         if (value.conversation_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.conversation_id)
         }
-        size += metadataAdapter.encodedSizeWithTag(25, value.metadata)
         size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(26, value.options)
-        size += ChatMessage.ADAPTER.asRepeated().encodedSizeWithTag(27, value.history)
+        size += ChatMessage.ADAPTER.asRepeated().encodedSizeWithTag(28, value.messages)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: LLMGenerateRequest) {
-        if (value.prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
-        }
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
         }
@@ -205,17 +176,15 @@ public class LLMGenerateRequest(
         if (value.conversation_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 16, value.conversation_id)
         }
-        metadataAdapter.encodeWithTag(writer, 25, value.metadata)
         LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
-        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 27, value.history)
+        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 28, value.messages)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerateRequest) {
         writer.writeBytes(value.unknownFields)
-        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 27, value.history)
+        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 28, value.messages)
         LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
-        metadataAdapter.encodeWithTag(writer, 25, value.metadata)
         if (value.conversation_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 16, value.conversation_id)
         }
@@ -225,46 +194,37 @@ public class LLMGenerateRequest(
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
         }
-        if (value.prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
-        }
       }
 
       override fun decode(reader: ProtoReader): LLMGenerateRequest {
-        var prompt: String = ""
         var request_id: String = ""
         var model_id: String = ""
         var conversation_id: String = ""
-        val metadata = mutableMapOf<String, String>()
         var options: LLMGenerationOptions? = null
-        val history = mutableListOf<ChatMessage>()
+        val messages = mutableListOf<ChatMessage>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> prompt = ProtoAdapter.STRING.decode(reader)
             14 -> request_id = ProtoAdapter.STRING.decode(reader)
             15 -> model_id = ProtoAdapter.STRING.decode(reader)
             16 -> conversation_id = ProtoAdapter.STRING.decode(reader)
-            25 -> metadata.putAll(metadataAdapter.decode(reader))
             26 -> options = LLMGenerationOptions.ADAPTER.decode(reader)
-            27 -> history.add(ChatMessage.ADAPTER.decode(reader))
+            28 -> messages.add(ChatMessage.ADAPTER.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
         return LLMGenerateRequest(
-          prompt = prompt,
           request_id = request_id,
           model_id = model_id,
           conversation_id = conversation_id,
-          metadata = metadata,
           options = options,
-          history = history,
+          messages = messages,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMGenerateRequest): LLMGenerateRequest = value.copy(
         options = value.options?.let(LLMGenerationOptions.ADAPTER::redact),
-        history = value.history.redactElements(ChatMessage.ADAPTER),
+        messages = value.messages.redactElements(ChatMessage.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

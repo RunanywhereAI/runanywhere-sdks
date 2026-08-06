@@ -15,7 +15,7 @@
 import type { TabLifecycle } from '../app';
 import { showToast } from '../components/dialogs';
 import { RunAnywhere } from '@runanywhere/web';
-import type { ModelInfo, ModelsState } from '@runanywhere/web';
+import type { ModelsState } from '@runanywhere/web';
 import {
   findLoadedModelForCategory,
   onModelStateChange,
@@ -253,8 +253,7 @@ function renderModelList(): void {
   );
 
   host.innerHTML = catalog.map((entry) => {
-    const registryInfo = lookupModelInfo(entry.id);
-    const isDownloaded = downloadedIds.has(entry.id) || Boolean(registryInfo?.isDownloaded);
+    const isDownloaded = downloadedIds.has(entry.id);
     const isLoaded = loadedIds.has(entry.id);
     const statusLabel = isLoaded
       ? '<span class="badge badge-green">Loaded</span>'
@@ -297,8 +296,4 @@ async function deleteModel(modelId: string): Promise<void> {
   }
   await refreshStorageInfo();
   renderModelList();
-}
-
-function lookupModelInfo(modelId: string): ModelInfo | null {
-  return RunAnywhere.models.get(modelId);
 }

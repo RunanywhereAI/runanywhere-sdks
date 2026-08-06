@@ -13,15 +13,16 @@
  * `AsyncIterator.return()` which calls the transport's cancel function,
  * which deregisters the proto-byte callback on the C++ handle.
  *
- * Terminal events: `event.isFinal` finishes every subscriber and tears the
- * Nitro subscription down deterministically (Swift LLMStreamAdapter.swift:63)
- * instead of waiting for the native `onDone`.
+ * Terminal events: an `eventKind` of COMPLETED or ERROR finishes every
+ * subscriber and tears the Nitro subscription down deterministically (Swift
+ * LLMStreamAdapter.swift:63) instead of waiting for the native `onDone`.
  */
 
 import { LLM as NitroLLM } from '../Internal/Nitro/NitroLLMSpec';
 import {
   LLMGenerateRequest,
   LLMStreamEvent,
+  LLMStreamEventKind,
 } from '@runanywhere/proto-ts/llm_service';
 import {
   generateLLM,
@@ -35,7 +36,11 @@ const llmFanOutRegistry = new HandleStreamFanOutRegistry<LLMStreamEvent>({
   subscribe: (handle, onBytes, onDone, onError) =>
     NitroLLM.subscribeProtoEvents(handle, onBytes, onDone, onError),
   decode: (bytes) => LLMStreamEvent.decode(bytes),
-  isTerminalEvent: (event) => event.isFinal,
+  // `LLMStreamEvent.isFinal` is deleted outright — `eventKind` (COMPLETED or
+  // ERROR) is the sole terminal signal now.
+  isTerminalEvent: (event) =>
+    event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+    event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
 });
 
 function fanOutTransportFor(handle: number): LLMStreamTransport {

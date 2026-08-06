@@ -135,7 +135,10 @@ public extension RunAnywhere {
                                 sawStarted = true
                                 continuation.yield(.started(operationId: operationId, sequence: nextSequence()))
                             }
-                            switch progress.stage {
+                            // RADownloadStage was folded into RADownloadState
+                            // (idl/download_service.proto) — switch on
+                            // `.state` directly.
+                            switch progress.state {
                             case .validating:
                                 continuation.yield(.verifying(operationId: operationId, sequence: nextSequence()))
                             case .extracting:
@@ -293,7 +296,12 @@ public extension RunAnywhere {
                 )
             }
 
-            let hasLocalArtifacts = info.hasIsDownloaded ? info.isDownloaded : !info.localPath.isEmpty
+            // ModelInfo.isDownloaded was deleted outright
+            // (idl/model_types.proto: "reserved 32; // was is_downloaded: a
+            // bool cannot express DOWNLOADING"). registry_status is the
+            // sole downloaded-ness signal now; a non-empty localPath is the
+            // simplest local proxy for it, same as everywhere else in this SDK.
+            let hasLocalArtifacts = !info.localPath.isEmpty
             guard !hasLocalArtifacts else {
                 throw SDKException(
                     code: .invalidState,
@@ -406,7 +414,9 @@ extension RunAnywhere {
         }
 
         var model = lookup.model
-        let alreadyDownloaded = model.hasIsDownloaded ? model.isDownloaded : !model.localPath.isEmpty
+        // ModelInfo.isDownloaded deleted outright — see the comment on the
+        // sibling check in `unregister` above.
+        let alreadyDownloaded = !model.localPath.isEmpty
         if !alreadyDownloaded {
             guard downloadIfNeeded else {
                 throw SDKException(

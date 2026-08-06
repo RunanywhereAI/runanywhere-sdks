@@ -1,6 +1,6 @@
 // assets.ts — the `models`, `lora`, `images`, and `segmentation` namespaces.
 
-import { CATALOG, isCatalogId } from '../catalog';
+import { catalogEntries, catalogEntry, isCatalogId } from '../catalog';
 import type { CatalogEntry, ModelType } from '../catalog';
 import { SDKException } from '../errors';
 import type { LoadSlot, RaBackend } from './backend';
@@ -129,7 +129,7 @@ function toLoadedModel(
   options: LoadOptions,
   unload: (id: string) => Promise<void>
 ): LoadedModel {
-  const actualBackend = options.framework ?? (isCatalogId(id) ? FRAMEWORK_OF_TYPE[CATALOG[id].type] : undefined);
+  const actualBackend = options.framework ?? (isCatalogId(id) ? FRAMEWORK_OF_TYPE[catalogEntry(id)!.type] : undefined);
   return {
     id,
     category,
@@ -147,7 +147,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
   const infoFor = async (id: string): Promise<ModelInfo | null> => {
     const status = await deps.backend.modelStatus();
     if (isCatalogId(id)) {
-      return catalogToInfo(id, CATALOG[id], status[id] ?? { downloaded: false, sizeBytes: 0 });
+      return catalogToInfo(id, catalogEntry(id)!, status[id] ?? { downloaded: false, sizeBytes: 0 });
     }
     const custom = runtime.get(id);
     if (!custom) return null;
@@ -183,7 +183,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
   };
 
   const categoryOf = async (id: string): Promise<ModelCategory> => {
-    if (isCatalogId(id)) return CATEGORY_OF_TYPE[CATALOG[id].type];
+    if (isCatalogId(id)) return CATEGORY_OF_TYPE[catalogEntry(id)!.type];
     const custom = runtime.get(id);
     if (custom) return custom.registration.category;
     throw SDKException.modelNotFound(id);
@@ -211,7 +211,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
     async list(filter = {}) {
       const status = await deps.backend.modelStatus();
       const out: ModelInfo[] = [];
-      for (const [id, entry] of Object.entries(CATALOG)) {
+      for (const [id, entry] of Object.entries(catalogEntries())) {
         out.push(catalogToInfo(id, entry, status[id] ?? { downloaded: false, sizeBytes: 0 }));
       }
       for (const id of runtime.keys()) {
@@ -257,7 +257,7 @@ export function createModelsNamespace(deps: AssetDeps): ModelsNamespace {
           });
           // An archive entry reports 100% while the tar extract still runs; surface
           // that as its own phase rather than a stall at 100.
-          if (!extracting && p.percent >= 100 && isCatalogId(source) && CATALOG[source].archive) {
+          if (!extracting && p.percent >= 100 && isCatalogId(source) && catalogEntry(source)?.archive) {
             extracting = true;
             sink.push({ type: 'extracting' });
           }

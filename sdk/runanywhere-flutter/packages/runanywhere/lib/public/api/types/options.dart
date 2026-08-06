@@ -8,8 +8,6 @@ import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/diarization.pb.dart' as diar_pb;
 import 'package:runanywhere/generated/diffusion_options.pb.dart' as diff_pb;
-import 'package:runanywhere/generated/diffusion_options.pbenum.dart'
-    show DiffusionMode;
 import 'package:runanywhere/generated/embeddings_options.pb.dart' as embed_pb;
 import 'package:runanywhere/generated/embeddings_options.pbenum.dart'
     show EmbeddingsPoolingStrategy;
@@ -22,7 +20,7 @@ import 'package:runanywhere/generated/model_types.pbenum.dart' as model_pb;
 import 'package:runanywhere/generated/rag.pb.dart' show RAGConfiguration;
 import 'package:runanywhere/generated/segmentation.pb.dart' as seg_pb;
 import 'package:runanywhere/generated/structured_output.pb.dart'
-    show JSONSchema, StructuredOutputOptions;
+    show StructuredOutputOptions;
 import 'package:runanywhere/generated/stt_options.pb.dart' show STTOptions;
 import 'package:runanywhere/generated/thinking_tag_pattern.pb.dart'
     as think_pb;
@@ -36,7 +34,7 @@ import 'package:runanywhere/generated/tts_options.pb.dart' show TTSOptions;
 
 import 'package:runanywhere/generated/vad_options.pb.dart' show VADOptions;
 import 'package:runanywhere/generated/vlm_options.pb.dart'
-    show VLMGenerationOptions;
+    show VLMGenerationRequest, VLMImage;
 import 'package:runanywhere/public/api/types/inputs.dart';
 
 export 'package:runanywhere/generated/embeddings_options.pbenum.dart'
@@ -56,8 +54,6 @@ RAGConfiguration? _ragDefaults;
 diff_pb.DiffusionGenerationOptions? _imageDefaults;
 diar_pb.DiarizationOptions? _diarizationDefaults;
 ToolCallingOptions? _toolDefaults;
-StructuredOutputOptions? _structuredDefaults;
-VLMGenerationOptions? _vlmDefaults;
 
 LLMGenerationOptions get _llm =>
     _llmDefaults ??= LLMGenerationOptionsConvenience.defaults();
@@ -74,10 +70,6 @@ diar_pb.DiarizationOptions get _diarization =>
     _diarizationDefaults ??= DiarizationOptionsConvenience.defaults();
 ToolCallingOptions get _tools =>
     _toolDefaults ??= ToolCallingOptions(maxToolCalls: 5);
-StructuredOutputOptions get _structured =>
-    _structuredDefaults ??= StructuredOutputOptionsConvenience.defaults();
-VLMGenerationOptions get _vlm =>
-    _vlmDefaults ??= VLMGenerationOptionsConvenience.defaults();
 
 /// Thinking-phase control for a generation request.
 class ReasoningOptions {
@@ -155,18 +147,26 @@ class StructuredOutput {
   /// Constrain output to [schema].
   const StructuredOutput({required this.schema, this.strict = true});
 
-  /// JSON Schema the output must satisfy.
-  final JSONSchema schema;
+  /// JSON Schema the output must satisfy, as raw JSON Schema text.
+  ///
+  /// idl/structured_output.proto deleted the typed `JSONSchema` message tree
+  /// outright: `StructuredOutputOptions.schema` is now a plain JSON Schema
+  /// string (one arm of a `oneof constraint { schema | grammar | regex }`).
+  /// commons' `rac_structured_output_schema_to_json_proto` (the former
+  /// proto-tree-to-text serializer) is a permanently-retired stub now, so
+  /// callers must already hold the schema as text.
+  final String schema;
 
   /// True rejects output that does not validate instead of repairing it.
+  ///
+  /// `StructuredOutputOptions.strict_mode` was deleted outright — this knob
+  /// has no wire home anymore. Kept on the public struct for API stability
+  /// but currently has no effect on the built proto.
   final bool strict;
 
   /// Build the generated structured-output options.
-  StructuredOutputOptions toProto() => StructuredOutputOptions(
-    schema: schema,
-    strictMode: strict,
-    maxRetries: _structured.maxRetries,
-  );
+  StructuredOutputOptions toProto() =>
+      StructuredOutputOptions(schema: schema, includeSchemaInPrompt: true);
 }
 
 /// Sampling, prompting, reasoning, and tool controls for `llm` and `vlm`.
@@ -228,7 +228,7 @@ class LlmOptions {
   final double? presencePenalty;
 
   /// Repetition penalty. 1.0 is no penalty.
-  double get repetitionPenalty => _argRepetitionPenalty ?? _llm.repetitionPenalty;
+  double get repetitionPenalty => _argRepetitionPenalty ?? _llm.repeatPenalty;
 
   /// Deterministic sampling seed.
   final int? seed;
@@ -267,7 +267,9 @@ class LlmOptions {
       maxOutputTokens: maxOutputTokens,
       temperature: temperature,
       topP: topP,
-      repetitionPenalty: repetitionPenalty,
+      // idl/llm_options.proto renamed repetition_penalty -> repeat_penalty
+      // (industry name: llama.cpp / Ollama both spell it repeat_penalty).
+      repeatPenalty: repetitionPenalty,
       stopSequences: stopSequences,
     );
     if (topK != null) proto.topK = topK!;
@@ -302,31 +304,35 @@ class LlmOptions {
     return proto;
   }
 
-  /// Build the generated VLM generation options for [prompt].
-  VLMGenerationOptions toVlmProto(String prompt) {
-    final proto = VLMGenerationOptions(
-      prompt: prompt,
-      maxOutputTokens: _argMaxOutputTokens ?? _vlm.maxOutputTokens,
-      temperature: _argTemperature ?? _vlm.temperature,
-      topP: _argTopP ?? _vlm.topP,
-      topK: topK ?? _vlm.topK,
-      repetitionPenalty: _argRepetitionPenalty ?? _vlm.repetitionPenalty,
-      stopSequences: stopSequences,
-    );
-    if (minP != null) proto.minP = minP!;
-    if (seed != null) proto.seed = Int64(seed!);
-    if (systemPrompt != null) proto.systemPrompt = systemPrompt!;
-    final reasoningOptions = reasoning;
-    if (reasoningOptions != null) {
-      proto.reasoning = reasoningOptions.toProto();
-    }
-    return proto;
-  }
+  /// Build the generated VLM request envelope for [prompt] over [images].
+  ///
+  /// `VLMGenerationOptions` was deleted outright (idl/vlm_options.proto):
+  /// its 11 sampling fields were name-for-name copies of
+  /// `LLMGenerationOptions` with drifted defaults, so VLM now shares the
+  /// exact same [toProto] options this class already builds for `llm`.
+  /// `vision` carries the four genuinely vision-specific knobs; neither has
+  /// a public [LlmOptions] knob yet, so it stays default. Mirrors Swift
+  /// `LlmOptions.toVLMRequest(prompt:images:)`.
+  VLMGenerationRequest toVlmRequest({
+    required String prompt,
+    required List<VLMImage> images,
+    List<ToolDefinition> registeredTools = const <ToolDefinition>[],
+  }) => VLMGenerationRequest(
+    prompt: prompt,
+    images: images,
+    options: toProto(registeredTools: registeredTools),
+  );
 }
 
 /// Language, formatting, and speaker controls for `stt`.
 class SttOptions {
   /// Override any subset of the transcription defaults.
+  ///
+  /// [translateToEnglish] has no wire home: idl/stt_options.proto's
+  /// `STTOptions` carries no such field (only `diarize`, `speakersExpected`,
+  /// `silenceDurationMs`, `language`, `enablePunctuation`,
+  /// `enableWordTimestamps`). Kept on the public constructor for API
+  /// stability but currently has no effect on the built proto.
   SttOptions({
     this.language,
     bool? punctuation,
@@ -355,7 +361,8 @@ class SttOptions {
   /// Upper bound on distinct speakers. Null lets the model decide.
   final int? maxSpeakers;
 
-  /// True translates non-English speech into English text.
+  /// True translates non-English speech into English text. Currently
+  /// inert — see the constructor doc.
   final bool translateToEnglish;
 
   /// Build the generated STT options.
@@ -363,12 +370,11 @@ class SttOptions {
     final proto = STTOptions(
       enablePunctuation: punctuation,
       enableWordTimestamps: wordTimestamps,
-      enableDiarization: diarization,
-      translateToEnglish: translateToEnglish,
+      diarize: diarization,
     );
     final tag = language;
     if (tag != null) proto.language = tag;
-    if (maxSpeakers != null) proto.maxSpeakers = maxSpeakers!;
+    if (maxSpeakers != null) proto.speakersExpected = maxSpeakers!;
     return proto;
   }
 }
@@ -499,22 +505,21 @@ class EmbedOptions {
 }
 
 /// Whether `images.generate` synthesizes from scratch or repaints a region.
+///
+/// `DiffusionMode` (the wire enum) was deleted outright
+/// (idl/diffusion_options.proto): "Mode is inferred, never declared: no
+/// image = text-to-image, image = image-to-image, image + mask_image =
+/// inpainting." This class keeps the same public shape and lets [toProto]
+/// infer the wire mode from whether [input]/[mask] are present.
 class ImageMode {
-  const ImageMode._(this.mode, this.input, this.mask);
+  const ImageMode._(this.input, this.mask);
 
   /// Synthesize a new image from the prompt alone.
-  static const ImageMode generate = ImageMode._(
-    DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
-    null,
-    null,
-  );
+  static const ImageMode generate = ImageMode._(null, null);
 
   /// Repaint the masked region of [input].
   factory ImageMode.inpaint(ImageInput input, ImageInput mask) =>
-      ImageMode._(DiffusionMode.DIFFUSION_MODE_INPAINTING, input, mask);
-
-  /// Generated diffusion mode.
-  final DiffusionMode mode;
+      ImageMode._(input, mask);
 
   /// Base image for inpainting.
   final ImageInput? input;
@@ -566,14 +571,22 @@ class ImageOptions {
   final bool reportPartials;
 
   /// Build the generated diffusion options for [prompt].
+  ///
+  /// `DiffusionMode`/`report_intermediate_images`/`denoise_strength`/
+  /// `input_image*` were all deleted or renamed (idl/diffusion_options.proto):
+  /// mode is inferred from whether `image`/`mask_image` are set rather than
+  /// declared by an enum; the base image field is `image`/`image_media_type`
+  /// (no separate width/height — the bytes are an encoded PNG/JPEG
+  /// container, not raw pixels); denoise strength is `strength`; and
+  /// intermediate-image reporting has no request-side opt-in anymore
+  /// ([reportPartials] only gates whether [namespaces/media.dart] emits the
+  /// `INTERMEDIATE_IMAGE` stream events it already receives).
   diff_pb.DiffusionGenerationOptions toProto(String prompt) {
     final proto = diff_pb.DiffusionGenerationOptions(
       prompt: prompt,
       steps: steps,
       guidanceScale: guidanceScale,
-      mode: mode.mode,
-      reportIntermediateImages: reportPartials,
-      denoiseStrength: _image.denoiseStrength,
+      strength: _image.strength,
     );
     if (negativePrompt != null) proto.negativePrompt = negativePrompt!;
     if (width != null) proto.width = width!;
@@ -582,13 +595,14 @@ class ImageOptions {
     final input = mode.input;
     if (input != null) {
       proto
-        ..inputImage = input.bytes
-        ..inputImageWidth = input.width
-        ..inputImageHeight = input.height;
+        ..image = input.bytes
+        ..imageMediaType = input.mediaType;
     }
     final mask = mode.mask;
     if (mask != null) {
-      proto.maskImage = mask.bytes;
+      proto
+        ..maskImage = mask.bytes
+        ..maskImageMediaType = mask.mediaType;
     }
     return proto;
   }
@@ -717,7 +731,12 @@ class RagConfig {
   /// Minimum similarity a chunk needs to be returned.
   final double? similarityThreshold;
 
-  /// Directory the index persists to. Null keeps it in memory.
+  /// Directory the index persists to.
+  ///
+  /// `RAGConfiguration.index_path`/`persist_index` were deleted outright
+  /// (idl/rag.proto) — RAG is in-memory only now, with no on-disk index.
+  /// Kept on the public constructor for API stability but currently has no
+  /// effect on the built proto.
   final String? persistPath;
 
   /// Build the generated RAG configuration for the given models.
@@ -733,13 +752,8 @@ class RagConfig {
     );
     if (llmModelId != null) proto.llmModelId = llmModelId;
     if (similarityThreshold != null) {
-      proto.similarityThreshold = similarityThreshold!;
-    }
-    final path = persistPath;
-    if (path != null) {
-      proto
-        ..indexPath = path
-        ..persistIndex = true;
+      // idl/rag.proto renamed similarity_threshold -> score_threshold.
+      proto.scoreThreshold = similarityThreshold!;
     }
     return proto;
   }

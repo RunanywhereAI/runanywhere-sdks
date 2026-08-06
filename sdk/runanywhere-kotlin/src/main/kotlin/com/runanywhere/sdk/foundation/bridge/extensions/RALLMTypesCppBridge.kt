@@ -15,8 +15,10 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.ChatMessage
 import ai.runanywhere.proto.v1.ExecutionTarget
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.MessageRole
 import ai.runanywhere.proto.v1.ThinkingTagPattern
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.types.RAExecutionTarget
@@ -30,24 +32,28 @@ import com.runanywhere.sdk.public.types.RAThinkingTagPattern
 /**
  * Build a `RALLMGenerateRequest` from these options + a prompt.
  *
- * Generation controls remain in the canonical `options` envelope; the
- * request itself carries only prompt, identity, metadata, and history.
+ * `LLMGenerateRequest.prompt`/`.history` were deleted outright
+ * (idl/llm_service.proto): the request now carries only `messages` (oldest
+ * first, ending with the turn the model must answer). Generation controls
+ * remain in the canonical `options` envelope.
  */
 fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
     val defaults = RALLMGenerationOptions.defaults()
     val requestOptions =
         copy(
-            max_output_tokens = max_output_tokens.takeIf { it > 0 } ?: defaults.max_output_tokens,
-            // This extension is invoked on an explicit options value. Zero is
-            // the documented greedy-decoding sentinel, not an absent value;
-            // callers that want the sampled default use defaults().
-            temperature = temperature.coerceIn(0.0f, 2.0f),
-            top_p = top_p.takeIf { it > 0.0f } ?: defaults.top_p,
-            repetition_penalty = repetition_penalty.takeIf { it > 0.0f } ?: defaults.repetition_penalty,
+            max_output_tokens = max_output_tokens?.takeIf { it > 0 } ?: defaults.max_output_tokens,
+            // max_output_tokens/temperature/top_p/repeat_penalty are all
+            // optional now (idl/llm_options.proto): absent means "let the
+            // engine decide," so zero is a real caller-supplied greedy
+            // temperature that survives, and only an explicit null falls
+            // back to defaults().
+            temperature = temperature?.coerceIn(0.0f, 2.0f) ?: defaults.temperature,
+            top_p = top_p?.takeIf { it > 0.0f } ?: defaults.top_p,
+            repeat_penalty = repeat_penalty?.takeIf { it > 0.0f } ?: defaults.repeat_penalty,
         )
     return RALLMGenerateRequest(
-        prompt = prompt,
         options = requestOptions,
+        messages = listOf(ChatMessage(role = MessageRole.MESSAGE_ROLE_USER, content = prompt)),
     )
 }
 
@@ -67,10 +73,11 @@ val RALLMGenerationResult.latencyMs: Double
 
 /**
  * Optional time-to-first-token (Swift `RALLMGenerationResult.timeToFirstTokenMs`).
- * Returns null when the underlying Wire field is unset.
+ * `LLMGenerationResult.ttft_ms` was deleted outright -- `TokenUsage.ttft_ms`
+ * (`usage.ttft_ms`) is the canonical spelling for every result type now.
  */
 val RALLMGenerationResult.timeToFirstTokenMs: Double?
-    get() = ttft_ms
+    get() = usage?.ttft_ms?.toDouble()
 
 // MARK: - RAThinkingTagPattern: defaults
 

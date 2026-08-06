@@ -130,12 +130,12 @@ class SttApi {
           if (eventController.isClosed) return;
           if (partial.isFinal) {
             sawTerminal = true;
+            // `STTPartialResult.final_output` (a full `STTOutput`) was
+            // deleted outright, along with `segment_index`/`confidence`/
+            // `stability`/etc (idl/stt_options.proto) — `text` is the only
+            // content field left on a final partial.
             eventController.add(
-              TranscriptionFinal(
-                partial.hasFinalOutput()
-                    ? Transcription.fromProto(partial.finalOutput)
-                    : Transcription(text: partial.text),
-              ),
+              TranscriptionFinal(Transcription(text: partial.text)),
             );
             eventController.add(const TranscriptionCompleted());
             break;

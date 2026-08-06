@@ -1,6 +1,5 @@
 import {
   ToolDefinition,
-  ToolParameterType,
   ToolValue,
 } from '@runanywhere/proto-ts/tool_calling';
 import { ToolCalling } from '../Extensions/RunAnywhere+ToolCalling.js';
@@ -17,13 +16,20 @@ export function registerDuckDuckGoSearchTool(): void {
     ToolDefinition.fromPartial({
       name: 'web_search',
       description: 'Search the public web using DuckDuckGo Instant Answers.',
-      parameters: [{
-        name: 'query',
-        type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-        description: 'The search query',
-        required: true,
-        enumValues: [],
-      }],
+      // `ToolDefinition.parameters` is one OpenAI/Anthropic/MCP-style JSON
+      // Schema string now (idl/tool_calling.proto) -- ToolParameterType and
+      // the structured-parameter-list shape were deleted outright. Swift
+      // parity: RAToolDefinition.jsonSchema(for:) (ToolCallingTypes.swift).
+      parameters: JSON.stringify({
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The search query',
+          },
+        },
+        required: ['query'],
+      }),
     }),
     async (args) => {
       const query = args.query?.stringValue?.trim();

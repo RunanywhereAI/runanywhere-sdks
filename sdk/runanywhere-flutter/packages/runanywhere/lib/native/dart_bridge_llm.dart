@@ -19,6 +19,8 @@ import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent;
+import 'package:runanywhere/generated/llm_service.pbenum.dart'
+    show LLMStreamEventKind;
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
@@ -213,9 +215,15 @@ class DartBridgeLLM {
         if (controller.isClosed) return;
         try {
           final event = LLMStreamEvent.fromBuffer(message);
-          sawTerminalEvent = sawTerminalEvent || event.isFinal;
+          // `LLMStreamEvent.isFinal`/`.kind` were renamed `event_kind`
+          // (idl/llm_service.proto; reserved list explicitly includes
+          // `is_final`/`kind`) — terminal-ness is now `COMPLETED`/`ERROR`.
+          final isTerminal =
+              event.eventKind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+              event.eventKind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR;
+          sawTerminalEvent = sawTerminalEvent || isTerminal;
           controller.add(event);
-          if (event.isFinal) {
+          if (isTerminal) {
             unawaited(controller.close());
           }
         } catch (e, st) {

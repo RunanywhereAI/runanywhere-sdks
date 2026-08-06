@@ -15,8 +15,10 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
-/// into COMPONENT; the modality is recoverable from c_abi_code and
-/// ErrorContext.operation, so it is not encoded twice.
+/// into COMPONENT; use SDKError.component to tell them apart.
+///
+/// The rac_wire_string values are the one form every SDK prints, so a crash
+/// report written by Swift and one written by Web say the same word.
 class ErrorCategory extends $pb.ProtobufEnum {
   static const ErrorCategory ERROR_CATEGORY_UNSPECIFIED =
       ErrorCategory._(0, _omitEnumNames ? '' : 'ERROR_CATEGORY_UNSPECIFIED');

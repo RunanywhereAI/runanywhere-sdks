@@ -1,12 +1,23 @@
 /*
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * `RALLMStreamEvent.is_final` and `LLMStreamFinalResult` are deleted outright
+ * (idl/llm_service.proto): `event_kind` (COMPLETED/ERROR) is the sole
+ * terminal discriminator now, `finish_reason` was retyped from a plain
+ * string to the `FinishReason` enum, and the terminal canonical payload is
+ * carried on `LLMStreamEvent.result` as a plain `LLMGenerationResult`
+ * (the same message every non-streaming call returns) rather than a
+ * dedicated final-result type. `TokenUsage.tokens_per_second` was renamed
+ * `decode_tokens_per_second`.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.FinishReason
+import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
-import ai.runanywhere.proto.v1.LLMStreamFinalResult
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.TokenUsage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
@@ -46,6 +57,7 @@ class RunAnywhereTextGenerationStreamTest {
                                 onEvent(
                                     LLMStreamEvent(
                                         token = "<$index>",
+                                        event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
                                     ),
                                 ),
                             )
@@ -54,8 +66,8 @@ class RunAnywhereTextGenerationStreamTest {
                             "terminal callback must stop native generation",
                             onEvent(
                                 LLMStreamEvent(
-                                    is_final = true,
-                                    finish_reason = "stop",
+                                    event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+                                    finish_reason = FinishReason.FINISH_REASON_STOP,
                                 ),
                             ),
                         )
@@ -97,7 +109,7 @@ class RunAnywhereTextGenerationStreamTest {
             assertEquals(tokenCount, usage.output_tokens)
             assertEquals(tokenCount, result.response_tokens)
             assertEquals(tokenCount + 1, usage.total_tokens)
-            assertEquals("stop", result.finish_reason)
+            assertEquals(FinishReason.FINISH_REASON_STOP, result.finish_reason)
             assertEquals("stress-model", result.model_used)
             assertEquals("stress-framework", result.framework)
             assertNull(result.error)
@@ -108,11 +120,10 @@ class RunAnywhereTextGenerationStreamTest {
     fun `terminal canonical result wins without changing metrics`() =
         runBlocking {
             val canonical =
-                LLMStreamFinalResult(
+                LLMGenerationResult(
                     text = "canonical answer",
                     thinking_content = "canonical reasoning",
-                    total_time_ms = 123L,
-                    time_to_first_token_ms = 8L,
+                    generation_time_ms = 123.0,
                     prompt_eval_time_ms = 20L,
                     decode_time_ms = 100L,
                     usage =
@@ -120,15 +131,16 @@ class RunAnywhereTextGenerationStreamTest {
                             input_tokens = 7,
                             output_tokens = 9,
                             total_tokens = 16,
-                            tokens_per_second = 45.5,
+                            decode_tokens_per_second = 45.5,
+                            ttft_ms = 8L,
                         ),
                 )
             val events =
                 flowOf(
-                    LLMStreamEvent(token = "streamed fallback"),
+                    LLMStreamEvent(token = "streamed fallback", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN),
                     LLMStreamEvent(
-                        is_final = true,
-                        finish_reason = "stop",
+                        event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+                        finish_reason = FinishReason.FINISH_REASON_STOP,
                         result = canonical,
                     ),
                 )
@@ -155,11 +167,11 @@ class RunAnywhereTextGenerationStreamTest {
             assertEquals(9, result.response_tokens)
             assertEquals(16, usage.total_tokens)
             assertEquals(123.0, result.generation_time_ms, 0.0)
-            assertEquals(8.0, result.ttft_ms!!, 0.0)
-            assertEquals(45.5, usage.tokens_per_second, 0.0)
+            assertEquals(8L, usage.ttft_ms)
+            assertEquals(45.5, usage.decode_tokens_per_second, 0.0)
             assertEquals(20L, result.prompt_eval_time_ms)
             assertEquals(100L, result.decode_time_ms)
-            assertEquals("stop", result.finish_reason)
+            assertEquals(FinishReason.FINISH_REASON_STOP, result.finish_reason)
             assertEquals("canonical-model", result.model_used)
             assertEquals("qhexrt", result.framework)
         }
@@ -174,13 +186,20 @@ class RunAnywhereTextGenerationStreamTest {
                 losslessLLMStreamFlow(
                     prepare = {},
                     generate = { onEvent ->
-                        assertTrue(onEvent(LLMStreamEvent(token = "first")))
+                        assertTrue(
+                            onEvent(LLMStreamEvent(token = "first", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN)),
+                        )
                         assertTrue(
                             "cancellation hook did not release producer",
                             continueAfterCancellation.await(2, TimeUnit.SECONDS),
                         )
                         callbackAfterCancellation.complete(
-                            onEvent(LLMStreamEvent(token = "must-not-deliver")),
+                            onEvent(
+                                LLMStreamEvent(
+                                    token = "must-not-deliver",
+                                    event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+                                ),
+                            ),
                         )
                     },
                     cancel = {

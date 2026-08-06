@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include "chat.pb.h"
 #include "llm_service.pb.h"
 #include "model_types.pb.h"
 #include "rac/core/rac_core.h"
@@ -76,7 +77,7 @@ struct RunParams {
     float presence_penalty = 0.0f;
     int32_t top_k = 0;
     int32_t max_output_tokens = 1024;
-    int64_t seed = -1;  // vlm only; LLMGenerationOptions has no seed field
+    int64_t seed = -1;  // -1 = unset; LLMGenerationOptions.seed default is 0
     std::vector<std::string> stop_sequences;
 };
 
@@ -107,13 +108,16 @@ void apply_options(const RunParams& params, v1::LLMGenerationOptions* gen) {
         gen->set_min_p(params.min_p);
     }
     if (params.repetition_penalty > 0.0f) {
-        gen->set_repetition_penalty(params.repetition_penalty);
+        gen->set_repeat_penalty(params.repetition_penalty);
     }
     if (params.frequency_penalty != 0.0f) {
         gen->set_frequency_penalty(params.frequency_penalty);
     }
     if (params.presence_penalty != 0.0f) {
         gen->set_presence_penalty(params.presence_penalty);
+    }
+    if (params.seed >= 0) {
+        gen->set_seed(params.seed);
     }
     for (const std::string& stop : params.stop_sequences) {
         gen->add_stop_sequences(stop);
@@ -169,7 +173,7 @@ void llm_stream_callback(const uint8_t* event_bytes, size_t event_size, void* /*
 
     if (!event.token().empty()) {
         std::lock_guard<std::mutex> lock(state->mutex);
-        if (event.kind() == v1::TOKEN_KIND_THOUGHT) {
+        if (event.event_kind() == v1::LLM_STREAM_EVENT_KIND_THINKING) {
             if (state->show_thoughts) {
                 if (!state->in_thought_block) {
                     std::fprintf(stderr, "%s", term::color_enabled() ? "\033[2m" : "");
@@ -204,13 +208,14 @@ void llm_stream_callback(const uint8_t* event_bytes, size_t event_size, void* /*
         }
     }
 
-    if (event.is_final()) {
+    if (event.event_kind() == v1::LLM_STREAM_EVENT_KIND_COMPLETED ||
+        event.event_kind() == v1::LLM_STREAM_EVENT_KIND_ERROR) {
         std::lock_guard<std::mutex> lock(state->mutex);
         if (state->in_thought_block) {
             std::fprintf(stderr, "%s\n", term::color_enabled() ? "\033[0m" : "");
             state->in_thought_block = false;
         }
-        state->finish_reason = event.finish_reason();
+        state->finish_reason = v1::FinishReason_Name(event.finish_reason());
         if (!event.error().message().empty()) {
             state->error = event.error().message();
         }
@@ -223,7 +228,9 @@ void llm_stream_callback(const uint8_t* event_bytes, size_t event_size, void* /*
 int stream_once(const GlobalOptions& options, const std::string& model_id,
                 const std::string& prompt, const RunParams& params) {
     v1::LLMGenerateRequest request;
-    request.set_prompt(prompt);
+    v1::ChatMessage* message = request.add_messages();
+    message->set_role(v1::MESSAGE_ROLE_USER);
+    message->set_content(prompt);
     apply_options(params, request.mutable_options());
     (void)model_id;  // lifecycle-owned state knows the loaded model
 
@@ -283,7 +290,9 @@ int stream_once(const GlobalOptions& options, const std::string& model_id,
 int generate_once(const GlobalOptions& options, const std::string& model_id,
                   const std::string& prompt, const RunParams& params) {
     v1::LLMGenerateRequest request;
-    request.set_prompt(prompt);
+    v1::ChatMessage* message = request.add_messages();
+    message->set_role(v1::MESSAGE_ROLE_USER);
+    message->set_content(prompt);
     apply_options(params, request.mutable_options());
 
     const std::string bytes = proto::serialize(request);
@@ -304,10 +313,10 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
             .field("model", result.model_used().empty() ? model_id : result.model_used())
             .field("response", result.text())
             .field("thinking", result.thinking_content())
-            .field("finish_reason", result.finish_reason())
+            .field("finish_reason", v1::FinishReason_Name(result.finish_reason()))
             .field("input_tokens", static_cast<int64_t>(result.usage().input_tokens()))
             .field("output_tokens", static_cast<int64_t>(result.usage().output_tokens()))
-            .field("tokens_per_second", result.usage().tokens_per_second())
+            .field("tokens_per_second", result.usage().decode_tokens_per_second())
             .field("total_ms", static_cast<int64_t>(result.generation_time_ms()))
             .end_object();
         out::result_line(json.str());
@@ -321,7 +330,8 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
     out::result_line(result.text());
     if (options.verbose) {
         out::status_line("(" + std::to_string(static_cast<int64_t>(result.generation_time_ms())) +
-                         " ms, " + std::to_string(result.usage().tokens_per_second()) + " tok/s)");
+                         " ms, " + std::to_string(result.usage().decode_tokens_per_second()) +
+                         " tok/s)");
     }
     return 0;
 }
@@ -371,8 +381,8 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
     request.set_model_id(model_id);
     v1::VLMImage* image = request.add_images();
     image->set_file_path(image_path);
-    v1::VLMGenerationOptions* gen = request.mutable_options();
-    gen->set_prompt(prompt.empty() ? "Describe this image." : prompt);
+    request.set_prompt(prompt.empty() ? "Describe this image." : prompt);
+    v1::LLMGenerationOptions* gen = request.mutable_options();
     gen->set_max_output_tokens(params.max_output_tokens);
     if (params.temperature > 0.0f) {
         gen->set_temperature(params.temperature);
@@ -387,7 +397,7 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
         gen->set_min_p(params.min_p);
     }
     if (params.repetition_penalty > 0.0f) {
-        gen->set_repetition_penalty(params.repetition_penalty);
+        gen->set_repeat_penalty(params.repetition_penalty);
     }
     if (params.seed >= 0) {
         gen->set_seed(params.seed);
@@ -404,11 +414,13 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
     } else {
         reasoning->set_include_in_output(params.show_thinking);
     }
-    // VLMGenerationOptions has no frequency/presence penalty; say so rather
-    // than dropping the flags silently.
-    if (params.frequency_penalty != 0.0f || params.presence_penalty != 0.0f) {
-        out::status_line(
-            "note: --frequency-penalty / --presence-penalty are not applied to VLM models");
+    // VLMGenerationRequest.options is now the shared LLMGenerationOptions, so
+    // frequency/presence penalty apply to VLM generation too.
+    if (params.frequency_penalty != 0.0f) {
+        gen->set_frequency_penalty(params.frequency_penalty);
+    }
+    if (params.presence_penalty != 0.0f) {
+        gen->set_presence_penalty(params.presence_penalty);
     }
 
     const std::string bytes = proto::serialize(request);
@@ -432,15 +444,17 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
         json.begin_object()
             .field("model", model_id)
             .field("response", result.text())
-            .field("total_ms", static_cast<int64_t>(result.processing_time_ms()))
-            .field("tokens_per_second", static_cast<double>(result.usage().tokens_per_second()))
+            .field("total_ms", static_cast<int64_t>(result.total_time_ms()))
+            .field("tokens_per_second",
+                   static_cast<double>(result.usage().decode_tokens_per_second()))
             .end_object();
         out::result_line(json.str());
     } else {
         out::result_line(result.text());
         if (options.verbose) {
-            out::status_line("(" + std::to_string(result.processing_time_ms()) + " ms, " +
-                             std::to_string(result.usage().tokens_per_second()) + " tok/s)");
+            out::status_line("(" + std::to_string(result.total_time_ms()) + " ms, " +
+                             std::to_string(result.usage().decode_tokens_per_second()) +
+                             " tok/s)");
         }
     }
     return 0;
@@ -541,9 +555,11 @@ std::string read_piped_prompt() {
 // Attach a LoRA adapter to the already-loaded LLM in this same process, so the
 // following generation actually uses it (adapter state is session-scoped).
 bool apply_lora_adapter(const std::string& adapter_path, float scale) {
-    v1::LoRAApplyRequest request;
-    request.set_replace_existing(true);
-    v1::LoRAAdapterConfig* adapter = request.add_adapters();
+    // keep_existing left unset (false): SET semantics, which is what the
+    // former explicit replace_existing(true) meant. LoraApplyRequest has no
+    // replace_existing field to set.
+    v1::LoraApplyRequest request;
+    v1::LoraAdapterConfig* adapter = request.add_adapters();
     adapter->set_adapter_path(adapter_path);
     adapter->set_scale(scale);
 
@@ -552,7 +568,7 @@ bool apply_lora_adapter(const std::string& adapter_path, float scale) {
     rac_proto_buffer_init(&out_buffer);
     const rac_result_t rc = rac_lora_apply_proto(
         reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(), &out_buffer);
-    v1::LoRAApplyResult result;
+    v1::LoraApplyResult result;
     std::string error;
     const bool parsed = proto::parse_proto_buffer(&out_buffer, &result, &error);
     if (!parsed || rc != RAC_SUCCESS || result.has_error()) {
@@ -635,10 +651,14 @@ int run_llm(const GlobalOptions& options, LlmVerb verb, const std::string& promp
 }
 
 // The sampling / reasoning / model flags shared by every llm and vlm command.
-// The two option sets differ only where the protos do: LLMGenerationOptions has
-// the frequency/presence penalties, VLMGenerationOptions has the seed.
+// VLMGenerationRequest.options is now the same LLMGenerationOptions the LLM
+// path uses (VLMGenerationOptions was deleted), so llm and vlm expose an
+// identical sampling surface -- the `vlm` parameter only controls whether
+// --seed / --frequency-penalty / --presence-penalty are offered at all
+// (kept for CLI-surface stability; both option sets now support them).
 void add_generation_options(CLI::App* cmd, const std::shared_ptr<RunParams>& params,
                            ModelArg model_arg, bool vlm) {
+    (void)vlm;
     if (model_arg == ModelArg::Option) {
         cmd->add_option("--model,-m", params->model,
                         "Model to generate with; downloads and loads it when absent");
@@ -662,14 +682,11 @@ void add_generation_options(CLI::App* cmd, const std::shared_ptr<RunParams>& par
     cmd->add_option("--min-p", params->min_p, "Drop tokens below this share of the top token");
     cmd->add_option("--repetition-penalty", params->repetition_penalty,
                     "Penalize tokens already present in the context");
-    if (vlm) {
-        cmd->add_option("--seed", params->seed, "Fix the RNG for a repeatable answer");
-    } else {
-        cmd->add_option("--frequency-penalty", params->frequency_penalty,
-                        "Penalize tokens by how often they have appeared");
-        cmd->add_option("--presence-penalty", params->presence_penalty,
-                        "Penalize tokens that appeared at all");
-    }
+    cmd->add_option("--seed", params->seed, "Fix the RNG for a repeatable answer");
+    cmd->add_option("--frequency-penalty", params->frequency_penalty,
+                    "Penalize tokens by how often they have appeared");
+    cmd->add_option("--presence-penalty", params->presence_penalty,
+                    "Penalize tokens that appeared at all");
     cmd->add_option("--stop", params->stop_sequences,
                     "Stop as soon as this text is produced (repeat for several)");
     cmd->add_option("--max-output-tokens,--max-tokens", params->max_output_tokens,

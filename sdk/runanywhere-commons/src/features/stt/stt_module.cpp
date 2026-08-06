@@ -382,8 +382,8 @@ rac_stt_options_t options_from_proto(const runanywhere::v1::STTOptions& proto,
         options.detect_language = RAC_TRUE;
     }
     options.enable_punctuation = proto.enable_punctuation() ? RAC_TRUE : RAC_FALSE;
-    options.enable_diarization = proto.enable_diarization() ? RAC_TRUE : RAC_FALSE;
-    options.max_speakers = proto.max_speakers();
+    options.enable_diarization = proto.diarize() ? RAC_TRUE : RAC_FALSE;
+    options.max_speakers = proto.has_speakers_expected() ? proto.speakers_expected() : 0;
     options.enable_timestamps = proto.enable_word_timestamps() ? RAC_TRUE : RAC_FALSE;
     return options;
 }
@@ -422,8 +422,9 @@ void fill_stt_output(const rac_stt_result_t& result, const rac_stt_options_t& op
         metadata->set_model_id(model_id);
     }
     metadata->set_processing_time_ms(result.processing_time_ms);
-    const int64_t audio_length_ms = estimate_audio_length_ms(audio_size, options.sample_rate);
-    metadata->set_audio_length_ms(audio_length_ms);
+    // Audio length lives on STTOutput.duration_ms now (TranscriptionMetadata's
+    // copy was deleted as a duplicate).
+    out->set_duration_ms(estimate_audio_length_ms(audio_size, options.sample_rate));
 }
 
 int64_t current_time_us() {
@@ -520,10 +521,10 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
         voice.set_duration_ms(processing_ms);
     }
     if (audio_length_ms > 0) {
-        voice.set_audio_length_ms(audio_length_ms);
+        voice.set_input_audio_duration_ms(audio_length_ms);
     }
     if (audio_size_bytes > 0) {
-        voice.set_audio_size_bytes(audio_size_bytes);
+        voice.set_input_audio_bytes(audio_size_bytes);
     }
     if (word_count > 0) {
         voice.set_word_count(word_count);
@@ -544,7 +545,8 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
     if (framework_name != nullptr && framework_name[0] != '\0') {
         rac_inference_framework_t fw = RAC_FRAMEWORK_UNKNOWN;
         (void)rac_inference_framework_from_string(framework_name, &fw);
-        voice.set_framework(rac::events::framework_to_proto_int(fw));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(fw)));
     }
     voice.set_is_streaming(is_streaming);
     // Plain (non-hybrid) STT attribution: the model that served it, with no
@@ -801,7 +803,8 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
             m.set_model_id(model_id);
         if (model_name)
             m.set_model_name(model_name);
-        m.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        m.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(component->actual_framework)));
         rac::events::publish(runanywhere::v1::SDK_COMPONENT_STT,
                              runanywhere::v1::EVENT_CATEGORY_MODEL, std::move(m));
     }
@@ -825,7 +828,8 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
             m.set_model_id(model_id);
         if (model_name)
             m.set_model_name(model_name);
-        m.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        m.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(component->actual_framework)));
         m.set_duration_ms(static_cast<int64_t>(load_duration_ms));
         if (result != RAC_SUCCESS) {
             m.set_kind(runanywhere::v1::MODEL_EVENT_KIND_LOAD_FAILED);
@@ -948,13 +952,14 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
             voice.set_model_id(model_id);
         if (model_name)
             voice.set_model_name(model_name);
-        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
-        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_input_audio_bytes(static_cast<int32_t>(audio_size));
         if (local_options.language)
             voice.set_language(local_options.language);
         voice.set_is_streaming(false);
         voice.set_sample_rate(sample_rate);
-        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(framework)));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
                                           runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
                                           transcription_id.c_str());
@@ -1016,13 +1021,14 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
             voice.set_text(out_result->text);
         voice.set_confidence(out_result->confidence);
         voice.set_duration_ms(static_cast<int64_t>(duration_ms));
-        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
-        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_input_audio_bytes(static_cast<int32_t>(audio_size));
         voice.set_word_count(word_count);
         if (local_options.language)
             voice.set_language(local_options.language);
         voice.set_sample_rate(sample_rate);
-        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(framework)));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
                                           runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
                                           transcription_id.c_str());
@@ -1114,13 +1120,14 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
             voice.set_model_id(model_id);
         if (model_name)
             voice.set_model_name(model_name);
-        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
-        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_input_audio_bytes(static_cast<int32_t>(audio_size));
         if (effective_options->language)
             voice.set_language(effective_options->language);
         voice.set_is_streaming(true);  // Streaming mode!
         voice.set_sample_rate(component->config.sample_rate);
-        voice.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(component->actual_framework)));
         // PUBLIC only: this fires once per streamed CHUNK (the live path calls
         // transcribe_stream per chunk), so routing it to telemetry produced
         // rows + an HTTP flush per chunk. The session summary is recorded once
@@ -1171,15 +1178,16 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
             voice.set_model_id(model_id);
         if (model_name)
             voice.set_model_name(model_name);
-        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
-        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_input_audio_bytes(static_cast<int32_t>(audio_size));
         if (effective_options->language)
             voice.set_language(effective_options->language);
         voice.set_is_streaming(true);  // Streaming mode!
         voice.set_duration_ms(static_cast<int64_t>(duration_ms));
         // word_count not available for streaming - text is delivered via callbacks
         voice.set_sample_rate(component->config.sample_rate);
-        voice.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        voice.set_framework(static_cast<runanywhere::v1::InferenceFramework>(
+            rac::events::framework_to_proto_int(component->actual_framework)));
         // PUBLIC only: per-chunk completion (see the STARTED emit above). The
         // STT_COMPLETED kind is a telemetry completion trigger, so on the
         // telemetry path it forced one HTTP flush PER CHUNK.
@@ -1448,8 +1456,6 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
             partial->set_text(partial_text);
         }
         partial->set_is_final(is_final == RAC_TRUE);
-        partial->set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
-        partial->set_request_id(ctx->request_id);
         if (ctx->options.language && ctx->options.language[0] != '\0') {
             partial->set_language(ctx->options.language);
         }
@@ -1463,7 +1469,6 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
             }
             final_output->set_duration_ms(
                 estimate_audio_length_ms(ctx->audio_size, ctx->options.sample_rate));
-            final_output->mutable_metadata()->set_audio_length_ms(final_output->duration_ms());
         }
         emit_stt_stream_event(event, ctx->callback, ctx->user_data);
     };
@@ -1689,11 +1694,10 @@ rac_result_t parse_stt_request(const uint8_t* request_proto_bytes, size_t reques
                                      static_cast<int>(request_proto_size))) {
         return parse_error(out_error, "failed to parse STTTranscriptionRequest");
     }
-    if (out_request->has_audio() && (!out_request->audio().file_uri().empty() ||
-                                     !out_request->audio().adapter_handle().empty())) {
+    if (out_request->has_audio() && !out_request->audio().file_uri().empty()) {
         return rac_proto_buffer_set_error(
             out_error, RAC_ERROR_NOT_SUPPORTED,
-            "STTTranscriptionRequest audio file_uri/adapter_handle requires a platform adapter");
+            "STTTranscriptionRequest audio file_uri requires a platform adapter");
     }
     if (!out_request->has_audio() || out_request->audio().audio_data().empty()) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
@@ -1797,7 +1801,6 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     output.set_duration_ms(duration_ms);
     auto* metadata = output.mutable_metadata();
     metadata->set_model_id(ref.model_id ? ref.model_id : "");
-    metadata->set_audio_length_ms(duration_ms);
 
     const int32_t word_count = count_words(raw.text);
     publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED,
@@ -1878,8 +1881,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
                                 static_cast<int>(request_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
-    if (request.has_audio() &&
-        (!request.audio().file_uri().empty() || !request.audio().adapter_handle().empty())) {
+    if (request.has_audio() && !request.audio().file_uri().empty()) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
     if (!request.has_audio() || request.audio().audio_data().empty()) {
@@ -1988,8 +1990,6 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
             partial->set_text(partial_text);
         }
         partial->set_is_final(is_final == RAC_TRUE);
-        partial->set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
-        partial->set_request_id(c->request_id);
         if (!c->language.empty()) {
             partial->set_language(c->language);
         }
@@ -2004,7 +2004,6 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
             const int64_t audio_length_ms =
                 estimate_audio_length_ms(c->audio_size, c->sample_rate, c->sample_width);
             final_output->set_duration_ms(audio_length_ms);
-            final_output->mutable_metadata()->set_audio_length_ms(audio_length_ms);
         }
         const size_t size = event.ByteSizeLong();
         std::vector<uint8_t> bytes(size);

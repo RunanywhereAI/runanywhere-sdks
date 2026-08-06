@@ -3,7 +3,6 @@
  */
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
-import { VLMImageFormat } from '@runanywhere/proto-ts/vlm_options';
 import {
   SegmentationPixelFormat,
   type SegmentationImage,
@@ -22,20 +21,24 @@ import { ensureModelForCategory, ensureReady } from '../Runtime/Prerequisites.js
  * file-path payloads cannot be reached from the main thread's decoder.
  */
 async function toSegmentationImage(image: ImageInput): Promise<SegmentationImage> {
+  if (image.rawRgba && image.width > 0 && image.height > 0) {
+    return {
+      data: image.rawRgba,
+      width: image.width,
+      height: image.height,
+      pixelFormat: SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGBA8,
+    };
+  }
   if (image.rawRgb && image.width > 0 && image.height > 0) {
-    const rgba = image.format === VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA;
     return {
       data: image.rawRgb,
       width: image.width,
       height: image.height,
-      pixelFormat: rgba
-        ? SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGBA8
-        : SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGB8,
-      strideBytes: 0,
+      pixelFormat: SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGB8,
     };
   }
 
-  const encoded = image.encoded
+  const encoded = image.data
     ?? (image.base64 ? Uint8Array.from(atob(image.base64), (char) => char.charCodeAt(0)) : null);
   if (!encoded) {
     throw SDKException.invalidConfiguration(
@@ -57,7 +60,6 @@ async function toSegmentationImage(image: ImageInput): Promise<SegmentationImage
       width: bitmap.width,
       height: bitmap.height,
       pixelFormat: SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGBA8,
-      strideBytes: 0,
     };
   } finally {
     bitmap.close();
@@ -80,7 +82,10 @@ export const segmentation = {
     await ensureModelForCategory(ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION);
     const result = await segment({
       image: await toSegmentationImage(image),
-      options: { includeDiagnosticRgba: options?.includeDiagnosticImage ?? false },
+      options: {
+        includeDiagnosticRgba: options?.includeDiagnosticImage ?? false,
+        includeConfidence: false,
+      },
     });
     return toSegmentationResult(result);
   },

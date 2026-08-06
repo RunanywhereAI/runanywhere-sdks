@@ -17,7 +17,6 @@ export declare const audioCaptureDefaults: Readonly<{
     micSampleRateHz: number;
     micChannels: number;
     micChannelCapacity: number;
-    micTapBufferFrames: number;
     ttsSampleRateHz: number;
 }>;
 export declare const voiceAgentDefaults: Readonly<{

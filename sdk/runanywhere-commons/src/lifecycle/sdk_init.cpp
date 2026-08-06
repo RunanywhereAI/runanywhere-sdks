@@ -56,16 +56,23 @@ namespace {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-using ::runanywhere::v1::SdkInitEnvironment;
+using ::runanywhere::v1::SDKEnvironment;
 using ::runanywhere::v1::SdkInitPhase1Request;
 using ::runanywhere::v1::SdkInitPhase2Request;
 using ::runanywhere::v1::SdkInitResult;
 
 // -- helpers ----------------------------------------------------------------
 
-rac_environment_t to_rac_environment(SdkInitEnvironment env) {
-    // DEVELOPMENT=0, PRODUCTION=2. Reserved former-staging (=1) → production.
-    return rac_env_normalize(static_cast<rac_environment_t>(static_cast<int>(env)));
+rac_environment_t to_rac_environment(SDKEnvironment env) {
+    // model_types.proto's SDKEnvironment is now the single environment
+    // vocabulary (SdkInitEnvironment was deleted). Its zero is UNSPECIFIED,
+    // not DEVELOPMENT — commons fails closed on an unset/unrecognized value
+    // by treating it as DEVELOPMENT rather than silently promoting to
+    // PRODUCTION.
+    if (env == ::runanywhere::v1::SDK_ENVIRONMENT_PRODUCTION) {
+        return RAC_ENV_PRODUCTION;
+    }
+    return RAC_ENV_DEVELOPMENT;
 }
 
 rac_result_t serialize_result(const SdkInitResult& result, rac_proto_buffer_t* out) {
@@ -264,7 +271,6 @@ rac_result_t perform_authentication(SdkInitResult* result) {
     }
 
     if (rac_auth_is_authenticated() && !rac_auth_needs_refresh()) {
-        result->set_http_configured(true);
         result->set_has_completed_http_setup(true);
         return RAC_SUCCESS;
     }
@@ -290,7 +296,6 @@ rac_result_t perform_authentication(SdkInitResult* result) {
                         refresh_rc);
         const rac_result_t clear_rc = rac_auth_clear();
         if (clear_rc != RAC_SUCCESS) {
-            result->set_http_configured(false);
             result->set_has_completed_http_setup(false);
             return clear_rc;
         }
@@ -306,19 +311,16 @@ rac_result_t perform_authentication(SdkInitResult* result) {
     if (!rac_env_auth_expected(env, api_key)) {
         // Keyless development: requests go out unauthenticated (PUBLIC org),
         // there is no token to fetch.
-        result->set_http_configured(rac_http_transport_is_registered() == RAC_TRUE);
         result->set_has_completed_http_setup(true);
         return RAC_SUCCESS;
     }
 
     const char* base_url = rac_state_get_base_url();
     if (!has_nonempty_string(base_url)) {
-        result->set_http_configured(false);
         result->set_has_completed_http_setup(false);
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
     if (!has_nonempty_string(api_key)) {
-        result->set_http_configured(false);
         result->set_has_completed_http_setup(false);
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
@@ -326,7 +328,6 @@ rac_result_t perform_authentication(SdkInitResult* result) {
     rac_sdk_config_t config = current_sdk_config_or_state(env);
     char* request_json = rac_auth_build_authenticate_request(&config);
     if (request_json == nullptr) {
-        result->set_http_configured(false);
         result->set_has_completed_http_setup(false);
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
@@ -335,12 +336,10 @@ rac_result_t perform_authentication(SdkInitResult* result) {
                                            handle_authenticate_response_for_init);
     std::free(request_json);
     if (rc != RAC_SUCCESS) {
-        result->set_http_configured(false);
         result->set_has_completed_http_setup(false);
         return rc;
     }
 
-    result->set_http_configured(true);
     result->set_has_completed_http_setup(true);
     return RAC_SUCCESS;
 }
@@ -352,14 +351,12 @@ rac_result_t perform_token_refresh(SdkInitResult* result) {
 
     const rac_environment_t env = rac_state_get_environment();
     if (!environment_requires_external_config(env)) {
-        result->set_http_configured(rac_http_transport_is_registered() == RAC_TRUE);
         result->set_has_completed_http_setup(true);
         return RAC_SUCCESS;
     }
 
     char* request_json = rac_auth_build_refresh_request();
     if (request_json == nullptr) {
-        result->set_http_configured(false);
         result->set_has_completed_http_setup(false);
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
@@ -368,12 +365,10 @@ rac_result_t perform_token_refresh(SdkInitResult* result) {
         post_auth_json(env, RAC_ENDPOINT_REFRESH, request_json, handle_refresh_response_for_init);
     std::free(request_json);
     if (rc != RAC_SUCCESS) {
-        result->set_http_configured(false);
         result->set_has_completed_http_setup(false);
         return rc;
     }
 
-    result->set_http_configured(true);
     result->set_has_completed_http_setup(true);
     return RAC_SUCCESS;
 }
@@ -418,7 +413,9 @@ rac_result_t refresh_model_registry(SdkInitResult* result, bool force_refresh, b
     }
     rac_proto_buffer_free(&out);
 
-    result->set_linked_models_count(clamp_count_to_u32(refresh_result.discovered_count()));
+    // discovered_count (a pure count-over-models derivation) was deleted;
+    // models.models_size() is the same information.
+    result->set_linked_models_count(clamp_count_to_u32(refresh_result.models().models_size()));
     return RAC_SUCCESS;
 }
 
@@ -458,8 +455,17 @@ rac_result_t discover_downloaded_models(SdkInitResult* result) {
     }
     rac_proto_buffer_free(&out);
 
-    result->set_linked_models_count(clamp_count_to_u32(discovery_result.linked_count()));
-    result->set_discovered_orphans(0);
+    // linked_count (a pure count-over-discovered_models derivation) was
+    // deleted; count entries that matched an existing registry row directly.
+    // discovered_orphans was deleted from SdkInitResult entirely -- delete
+    // rather than try to preserve its meaning via another field.
+    int32_t linked = 0;
+    for (const auto& discovered : discovery_result.discovered_models()) {
+        if (discovered.matched_registry()) {
+            ++linked;
+        }
+    }
+    result->set_linked_models_count(clamp_count_to_u32(linked));
     return RAC_SUCCESS;
 }
 
@@ -475,15 +481,15 @@ namespace {
 /**
  * Phase-1 failure: publish the lifecycle FAILED event (the single source of
  * INITIALIZATION_STAGE_* emits — platform SDKs no longer hand-emit
- * duplicates) and serialize the failed SdkInitResult.
+ * duplicates) and serialize the failed SdkInitResult. SdkInitResult was cut
+ * to 5 fields (idl/sdk_init.proto): `phase` and `duration_ms` are gone, along
+ * with the SdkInitPhase enum, so this no longer stamps either.
  */
-rac_result_t phase1_failure(rac_result_t code, const char* message, int64_t start_ms,
+rac_result_t phase1_failure(rac_result_t code, const char* message,
                             rac_proto_buffer_t* out_result) {
     rac::events::publish_initialization_failed(code, message);
     SdkInitResult result;
-    result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
     set_error_from_code(&result, code, message);
-    result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
     return serialize_result(result, out_result);
 }
 
@@ -510,7 +516,7 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
 
     const rac_result_t validate = rac_proto_bytes_validate(in_request_bytes, in_size);
     if (validate != RAC_SUCCESS) {
-        return phase1_failure(validate, "Invalid SdkInitPhase1Request bytes", start_ms,
+        return phase1_failure(validate, "Invalid SdkInitPhase1Request bytes",
                               out_RASdkInitResult);
     }
 
@@ -519,7 +525,7 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
         const void* data = rac_proto_bytes_data_or_empty(in_request_bytes, in_size);
         if (!request.ParseFromArray(data, static_cast<int>(in_size))) {
             return phase1_failure(RAC_ERROR_INVALID_ARGUMENT,
-                                  "Failed to parse SdkInitPhase1Request", start_ms,
+                                  "Failed to parse SdkInitPhase1Request",
                                   out_RASdkInitResult);
         }
     }
@@ -548,14 +554,14 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
             rac_validate_api_key(api_key.empty() ? nullptr : api_key.c_str(), env);
         if (key_check != RAC_VALIDATION_OK) {
             return phase1_failure(RAC_ERROR_INVALID_ARGUMENT,
-                                  rac_validation_error_message(key_check), start_ms,
+                                  rac_validation_error_message(key_check),
                                   out_RASdkInitResult);
         }
         const rac_validation_result_t url_check =
             rac_validate_base_url(base_url.empty() ? nullptr : base_url.c_str(), env);
         if (url_check != RAC_VALIDATION_OK) {
             return phase1_failure(RAC_ERROR_INVALID_ARGUMENT,
-                                  rac_validation_error_message(url_check), start_ms,
+                                  rac_validation_error_message(url_check),
                                   out_RASdkInitResult);
         }
     }
@@ -572,7 +578,7 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
                                                        base_url.empty() ? "" : base_url.c_str(),
                                                        device_id.empty() ? "" : device_id.c_str());
     if (state_rc != RAC_SUCCESS) {
-        return phase1_failure(state_rc, "rac_state_initialize failed", start_ms,
+        return phase1_failure(state_rc, "rac_state_initialize failed",
                               out_RASdkInitResult);
     }
 
@@ -587,16 +593,16 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
     const rac_validation_result_t sdk_config_rc = rac_sdk_init(&sdk_config);
     if (sdk_config_rc != RAC_VALIDATION_OK) {
         return phase1_failure(RAC_ERROR_INVALID_CONFIGURATION,
-                              rac_validation_error_message(sdk_config_rc), start_ms,
+                              rac_validation_error_message(sdk_config_rc),
                               out_RASdkInitResult);
     }
 
-    // Phase 1 complete.
+    // Phase 1 complete. The INITIALIZATION_COMPLETED event still carries its
+    // own duration_ms property (rac::events::publish_initialization_completed
+    // takes it as a properties-map entry, independent of SdkInitResult).
     const int64_t duration_ms = rac_monotonic_now_ms() - start_ms;
     rac::events::publish_initialization_completed(duration_ms);
     SdkInitResult result;
-    result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-    result.set_duration_ms(duration_ms);
     return serialize_result(result, out_RASdkInitResult);
 #endif  // RAC_HAVE_PROTOBUF
 }
@@ -612,14 +618,10 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
                                "rac_sdk_init_phase2_proto requires RAC_HAVE_PROTOBUF");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
-    const int64_t start_ms = rac_monotonic_now_ms();
-
     const rac_result_t validate = rac_proto_bytes_validate(in_request_bytes, in_size);
     if (validate != RAC_SUCCESS) {
         SdkInitResult result;
-        result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
         set_error_from_code(&result, validate, "Invalid SdkInitPhase2Request bytes");
-        result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
         return serialize_result(result, out_RASdkInitResult);
     }
 
@@ -628,25 +630,20 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
         const void* data = rac_proto_bytes_data_or_empty(in_request_bytes, in_size);
         if (!request.ParseFromArray(data, static_cast<int>(in_size))) {
             SdkInitResult result;
-            result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
             set_error_from_code(&result, RAC_ERROR_INVALID_ARGUMENT,
                                 "Failed to parse SdkInitPhase2Request");
-            result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
             return serialize_result(result, out_RASdkInitResult);
         }
     }
 
     if (!rac_state_is_initialized()) {
         SdkInitResult result;
-        result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
         set_error_from_code(&result, RAC_ERROR_NOT_INITIALIZED,
                             "Phase 1 must complete before Phase 2");
-        result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
         return serialize_result(result, out_RASdkInitResult);
     }
 
     SdkInitResult result;
-    result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
     const bool http_applicable = http_setup_applicable_for_state();
     result.set_http_applicable(http_applicable);
 
@@ -668,9 +665,6 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
             const char* build_token =
                 request.build_token().empty() ? nullptr : request.build_token().c_str();
             const rac_result_t dev_rc = rac_device_manager_register_if_needed(env, build_token);
-            const bool device_registered =
-                (dev_rc == RAC_SUCCESS) || (rac_device_manager_is_registered() == RAC_TRUE);
-            result.set_device_registered(device_registered);
             if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE &&
                 dev_rc != RAC_ERROR_NOT_INITIALIZED) {
                 // Surface as a warning rather than aborting — matches Swift's
@@ -678,12 +672,13 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
                 append_warning(&result, warning_from_code("device registration deferred", dev_rc));
             }
 
-            // Step 3: Fetch model assignments (cached).
+            // Step 3: Fetch model assignments (cached). force_refresh_assignments
+            // was deleted from SdkInitPhase2Request; commons no longer takes a
+            // per-call force hint here.
             rac_model_info_t** assigned_models = nullptr;
             size_t assigned_count = 0;
-            const rac_result_t fetch_rc = rac_model_assignment_fetch(
-                request.force_refresh_assignments() ? RAC_TRUE : RAC_FALSE, &assigned_models,
-                &assigned_count);
+            const rac_result_t fetch_rc =
+                rac_model_assignment_fetch(RAC_FALSE, &assigned_models, &assigned_count);
             if (fetch_rc == RAC_SUCCESS && assigned_models != nullptr) {
                 result.set_linked_models_count(static_cast<uint32_t>(assigned_count));
                 rac_model_info_array_free(assigned_models, assigned_count);
@@ -691,41 +686,32 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
                 append_warning(&result,
                                warning_from_code("model assignment fetch deferred", fetch_rc));
             }
-        } else {
-            result.set_device_registered(false);
         }
-    } else {
-        result.set_device_registered(rac_device_manager_is_registered() == RAC_TRUE);
     }
 
     // Step 4: Flush telemetry via the sink registered by the SDK.
-    if (request.flush_telemetry()) {
-        const rac_result_t flush_rc = rac_events_flush_telemetry_sink();
-        if (flush_rc != RAC_SUCCESS && flush_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
-            append_warning(&result, warning_from_code("telemetry flush deferred", flush_rc));
-        }
+    // flush_telemetry was deleted from SdkInitPhase2Request: commons always
+    // flushes now, unconditionally, rather than gating on a per-call flag.
+    const rac_result_t flush_rc = rac_events_flush_telemetry_sink();
+    if (flush_rc != RAC_SUCCESS && flush_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        append_warning(&result, warning_from_code("telemetry flush deferred", flush_rc));
     }
 
-    // Step 5: Reconcile registry rows with downloaded/local files when the
-    // SDK asks for the startup discovery pass.
-    if (request.rescan_local_models()) {
-        const rac_result_t refresh_rc = refresh_model_registry(
-            &result, request.force_refresh_assignments(), request.rescan_local_models());
-        if (refresh_rc != RAC_SUCCESS && refresh_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
-            append_warning(&result,
-                           warning_from_code("model registry refresh deferred", refresh_rc));
-        }
+    // Step 5: Reconcile registry rows with downloaded/local files.
+    // discover_downloaded_models and rescan_local_models were deleted from
+    // SdkInitPhase2Request: commons always reconciles now, unconditionally.
+    const rac_result_t refresh_rc = refresh_model_registry(&result, /*force_refresh=*/false,
+                                                            /*rescan_local=*/true);
+    if (refresh_rc != RAC_SUCCESS && refresh_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        append_warning(&result, warning_from_code("model registry refresh deferred", refresh_rc));
     }
-    if (request.discover_downloaded_models()) {
-        const rac_result_t discover_rc = discover_downloaded_models(&result);
-        if (discover_rc != RAC_SUCCESS && discover_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
-            append_warning(&result,
-                           warning_from_code("downloaded model discovery deferred", discover_rc));
-        }
+    const rac_result_t discover_rc = discover_downloaded_models(&result);
+    if (discover_rc != RAC_SUCCESS && discover_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        append_warning(&result,
+                       warning_from_code("downloaded model discovery deferred", discover_rc));
     }
 
     // Phase 2 succeeds in offline mode too — Swift mirrors this policy.
-    result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
     return serialize_result(result, out_RASdkInitResult);
 #endif  // RAC_HAVE_PROTOBUF
 }
@@ -740,25 +726,19 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
                                "rac_sdk_retry_http_proto requires RAC_HAVE_PROTOBUF");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
-    const int64_t start_ms = rac_monotonic_now_ms();
-
     SdkInitResult result;
-    result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_RETRY_HTTP);
 
     if (!rac_state_is_initialized()) {
         set_error_from_code(&result, RAC_ERROR_NOT_INITIALIZED,
                             "Phase 1 must complete before retry");
-        result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
         return serialize_result(result, out_RASdkInitResult);
     }
     result.set_http_applicable(http_setup_applicable_for_state());
 
     // Idempotent fast path: authenticated and token is still valid.
     if (rac_auth_is_authenticated() && !rac_auth_needs_refresh()) {
-        result.set_http_configured(true);
         result.set_has_completed_http_setup(true);
         result.set_warning("already authenticated");
-        result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
         return serialize_result(result, out_RASdkInitResult);
     }
 
@@ -768,10 +748,9 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
     const rac_result_t auth_rc = perform_authentication(&result);
     if (auth_rc != RAC_SUCCESS) {
         append_warning(&result, warning_from_code("auth retry deferred", auth_rc));
-    } else if (!result.http_configured() && result.warning().empty()) {
+    } else if (!result.has_completed_http_setup() && result.warning().empty()) {
         append_warning(&result, "no usable external config");
     }
-    result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
     return serialize_result(result, out_RASdkInitResult);
 #endif  // RAC_HAVE_PROTOBUF
 }

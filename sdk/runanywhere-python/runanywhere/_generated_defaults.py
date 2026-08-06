@@ -37,7 +37,6 @@ class AudioCaptureDefaults:
     MIC_SAMPLE_RATE_HZ: Final[int] = 16000
     MIC_CHANNELS: Final[int] = 1
     MIC_CHANNEL_CAPACITY: Final[int] = 128
-    MIC_TAP_BUFFER_FRAMES: Final[int] = 4096
     TTS_SAMPLE_RATE_HZ: Final[int] = 22050
 
 

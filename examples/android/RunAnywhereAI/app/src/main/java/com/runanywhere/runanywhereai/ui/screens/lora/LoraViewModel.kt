@@ -8,8 +8,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.api.lora
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.extensions.loraCatalog
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -42,14 +44,25 @@ class LoraViewModel : ViewModel() {
             state = state.copy(busyId = entry.id, progressPercent = 0, error = null)
             try {
                 val path =
-                    adapterLocalPath(entry) ?: RunAnywhere.loraCatalog.download(entry) { progress ->
-                        val pct =
-                            if (progress.total_bytes > 0) {
-                                (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
-                            } else {
-                                (progress.stage_progress.coerceIn(0f, 1f) * 100).toInt()
-                            }
-                        state = state.copy(progressPercent = pct)
+                    adapterLocalPath(entry) ?: run {
+                        // LoraAdapterCatalogEntry no longer carries url/filename/size
+                        // (idl/lora_options.proto: "everything generic about the
+                        // artifact ... lives on the ModelInfo record for this
+                        // adapter"), so lora.download() now takes the companion
+                        // ModelInfo artifact directly -- looked up under the
+                        // `lora-adapter:{id}` convention ModelBootstrap/seedLora
+                        // registers it under.
+                        val artifact = RunAnywhere.models.get(loraArtifactModelId(entry.id))
+                            ?: throw SDKException.modelNotFound(entry.id)
+                        RunAnywhere.loraCatalog.download(entry, artifact) { progress ->
+                            val pct =
+                                if (progress.total_bytes > 0) {
+                                    (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
+                                } else {
+                                    (progress.stage_progress.coerceIn(0f, 1f) * 100).toInt()
+                                }
+                            state = state.copy(progressPercent = pct)
+                        }
                     }
 
                 if (path.isNotBlank()) {
@@ -66,7 +79,7 @@ class LoraViewModel : ViewModel() {
         }
     }
 
-    fun apply(entry: LoraAdapterCatalogEntry, scale: Float = entry.default_scale.takeIf { it > 0f } ?: 1f) {
+    fun apply(entry: LoraAdapterCatalogEntry, scale: Float = entry.default_scale?.takeIf { it > 0f } ?: 1f) {
         val path = adapterLocalPath(entry)
         if (path.isNullOrBlank()) {
             state = state.copy(error = "Adapter not downloaded yet")
@@ -106,12 +119,24 @@ class LoraViewModel : ViewModel() {
         state = state.copy(error = null)
     }
 
+    // LoraAdapterCatalogEntry.is_downloaded was deleted outright; a non-empty
+    // local_path is the proto's sole documented "is this downloaded" signal.
     fun isDownloaded(entry: LoraAdapterCatalogEntry): Boolean =
-        adapterLocalPath(entry) != null || entry.is_downloaded == true
+        adapterLocalPath(entry) != null
 
     private fun adapterLocalPath(entry: LoraAdapterCatalogEntry): String? =
         downloadedPaths[entry.id]
             ?: entry.local_path?.takeIf { it.isNotBlank() }
+
+    /**
+     * Stable model-registry id for a LoRA adapter's downloadable artifact.
+     * `LoraAdapterCatalogEntry` no longer carries url/filename/size
+     * (idl/lora_options.proto), so its bytes are described by a companion
+     * [com.runanywhere.sdk.public.types.RAModelInfo] artifact keyed by this
+     * id -- the same `lora-adapter:{id}` convention commons and the other
+     * SDKs' reference LoRA extensions use.
+     */
+    private fun loraArtifactModelId(adapterId: String): String = "lora-adapter:$adapterId"
 
     private suspend fun reload() {
         val modelId = GlobalState.model.loaded?.id

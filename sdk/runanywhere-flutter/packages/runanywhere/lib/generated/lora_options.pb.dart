@@ -19,67 +19,59 @@ import 'errors.pb.dart' as $0;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
-class LoRAAdapterConfig extends $pb.GeneratedMessage {
-  factory LoRAAdapterConfig({
+class LoraAdapterConfig extends $pb.GeneratedMessage {
+  factory LoraAdapterConfig({
     $core.String? adapterPath,
     $core.double? scale,
     $core.String? adapterId,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
-    $core.Iterable<$core.String>? targetModules,
   }) {
     final result = create();
     if (adapterPath != null) result.adapterPath = adapterPath;
     if (scale != null) result.scale = scale;
     if (adapterId != null) result.adapterId = adapterId;
-    if (metadata != null) result.metadata.addEntries(metadata);
-    if (targetModules != null) result.targetModules.addAll(targetModules);
     return result;
   }
 
-  LoRAAdapterConfig._();
+  LoraAdapterConfig._();
 
-  factory LoRAAdapterConfig.fromBuffer($core.List<$core.int> data,
+  factory LoraAdapterConfig.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory LoRAAdapterConfig.fromJson($core.String json,
+  factory LoraAdapterConfig.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoRAAdapterConfig',
+      _omitMessageNames ? '' : 'LoraAdapterConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'adapterPath')
     ..aD(2, _omitFieldNames ? '' : 'scale', fieldType: $pb.PbFieldType.OF)
     ..aOS(3, _omitFieldNames ? '' : 'adapterId')
-    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'LoRAAdapterConfig.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
-    ..pPS(5, _omitFieldNames ? '' : 'targetModules')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAAdapterConfig clone() => deepCopy();
+  LoraAdapterConfig clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAAdapterConfig copyWith(void Function(LoRAAdapterConfig) updates) =>
-      super.copyWith((message) => updates(message as LoRAAdapterConfig))
-          as LoRAAdapterConfig;
+  LoraAdapterConfig copyWith(void Function(LoraAdapterConfig) updates) =>
+      super.copyWith((message) => updates(message as LoraAdapterConfig))
+          as LoraAdapterConfig;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static LoRAAdapterConfig create() => LoRAAdapterConfig._();
+  static LoraAdapterConfig create() => LoraAdapterConfig._();
   @$core.override
-  LoRAAdapterConfig createEmptyInstance() => create();
+  LoraAdapterConfig createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static LoRAAdapterConfig getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoRAAdapterConfig>(create);
-  static LoRAAdapterConfig? _defaultInstance;
+  static LoraAdapterConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoraAdapterConfig>(create);
+  static LoraAdapterConfig? _defaultInstance;
 
-  /// On-disk path to the GGUF file.
+  /// Escape hatch for a loose GGUF that was never registered. Commons still
+  /// loads strictly from this path: there is no catalog id -> path resolver
+  /// on the apply path yet.
   @$pb.TagNumber(1)
   $core.String get adapterPath => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -89,6 +81,9 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearAdapterPath() => $_clearField(1);
 
+  /// 1.0 = as trained, 0.0 = applied but contributing nothing, negatives
+  /// subtract. Unbounded and signed. Unset falls back to the catalog entry's
+  /// default_scale, then to 1.0.
   @$pb.TagNumber(2)
   $core.double get scale => $_getN(1);
   @$pb.TagNumber(2)
@@ -98,7 +93,9 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearScale() => $_clearField(2);
 
-  /// Links back to a catalog entry when the adapter came from one.
+  /// The handle. apply, remove, list and per-request selection all key on
+  /// this. Matches PEFT adapter_name / vLLM lora_name / Genie
+  /// loraAdapterName.
   @$pb.TagNumber(3)
   $core.String get adapterId => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -107,21 +104,17 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
   $core.bool hasAdapterId() => $_has(2);
   @$pb.TagNumber(3)
   void clearAdapterId() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(3);
-
-  /// Not read by commons.
-  @$pb.TagNumber(5)
-  $pb.PbList<$core.String> get targetModules => $_getList(4);
 }
 
-class LoRAAdapterInfo extends $pb.GeneratedMessage {
-  factory LoRAAdapterInfo({
+class LoraAdapterInfo extends $pb.GeneratedMessage {
+  factory LoraAdapterInfo({
     $core.String? adapterId,
     $core.String? adapterPath,
     $core.double? scale,
     $core.bool? applied,
+    $core.int? rank,
+    $core.double? alpha,
+    $fixnum.Int64? sizeBytes,
     $fixnum.Int64? loadedAtMs,
     $0.SDKError? error,
   }) {
@@ -130,51 +123,57 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
     if (adapterPath != null) result.adapterPath = adapterPath;
     if (scale != null) result.scale = scale;
     if (applied != null) result.applied = applied;
+    if (rank != null) result.rank = rank;
+    if (alpha != null) result.alpha = alpha;
+    if (sizeBytes != null) result.sizeBytes = sizeBytes;
     if (loadedAtMs != null) result.loadedAtMs = loadedAtMs;
     if (error != null) result.error = error;
     return result;
   }
 
-  LoRAAdapterInfo._();
+  LoraAdapterInfo._();
 
-  factory LoRAAdapterInfo.fromBuffer($core.List<$core.int> data,
+  factory LoraAdapterInfo.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory LoRAAdapterInfo.fromJson($core.String json,
+  factory LoraAdapterInfo.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoRAAdapterInfo',
+      _omitMessageNames ? '' : 'LoraAdapterInfo',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'adapterId')
     ..aOS(2, _omitFieldNames ? '' : 'adapterPath')
     ..aD(3, _omitFieldNames ? '' : 'scale', fieldType: $pb.PbFieldType.OF)
     ..aOB(4, _omitFieldNames ? '' : 'applied')
-    ..aInt64(7, _omitFieldNames ? '' : 'loadedAtMs')
-    ..aOM<$0.SDKError>(8, _omitFieldNames ? '' : 'error',
+    ..aI(5, _omitFieldNames ? '' : 'rank')
+    ..aD(6, _omitFieldNames ? '' : 'alpha', fieldType: $pb.PbFieldType.OF)
+    ..aInt64(7, _omitFieldNames ? '' : 'sizeBytes')
+    ..aInt64(8, _omitFieldNames ? '' : 'loadedAtMs')
+    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAAdapterInfo clone() => deepCopy();
+  LoraAdapterInfo clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAAdapterInfo copyWith(void Function(LoRAAdapterInfo) updates) =>
-      super.copyWith((message) => updates(message as LoRAAdapterInfo))
-          as LoRAAdapterInfo;
+  LoraAdapterInfo copyWith(void Function(LoraAdapterInfo) updates) =>
+      super.copyWith((message) => updates(message as LoraAdapterInfo))
+          as LoraAdapterInfo;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static LoRAAdapterInfo create() => LoRAAdapterInfo._();
+  static LoraAdapterInfo create() => LoraAdapterInfo._();
   @$core.override
-  LoRAAdapterInfo createEmptyInstance() => create();
+  LoraAdapterInfo createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static LoRAAdapterInfo getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoRAAdapterInfo>(create);
-  static LoRAAdapterInfo? _defaultInstance;
+  static LoraAdapterInfo getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoraAdapterInfo>(create);
+  static LoraAdapterInfo? _defaultInstance;
 
   /// Catalog id when known, else empty.
   @$pb.TagNumber(1)
@@ -214,70 +213,82 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearApplied() => $_clearField(4);
 
+  /// Read from the adapter artifact at load time. Never settable.
+  /// rank is PEFT's `r`, alpha is lora_alpha; effective strength is
+  /// scale * (alpha / rank), which is why 1.0 is not portable between
+  /// adapters trained with different alpha/rank.
+  @$pb.TagNumber(5)
+  $core.int get rank => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set rank($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRank() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRank() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.double get alpha => $_getN(5);
+  @$pb.TagNumber(6)
+  set alpha($core.double value) => $_setFloat(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAlpha() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAlpha() => $_clearField(6);
+
+  /// Measured resident size of this adapter's weights. Absent when the
+  /// backend does not report it.
   @$pb.TagNumber(7)
-  $fixnum.Int64 get loadedAtMs => $_getI64(4);
+  $fixnum.Int64 get sizeBytes => $_getI64(6);
   @$pb.TagNumber(7)
-  set loadedAtMs($fixnum.Int64 value) => $_setInt64(4, value);
+  set sizeBytes($fixnum.Int64 value) => $_setInt64(6, value);
   @$pb.TagNumber(7)
-  $core.bool hasLoadedAtMs() => $_has(4);
+  $core.bool hasSizeBytes() => $_has(6);
   @$pb.TagNumber(7)
-  void clearLoadedAtMs() => $_clearField(7);
+  void clearSizeBytes() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get loadedAtMs => $_getI64(7);
+  @$pb.TagNumber(8)
+  set loadedAtMs($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasLoadedAtMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLoadedAtMs() => $_clearField(8);
 
   /// Populated when applied is false.
-  @$pb.TagNumber(8)
-  $0.SDKError get error => $_getN(5);
-  @$pb.TagNumber(8)
-  set error($0.SDKError value) => $_setField(8, value);
-  @$pb.TagNumber(8)
-  $core.bool hasError() => $_has(5);
-  @$pb.TagNumber(8)
-  void clearError() => $_clearField(8);
-  @$pb.TagNumber(8)
-  $0.SDKError ensureError() => $_ensure(5);
+  @$pb.TagNumber(9)
+  $0.SDKError get error => $_getN(8);
+  @$pb.TagNumber(9)
+  set error($0.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $0.SDKError ensureError() => $_ensure(8);
 }
 
+/// The adapter-specific facts only. Everything generic about the artifact —
+/// where it is fetched from, how large it is, how to verify it, who published
+/// it, and whether it has been fetched — lives on the ModelInfo record for
+/// this adapter.
 class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   factory LoraAdapterCatalogEntry({
     $core.String? id,
     $core.String? name,
-    $core.String? description,
-    $core.String? url,
-    $core.String? filename,
     $core.Iterable<$core.String>? compatibleModels,
-    $fixnum.Int64? sizeBytes,
-    $core.String? author,
     $core.double? defaultScale,
-    $core.String? checksumSha256,
-    $core.String? license,
     $core.Iterable<$core.String>? tags,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
     $core.String? localPath,
-    $core.bool? isDownloaded,
-    $fixnum.Int64? downloadedAtUnixMs,
-    $core.bool? isImported,
-    $core.String? statusMessage,
   }) {
     final result = create();
     if (id != null) result.id = id;
     if (name != null) result.name = name;
-    if (description != null) result.description = description;
-    if (url != null) result.url = url;
-    if (filename != null) result.filename = filename;
     if (compatibleModels != null)
       result.compatibleModels.addAll(compatibleModels);
-    if (sizeBytes != null) result.sizeBytes = sizeBytes;
-    if (author != null) result.author = author;
     if (defaultScale != null) result.defaultScale = defaultScale;
-    if (checksumSha256 != null) result.checksumSha256 = checksumSha256;
-    if (license != null) result.license = license;
     if (tags != null) result.tags.addAll(tags);
-    if (metadata != null) result.metadata.addEntries(metadata);
     if (localPath != null) result.localPath = localPath;
-    if (isDownloaded != null) result.isDownloaded = isDownloaded;
-    if (downloadedAtUnixMs != null)
-      result.downloadedAtUnixMs = downloadedAtUnixMs;
-    if (isImported != null) result.isImported = isImported;
-    if (statusMessage != null) result.statusMessage = statusMessage;
     return result;
   }
 
@@ -296,27 +307,11 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aOS(2, _omitFieldNames ? '' : 'name')
-    ..aOS(3, _omitFieldNames ? '' : 'description')
-    ..aOS(4, _omitFieldNames ? '' : 'url')
-    ..aOS(5, _omitFieldNames ? '' : 'filename')
-    ..pPS(6, _omitFieldNames ? '' : 'compatibleModels')
-    ..aInt64(7, _omitFieldNames ? '' : 'sizeBytes')
-    ..aOS(8, _omitFieldNames ? '' : 'author')
-    ..aD(9, _omitFieldNames ? '' : 'defaultScale',
+    ..pPS(3, _omitFieldNames ? '' : 'compatibleModels')
+    ..aD(4, _omitFieldNames ? '' : 'defaultScale',
         fieldType: $pb.PbFieldType.OF)
-    ..aOS(10, _omitFieldNames ? '' : 'checksumSha256')
-    ..aOS(11, _omitFieldNames ? '' : 'license')
-    ..pPS(12, _omitFieldNames ? '' : 'tags')
-    ..m<$core.String, $core.String>(13, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'LoraAdapterCatalogEntry.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
-    ..aOS(14, _omitFieldNames ? '' : 'localPath')
-    ..aOB(15, _omitFieldNames ? '' : 'isDownloaded')
-    ..aInt64(16, _omitFieldNames ? '' : 'downloadedAtUnixMs')
-    ..aOB(17, _omitFieldNames ? '' : 'isImported')
-    ..aOS(18, _omitFieldNames ? '' : 'statusMessage')
+    ..pPS(5, _omitFieldNames ? '' : 'tags')
+    ..aOS(6, _omitFieldNames ? '' : 'localPath')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -357,136 +352,33 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearName() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.String get description => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set description($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasDescription() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearDescription() => $_clearField(3);
-
-  /// Direct .gguf download URL, and the filename to save it as.
-  @$pb.TagNumber(4)
-  $core.String get url => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set url($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasUrl() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearUrl() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get filename => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set filename($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasFilename() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearFilename() => $_clearField(5);
-
   /// Explicit base model ids this adapter works with.
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get compatibleModels => $_getList(2);
+
+  /// Publisher-recommended strength. Unset means 1.0.
+  @$pb.TagNumber(4)
+  $core.double get defaultScale => $_getN(3);
+  @$pb.TagNumber(4)
+  set defaultScale($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDefaultScale() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDefaultScale() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<$core.String> get tags => $_getList(4);
+
+  /// Non-empty means the adapter file is on disk. This is the single
+  /// definition of "downloaded".
   @$pb.TagNumber(6)
-  $pb.PbList<$core.String> get compatibleModels => $_getList(5);
-
-  /// 0 if unknown.
-  @$pb.TagNumber(7)
-  $fixnum.Int64 get sizeBytes => $_getI64(6);
-  @$pb.TagNumber(7)
-  set sizeBytes($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasSizeBytes() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearSizeBytes() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get author => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set author($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasAuthor() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearAuthor() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.double get defaultScale => $_getN(8);
-  @$pb.TagNumber(9)
-  set defaultScale($core.double value) => $_setFloat(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasDefaultScale() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearDefaultScale() => $_clearField(9);
-
-  /// Lowercase hex.
-  @$pb.TagNumber(10)
-  $core.String get checksumSha256 => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set checksumSha256($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasChecksumSha256() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearChecksumSha256() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.String get license => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set license($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasLicense() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearLicense() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $pb.PbList<$core.String> get tags => $_getList(11);
-
-  @$pb.TagNumber(13)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(12);
-
-  /// Local artifact state, persisted only after the platform reports success.
-  @$pb.TagNumber(14)
-  $core.String get localPath => $_getSZ(13);
-  @$pb.TagNumber(14)
-  set localPath($core.String value) => $_setString(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasLocalPath() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearLocalPath() => $_clearField(14);
-
-  @$pb.TagNumber(15)
-  $core.bool get isDownloaded => $_getBF(14);
-  @$pb.TagNumber(15)
-  set isDownloaded($core.bool value) => $_setBool(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasIsDownloaded() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearIsDownloaded() => $_clearField(15);
-
-  @$pb.TagNumber(16)
-  $fixnum.Int64 get downloadedAtUnixMs => $_getI64(15);
-  @$pb.TagNumber(16)
-  set downloadedAtUnixMs($fixnum.Int64 value) => $_setInt64(15, value);
-  @$pb.TagNumber(16)
-  $core.bool hasDownloadedAtUnixMs() => $_has(15);
-  @$pb.TagNumber(16)
-  void clearDownloadedAtUnixMs() => $_clearField(16);
-
-  @$pb.TagNumber(17)
-  $core.bool get isImported => $_getBF(16);
-  @$pb.TagNumber(17)
-  set isImported($core.bool value) => $_setBool(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasIsImported() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearIsImported() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  $core.String get statusMessage => $_getSZ(17);
-  @$pb.TagNumber(18)
-  set statusMessage($core.String value) => $_setString(17, value);
-  @$pb.TagNumber(18)
-  $core.bool hasStatusMessage() => $_has(17);
-  @$pb.TagNumber(18)
-  void clearStatusMessage() => $_clearField(18);
+  $core.String get localPath => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set localPath($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLocalPath() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLocalPath() => $_clearField(6);
 }
 
 class LoraAdapterCatalogQuery extends $pb.GeneratedMessage {
@@ -573,6 +465,7 @@ class LoraAdapterCatalogQuery extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearDownloadedOnly() => $_clearField(3);
 
+  /// Substring match against name.
   @$pb.TagNumber(4)
   $core.String get searchQuery => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -589,11 +482,9 @@ class LoraAdapterCatalogQuery extends $pb.GeneratedMessage {
 class LoraAdapterCatalogListRequest extends $pb.GeneratedMessage {
   factory LoraAdapterCatalogListRequest({
     LoraAdapterCatalogQuery? query,
-    $core.bool? includeCounts,
   }) {
     final result = create();
     if (query != null) result.query = query;
-    if (includeCounts != null) result.includeCounts = includeCounts;
     return result;
   }
 
@@ -612,7 +503,6 @@ class LoraAdapterCatalogListRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOM<LoraAdapterCatalogQuery>(1, _omitFieldNames ? '' : 'query',
         subBuilder: LoraAdapterCatalogQuery.create)
-    ..aOB(2, _omitFieldNames ? '' : 'includeCounts')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -647,29 +537,18 @@ class LoraAdapterCatalogListRequest extends $pb.GeneratedMessage {
   void clearQuery() => $_clearField(1);
   @$pb.TagNumber(1)
   LoraAdapterCatalogQuery ensureQuery() => $_ensure(0);
-
-  @$pb.TagNumber(2)
-  $core.bool get includeCounts => $_getBF(1);
-  @$pb.TagNumber(2)
-  set includeCounts($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasIncludeCounts() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearIncludeCounts() => $_clearField(2);
 }
 
 class LoraAdapterCatalogListResult extends $pb.GeneratedMessage {
   factory LoraAdapterCatalogListResult({
     $core.Iterable<LoraAdapterCatalogEntry>? entries,
     $core.int? totalCount,
-    $core.int? filteredCount,
     $core.int? downloadedCount,
     $0.SDKError? error,
   }) {
     final result = create();
     if (entries != null) result.entries.addAll(entries);
     if (totalCount != null) result.totalCount = totalCount;
-    if (filteredCount != null) result.filteredCount = filteredCount;
     if (downloadedCount != null) result.downloadedCount = downloadedCount;
     if (error != null) result.error = error;
     return result;
@@ -688,12 +567,11 @@ class LoraAdapterCatalogListResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'LoraAdapterCatalogListResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..pPM<LoraAdapterCatalogEntry>(2, _omitFieldNames ? '' : 'entries',
+    ..pPM<LoraAdapterCatalogEntry>(1, _omitFieldNames ? '' : 'entries',
         subBuilder: LoraAdapterCatalogEntry.create)
-    ..aI(4, _omitFieldNames ? '' : 'totalCount')
-    ..aI(5, _omitFieldNames ? '' : 'filteredCount')
-    ..aI(6, _omitFieldNames ? '' : 'downloadedCount')
-    ..aOM<$0.SDKError>(7, _omitFieldNames ? '' : 'error',
+    ..aI(2, _omitFieldNames ? '' : 'totalCount')
+    ..aI(3, _omitFieldNames ? '' : 'downloadedCount')
+    ..aOM<$0.SDKError>(4, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
@@ -719,47 +597,39 @@ class LoraAdapterCatalogListResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LoraAdapterCatalogListResult>(create);
   static LoraAdapterCatalogListResult? _defaultInstance;
 
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   $pb.PbList<LoraAdapterCatalogEntry> get entries => $_getList(0);
 
-  /// total_count is unfiltered; filtered_count reflects the query.
-  @$pb.TagNumber(4)
+  /// total_count is unfiltered. Callers that want a filtered count read
+  /// entries.size(); a downloaded count is entries with a local_path.
+  @$pb.TagNumber(2)
   $core.int get totalCount => $_getIZ(1);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   set totalCount($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(2)
   $core.bool hasTotalCount() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTotalCount() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get downloadedCount => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set downloadedCount($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDownloadedCount() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDownloadedCount() => $_clearField(3);
+
   @$pb.TagNumber(4)
-  void clearTotalCount() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get filteredCount => $_getIZ(2);
-  @$pb.TagNumber(5)
-  set filteredCount($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(5)
-  $core.bool hasFilteredCount() => $_has(2);
-  @$pb.TagNumber(5)
-  void clearFilteredCount() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get downloadedCount => $_getIZ(3);
-  @$pb.TagNumber(6)
-  set downloadedCount($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(6)
-  $core.bool hasDownloadedCount() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearDownloadedCount() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $0.SDKError get error => $_getN(4);
-  @$pb.TagNumber(7)
-  set error($0.SDKError value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasError() => $_has(4);
-  @$pb.TagNumber(7)
-  void clearError() => $_clearField(7);
-  @$pb.TagNumber(7)
-  $0.SDKError ensureError() => $_ensure(4);
+  $0.SDKError get error => $_getN(3);
+  @$pb.TagNumber(4)
+  set error($0.SDKError value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearError() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $0.SDKError ensureError() => $_ensure(3);
 }
 
 class LoraAdapterCatalogGetRequest extends $pb.GeneratedMessage {
@@ -906,405 +776,15 @@ class LoraAdapterCatalogGetResult extends $pb.GeneratedMessage {
   $0.SDKError ensureError() => $_ensure(2);
 }
 
-class LoraAdapterDownloadCompletedRequest extends $pb.GeneratedMessage {
-  factory LoraAdapterDownloadCompletedRequest({
-    $core.String? adapterId,
-    $core.String? localPath,
-    $fixnum.Int64? sizeBytes,
-    $core.String? checksumSha256,
-    $fixnum.Int64? completedAtUnixMs,
-    $core.bool? imported,
-    $core.String? statusMessage,
-  }) {
-    final result = create();
-    if (adapterId != null) result.adapterId = adapterId;
-    if (localPath != null) result.localPath = localPath;
-    if (sizeBytes != null) result.sizeBytes = sizeBytes;
-    if (checksumSha256 != null) result.checksumSha256 = checksumSha256;
-    if (completedAtUnixMs != null) result.completedAtUnixMs = completedAtUnixMs;
-    if (imported != null) result.imported = imported;
-    if (statusMessage != null) result.statusMessage = statusMessage;
-    return result;
-  }
-
-  LoraAdapterDownloadCompletedRequest._();
-
-  factory LoraAdapterDownloadCompletedRequest.fromBuffer(
-          $core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory LoraAdapterDownloadCompletedRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoraAdapterDownloadCompletedRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'adapterId')
-    ..aOS(2, _omitFieldNames ? '' : 'localPath')
-    ..aInt64(3, _omitFieldNames ? '' : 'sizeBytes')
-    ..aOS(4, _omitFieldNames ? '' : 'checksumSha256')
-    ..aInt64(5, _omitFieldNames ? '' : 'completedAtUnixMs')
-    ..aOB(6, _omitFieldNames ? '' : 'imported')
-    ..aOS(7, _omitFieldNames ? '' : 'statusMessage')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterDownloadCompletedRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterDownloadCompletedRequest copyWith(
-          void Function(LoraAdapterDownloadCompletedRequest) updates) =>
-      super.copyWith((message) =>
-              updates(message as LoraAdapterDownloadCompletedRequest))
-          as LoraAdapterDownloadCompletedRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterDownloadCompletedRequest create() =>
-      LoraAdapterDownloadCompletedRequest._();
-  @$core.override
-  LoraAdapterDownloadCompletedRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterDownloadCompletedRequest getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
-          LoraAdapterDownloadCompletedRequest>(create);
-  static LoraAdapterDownloadCompletedRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get adapterId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set adapterId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasAdapterId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearAdapterId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get localPath => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set localPath($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasLocalPath() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearLocalPath() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $fixnum.Int64 get sizeBytes => $_getI64(2);
-  @$pb.TagNumber(3)
-  set sizeBytes($fixnum.Int64 value) => $_setInt64(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasSizeBytes() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearSizeBytes() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get checksumSha256 => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set checksumSha256($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasChecksumSha256() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearChecksumSha256() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get completedAtUnixMs => $_getI64(4);
-  @$pb.TagNumber(5)
-  set completedAtUnixMs($fixnum.Int64 value) => $_setInt64(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasCompletedAtUnixMs() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearCompletedAtUnixMs() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.bool get imported => $_getBF(5);
-  @$pb.TagNumber(6)
-  set imported($core.bool value) => $_setBool(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasImported() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearImported() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.String get statusMessage => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set statusMessage($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasStatusMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearStatusMessage() => $_clearField(7);
-}
-
-class LoraAdapterDownloadCompletedResult extends $pb.GeneratedMessage {
-  factory LoraAdapterDownloadCompletedResult({
-    LoraAdapterCatalogEntry? entry,
-    $core.bool? persisted,
-    $0.SDKError? error,
-  }) {
-    final result = create();
-    if (entry != null) result.entry = entry;
-    if (persisted != null) result.persisted = persisted;
-    if (error != null) result.error = error;
-    return result;
-  }
-
-  LoraAdapterDownloadCompletedResult._();
-
-  factory LoraAdapterDownloadCompletedResult.fromBuffer(
-          $core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory LoraAdapterDownloadCompletedResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoraAdapterDownloadCompletedResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOM<LoraAdapterCatalogEntry>(2, _omitFieldNames ? '' : 'entry',
-        subBuilder: LoraAdapterCatalogEntry.create)
-    ..aOB(4, _omitFieldNames ? '' : 'persisted')
-    ..aOM<$0.SDKError>(5, _omitFieldNames ? '' : 'error',
-        subBuilder: $0.SDKError.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterDownloadCompletedResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterDownloadCompletedResult copyWith(
-          void Function(LoraAdapterDownloadCompletedResult) updates) =>
-      super.copyWith((message) =>
-              updates(message as LoraAdapterDownloadCompletedResult))
-          as LoraAdapterDownloadCompletedResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterDownloadCompletedResult create() =>
-      LoraAdapterDownloadCompletedResult._();
-  @$core.override
-  LoraAdapterDownloadCompletedResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterDownloadCompletedResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoraAdapterDownloadCompletedResult>(
-          create);
-  static LoraAdapterDownloadCompletedResult? _defaultInstance;
-
-  @$pb.TagNumber(2)
-  LoraAdapterCatalogEntry get entry => $_getN(0);
-  @$pb.TagNumber(2)
-  set entry(LoraAdapterCatalogEntry value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasEntry() => $_has(0);
-  @$pb.TagNumber(2)
-  void clearEntry() => $_clearField(2);
-  @$pb.TagNumber(2)
-  LoraAdapterCatalogEntry ensureEntry() => $_ensure(0);
-
-  @$pb.TagNumber(4)
-  $core.bool get persisted => $_getBF(1);
-  @$pb.TagNumber(4)
-  set persisted($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(4)
-  $core.bool hasPersisted() => $_has(1);
-  @$pb.TagNumber(4)
-  void clearPersisted() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $0.SDKError get error => $_getN(2);
-  @$pb.TagNumber(5)
-  set error($0.SDKError value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasError() => $_has(2);
-  @$pb.TagNumber(5)
-  void clearError() => $_clearField(5);
-  @$pb.TagNumber(5)
-  $0.SDKError ensureError() => $_ensure(2);
-}
-
-class LoraAdapterImportRequest extends $pb.GeneratedMessage {
-  factory LoraAdapterImportRequest({
-    $core.String? sourcePath,
-    $core.String? filename,
-  }) {
-    final result = create();
-    if (sourcePath != null) result.sourcePath = sourcePath;
-    if (filename != null) result.filename = filename;
-    return result;
-  }
-
-  LoraAdapterImportRequest._();
-
-  factory LoraAdapterImportRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory LoraAdapterImportRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoraAdapterImportRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'sourcePath')
-    ..aOS(2, _omitFieldNames ? '' : 'filename')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterImportRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterImportRequest copyWith(
-          void Function(LoraAdapterImportRequest) updates) =>
-      super.copyWith((message) => updates(message as LoraAdapterImportRequest))
-          as LoraAdapterImportRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterImportRequest create() => LoraAdapterImportRequest._();
-  @$core.override
-  LoraAdapterImportRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterImportRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoraAdapterImportRequest>(create);
-  static LoraAdapterImportRequest? _defaultInstance;
-
-  /// Platform-readable path of the picked file.
-  @$pb.TagNumber(1)
-  $core.String get sourcePath => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set sourcePath($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSourcePath() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSourcePath() => $_clearField(1);
-
-  /// Defaults to basename(source_path).
-  @$pb.TagNumber(2)
-  $core.String get filename => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set filename($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasFilename() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearFilename() => $_clearField(2);
-}
-
-class LoraAdapterImportResult extends $pb.GeneratedMessage {
-  factory LoraAdapterImportResult({
-    $core.String? localPath,
-    $core.bool? matched,
-    LoraAdapterCatalogEntry? entry,
-    $0.SDKError? error,
-  }) {
-    final result = create();
-    if (localPath != null) result.localPath = localPath;
-    if (matched != null) result.matched = matched;
-    if (entry != null) result.entry = entry;
-    if (error != null) result.error = error;
-    return result;
-  }
-
-  LoraAdapterImportResult._();
-
-  factory LoraAdapterImportResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory LoraAdapterImportResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoraAdapterImportResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(3, _omitFieldNames ? '' : 'localPath')
-    ..aOB(4, _omitFieldNames ? '' : 'matched')
-    ..aOM<LoraAdapterCatalogEntry>(5, _omitFieldNames ? '' : 'entry',
-        subBuilder: LoraAdapterCatalogEntry.create)
-    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
-        subBuilder: $0.SDKError.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterImportResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoraAdapterImportResult copyWith(
-          void Function(LoraAdapterImportResult) updates) =>
-      super.copyWith((message) => updates(message as LoraAdapterImportResult))
-          as LoraAdapterImportResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterImportResult create() => LoraAdapterImportResult._();
-  @$core.override
-  LoraAdapterImportResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static LoraAdapterImportResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoraAdapterImportResult>(create);
-  static LoraAdapterImportResult? _defaultInstance;
-
-  /// Stable SDK-owned path of the imported file.
-  @$pb.TagNumber(3)
-  $core.String get localPath => $_getSZ(0);
-  @$pb.TagNumber(3)
-  set localPath($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(3)
-  $core.bool hasLocalPath() => $_has(0);
-  @$pb.TagNumber(3)
-  void clearLocalPath() => $_clearField(3);
-
-  /// Whether a catalog entry matched and was completed.
-  @$pb.TagNumber(4)
-  $core.bool get matched => $_getBF(1);
-  @$pb.TagNumber(4)
-  set matched($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(4)
-  $core.bool hasMatched() => $_has(1);
-  @$pb.TagNumber(4)
-  void clearMatched() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  LoraAdapterCatalogEntry get entry => $_getN(2);
-  @$pb.TagNumber(5)
-  set entry(LoraAdapterCatalogEntry value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasEntry() => $_has(2);
-  @$pb.TagNumber(5)
-  void clearEntry() => $_clearField(5);
-  @$pb.TagNumber(5)
-  LoraAdapterCatalogEntry ensureEntry() => $_ensure(2);
-
-  @$pb.TagNumber(6)
-  $0.SDKError get error => $_getN(3);
-  @$pb.TagNumber(6)
-  set error($0.SDKError value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasError() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearError() => $_clearField(6);
-  @$pb.TagNumber(6)
-  $0.SDKError ensureError() => $_ensure(3);
-}
-
 class LoraCompatibilityResult extends $pb.GeneratedMessage {
   factory LoraCompatibilityResult({
     $core.bool? isCompatible,
     $core.String? baseModelRequired,
-    $core.Iterable<$core.String>? warnings,
     $0.SDKError? error,
   }) {
     final result = create();
     if (isCompatible != null) result.isCompatible = isCompatible;
     if (baseModelRequired != null) result.baseModelRequired = baseModelRequired;
-    if (warnings != null) result.warnings.addAll(warnings);
     if (error != null) result.error = error;
     return result;
   }
@@ -1323,9 +803,8 @@ class LoraCompatibilityResult extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'isCompatible')
-    ..aOS(3, _omitFieldNames ? '' : 'baseModelRequired')
-    ..pPS(4, _omitFieldNames ? '' : 'warnings')
-    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
+    ..aOS(2, _omitFieldNames ? '' : 'baseModelRequired')
+    ..aOM<$0.SDKError>(3, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
@@ -1358,81 +837,78 @@ class LoraCompatibilityResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearIsCompatible() => $_clearField(1);
 
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.String get baseModelRequired => $_getSZ(1);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   set baseModelRequired($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.bool hasBaseModelRequired() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearBaseModelRequired() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $pb.PbList<$core.String> get warnings => $_getList(2);
+  @$pb.TagNumber(2)
+  void clearBaseModelRequired() => $_clearField(2);
 
   /// Populated when is_compatible is false.
-  @$pb.TagNumber(6)
-  $0.SDKError get error => $_getN(3);
-  @$pb.TagNumber(6)
-  set error($0.SDKError value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasError() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearError() => $_clearField(6);
-  @$pb.TagNumber(6)
-  $0.SDKError ensureError() => $_ensure(3);
+  @$pb.TagNumber(3)
+  $0.SDKError get error => $_getN(2);
+  @$pb.TagNumber(3)
+  set error($0.SDKError value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasError() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearError() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $0.SDKError ensureError() => $_ensure(2);
 }
 
-class LoRAApplyRequest extends $pb.GeneratedMessage {
-  factory LoRAApplyRequest({
+class LoraApplyRequest extends $pb.GeneratedMessage {
+  factory LoraApplyRequest({
     $core.String? requestId,
-    $core.Iterable<LoRAAdapterConfig>? adapters,
-    $core.bool? replaceExisting,
+    $core.Iterable<LoraAdapterConfig>? adapters,
+    $core.bool? keepExisting,
   }) {
     final result = create();
     if (requestId != null) result.requestId = requestId;
     if (adapters != null) result.adapters.addAll(adapters);
-    if (replaceExisting != null) result.replaceExisting = replaceExisting;
+    if (keepExisting != null) result.keepExisting = keepExisting;
     return result;
   }
 
-  LoRAApplyRequest._();
+  LoraApplyRequest._();
 
-  factory LoRAApplyRequest.fromBuffer($core.List<$core.int> data,
+  factory LoraApplyRequest.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory LoRAApplyRequest.fromJson($core.String json,
+  factory LoraApplyRequest.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoRAApplyRequest',
+      _omitMessageNames ? '' : 'LoraApplyRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..pPM<LoRAAdapterConfig>(2, _omitFieldNames ? '' : 'adapters',
-        subBuilder: LoRAAdapterConfig.create)
-    ..aOB(3, _omitFieldNames ? '' : 'replaceExisting')
+    ..pPM<LoraAdapterConfig>(2, _omitFieldNames ? '' : 'adapters',
+        subBuilder: LoraAdapterConfig.create)
+    ..aOB(3, _omitFieldNames ? '' : 'keepExisting')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAApplyRequest clone() => deepCopy();
+  LoraApplyRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAApplyRequest copyWith(void Function(LoRAApplyRequest) updates) =>
-      super.copyWith((message) => updates(message as LoRAApplyRequest))
-          as LoRAApplyRequest;
+  LoraApplyRequest copyWith(void Function(LoraApplyRequest) updates) =>
+      super.copyWith((message) => updates(message as LoraApplyRequest))
+          as LoraApplyRequest;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static LoRAApplyRequest create() => LoRAApplyRequest._();
+  static LoraApplyRequest create() => LoraApplyRequest._();
   @$core.override
-  LoRAApplyRequest createEmptyInstance() => create();
+  LoraApplyRequest createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static LoRAApplyRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoRAApplyRequest>(create);
-  static LoRAApplyRequest? _defaultInstance;
+  static LoraApplyRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoraApplyRequest>(create);
+  static LoraApplyRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
   $core.String get requestId => $_getSZ(0);
@@ -1443,24 +919,27 @@ class LoRAApplyRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearRequestId() => $_clearField(1);
 
+  /// SET semantics, matching Diffusers set_adapters and
+  /// llama_set_adapters_lora: `adapters` becomes the complete active set and
+  /// anything not listed is detached.
   @$pb.TagNumber(2)
-  $pb.PbList<LoRAAdapterConfig> get adapters => $_getList(1);
+  $pb.PbList<LoraAdapterConfig> get adapters => $_getList(1);
 
-  /// Drop currently-applied adapters instead of stacking.
+  /// Stack on top of the currently-applied set instead of replacing it.
   @$pb.TagNumber(3)
-  $core.bool get replaceExisting => $_getBF(2);
+  $core.bool get keepExisting => $_getBF(2);
   @$pb.TagNumber(3)
-  set replaceExisting($core.bool value) => $_setBool(2, value);
+  set keepExisting($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasReplaceExisting() => $_has(2);
+  $core.bool hasKeepExisting() => $_has(2);
   @$pb.TagNumber(3)
-  void clearReplaceExisting() => $_clearField(3);
+  void clearKeepExisting() => $_clearField(3);
 }
 
-class LoRAApplyResult extends $pb.GeneratedMessage {
-  factory LoRAApplyResult({
+class LoraApplyResult extends $pb.GeneratedMessage {
+  factory LoraApplyResult({
     $core.String? requestId,
-    $core.Iterable<LoRAAdapterInfo>? adapters,
+    $core.Iterable<LoraAdapterInfo>? adapters,
     $0.SDKError? error,
   }) {
     final result = create();
@@ -1470,44 +949,44 @@ class LoRAApplyResult extends $pb.GeneratedMessage {
     return result;
   }
 
-  LoRAApplyResult._();
+  LoraApplyResult._();
 
-  factory LoRAApplyResult.fromBuffer($core.List<$core.int> data,
+  factory LoraApplyResult.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory LoRAApplyResult.fromJson($core.String json,
+  factory LoraApplyResult.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoRAApplyResult',
+      _omitMessageNames ? '' : 'LoraApplyResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..pPM<LoRAAdapterInfo>(2, _omitFieldNames ? '' : 'adapters',
-        subBuilder: LoRAAdapterInfo.create)
+    ..pPM<LoraAdapterInfo>(2, _omitFieldNames ? '' : 'adapters',
+        subBuilder: LoraAdapterInfo.create)
     ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAApplyResult clone() => deepCopy();
+  LoraApplyResult clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAApplyResult copyWith(void Function(LoRAApplyResult) updates) =>
-      super.copyWith((message) => updates(message as LoRAApplyResult))
-          as LoRAApplyResult;
+  LoraApplyResult copyWith(void Function(LoraApplyResult) updates) =>
+      super.copyWith((message) => updates(message as LoraApplyResult))
+          as LoraApplyResult;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static LoRAApplyResult create() => LoRAApplyResult._();
+  static LoraApplyResult create() => LoraApplyResult._();
   @$core.override
-  LoRAApplyResult createEmptyInstance() => create();
+  LoraApplyResult createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static LoRAApplyResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoRAApplyResult>(create);
-  static LoRAApplyResult? _defaultInstance;
+  static LoraApplyResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoraApplyResult>(create);
+  static LoraApplyResult? _defaultInstance;
 
   @$pb.TagNumber(1)
   $core.String get requestId => $_getSZ(0);
@@ -1519,7 +998,7 @@ class LoRAApplyResult extends $pb.GeneratedMessage {
   void clearRequestId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $pb.PbList<LoRAAdapterInfo> get adapters => $_getList(1);
+  $pb.PbList<LoraAdapterInfo> get adapters => $_getList(1);
 
   @$pb.TagNumber(6)
   $0.SDKError get error => $_getN(2);
@@ -1533,172 +1012,142 @@ class LoRAApplyResult extends $pb.GeneratedMessage {
   $0.SDKError ensureError() => $_ensure(2);
 }
 
-class LoRARemoveRequest extends $pb.GeneratedMessage {
-  factory LoRARemoveRequest({
-    $core.String? requestId,
+class LoraRemoveRequest extends $pb.GeneratedMessage {
+  factory LoraRemoveRequest({
     $core.Iterable<$core.String>? adapterIds,
-    $core.Iterable<$core.String>? adapterPaths,
     $core.bool? clearAll,
   }) {
     final result = create();
-    if (requestId != null) result.requestId = requestId;
     if (adapterIds != null) result.adapterIds.addAll(adapterIds);
-    if (adapterPaths != null) result.adapterPaths.addAll(adapterPaths);
     if (clearAll != null) result.clearAll = clearAll;
     return result;
   }
 
-  LoRARemoveRequest._();
+  LoraRemoveRequest._();
 
-  factory LoRARemoveRequest.fromBuffer($core.List<$core.int> data,
+  factory LoraRemoveRequest.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory LoRARemoveRequest.fromJson($core.String json,
+  factory LoraRemoveRequest.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoRARemoveRequest',
+      _omitMessageNames ? '' : 'LoraRemoveRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..pPS(2, _omitFieldNames ? '' : 'adapterIds')
-    ..pPS(3, _omitFieldNames ? '' : 'adapterPaths')
-    ..aOB(4, _omitFieldNames ? '' : 'clearAll')
+    ..pPS(1, _omitFieldNames ? '' : 'adapterIds')
+    ..aOB(2, _omitFieldNames ? '' : 'clearAll')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRARemoveRequest clone() => deepCopy();
+  LoraRemoveRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRARemoveRequest copyWith(void Function(LoRARemoveRequest) updates) =>
-      super.copyWith((message) => updates(message as LoRARemoveRequest))
-          as LoRARemoveRequest;
+  LoraRemoveRequest copyWith(void Function(LoraRemoveRequest) updates) =>
+      super.copyWith((message) => updates(message as LoraRemoveRequest))
+          as LoraRemoveRequest;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static LoRARemoveRequest create() => LoRARemoveRequest._();
+  static LoraRemoveRequest create() => LoraRemoveRequest._();
   @$core.override
-  LoRARemoveRequest createEmptyInstance() => create();
+  LoraRemoveRequest createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static LoRARemoveRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LoRARemoveRequest>(create);
-  static LoRARemoveRequest? _defaultInstance;
+  static LoraRemoveRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoraRemoveRequest>(create);
+  static LoraRemoveRequest? _defaultInstance;
 
+  /// Remove the named adapters; clear_all ignores the list.
   @$pb.TagNumber(1)
-  $core.String get requestId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set requestId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasRequestId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearRequestId() => $_clearField(1);
+  $pb.PbList<$core.String> get adapterIds => $_getList(0);
 
-  /// Remove by id or by path; clear_all ignores both lists.
   @$pb.TagNumber(2)
-  $pb.PbList<$core.String> get adapterIds => $_getList(1);
-
-  @$pb.TagNumber(3)
-  $pb.PbList<$core.String> get adapterPaths => $_getList(2);
-
-  @$pb.TagNumber(4)
-  $core.bool get clearAll => $_getBF(3);
-  @$pb.TagNumber(4)
-  set clearAll($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasClearAll() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearClearAll() => $_clearField(4);
+  $core.bool get clearAll => $_getBF(1);
+  @$pb.TagNumber(2)
+  set clearAll($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasClearAll() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearClearAll() => $_clearField(2);
 }
 
-/// Also serves as the request for List and State, carrying optional
-/// base_model_id filtering without a separate empty request type.
-class LoRAState extends $pb.GeneratedMessage {
-  factory LoRAState({
-    $core.Iterable<LoRAAdapterInfo>? loadedAdapters,
-    $core.bool? hasActiveAdapters,
+/// Response only. The state read takes no arguments; base_model_id is
+/// reported, never a filter.
+class LoraState extends $pb.GeneratedMessage {
+  factory LoraState({
+    $core.Iterable<LoraAdapterInfo>? loadedAdapters,
     $core.String? baseModelId,
     $0.SDKError? error,
   }) {
     final result = create();
     if (loadedAdapters != null) result.loadedAdapters.addAll(loadedAdapters);
-    if (hasActiveAdapters != null) result.hasActiveAdapters = hasActiveAdapters;
     if (baseModelId != null) result.baseModelId = baseModelId;
     if (error != null) result.error = error;
     return result;
   }
 
-  LoRAState._();
+  LoraState._();
 
-  factory LoRAState.fromBuffer($core.List<$core.int> data,
+  factory LoraState.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory LoRAState.fromJson($core.String json,
+  factory LoraState.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LoRAState',
+      _omitMessageNames ? '' : 'LoraState',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..pPM<LoRAAdapterInfo>(1, _omitFieldNames ? '' : 'loadedAdapters',
-        subBuilder: LoRAAdapterInfo.create)
-    ..aOB(2, _omitFieldNames ? '' : 'hasActiveAdapters')
-    ..aOS(3, _omitFieldNames ? '' : 'baseModelId')
-    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
+    ..pPM<LoraAdapterInfo>(1, _omitFieldNames ? '' : 'loadedAdapters',
+        subBuilder: LoraAdapterInfo.create)
+    ..aOS(2, _omitFieldNames ? '' : 'baseModelId')
+    ..aOM<$0.SDKError>(3, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAState clone() => deepCopy();
+  LoraState clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LoRAState copyWith(void Function(LoRAState) updates) =>
-      super.copyWith((message) => updates(message as LoRAState)) as LoRAState;
+  LoraState copyWith(void Function(LoraState) updates) =>
+      super.copyWith((message) => updates(message as LoraState)) as LoraState;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static LoRAState create() => LoRAState._();
+  static LoraState create() => LoraState._();
   @$core.override
-  LoRAState createEmptyInstance() => create();
+  LoraState createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static LoRAState getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LoRAState>(create);
-  static LoRAState? _defaultInstance;
+  static LoraState getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LoraState>(create);
+  static LoraState? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<LoRAAdapterInfo> get loadedAdapters => $_getList(0);
+  $pb.PbList<LoraAdapterInfo> get loadedAdapters => $_getList(0);
 
   @$pb.TagNumber(2)
-  $core.bool get hasActiveAdapters => $_getBF(1);
+  $core.String get baseModelId => $_getSZ(1);
   @$pb.TagNumber(2)
-  set hasActiveAdapters($core.bool value) => $_setBool(1, value);
+  set baseModelId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasHasActiveAdapters() => $_has(1);
+  $core.bool hasBaseModelId() => $_has(1);
   @$pb.TagNumber(2)
-  void clearHasActiveAdapters() => $_clearField(2);
+  void clearBaseModelId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get baseModelId => $_getSZ(2);
+  $0.SDKError get error => $_getN(2);
   @$pb.TagNumber(3)
-  set baseModelId($core.String value) => $_setString(2, value);
+  set error($0.SDKError value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasBaseModelId() => $_has(2);
+  $core.bool hasError() => $_has(2);
   @$pb.TagNumber(3)
-  void clearBaseModelId() => $_clearField(3);
-
-  @$pb.TagNumber(6)
-  $0.SDKError get error => $_getN(3);
-  @$pb.TagNumber(6)
-  set error($0.SDKError value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasError() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearError() => $_clearField(6);
-  @$pb.TagNumber(6)
-  $0.SDKError ensureError() => $_ensure(3);
+  void clearError() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $0.SDKError ensureError() => $_ensure(2);
 }
 
 const $core.bool _omitFieldNames =

@@ -21,7 +21,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -46,6 +45,10 @@ public class DeviceStorageInfo(
     schemaIndex = 1,
   )
   public val free_bytes: Long = 0L,
+  /**
+   * Distinct from total-minus-free: this is the adapter's own reading of
+   * occupied space, not a derivation. Kept live.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -54,17 +57,6 @@ public class DeviceStorageInfo(
     schemaIndex = 2,
   )
   public val used_bytes: Long = 0L,
-  /**
-   * 0.0 to 100.0, and 0.0 when total_bytes is 0.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "usedPercent",
-    schemaIndex = 3,
-  )
-  public val used_percent: Float = 0f,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DeviceStorageInfo, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -80,7 +72,6 @@ public class DeviceStorageInfo(
     if (total_bytes != other.total_bytes) return false
     if (free_bytes != other.free_bytes) return false
     if (used_bytes != other.used_bytes) return false
-    if (used_percent != other.used_percent) return false
     return true
   }
 
@@ -91,7 +82,6 @@ public class DeviceStorageInfo(
       result = result * 37 + total_bytes.hashCode()
       result = result * 37 + free_bytes.hashCode()
       result = result * 37 + used_bytes.hashCode()
-      result = result * 37 + used_percent.hashCode()
       super.hashCode = result
     }
     return result
@@ -102,7 +92,6 @@ public class DeviceStorageInfo(
     result += """total_bytes=$total_bytes"""
     result += """free_bytes=$free_bytes"""
     result += """used_bytes=$used_bytes"""
-    result += """used_percent=$used_percent"""
     return result.joinToString(prefix = "DeviceStorageInfo{", separator = ", ", postfix = "}")
   }
 
@@ -110,9 +99,8 @@ public class DeviceStorageInfo(
     total_bytes: Long = this.total_bytes,
     free_bytes: Long = this.free_bytes,
     used_bytes: Long = this.used_bytes,
-    used_percent: Float = this.used_percent,
     unknownFields: ByteString = this.unknownFields,
-  ): DeviceStorageInfo = DeviceStorageInfo(total_bytes, free_bytes, used_bytes, used_percent, unknownFields)
+  ): DeviceStorageInfo = DeviceStorageInfo(total_bytes, free_bytes, used_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -135,9 +123,6 @@ public class DeviceStorageInfo(
         if (value.used_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.used_bytes)
         }
-        if (!value.used_percent.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.used_percent)
-        }
         return size
       }
 
@@ -151,17 +136,11 @@ public class DeviceStorageInfo(
         if (value.used_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.used_bytes)
         }
-        if (!value.used_percent.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.used_percent)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DeviceStorageInfo) {
         writer.writeBytes(value.unknownFields)
-        if (!value.used_percent.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.used_percent)
-        }
         if (value.used_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.used_bytes)
         }
@@ -177,13 +156,11 @@ public class DeviceStorageInfo(
         var total_bytes: Long = 0L
         var free_bytes: Long = 0L
         var used_bytes: Long = 0L
-        var used_percent: Float = 0f
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> total_bytes = ProtoAdapter.INT64.decode(reader)
             2 -> free_bytes = ProtoAdapter.INT64.decode(reader)
             3 -> used_bytes = ProtoAdapter.INT64.decode(reader)
-            4 -> used_percent = ProtoAdapter.FLOAT.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -191,7 +168,6 @@ public class DeviceStorageInfo(
           total_bytes = total_bytes,
           free_bytes = free_bytes,
           used_bytes = used_bytes,
-          used_percent = used_percent,
           unknownFields = unknownFields
         )
       }

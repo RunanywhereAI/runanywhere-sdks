@@ -8,7 +8,7 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere IDL — Embeddings configuration, options, vector, and result.
+// RunAnywhere IDL — Embeddings options, vector, and result.
 
 import SwiftProtobuf
 
@@ -22,8 +22,14 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+/// The required public spelling in every SDK is exactly "mean" / "cls" / "last".
+/// LAST is the final token's hidden state (llama.cpp --pooling last), which
+/// decoder-style embedders require. It is NOT max-pooling; no SDK may expose
+/// it as "max".
 public nonisolated enum RAEmbeddingsPoolingStrategy: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
+
+  /// inherit the bundle's pooling
   case unspecified // = 0
   case mean // = 1
   case cls // = 2
@@ -64,61 +70,56 @@ public nonisolated enum RAEmbeddingsPoolingStrategy: SwiftProtobuf.Enum, Swift.C
 
 }
 
-/// Applied at service creation.
-public nonisolated struct RAEmbeddingsConfiguration: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
+public nonisolated enum RAEmbeddingsInputType: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
 
-  /// Registry id or local path.
-  public var modelID: String = String()
+  /// model default / symmetric model
+  case unspecified // = 0
+  case query // = 1
+  case document // = 2
+  case UNRECOGNIZED(Int)
 
-  /// Must match the loaded model's hidden size: 384 for all-MiniLM-L6-v2,
-  /// 768 for bge-base, 1024 for bge-large.
-  public var embeddingDimension: Int32 = 0
-
-  /// Truncation or sliding window past this length is backend-decided.
-  public var maxSequenceLength: Int32 = 0
-
-  public var preferredFramework: RAInferenceFramework {
-    get {_preferredFramework ?? .unspecified}
-    set {_preferredFramework = newValue}
+  public init() {
+    self = .unspecified
   }
-  /// Returns true if `preferredFramework` has been explicitly set.
-  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
-  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
-  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
 
-  public var normalize: Bool = false
-
-  public var pooling: RAEmbeddingsPoolingStrategy = .unspecified
-
-  /// Backend-specific config such as tokenizer or vocab companion paths.
-  public var configJson: String {
-    get {_configJson ?? String()}
-    set {_configJson = newValue}
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .query
+    case 2: self = .document
+    default: self = .UNRECOGNIZED(rawValue)
+    }
   }
-  /// Returns true if `configJson` has been explicitly set.
-  public var hasConfigJson: Bool {self._configJson != nil}
-  /// Clears the value of `configJson`. Subsequent reads from it will return its default value.
-  public mutating func clearConfigJson() {self._configJson = nil}
 
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .query: return 1
+    case .document: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
 
-  public init() {}
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAEmbeddingsInputType] = [
+    .unspecified,
+    .query,
+    .document,
+  ]
 
-  fileprivate var _preferredFramework: RAInferenceFramework? = nil
-  fileprivate var _configJson: String? = nil
 }
 
-/// Per-call overrides. Unset fields fall back to the component configuration.
+/// Per-call overrides. Unset fields fall back to the loaded bundle's defaults.
 public nonisolated struct RAEmbeddingsOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Truncate over-long inputs instead of erroring. Unset = backend default,
-  /// currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
+  /// true  = clip an over-long input to the model's context and embed it.
+  /// false = fail the call.
+  /// Unset = true. A backend may instead aggregate over a sliding window,
+  /// which embeds the whole document rather than discarding its tail.
   public var truncate: Bool {
     get {_truncate ?? false}
     set {_truncate = newValue}
@@ -138,12 +139,43 @@ public nonisolated struct RAEmbeddingsOptions: Sendable {
   /// Clears the value of `batchSize`. Subsequent reads from it will return its default value.
   public mutating func clearBatchSize() {self._batchSize = nil}
 
-  public var normalize: Bool = false
+  /// L2-normalize every vector to unit length (what cosine search expects).
+  /// Unset = true. false returns the raw pooled vector.
+  public var normalize: Bool {
+    get {_normalize ?? false}
+    set {_normalize = newValue}
+  }
+  /// Returns true if `normalize` has been explicitly set.
+  public var hasNormalize: Bool {self._normalize != nil}
+  /// Clears the value of `normalize`. Subsequent reads from it will return its default value.
+  public mutating func clearNormalize() {self._normalize = nil}
 
   public var pooling: RAEmbeddingsPoolingStrategy = .unspecified
 
   /// 0 = auto
   public var nThreads: Int32 = 0
+
+  /// What the vector will be used for. Asymmetric embedders (bge, e5,
+  /// nomic-embed, gte, EmbeddingGemma) prepend a different prompt for a query
+  /// than for a document. The prefix table must be added to the model manifest
+  /// as part of honouring this field; it does not exist today. A bundle that
+  /// declares no prompts ignores input_type and returns the identical vector
+  /// for QUERY and DOCUMENT — it never errors.
+  public var inputType: RAEmbeddingsInputType = .unspecified
+
+  /// Matryoshka (MRL) output width: truncate each vector to this many floats
+  /// and re-normalize. Unset = the model's native width. Accepts any width in
+  /// [1, the native width]; a width the model was not MRL-trained at is
+  /// silently worse. This is the request-side width — EmbeddingsResult.dimension
+  /// reports the width actually produced.
+  public var dimensions: Int32 {
+    get {_dimensions ?? 0}
+    set {_dimensions = newValue}
+  }
+  /// Returns true if `dimensions` has been explicitly set.
+  public var hasDimensions: Bool {self._dimensions != nil}
+  /// Clears the value of `dimensions`. Subsequent reads from it will return its default value.
+  public mutating func clearDimensions() {self._dimensions = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -151,6 +183,8 @@ public nonisolated struct RAEmbeddingsOptions: Sendable {
 
   fileprivate var _truncate: Bool? = nil
   fileprivate var _batchSize: Int32? = nil
+  fileprivate var _normalize: Bool? = nil
+  fileprivate var _dimensions: Int32? = nil
 }
 
 public nonisolated struct RAEmbeddingVector: Sendable {
@@ -161,39 +195,13 @@ public nonisolated struct RAEmbeddingVector: Sendable {
   /// Length equals EmbeddingsResult.dimension.
   public var values: [Float] = []
 
-  /// Populated when the backend computes it, letting consumers score
-  /// similarity without recomputing.
-  public var norm: Float {
-    get {_norm ?? 0}
-    set {_norm = newValue}
-  }
-  /// Returns true if `norm` has been explicitly set.
-  public var hasNorm: Bool {self._norm != nil}
-  /// Clears the value of `norm`. Subsequent reads from it will return its default value.
-  public mutating func clearNorm() {self._norm = nil}
-
-  /// Lets batch callers correlate vectors with inputs without tracking order.
-  public var text: String {
-    get {_text ?? String()}
-    set {_text = newValue}
-  }
-  /// Returns true if `text` has been explicitly set.
-  public var hasText: Bool {self._text != nil}
-  /// Clears the value of `text`. Subsequent reads from it will return its default value.
-  public mutating func clearText() {self._text = nil}
-
-  public var dimension: Int32 = 0
-
+  /// Zero-based position in the request batch. ALWAYS set, on every entry
+  /// point, including index 0.
   public var inputIndex: Int32 = 0
-
-  public var metadata: Dictionary<String,String> = [:]
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _norm: Float? = nil
-  fileprivate var _text: String? = nil
 }
 
 /// One text = embed, multiple texts = embed_batch.
@@ -224,8 +232,6 @@ public nonisolated struct RAEmbeddingsRequest: Sendable {
   /// Clears the value of `modelID`. Subsequent reads from it will return its default value.
   public mutating func clearModelID() {self._modelID = nil}
 
-  public var metadata: Dictionary<String,String> = [:]
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -234,62 +240,38 @@ public nonisolated struct RAEmbeddingsRequest: Sendable {
   fileprivate var _modelID: String? = nil
 }
 
-public nonisolated struct RAEmbeddingsResult: @unchecked Sendable {
+public nonisolated struct RAEmbeddingsResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// One vector per input text, in input order.
-  public var vectors: [RAEmbeddingVector] {
-    get {_storage._vectors}
-    set {_uniqueStorage()._vectors = newValue}
-  }
+  public var vectors: [RAEmbeddingVector] = []
 
-  /// Duplicated from each vector so consumers can size buffers in O(1).
-  public var dimension: Int32 {
-    get {_storage._dimension}
-    set {_uniqueStorage()._dimension = newValue}
-  }
+  /// The width of every vector above, so consumers can size buffers in O(1).
+  public var dimension: Int32 = 0
 
-  public var processingTimeMs: Int64 {
-    get {_storage._processingTimeMs}
-    set {_uniqueStorage()._processingTimeMs = newValue}
-  }
+  public var processingTimeMs: Int64 = 0
 
   /// Across all inputs, post-truncation.
-  public var tokensUsed: Int32 {
-    get {_storage._tokensUsed}
-    set {_uniqueStorage()._tokensUsed = newValue}
-  }
+  public var tokensUsed: Int32 = 0
 
   public var modelID: String {
-    get {_storage._modelID ?? String()}
-    set {_uniqueStorage()._modelID = newValue}
+    get {_modelID ?? String()}
+    set {_modelID = newValue}
   }
   /// Returns true if `modelID` has been explicitly set.
-  public var hasModelID: Bool {_storage._modelID != nil}
+  public var hasModelID: Bool {self._modelID != nil}
   /// Clears the value of `modelID`. Subsequent reads from it will return its default value.
-  public mutating func clearModelID() {_uniqueStorage()._modelID = nil}
+  public mutating func clearModelID() {self._modelID = nil}
 
-  public var requestID: String {
-    get {_storage._requestID}
-    set {_uniqueStorage()._requestID = newValue}
-  }
-
-  public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public var requestID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _modelID: String? = nil
 }
 
 public nonisolated struct RAEmbeddingsCreateRequest: Sendable {
@@ -299,16 +281,6 @@ public nonisolated struct RAEmbeddingsCreateRequest: Sendable {
 
   /// Registry id or absolute model path.
   public var modelID: String = String()
-
-  /// Unset = commons defaults; set fields override per-component defaults.
-  public var configuration: RAEmbeddingsConfiguration {
-    get {_configuration ?? RAEmbeddingsConfiguration()}
-    set {_configuration = newValue}
-  }
-  /// Returns true if `configuration` has been explicitly set.
-  public var hasConfiguration: Bool {self._configuration != nil}
-  /// Clears the value of `configuration`. Subsequent reads from it will return its default value.
-  public mutating func clearConfiguration() {self._configuration = nil}
 
   /// For backends needing companion file paths, e.g. {"vocab_path":"..."}.
   public var configJson: String {
@@ -324,52 +296,39 @@ public nonisolated struct RAEmbeddingsCreateRequest: Sendable {
 
   public init() {}
 
-  fileprivate var _configuration: RAEmbeddingsConfiguration? = nil
   fileprivate var _configJson: String? = nil
 }
 
-public nonisolated struct RAEmbeddingsCreateResult: @unchecked Sendable {
+public nonisolated struct RAEmbeddingsCreateResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// rac_handle_t cast to u64. Zero on failure.
-  public var handle: UInt64 {
-    get {_storage._handle}
-    set {_uniqueStorage()._handle = newValue}
-  }
+  public var handle: UInt64 = 0
 
   /// Echoed so callers can store it beside the handle.
-  public var modelID: String {
-    get {_storage._modelID}
-    set {_uniqueStorage()._modelID = newValue}
-  }
+  public var modelID: String = String()
 
   /// Backend-resolved after load. 0 = unknown until the first embed call.
-  public var dimension: Int32 {
-    get {_storage._dimension}
-    set {_uniqueStorage()._dimension = newValue}
-  }
+  public var dimension: Int32 = 0
 
-  public var maxTokens: Int32 {
-    get {_storage._maxTokens}
-    set {_uniqueStorage()._maxTokens = newValue}
-  }
+  public var maxTokens: Int32 = 0
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _error: RASDKError? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -380,73 +339,13 @@ nonisolated extension RAEmbeddingsPoolingStrategy: SwiftProtobuf._ProtoNameProvi
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED\0\u{1}EMBEDDINGS_POOLING_STRATEGY_MEAN\0\u{1}EMBEDDINGS_POOLING_STRATEGY_CLS\0\u{1}EMBEDDINGS_POOLING_STRATEGY_LAST\0")
 }
 
-nonisolated extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".EmbeddingsConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}embedding_dimension\0\u{3}max_sequence_length\0\u{4}\u{2}preferred_framework\0\u{2}\u{2}normalize\0\u{1}pooling\0\u{3}config_json\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.embeddingDimension) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxSequenceLength) }()
-      case 5: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self.normalize) }()
-      case 8: try { try decoder.decodeSingularEnumField(value: &self.pooling) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._configJson) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
-    }
-    if self.embeddingDimension != 0 {
-      try visitor.visitSingularInt32Field(value: self.embeddingDimension, fieldNumber: 2)
-    }
-    if self.maxSequenceLength != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxSequenceLength, fieldNumber: 3)
-    }
-    try { if let v = self._preferredFramework {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
-    } }()
-    if self.normalize != false {
-      try visitor.visitSingularBoolField(value: self.normalize, fieldNumber: 7)
-    }
-    if self.pooling != .unspecified {
-      try visitor.visitSingularEnumField(value: self.pooling, fieldNumber: 8)
-    }
-    try { if let v = self._configJson {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAEmbeddingsConfiguration, rhs: RAEmbeddingsConfiguration) -> Bool {
-    if lhs.modelID != rhs.modelID {return false}
-    if lhs.embeddingDimension != rhs.embeddingDimension {return false}
-    if lhs.maxSequenceLength != rhs.maxSequenceLength {return false}
-    if lhs._preferredFramework != rhs._preferredFramework {return false}
-    if lhs.normalize != rhs.normalize {return false}
-    if lhs.pooling != rhs.pooling {return false}
-    if lhs._configJson != rhs._configJson {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
+nonisolated extension RAEmbeddingsInputType: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EMBEDDINGS_INPUT_TYPE_UNSPECIFIED\0\u{1}EMBEDDINGS_INPUT_TYPE_QUERY\0\u{1}EMBEDDINGS_INPUT_TYPE_DOCUMENT\0")
 }
 
 nonisolated extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}truncate\0\u{3}batch_size\0\u{1}normalize\0\u{1}pooling\0\u{3}n_threads\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}truncate\0\u{3}batch_size\0\u{1}normalize\0\u{1}pooling\0\u{3}n_threads\0\u{3}input_type\0\u{1}dimensions\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -456,9 +355,11 @@ nonisolated extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf.
       switch fieldNumber {
       case 2: try { try decoder.decodeSingularBoolField(value: &self._truncate) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self._batchSize) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.normalize) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self._normalize) }()
       case 5: try { try decoder.decodeSingularEnumField(value: &self.pooling) }()
       case 6: try { try decoder.decodeSingularInt32Field(value: &self.nThreads) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self.inputType) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self._dimensions) }()
       default: break
       }
     }
@@ -475,24 +376,32 @@ nonisolated extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._batchSize {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
     } }()
-    if self.normalize != false {
-      try visitor.visitSingularBoolField(value: self.normalize, fieldNumber: 4)
-    }
+    try { if let v = self._normalize {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
+    } }()
     if self.pooling != .unspecified {
       try visitor.visitSingularEnumField(value: self.pooling, fieldNumber: 5)
     }
     if self.nThreads != 0 {
       try visitor.visitSingularInt32Field(value: self.nThreads, fieldNumber: 6)
     }
+    if self.inputType != .unspecified {
+      try visitor.visitSingularEnumField(value: self.inputType, fieldNumber: 7)
+    }
+    try { if let v = self._dimensions {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAEmbeddingsOptions, rhs: RAEmbeddingsOptions) -> Bool {
     if lhs._truncate != rhs._truncate {return false}
     if lhs._batchSize != rhs._batchSize {return false}
-    if lhs.normalize != rhs.normalize {return false}
+    if lhs._normalize != rhs._normalize {return false}
     if lhs.pooling != rhs.pooling {return false}
     if lhs.nThreads != rhs.nThreads {return false}
+    if lhs.inputType != rhs.inputType {return false}
+    if lhs._dimensions != rhs._dimensions {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -500,7 +409,7 @@ nonisolated extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingVector"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0\u{1}norm\0\u{1}text\0\u{1}dimension\0\u{3}input_index\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0\u{3}input_index\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -509,49 +418,25 @@ nonisolated extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._M
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedFloatField(value: &self.values) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self._norm) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._text) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.dimension) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.inputIndex) }()
-      case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.inputIndex) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.values.isEmpty {
       try visitor.visitPackedFloatField(value: self.values, fieldNumber: 1)
     }
-    try { if let v = self._norm {
-      try visitor.visitSingularFloatField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._text {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    if self.dimension != 0 {
-      try visitor.visitSingularInt32Field(value: self.dimension, fieldNumber: 4)
-    }
     if self.inputIndex != 0 {
-      try visitor.visitSingularInt32Field(value: self.inputIndex, fieldNumber: 5)
-    }
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 6)
+      try visitor.visitSingularInt32Field(value: self.inputIndex, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAEmbeddingVector, rhs: RAEmbeddingVector) -> Bool {
     if lhs.values != rhs.values {return false}
-    if lhs._norm != rhs._norm {return false}
-    if lhs._text != rhs._text {return false}
-    if lhs.dimension != rhs.dimension {return false}
     if lhs.inputIndex != rhs.inputIndex {return false}
-    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -559,7 +444,7 @@ nonisolated extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}texts\0\u{1}options\0\u{3}request_id\0\u{3}model_id\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}texts\0\u{1}options\0\u{3}request_id\0\u{3}model_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -571,7 +456,6 @@ nonisolated extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf.
       case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
-      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       default: break
       }
     }
@@ -594,9 +478,6 @@ nonisolated extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._modelID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -605,7 +486,6 @@ nonisolated extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs._options != rhs._options {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs._modelID != rhs._modelID {return false}
-    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -613,111 +493,58 @@ nonisolated extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RAEmbeddingsResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}vectors\0\u{1}dimension\0\u{3}processing_time_ms\0\u{3}tokens_used\0\u{3}model_id\0\u{4}\u{3}request_id\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _vectors: [RAEmbeddingVector] = []
-    var _dimension: Int32 = 0
-    var _processingTimeMs: Int64 = 0
-    var _tokensUsed: Int32 = 0
-    var _modelID: String? = nil
-    var _requestID: String = String()
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _vectors = source._vectors
-      _dimension = source._dimension
-      _processingTimeMs = source._processingTimeMs
-      _tokensUsed = source._tokensUsed
-      _modelID = source._modelID
-      _requestID = source._requestID
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}vectors\0\u{1}dimension\0\u{3}processing_time_ms\0\u{3}tokens_used\0\u{3}model_id\0\u{3}request_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeRepeatedMessageField(value: &_storage._vectors) }()
-        case 2: try { try decoder.decodeSingularInt32Field(value: &_storage._dimension) }()
-        case 3: try { try decoder.decodeSingularInt64Field(value: &_storage._processingTimeMs) }()
-        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._tokensUsed) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.vectors) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.dimension) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.processingTimeMs) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.tokensUsed) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._vectors.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._vectors, fieldNumber: 1)
-      }
-      if _storage._dimension != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._dimension, fieldNumber: 2)
-      }
-      if _storage._processingTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._processingTimeMs, fieldNumber: 3)
-      }
-      if _storage._tokensUsed != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._tokensUsed, fieldNumber: 4)
-      }
-      try { if let v = _storage._modelID {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-      } }()
-      if !_storage._requestID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 8)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.vectors.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.vectors, fieldNumber: 1)
+    }
+    if self.dimension != 0 {
+      try visitor.visitSingularInt32Field(value: self.dimension, fieldNumber: 2)
+    }
+    if self.processingTimeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.processingTimeMs, fieldNumber: 3)
+    }
+    if self.tokensUsed != 0 {
+      try visitor.visitSingularInt32Field(value: self.tokensUsed, fieldNumber: 4)
+    }
+    try { if let v = self._modelID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 6)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAEmbeddingsResult, rhs: RAEmbeddingsResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._vectors != rhs_storage._vectors {return false}
-        if _storage._dimension != rhs_storage._dimension {return false}
-        if _storage._processingTimeMs != rhs_storage._processingTimeMs {return false}
-        if _storage._tokensUsed != rhs_storage._tokensUsed {return false}
-        if _storage._modelID != rhs_storage._modelID {return false}
-        if _storage._requestID != rhs_storage._requestID {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.vectors != rhs.vectors {return false}
+    if lhs.dimension != rhs.dimension {return false}
+    if lhs.processingTimeMs != rhs.processingTimeMs {return false}
+    if lhs.tokensUsed != rhs.tokensUsed {return false}
+    if lhs._modelID != rhs._modelID {return false}
+    if lhs.requestID != rhs.requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -725,7 +552,7 @@ nonisolated extension RAEmbeddingsResult: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RAEmbeddingsCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsCreateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}configuration\0\u{3}config_json\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}config_json\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -734,8 +561,7 @@ nonisolated extension RAEmbeddingsCreateRequest: SwiftProtobuf.Message, SwiftPro
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._configuration) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._configJson) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._configJson) }()
       default: break
       }
     }
@@ -749,18 +575,14 @@ nonisolated extension RAEmbeddingsCreateRequest: SwiftProtobuf.Message, SwiftPro
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
     }
-    try { if let v = self._configuration {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
     try { if let v = self._configJson {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAEmbeddingsCreateRequest, rhs: RAEmbeddingsCreateRequest) -> Bool {
     if lhs.modelID != rhs.modelID {return false}
-    if lhs._configuration != rhs._configuration {return false}
     if lhs._configJson != rhs._configJson {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -771,95 +593,51 @@ nonisolated extension RAEmbeddingsCreateResult: SwiftProtobuf.Message, SwiftProt
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsCreateResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}handle\0\u{3}model_id\0\u{1}dimension\0\u{3}max_tokens\0\u{2}\u{3}error\0")
 
-  fileprivate class _StorageClass {
-    var _handle: UInt64 = 0
-    var _modelID: String = String()
-    var _dimension: Int32 = 0
-    var _maxTokens: Int32 = 0
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _handle = source._handle
-      _modelID = source._modelID
-      _dimension = source._dimension
-      _maxTokens = source._maxTokens
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._handle) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
-        case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._dimension) }()
-        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._maxTokens) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.handle) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.dimension) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._handle != 0 {
-        try visitor.visitSingularUInt64Field(value: _storage._handle, fieldNumber: 1)
-      }
-      if !_storage._modelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 2)
-      }
-      if _storage._dimension != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._dimension, fieldNumber: 3)
-      }
-      if _storage._maxTokens != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._maxTokens, fieldNumber: 4)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.handle != 0 {
+      try visitor.visitSingularUInt64Field(value: self.handle, fieldNumber: 1)
     }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
+    }
+    if self.dimension != 0 {
+      try visitor.visitSingularInt32Field(value: self.dimension, fieldNumber: 3)
+    }
+    if self.maxTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 4)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAEmbeddingsCreateResult, rhs: RAEmbeddingsCreateResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._handle != rhs_storage._handle {return false}
-        if _storage._modelID != rhs_storage._modelID {return false}
-        if _storage._dimension != rhs_storage._dimension {return false}
-        if _storage._maxTokens != rhs_storage._maxTokens {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.handle != rhs.handle {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.dimension != rhs.dimension {return false}
+    if lhs.maxTokens != rhs.maxTokens {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

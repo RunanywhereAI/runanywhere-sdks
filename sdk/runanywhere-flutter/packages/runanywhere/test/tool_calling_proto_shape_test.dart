@@ -22,13 +22,16 @@ void main() {
     });
 
     test('session request carries execution and validation policy', () {
+      // `ToolCallingSessionCreateRequest.validateCalls` moved onto the
+      // nested `ToolCallingOptions.validateCalls` (idl/tool_calling.proto
+      // collapsed every generation knob onto `options`).
       final request = ToolCallingSessionCreateRequest(
         prompt: 'call the tool',
-        validateCalls: false,
+        options: ToolCallingOptions(validateCalls: false),
       );
 
-      expect(request.hasValidateCalls(), isTrue);
-      expect(request.validateCalls, isFalse);
+      expect(request.options.hasValidateCalls(), isTrue);
+      expect(request.options.validateCalls, isFalse);
       expect(request.prompt, 'call the tool');
     });
   });

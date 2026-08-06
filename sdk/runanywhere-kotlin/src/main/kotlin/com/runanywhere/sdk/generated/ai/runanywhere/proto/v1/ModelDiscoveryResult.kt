@@ -34,43 +34,11 @@ import okio.ByteString
 
 public class ModelDiscoveryResult(
   discovered_models: List<DiscoveredModel> = emptyList(),
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "linkedCount",
-    schemaIndex = 1,
-  )
-  public val linked_count: Int = 0,
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "purgedCount",
-    schemaIndex = 2,
-  )
-  public val purged_count: Int = 0,
   warnings: List<String> = emptyList(),
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "scannedCount",
-    schemaIndex = 4,
-  )
-  public val scanned_count: Int = 0,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "importedCount",
-    schemaIndex = 5,
-  )
-  public val imported_count: Int = 0,
   @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 2,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -89,7 +57,7 @@ public class ModelDiscoveryResult(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 3,
+    schemaIndex = 1,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -104,11 +72,7 @@ public class ModelDiscoveryResult(
     if (other !is ModelDiscoveryResult) return false
     if (unknownFields != other.unknownFields) return false
     if (discovered_models != other.discovered_models) return false
-    if (linked_count != other.linked_count) return false
-    if (purged_count != other.purged_count) return false
     if (warnings != other.warnings) return false
-    if (scanned_count != other.scanned_count) return false
-    if (imported_count != other.imported_count) return false
     if (error != other.error) return false
     return true
   }
@@ -118,11 +82,7 @@ public class ModelDiscoveryResult(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + discovered_models.hashCode()
-      result = result * 37 + linked_count.hashCode()
-      result = result * 37 + purged_count.hashCode()
       result = result * 37 + warnings.hashCode()
-      result = result * 37 + scanned_count.hashCode()
-      result = result * 37 + imported_count.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -132,25 +92,17 @@ public class ModelDiscoveryResult(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (discovered_models.isNotEmpty()) result += """discovered_models=$discovered_models"""
-    result += """linked_count=$linked_count"""
-    result += """purged_count=$purged_count"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
-    result += """scanned_count=$scanned_count"""
-    result += """imported_count=$imported_count"""
     if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelDiscoveryResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     discovered_models: List<DiscoveredModel> = this.discovered_models,
-    linked_count: Int = this.linked_count,
-    purged_count: Int = this.purged_count,
     warnings: List<String> = this.warnings,
-    scanned_count: Int = this.scanned_count,
-    imported_count: Int = this.imported_count,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelDiscoveryResult = ModelDiscoveryResult(discovered_models, linked_count, purged_count, warnings, scanned_count, imported_count, error, unknownFields)
+  ): ModelDiscoveryResult = ModelDiscoveryResult(discovered_models, warnings, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -166,38 +118,14 @@ public class ModelDiscoveryResult(
       override fun encodedSize(`value`: ModelDiscoveryResult): Int {
         var size = value.unknownFields.size
         size += DiscoveredModel.ADAPTER.asRepeated().encodedSizeWithTag(2, value.discovered_models)
-        if (value.linked_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.linked_count)
-        }
-        if (value.purged_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.purged_count)
-        }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.warnings)
-        if (value.scanned_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.scanned_count)
-        }
-        if (value.imported_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.imported_count)
-        }
         size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelDiscoveryResult) {
         DiscoveredModel.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.discovered_models)
-        if (value.linked_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.linked_count)
-        }
-        if (value.purged_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.purged_count)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
-        if (value.scanned_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.scanned_count)
-        }
-        if (value.imported_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.imported_count)
-        }
         SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
@@ -205,49 +133,25 @@ public class ModelDiscoveryResult(
       override fun encode(writer: ReverseProtoWriter, `value`: ModelDiscoveryResult) {
         writer.writeBytes(value.unknownFields)
         SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
-        if (value.imported_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.imported_count)
-        }
-        if (value.scanned_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.scanned_count)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
-        if (value.purged_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.purged_count)
-        }
-        if (value.linked_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.linked_count)
-        }
         DiscoveredModel.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.discovered_models)
       }
 
       override fun decode(reader: ProtoReader): ModelDiscoveryResult {
         val discovered_models = mutableListOf<DiscoveredModel>()
-        var linked_count: Int = 0
-        var purged_count: Int = 0
         val warnings = mutableListOf<String>()
-        var scanned_count: Int = 0
-        var imported_count: Int = 0
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             2 -> discovered_models.add(DiscoveredModel.ADAPTER.decode(reader))
-            3 -> linked_count = ProtoAdapter.INT32.decode(reader)
-            4 -> purged_count = ProtoAdapter.INT32.decode(reader)
             5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
-            7 -> scanned_count = ProtoAdapter.INT32.decode(reader)
-            8 -> imported_count = ProtoAdapter.INT32.decode(reader)
             9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelDiscoveryResult(
           discovered_models = discovered_models,
-          linked_count = linked_count,
-          purged_count = purged_count,
           warnings = warnings,
-          scanned_count = scanned_count,
-          imported_count = imported_count,
           error = error,
           unknownFields = unknownFields
         )

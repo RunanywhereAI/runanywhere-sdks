@@ -560,8 +560,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
     kThresholdFieldNumber = 4,
     kMinimumDurationMsFieldNumber = 5,
     kMergeGapMsFieldNumber = 6,
+    kMaxSpeakersFieldNumber = 8,
   };
-  // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+  // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
   [[nodiscard]] bool has_sample_rate()
       const;
   void clear_sample_rate() ;
@@ -629,11 +630,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
   void _internal_set_merge_gap_ms(::int64_t value);
 
   public:
+  // optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+  [[nodiscard]] bool has_max_speakers()
+      const;
+  void clear_max_speakers() ;
+  [[nodiscard]] ::int32_t max_speakers() const;
+  void set_max_speakers(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_speakers() const;
+  void _internal_set_max_speakers(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.DiarizationOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<3, 7,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -668,6 +681,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
     float threshold_;
     ::int64_t minimum_duration_ms_;
     ::int64_t merge_gap_ms_;
+    ::int32_t max_speakers_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1452,7 +1466,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationStreamEvent final : publ
 
 // DiarizationOptions
 
-// optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+// optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
 inline bool DiarizationOptions::has_sample_rate() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   return value;
@@ -1610,6 +1624,34 @@ inline ::int64_t DiarizationOptions::_internal_merge_gap_ms() const {
 inline void DiarizationOptions::_internal_set_merge_gap_ms(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.merge_gap_ms_ = value;
+}
+
+// optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+inline bool DiarizationOptions::has_max_speakers() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void DiarizationOptions::clear_max_speakers() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speakers_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline ::int32_t DiarizationOptions::max_speakers() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.max_speakers)
+  return _internal_max_speakers();
+}
+inline void DiarizationOptions::set_max_speakers(::int32_t value) {
+  _internal_set_max_speakers(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.max_speakers)
+}
+inline ::int32_t DiarizationOptions::_internal_max_speakers() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.max_speakers_;
+}
+inline void DiarizationOptions::_internal_set_max_speakers(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speakers_ = value;
 }
 
 // -------------------------------------------------------------------

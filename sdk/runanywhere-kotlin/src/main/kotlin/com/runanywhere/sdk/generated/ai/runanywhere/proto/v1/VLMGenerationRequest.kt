@@ -30,10 +30,14 @@ import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
 import kotlin.collections.List
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
+/**
+ * VLMConfiguration is deleted: it had no adapter in commons -- max_tokens,
+ * temperature and system_prompt duplicated the live per-request fields with
+ * different defaults, streaming is chosen by which verb the app calls, and
+ * engine selection goes through the model registry.
+ */
 public class VLMGenerationRequest(
   @field:WireField(
     tag = 1,
@@ -44,20 +48,45 @@ public class VLMGenerationRequest(
   )
   public val request_id: String = "",
   images: List<VLMImage> = emptyList(),
+  messages: List<ChatMessage> = emptyList(),
+  /**
+   * The question about the image, for the single-turn quickstart path.
+   */
   @field:WireField(
-    tag = 3,
-    adapter = "ai.runanywhere.proto.v1.VLMGenerationOptions#ADAPTER",
-    schemaIndex = 2,
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
   )
-  public val options: VLMGenerationOptions? = null,
+  public val prompt: String = "",
+  /**
+   * One options set for all text generation, image or not -- same names,
+   * same defaults, same validation as the text API. Carries
+   * structured_output, which is how OCR / field extraction / bounding
+   * boxes are expressed (deliberately no ocr() or detect() verb).
+   */
+  @field:WireField(
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
+    schemaIndex = 4,
+  )
+  public val options: LLMGenerationOptions? = null,
+  /**
+   * Only the knobs that have no text-generation meaning.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.VLMVisionOptions#ADAPTER",
+    schemaIndex = 5,
+  )
+  public val vision: VLMVisionOptions? = null,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "modelId",
-    schemaIndex = 3,
+    schemaIndex = 6,
   )
   public val model_id: String? = null,
-  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMGenerationRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -68,13 +97,17 @@ public class VLMGenerationRequest(
   )
   public val images: List<VLMImage> = immutableCopyOf("images", images)
 
+  /**
+   * Ordered conversation. A follow-up question about the same picture is
+   * just another turn; images ride as ChatMessage.attachments.
+   */
   @field:WireField(
-    tag = 5,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 4,
+    tag = 8,
+    adapter = "ai.runanywhere.proto.v1.ChatMessage#ADAPTER",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 2,
   )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
+  public val messages: List<ChatMessage> = immutableCopyOf("messages", messages)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -88,9 +121,11 @@ public class VLMGenerationRequest(
     if (unknownFields != other.unknownFields) return false
     if (request_id != other.request_id) return false
     if (images != other.images) return false
+    if (messages != other.messages) return false
+    if (prompt != other.prompt) return false
     if (options != other.options) return false
+    if (vision != other.vision) return false
     if (model_id != other.model_id) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -100,9 +135,11 @@ public class VLMGenerationRequest(
       result = unknownFields.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + images.hashCode()
+      result = result * 37 + messages.hashCode()
+      result = result * 37 + prompt.hashCode()
       result = result * 37 + (options?.hashCode() ?: 0)
+      result = result * 37 + (vision?.hashCode() ?: 0)
       result = result * 37 + (model_id?.hashCode() ?: 0)
-      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -112,20 +149,24 @@ public class VLMGenerationRequest(
     val result = mutableListOf<String>()
     result += """request_id=${sanitize(request_id)}"""
     if (images.isNotEmpty()) result += """images=$images"""
+    if (messages.isNotEmpty()) result += """messages=$messages"""
+    result += """prompt=${sanitize(prompt)}"""
     if (options != null) result += """options=$options"""
+    if (vision != null) result += """vision=$vision"""
     if (model_id != null) result += """model_id=${sanitize(model_id)}"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "VLMGenerationRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     request_id: String = this.request_id,
     images: List<VLMImage> = this.images,
-    options: VLMGenerationOptions? = this.options,
+    messages: List<ChatMessage> = this.messages,
+    prompt: String = this.prompt,
+    options: LLMGenerationOptions? = this.options,
+    vision: VLMVisionOptions? = this.vision,
     model_id: String? = this.model_id,
-    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMGenerationRequest = VLMGenerationRequest(request_id, images, options, model_id, metadata, unknownFields)
+  ): VLMGenerationRequest = VLMGenerationRequest(request_id, images, messages, prompt, options, vision, model_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -138,18 +179,19 @@ public class VLMGenerationRequest(
       null, 
       "vlm_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: VLMGenerationRequest): Int {
         var size = value.unknownFields.size
         if (value.request_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.request_id)
         }
         size += VLMImage.ADAPTER.asRepeated().encodedSizeWithTag(2, value.images)
-        size += VLMGenerationOptions.ADAPTER.encodedSizeWithTag(3, value.options)
+        size += ChatMessage.ADAPTER.asRepeated().encodedSizeWithTag(8, value.messages)
+        if (value.prompt != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.prompt)
+        }
+        size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(9, value.options)
+        size += VLMVisionOptions.ADAPTER.encodedSizeWithTag(7, value.vision)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.model_id)
-        size += metadataAdapter.encodedSizeWithTag(5, value.metadata)
         return size
       }
 
@@ -158,17 +200,25 @@ public class VLMGenerationRequest(
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
         }
         VLMImage.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.images)
-        VLMGenerationOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
+        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.messages)
+        if (value.prompt != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.prompt)
+        }
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 9, value.options)
+        VLMVisionOptions.ADAPTER.encodeWithTag(writer, 7, value.vision)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.model_id)
-        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMGenerationRequest) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.model_id)
-        VLMGenerationOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
+        VLMVisionOptions.ADAPTER.encodeWithTag(writer, 7, value.vision)
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 9, value.options)
+        if (value.prompt != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.prompt)
+        }
+        ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.messages)
         VLMImage.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.images)
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
@@ -178,32 +228,40 @@ public class VLMGenerationRequest(
       override fun decode(reader: ProtoReader): VLMGenerationRequest {
         var request_id: String = ""
         val images = mutableListOf<VLMImage>()
-        var options: VLMGenerationOptions? = null
+        val messages = mutableListOf<ChatMessage>()
+        var prompt: String = ""
+        var options: LLMGenerationOptions? = null
+        var vision: VLMVisionOptions? = null
         var model_id: String? = null
-        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> request_id = ProtoAdapter.STRING.decode(reader)
             2 -> images.add(VLMImage.ADAPTER.decode(reader))
-            3 -> options = VLMGenerationOptions.ADAPTER.decode(reader)
+            8 -> messages.add(ChatMessage.ADAPTER.decode(reader))
+            6 -> prompt = ProtoAdapter.STRING.decode(reader)
+            9 -> options = LLMGenerationOptions.ADAPTER.decode(reader)
+            7 -> vision = VLMVisionOptions.ADAPTER.decode(reader)
             4 -> model_id = ProtoAdapter.STRING.decode(reader)
-            5 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
         return VLMGenerationRequest(
           request_id = request_id,
           images = images,
+          messages = messages,
+          prompt = prompt,
           options = options,
+          vision = vision,
           model_id = model_id,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VLMGenerationRequest): VLMGenerationRequest = value.copy(
         images = value.images.redactElements(VLMImage.ADAPTER),
-        options = value.options?.let(VLMGenerationOptions.ADAPTER::redact),
+        messages = value.messages.redactElements(ChatMessage.ADAPTER),
+        options = value.options?.let(LLMGenerationOptions.ADAPTER::redact),
+        vision = value.vision?.let(VLMVisionOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

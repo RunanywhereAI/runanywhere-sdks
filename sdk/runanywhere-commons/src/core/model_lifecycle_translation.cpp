@@ -406,11 +406,11 @@ void publish_current_model_event(const runanywhere::v1::CurrentModelResult& resu
     runanywhere::v1::SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_MODEL,
                             runanywhere::v1::ERROR_SEVERITY_INFO, component);
-    auto* registry = event.mutable_model_registry();
-    registry->set_kind(runanywhere::v1::MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED);
-    registry->set_model_id(result.model_id());
-    registry->set_assigned_component(component);
-    registry->mutable_current_model_result()->CopyFrom(result);
+    auto* model = event.mutable_model();
+    model->set_kind(runanywhere::v1::MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED);
+    model->set_model_id(result.model_id());
+    model->set_assigned_component(component);
+    model->mutable_current_model_result()->CopyFrom(result);
     (void)publish_event(event);
 }
 
@@ -425,9 +425,6 @@ std::string load_options_json(const runanywhere::v1::ModelLoadRequest& request) 
     std::vector<std::string> parts;
     if (request.has_context_length()) {
         parts.push_back("\"context_length\":" + std::to_string(request.context_length()));
-    }
-    if (request.has_threads()) {
-        parts.push_back("\"threads\":" + std::to_string(request.threads()));
     }
     if (request.has_use_gpu()) {
         parts.push_back(std::string("\"use_gpu\":") + (request.use_gpu() ? "true" : "false"));

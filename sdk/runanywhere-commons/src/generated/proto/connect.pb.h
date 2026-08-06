@@ -4119,230 +4119,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectClientSessionState final : p
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectInvocationEvent final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ConnectInvocationEvent) */ {
- public:
-  inline ConnectInvocationEvent() : ConnectInvocationEvent(nullptr) {}
-  ~ConnectInvocationEvent() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ConnectInvocationEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ConnectInvocationEvent));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ConnectInvocationEvent(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline ConnectInvocationEvent(const ConnectInvocationEvent& from) : ConnectInvocationEvent(nullptr, from) {}
-  inline ConnectInvocationEvent(ConnectInvocationEvent&& from) noexcept : ConnectInvocationEvent(nullptr, ::std::move(from)) {}
-  inline ConnectInvocationEvent& operator=(const ConnectInvocationEvent& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ConnectInvocationEvent& operator=(ConnectInvocationEvent&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ConnectInvocationEvent& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ConnectInvocationEvent>(&ConnectInvocationEvent_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 15;
-  friend void swap(ConnectInvocationEvent& a, ConnectInvocationEvent& b) { a.Swap(&b); }
-  inline void Swap(ConnectInvocationEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ConnectInvocationEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ConnectInvocationEvent* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ConnectInvocationEvent>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ConnectInvocationEvent& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ConnectInvocationEvent& from) { ConnectInvocationEvent::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ConnectInvocationEvent* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ConnectInvocationEvent"; }
-
-  explicit ConnectInvocationEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ConnectInvocationEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ConnectInvocationEvent& from);
-  ConnectInvocationEvent(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ConnectInvocationEvent&& from) noexcept
-      : ConnectInvocationEvent(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kRequestIdFieldNumber = 1,
-    kEventFieldNumber = 2,
-  };
-  // string request_id = 1;
-  void clear_request_id() ;
-  [[nodiscard]] const ::std::string& request_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_request_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_request_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
-  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_request_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // .runanywhere.v1.LLMStreamEvent event = 2;
-  [[nodiscard]] bool has_event()
-      const;
-  void clear_event() ;
-  [[nodiscard]] const ::runanywhere::v1::LLMStreamEvent& event() const;
-  [[nodiscard]] ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE release_event();
-  ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NONNULL mutable_event();
-  void set_allocated_event(::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_event(::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE unsafe_arena_release_event();
-
-  private:
-  const ::runanywhere::v1::LLMStreamEvent& _internal_event() const;
-  ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NONNULL _internal_mutable_event();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ConnectInvocationEvent)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 2,
-                          1, 56,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ConnectInvocationEvent& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE event_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_connect_2eproto;
-};
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectInvocationRequest final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ConnectInvocationRequest) */ {
  public:
@@ -4577,6 +4353,230 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectInvocationRequest final : pu
     ::google::protobuf::internal::ArenaStringPtr session_id_;
     ::google::protobuf::internal::ArenaStringPtr request_id_;
     ::runanywhere::v1::LLMGenerateRequest* PROTOBUF_NULLABLE generation_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_connect_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectInvocationEvent final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ConnectInvocationEvent) */ {
+ public:
+  inline ConnectInvocationEvent() : ConnectInvocationEvent(nullptr) {}
+  ~ConnectInvocationEvent() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ConnectInvocationEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ConnectInvocationEvent));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ConnectInvocationEvent(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline ConnectInvocationEvent(const ConnectInvocationEvent& from) : ConnectInvocationEvent(nullptr, from) {}
+  inline ConnectInvocationEvent(ConnectInvocationEvent&& from) noexcept : ConnectInvocationEvent(nullptr, ::std::move(from)) {}
+  inline ConnectInvocationEvent& operator=(const ConnectInvocationEvent& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ConnectInvocationEvent& operator=(ConnectInvocationEvent&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ConnectInvocationEvent& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ConnectInvocationEvent>(&ConnectInvocationEvent_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 15;
+  friend void swap(ConnectInvocationEvent& a, ConnectInvocationEvent& b) { a.Swap(&b); }
+  inline void Swap(ConnectInvocationEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ConnectInvocationEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ConnectInvocationEvent* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ConnectInvocationEvent>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ConnectInvocationEvent& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ConnectInvocationEvent& from) { ConnectInvocationEvent::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ConnectInvocationEvent* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ConnectInvocationEvent"; }
+
+  explicit ConnectInvocationEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ConnectInvocationEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ConnectInvocationEvent& from);
+  ConnectInvocationEvent(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ConnectInvocationEvent&& from) noexcept
+      : ConnectInvocationEvent(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kRequestIdFieldNumber = 1,
+    kEventFieldNumber = 2,
+  };
+  // string request_id = 1;
+  void clear_request_id() ;
+  [[nodiscard]] const ::std::string& request_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_request_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_request_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
+  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_request_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // .runanywhere.v1.LLMStreamEvent event = 2;
+  [[nodiscard]] bool has_event()
+      const;
+  void clear_event() ;
+  [[nodiscard]] const ::runanywhere::v1::LLMStreamEvent& event() const;
+  [[nodiscard]] ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE release_event();
+  ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NONNULL mutable_event();
+  void set_allocated_event(::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_event(::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE unsafe_arena_release_event();
+
+  private:
+  const ::runanywhere::v1::LLMStreamEvent& _internal_event() const;
+  ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NONNULL _internal_mutable_event();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ConnectInvocationEvent)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<1, 2,
+                          1, 56,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ConnectInvocationEvent& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::runanywhere::v1::LLMStreamEvent* PROTOBUF_NULLABLE event_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };

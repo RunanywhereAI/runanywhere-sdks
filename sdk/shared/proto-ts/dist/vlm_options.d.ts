@@ -1,27 +1,9 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { ChatMessage } from "./chat";
 import { SDKError } from "./errors";
-import { InferenceFramework } from "./model_types";
-import { ReasoningOptions } from "./thinking_tag_pattern";
+import { LLMGenerationOptions } from "./llm_options";
 import { TokenUsage } from "./token_usage";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * The JPEG/PNG/WEBP and RAW_RGBA values are reserved: no backend detects
- * containers yet, and no SDK passes straight RGBA. Swift's Apple-only uiImage
- * and pixelBuffer cases flatten to RAW_RGB before crossing the C ABI.
- */
-export declare enum VLMImageFormat {
-    VLM_IMAGE_FORMAT_UNSPECIFIED = 0,
-    VLM_IMAGE_FORMAT_JPEG = 1,
-    VLM_IMAGE_FORMAT_PNG = 2,
-    VLM_IMAGE_FORMAT_WEBP = 3,
-    VLM_IMAGE_FORMAT_RAW_RGB = 4,
-    VLM_IMAGE_FORMAT_RAW_RGBA = 5,
-    VLM_IMAGE_FORMAT_BASE64 = 6,
-    VLM_IMAGE_FORMAT_FILE_PATH = 7,
-    UNRECOGNIZED = -1
-}
-export declare function vLMImageFormatFromJSON(object: any): VLMImageFormat;
-export declare function vLMImageFormatToJSON(object: VLMImageFormat): string;
 export declare enum VLMModelFamily {
     VLM_MODEL_FAMILY_UNSPECIFIED = 0,
     VLM_MODEL_FAMILY_AUTO = 1,
@@ -36,6 +18,12 @@ export declare function vLMModelFamilyToJSON(object: VLMModelFamily): string;
 export declare enum VLMStreamEventKind {
     VLM_STREAM_EVENT_KIND_UNSPECIFIED = 0,
     VLM_STREAM_EVENT_KIND_STARTED = 1,
+    /**
+     * VLM_STREAM_EVENT_KIND_IMAGE_ENCODED - Emitted when the vision encoder finishes and decoding begins -- the
+     * cue for a UI to switch from "analysing image" to "writing". Emitted
+     * where the backend measures the encode boundary
+     * (VLMResult.image_encode_time_ms comes from the same measurement).
+     */
     VLM_STREAM_EVENT_KIND_IMAGE_ENCODED = 2,
     VLM_STREAM_EVENT_KIND_TOKEN = 3,
     VLM_STREAM_EVENT_KIND_COMPLETED = 4,
@@ -49,116 +37,116 @@ export interface VLMChatTemplate {
     imageMarker?: string | undefined;
     defaultSystemPrompt?: string | undefined;
 }
+/**
+ * Pixel buffers are tightly packed with NO row padding: RGB is 3 bytes/px,
+ * RGBA is 4, and width * height * channels MUST equal the buffer length or
+ * the request is rejected. raw_rgba drops alpha at the boundary.
+ */
 export interface VLMImage {
+    /** Local file. The on-device analogue of a cloud Files-API file_id. */
     filePath?: string | undefined;
-    /** JPEG/PNG/WEBP container bytes */
-    encoded?: Uint8Array | undefined;
-    /** RAW_RGB or RAW_RGBA pixel buffer */
-    rawRgb?: Uint8Array | undefined;
-    base64?: string | undefined;
-    width: number;
-    height: number;
-    format: VLMImageFormat;
-    mediaType?: string | undefined;
-    name?: string | undefined;
-    sizeBytes: number;
-    metadata: {
-        [key: string]: string;
-    };
-}
-export interface VLMImage_MetadataEntry {
-    key: string;
-    value: string;
-}
-export interface VLMConfiguration {
-    modelId: string;
-    maxImageSizePx: number;
-    maxTokens: number;
-    contextLength: number;
-    temperature: number;
-    systemPrompt?: string | undefined;
-    streamingEnabled: boolean;
-    preferredFramework?: InferenceFramework | undefined;
-}
-export interface VLMGenerationOptions {
-    prompt: string;
-    maxOutputTokens: number;
-    temperature: number;
-    topP: number;
-    topK: number;
-    stopSequences: string[];
-    systemPrompt?: string | undefined;
-    maxImageSize: number;
-    nThreads: number;
-    useGpu: boolean;
-    modelFamily: VLMModelFamily;
     /**
-     * Commons does not convert this field on the VLM proto path, so the
-     * llama.cpp template support behind it is currently unreachable from here.
+     * Compressed container bytes -- image/jpeg, image/png, image/webp.
+     * Decoded by commons. Set media_type alongside. Same slot name and
+     * meaning as ChatAttachment.data and Anthropic source.data.
      */
-    customChatTemplate?: VLMChatTemplate | undefined;
-    imageMarkerOverride?: string | undefined;
-    seed: number;
-    repetitionPenalty: number;
-    minP: number;
-    emitImageEmbeddings: boolean;
-    reasoning?: ReasoningOptions | undefined;
+    data?: Uint8Array | undefined;
+    /** 3 bytes/px */
+    rawRgb?: Uint8Array | undefined;
+    /** same container formats as `data`, base64-encoded */
+    base64?: string | undefined;
+    /** 4 bytes/px; commons drops alpha */
+    rawRgba?: Uint8Array | undefined;
+    /** required for raw_rgb / raw_rgba */
+    width: number;
+    /** required for raw_rgb / raw_rgba */
+    height: number;
+    /**
+     * MIME type of `data`/`base64`. Required when either is set. An open
+     * string, as everywhere in the industry, so adding HEIC is not a proto
+     * change.
+     */
+    mediaType: string;
 }
 export interface VLMGenerationRequest {
     requestId: string;
     images: VLMImage[];
-    options?: VLMGenerationOptions | undefined;
+    /**
+     * Ordered conversation. A follow-up question about the same picture is
+     * just another turn; images ride as ChatMessage.attachments.
+     */
+    messages: ChatMessage[];
+    /** The question about the image, for the single-turn quickstart path. */
+    prompt: string;
+    /**
+     * One options set for all text generation, image or not -- same names,
+     * same defaults, same validation as the text API. Carries
+     * structured_output, which is how OCR / field extraction / bounding
+     * boxes are expressed (deliberately no ocr() or detect() verb).
+     */
+    options?: LLMGenerationOptions | undefined;
+    /** Only the knobs that have no text-generation meaning. */
+    vision?: VLMVisionOptions | undefined;
     modelId?: string | undefined;
-    metadata: {
-        [key: string]: string;
-    };
 }
-export interface VLMGenerationRequest_MetadataEntry {
-    key: string;
-    value: string;
+/**
+ * The four genuinely vision-specific knobs. Everything else in the old
+ * VLMGenerationOptions was either a copy of LLMGenerationOptions or dead.
+ */
+export interface VLMVisionOptions {
+    modelFamily: VLMModelFamily;
+    /**
+     * Live end-to-end (commons converts it, llama.cpp applies it); it is
+     * simply not surfaced by the v3 facades yet.
+     */
+    customChatTemplate?: VLMChatTemplate | undefined;
+    imageMarkerOverride?: string | undefined;
+    /**
+     * Per-image vision-token budget -- the unit that actually drives
+     * prefill (cf. llama.cpp --image-max-tokens, Gemini media_resolution).
+     * 0 = the bundle's compiled default. The value actually used is
+     * reported back as VLMResult.image_tokens.
+     */
+    maxImageTokens: number;
 }
 export interface VLMResult {
     text: string;
-    processingTimeMs: number;
+    /**
+     * Wall-clock for the whole call, image encode included. int64 ms is the
+     * unit for every duration on this surface; the _ms suffix stays explicit.
+     */
+    totalTimeMs: number;
     imageTokens: number;
-    timeToFirstTokenMs: number;
+    /** canonical spelling (usage = 15) */
     imageEncodeTimeMs: number;
-    hardwareUsed?: string | undefined;
+    /**
+     * Produced by commons on both the one-shot and the streaming path, with
+     * the LLM domain's vocabulary: "stop" | "length" | "stop_sequence".
+     */
     finishReason: string;
-    imagesProcessed: number;
     usage?: TokenUsage | undefined;
     error?: SDKError | undefined;
 }
 export interface VLMStreamEvent {
     timestampUs: number;
     requestId: string;
+    /** The single terminal discriminator: COMPLETED or ERROR ends the stream. */
     kind: VLMStreamEventKind;
     token: string;
     tokenIndex: number;
-    isFinal: boolean;
-    tokensPerSecond: number;
+    /**
+     * Rate comes from result.usage.tokens_per_second on the terminal event,
+     * in TokenUsage's own type. No second copy, no second scalar type.
+     */
     result?: VLMResult | undefined;
-    error?: SDKError | undefined;
-}
-export interface VLMServiceState {
-    isReady: boolean;
-    currentModel?: string | undefined;
-    contextLength: number;
-    supportsStreaming: boolean;
-    supportsMultipleImages: boolean;
-    visionEncoderType?: string | undefined;
     error?: SDKError | undefined;
 }
 export declare const VLMChatTemplate: MessageFns<VLMChatTemplate>;
 export declare const VLMImage: MessageFns<VLMImage>;
-export declare const VLMImage_MetadataEntry: MessageFns<VLMImage_MetadataEntry>;
-export declare const VLMConfiguration: MessageFns<VLMConfiguration>;
-export declare const VLMGenerationOptions: MessageFns<VLMGenerationOptions>;
 export declare const VLMGenerationRequest: MessageFns<VLMGenerationRequest>;
-export declare const VLMGenerationRequest_MetadataEntry: MessageFns<VLMGenerationRequest_MetadataEntry>;
+export declare const VLMVisionOptions: MessageFns<VLMVisionOptions>;
 export declare const VLMResult: MessageFns<VLMResult>;
 export declare const VLMStreamEvent: MessageFns<VLMStreamEvent>;
-export declare const VLMServiceState: MessageFns<VLMServiceState>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

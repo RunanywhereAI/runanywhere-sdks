@@ -155,17 +155,19 @@ object EventBus {
     val voiceEventPayloads: Flow<VoiceEvent>
         get() = eventsOfPayload { it.voice_pipeline }
 
-    /** Stream of [DownloadEvent] payloads (model download progress / lifecycle). */
-    val downloadEventPayloads: Flow<DownloadEvent>
-        get() = eventsOfPayload { it.download }
+    /**
+     * Stream of [ModelEvent] payloads (model load/unload, download
+     * progress/lifecycle, and registry refresh/assignment/import/discovery
+     * results — `DownloadEvent`/`ModelRegistryEvent` were absorbed into this
+     * single message outright, idl/sdk_events.proto: "+ model_registry,
+     * + download"). Mirrors Swift's `EventBus.modelEventPayloads`.
+     */
+    val modelEventPayloads: Flow<ModelEvent>
+        get() = eventsOfPayload { it.model }
 
     /** Stream of [ComponentLifecycleEvent] payloads. */
     val componentLifecycleEventPayloads: Flow<ComponentLifecycleEvent>
         get() = eventsOfPayload { it.component_lifecycle }
-
-    /** Stream of [ModelRegistryEvent] payloads. */
-    val modelRegistryEventPayloads: Flow<ModelRegistryEvent>
-        get() = eventsOfPayload { it.model_registry }
 
     // MARK: - Convenience Methods
 

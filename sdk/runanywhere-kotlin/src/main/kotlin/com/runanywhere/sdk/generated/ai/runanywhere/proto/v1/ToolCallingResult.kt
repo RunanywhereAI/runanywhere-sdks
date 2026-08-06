@@ -62,57 +62,39 @@ public class ToolCallingResult(
   )
   public val is_complete: Boolean = false,
   /**
-   * Conversation ID for continuing with tool results.
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "conversationId",
-    schemaIndex = 4,
-  )
-  public val conversation_id: String? = null,
-  /**
    * Number of LLM generation turns used, including the final synthesis turn.
    */
   @field:WireField(
-    tag = 6,
+    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "iterationsUsed",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val iterations_used: Int = 0,
   @field:WireField(
-    tag = 7,
+    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "errorMessage",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val error_message: String? = null,
   @field:WireField(
-    tag = 8,
+    tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "errorCode",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val error_code: Int = 0,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "rawText",
-    schemaIndex = 8,
-  )
-  public val raw_text: String = "",
   /**
    * Optional thinking/reasoning content extracted from the final response.
    */
   @field:WireField(
-    tag = 10,
+    tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "thinkingContent",
-    schemaIndex = 9,
+    schemaIndex = 7,
   )
   public val thinking_content: String? = null,
   /**
@@ -121,10 +103,10 @@ public class ToolCallingResult(
    * through the tool loop report the same usage a non-tool generate would.
    */
   @field:WireField(
-    tag = 11,
+    tag = 9,
     adapter = "ai.runanywhere.proto.v1.TokenUsage#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 10,
+    schemaIndex = 8,
   )
   public val usage: TokenUsage? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -167,11 +149,9 @@ public class ToolCallingResult(
     if (tool_calls != other.tool_calls) return false
     if (tool_results != other.tool_results) return false
     if (is_complete != other.is_complete) return false
-    if (conversation_id != other.conversation_id) return false
     if (iterations_used != other.iterations_used) return false
     if (error_message != other.error_message) return false
     if (error_code != other.error_code) return false
-    if (raw_text != other.raw_text) return false
     if (thinking_content != other.thinking_content) return false
     if (usage != other.usage) return false
     return true
@@ -185,11 +165,9 @@ public class ToolCallingResult(
       result = result * 37 + tool_calls.hashCode()
       result = result * 37 + tool_results.hashCode()
       result = result * 37 + is_complete.hashCode()
-      result = result * 37 + (conversation_id?.hashCode() ?: 0)
       result = result * 37 + iterations_used.hashCode()
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + error_code.hashCode()
-      result = result * 37 + raw_text.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
       result = result * 37 + (usage?.hashCode() ?: 0)
       super.hashCode = result
@@ -203,11 +181,9 @@ public class ToolCallingResult(
     if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
     if (tool_results.isNotEmpty()) result += """tool_results=$tool_results"""
     result += """is_complete=$is_complete"""
-    if (conversation_id != null) result += """conversation_id=${sanitize(conversation_id)}"""
     result += """iterations_used=$iterations_used"""
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     result += """error_code=$error_code"""
-    result += """raw_text=${sanitize(raw_text)}"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     if (usage != null) result += """usage=$usage"""
     return result.joinToString(prefix = "ToolCallingResult{", separator = ", ", postfix = "}")
@@ -218,15 +194,13 @@ public class ToolCallingResult(
     tool_calls: List<ToolCall> = this.tool_calls,
     tool_results: List<ToolResult> = this.tool_results,
     is_complete: Boolean = this.is_complete,
-    conversation_id: String? = this.conversation_id,
     iterations_used: Int = this.iterations_used,
     error_message: String? = this.error_message,
     error_code: Int = this.error_code,
-    raw_text: String = this.raw_text,
     thinking_content: String? = this.thinking_content,
     usage: TokenUsage? = this.usage,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, conversation_id, iterations_used, error_message, error_code, raw_text, thinking_content, usage, unknownFields)
+  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, iterations_used, error_message, error_code, thinking_content, usage, unknownFields)
 
   public companion object {
     @JvmField
@@ -248,20 +222,16 @@ public class ToolCallingResult(
         if (value.is_complete != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.is_complete)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.conversation_id)
         if (value.iterations_used != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.iterations_used)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.iterations_used)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error_message)
         if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.error_code)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.error_code)
         }
-        if (value.raw_text != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.raw_text)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.thinking_content)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.thinking_content)
         if (value.usage != null) {
-          size += TokenUsage.ADAPTER.encodedSizeWithTag(11, value.usage)
+          size += TokenUsage.ADAPTER.encodedSizeWithTag(9, value.usage)
         }
         return size
       }
@@ -275,20 +245,16 @@ public class ToolCallingResult(
         if (value.is_complete != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_complete)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.conversation_id)
         if (value.iterations_used != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.iterations_used)
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.iterations_used)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
         if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
+          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.error_code)
         }
-        if (value.raw_text != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.raw_text)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.thinking_content)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.thinking_content)
         if (value.usage != null) {
-          TokenUsage.ADAPTER.encodeWithTag(writer, 11, value.usage)
+          TokenUsage.ADAPTER.encodeWithTag(writer, 9, value.usage)
         }
         writer.writeBytes(value.unknownFields)
       }
@@ -296,20 +262,16 @@ public class ToolCallingResult(
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingResult) {
         writer.writeBytes(value.unknownFields)
         if (value.usage != null) {
-          TokenUsage.ADAPTER.encodeWithTag(writer, 11, value.usage)
+          TokenUsage.ADAPTER.encodeWithTag(writer, 9, value.usage)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.thinking_content)
-        if (value.raw_text != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.raw_text)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.thinking_content)
         if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
+          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.error_code)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
         if (value.iterations_used != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.iterations_used)
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.iterations_used)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.conversation_id)
         if (value.is_complete != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_complete)
         }
@@ -325,11 +287,9 @@ public class ToolCallingResult(
         val tool_calls = mutableListOf<ToolCall>()
         val tool_results = mutableListOf<ToolResult>()
         var is_complete: Boolean = false
-        var conversation_id: String? = null
         var iterations_used: Int = 0
         var error_message: String? = null
         var error_code: Int = 0
-        var raw_text: String = ""
         var thinking_content: String? = null
         var usage: TokenUsage? = null
         val unknownFields = reader.forEachTag { tag ->
@@ -338,13 +298,11 @@ public class ToolCallingResult(
             2 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
             3 -> tool_results.add(ToolResult.ADAPTER.decode(reader))
             4 -> is_complete = ProtoAdapter.BOOL.decode(reader)
-            5 -> conversation_id = ProtoAdapter.STRING.decode(reader)
-            6 -> iterations_used = ProtoAdapter.INT32.decode(reader)
-            7 -> error_message = ProtoAdapter.STRING.decode(reader)
-            8 -> error_code = ProtoAdapter.INT32.decode(reader)
-            9 -> raw_text = ProtoAdapter.STRING.decode(reader)
-            10 -> thinking_content = ProtoAdapter.STRING.decode(reader)
-            11 -> usage = TokenUsage.ADAPTER.decode(reader)
+            5 -> iterations_used = ProtoAdapter.INT32.decode(reader)
+            6 -> error_message = ProtoAdapter.STRING.decode(reader)
+            7 -> error_code = ProtoAdapter.INT32.decode(reader)
+            8 -> thinking_content = ProtoAdapter.STRING.decode(reader)
+            9 -> usage = TokenUsage.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -353,11 +311,9 @@ public class ToolCallingResult(
           tool_calls = tool_calls,
           tool_results = tool_results,
           is_complete = is_complete,
-          conversation_id = conversation_id,
           iterations_used = iterations_used,
           error_message = error_message,
           error_code = error_code,
-          raw_text = raw_text,
           thinking_content = thinking_content,
           usage = usage,
           unknownFields = unknownFields

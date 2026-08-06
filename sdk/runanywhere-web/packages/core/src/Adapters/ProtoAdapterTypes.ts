@@ -1,4 +1,4 @@
-import type { LoRAState as ProtoLoRAState } from '@runanywhere/proto-ts/lora_options';
+import type { LoraState as ProtoLoRAState } from '@runanywhere/proto-ts/lora_options';
 import { SDKException } from '../Foundation/SDKException.js';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import {
@@ -441,7 +441,6 @@ export function modalityModuleFor(
 export function emptyLoRAState(): ProtoLoRAState {
   return {
     loadedAdapters: [],
-    hasActiveAdapters: false,
   };
 }
 

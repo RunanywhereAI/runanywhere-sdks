@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere/runanywhere_protos.dart' as proto;
 import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
 
@@ -570,24 +571,57 @@ abstract final class ModelCatalogBootstrap {
     RunAnywhere.setHfToken(token);
   }
 
-  /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the
-  /// catalog entry plus its downloadable artifact record (no bytes fetched);
+  /// Seed the curated LoRA adapter catalog. `LoraAdapterCatalogEntry` no
+  /// longer carries url/filename/size/description (idl/lora_options.proto:
+  /// "everything generic about the artifact ... lives on the ModelInfo
+  /// record for this adapter"), so those fields move onto a companion
+  /// [ModelInfo] artifact passed to `RunAnywhere.lora.register` alongside the
+  /// catalog entry. Mirrors iOS `RunAnywhere+LoRADownload.swift`/Web
+  /// `RunAnywhere+LoRA.ts`'s `toLoraArtifactModelInfo`. Does not fetch bytes;
   /// safe to re-run on every cold launch.
   static Future<void> _registerLoraAdapters() async {
+    const adapterId = 'abliterated-lora';
+    const artifactUrl =
+        'https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf';
+    const artifactFilename = 'qwen2.5-0.5b-abliterated-lora-f16.gguf';
+    const artifactSizeBytes = 17620224;
+
     final adapter = LoraAdapterCatalogEntry(
-      id: 'abliterated-lora',
+      id: adapterId,
       name: 'Abliterated LoRA (F16)',
-      description:
-          'Removes refusal behavior — model answers directly without disclaimers',
-      url:
-          'https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf',
-      filename: 'qwen2.5-0.5b-abliterated-lora-f16.gguf',
       compatibleModels: ['qwen2.5-0.5b-instruct-q6_k'],
-      sizeBytes: Int64(17620224),
       defaultScale: 1.0,
     );
+    final artifact = proto.ModelInfo(
+      id: 'lora-adapter:$adapterId',
+      name: adapter.name,
+      category: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+      format: ModelFormat.MODEL_FORMAT_GGUF,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+      downloadUrl: artifactUrl,
+      downloadSizeBytes: Int64(artifactSizeBytes),
+      source: ModelSource.MODEL_SOURCE_REMOTE,
+      singleFile: proto.SingleFileArtifact(
+        expectedFiles: proto.ExpectedModelFiles(
+          files: [
+            ModelFileDescriptor(
+              url: artifactUrl,
+              filename: artifactFilename,
+              sizeBytes: Int64(artifactSizeBytes),
+              role: proto.ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+            ),
+          ],
+          requiredPatterns: [artifactFilename],
+          description: 'LoRA adapter artifact',
+        ),
+      ),
+      metadata: proto.ModelInfoMetadata(
+        description:
+            'Removes refusal behavior — model answers directly without disclaimers',
+      ),
+    );
     try {
-      await RunAnywhere.lora.register(adapter);
+      await RunAnywhere.lora.register(adapter, artifact);
     } catch (e) {
       debugPrint('Failed to register LoRA adapter: $e');
     }
@@ -688,12 +722,15 @@ abstract final class ModelCatalogBootstrap {
   }) async {
     // File roles are left unset: the SDK fills them from the shared commons
     // classifier so the app never mirrors its filename conventions.
+    // `isRequired` was deleted; `ModelFileDescriptor.isOptional` is the
+    // renamed/inverted field, and every file here is required (isOptional:
+    // false, which is also the default when left unset).
     final descriptors = files
         .map(
           (file) => ModelFileDescriptor(
             filename: file.filename,
             url: file.url,
-            isRequired: true,
+            isOptional: false,
           ),
         )
         .toList();

@@ -36,8 +36,11 @@ message STTConfiguration {
 
     bool        enable_punctuation      = 6 [(runanywhere.v1.rac_default) = "true"];
     bool        enable_diarization      = 7;
-    repeated string vocabulary_list     = 8;
-    int32       max_alternatives        = 9;   // 0 = backend default
+
+    // 8 was vocabulary_list, 9 was max_alternatives: same dead surface as
+    // STTOptions' copies (never read by any backend).
+    reserved 8, 9;
+    reserved "vocabulary_list", "max_alternatives";
     bool        enable_word_timestamps  = 10 [(runanywhere.v1.rac_default) = "true"];
 
     optional InferenceFramework preferred_framework = 11;
@@ -45,36 +48,58 @@ message STTConfiguration {
 
 // Per-call overrides.
 message STTOptions {
+    // BCP-47 tag (bare ISO-639-1 accepted). Unset or "" means auto-detect;
+    // the code the engine settles on comes back on STTOutput.language.
     optional string language               = 17;
 
     bool            enable_punctuation     = 2 [(runanywhere.v1.rac_default) = "true"];
-    bool            enable_diarization     = 3;
-    int32           max_speakers           = 4 [(runanywhere.v1.rac_default) = "0"];   // 0 = auto
-    repeated string vocabulary_list        = 5;
+
+    // Attribute each word to a speaker. Labels come back on
+    // WordTimestamp.speaker_id and STTOutput.speaker_ids. Deepgram `diarize`,
+    // AssemblyAI `speaker_labels`.
+    bool            diarize                = 3;
+
+    // Hint for how many distinct speakers to expect. AssemblyAI
+    // `speakers_expected`. Unset = let the engine decide.
+    optional int32  speakers_expected      = 4;
     bool            enable_word_timestamps = 6 [(runanywhere.v1.rac_default) = "true"];
 
-    // 0 = backend default, for all four of these.
-    int32           beam_size              = 7 [(runanywhere.v1.rac_default) = "0"];
-    int32           max_alternatives       = 12 [(runanywhere.v1.rac_default) = "0"];
-    int32           chunk_duration_ms      = 13;
-    int32           endpoint_silence_ms    = 14;
+    // Trailing silence after which the utterance is finalized and an
+    // STT_STREAM_EVENT_KIND_ENDPOINT + FINAL pair is emitted. 0 = engine
+    // default.
+    int32           silence_duration_ms    = 14 [(runanywhere.v1.rac_default) = "0"];
 
-    bool            suppress_blank         = 15;
-    bool            translate_to_english   = 16;
+    // 5, 7, 12, 15, 16 were vocabulary_list, beam_size, max_alternatives,
+    // suppress_blank, translate_to_english. None were ever read by any
+    // backend; re-add only alongside working wiring.
+    // 1, 8, 9, 10, 11 vacated by earlier renames; never reuse.
+    reserved 1, 5, 7, 8, 9, 10, 11, 12, 13, 15, 16;
+    reserved "vocabulary_list", "beam_size", "max_alternatives",
+             "chunk_duration_ms", "suppress_blank", "translate_to_english";
 }
 
 message STTAudioSource {
     oneof source {
+        // Audio bytes, in-process.
         bytes  audio_data      = 1;
+
+        // Local path or file:// URI, read and decoded by the platform adapter.
         string file_uri        = 2;
-        string adapter_handle  = 3;
     }
+
+    reserved 3;   // was adapter_handle: no SDK set it, no engine read it
+    reserved "adapter_handle";
 
     AudioEncoding encoding = 4;
     AudioFormat audio_format = 5;
     int32 sample_rate = 6;
+
+    // Interleaved channel count; 0 or 1 = mono. Non-mono audio is downmixed
+    // before decoding and MUST be divided out of the duration estimate.
     int32 channels = 7;
-    int32 bits_per_sample = 8;
+
+    reserved 8;   // bits_per_sample: sample width is determined by `encoding`
+    reserved "bits_per_sample";
     int64 duration_ms = 9;
 }
 
@@ -90,6 +115,9 @@ message WordTimestamp {
     int64  start_ms   = 2;
     int64  end_ms     = 3;
     float  confidence = 4;
+
+    // Always empty today: no backend fills this. Kept live -- read by all
+    // five SDK facades as public API -- pending real diarization wiring.
     optional string speaker_id = 5;
 }
 
@@ -100,10 +128,13 @@ message TranscriptionAlternative {
     repeated WordTimestamp words      = 3;
 }
 
+// Which model ran, and how long it took.
 message TranscriptionMetadata {
     string model_id           = 1;
     int64  processing_time_ms = 2;
-    int64  audio_length_ms    = 3;
+
+    reserved 3;   // audio length lives on STTOutput.duration_ms
+    reserved "audio_length_ms";
 }
 
 message STTOutput {
@@ -119,10 +150,11 @@ message STTOutput {
     // Milliseconds since epoch.
     int64                             timestamp_ms  = 8;
 
-    // Often duplicates metadata.audio_length_ms.
     int64                             duration_ms   = 9;
 
-    repeated string                   speaker_ids   = 10;
+    reserved 10;   // speaker_ids: zero writers, zero readers anywhere
+    reserved "speaker_ids";
+    reserved 2, 7, 11, 12;   // vacated gaps, never reused
 
     // For long-running or streaming transcription.
     int32                             segment_index = 13;
@@ -130,23 +162,19 @@ message STTOutput {
     optional SDKError                 error         = 15;
 }
 
+// An in-progress hypothesis. `text` replaces the previous partial in full.
+// The finished result arrives on STTStreamEvent.final_output and never here;
+// correlation (request_id, seq) and failures live on the STTStreamEvent
+// envelope.
 message STTPartialResult {
     string text      = 1;
     bool   is_final  = 2;
-
-    // Whisper-style hypothesis stability, 0.0-1.0. 0.0 when unsupported.
-    float  stability = 3;
-
-    float  confidence = 4;
     optional string language = 14;
-    int64  timestamp_ms = 6;
-    repeated TranscriptionAlternative alternatives = 7;
 
-    string request_id = 9;
-    int32 segment_index = 10;
-    int64 audio_start_ms = 11;
-    int64 audio_end_ms = 12;
-    optional STTOutput final_output = 13;
+    reserved 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13;
+    reserved "stability", "confidence", "timestamp_ms", "alternatives",
+             "request_id", "segment_index", "audio_start_ms", "audio_end_ms",
+             "final_output";
 }
 
 enum STTStreamEventKind {
@@ -173,5 +201,9 @@ message STTServiceState {
     optional string current_model = 2;
     bool supports_streaming = 3;
     repeated string supported_language_codes = 4;
-    optional SDKError error = 7;
+
+    // 5 and 6 were vacated; 7 was `error`, declared but never written --
+    // failures surface on the call that fails, not on the state snapshot.
+    reserved 5, 6, 7;
+    reserved "error";
 }

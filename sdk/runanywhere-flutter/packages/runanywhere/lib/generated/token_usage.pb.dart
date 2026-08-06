@@ -12,25 +12,33 @@
 
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 /// One token-accounting shape embedded by every result and metrics message,
 /// replacing the input/output/total/throughput quadruple that was copied inline
-/// across LLM, VLM, and RAG results. Names follow the OpenAI Responses API.
+/// across LLM, VLM, and RAG results. Names follow the OpenAI Responses API; the
+/// timing fields follow llama.cpp's `timings` object, which names the phase it
+/// measures.
 class TokenUsage extends $pb.GeneratedMessage {
   factory TokenUsage({
     $core.int? inputTokens,
     $core.int? outputTokens,
     $core.int? totalTokens,
-    $core.double? tokensPerSecond,
+    $core.double? decodeTokensPerSecond,
+    $fixnum.Int64? prefillMs,
+    $fixnum.Int64? ttftMs,
   }) {
     final result = create();
     if (inputTokens != null) result.inputTokens = inputTokens;
     if (outputTokens != null) result.outputTokens = outputTokens;
     if (totalTokens != null) result.totalTokens = totalTokens;
-    if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
+    if (decodeTokensPerSecond != null)
+      result.decodeTokensPerSecond = decodeTokensPerSecond;
+    if (prefillMs != null) result.prefillMs = prefillMs;
+    if (ttftMs != null) result.ttftMs = ttftMs;
     return result;
   }
 
@@ -50,7 +58,9 @@ class TokenUsage extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'inputTokens')
     ..aI(2, _omitFieldNames ? '' : 'outputTokens')
     ..aI(3, _omitFieldNames ? '' : 'totalTokens')
-    ..aD(4, _omitFieldNames ? '' : 'tokensPerSecond')
+    ..aD(4, _omitFieldNames ? '' : 'decodeTokensPerSecond')
+    ..aInt64(5, _omitFieldNames ? '' : 'prefillMs')
+    ..aInt64(6, _omitFieldNames ? '' : 'ttftMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -98,14 +108,41 @@ class TokenUsage extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearTotalTokens() => $_clearField(3);
 
+  /// Decode-phase throughput only: output_tokens / decode_ms. Excludes
+  /// prefill. cf. llama.cpp timings.predicted_per_second.
   @$pb.TagNumber(4)
-  $core.double get tokensPerSecond => $_getN(3);
+  $core.double get decodeTokensPerSecond => $_getN(3);
   @$pb.TagNumber(4)
-  set tokensPerSecond($core.double value) => $_setDouble(3, value);
+  set decodeTokensPerSecond($core.double value) => $_setDouble(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasTokensPerSecond() => $_has(3);
+  $core.bool hasDecodeTokensPerSecond() => $_has(3);
   @$pb.TagNumber(4)
-  void clearTokensPerSecond() => $_clearField(4);
+  void clearDecodeTokensPerSecond() => $_clearField(4);
+
+  /// Prefill (prompt eval) wall time. cf. llama.cpp timings.prompt_ms,
+  /// Ollama prompt_eval_duration. 0 when the backend does not report it.
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get prefillMs => $_getI64(4);
+  @$pb.TagNumber(5)
+  set prefillMs($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPrefillMs() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPrefillMs() => $_clearField(5);
+
+  /// Request start to first output token. The canonical spelling for every
+  /// result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
+  /// report TTFT here and nowhere else. SDKEvent's own telemetry fields
+  /// (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
+  /// their separate event-stream spelling.
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get ttftMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set ttftMs($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTtftMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTtftMs() => $_clearField(6);
 }
 
 const $core.bool _omitFieldNames =

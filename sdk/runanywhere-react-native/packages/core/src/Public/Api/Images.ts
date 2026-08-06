@@ -8,16 +8,17 @@ import {
 } from '@runanywhere/proto-ts/diffusion_options';
 
 import { requireInitialized } from '../../Foundation/Initialization/InitializedGuard';
-import { decode, encode, nextRequestId, preflight } from './Bridge';
+import { decode, encode, preflight } from './Bridge';
 import { toImageOptions } from './Options';
 import { toImageResult } from './Results';
 import { pushStream } from './Stream';
 import type { ImageEvent, ImageOptions, ImageResult } from './Types';
 
+// `DiffusionGenerationRequest.requestId` is deleted outright — the message
+// is now just `options`/`modelId`.
 function buildRequest(prompt: string, options?: ImageOptions): ArrayBuffer {
   return encode(
     DiffusionGenerationRequest.fromPartial({
-      requestId: nextRequestId('image'),
       options: toImageOptions(prompt, options),
     }),
     DiffusionGenerationRequest

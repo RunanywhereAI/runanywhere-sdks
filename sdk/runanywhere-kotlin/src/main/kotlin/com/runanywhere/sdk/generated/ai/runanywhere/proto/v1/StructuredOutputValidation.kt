@@ -49,14 +49,14 @@ public class StructuredOutputValidation(
   )
   public val contains_json: Boolean = false,
   @field:WireField(
-    tag = 4,
+    tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "rawOutput",
     schemaIndex = 2,
   )
   public val raw_output: String? = null,
   @field:WireField(
-    tag = 5,
+    tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "extractedJson",
     schemaIndex = 3,
@@ -64,7 +64,7 @@ public class StructuredOutputValidation(
   public val extracted_json: String? = null,
   validation_errors: List<String> = emptyList(),
   @field:WireField(
-    tag = 7,
+    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "validationTimeMs",
@@ -72,7 +72,7 @@ public class StructuredOutputValidation(
   )
   public val validation_time_ms: Long = 0L,
   @field:WireField(
-    tag = 8,
+    tag = 7,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 6,
   )
@@ -80,7 +80,7 @@ public class StructuredOutputValidation(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputValidation, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
-    tag = 6,
+    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
     jsonName = "validationErrors",
@@ -167,13 +167,13 @@ public class StructuredOutputValidation(
         if (value.contains_json != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.contains_json)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.raw_output)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.extracted_json)
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.validation_errors)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.raw_output)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.extracted_json)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.validation_errors)
         if (value.validation_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.validation_time_ms)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.validation_time_ms)
         }
-        size += SDKError.ADAPTER.encodedSizeWithTag(8, value.error)
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
@@ -184,25 +184,25 @@ public class StructuredOutputValidation(
         if (value.contains_json != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.contains_json)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.validation_errors)
+        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.raw_output)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.extracted_json)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.validation_errors)
         if (value.validation_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.validation_time_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.validation_time_ms)
         }
-        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputValidation) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         if (value.validation_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.validation_time_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.validation_time_ms)
         }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.validation_errors)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.validation_errors)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.extracted_json)
+        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.raw_output)
         if (value.contains_json != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.contains_json)
         }
@@ -223,11 +223,11 @@ public class StructuredOutputValidation(
           when (tag) {
             1 -> is_valid = ProtoAdapter.BOOL.decode(reader)
             2 -> contains_json = ProtoAdapter.BOOL.decode(reader)
-            4 -> raw_output = ProtoAdapter.STRING.decode(reader)
-            5 -> extracted_json = ProtoAdapter.STRING.decode(reader)
-            6 -> validation_errors.add(ProtoAdapter.STRING.decode(reader))
-            7 -> validation_time_ms = ProtoAdapter.INT64.decode(reader)
-            8 -> error = SDKError.ADAPTER.decode(reader)
+            3 -> raw_output = ProtoAdapter.STRING.decode(reader)
+            4 -> extracted_json = ProtoAdapter.STRING.decode(reader)
+            5 -> validation_errors.add(ProtoAdapter.STRING.decode(reader))
+            6 -> validation_time_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }

@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: hardware_profile.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NpuCapability = exports.HardwareProfileResult = exports.AcceleratorInfo = exports.HardwareProfile = exports.HexagonArch = exports.AccelerationPreference = exports.protobufPackage = void 0;
+exports.NpuCapability = exports.HexagonArch = exports.AccelerationPreference = exports.protobufPackage = void 0;
 exports.accelerationPreferenceFromJSON = accelerationPreferenceFromJSON;
 exports.accelerationPreferenceToJSON = accelerationPreferenceToJSON;
 exports.hexagonArchFromJSON = hexagonArchFromJSON;
@@ -16,28 +16,30 @@ const storage_types_1 = require("./storage_types");
 exports.protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
- * Hardware acceleration preference for inference. Canonical single enum —
- * previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
- * file and `AccelerationPreference` in model_types.proto. Consolidated here
- * because it is a pure hardware concept and
- * hardware_profile.proto has no imports (model_types.proto already imports
- * this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
- *   Web    enums.ts:165   (Auto / WebGPU / CPU)
- *   Swift  extensions     (CPU / GPU / NPU / Metal)
- *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
- * Canonicalized union below.
+ * Hardware acceleration preference for inference. Device CLASS, not graphics
+ * API. A hint, never a hard requirement — the runtime may fall back.
+ * UNSPECIFIED means "you choose".
+ *
+ * Canonical single enum. It lives in this file rather than model_types.proto
+ * because model_types.proto already imports this file; placing it here avoids
+ * a cyclic import.
  * ---------------------------------------------------------------------------
  */
 var AccelerationPreference;
 (function (AccelerationPreference) {
+    /** ACCELERATION_PREFERENCE_UNSPECIFIED - let the runtime choose */
     AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_UNSPECIFIED"] = 0] = "ACCELERATION_PREFERENCE_UNSPECIFIED";
+    /** ACCELERATION_PREFERENCE_AUTO - DEPRECATED: alias of UNSPECIFIED */
     AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_AUTO"] = 1] = "ACCELERATION_PREFERENCE_AUTO";
     AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_CPU"] = 2] = "ACCELERATION_PREFERENCE_CPU";
+    /** ACCELERATION_PREFERENCE_GPU - covers Metal / Vulkan / WebGPU */
     AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_GPU"] = 3] = "ACCELERATION_PREFERENCE_GPU";
+    /**
+     * ACCELERATION_PREFERENCE_NPU - WEBGPU / METAL / VULKAN were removed: they are spellings of GPU, not
+     * device classes. The concrete API is the runtime's choice; pass vendor
+     * knobs as engine options instead.
+     */
     AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_NPU"] = 4] = "ACCELERATION_PREFERENCE_NPU";
-    AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_WEBGPU"] = 5] = "ACCELERATION_PREFERENCE_WEBGPU";
-    AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_METAL"] = 6] = "ACCELERATION_PREFERENCE_METAL";
-    AccelerationPreference[AccelerationPreference["ACCELERATION_PREFERENCE_VULKAN"] = 7] = "ACCELERATION_PREFERENCE_VULKAN";
     AccelerationPreference[AccelerationPreference["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(AccelerationPreference || (exports.AccelerationPreference = AccelerationPreference = {}));
 function accelerationPreferenceFromJSON(object) {
@@ -57,15 +59,6 @@ function accelerationPreferenceFromJSON(object) {
         case 4:
         case "ACCELERATION_PREFERENCE_NPU":
             return AccelerationPreference.ACCELERATION_PREFERENCE_NPU;
-        case 5:
-        case "ACCELERATION_PREFERENCE_WEBGPU":
-            return AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU;
-        case 6:
-        case "ACCELERATION_PREFERENCE_METAL":
-            return AccelerationPreference.ACCELERATION_PREFERENCE_METAL;
-        case 7:
-        case "ACCELERATION_PREFERENCE_VULKAN":
-            return AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -84,27 +77,12 @@ function accelerationPreferenceToJSON(object) {
             return "ACCELERATION_PREFERENCE_GPU";
         case AccelerationPreference.ACCELERATION_PREFERENCE_NPU:
             return "ACCELERATION_PREFERENCE_NPU";
-        case AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU:
-            return "ACCELERATION_PREFERENCE_WEBGPU";
-        case AccelerationPreference.ACCELERATION_PREFERENCE_METAL:
-            return "ACCELERATION_PREFERENCE_METAL";
-        case AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN:
-            return "ACCELERATION_PREFERENCE_VULKAN";
         case AccelerationPreference.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
 }
 /**
- * Logical hardware service contract. Mirrors the C ABI in
- * sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
- *   - rac_hardware_profile_get → GetProfile
- *   - rac_hardware_get_accelerators → GetAccelerators
- *   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
- *
- * Native device probes (chip detection, neural engine queries, GPU
- * discovery, memory/cores) remain platform-adapter owned. C++ caches and
- * serves the normalized HardwareProfile/AcceleratorInfo messages.
  * Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
  * (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
  * rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number
@@ -171,407 +149,25 @@ function hexagonArchToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-function createBaseHardwareProfile() {
-    return {
-        chip: "",
-        hasNeuralEngine: false,
-        accelerationMode: "",
-        totalMemoryBytes: 0,
-        coreCount: 0,
-        performanceCores: 0,
-        efficiencyCores: 0,
-        architecture: "",
-        platform: "",
-        npuChip: 0,
-    };
-}
-exports.HardwareProfile = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.chip !== "") {
-            writer.uint32(10).string(message.chip);
-        }
-        if (message.hasNeuralEngine !== false) {
-            writer.uint32(16).bool(message.hasNeuralEngine);
-        }
-        if (message.accelerationMode !== "") {
-            writer.uint32(26).string(message.accelerationMode);
-        }
-        if (message.totalMemoryBytes !== 0) {
-            writer.uint32(32).uint64(message.totalMemoryBytes);
-        }
-        if (message.coreCount !== 0) {
-            writer.uint32(40).uint32(message.coreCount);
-        }
-        if (message.performanceCores !== 0) {
-            writer.uint32(48).uint32(message.performanceCores);
-        }
-        if (message.efficiencyCores !== 0) {
-            writer.uint32(56).uint32(message.efficiencyCores);
-        }
-        if (message.architecture !== "") {
-            writer.uint32(66).string(message.architecture);
-        }
-        if (message.platform !== "") {
-            writer.uint32(74).string(message.platform);
-        }
-        if (message.npuChip !== 0) {
-            writer.uint32(80).int32(message.npuChip);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseHardwareProfile();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.chip = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.hasNeuralEngine = reader.bool();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.accelerationMode = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.totalMemoryBytes = longToNumber(reader.uint64());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.coreCount = reader.uint32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.performanceCores = reader.uint32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.efficiencyCores = reader.uint32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.architecture = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.platform = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.npuChip = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            chip: isSet(object.chip) ? globalThis.String(object.chip) : "",
-            hasNeuralEngine: isSet(object.hasNeuralEngine)
-                ? globalThis.Boolean(object.hasNeuralEngine)
-                : isSet(object.has_neural_engine)
-                    ? globalThis.Boolean(object.has_neural_engine)
-                    : false,
-            accelerationMode: isSet(object.accelerationMode)
-                ? globalThis.String(object.accelerationMode)
-                : isSet(object.acceleration_mode)
-                    ? globalThis.String(object.acceleration_mode)
-                    : "",
-            totalMemoryBytes: isSet(object.totalMemoryBytes)
-                ? globalThis.Number(object.totalMemoryBytes)
-                : isSet(object.total_memory_bytes)
-                    ? globalThis.Number(object.total_memory_bytes)
-                    : 0,
-            coreCount: isSet(object.coreCount)
-                ? globalThis.Number(object.coreCount)
-                : isSet(object.core_count)
-                    ? globalThis.Number(object.core_count)
-                    : 0,
-            performanceCores: isSet(object.performanceCores)
-                ? globalThis.Number(object.performanceCores)
-                : isSet(object.performance_cores)
-                    ? globalThis.Number(object.performance_cores)
-                    : 0,
-            efficiencyCores: isSet(object.efficiencyCores)
-                ? globalThis.Number(object.efficiencyCores)
-                : isSet(object.efficiency_cores)
-                    ? globalThis.Number(object.efficiency_cores)
-                    : 0,
-            architecture: isSet(object.architecture) ? globalThis.String(object.architecture) : "",
-            platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
-            npuChip: isSet(object.npuChip)
-                ? (0, storage_types_1.nPUChipFromJSON)(object.npuChip)
-                : isSet(object.npu_chip)
-                    ? (0, storage_types_1.nPUChipFromJSON)(object.npu_chip)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.chip !== "") {
-            obj.chip = message.chip;
-        }
-        if (message.hasNeuralEngine !== false) {
-            obj.hasNeuralEngine = message.hasNeuralEngine;
-        }
-        if (message.accelerationMode !== "") {
-            obj.accelerationMode = message.accelerationMode;
-        }
-        if (message.totalMemoryBytes !== 0) {
-            obj.totalMemoryBytes = Math.round(message.totalMemoryBytes);
-        }
-        if (message.coreCount !== 0) {
-            obj.coreCount = Math.round(message.coreCount);
-        }
-        if (message.performanceCores !== 0) {
-            obj.performanceCores = Math.round(message.performanceCores);
-        }
-        if (message.efficiencyCores !== 0) {
-            obj.efficiencyCores = Math.round(message.efficiencyCores);
-        }
-        if (message.architecture !== "") {
-            obj.architecture = message.architecture;
-        }
-        if (message.platform !== "") {
-            obj.platform = message.platform;
-        }
-        if (message.npuChip !== 0) {
-            obj.npuChip = (0, storage_types_1.nPUChipToJSON)(message.npuChip);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.HardwareProfile.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseHardwareProfile();
-        message.chip = object.chip ?? "";
-        message.hasNeuralEngine = object.hasNeuralEngine ?? false;
-        message.accelerationMode = object.accelerationMode ?? "";
-        message.totalMemoryBytes = object.totalMemoryBytes ?? 0;
-        message.coreCount = object.coreCount ?? 0;
-        message.performanceCores = object.performanceCores ?? 0;
-        message.efficiencyCores = object.efficiencyCores ?? 0;
-        message.architecture = object.architecture ?? "";
-        message.platform = object.platform ?? "";
-        message.npuChip = object.npuChip ?? 0;
-        return message;
-    },
-};
-function createBaseAcceleratorInfo() {
-    return { name: "", type: 0, available: false };
-}
-exports.AcceleratorInfo = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.name !== "") {
-            writer.uint32(10).string(message.name);
-        }
-        if (message.type !== 0) {
-            writer.uint32(16).int32(message.type);
-        }
-        if (message.available !== false) {
-            writer.uint32(24).bool(message.available);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseAcceleratorInfo();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.name = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.type = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.available = reader.bool();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            name: isSet(object.name) ? globalThis.String(object.name) : "",
-            type: isSet(object.type) ? accelerationPreferenceFromJSON(object.type) : 0,
-            available: isSet(object.available) ? globalThis.Boolean(object.available) : false,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.name !== "") {
-            obj.name = message.name;
-        }
-        if (message.type !== 0) {
-            obj.type = accelerationPreferenceToJSON(message.type);
-        }
-        if (message.available !== false) {
-            obj.available = message.available;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.AcceleratorInfo.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseAcceleratorInfo();
-        message.name = object.name ?? "";
-        message.type = object.type ?? 0;
-        message.available = object.available ?? false;
-        return message;
-    },
-};
-function createBaseHardwareProfileResult() {
-    return { profile: undefined, accelerators: [] };
-}
-exports.HardwareProfileResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.profile !== undefined) {
-            exports.HardwareProfile.encode(message.profile, writer.uint32(10).fork()).join();
-        }
-        for (const v of message.accelerators) {
-            exports.AcceleratorInfo.encode(v, writer.uint32(18).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseHardwareProfileResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.profile = exports.HardwareProfile.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.accelerators.push(exports.AcceleratorInfo.decode(reader, reader.uint32()));
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            profile: isSet(object.profile) ? exports.HardwareProfile.fromJSON(object.profile) : undefined,
-            accelerators: globalThis.Array.isArray(object?.accelerators)
-                ? object.accelerators.map((e) => exports.AcceleratorInfo.fromJSON(e))
-                : [],
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.profile !== undefined) {
-            obj.profile = exports.HardwareProfile.toJSON(message.profile);
-        }
-        if (message.accelerators?.length) {
-            obj.accelerators = message.accelerators.map((e) => exports.AcceleratorInfo.toJSON(e));
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.HardwareProfileResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseHardwareProfileResult();
-        message.profile = (object.profile !== undefined && object.profile !== null)
-            ? exports.HardwareProfile.fromPartial(object.profile)
-            : undefined;
-        message.accelerators = object.accelerators?.map((e) => exports.AcceleratorInfo.fromPartial(e)) || [];
-        return message;
-    },
-};
 function createBaseNpuCapability() {
-    return { socModel: "", socId: 0, hexagonArch: 0, qhexrtSupported: false, archName: "" };
+    return { socModel: "", socId: undefined, hexagonArch: 0, supported: false, npu: 0 };
 }
 exports.NpuCapability = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.socModel !== "") {
             writer.uint32(10).string(message.socModel);
         }
-        if (message.socId !== 0) {
+        if (message.socId !== undefined) {
             writer.uint32(16).int32(message.socId);
         }
         if (message.hexagonArch !== 0) {
             writer.uint32(24).int32(message.hexagonArch);
         }
-        if (message.qhexrtSupported !== false) {
-            writer.uint32(32).bool(message.qhexrtSupported);
+        if (message.supported !== false) {
+            writer.uint32(32).bool(message.supported);
         }
-        if (message.archName !== "") {
-            writer.uint32(42).string(message.archName);
+        if (message.npu !== 0) {
+            writer.uint32(40).int32(message.npu);
         }
         return writer;
     },
@@ -607,14 +203,14 @@ exports.NpuCapability = {
                     if (tag !== 32) {
                         break;
                     }
-                    message.qhexrtSupported = reader.bool();
+                    message.supported = reader.bool();
                     continue;
                 }
                 case 5: {
-                    if (tag !== 42) {
+                    if (tag !== 40) {
                         break;
                     }
-                    message.archName = reader.string();
+                    message.npu = reader.int32();
                     continue;
                 }
             }
@@ -636,22 +232,14 @@ exports.NpuCapability = {
                 ? globalThis.Number(object.socId)
                 : isSet(object.soc_id)
                     ? globalThis.Number(object.soc_id)
-                    : 0,
+                    : undefined,
             hexagonArch: isSet(object.hexagonArch)
                 ? hexagonArchFromJSON(object.hexagonArch)
                 : isSet(object.hexagon_arch)
                     ? hexagonArchFromJSON(object.hexagon_arch)
                     : 0,
-            qhexrtSupported: isSet(object.qhexrtSupported)
-                ? globalThis.Boolean(object.qhexrtSupported)
-                : isSet(object.qhexrt_supported)
-                    ? globalThis.Boolean(object.qhexrt_supported)
-                    : false,
-            archName: isSet(object.archName)
-                ? globalThis.String(object.archName)
-                : isSet(object.arch_name)
-                    ? globalThis.String(object.arch_name)
-                    : "",
+            supported: isSet(object.supported) ? globalThis.Boolean(object.supported) : false,
+            npu: isSet(object.npu) ? (0, storage_types_1.nPUChipFromJSON)(object.npu) : 0,
         };
     },
     toJSON(message) {
@@ -659,17 +247,17 @@ exports.NpuCapability = {
         if (message.socModel !== "") {
             obj.socModel = message.socModel;
         }
-        if (message.socId !== 0) {
+        if (message.socId !== undefined) {
             obj.socId = Math.round(message.socId);
         }
         if (message.hexagonArch !== 0) {
             obj.hexagonArch = hexagonArchToJSON(message.hexagonArch);
         }
-        if (message.qhexrtSupported !== false) {
-            obj.qhexrtSupported = message.qhexrtSupported;
+        if (message.supported !== false) {
+            obj.supported = message.supported;
         }
-        if (message.archName !== "") {
-            obj.archName = message.archName;
+        if (message.npu !== 0) {
+            obj.npu = (0, storage_types_1.nPUChipToJSON)(message.npu);
         }
         return obj;
     },
@@ -679,23 +267,13 @@ exports.NpuCapability = {
     fromPartial(object) {
         const message = createBaseNpuCapability();
         message.socModel = object.socModel ?? "";
-        message.socId = object.socId ?? 0;
+        message.socId = object.socId ?? undefined;
         message.hexagonArch = object.hexagonArch ?? 0;
-        message.qhexrtSupported = object.qhexrtSupported ?? false;
-        message.archName = object.archName ?? "";
+        message.supported = object.supported ?? false;
+        message.npu = object.npu ?? 0;
         return message;
     },
 };
-function longToNumber(int64) {
-    const num = globalThis.Number(int64.toString());
-    if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-        throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
-    }
-    if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-        throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
-    }
-    return num;
-}
 function isSet(value) {
     return value !== null && value !== undefined;
 }

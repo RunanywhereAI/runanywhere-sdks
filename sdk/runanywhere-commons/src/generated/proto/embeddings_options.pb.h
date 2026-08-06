@@ -29,14 +29,9 @@
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/repeated_field.h"  // IWYU pragma: export
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
-#include "google/protobuf/map.h"  // IWYU pragma: export
-#include "google/protobuf/map_type_handler.h"  // IWYU pragma: export
-#include "google/protobuf/map_entry.h"
-#include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
-#include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
@@ -63,6 +58,8 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_embe
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
+enum EmbeddingsInputType : int;
+extern const uint32_t EmbeddingsInputType_internal_data_[];
 enum EmbeddingsPoolingStrategy : int;
 extern const uint32_t EmbeddingsPoolingStrategy_internal_data_[];
 class EmbeddingVector;
@@ -72,22 +69,6 @@ extern EmbeddingVectorGlobalsTypeInternal EmbeddingVector_globals_;
 extern const ::google::protobuf::internal::ClassDataFull EmbeddingVector_class_data_;
 #else
 extern const EmbeddingVectorGlobalsTypeInternal EmbeddingVector_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class EmbeddingVector_MetadataEntry_DoNotUse;
-struct EmbeddingVector_MetadataEntry_DoNotUseGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern EmbeddingVector_MetadataEntry_DoNotUseGlobalsTypeInternal EmbeddingVector_MetadataEntry_DoNotUse_globals_;
-extern const ::google::protobuf::internal::ClassDataFull EmbeddingVector_MetadataEntry_DoNotUse_class_data_;
-#else
-extern const EmbeddingVector_MetadataEntry_DoNotUseGlobalsTypeInternal EmbeddingVector_MetadataEntry_DoNotUse_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class EmbeddingsConfiguration;
-struct EmbeddingsConfigurationGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern EmbeddingsConfigurationGlobalsTypeInternal EmbeddingsConfiguration_globals_;
-extern const ::google::protobuf::internal::ClassDataFull EmbeddingsConfiguration_class_data_;
-#else
-extern const EmbeddingsConfigurationGlobalsTypeInternal EmbeddingsConfiguration_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 class EmbeddingsCreateRequest;
 struct EmbeddingsCreateRequestGlobalsTypeInternal;
@@ -121,14 +102,6 @@ extern const ::google::protobuf::internal::ClassDataFull EmbeddingsRequest_class
 #else
 extern const EmbeddingsRequestGlobalsTypeInternal EmbeddingsRequest_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
-class EmbeddingsRequest_MetadataEntry_DoNotUse;
-struct EmbeddingsRequest_MetadataEntry_DoNotUseGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern EmbeddingsRequest_MetadataEntry_DoNotUseGlobalsTypeInternal EmbeddingsRequest_MetadataEntry_DoNotUse_globals_;
-extern const ::google::protobuf::internal::ClassDataFull EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_;
-#else
-extern const EmbeddingsRequest_MetadataEntry_DoNotUseGlobalsTypeInternal EmbeddingsRequest_MetadataEntry_DoNotUse_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
 class EmbeddingsResult;
 struct EmbeddingsResultGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -141,6 +114,9 @@ extern const EmbeddingsResultGlobalsTypeInternal EmbeddingsResult_globals_;
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
+template <>
+internal::EnumTraitsT<::runanywhere::v1::EmbeddingsInputType_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::EmbeddingsInputType>;
 template <>
 internal::EnumTraitsT<::runanywhere::v1::EmbeddingsPoolingStrategy_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::EmbeddingsPoolingStrategy>;
@@ -191,61 +167,53 @@ template <>
   return ::google::protobuf::internal::ParseNamedEnum<EmbeddingsPoolingStrategy>(EmbeddingsPoolingStrategy_descriptor(), name,
                                            value);
 }
+enum EmbeddingsInputType : int {
+  EMBEDDINGS_INPUT_TYPE_UNSPECIFIED = 0,
+  EMBEDDINGS_INPUT_TYPE_QUERY = 1,
+  EMBEDDINGS_INPUT_TYPE_DOCUMENT = 2,
+  EmbeddingsInputType_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  EmbeddingsInputType_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t EmbeddingsInputType_internal_data_[];
+inline constexpr EmbeddingsInputType EmbeddingsInputType_MIN =
+    static_cast<EmbeddingsInputType>(0);
+inline constexpr EmbeddingsInputType EmbeddingsInputType_MAX =
+    static_cast<EmbeddingsInputType>(2);
+[[nodiscard]] inline bool EmbeddingsInputType_IsValid(int value) {
+  return 0 <= value && value <= 2;
+}
+inline constexpr int EmbeddingsInputType_ARRAYSIZE = 2 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+EmbeddingsInputType_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(EmbeddingsInputType) {
+  return EmbeddingsInputType_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& EmbeddingsInputType_Name(T value) {
+  static_assert(::std::is_same<T, EmbeddingsInputType>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to EmbeddingsInputType_Name().");
+  return EmbeddingsInputType_Name(static_cast<EmbeddingsInputType>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& EmbeddingsInputType_Name(EmbeddingsInputType value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<EmbeddingsInputType_descriptor, 0, 2>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool EmbeddingsInputType_Parse(
+    ::absl::string_view name, EmbeddingsInputType* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<EmbeddingsInputType>(EmbeddingsInputType_descriptor(), name,
+                                           value);
+}
 using ::google::protobuf::internal::generated_enum::AbslParseFlag;
 using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 
 // ===================================================================
 
 
-// -------------------------------------------------------------------
-
-class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsRequest_MetadataEntry_DoNotUse final
-    : public ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING> {
- public:
-  using SuperType =
-      ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING>;
-  EmbeddingsRequest_MetadataEntry_DoNotUse();
-  template <typename = void>
-  explicit constexpr EmbeddingsRequest_MetadataEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-  explicit EmbeddingsRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr const void* PROTOBUF_NONNULL internal_message_globals() {
-    return &EmbeddingsRequest_MetadataEntry_DoNotUse_globals_;
-  }
-
-
-  static constexpr auto InternalGenerateClassData_(
-      const ::google::protobuf::MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
- private:
-  friend class ::google::protobuf::MessageLite;
-  friend struct ::TableStruct_embeddings_5foptions_2eproto;
-  friend ::google::protobuf::internal::PrivateAccess;
-  friend EmbeddingsRequest_MetadataEntry_DoNotUseGlobalsTypeInternal;
-
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 2,
-                          0, 63,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-};
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::google::protobuf::Message
@@ -304,7 +272,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
   [[nodiscard]] static const EmbeddingsOptions& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsOptions>(&EmbeddingsOptions_globals_);
   }
-  static constexpr int kIndexInFileMessages = 1;
+  static constexpr int kIndexInFileMessages = 0;
   friend void swap(EmbeddingsOptions& a, EmbeddingsOptions& b) { a.Swap(&b); }
   inline void Swap(EmbeddingsOptions* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -401,6 +369,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
     kNormalizeFieldNumber = 4,
     kPoolingFieldNumber = 5,
     kNThreadsFieldNumber = 6,
+    kInputTypeFieldNumber = 7,
+    kDimensionsFieldNumber = 8,
   };
   // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
   [[nodiscard]] bool has_batch_size()
@@ -426,7 +396,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
   void _internal_set_truncate(bool value);
 
   public:
-  // bool normalize = 4;
+  // optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
+  [[nodiscard]] bool has_normalize()
+      const;
   void clear_normalize() ;
   [[nodiscard]] bool normalize() const;
   void set_normalize(bool value);
@@ -456,11 +428,33 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
   void _internal_set_n_threads(::int32_t value);
 
   public:
+  // .runanywhere.v1.EmbeddingsInputType input_type = 7;
+  void clear_input_type() ;
+  [[nodiscard]] ::runanywhere::v1::EmbeddingsInputType input_type() const;
+  void set_input_type(::runanywhere::v1::EmbeddingsInputType value);
+
+  private:
+  ::runanywhere::v1::EmbeddingsInputType _internal_input_type() const;
+  void _internal_set_input_type(::runanywhere::v1::EmbeddingsInputType value);
+
+  public:
+  // optional int32 dimensions = 8 [(.runanywhere.v1.rac_min) = 1];
+  [[nodiscard]] bool has_dimensions()
+      const;
+  void clear_dimensions() ;
+  [[nodiscard]] ::int32_t dimensions() const;
+  void set_dimensions(::int32_t value);
+
+  private:
+  ::int32_t _internal_dimensions() const;
+  void _internal_set_dimensions(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 5,
+      ::google::protobuf::internal::TcParseTable<3, 7,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -494,6 +488,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
     bool normalize_;
     int pooling_;
     ::int32_t n_threads_;
+    int input_type_;
+    ::int32_t dimensions_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -501,31 +497,31 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingsConfiguration) */ {
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsCreateRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingsCreateRequest) */ {
  public:
-  inline EmbeddingsConfiguration() : EmbeddingsConfiguration(nullptr) {}
-  ~EmbeddingsConfiguration() PROTOBUF_FINAL;
+  inline EmbeddingsCreateRequest() : EmbeddingsCreateRequest(nullptr) {}
+  ~EmbeddingsCreateRequest() PROTOBUF_FINAL;
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(EmbeddingsConfiguration* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+  void operator delete(EmbeddingsCreateRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
     SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingsConfiguration));
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingsCreateRequest));
   }
 #endif
 
   template <typename = void>
-  explicit constexpr EmbeddingsConfiguration(::google::protobuf::internal::ConstantInitialized,
+  explicit constexpr EmbeddingsCreateRequest(::google::protobuf::internal::ConstantInitialized,
                            const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
                                class_data);
 
-  inline EmbeddingsConfiguration(const EmbeddingsConfiguration& from) : EmbeddingsConfiguration(nullptr, from) {}
-  inline EmbeddingsConfiguration(EmbeddingsConfiguration&& from) noexcept : EmbeddingsConfiguration(nullptr, ::std::move(from)) {}
-  inline EmbeddingsConfiguration& operator=(const EmbeddingsConfiguration& from) {
+  inline EmbeddingsCreateRequest(const EmbeddingsCreateRequest& from) : EmbeddingsCreateRequest(nullptr, from) {}
+  inline EmbeddingsCreateRequest(EmbeddingsCreateRequest&& from) noexcept : EmbeddingsCreateRequest(nullptr, ::std::move(from)) {}
+  inline EmbeddingsCreateRequest& operator=(const EmbeddingsCreateRequest& from) {
     CopyFrom(from);
     return *this;
   }
-  inline EmbeddingsConfiguration& operator=(EmbeddingsConfiguration&& from) noexcept {
+  inline EmbeddingsCreateRequest& operator=(EmbeddingsCreateRequest&& from) noexcept {
     if (this == &from) return *this;
     if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
       InternalSwap(&from);
@@ -554,12 +550,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  [[nodiscard]] static const EmbeddingsConfiguration& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsConfiguration>(&EmbeddingsConfiguration_globals_);
+  [[nodiscard]] static const EmbeddingsCreateRequest& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsCreateRequest>(&EmbeddingsCreateRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 0;
-  friend void swap(EmbeddingsConfiguration& a, EmbeddingsConfiguration& b) { a.Swap(&b); }
-  inline void Swap(EmbeddingsConfiguration* PROTOBUF_NONNULL other) {
+  static constexpr int kIndexInFileMessages = 4;
+  friend void swap(EmbeddingsCreateRequest& a, EmbeddingsCreateRequest& b) { a.Swap(&b); }
+  inline void Swap(EmbeddingsCreateRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
     if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
       InternalSwap(other);
@@ -567,7 +563,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
       ::google::protobuf::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(EmbeddingsConfiguration* PROTOBUF_NONNULL other) {
+  void UnsafeArenaSwap(EmbeddingsCreateRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
     ABSL_DCHECK(GetArena() == other->GetArena());
     InternalSwap(other);
@@ -575,14 +571,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
 
   // implements Message ----------------------------------------------
 
-  [[nodiscard]] EmbeddingsConfiguration* PROTOBUF_NONNULL
+  [[nodiscard]] EmbeddingsCreateRequest* PROTOBUF_NONNULL
   New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<EmbeddingsConfiguration>(arena);
+    return ::google::protobuf::Message::DefaultConstruct<EmbeddingsCreateRequest>(arena);
   }
   using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const EmbeddingsConfiguration& from);
+  void CopyFrom(const EmbeddingsCreateRequest& from);
   using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const EmbeddingsConfiguration& from) { EmbeddingsConfiguration::MergeImpl(*this, from); }
+  void MergeFrom(const EmbeddingsCreateRequest& from) { EmbeddingsCreateRequest::MergeImpl(*this, from); }
 
   private:
   static void MergeImpl(::google::protobuf::MessageLite& to_msg,
@@ -620,17 +616,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   private:
   void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static void SharedDtor(MessageLite& self);
-  void InternalSwap(EmbeddingsConfiguration* PROTOBUF_NONNULL other);
+  void InternalSwap(EmbeddingsCreateRequest* PROTOBUF_NONNULL other);
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingsConfiguration"; }
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingsCreateRequest"; }
 
-  explicit EmbeddingsConfiguration(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  EmbeddingsConfiguration(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingsConfiguration& from);
-  EmbeddingsConfiguration(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingsConfiguration&& from) noexcept
-      : EmbeddingsConfiguration(arena) {
+  explicit EmbeddingsCreateRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  EmbeddingsCreateRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingsCreateRequest& from);
+  EmbeddingsCreateRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingsCreateRequest&& from) noexcept
+      : EmbeddingsCreateRequest(arena) {
     *this = ::std::move(from);
   }
   const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
@@ -650,14 +646,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   // accessors -------------------------------------------------------
   enum : int {
     kModelIdFieldNumber = 1,
-    kConfigJsonFieldNumber = 9,
-    kEmbeddingDimensionFieldNumber = 2,
-    kMaxSequenceLengthFieldNumber = 3,
-    kPreferredFrameworkFieldNumber = 5,
-    kNormalizeFieldNumber = 7,
-    kPoolingFieldNumber = 8,
+    kConfigJsonFieldNumber = 2,
   };
-  // string model_id = 1 [(.runanywhere.v1.rac_required) = true];
+  // string model_id = 1;
   void clear_model_id() ;
   [[nodiscard]] const ::std::string& model_id() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -672,7 +663,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
-  // optional string config_json = 9;
+  // optional string config_json = 2;
   [[nodiscard]] bool has_config_json()
       const;
   void clear_config_json() ;
@@ -689,63 +680,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   ::std::string* PROTOBUF_NONNULL _internal_mutable_config_json();
 
   public:
-  // int32 embedding_dimension = 2 [(.runanywhere.v1.rac_default) = "384", (.runanywhere.v1.rac_min) = 1];
-  void clear_embedding_dimension() ;
-  [[nodiscard]] ::int32_t embedding_dimension() const;
-  void set_embedding_dimension(::int32_t value);
-
-  private:
-  ::int32_t _internal_embedding_dimension() const;
-  void _internal_set_embedding_dimension(::int32_t value);
-
-  public:
-  // int32 max_sequence_length = 3 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
-  void clear_max_sequence_length() ;
-  [[nodiscard]] ::int32_t max_sequence_length() const;
-  void set_max_sequence_length(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_sequence_length() const;
-  void _internal_set_max_sequence_length(::int32_t value);
-
-  public:
-  // optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
-  [[nodiscard]] bool has_preferred_framework()
-      const;
-  void clear_preferred_framework() ;
-  [[nodiscard]] ::runanywhere::v1::InferenceFramework preferred_framework() const;
-  void set_preferred_framework(::runanywhere::v1::InferenceFramework value);
-
-  private:
-  ::runanywhere::v1::InferenceFramework _internal_preferred_framework() const;
-  void _internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value);
-
-  public:
-  // bool normalize = 7 [(.runanywhere.v1.rac_default) = "true"];
-  void clear_normalize() ;
-  [[nodiscard]] bool normalize() const;
-  void set_normalize(bool value);
-
-  private:
-  bool _internal_normalize() const;
-  void _internal_set_normalize(bool value);
-
-  public:
-  // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
-  void clear_pooling() ;
-  [[nodiscard]] ::runanywhere::v1::EmbeddingsPoolingStrategy pooling() const;
-  void set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value);
-
-  private:
-  ::runanywhere::v1::EmbeddingsPoolingStrategy _internal_pooling() const;
-  void _internal_set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsConfiguration)
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsCreateRequest)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 7,
+      ::google::protobuf::internal::TcParseTable<1, 2,
                           0, 66,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -771,16 +710,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
     inline explicit Impl_(
         ::google::protobuf::internal::InternalVisibility visibility,
         ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const EmbeddingsConfiguration& from_msg);
+        const EmbeddingsCreateRequest& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::google::protobuf::internal::ArenaStringPtr config_json_;
-    ::int32_t embedding_dimension_;
-    ::int32_t max_sequence_length_;
-    int preferred_framework_;
-    bool normalize_;
-    int pooling_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -788,39 +722,193 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
 };
 // -------------------------------------------------------------------
 
-class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingVector_MetadataEntry_DoNotUse final
-    : public ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING> {
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingVector final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingVector) */ {
  public:
-  using SuperType =
-      ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING>;
-  EmbeddingVector_MetadataEntry_DoNotUse();
+  inline EmbeddingVector() : EmbeddingVector(nullptr) {}
+  ~EmbeddingVector() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(EmbeddingVector* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingVector));
+  }
+#endif
+
   template <typename = void>
-  explicit constexpr EmbeddingVector_MetadataEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized,
+  explicit constexpr EmbeddingVector(::google::protobuf::internal::ConstantInitialized,
                            const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
                                class_data);
-  explicit EmbeddingVector_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr const void* PROTOBUF_NONNULL internal_message_globals() {
-    return &EmbeddingVector_MetadataEntry_DoNotUse_globals_;
+
+  inline EmbeddingVector(const EmbeddingVector& from) : EmbeddingVector(nullptr, from) {}
+  inline EmbeddingVector(EmbeddingVector&& from) noexcept : EmbeddingVector(nullptr, ::std::move(from)) {}
+  inline EmbeddingVector& operator=(const EmbeddingVector& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline EmbeddingVector& operator=(EmbeddingVector&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
   }
 
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
 
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const EmbeddingVector& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingVector>(&EmbeddingVector_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 1;
+  friend void swap(EmbeddingVector& a, EmbeddingVector& b) { a.Swap(&b); }
+  inline void Swap(EmbeddingVector* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(EmbeddingVector* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] EmbeddingVector* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<EmbeddingVector>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const EmbeddingVector& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const EmbeddingVector& from) { EmbeddingVector::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(EmbeddingVector* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingVector"; }
+
+  explicit EmbeddingVector(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  EmbeddingVector(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingVector& from);
+  EmbeddingVector(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingVector&& from) noexcept
+      : EmbeddingVector(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
   static constexpr auto InternalGenerateClassData_(
-      const ::google::protobuf::MessageLite& prototype,
+      const MessageLite& prototype,
       const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
 
- private:
-  friend class ::google::protobuf::MessageLite;
-  friend struct ::TableStruct_embeddings_5foptions_2eproto;
-  friend ::google::protobuf::internal::PrivateAccess;
-  friend EmbeddingVector_MetadataEntry_DoNotUseGlobalsTypeInternal;
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
 
+  // accessors -------------------------------------------------------
+  enum : int {
+    kValuesFieldNumber = 1,
+    kInputIndexFieldNumber = 2,
+  };
+  // repeated float values = 1;
+  [[nodiscard]] int values_size()
+      const;
+  private:
+  int _internal_values_size() const;
+
+  public:
+  void clear_values() ;
+  [[nodiscard]] float values(int index) const;
+  void set_values(int index, float value);
+  void add_values(float value);
+  [[nodiscard]] const ::google::protobuf::RepeatedField<float>& values()
+      const;
+  ::google::protobuf::RepeatedField<float>* PROTOBUF_NONNULL mutable_values();
+
+  private:
+  const ::google::protobuf::RepeatedField<float>& _internal_values() const;
+  ::google::protobuf::RepeatedField<float>* PROTOBUF_NONNULL _internal_mutable_values();
+
+  public:
+  // int32 input_index = 2;
+  void clear_input_index() ;
+  [[nodiscard]] ::int32_t input_index() const;
+  void set_input_index(::int32_t value);
+
+  private:
+  ::int32_t _internal_input_index() const;
+  void _internal_set_input_index(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingVector)
+ private:
+  class _Internal;
   using ParseTableT_ =
       ::google::protobuf::internal::TcParseTable<1, 2,
-                          0, 61,
+                          0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -829,11 +917,315 @@ class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingVector_MetadataEntry_DoNotU
   static const ParseTableT_ _table_;
   #endif
 
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const EmbeddingVector& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedField<float> values_;
+    ::int32_t input_index_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_embeddings_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingsResult) */ {
+ public:
+  inline EmbeddingsResult() : EmbeddingsResult(nullptr) {}
+  ~EmbeddingsResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(EmbeddingsResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingsResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr EmbeddingsResult(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline EmbeddingsResult(const EmbeddingsResult& from) : EmbeddingsResult(nullptr, from) {}
+  inline EmbeddingsResult(EmbeddingsResult&& from) noexcept : EmbeddingsResult(nullptr, ::std::move(from)) {}
+  inline EmbeddingsResult& operator=(const EmbeddingsResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline EmbeddingsResult& operator=(EmbeddingsResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const EmbeddingsResult& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsResult>(&EmbeddingsResult_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 3;
+  friend void swap(EmbeddingsResult& a, EmbeddingsResult& b) { a.Swap(&b); }
+  inline void Swap(EmbeddingsResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(EmbeddingsResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] EmbeddingsResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<EmbeddingsResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const EmbeddingsResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const EmbeddingsResult& from) { EmbeddingsResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(EmbeddingsResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingsResult"; }
+
+  explicit EmbeddingsResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  EmbeddingsResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingsResult& from);
+  EmbeddingsResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingsResult&& from) noexcept
+      : EmbeddingsResult(arena) {
+    *this = ::std::move(from);
+  }
   const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
   static void* PROTOBUF_NONNULL PlacementNew_(
       const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
       ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kVectorsFieldNumber = 1,
+    kModelIdFieldNumber = 5,
+    kRequestIdFieldNumber = 6,
+    kProcessingTimeMsFieldNumber = 3,
+    kDimensionFieldNumber = 2,
+    kTokensUsedFieldNumber = 4,
+  };
+  // repeated .runanywhere.v1.EmbeddingVector vectors = 1;
+  [[nodiscard]] int vectors_size()
+      const;
+  private:
+  int _internal_vectors_size() const;
+
+  public:
+  void clear_vectors() ;
+  [[nodiscard]] const ::runanywhere::v1::EmbeddingVector& vectors(int index) const;
+  [[nodiscard]] ::runanywhere::v1::EmbeddingVector* PROTOBUF_NONNULL mutable_vectors(int index);
+  ::runanywhere::v1::EmbeddingVector* PROTOBUF_NONNULL add_vectors();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>&
+  vectors() const;
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>* PROTOBUF_NONNULL
+  mutable_vectors();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>& _internal_vectors() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>* PROTOBUF_NONNULL _internal_mutable_vectors();
+
+  public:
+  // optional string model_id = 5;
+  [[nodiscard]] bool has_model_id()
+      const;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // string request_id = 6;
+  void clear_request_id() ;
+  [[nodiscard]] const ::std::string& request_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_request_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_request_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
+  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_request_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // int64 processing_time_ms = 3;
+  void clear_processing_time_ms() ;
+  [[nodiscard]] ::int64_t processing_time_ms() const;
+  void set_processing_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_processing_time_ms() const;
+  void _internal_set_processing_time_ms(::int64_t value);
+
+  public:
+  // int32 dimension = 2;
+  void clear_dimension() ;
+  [[nodiscard]] ::int32_t dimension() const;
+  void set_dimension(::int32_t value);
+
+  private:
+  ::int32_t _internal_dimension() const;
+  void _internal_set_dimension(::int32_t value);
+
+  public:
+  // int32 tokens_used = 4;
+  void clear_tokens_used() ;
+  [[nodiscard]] ::int32_t tokens_used() const;
+  void set_tokens_used(::int32_t value);
+
+  private:
+  ::int32_t _internal_tokens_used() const;
+  void _internal_set_tokens_used(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsResult)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<3, 6,
+                          1, 58,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const EmbeddingsResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::EmbeddingVector > vectors_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::int64_t processing_time_ms_;
+    ::int32_t dimension_;
+    ::int32_t tokens_used_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_embeddings_5foptions_2eproto;
 };
 // -------------------------------------------------------------------
 
@@ -893,7 +1285,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsRequest final : public ::
   [[nodiscard]] static const EmbeddingsRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsRequest>(&EmbeddingsRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 5;
+  static constexpr int kIndexInFileMessages = 2;
   friend void swap(EmbeddingsRequest& a, EmbeddingsRequest& b) { a.Swap(&b); }
   inline void Swap(EmbeddingsRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -989,7 +1381,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsRequest final : public ::
     kRequestIdFieldNumber = 3,
     kModelIdFieldNumber = 4,
     kOptionsFieldNumber = 2,
-    kMetadataFieldNumber = 5,
   };
   // repeated string texts = 1;
   [[nodiscard]] int texts_size()
@@ -1066,28 +1457,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsRequest final : public ::
   ::runanywhere::v1::EmbeddingsOptions* PROTOBUF_NONNULL _internal_mutable_options();
 
   public:
-  // map<string, string> metadata = 5;
-  [[nodiscard]] int metadata_size()
-      const;
-  private:
-  int _internal_metadata_size() const;
-
-  public:
-  void clear_metadata() ;
-  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::std::string>& metadata() const;
-  [[nodiscard]] ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL mutable_metadata();
-
-  private:
-  const ::google::protobuf::Map<::std::string, ::std::string>& _internal_metadata() const;
-  ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL _internal_mutable_metadata();
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsRequest)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 5,
-                          2, 72,
+      ::google::protobuf::internal::TcParseTable<2, 4,
+                          1, 64,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1119,838 +1494,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsRequest final : public ::
     ::google::protobuf::internal::ArenaStringPtr request_id_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::runanywhere::v1::EmbeddingsOptions* PROTOBUF_NULLABLE options_;
-    ::google::protobuf::internal::MapField<EmbeddingsRequest_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_embeddings_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsCreateRequest final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingsCreateRequest) */ {
- public:
-  inline EmbeddingsCreateRequest() : EmbeddingsCreateRequest(nullptr) {}
-  ~EmbeddingsCreateRequest() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(EmbeddingsCreateRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingsCreateRequest));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr EmbeddingsCreateRequest(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline EmbeddingsCreateRequest(const EmbeddingsCreateRequest& from) : EmbeddingsCreateRequest(nullptr, from) {}
-  inline EmbeddingsCreateRequest(EmbeddingsCreateRequest&& from) noexcept : EmbeddingsCreateRequest(nullptr, ::std::move(from)) {}
-  inline EmbeddingsCreateRequest& operator=(const EmbeddingsCreateRequest& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline EmbeddingsCreateRequest& operator=(EmbeddingsCreateRequest&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const EmbeddingsCreateRequest& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsCreateRequest>(&EmbeddingsCreateRequest_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 7;
-  friend void swap(EmbeddingsCreateRequest& a, EmbeddingsCreateRequest& b) { a.Swap(&b); }
-  inline void Swap(EmbeddingsCreateRequest* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(EmbeddingsCreateRequest* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] EmbeddingsCreateRequest* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<EmbeddingsCreateRequest>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const EmbeddingsCreateRequest& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const EmbeddingsCreateRequest& from) { EmbeddingsCreateRequest::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(EmbeddingsCreateRequest* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingsCreateRequest"; }
-
-  explicit EmbeddingsCreateRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  EmbeddingsCreateRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingsCreateRequest& from);
-  EmbeddingsCreateRequest(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingsCreateRequest&& from) noexcept
-      : EmbeddingsCreateRequest(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kModelIdFieldNumber = 1,
-    kConfigJsonFieldNumber = 3,
-    kConfigurationFieldNumber = 2,
-  };
-  // string model_id = 1;
-  void clear_model_id() ;
-  [[nodiscard]] const ::std::string& model_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_model_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_model_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
-  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_model_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
-
-  public:
-  // optional string config_json = 3;
-  [[nodiscard]] bool has_config_json()
-      const;
-  void clear_config_json() ;
-  [[nodiscard]] const ::std::string& config_json() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_config_json(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_config_json();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_config_json();
-  void set_allocated_config_json(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_config_json() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_config_json(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_config_json();
-
-  public:
-  // optional .runanywhere.v1.EmbeddingsConfiguration configuration = 2;
-  [[nodiscard]] bool has_configuration()
-      const;
-  void clear_configuration() ;
-  [[nodiscard]] const ::runanywhere::v1::EmbeddingsConfiguration& configuration() const;
-  [[nodiscard]] ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE release_configuration();
-  ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NONNULL mutable_configuration();
-  void set_allocated_configuration(::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_configuration(::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE unsafe_arena_release_configuration();
-
-  private:
-  const ::runanywhere::v1::EmbeddingsConfiguration& _internal_configuration() const;
-  ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NONNULL _internal_mutable_configuration();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsCreateRequest)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
-                          1, 66,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const EmbeddingsCreateRequest& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr config_json_;
-    ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE configuration_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_embeddings_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingVector final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingVector) */ {
- public:
-  inline EmbeddingVector() : EmbeddingVector(nullptr) {}
-  ~EmbeddingVector() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(EmbeddingVector* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingVector));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr EmbeddingVector(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline EmbeddingVector(const EmbeddingVector& from) : EmbeddingVector(nullptr, from) {}
-  inline EmbeddingVector(EmbeddingVector&& from) noexcept : EmbeddingVector(nullptr, ::std::move(from)) {}
-  inline EmbeddingVector& operator=(const EmbeddingVector& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline EmbeddingVector& operator=(EmbeddingVector&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const EmbeddingVector& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingVector>(&EmbeddingVector_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 3;
-  friend void swap(EmbeddingVector& a, EmbeddingVector& b) { a.Swap(&b); }
-  inline void Swap(EmbeddingVector* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(EmbeddingVector* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] EmbeddingVector* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<EmbeddingVector>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const EmbeddingVector& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const EmbeddingVector& from) { EmbeddingVector::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(EmbeddingVector* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingVector"; }
-
-  explicit EmbeddingVector(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  EmbeddingVector(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingVector& from);
-  EmbeddingVector(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingVector&& from) noexcept
-      : EmbeddingVector(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kValuesFieldNumber = 1,
-    kTextFieldNumber = 3,
-    kNormFieldNumber = 2,
-    kDimensionFieldNumber = 4,
-    kInputIndexFieldNumber = 5,
-    kMetadataFieldNumber = 6,
-  };
-  // repeated float values = 1;
-  [[nodiscard]] int values_size()
-      const;
-  private:
-  int _internal_values_size() const;
-
-  public:
-  void clear_values() ;
-  [[nodiscard]] float values(int index) const;
-  void set_values(int index, float value);
-  void add_values(float value);
-  [[nodiscard]] const ::google::protobuf::RepeatedField<float>& values()
-      const;
-  ::google::protobuf::RepeatedField<float>* PROTOBUF_NONNULL mutable_values();
-
-  private:
-  const ::google::protobuf::RepeatedField<float>& _internal_values() const;
-  ::google::protobuf::RepeatedField<float>* PROTOBUF_NONNULL _internal_mutable_values();
-
-  public:
-  // optional string text = 3;
-  [[nodiscard]] bool has_text()
-      const;
-  void clear_text() ;
-  [[nodiscard]] const ::std::string& text() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_text(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_text();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_text();
-  void set_allocated_text(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_text() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_text(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
-
-  public:
-  // optional float norm = 2;
-  [[nodiscard]] bool has_norm()
-      const;
-  void clear_norm() ;
-  [[nodiscard]] float norm() const;
-  void set_norm(float value);
-
-  private:
-  float _internal_norm() const;
-  void _internal_set_norm(float value);
-
-  public:
-  // int32 dimension = 4;
-  void clear_dimension() ;
-  [[nodiscard]] ::int32_t dimension() const;
-  void set_dimension(::int32_t value);
-
-  private:
-  ::int32_t _internal_dimension() const;
-  void _internal_set_dimension(::int32_t value);
-
-  public:
-  // int32 input_index = 5;
-  void clear_input_index() ;
-  [[nodiscard]] ::int32_t input_index() const;
-  void set_input_index(::int32_t value);
-
-  private:
-  ::int32_t _internal_input_index() const;
-  void _internal_set_input_index(::int32_t value);
-
-  public:
-  // map<string, string> metadata = 6;
-  [[nodiscard]] int metadata_size()
-      const;
-  private:
-  int _internal_metadata_size() const;
-
-  public:
-  void clear_metadata() ;
-  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::std::string>& metadata() const;
-  [[nodiscard]] ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL mutable_metadata();
-
-  private:
-  const ::google::protobuf::Map<::std::string, ::std::string>& _internal_metadata() const;
-  ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL _internal_mutable_metadata();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingVector)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
-                          1, 51,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const EmbeddingVector& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedField<float> values_;
-    ::google::protobuf::internal::ArenaStringPtr text_;
-    float norm_;
-    ::int32_t dimension_;
-    ::int32_t input_index_;
-    ::google::protobuf::internal::MapField<EmbeddingVector_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_embeddings_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingsResult) */ {
- public:
-  inline EmbeddingsResult() : EmbeddingsResult(nullptr) {}
-  ~EmbeddingsResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(EmbeddingsResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingsResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr EmbeddingsResult(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline EmbeddingsResult(const EmbeddingsResult& from) : EmbeddingsResult(nullptr, from) {}
-  inline EmbeddingsResult(EmbeddingsResult&& from) noexcept : EmbeddingsResult(nullptr, ::std::move(from)) {}
-  inline EmbeddingsResult& operator=(const EmbeddingsResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline EmbeddingsResult& operator=(EmbeddingsResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const EmbeddingsResult& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsResult>(&EmbeddingsResult_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 6;
-  friend void swap(EmbeddingsResult& a, EmbeddingsResult& b) { a.Swap(&b); }
-  inline void Swap(EmbeddingsResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(EmbeddingsResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] EmbeddingsResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<EmbeddingsResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const EmbeddingsResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const EmbeddingsResult& from) { EmbeddingsResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(EmbeddingsResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingsResult"; }
-
-  explicit EmbeddingsResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  EmbeddingsResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingsResult& from);
-  EmbeddingsResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingsResult&& from) noexcept
-      : EmbeddingsResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kVectorsFieldNumber = 1,
-    kModelIdFieldNumber = 5,
-    kRequestIdFieldNumber = 8,
-    kErrorFieldNumber = 9,
-    kProcessingTimeMsFieldNumber = 3,
-    kDimensionFieldNumber = 2,
-    kTokensUsedFieldNumber = 4,
-  };
-  // repeated .runanywhere.v1.EmbeddingVector vectors = 1;
-  [[nodiscard]] int vectors_size()
-      const;
-  private:
-  int _internal_vectors_size() const;
-
-  public:
-  void clear_vectors() ;
-  [[nodiscard]] const ::runanywhere::v1::EmbeddingVector& vectors(int index) const;
-  [[nodiscard]] ::runanywhere::v1::EmbeddingVector* PROTOBUF_NONNULL mutable_vectors(int index);
-  ::runanywhere::v1::EmbeddingVector* PROTOBUF_NONNULL add_vectors();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>&
-  vectors() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>* PROTOBUF_NONNULL
-  mutable_vectors();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>& _internal_vectors() const;
-  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::EmbeddingVector>* PROTOBUF_NONNULL _internal_mutable_vectors();
-
-  public:
-  // optional string model_id = 5;
-  [[nodiscard]] bool has_model_id()
-      const;
-  void clear_model_id() ;
-  [[nodiscard]] const ::std::string& model_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_model_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_model_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
-  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_model_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
-
-  public:
-  // string request_id = 8;
-  void clear_request_id() ;
-  [[nodiscard]] const ::std::string& request_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_request_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_request_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
-  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_request_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // optional .runanywhere.v1.SDKError error = 9;
-  [[nodiscard]] bool has_error()
-      const;
-  void clear_error() ;
-  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
-  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
-  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
-  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
-
-  private:
-  const ::runanywhere::v1::SDKError& _internal_error() const;
-  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
-
-  public:
-  // int64 processing_time_ms = 3;
-  void clear_processing_time_ms() ;
-  [[nodiscard]] ::int64_t processing_time_ms() const;
-  void set_processing_time_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_processing_time_ms() const;
-  void _internal_set_processing_time_ms(::int64_t value);
-
-  public:
-  // int32 dimension = 2;
-  void clear_dimension() ;
-  [[nodiscard]] ::int32_t dimension() const;
-  void set_dimension(::int32_t value);
-
-  private:
-  ::int32_t _internal_dimension() const;
-  void _internal_set_dimension(::int32_t value);
-
-  public:
-  // int32 tokens_used = 4;
-  void clear_tokens_used() ;
-  [[nodiscard]] ::int32_t tokens_used() const;
-  void set_tokens_used(::int32_t value);
-
-  private:
-  ::int32_t _internal_tokens_used() const;
-  void _internal_set_tokens_used(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsResult)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 7,
-                          2, 58,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const EmbeddingsResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::EmbeddingVector > vectors_;
-    ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
-    ::int64_t processing_time_ms_;
-    ::int32_t dimension_;
-    ::int32_t tokens_used_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2014,7 +1557,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsCreateResult final : publ
   [[nodiscard]] static const EmbeddingsCreateResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsCreateResult>(&EmbeddingsCreateResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(EmbeddingsCreateResult& a, EmbeddingsCreateResult& b) { a.Swap(&b); }
   inline void Swap(EmbeddingsCreateResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2231,266 +1774,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsCreateResult final : publ
 #endif  // __GNUC__
 // -------------------------------------------------------------------
 
-// EmbeddingsConfiguration
-
-// string model_id = 1 [(.runanywhere.v1.rac_required) = true];
-inline void EmbeddingsConfiguration::clear_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& EmbeddingsConfiguration::model_id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.model_id)
-  return _internal_model_id();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void EmbeddingsConfiguration::set_model_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.model_id)
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsConfiguration::mutable_model_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_model_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsConfiguration.model_id)
-  return _s;
-}
-inline const ::std::string& EmbeddingsConfiguration::_internal_model_id() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.model_id_.Get();
-}
-inline void EmbeddingsConfiguration::_internal_set_model_id(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsConfiguration::_internal_mutable_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.model_id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE EmbeddingsConfiguration::release_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsConfiguration.model_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.model_id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void EmbeddingsConfiguration::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.model_id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsConfiguration.model_id)
-}
-
-// int32 embedding_dimension = 2 [(.runanywhere.v1.rac_default) = "384", (.runanywhere.v1.rac_min) = 1];
-inline void EmbeddingsConfiguration::clear_embedding_dimension() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.embedding_dimension_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline ::int32_t EmbeddingsConfiguration::embedding_dimension() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.embedding_dimension)
-  return _internal_embedding_dimension();
-}
-inline void EmbeddingsConfiguration::set_embedding_dimension(::int32_t value) {
-  _internal_set_embedding_dimension(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.embedding_dimension)
-}
-inline ::int32_t EmbeddingsConfiguration::_internal_embedding_dimension() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.embedding_dimension_;
-}
-inline void EmbeddingsConfiguration::_internal_set_embedding_dimension(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.embedding_dimension_ = value;
-}
-
-// int32 max_sequence_length = 3 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
-inline void EmbeddingsConfiguration::clear_max_sequence_length() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_sequence_length_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline ::int32_t EmbeddingsConfiguration::max_sequence_length() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.max_sequence_length)
-  return _internal_max_sequence_length();
-}
-inline void EmbeddingsConfiguration::set_max_sequence_length(::int32_t value) {
-  _internal_set_max_sequence_length(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.max_sequence_length)
-}
-inline ::int32_t EmbeddingsConfiguration::_internal_max_sequence_length() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_sequence_length_;
-}
-inline void EmbeddingsConfiguration::_internal_set_max_sequence_length(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_sequence_length_ = value;
-}
-
-// optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
-inline bool EmbeddingsConfiguration::has_preferred_framework() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
-  return value;
-}
-inline void EmbeddingsConfiguration::clear_preferred_framework() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.preferred_framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline ::runanywhere::v1::InferenceFramework EmbeddingsConfiguration::preferred_framework() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.preferred_framework)
-  return _internal_preferred_framework();
-}
-inline void EmbeddingsConfiguration::set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
-  _internal_set_preferred_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.preferred_framework)
-}
-inline ::runanywhere::v1::InferenceFramework EmbeddingsConfiguration::_internal_preferred_framework() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::InferenceFramework>(_impl_.preferred_framework_);
-}
-inline void EmbeddingsConfiguration::_internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.preferred_framework_ = value;
-}
-
-// bool normalize = 7 [(.runanywhere.v1.rac_default) = "true"];
-inline void EmbeddingsConfiguration::clear_normalize() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline bool EmbeddingsConfiguration::normalize() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.normalize)
-  return _internal_normalize();
-}
-inline void EmbeddingsConfiguration::set_normalize(bool value) {
-  _internal_set_normalize(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.normalize)
-}
-inline bool EmbeddingsConfiguration::_internal_normalize() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.normalize_;
-}
-inline void EmbeddingsConfiguration::_internal_set_normalize(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_ = value;
-}
-
-// .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
-inline void EmbeddingsConfiguration::clear_pooling() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.pooling_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-}
-inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsConfiguration::pooling() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.pooling)
-  return _internal_pooling();
-}
-inline void EmbeddingsConfiguration::set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value) {
-  _internal_set_pooling(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.pooling)
-}
-inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsConfiguration::_internal_pooling() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::EmbeddingsPoolingStrategy>(_impl_.pooling_);
-}
-inline void EmbeddingsConfiguration::_internal_set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.pooling_ = value;
-}
-
-// optional string config_json = 9;
-inline bool EmbeddingsConfiguration::has_config_json() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
-  return value;
-}
-inline void EmbeddingsConfiguration::clear_config_json() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.config_json_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& EmbeddingsConfiguration::config_json() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.config_json)
-  return _internal_config_json();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void EmbeddingsConfiguration::set_config_json(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.config_json_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.config_json)
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsConfiguration::mutable_config_json()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_config_json();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsConfiguration.config_json)
-  return _s;
-}
-inline const ::std::string& EmbeddingsConfiguration::_internal_config_json() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.config_json_.Get();
-}
-inline void EmbeddingsConfiguration::_internal_set_config_json(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.config_json_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsConfiguration::_internal_mutable_config_json() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.config_json_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE EmbeddingsConfiguration::release_config_json() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsConfiguration.config_json)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.config_json_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.config_json_.Set("", GetArena());
-  }
-  return released;
-}
-inline void EmbeddingsConfiguration::set_allocated_config_json(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.config_json_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.config_json_.IsDefault()) {
-    _impl_.config_json_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsConfiguration.config_json)
-}
-
-// -------------------------------------------------------------------
-
 // EmbeddingsOptions
 
 // optional bool truncate = 2;
@@ -2549,7 +1832,11 @@ inline void EmbeddingsOptions::_internal_set_batch_size(::int32_t value) {
   _impl_.batch_size_ = value;
 }
 
-// bool normalize = 4;
+// optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
+inline bool EmbeddingsOptions::has_normalize() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
 inline void EmbeddingsOptions::clear_normalize() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.normalize_ = false;
@@ -2621,7 +1908,57 @@ inline void EmbeddingsOptions::_internal_set_n_threads(::int32_t value) {
   _impl_.n_threads_ = value;
 }
 
-// -------------------------------------------------------------------
+// .runanywhere.v1.EmbeddingsInputType input_type = 7;
+inline void EmbeddingsOptions::clear_input_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.input_type_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline ::runanywhere::v1::EmbeddingsInputType EmbeddingsOptions::input_type() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.input_type)
+  return _internal_input_type();
+}
+inline void EmbeddingsOptions::set_input_type(::runanywhere::v1::EmbeddingsInputType value) {
+  _internal_set_input_type(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.input_type)
+}
+inline ::runanywhere::v1::EmbeddingsInputType EmbeddingsOptions::_internal_input_type() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::EmbeddingsInputType>(_impl_.input_type_);
+}
+inline void EmbeddingsOptions::_internal_set_input_type(::runanywhere::v1::EmbeddingsInputType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.input_type_ = value;
+}
+
+// optional int32 dimensions = 8 [(.runanywhere.v1.rac_min) = 1];
+inline bool EmbeddingsOptions::has_dimensions() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void EmbeddingsOptions::clear_dimensions() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.dimensions_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline ::int32_t EmbeddingsOptions::dimensions() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.dimensions)
+  return _internal_dimensions();
+}
+inline void EmbeddingsOptions::set_dimensions(::int32_t value) {
+  _internal_set_dimensions(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.dimensions)
+}
+inline ::int32_t EmbeddingsOptions::_internal_dimensions() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.dimensions_;
+}
+inline void EmbeddingsOptions::_internal_set_dimensions(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.dimensions_ = value;
+}
 
 // -------------------------------------------------------------------
 
@@ -2678,131 +2015,11 @@ EmbeddingVector::_internal_mutable_values() {
   return &_impl_.values_;
 }
 
-// optional float norm = 2;
-inline bool EmbeddingVector::has_norm() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  return value;
-}
-inline void EmbeddingVector::clear_norm() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.norm_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline float EmbeddingVector::norm() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingVector.norm)
-  return _internal_norm();
-}
-inline void EmbeddingVector::set_norm(float value) {
-  _internal_set_norm(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingVector.norm)
-}
-inline float EmbeddingVector::_internal_norm() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.norm_;
-}
-inline void EmbeddingVector::_internal_set_norm(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.norm_ = value;
-}
-
-// optional string text = 3;
-inline bool EmbeddingVector::has_text() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
-  return value;
-}
-inline void EmbeddingVector::clear_text() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.text_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& EmbeddingVector::text() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingVector.text)
-  return _internal_text();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void EmbeddingVector::set_text(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.text_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingVector.text)
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingVector::mutable_text()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_text();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingVector.text)
-  return _s;
-}
-inline const ::std::string& EmbeddingVector::_internal_text() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.text_.Get();
-}
-inline void EmbeddingVector::_internal_set_text(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.text_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingVector::_internal_mutable_text() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.text_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE EmbeddingVector::release_text() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingVector.text)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.text_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.text_.Set("", GetArena());
-  }
-  return released;
-}
-inline void EmbeddingVector::set_allocated_text(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.text_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.text_.IsDefault()) {
-    _impl_.text_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingVector.text)
-}
-
-// int32 dimension = 4;
-inline void EmbeddingVector::clear_dimension() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.dimension_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline ::int32_t EmbeddingVector::dimension() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingVector.dimension)
-  return _internal_dimension();
-}
-inline void EmbeddingVector::set_dimension(::int32_t value) {
-  _internal_set_dimension(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingVector.dimension)
-}
-inline ::int32_t EmbeddingVector::_internal_dimension() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.dimension_;
-}
-inline void EmbeddingVector::_internal_set_dimension(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.dimension_ = value;
-}
-
-// int32 input_index = 5;
+// int32 input_index = 2;
 inline void EmbeddingVector::clear_input_index() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.input_index_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline ::int32_t EmbeddingVector::input_index() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingVector.input_index)
@@ -2810,7 +2027,7 @@ inline ::int32_t EmbeddingVector::input_index() const {
 }
 inline void EmbeddingVector::set_input_index(::int32_t value) {
   _internal_set_input_index(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingVector.input_index)
 }
 inline ::int32_t EmbeddingVector::_internal_input_index() const {
@@ -2821,39 +2038,6 @@ inline void EmbeddingVector::_internal_set_input_index(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.input_index_ = value;
 }
-
-// map<string, string> metadata = 6;
-inline int EmbeddingVector::_internal_metadata_size() const {
-  return _internal_metadata().size();
-}
-inline int EmbeddingVector::metadata_size() const {
-  return _internal_metadata_size();
-}
-inline void EmbeddingVector::clear_metadata() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.metadata_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline const ::google::protobuf::Map<::std::string, ::std::string>& EmbeddingVector::_internal_metadata() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.metadata_.GetMap();
-}
-inline const ::google::protobuf::Map<::std::string, ::std::string>& EmbeddingVector::metadata() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_map:runanywhere.v1.EmbeddingVector.metadata)
-  return _internal_metadata();
-}
-inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL EmbeddingVector::_internal_mutable_metadata() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.metadata_.MutableMap();
-}
-inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL EmbeddingVector::mutable_metadata()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.EmbeddingVector.metadata)
-  return _internal_mutable_metadata();
-}
-
-// -------------------------------------------------------------------
 
 // -------------------------------------------------------------------
 
@@ -3161,37 +2345,6 @@ inline void EmbeddingsRequest::set_allocated_model_id(::std::string* PROTOBUF_NU
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsRequest.model_id)
 }
 
-// map<string, string> metadata = 5;
-inline int EmbeddingsRequest::_internal_metadata_size() const {
-  return _internal_metadata().size();
-}
-inline int EmbeddingsRequest::metadata_size() const {
-  return _internal_metadata_size();
-}
-inline void EmbeddingsRequest::clear_metadata() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.metadata_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline const ::google::protobuf::Map<::std::string, ::std::string>& EmbeddingsRequest::_internal_metadata() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.metadata_.GetMap();
-}
-inline const ::google::protobuf::Map<::std::string, ::std::string>& EmbeddingsRequest::metadata() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_map:runanywhere.v1.EmbeddingsRequest.metadata)
-  return _internal_metadata();
-}
-inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL EmbeddingsRequest::_internal_mutable_metadata() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.metadata_.MutableMap();
-}
-inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL EmbeddingsRequest::mutable_metadata()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.EmbeddingsRequest.metadata)
-  return _internal_mutable_metadata();
-}
-
 // -------------------------------------------------------------------
 
 // EmbeddingsResult
@@ -3255,7 +2408,7 @@ EmbeddingsResult::_internal_mutable_vectors() {
 inline void EmbeddingsResult::clear_dimension() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.dimension_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int32_t EmbeddingsResult::dimension() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsResult.dimension)
@@ -3263,7 +2416,7 @@ inline ::int32_t EmbeddingsResult::dimension() const {
 }
 inline void EmbeddingsResult::set_dimension(::int32_t value) {
   _internal_set_dimension(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsResult.dimension)
 }
 inline ::int32_t EmbeddingsResult::_internal_dimension() const {
@@ -3279,7 +2432,7 @@ inline void EmbeddingsResult::_internal_set_dimension(::int32_t value) {
 inline void EmbeddingsResult::clear_processing_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.processing_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::int64_t EmbeddingsResult::processing_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsResult.processing_time_ms)
@@ -3287,7 +2440,7 @@ inline ::int64_t EmbeddingsResult::processing_time_ms() const {
 }
 inline void EmbeddingsResult::set_processing_time_ms(::int64_t value) {
   _internal_set_processing_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsResult.processing_time_ms)
 }
 inline ::int64_t EmbeddingsResult::_internal_processing_time_ms() const {
@@ -3303,7 +2456,7 @@ inline void EmbeddingsResult::_internal_set_processing_time_ms(::int64_t value) 
 inline void EmbeddingsResult::clear_tokens_used() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tokens_used_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::int32_t EmbeddingsResult::tokens_used() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsResult.tokens_used)
@@ -3311,7 +2464,7 @@ inline ::int32_t EmbeddingsResult::tokens_used() const {
 }
 inline void EmbeddingsResult::set_tokens_used(::int32_t value) {
   _internal_set_tokens_used(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsResult.tokens_used)
 }
 inline ::int32_t EmbeddingsResult::_internal_tokens_used() const {
@@ -3391,7 +2544,7 @@ inline void EmbeddingsResult::set_allocated_model_id(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsResult.model_id)
 }
 
-// string request_id = 8;
+// string request_id = 6;
 inline void EmbeddingsResult::clear_request_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.request_id_.ClearToEmpty();
@@ -3453,99 +2606,6 @@ inline void EmbeddingsResult::set_allocated_request_id(::std::string* PROTOBUF_N
     _impl_.request_id_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsResult.request_id)
-}
-
-// optional .runanywhere.v1.SDKError error = 9;
-inline bool EmbeddingsResult::has_error() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
-  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
-  return value;
-}
-inline const ::runanywhere::v1::SDKError& EmbeddingsResult::_internal_error() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::SDKError* p = _impl_.error_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
-}
-inline const ::runanywhere::v1::SDKError& EmbeddingsResult::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsResult.error)
-  return _internal_error();
-}
-inline void EmbeddingsResult::unsafe_arena_set_allocated_error(
-    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
-  }
-  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.EmbeddingsResult.error)
-}
-inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE EmbeddingsResult::release_error() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::runanywhere::v1::SDKError* released = _impl_.error_;
-  _impl_.error_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE EmbeddingsResult::unsafe_arena_release_error() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsResult.error)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::runanywhere::v1::SDKError* temp = _impl_.error_;
-  _impl_.error_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL EmbeddingsResult::_internal_mutable_error() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.error_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
-    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
-  }
-  return _impl_.error_;
-}
-inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL EmbeddingsResult::mutable_error()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsResult.error)
-  return _msg;
-}
-inline void EmbeddingsResult::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  }
-
-  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsResult.error)
 }
 
 // -------------------------------------------------------------------
@@ -3616,105 +2676,7 @@ inline void EmbeddingsCreateRequest::set_allocated_model_id(::std::string* PROTO
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsCreateRequest.model_id)
 }
 
-// optional .runanywhere.v1.EmbeddingsConfiguration configuration = 2;
-inline bool EmbeddingsCreateRequest::has_configuration() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  PROTOBUF_ASSUME(!value || _impl_.configuration_ != nullptr);
-  return value;
-}
-inline void EmbeddingsCreateRequest::clear_configuration() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.configuration_ != nullptr) _impl_.configuration_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::runanywhere::v1::EmbeddingsConfiguration& EmbeddingsCreateRequest::_internal_configuration() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::EmbeddingsConfiguration* p = _impl_.configuration_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::EmbeddingsConfiguration>(&::runanywhere::v1::EmbeddingsConfiguration_globals_);
-}
-inline const ::runanywhere::v1::EmbeddingsConfiguration& EmbeddingsCreateRequest::configuration() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsCreateRequest.configuration)
-  return _internal_configuration();
-}
-inline void EmbeddingsCreateRequest::unsafe_arena_set_allocated_configuration(
-    ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.configuration_);
-  }
-  _impl_.configuration_ = reinterpret_cast<::runanywhere::v1::EmbeddingsConfiguration*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.EmbeddingsCreateRequest.configuration)
-}
-inline ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE EmbeddingsCreateRequest::release_configuration() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::runanywhere::v1::EmbeddingsConfiguration* released = _impl_.configuration_;
-  _impl_.configuration_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE EmbeddingsCreateRequest::unsafe_arena_release_configuration() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsCreateRequest.configuration)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::runanywhere::v1::EmbeddingsConfiguration* temp = _impl_.configuration_;
-  _impl_.configuration_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NONNULL EmbeddingsCreateRequest::_internal_mutable_configuration() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.configuration_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::EmbeddingsConfiguration>(GetArena());
-    _impl_.configuration_ = reinterpret_cast<::runanywhere::v1::EmbeddingsConfiguration*>(p);
-  }
-  return _impl_.configuration_;
-}
-inline ::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NONNULL EmbeddingsCreateRequest::mutable_configuration()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::runanywhere::v1::EmbeddingsConfiguration* _msg = _internal_mutable_configuration();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsCreateRequest.configuration)
-  return _msg;
-}
-inline void EmbeddingsCreateRequest::set_allocated_configuration(::runanywhere::v1::EmbeddingsConfiguration* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.configuration_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-
-  _impl_.configuration_ = reinterpret_cast<::runanywhere::v1::EmbeddingsConfiguration*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsCreateRequest.configuration)
-}
-
-// optional string config_json = 3;
+// optional string config_json = 2;
 inline bool EmbeddingsCreateRequest::has_config_json() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   return value;
@@ -4032,6 +2994,12 @@ struct is_proto_enum<::runanywhere::v1::EmbeddingsPoolingStrategy> : std::true_t
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::EmbeddingsPoolingStrategy>() {
   return ::runanywhere::v1::EmbeddingsPoolingStrategy_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::EmbeddingsInputType> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::EmbeddingsInputType>() {
+  return ::runanywhere::v1::EmbeddingsInputType_descriptor();
 }
 
 }  // namespace protobuf

@@ -7,11 +7,17 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
-import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
+/**
+ * The required public spelling in every SDK is exactly "mean" / "cls" / "last".
+ * LAST is the final token's hidden state (llama.cpp --pooling last), which
+ * decoder-style embedders require. It is NOT max-pooling; no SDK may expose
+ * it as "max".
+ */
 export enum EmbeddingsPoolingStrategy {
+  /** EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED - inherit the bundle's pooling */
   EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
   EMBEDDINGS_POOLING_STRATEGY_MEAN = 1,
   EMBEDDINGS_POOLING_STRATEGY_CLS = 2,
@@ -56,61 +62,96 @@ export function embeddingsPoolingStrategyToJSON(object: EmbeddingsPoolingStrateg
   }
 }
 
-/** Applied at service creation. */
-export interface EmbeddingsConfiguration {
-  /** Registry id or local path. */
-  modelId: string;
-  /**
-   * Must match the loaded model's hidden size: 384 for all-MiniLM-L6-v2,
-   * 768 for bge-base, 1024 for bge-large.
-   */
-  embeddingDimension: number;
-  /** Truncation or sliding window past this length is backend-decided. */
-  maxSequenceLength: number;
-  preferredFramework?: InferenceFramework | undefined;
-  normalize: boolean;
-  pooling: EmbeddingsPoolingStrategy;
-  /** Backend-specific config such as tokenizer or vocab companion paths. */
-  configJson?: string | undefined;
+export enum EmbeddingsInputType {
+  /** EMBEDDINGS_INPUT_TYPE_UNSPECIFIED - model default / symmetric model */
+  EMBEDDINGS_INPUT_TYPE_UNSPECIFIED = 0,
+  EMBEDDINGS_INPUT_TYPE_QUERY = 1,
+  EMBEDDINGS_INPUT_TYPE_DOCUMENT = 2,
+  UNRECOGNIZED = -1,
 }
 
-/** Per-call overrides. Unset fields fall back to the component configuration. */
+export function embeddingsInputTypeFromJSON(object: any): EmbeddingsInputType {
+  switch (object) {
+    case 0:
+    case "EMBEDDINGS_INPUT_TYPE_UNSPECIFIED":
+      return EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED;
+    case 1:
+    case "EMBEDDINGS_INPUT_TYPE_QUERY":
+      return EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_QUERY;
+    case 2:
+    case "EMBEDDINGS_INPUT_TYPE_DOCUMENT":
+      return EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_DOCUMENT;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return EmbeddingsInputType.UNRECOGNIZED;
+  }
+}
+
+export function embeddingsInputTypeToJSON(object: EmbeddingsInputType): string {
+  switch (object) {
+    case EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED:
+      return "EMBEDDINGS_INPUT_TYPE_UNSPECIFIED";
+    case EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_QUERY:
+      return "EMBEDDINGS_INPUT_TYPE_QUERY";
+    case EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_DOCUMENT:
+      return "EMBEDDINGS_INPUT_TYPE_DOCUMENT";
+    case EmbeddingsInputType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** Per-call overrides. Unset fields fall back to the loaded bundle's defaults. */
 export interface EmbeddingsOptions {
   /**
-   * Truncate over-long inputs instead of erroring. Unset = backend default,
-   * currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
+   * true  = clip an over-long input to the model's context and embed it.
+   * false = fail the call.
+   * Unset = true. A backend may instead aggregate over a sliding window,
+   * which embeds the whole document rather than discarding its tail.
    */
   truncate?:
     | boolean
     | undefined;
   /** Unset = backend chooses (512, capped at 8192). */
-  batchSize?: number | undefined;
-  normalize: boolean;
+  batchSize?:
+    | number
+    | undefined;
+  /**
+   * L2-normalize every vector to unit length (what cosine search expects).
+   * Unset = true. false returns the raw pooled vector.
+   */
+  normalize?: boolean | undefined;
   pooling: EmbeddingsPoolingStrategy;
   /** 0 = auto */
   nThreads: number;
+  /**
+   * What the vector will be used for. Asymmetric embedders (bge, e5,
+   * nomic-embed, gte, EmbeddingGemma) prepend a different prompt for a query
+   * than for a document. The prefix table must be added to the model manifest
+   * as part of honouring this field; it does not exist today. A bundle that
+   * declares no prompts ignores input_type and returns the identical vector
+   * for QUERY and DOCUMENT — it never errors.
+   */
+  inputType: EmbeddingsInputType;
+  /**
+   * Matryoshka (MRL) output width: truncate each vector to this many floats
+   * and re-normalize. Unset = the model's native width. Accepts any width in
+   * [1, the native width]; a width the model was not MRL-trained at is
+   * silently worse. This is the request-side width — EmbeddingsResult.dimension
+   * reports the width actually produced.
+   */
+  dimensions?: number | undefined;
 }
 
 export interface EmbeddingVector {
   /** Length equals EmbeddingsResult.dimension. */
   values: number[];
   /**
-   * Populated when the backend computes it, letting consumers score
-   * similarity without recomputing.
+   * Zero-based position in the request batch. ALWAYS set, on every entry
+   * point, including index 0.
    */
-  norm?:
-    | number
-    | undefined;
-  /** Lets batch callers correlate vectors with inputs without tracking order. */
-  text?: string | undefined;
-  dimension: number;
   inputIndex: number;
-  metadata: { [key: string]: string };
-}
-
-export interface EmbeddingVector_MetadataEntry {
-  key: string;
-  value: string;
 }
 
 /** One text = embed, multiple texts = embed_batch. */
@@ -119,34 +160,23 @@ export interface EmbeddingsRequest {
   options?: EmbeddingsOptions | undefined;
   requestId: string;
   modelId?: string | undefined;
-  metadata: { [key: string]: string };
-}
-
-export interface EmbeddingsRequest_MetadataEntry {
-  key: string;
-  value: string;
 }
 
 export interface EmbeddingsResult {
   /** One vector per input text, in input order. */
   vectors: EmbeddingVector[];
-  /** Duplicated from each vector so consumers can size buffers in O(1). */
+  /** The width of every vector above, so consumers can size buffers in O(1). */
   dimension: number;
   processingTimeMs: number;
   /** Across all inputs, post-truncation. */
   tokensUsed: number;
   modelId?: string | undefined;
   requestId: string;
-  error?: SDKError | undefined;
 }
 
 export interface EmbeddingsCreateRequest {
   /** Registry id or absolute model path. */
   modelId: string;
-  /** Unset = commons defaults; set fields override per-component defaults. */
-  configuration?:
-    | EmbeddingsConfiguration
-    | undefined;
   /** For backends needing companion file paths, e.g. {"vocab_path":"..."}. */
   configJson?: string | undefined;
 }
@@ -162,192 +192,16 @@ export interface EmbeddingsCreateResult {
   error?: SDKError | undefined;
 }
 
-function createBaseEmbeddingsConfiguration(): EmbeddingsConfiguration {
-  return {
-    modelId: "",
-    embeddingDimension: 0,
-    maxSequenceLength: 0,
-    preferredFramework: undefined,
-    normalize: false,
-    pooling: 0,
-    configJson: undefined,
-  };
-}
-
-export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
-  encode(message: EmbeddingsConfiguration, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.modelId !== "") {
-      writer.uint32(10).string(message.modelId);
-    }
-    if (message.embeddingDimension !== 0) {
-      writer.uint32(16).int32(message.embeddingDimension);
-    }
-    if (message.maxSequenceLength !== 0) {
-      writer.uint32(24).int32(message.maxSequenceLength);
-    }
-    if (message.preferredFramework !== undefined) {
-      writer.uint32(40).int32(message.preferredFramework);
-    }
-    if (message.normalize !== false) {
-      writer.uint32(56).bool(message.normalize);
-    }
-    if (message.pooling !== 0) {
-      writer.uint32(64).int32(message.pooling);
-    }
-    if (message.configJson !== undefined) {
-      writer.uint32(74).string(message.configJson);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): EmbeddingsConfiguration {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseEmbeddingsConfiguration();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.modelId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.embeddingDimension = reader.int32();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.maxSequenceLength = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.preferredFramework = reader.int32() as any;
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.normalize = reader.bool();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.pooling = reader.int32() as any;
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.configJson = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): EmbeddingsConfiguration {
-    return {
-      modelId: isSet(object.modelId)
-        ? globalThis.String(object.modelId)
-        : isSet(object.model_id)
-        ? globalThis.String(object.model_id)
-        : "",
-      embeddingDimension: isSet(object.embeddingDimension)
-        ? globalThis.Number(object.embeddingDimension)
-        : isSet(object.embedding_dimension)
-        ? globalThis.Number(object.embedding_dimension)
-        : 0,
-      maxSequenceLength: isSet(object.maxSequenceLength)
-        ? globalThis.Number(object.maxSequenceLength)
-        : isSet(object.max_sequence_length)
-        ? globalThis.Number(object.max_sequence_length)
-        : 0,
-      preferredFramework: isSet(object.preferredFramework)
-        ? inferenceFrameworkFromJSON(object.preferredFramework)
-        : isSet(object.preferred_framework)
-        ? inferenceFrameworkFromJSON(object.preferred_framework)
-        : undefined,
-      normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
-      pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
-      configJson: isSet(object.configJson)
-        ? globalThis.String(object.configJson)
-        : isSet(object.config_json)
-        ? globalThis.String(object.config_json)
-        : undefined,
-    };
-  },
-
-  toJSON(message: EmbeddingsConfiguration): unknown {
-    const obj: any = {};
-    if (message.modelId !== "") {
-      obj.modelId = message.modelId;
-    }
-    if (message.embeddingDimension !== 0) {
-      obj.embeddingDimension = Math.round(message.embeddingDimension);
-    }
-    if (message.maxSequenceLength !== 0) {
-      obj.maxSequenceLength = Math.round(message.maxSequenceLength);
-    }
-    if (message.preferredFramework !== undefined) {
-      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
-    }
-    if (message.normalize !== false) {
-      obj.normalize = message.normalize;
-    }
-    if (message.pooling !== 0) {
-      obj.pooling = embeddingsPoolingStrategyToJSON(message.pooling);
-    }
-    if (message.configJson !== undefined) {
-      obj.configJson = message.configJson;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<EmbeddingsConfiguration>, I>>(base?: I): EmbeddingsConfiguration {
-    return EmbeddingsConfiguration.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<EmbeddingsConfiguration>, I>>(object: I): EmbeddingsConfiguration {
-    const message = createBaseEmbeddingsConfiguration();
-    message.modelId = object.modelId ?? "";
-    message.embeddingDimension = object.embeddingDimension ?? 0;
-    message.maxSequenceLength = object.maxSequenceLength ?? 0;
-    message.preferredFramework = object.preferredFramework ?? undefined;
-    message.normalize = object.normalize ?? false;
-    message.pooling = object.pooling ?? 0;
-    message.configJson = object.configJson ?? undefined;
-    return message;
-  },
-};
-
 function createBaseEmbeddingsOptions(): EmbeddingsOptions {
-  return { truncate: undefined, batchSize: undefined, normalize: false, pooling: 0, nThreads: 0 };
+  return {
+    truncate: undefined,
+    batchSize: undefined,
+    normalize: undefined,
+    pooling: 0,
+    nThreads: 0,
+    inputType: 0,
+    dimensions: undefined,
+  };
 }
 
 export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
@@ -358,7 +212,7 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     if (message.batchSize !== undefined) {
       writer.uint32(24).int32(message.batchSize);
     }
-    if (message.normalize !== false) {
+    if (message.normalize !== undefined) {
       writer.uint32(32).bool(message.normalize);
     }
     if (message.pooling !== 0) {
@@ -366,6 +220,12 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     }
     if (message.nThreads !== 0) {
       writer.uint32(48).int32(message.nThreads);
+    }
+    if (message.inputType !== 0) {
+      writer.uint32(56).int32(message.inputType);
+    }
+    if (message.dimensions !== undefined) {
+      writer.uint32(64).int32(message.dimensions);
     }
     return writer;
   },
@@ -417,6 +277,22 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
           message.nThreads = reader.int32();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.inputType = reader.int32() as any;
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.dimensions = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -434,13 +310,19 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
         : isSet(object.batch_size)
         ? globalThis.Number(object.batch_size)
         : undefined,
-      normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
+      normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : undefined,
       pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
       nThreads: isSet(object.nThreads)
         ? globalThis.Number(object.nThreads)
         : isSet(object.n_threads)
         ? globalThis.Number(object.n_threads)
         : 0,
+      inputType: isSet(object.inputType)
+        ? embeddingsInputTypeFromJSON(object.inputType)
+        : isSet(object.input_type)
+        ? embeddingsInputTypeFromJSON(object.input_type)
+        : 0,
+      dimensions: isSet(object.dimensions) ? globalThis.Number(object.dimensions) : undefined,
     };
   },
 
@@ -452,7 +334,7 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     if (message.batchSize !== undefined) {
       obj.batchSize = Math.round(message.batchSize);
     }
-    if (message.normalize !== false) {
+    if (message.normalize !== undefined) {
       obj.normalize = message.normalize;
     }
     if (message.pooling !== 0) {
@@ -460,6 +342,12 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     }
     if (message.nThreads !== 0) {
       obj.nThreads = Math.round(message.nThreads);
+    }
+    if (message.inputType !== 0) {
+      obj.inputType = embeddingsInputTypeToJSON(message.inputType);
+    }
+    if (message.dimensions !== undefined) {
+      obj.dimensions = Math.round(message.dimensions);
     }
     return obj;
   },
@@ -471,15 +359,17 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     const message = createBaseEmbeddingsOptions();
     message.truncate = object.truncate ?? undefined;
     message.batchSize = object.batchSize ?? undefined;
-    message.normalize = object.normalize ?? false;
+    message.normalize = object.normalize ?? undefined;
     message.pooling = object.pooling ?? 0;
     message.nThreads = object.nThreads ?? 0;
+    message.inputType = object.inputType ?? 0;
+    message.dimensions = object.dimensions ?? undefined;
     return message;
   },
 };
 
 function createBaseEmbeddingVector(): EmbeddingVector {
-  return { values: [], norm: undefined, text: undefined, dimension: 0, inputIndex: 0, metadata: {} };
+  return { values: [], inputIndex: 0 };
 }
 
 export const EmbeddingVector: MessageFns<EmbeddingVector> = {
@@ -489,21 +379,9 @@ export const EmbeddingVector: MessageFns<EmbeddingVector> = {
       writer.float(v);
     }
     writer.join();
-    if (message.norm !== undefined) {
-      writer.uint32(21).float(message.norm);
-    }
-    if (message.text !== undefined) {
-      writer.uint32(26).string(message.text);
-    }
-    if (message.dimension !== 0) {
-      writer.uint32(32).int32(message.dimension);
-    }
     if (message.inputIndex !== 0) {
-      writer.uint32(40).int32(message.inputIndex);
+      writer.uint32(16).int32(message.inputIndex);
     }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      EmbeddingVector_MetadataEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
-    });
     return writer;
   },
 
@@ -533,46 +411,11 @@ export const EmbeddingVector: MessageFns<EmbeddingVector> = {
           break;
         }
         case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.norm = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.text = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.dimension = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
+          if (tag !== 16) {
             break;
           }
 
           message.inputIndex = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          const entry6 = EmbeddingVector_MetadataEntry.decode(reader, reader.uint32());
-          if (entry6.value !== undefined) {
-            message.metadata[entry6.key] = entry6.value;
-          }
           continue;
         }
       }
@@ -587,23 +430,11 @@ export const EmbeddingVector: MessageFns<EmbeddingVector> = {
   fromJSON(object: any): EmbeddingVector {
     return {
       values: globalThis.Array.isArray(object?.values) ? object.values.map((e: any) => globalThis.Number(e)) : [],
-      norm: isSet(object.norm) ? globalThis.Number(object.norm) : undefined,
-      text: isSet(object.text) ? globalThis.String(object.text) : undefined,
-      dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
       inputIndex: isSet(object.inputIndex)
         ? globalThis.Number(object.inputIndex)
         : isSet(object.input_index)
         ? globalThis.Number(object.input_index)
         : 0,
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
     };
   },
 
@@ -612,26 +443,8 @@ export const EmbeddingVector: MessageFns<EmbeddingVector> = {
     if (message.values?.length) {
       obj.values = message.values;
     }
-    if (message.norm !== undefined) {
-      obj.norm = message.norm;
-    }
-    if (message.text !== undefined) {
-      obj.text = message.text;
-    }
-    if (message.dimension !== 0) {
-      obj.dimension = Math.round(message.dimension);
-    }
     if (message.inputIndex !== 0) {
       obj.inputIndex = Math.round(message.inputIndex);
-    }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
     }
     return obj;
   },
@@ -642,103 +455,13 @@ export const EmbeddingVector: MessageFns<EmbeddingVector> = {
   fromPartial<I extends Exact<DeepPartial<EmbeddingVector>, I>>(object: I): EmbeddingVector {
     const message = createBaseEmbeddingVector();
     message.values = object.values?.map((e) => e) || [];
-    message.norm = object.norm ?? undefined;
-    message.text = object.text ?? undefined;
-    message.dimension = object.dimension ?? 0;
     message.inputIndex = object.inputIndex ?? 0;
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    return message;
-  },
-};
-
-function createBaseEmbeddingVector_MetadataEntry(): EmbeddingVector_MetadataEntry {
-  return { key: "", value: "" };
-}
-
-export const EmbeddingVector_MetadataEntry: MessageFns<EmbeddingVector_MetadataEntry> = {
-  encode(message: EmbeddingVector_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): EmbeddingVector_MetadataEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseEmbeddingVector_MetadataEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): EmbeddingVector_MetadataEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: EmbeddingVector_MetadataEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<EmbeddingVector_MetadataEntry>, I>>(base?: I): EmbeddingVector_MetadataEntry {
-    return EmbeddingVector_MetadataEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<EmbeddingVector_MetadataEntry>, I>>(
-    object: I,
-  ): EmbeddingVector_MetadataEntry {
-    const message = createBaseEmbeddingVector_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
     return message;
   },
 };
 
 function createBaseEmbeddingsRequest(): EmbeddingsRequest {
-  return { texts: [], options: undefined, requestId: "", modelId: undefined, metadata: {} };
+  return { texts: [], options: undefined, requestId: "", modelId: undefined };
 }
 
 export const EmbeddingsRequest: MessageFns<EmbeddingsRequest> = {
@@ -755,9 +478,6 @@ export const EmbeddingsRequest: MessageFns<EmbeddingsRequest> = {
     if (message.modelId !== undefined) {
       writer.uint32(34).string(message.modelId);
     }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      EmbeddingsRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).join();
-    });
     return writer;
   },
 
@@ -800,17 +520,6 @@ export const EmbeddingsRequest: MessageFns<EmbeddingsRequest> = {
           message.modelId = reader.string();
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          const entry5 = EmbeddingsRequest_MetadataEntry.decode(reader, reader.uint32());
-          if (entry5.value !== undefined) {
-            message.metadata[entry5.key] = entry5.value;
-          }
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -834,15 +543,6 @@ export const EmbeddingsRequest: MessageFns<EmbeddingsRequest> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : undefined,
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
     };
   },
 
@@ -860,15 +560,6 @@ export const EmbeddingsRequest: MessageFns<EmbeddingsRequest> = {
     if (message.modelId !== undefined) {
       obj.modelId = message.modelId;
     }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
-    }
     return obj;
   },
 
@@ -883,107 +574,12 @@ export const EmbeddingsRequest: MessageFns<EmbeddingsRequest> = {
       : undefined;
     message.requestId = object.requestId ?? "";
     message.modelId = object.modelId ?? undefined;
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    return message;
-  },
-};
-
-function createBaseEmbeddingsRequest_MetadataEntry(): EmbeddingsRequest_MetadataEntry {
-  return { key: "", value: "" };
-}
-
-export const EmbeddingsRequest_MetadataEntry: MessageFns<EmbeddingsRequest_MetadataEntry> = {
-  encode(message: EmbeddingsRequest_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): EmbeddingsRequest_MetadataEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseEmbeddingsRequest_MetadataEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): EmbeddingsRequest_MetadataEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: EmbeddingsRequest_MetadataEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<EmbeddingsRequest_MetadataEntry>, I>>(base?: I): EmbeddingsRequest_MetadataEntry {
-    return EmbeddingsRequest_MetadataEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<EmbeddingsRequest_MetadataEntry>, I>>(
-    object: I,
-  ): EmbeddingsRequest_MetadataEntry {
-    const message = createBaseEmbeddingsRequest_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
     return message;
   },
 };
 
 function createBaseEmbeddingsResult(): EmbeddingsResult {
-  return {
-    vectors: [],
-    dimension: 0,
-    processingTimeMs: 0,
-    tokensUsed: 0,
-    modelId: undefined,
-    requestId: "",
-    error: undefined,
-  };
+  return { vectors: [], dimension: 0, processingTimeMs: 0, tokensUsed: 0, modelId: undefined, requestId: "" };
 }
 
 export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
@@ -1004,10 +600,7 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
       writer.uint32(42).string(message.modelId);
     }
     if (message.requestId !== "") {
-      writer.uint32(66).string(message.requestId);
-    }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(74).fork()).join();
+      writer.uint32(50).string(message.requestId);
     }
     return writer;
   },
@@ -1059,20 +652,12 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
           message.modelId = reader.string();
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
           message.requestId = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1110,7 +695,6 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
         : isSet(object.request_id)
         ? globalThis.String(object.request_id)
         : "",
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1134,9 +718,6 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
     }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
-    }
     return obj;
   },
 
@@ -1151,15 +732,12 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
     message.tokensUsed = object.tokensUsed ?? 0;
     message.modelId = object.modelId ?? undefined;
     message.requestId = object.requestId ?? "";
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
     return message;
   },
 };
 
 function createBaseEmbeddingsCreateRequest(): EmbeddingsCreateRequest {
-  return { modelId: "", configuration: undefined, configJson: undefined };
+  return { modelId: "", configJson: undefined };
 }
 
 export const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest> = {
@@ -1167,11 +745,8 @@ export const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest> = {
     if (message.modelId !== "") {
       writer.uint32(10).string(message.modelId);
     }
-    if (message.configuration !== undefined) {
-      EmbeddingsConfiguration.encode(message.configuration, writer.uint32(18).fork()).join();
-    }
     if (message.configJson !== undefined) {
-      writer.uint32(26).string(message.configJson);
+      writer.uint32(18).string(message.configJson);
     }
     return writer;
   },
@@ -1196,14 +771,6 @@ export const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest> = {
             break;
           }
 
-          message.configuration = EmbeddingsConfiguration.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
           message.configJson = reader.string();
           continue;
         }
@@ -1223,7 +790,6 @@ export const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      configuration: isSet(object.configuration) ? EmbeddingsConfiguration.fromJSON(object.configuration) : undefined,
       configJson: isSet(object.configJson)
         ? globalThis.String(object.configJson)
         : isSet(object.config_json)
@@ -1237,9 +803,6 @@ export const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.configuration !== undefined) {
-      obj.configuration = EmbeddingsConfiguration.toJSON(message.configuration);
-    }
     if (message.configJson !== undefined) {
       obj.configJson = message.configJson;
     }
@@ -1252,9 +815,6 @@ export const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest> = {
   fromPartial<I extends Exact<DeepPartial<EmbeddingsCreateRequest>, I>>(object: I): EmbeddingsCreateRequest {
     const message = createBaseEmbeddingsCreateRequest();
     message.modelId = object.modelId ?? "";
-    message.configuration = (object.configuration !== undefined && object.configuration !== null)
-      ? EmbeddingsConfiguration.fromPartial(object.configuration)
-      : undefined;
     message.configJson = object.configJson ?? undefined;
     return message;
   },
@@ -1415,10 +975,6 @@ function longToNumber(int64: { toString(): string }): number {
     throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
   }
   return num;
-}
-
-function isObject(value: any): boolean {
-  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

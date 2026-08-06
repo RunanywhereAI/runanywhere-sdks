@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: model_types.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ModelRegistryFetchAssignmentsRequest = exports.ArtifactInferFromUrlResult = exports.ArtifactInferFromUrlRequest = exports.ModelFormatFromUrlResult = exports.ModelFormatFromUrlRequest = exports.ModelCompatibilityResult = exports.ModelCompatibilityRequest = exports.ModelDeleteResult = exports.CurrentModelResult = exports.CurrentModelRequest = exports.ModelUnloadResult = exports.ModelUnloadRequest = exports.ModelLoadResult = exports.ModelLoadRequest = exports.ModelDiscoveryResult = exports.DiscoveredModel = exports.ModelDiscoveryRequest = exports.ModelImportResult = exports.ModelImportRequest = exports.ModelGetResult = exports.ModelGetRequest = exports.ModelListResult = exports.ModelListRequest = exports.ModelRegistryRefreshResult = exports.ModelRegistryRefreshRequest = exports.ModelQuery = exports.ExpectedModelFiles = exports.MultiFileArtifact = exports.ModelFileDescriptor = exports.ArchiveArtifact = exports.SingleFileArtifact = exports.ModelInfoList = exports.ModelInfo = exports.ModelRuntimeCompatibility = exports.ModelInfoMetadata = exports.RoutingPolicy = exports.ModelFileRole = exports.ModelQuerySortField = exports.ModelRegistryStatus = exports.ModelArtifactType = exports.ArchiveStructure = exports.ArchiveType = exports.ModelSource = exports.SDKEnvironment = exports.ModelCategory = exports.InferenceFramework = exports.ModelFormat = exports.AudioEncoding = exports.AudioFormat = exports.protobufPackage = void 0;
+exports.ModelRegistryFetchAssignmentsRequest = exports.ArtifactInferFromUrlResult = exports.ArtifactInferFromUrlRequest = exports.ModelFormatFromUrlResult = exports.ModelFormatFromUrlRequest = exports.ModelCompatibilityResult = exports.ModelCompatibilityRequest = exports.ModelDeleteResult = exports.CurrentModelResult = exports.CurrentModelRequest = exports.ModelUnloadResult = exports.ModelUnloadRequest = exports.ModelLoadResult = exports.ModelLoadRequest = exports.ModelDiscoveryResult = exports.DiscoveredModel = exports.ModelDiscoveryRequest = exports.ModelImportResult = exports.ModelImportRequest = exports.ModelGetResult = exports.ModelGetRequest = exports.ModelListResult = exports.ModelListRequest = exports.ModelRegistryRefreshResult = exports.ModelRegistryRefreshRequest = exports.ModelQuery = exports.ExpectedModelFiles = exports.MultiFileArtifact = exports.ModelFileDescriptor = exports.ArchiveArtifact = exports.SingleFileArtifact = exports.ModelInfoList = exports.ModelInfo = exports.ModelRuntimeCompatibility = exports.ModelInfoMetadata = exports.AcceleratorPolicy = exports.RoutingPolicy = exports.ModelFileRole = exports.ModelRegistryStatus = exports.ModelArtifactType = exports.ArchiveStructure = exports.ArchiveType = exports.ModelSource = exports.SDKEnvironment = exports.ModelCategory = exports.InferenceFramework = exports.ModelFormat = exports.AudioEncoding = exports.AudioFormat = exports.protobufPackage = void 0;
 exports.RegisterMultiFileModelRequest = exports.RegisterModelFromUrlRequest = exports.ModelInfoMakeRequest = exports.ModelRegistryFetchAssignmentsResult = void 0;
 exports.audioFormatFromJSON = audioFormatFromJSON;
 exports.audioFormatToJSON = audioFormatToJSON;
@@ -29,12 +29,12 @@ exports.modelArtifactTypeFromJSON = modelArtifactTypeFromJSON;
 exports.modelArtifactTypeToJSON = modelArtifactTypeToJSON;
 exports.modelRegistryStatusFromJSON = modelRegistryStatusFromJSON;
 exports.modelRegistryStatusToJSON = modelRegistryStatusToJSON;
-exports.modelQuerySortFieldFromJSON = modelQuerySortFieldFromJSON;
-exports.modelQuerySortFieldToJSON = modelQuerySortFieldToJSON;
 exports.modelFileRoleFromJSON = modelFileRoleFromJSON;
 exports.modelFileRoleToJSON = modelFileRoleToJSON;
 exports.routingPolicyFromJSON = routingPolicyFromJSON;
 exports.routingPolicyToJSON = routingPolicyToJSON;
+exports.acceleratorPolicyFromJSON = acceleratorPolicyFromJSON;
+exports.acceleratorPolicyToJSON = acceleratorPolicyToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
@@ -449,10 +449,7 @@ function inferenceFrameworkToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-/**
- * What a model does. There is no RERANK member, which is why the rerank
- * primitive cannot auto-load a model.
- */
+/** What a model does. */
 var ModelCategory;
 (function (ModelCategory) {
     ModelCategory[ModelCategory["MODEL_CATEGORY_UNSPECIFIED"] = 0] = "MODEL_CATEGORY_UNSPECIFIED";
@@ -468,6 +465,7 @@ var ModelCategory;
     ModelCategory[ModelCategory["MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION"] = 9] = "MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION";
     ModelCategory[ModelCategory["MODEL_CATEGORY_SPEAKER_DIARIZATION"] = 10] = "MODEL_CATEGORY_SPEAKER_DIARIZATION";
     ModelCategory[ModelCategory["MODEL_CATEGORY_SEMANTIC_SEGMENTATION"] = 11] = "MODEL_CATEGORY_SEMANTIC_SEGMENTATION";
+    ModelCategory[ModelCategory["MODEL_CATEGORY_RERANK"] = 12] = "MODEL_CATEGORY_RERANK";
     ModelCategory[ModelCategory["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ModelCategory || (exports.ModelCategory = ModelCategory = {}));
 function modelCategoryFromJSON(object) {
@@ -508,6 +506,9 @@ function modelCategoryFromJSON(object) {
         case 11:
         case "MODEL_CATEGORY_SEMANTIC_SEGMENTATION":
             return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+        case 12:
+        case "MODEL_CATEGORY_RERANK":
+            return ModelCategory.MODEL_CATEGORY_RERANK;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -540,6 +541,8 @@ function modelCategoryToJSON(object) {
             return "MODEL_CATEGORY_SPEAKER_DIARIZATION";
         case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return "MODEL_CATEGORY_SEMANTIC_SEGMENTATION";
+        case ModelCategory.MODEL_CATEGORY_RERANK:
+            return "MODEL_CATEGORY_RERANK";
         case ModelCategory.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -890,67 +893,6 @@ function modelRegistryStatusToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-var ModelQuerySortField;
-(function (ModelQuerySortField) {
-    ModelQuerySortField[ModelQuerySortField["MODEL_QUERY_SORT_FIELD_UNSPECIFIED"] = 0] = "MODEL_QUERY_SORT_FIELD_UNSPECIFIED";
-    ModelQuerySortField[ModelQuerySortField["MODEL_QUERY_SORT_FIELD_NAME"] = 1] = "MODEL_QUERY_SORT_FIELD_NAME";
-    ModelQuerySortField[ModelQuerySortField["MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS"] = 2] = "MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS";
-    ModelQuerySortField[ModelQuerySortField["MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS"] = 3] = "MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS";
-    ModelQuerySortField[ModelQuerySortField["MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES"] = 4] = "MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES";
-    ModelQuerySortField[ModelQuerySortField["MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS"] = 5] = "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS";
-    ModelQuerySortField[ModelQuerySortField["MODEL_QUERY_SORT_FIELD_USAGE_COUNT"] = 6] = "MODEL_QUERY_SORT_FIELD_USAGE_COUNT";
-    ModelQuerySortField[ModelQuerySortField["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(ModelQuerySortField || (exports.ModelQuerySortField = ModelQuerySortField = {}));
-function modelQuerySortFieldFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "MODEL_QUERY_SORT_FIELD_UNSPECIFIED":
-            return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED;
-        case 1:
-        case "MODEL_QUERY_SORT_FIELD_NAME":
-            return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_NAME;
-        case 2:
-        case "MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS":
-            return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS;
-        case 3:
-        case "MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS":
-            return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS;
-        case 4:
-        case "MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES":
-            return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES;
-        case 5:
-        case "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS":
-            return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS;
-        case 6:
-        case "MODEL_QUERY_SORT_FIELD_USAGE_COUNT":
-            return ModelQuerySortField.MODEL_QUERY_SORT_FIELD_USAGE_COUNT;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return ModelQuerySortField.UNRECOGNIZED;
-    }
-}
-function modelQuerySortFieldToJSON(object) {
-    switch (object) {
-        case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED:
-            return "MODEL_QUERY_SORT_FIELD_UNSPECIFIED";
-        case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_NAME:
-            return "MODEL_QUERY_SORT_FIELD_NAME";
-        case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS:
-            return "MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS";
-        case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS:
-            return "MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS";
-        case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES:
-            return "MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES";
-        case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS:
-            return "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS";
-        case ModelQuerySortField.MODEL_QUERY_SORT_FIELD_USAGE_COUNT:
-            return "MODEL_QUERY_SORT_FIELD_USAGE_COUNT";
-        case ModelQuerySortField.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 /**
  * Role of a file inside a single/multi-file artifact. The generic COMPANION
  * role covers arbitrary sidecars; specific roles document common public
@@ -1089,6 +1031,56 @@ function routingPolicyToJSON(object) {
         case RoutingPolicy.ROUTING_POLICY_MANUAL:
             return "ROUTING_POLICY_MANUAL";
         case RoutingPolicy.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+/** Requested execution placement for a load. LiteRT/ExecuTorch-aligned. */
+var AcceleratorPolicy;
+(function (AcceleratorPolicy) {
+    AcceleratorPolicy[AcceleratorPolicy["ACCELERATOR_POLICY_UNSPECIFIED"] = 0] = "ACCELERATOR_POLICY_UNSPECIFIED";
+    AcceleratorPolicy[AcceleratorPolicy["ACCELERATOR_POLICY_AUTO"] = 1] = "ACCELERATOR_POLICY_AUTO";
+    AcceleratorPolicy[AcceleratorPolicy["ACCELERATOR_POLICY_CPU"] = 2] = "ACCELERATOR_POLICY_CPU";
+    AcceleratorPolicy[AcceleratorPolicy["ACCELERATOR_POLICY_GPU"] = 3] = "ACCELERATOR_POLICY_GPU";
+    AcceleratorPolicy[AcceleratorPolicy["ACCELERATOR_POLICY_NPU"] = 4] = "ACCELERATOR_POLICY_NPU";
+    AcceleratorPolicy[AcceleratorPolicy["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(AcceleratorPolicy || (exports.AcceleratorPolicy = AcceleratorPolicy = {}));
+function acceleratorPolicyFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "ACCELERATOR_POLICY_UNSPECIFIED":
+            return AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED;
+        case 1:
+        case "ACCELERATOR_POLICY_AUTO":
+            return AcceleratorPolicy.ACCELERATOR_POLICY_AUTO;
+        case 2:
+        case "ACCELERATOR_POLICY_CPU":
+            return AcceleratorPolicy.ACCELERATOR_POLICY_CPU;
+        case 3:
+        case "ACCELERATOR_POLICY_GPU":
+            return AcceleratorPolicy.ACCELERATOR_POLICY_GPU;
+        case 4:
+        case "ACCELERATOR_POLICY_NPU":
+            return AcceleratorPolicy.ACCELERATOR_POLICY_NPU;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return AcceleratorPolicy.UNRECOGNIZED;
+    }
+}
+function acceleratorPolicyToJSON(object) {
+    switch (object) {
+        case AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED:
+            return "ACCELERATOR_POLICY_UNSPECIFIED";
+        case AcceleratorPolicy.ACCELERATOR_POLICY_AUTO:
+            return "ACCELERATOR_POLICY_AUTO";
+        case AcceleratorPolicy.ACCELERATOR_POLICY_CPU:
+            return "ACCELERATOR_POLICY_CPU";
+        case AcceleratorPolicy.ACCELERATOR_POLICY_GPU:
+            return "ACCELERATOR_POLICY_GPU";
+        case AcceleratorPolicy.ACCELERATOR_POLICY_NPU:
+            return "ACCELERATOR_POLICY_NPU";
+        case AcceleratorPolicy.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1323,21 +1315,14 @@ function createBaseModelInfo() {
         singleFile: undefined,
         archive: undefined,
         multiFile: undefined,
-        customStrategyId: undefined,
         builtIn: undefined,
-        artifactType: undefined,
-        expectedFiles: undefined,
         accelerationPreference: undefined,
         routingPolicy: undefined,
         compatibility: undefined,
         preferredFramework: undefined,
         registryStatus: undefined,
-        isDownloaded: undefined,
         isAvailable: undefined,
         lastUsedAtUnixMs: undefined,
-        usageCount: undefined,
-        syncPending: undefined,
-        statusMessage: undefined,
         cuaProfile: undefined,
     };
 }
@@ -1406,17 +1391,8 @@ exports.ModelInfo = {
         if (message.multiFile !== undefined) {
             exports.MultiFileArtifact.encode(message.multiFile, writer.uint32(178).fork()).join();
         }
-        if (message.customStrategyId !== undefined) {
-            writer.uint32(186).string(message.customStrategyId);
-        }
         if (message.builtIn !== undefined) {
             writer.uint32(192).bool(message.builtIn);
-        }
-        if (message.artifactType !== undefined) {
-            writer.uint32(200).int32(message.artifactType);
-        }
-        if (message.expectedFiles !== undefined) {
-            exports.ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(210).fork()).join();
         }
         if (message.accelerationPreference !== undefined) {
             writer.uint32(216).int32(message.accelerationPreference);
@@ -1433,23 +1409,11 @@ exports.ModelInfo = {
         if (message.registryStatus !== undefined) {
             writer.uint32(248).int32(message.registryStatus);
         }
-        if (message.isDownloaded !== undefined) {
-            writer.uint32(256).bool(message.isDownloaded);
-        }
         if (message.isAvailable !== undefined) {
             writer.uint32(264).bool(message.isAvailable);
         }
         if (message.lastUsedAtUnixMs !== undefined) {
             writer.uint32(272).int64(message.lastUsedAtUnixMs);
-        }
-        if (message.usageCount !== undefined) {
-            writer.uint32(280).int32(message.usageCount);
-        }
-        if (message.syncPending !== undefined) {
-            writer.uint32(288).bool(message.syncPending);
-        }
-        if (message.statusMessage !== undefined) {
-            writer.uint32(298).string(message.statusMessage);
         }
         if (message.cuaProfile !== undefined) {
             writer.uint32(306).string(message.cuaProfile);
@@ -1610,32 +1574,11 @@ exports.ModelInfo = {
                     message.multiFile = exports.MultiFileArtifact.decode(reader, reader.uint32());
                     continue;
                 }
-                case 23: {
-                    if (tag !== 186) {
-                        break;
-                    }
-                    message.customStrategyId = reader.string();
-                    continue;
-                }
                 case 24: {
                     if (tag !== 192) {
                         break;
                     }
                     message.builtIn = reader.bool();
-                    continue;
-                }
-                case 25: {
-                    if (tag !== 200) {
-                        break;
-                    }
-                    message.artifactType = reader.int32();
-                    continue;
-                }
-                case 26: {
-                    if (tag !== 210) {
-                        break;
-                    }
-                    message.expectedFiles = exports.ExpectedModelFiles.decode(reader, reader.uint32());
                     continue;
                 }
                 case 27: {
@@ -1673,13 +1616,6 @@ exports.ModelInfo = {
                     message.registryStatus = reader.int32();
                     continue;
                 }
-                case 32: {
-                    if (tag !== 256) {
-                        break;
-                    }
-                    message.isDownloaded = reader.bool();
-                    continue;
-                }
                 case 33: {
                     if (tag !== 264) {
                         break;
@@ -1692,27 +1628,6 @@ exports.ModelInfo = {
                         break;
                     }
                     message.lastUsedAtUnixMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 35: {
-                    if (tag !== 280) {
-                        break;
-                    }
-                    message.usageCount = reader.int32();
-                    continue;
-                }
-                case 36: {
-                    if (tag !== 288) {
-                        break;
-                    }
-                    message.syncPending = reader.bool();
-                    continue;
-                }
-                case 37: {
-                    if (tag !== 298) {
-                        break;
-                    }
-                    message.statusMessage = reader.string();
                     continue;
                 }
                 case 38: {
@@ -1805,25 +1720,10 @@ exports.ModelInfo = {
                 : isSet(object.multi_file)
                     ? exports.MultiFileArtifact.fromJSON(object.multi_file)
                     : undefined,
-            customStrategyId: isSet(object.customStrategyId)
-                ? globalThis.String(object.customStrategyId)
-                : isSet(object.custom_strategy_id)
-                    ? globalThis.String(object.custom_strategy_id)
-                    : undefined,
             builtIn: isSet(object.builtIn)
                 ? globalThis.Boolean(object.builtIn)
                 : isSet(object.built_in)
                     ? globalThis.Boolean(object.built_in)
-                    : undefined,
-            artifactType: isSet(object.artifactType)
-                ? modelArtifactTypeFromJSON(object.artifactType)
-                : isSet(object.artifact_type)
-                    ? modelArtifactTypeFromJSON(object.artifact_type)
-                    : undefined,
-            expectedFiles: isSet(object.expectedFiles)
-                ? exports.ExpectedModelFiles.fromJSON(object.expectedFiles)
-                : isSet(object.expected_files)
-                    ? exports.ExpectedModelFiles.fromJSON(object.expected_files)
                     : undefined,
             accelerationPreference: isSet(object.accelerationPreference)
                 ? (0, hardware_profile_1.accelerationPreferenceFromJSON)(object.accelerationPreference)
@@ -1846,11 +1746,6 @@ exports.ModelInfo = {
                 : isSet(object.registry_status)
                     ? modelRegistryStatusFromJSON(object.registry_status)
                     : undefined,
-            isDownloaded: isSet(object.isDownloaded)
-                ? globalThis.Boolean(object.isDownloaded)
-                : isSet(object.is_downloaded)
-                    ? globalThis.Boolean(object.is_downloaded)
-                    : undefined,
             isAvailable: isSet(object.isAvailable)
                 ? globalThis.Boolean(object.isAvailable)
                 : isSet(object.is_available)
@@ -1860,21 +1755,6 @@ exports.ModelInfo = {
                 ? globalThis.Number(object.lastUsedAtUnixMs)
                 : isSet(object.last_used_at_unix_ms)
                     ? globalThis.Number(object.last_used_at_unix_ms)
-                    : undefined,
-            usageCount: isSet(object.usageCount)
-                ? globalThis.Number(object.usageCount)
-                : isSet(object.usage_count)
-                    ? globalThis.Number(object.usage_count)
-                    : undefined,
-            syncPending: isSet(object.syncPending)
-                ? globalThis.Boolean(object.syncPending)
-                : isSet(object.sync_pending)
-                    ? globalThis.Boolean(object.sync_pending)
-                    : undefined,
-            statusMessage: isSet(object.statusMessage)
-                ? globalThis.String(object.statusMessage)
-                : isSet(object.status_message)
-                    ? globalThis.String(object.status_message)
                     : undefined,
             cuaProfile: isSet(object.cuaProfile)
                 ? globalThis.String(object.cuaProfile)
@@ -1948,17 +1828,8 @@ exports.ModelInfo = {
         if (message.multiFile !== undefined) {
             obj.multiFile = exports.MultiFileArtifact.toJSON(message.multiFile);
         }
-        if (message.customStrategyId !== undefined) {
-            obj.customStrategyId = message.customStrategyId;
-        }
         if (message.builtIn !== undefined) {
             obj.builtIn = message.builtIn;
-        }
-        if (message.artifactType !== undefined) {
-            obj.artifactType = modelArtifactTypeToJSON(message.artifactType);
-        }
-        if (message.expectedFiles !== undefined) {
-            obj.expectedFiles = exports.ExpectedModelFiles.toJSON(message.expectedFiles);
         }
         if (message.accelerationPreference !== undefined) {
             obj.accelerationPreference = (0, hardware_profile_1.accelerationPreferenceToJSON)(message.accelerationPreference);
@@ -1975,23 +1846,11 @@ exports.ModelInfo = {
         if (message.registryStatus !== undefined) {
             obj.registryStatus = modelRegistryStatusToJSON(message.registryStatus);
         }
-        if (message.isDownloaded !== undefined) {
-            obj.isDownloaded = message.isDownloaded;
-        }
         if (message.isAvailable !== undefined) {
             obj.isAvailable = message.isAvailable;
         }
         if (message.lastUsedAtUnixMs !== undefined) {
             obj.lastUsedAtUnixMs = Math.round(message.lastUsedAtUnixMs);
-        }
-        if (message.usageCount !== undefined) {
-            obj.usageCount = Math.round(message.usageCount);
-        }
-        if (message.syncPending !== undefined) {
-            obj.syncPending = message.syncPending;
-        }
-        if (message.statusMessage !== undefined) {
-            obj.statusMessage = message.statusMessage;
         }
         if (message.cuaProfile !== undefined) {
             obj.cuaProfile = message.cuaProfile;
@@ -2034,12 +1893,7 @@ exports.ModelInfo = {
         message.multiFile = (object.multiFile !== undefined && object.multiFile !== null)
             ? exports.MultiFileArtifact.fromPartial(object.multiFile)
             : undefined;
-        message.customStrategyId = object.customStrategyId ?? undefined;
         message.builtIn = object.builtIn ?? undefined;
-        message.artifactType = object.artifactType ?? undefined;
-        message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
-            ? exports.ExpectedModelFiles.fromPartial(object.expectedFiles)
-            : undefined;
         message.accelerationPreference = object.accelerationPreference ?? undefined;
         message.routingPolicy = object.routingPolicy ?? undefined;
         message.compatibility = (object.compatibility !== undefined && object.compatibility !== null)
@@ -2047,12 +1901,8 @@ exports.ModelInfo = {
             : undefined;
         message.preferredFramework = object.preferredFramework ?? undefined;
         message.registryStatus = object.registryStatus ?? undefined;
-        message.isDownloaded = object.isDownloaded ?? undefined;
         message.isAvailable = object.isAvailable ?? undefined;
         message.lastUsedAtUnixMs = object.lastUsedAtUnixMs ?? undefined;
-        message.usageCount = object.usageCount ?? undefined;
-        message.syncPending = object.syncPending ?? undefined;
-        message.statusMessage = object.statusMessage ?? undefined;
         message.cuaProfile = object.cuaProfile ?? undefined;
         return message;
     },
@@ -2111,16 +1961,10 @@ exports.ModelInfoList = {
     },
 };
 function createBaseSingleFileArtifact() {
-    return { requiredPatterns: [], optionalPatterns: [], expectedFiles: undefined };
+    return { expectedFiles: undefined };
 }
 exports.SingleFileArtifact = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        for (const v of message.requiredPatterns) {
-            writer.uint32(10).string(v);
-        }
-        for (const v of message.optionalPatterns) {
-            writer.uint32(18).string(v);
-        }
         if (message.expectedFiles !== undefined) {
             exports.ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(26).fork()).join();
         }
@@ -2133,20 +1977,6 @@ exports.SingleFileArtifact = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.requiredPatterns.push(reader.string());
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.optionalPatterns.push(reader.string());
-                    continue;
-                }
                 case 3: {
                     if (tag !== 26) {
                         break;
@@ -2164,16 +1994,6 @@ exports.SingleFileArtifact = {
     },
     fromJSON(object) {
         return {
-            requiredPatterns: globalThis.Array.isArray(object?.requiredPatterns)
-                ? object.requiredPatterns.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.required_patterns)
-                    ? object.required_patterns.map((e) => globalThis.String(e))
-                    : [],
-            optionalPatterns: globalThis.Array.isArray(object?.optionalPatterns)
-                ? object.optionalPatterns.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.optional_patterns)
-                    ? object.optional_patterns.map((e) => globalThis.String(e))
-                    : [],
             expectedFiles: isSet(object.expectedFiles)
                 ? exports.ExpectedModelFiles.fromJSON(object.expectedFiles)
                 : isSet(object.expected_files)
@@ -2183,12 +2003,6 @@ exports.SingleFileArtifact = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.requiredPatterns?.length) {
-            obj.requiredPatterns = message.requiredPatterns;
-        }
-        if (message.optionalPatterns?.length) {
-            obj.optionalPatterns = message.optionalPatterns;
-        }
         if (message.expectedFiles !== undefined) {
             obj.expectedFiles = exports.ExpectedModelFiles.toJSON(message.expectedFiles);
         }
@@ -2199,8 +2013,6 @@ exports.SingleFileArtifact = {
     },
     fromPartial(object) {
         const message = createBaseSingleFileArtifact();
-        message.requiredPatterns = object.requiredPatterns?.map((e) => e) || [];
-        message.optionalPatterns = object.optionalPatterns?.map((e) => e) || [];
         message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
             ? exports.ExpectedModelFiles.fromPartial(object.expectedFiles)
             : undefined;
@@ -2208,7 +2020,7 @@ exports.SingleFileArtifact = {
     },
 };
 function createBaseArchiveArtifact() {
-    return { type: 0, structure: 0, requiredPatterns: [], optionalPatterns: [], expectedFiles: undefined };
+    return { type: 0, structure: 0, expectedFiles: undefined };
 }
 exports.ArchiveArtifact = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -2217,12 +2029,6 @@ exports.ArchiveArtifact = {
         }
         if (message.structure !== 0) {
             writer.uint32(16).int32(message.structure);
-        }
-        for (const v of message.requiredPatterns) {
-            writer.uint32(26).string(v);
-        }
-        for (const v of message.optionalPatterns) {
-            writer.uint32(34).string(v);
         }
         if (message.expectedFiles !== undefined) {
             exports.ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(42).fork()).join();
@@ -2250,20 +2056,6 @@ exports.ArchiveArtifact = {
                     message.structure = reader.int32();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.requiredPatterns.push(reader.string());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.optionalPatterns.push(reader.string());
-                    continue;
-                }
                 case 5: {
                     if (tag !== 42) {
                         break;
@@ -2283,16 +2075,6 @@ exports.ArchiveArtifact = {
         return {
             type: isSet(object.type) ? archiveTypeFromJSON(object.type) : 0,
             structure: isSet(object.structure) ? archiveStructureFromJSON(object.structure) : 0,
-            requiredPatterns: globalThis.Array.isArray(object?.requiredPatterns)
-                ? object.requiredPatterns.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.required_patterns)
-                    ? object.required_patterns.map((e) => globalThis.String(e))
-                    : [],
-            optionalPatterns: globalThis.Array.isArray(object?.optionalPatterns)
-                ? object.optionalPatterns.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.optional_patterns)
-                    ? object.optional_patterns.map((e) => globalThis.String(e))
-                    : [],
             expectedFiles: isSet(object.expectedFiles)
                 ? exports.ExpectedModelFiles.fromJSON(object.expectedFiles)
                 : isSet(object.expected_files)
@@ -2308,12 +2090,6 @@ exports.ArchiveArtifact = {
         if (message.structure !== 0) {
             obj.structure = archiveStructureToJSON(message.structure);
         }
-        if (message.requiredPatterns?.length) {
-            obj.requiredPatterns = message.requiredPatterns;
-        }
-        if (message.optionalPatterns?.length) {
-            obj.optionalPatterns = message.optionalPatterns;
-        }
         if (message.expectedFiles !== undefined) {
             obj.expectedFiles = exports.ExpectedModelFiles.toJSON(message.expectedFiles);
         }
@@ -2326,8 +2102,6 @@ exports.ArchiveArtifact = {
         const message = createBaseArchiveArtifact();
         message.type = object.type ?? 0;
         message.structure = object.structure ?? 0;
-        message.requiredPatterns = object.requiredPatterns?.map((e) => e) || [];
-        message.optionalPatterns = object.optionalPatterns?.map((e) => e) || [];
         message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
             ? exports.ExpectedModelFiles.fromPartial(object.expectedFiles)
             : undefined;
@@ -2338,7 +2112,7 @@ function createBaseModelFileDescriptor() {
     return {
         url: "",
         filename: "",
-        isRequired: false,
+        isOptional: false,
         sizeBytes: undefined,
         relativePath: undefined,
         destinationPath: undefined,
@@ -2355,8 +2129,8 @@ exports.ModelFileDescriptor = {
         if (message.filename !== "") {
             writer.uint32(18).string(message.filename);
         }
-        if (message.isRequired !== false) {
-            writer.uint32(24).bool(message.isRequired);
+        if (message.isOptional !== false) {
+            writer.uint32(96).bool(message.isOptional);
         }
         if (message.sizeBytes !== undefined) {
             writer.uint32(32).int64(message.sizeBytes);
@@ -2399,11 +2173,11 @@ exports.ModelFileDescriptor = {
                     message.filename = reader.string();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
+                case 12: {
+                    if (tag !== 96) {
                         break;
                     }
-                    message.isRequired = reader.bool();
+                    message.isOptional = reader.bool();
                     continue;
                 }
                 case 4: {
@@ -2460,10 +2234,10 @@ exports.ModelFileDescriptor = {
         return {
             url: isSet(object.url) ? globalThis.String(object.url) : "",
             filename: isSet(object.filename) ? globalThis.String(object.filename) : "",
-            isRequired: isSet(object.isRequired)
-                ? globalThis.Boolean(object.isRequired)
-                : isSet(object.is_required)
-                    ? globalThis.Boolean(object.is_required)
+            isOptional: isSet(object.isOptional)
+                ? globalThis.Boolean(object.isOptional)
+                : isSet(object.is_optional)
+                    ? globalThis.Boolean(object.is_optional)
                     : false,
             sizeBytes: isSet(object.sizeBytes)
                 ? globalThis.Number(object.sizeBytes)
@@ -2501,8 +2275,8 @@ exports.ModelFileDescriptor = {
         if (message.filename !== "") {
             obj.filename = message.filename;
         }
-        if (message.isRequired !== false) {
-            obj.isRequired = message.isRequired;
+        if (message.isOptional !== false) {
+            obj.isOptional = message.isOptional;
         }
         if (message.sizeBytes !== undefined) {
             obj.sizeBytes = Math.round(message.sizeBytes);
@@ -2531,7 +2305,7 @@ exports.ModelFileDescriptor = {
         const message = createBaseModelFileDescriptor();
         message.url = object.url ?? "";
         message.filename = object.filename ?? "";
-        message.isRequired = object.isRequired ?? false;
+        message.isOptional = object.isOptional ?? false;
         message.sizeBytes = object.sizeBytes ?? undefined;
         message.relativePath = object.relativePath ?? undefined;
         message.destinationPath = object.destinationPath ?? undefined;
@@ -2729,12 +2503,8 @@ function createBaseModelQuery() {
         category: undefined,
         format: undefined,
         downloadedOnly: undefined,
-        availableOnly: undefined,
         maxSizeBytes: undefined,
-        searchQuery: "",
-        source: undefined,
-        sortField: undefined,
-        descending: undefined,
+        searchQuery: undefined,
         registryStatus: undefined,
     };
 }
@@ -2752,23 +2522,11 @@ exports.ModelQuery = {
         if (message.downloadedOnly !== undefined) {
             writer.uint32(32).bool(message.downloadedOnly);
         }
-        if (message.availableOnly !== undefined) {
-            writer.uint32(40).bool(message.availableOnly);
-        }
         if (message.maxSizeBytes !== undefined) {
             writer.uint32(48).int64(message.maxSizeBytes);
         }
-        if (message.searchQuery !== "") {
+        if (message.searchQuery !== undefined) {
             writer.uint32(58).string(message.searchQuery);
-        }
-        if (message.source !== undefined) {
-            writer.uint32(64).int32(message.source);
-        }
-        if (message.sortField !== undefined) {
-            writer.uint32(72).int32(message.sortField);
-        }
-        if (message.descending !== undefined) {
-            writer.uint32(80).bool(message.descending);
         }
         if (message.registryStatus !== undefined) {
             writer.uint32(88).int32(message.registryStatus);
@@ -2810,13 +2568,6 @@ exports.ModelQuery = {
                     message.downloadedOnly = reader.bool();
                     continue;
                 }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.availableOnly = reader.bool();
-                    continue;
-                }
                 case 6: {
                     if (tag !== 48) {
                         break;
@@ -2829,27 +2580,6 @@ exports.ModelQuery = {
                         break;
                     }
                     message.searchQuery = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.source = reader.int32();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.sortField = reader.int32();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.descending = reader.bool();
                     continue;
                 }
                 case 11: {
@@ -2877,11 +2607,6 @@ exports.ModelQuery = {
                 : isSet(object.downloaded_only)
                     ? globalThis.Boolean(object.downloaded_only)
                     : undefined,
-            availableOnly: isSet(object.availableOnly)
-                ? globalThis.Boolean(object.availableOnly)
-                : isSet(object.available_only)
-                    ? globalThis.Boolean(object.available_only)
-                    : undefined,
             maxSizeBytes: isSet(object.maxSizeBytes)
                 ? globalThis.Number(object.maxSizeBytes)
                 : isSet(object.max_size_bytes)
@@ -2891,14 +2616,7 @@ exports.ModelQuery = {
                 ? globalThis.String(object.searchQuery)
                 : isSet(object.search_query)
                     ? globalThis.String(object.search_query)
-                    : "",
-            source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
-            sortField: isSet(object.sortField)
-                ? modelQuerySortFieldFromJSON(object.sortField)
-                : isSet(object.sort_field)
-                    ? modelQuerySortFieldFromJSON(object.sort_field)
                     : undefined,
-            descending: isSet(object.descending) ? globalThis.Boolean(object.descending) : undefined,
             registryStatus: isSet(object.registryStatus)
                 ? modelRegistryStatusFromJSON(object.registryStatus)
                 : isSet(object.registry_status)
@@ -2920,23 +2638,11 @@ exports.ModelQuery = {
         if (message.downloadedOnly !== undefined) {
             obj.downloadedOnly = message.downloadedOnly;
         }
-        if (message.availableOnly !== undefined) {
-            obj.availableOnly = message.availableOnly;
-        }
         if (message.maxSizeBytes !== undefined) {
             obj.maxSizeBytes = Math.round(message.maxSizeBytes);
         }
-        if (message.searchQuery !== "") {
+        if (message.searchQuery !== undefined) {
             obj.searchQuery = message.searchQuery;
-        }
-        if (message.source !== undefined) {
-            obj.source = modelSourceToJSON(message.source);
-        }
-        if (message.sortField !== undefined) {
-            obj.sortField = modelQuerySortFieldToJSON(message.sortField);
-        }
-        if (message.descending !== undefined) {
-            obj.descending = message.descending;
         }
         if (message.registryStatus !== undefined) {
             obj.registryStatus = modelRegistryStatusToJSON(message.registryStatus);
@@ -2952,12 +2658,8 @@ exports.ModelQuery = {
         message.category = object.category ?? undefined;
         message.format = object.format ?? undefined;
         message.downloadedOnly = object.downloadedOnly ?? undefined;
-        message.availableOnly = object.availableOnly ?? undefined;
         message.maxSizeBytes = object.maxSizeBytes ?? undefined;
-        message.searchQuery = object.searchQuery ?? "";
-        message.source = object.source ?? undefined;
-        message.sortField = object.sortField ?? undefined;
-        message.descending = object.descending ?? undefined;
+        message.searchQuery = object.searchQuery ?? undefined;
         message.registryStatus = object.registryStatus ?? undefined;
         return message;
     },
@@ -3140,51 +2842,18 @@ exports.ModelRegistryRefreshRequest = {
     },
 };
 function createBaseModelRegistryRefreshResult() {
-    return {
-        models: undefined,
-        registeredCount: 0,
-        updatedCount: 0,
-        discoveredCount: 0,
-        prunedCount: 0,
-        refreshedAtUnixMs: 0,
-        warnings: [],
-        downloadedCount: 0,
-        availableCount: 0,
-        errorCount: 0,
-        error: undefined,
-    };
+    return { models: undefined, refreshedAtUnixMs: 0, warnings: [], error: undefined };
 }
 exports.ModelRegistryRefreshResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.models !== undefined) {
             exports.ModelInfoList.encode(message.models, writer.uint32(18).fork()).join();
         }
-        if (message.registeredCount !== 0) {
-            writer.uint32(24).int32(message.registeredCount);
-        }
-        if (message.updatedCount !== 0) {
-            writer.uint32(32).int32(message.updatedCount);
-        }
-        if (message.discoveredCount !== 0) {
-            writer.uint32(40).int32(message.discoveredCount);
-        }
-        if (message.prunedCount !== 0) {
-            writer.uint32(48).int32(message.prunedCount);
-        }
         if (message.refreshedAtUnixMs !== 0) {
             writer.uint32(56).int64(message.refreshedAtUnixMs);
         }
         for (const v of message.warnings) {
             writer.uint32(66).string(v);
-        }
-        if (message.downloadedCount !== 0) {
-            writer.uint32(80).int32(message.downloadedCount);
-        }
-        if (message.availableCount !== 0) {
-            writer.uint32(88).int32(message.availableCount);
-        }
-        if (message.errorCount !== 0) {
-            writer.uint32(96).int32(message.errorCount);
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(106).fork()).join();
@@ -3205,34 +2874,6 @@ exports.ModelRegistryRefreshResult = {
                     message.models = exports.ModelInfoList.decode(reader, reader.uint32());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.registeredCount = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.updatedCount = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.discoveredCount = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.prunedCount = reader.int32();
-                    continue;
-                }
                 case 7: {
                     if (tag !== 56) {
                         break;
@@ -3245,27 +2886,6 @@ exports.ModelRegistryRefreshResult = {
                         break;
                     }
                     message.warnings.push(reader.string());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.downloadedCount = reader.int32();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.availableCount = reader.int32();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.errorCount = reader.int32();
                     continue;
                 }
                 case 13: {
@@ -3286,49 +2906,12 @@ exports.ModelRegistryRefreshResult = {
     fromJSON(object) {
         return {
             models: isSet(object.models) ? exports.ModelInfoList.fromJSON(object.models) : undefined,
-            registeredCount: isSet(object.registeredCount)
-                ? globalThis.Number(object.registeredCount)
-                : isSet(object.registered_count)
-                    ? globalThis.Number(object.registered_count)
-                    : 0,
-            updatedCount: isSet(object.updatedCount)
-                ? globalThis.Number(object.updatedCount)
-                : isSet(object.updated_count)
-                    ? globalThis.Number(object.updated_count)
-                    : 0,
-            discoveredCount: isSet(object.discoveredCount)
-                ? globalThis.Number(object.discoveredCount)
-                : isSet(object.discovered_count)
-                    ? globalThis.Number(object.discovered_count)
-                    : 0,
-            prunedCount: isSet(object.prunedCount)
-                ? globalThis.Number(object.prunedCount)
-                : isSet(object.pruned_count)
-                    ? globalThis.Number(object.pruned_count)
-                    : 0,
             refreshedAtUnixMs: isSet(object.refreshedAtUnixMs)
                 ? globalThis.Number(object.refreshedAtUnixMs)
                 : isSet(object.refreshed_at_unix_ms)
                     ? globalThis.Number(object.refreshed_at_unix_ms)
                     : 0,
-            warnings: globalThis.Array.isArray(object?.warnings)
-                ? object.warnings.map((e) => globalThis.String(e))
-                : [],
-            downloadedCount: isSet(object.downloadedCount)
-                ? globalThis.Number(object.downloadedCount)
-                : isSet(object.downloaded_count)
-                    ? globalThis.Number(object.downloaded_count)
-                    : 0,
-            availableCount: isSet(object.availableCount)
-                ? globalThis.Number(object.availableCount)
-                : isSet(object.available_count)
-                    ? globalThis.Number(object.available_count)
-                    : 0,
-            errorCount: isSet(object.errorCount)
-                ? globalThis.Number(object.errorCount)
-                : isSet(object.error_count)
-                    ? globalThis.Number(object.error_count)
-                    : 0,
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -3337,32 +2920,11 @@ exports.ModelRegistryRefreshResult = {
         if (message.models !== undefined) {
             obj.models = exports.ModelInfoList.toJSON(message.models);
         }
-        if (message.registeredCount !== 0) {
-            obj.registeredCount = Math.round(message.registeredCount);
-        }
-        if (message.updatedCount !== 0) {
-            obj.updatedCount = Math.round(message.updatedCount);
-        }
-        if (message.discoveredCount !== 0) {
-            obj.discoveredCount = Math.round(message.discoveredCount);
-        }
-        if (message.prunedCount !== 0) {
-            obj.prunedCount = Math.round(message.prunedCount);
-        }
         if (message.refreshedAtUnixMs !== 0) {
             obj.refreshedAtUnixMs = Math.round(message.refreshedAtUnixMs);
         }
         if (message.warnings?.length) {
             obj.warnings = message.warnings;
-        }
-        if (message.downloadedCount !== 0) {
-            obj.downloadedCount = Math.round(message.downloadedCount);
-        }
-        if (message.availableCount !== 0) {
-            obj.availableCount = Math.round(message.availableCount);
-        }
-        if (message.errorCount !== 0) {
-            obj.errorCount = Math.round(message.errorCount);
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -3377,15 +2939,8 @@ exports.ModelRegistryRefreshResult = {
         message.models = (object.models !== undefined && object.models !== null)
             ? exports.ModelInfoList.fromPartial(object.models)
             : undefined;
-        message.registeredCount = object.registeredCount ?? 0;
-        message.updatedCount = object.updatedCount ?? 0;
-        message.discoveredCount = object.discoveredCount ?? 0;
-        message.prunedCount = object.prunedCount ?? 0;
         message.refreshedAtUnixMs = object.refreshedAtUnixMs ?? 0;
         message.warnings = object.warnings?.map((e) => e) || [];
-        message.downloadedCount = object.downloadedCount ?? 0;
-        message.availableCount = object.availableCount ?? 0;
-        message.errorCount = object.errorCount ?? 0;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -3393,15 +2948,12 @@ exports.ModelRegistryRefreshResult = {
     },
 };
 function createBaseModelListRequest() {
-    return { query: undefined, includeCounts: false };
+    return { query: undefined };
 }
 exports.ModelListRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.query !== undefined) {
             exports.ModelQuery.encode(message.query, writer.uint32(10).fork()).join();
-        }
-        if (message.includeCounts !== false) {
-            writer.uint32(16).bool(message.includeCounts);
         }
         return writer;
     },
@@ -3419,13 +2971,6 @@ exports.ModelListRequest = {
                     message.query = exports.ModelQuery.decode(reader, reader.uint32());
                     continue;
                 }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.includeCounts = reader.bool();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3435,22 +2980,12 @@ exports.ModelListRequest = {
         return message;
     },
     fromJSON(object) {
-        return {
-            query: isSet(object.query) ? exports.ModelQuery.fromJSON(object.query) : undefined,
-            includeCounts: isSet(object.includeCounts)
-                ? globalThis.Boolean(object.includeCounts)
-                : isSet(object.include_counts)
-                    ? globalThis.Boolean(object.include_counts)
-                    : false,
-        };
+        return { query: isSet(object.query) ? exports.ModelQuery.fromJSON(object.query) : undefined };
     },
     toJSON(message) {
         const obj = {};
         if (message.query !== undefined) {
             obj.query = exports.ModelQuery.toJSON(message.query);
-        }
-        if (message.includeCounts !== false) {
-            obj.includeCounts = message.includeCounts;
         }
         return obj;
     },
@@ -3462,36 +2997,16 @@ exports.ModelListRequest = {
         message.query = (object.query !== undefined && object.query !== null)
             ? exports.ModelQuery.fromPartial(object.query)
             : undefined;
-        message.includeCounts = object.includeCounts ?? false;
         return message;
     },
 };
 function createBaseModelListResult() {
-    return {
-        models: undefined,
-        totalCount: 0,
-        downloadedCount: 0,
-        availableCount: 0,
-        filteredCount: 0,
-        error: undefined,
-    };
+    return { models: undefined, error: undefined };
 }
 exports.ModelListResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.models !== undefined) {
             exports.ModelInfoList.encode(message.models, writer.uint32(18).fork()).join();
-        }
-        if (message.totalCount !== 0) {
-            writer.uint32(32).int32(message.totalCount);
-        }
-        if (message.downloadedCount !== 0) {
-            writer.uint32(40).int32(message.downloadedCount);
-        }
-        if (message.availableCount !== 0) {
-            writer.uint32(48).int32(message.availableCount);
-        }
-        if (message.filteredCount !== 0) {
-            writer.uint32(56).int32(message.filteredCount);
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(66).fork()).join();
@@ -3512,34 +3027,6 @@ exports.ModelListResult = {
                     message.models = exports.ModelInfoList.decode(reader, reader.uint32());
                     continue;
                 }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.totalCount = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.downloadedCount = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.availableCount = reader.int32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.filteredCount = reader.int32();
-                    continue;
-                }
                 case 8: {
                     if (tag !== 66) {
                         break;
@@ -3558,26 +3045,6 @@ exports.ModelListResult = {
     fromJSON(object) {
         return {
             models: isSet(object.models) ? exports.ModelInfoList.fromJSON(object.models) : undefined,
-            totalCount: isSet(object.totalCount)
-                ? globalThis.Number(object.totalCount)
-                : isSet(object.total_count)
-                    ? globalThis.Number(object.total_count)
-                    : 0,
-            downloadedCount: isSet(object.downloadedCount)
-                ? globalThis.Number(object.downloadedCount)
-                : isSet(object.downloaded_count)
-                    ? globalThis.Number(object.downloaded_count)
-                    : 0,
-            availableCount: isSet(object.availableCount)
-                ? globalThis.Number(object.availableCount)
-                : isSet(object.available_count)
-                    ? globalThis.Number(object.available_count)
-                    : 0,
-            filteredCount: isSet(object.filteredCount)
-                ? globalThis.Number(object.filteredCount)
-                : isSet(object.filtered_count)
-                    ? globalThis.Number(object.filtered_count)
-                    : 0,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -3585,18 +3052,6 @@ exports.ModelListResult = {
         const obj = {};
         if (message.models !== undefined) {
             obj.models = exports.ModelInfoList.toJSON(message.models);
-        }
-        if (message.totalCount !== 0) {
-            obj.totalCount = Math.round(message.totalCount);
-        }
-        if (message.downloadedCount !== 0) {
-            obj.downloadedCount = Math.round(message.downloadedCount);
-        }
-        if (message.availableCount !== 0) {
-            obj.availableCount = Math.round(message.availableCount);
-        }
-        if (message.filteredCount !== 0) {
-            obj.filteredCount = Math.round(message.filteredCount);
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -3611,10 +3066,6 @@ exports.ModelListResult = {
         message.models = (object.models !== undefined && object.models !== null)
             ? exports.ModelInfoList.fromPartial(object.models)
             : undefined;
-        message.totalCount = object.totalCount ?? 0;
-        message.downloadedCount = object.downloadedCount ?? 0;
-        message.availableCount = object.availableCount ?? 0;
-        message.filteredCount = object.filteredCount ?? 0;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -4409,35 +3860,15 @@ exports.DiscoveredModel = {
     },
 };
 function createBaseModelDiscoveryResult() {
-    return {
-        discoveredModels: [],
-        linkedCount: 0,
-        purgedCount: 0,
-        warnings: [],
-        scannedCount: 0,
-        importedCount: 0,
-        error: undefined,
-    };
+    return { discoveredModels: [], warnings: [], error: undefined };
 }
 exports.ModelDiscoveryResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         for (const v of message.discoveredModels) {
             exports.DiscoveredModel.encode(v, writer.uint32(18).fork()).join();
         }
-        if (message.linkedCount !== 0) {
-            writer.uint32(24).int32(message.linkedCount);
-        }
-        if (message.purgedCount !== 0) {
-            writer.uint32(32).int32(message.purgedCount);
-        }
         for (const v of message.warnings) {
             writer.uint32(42).string(v);
-        }
-        if (message.scannedCount !== 0) {
-            writer.uint32(56).int32(message.scannedCount);
-        }
-        if (message.importedCount !== 0) {
-            writer.uint32(64).int32(message.importedCount);
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
@@ -4458,39 +3889,11 @@ exports.ModelDiscoveryResult = {
                     message.discoveredModels.push(exports.DiscoveredModel.decode(reader, reader.uint32()));
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.linkedCount = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.purgedCount = reader.int32();
-                    continue;
-                }
                 case 5: {
                     if (tag !== 42) {
                         break;
                     }
                     message.warnings.push(reader.string());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.scannedCount = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.importedCount = reader.int32();
                     continue;
                 }
                 case 9: {
@@ -4515,27 +3918,7 @@ exports.ModelDiscoveryResult = {
                 : globalThis.Array.isArray(object?.discovered_models)
                     ? object.discovered_models.map((e) => exports.DiscoveredModel.fromJSON(e))
                     : [],
-            linkedCount: isSet(object.linkedCount)
-                ? globalThis.Number(object.linkedCount)
-                : isSet(object.linked_count)
-                    ? globalThis.Number(object.linked_count)
-                    : 0,
-            purgedCount: isSet(object.purgedCount)
-                ? globalThis.Number(object.purgedCount)
-                : isSet(object.purged_count)
-                    ? globalThis.Number(object.purged_count)
-                    : 0,
             warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
-            scannedCount: isSet(object.scannedCount)
-                ? globalThis.Number(object.scannedCount)
-                : isSet(object.scanned_count)
-                    ? globalThis.Number(object.scanned_count)
-                    : 0,
-            importedCount: isSet(object.importedCount)
-                ? globalThis.Number(object.importedCount)
-                : isSet(object.imported_count)
-                    ? globalThis.Number(object.imported_count)
-                    : 0,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -4544,20 +3927,8 @@ exports.ModelDiscoveryResult = {
         if (message.discoveredModels?.length) {
             obj.discoveredModels = message.discoveredModels.map((e) => exports.DiscoveredModel.toJSON(e));
         }
-        if (message.linkedCount !== 0) {
-            obj.linkedCount = Math.round(message.linkedCount);
-        }
-        if (message.purgedCount !== 0) {
-            obj.purgedCount = Math.round(message.purgedCount);
-        }
         if (message.warnings?.length) {
             obj.warnings = message.warnings;
-        }
-        if (message.scannedCount !== 0) {
-            obj.scannedCount = Math.round(message.scannedCount);
-        }
-        if (message.importedCount !== 0) {
-            obj.importedCount = Math.round(message.importedCount);
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -4570,11 +3941,7 @@ exports.ModelDiscoveryResult = {
     fromPartial(object) {
         const message = createBaseModelDiscoveryResult();
         message.discoveredModels = object.discoveredModels?.map((e) => exports.DiscoveredModel.fromPartial(e)) || [];
-        message.linkedCount = object.linkedCount ?? 0;
-        message.purgedCount = object.purgedCount ?? 0;
         message.warnings = object.warnings?.map((e) => e) || [];
-        message.scannedCount = object.scannedCount ?? 0;
-        message.importedCount = object.importedCount ?? 0;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -4589,7 +3956,6 @@ function createBaseModelLoadRequest() {
         forceReload: false,
         validateAvailability: false,
         contextLength: undefined,
-        threads: undefined,
         useGpu: undefined,
         backendPreferences: [],
         acceleratorPolicy: undefined,
@@ -4614,9 +3980,6 @@ exports.ModelLoadRequest = {
         }
         if (message.contextLength !== undefined) {
             writer.uint32(48).int32(message.contextLength);
-        }
-        if (message.threads !== undefined) {
-            writer.uint32(56).int32(message.threads);
         }
         if (message.useGpu !== undefined) {
             writer.uint32(64).bool(message.useGpu);
@@ -4680,13 +4043,6 @@ exports.ModelLoadRequest = {
                     message.contextLength = reader.int32();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.threads = reader.int32();
-                    continue;
-                }
                 case 8: {
                     if (tag !== 64) {
                         break;
@@ -4747,7 +4103,6 @@ exports.ModelLoadRequest = {
                 : isSet(object.context_length)
                     ? globalThis.Number(object.context_length)
                     : undefined,
-            threads: isSet(object.threads) ? globalThis.Number(object.threads) : undefined,
             useGpu: isSet(object.useGpu)
                 ? globalThis.Boolean(object.useGpu)
                 : isSet(object.use_gpu)
@@ -4759,9 +4114,9 @@ exports.ModelLoadRequest = {
                     ? object.backend_preferences.map((e) => inferenceFrameworkFromJSON(e))
                     : [],
             acceleratorPolicy: isSet(object.acceleratorPolicy)
-                ? globalThis.Number(object.acceleratorPolicy)
+                ? acceleratorPolicyFromJSON(object.acceleratorPolicy)
                 : isSet(object.accelerator_policy)
-                    ? globalThis.Number(object.accelerator_policy)
+                    ? acceleratorPolicyFromJSON(object.accelerator_policy)
                     : undefined,
         };
     },
@@ -4785,9 +4140,6 @@ exports.ModelLoadRequest = {
         if (message.contextLength !== undefined) {
             obj.contextLength = Math.round(message.contextLength);
         }
-        if (message.threads !== undefined) {
-            obj.threads = Math.round(message.threads);
-        }
         if (message.useGpu !== undefined) {
             obj.useGpu = message.useGpu;
         }
@@ -4795,7 +4147,7 @@ exports.ModelLoadRequest = {
             obj.backendPreferences = message.backendPreferences.map((e) => inferenceFrameworkToJSON(e));
         }
         if (message.acceleratorPolicy !== undefined) {
-            obj.acceleratorPolicy = Math.round(message.acceleratorPolicy);
+            obj.acceleratorPolicy = acceleratorPolicyToJSON(message.acceleratorPolicy);
         }
         return obj;
     },
@@ -4810,7 +4162,6 @@ exports.ModelLoadRequest = {
         message.forceReload = object.forceReload ?? false;
         message.validateAvailability = object.validateAvailability ?? false;
         message.contextLength = object.contextLength ?? undefined;
-        message.threads = object.threads ?? undefined;
         message.useGpu = object.useGpu ?? undefined;
         message.backendPreferences = object.backendPreferences?.map((e) => e) || [];
         message.acceleratorPolicy = object.acceleratorPolicy ?? undefined;
@@ -4835,6 +4186,7 @@ function createBaseModelLoadResult() {
         runtimeVersion: undefined,
         abiVersion: undefined,
         fallbackReason: undefined,
+        allocatedContextLength: undefined,
     };
 }
 exports.ModelLoadResult = {
@@ -4886,6 +4238,9 @@ exports.ModelLoadResult = {
         }
         if (message.fallbackReason !== undefined) {
             writer.uint32(146).string(message.fallbackReason);
+        }
+        if (message.allocatedContextLength !== undefined) {
+            writer.uint32(152).int32(message.allocatedContextLength);
         }
         return writer;
     },
@@ -5008,6 +4363,13 @@ exports.ModelLoadResult = {
                     message.fallbackReason = reader.string();
                     continue;
                 }
+                case 19: {
+                    if (tag !== 152) {
+                        break;
+                    }
+                    message.allocatedContextLength = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -5082,6 +4444,11 @@ exports.ModelLoadResult = {
                 : isSet(object.fallback_reason)
                     ? globalThis.String(object.fallback_reason)
                     : undefined,
+            allocatedContextLength: isSet(object.allocatedContextLength)
+                ? globalThis.Number(object.allocatedContextLength)
+                : isSet(object.allocated_context_length)
+                    ? globalThis.Number(object.allocated_context_length)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -5134,6 +4501,9 @@ exports.ModelLoadResult = {
         if (message.fallbackReason !== undefined) {
             obj.fallbackReason = message.fallbackReason;
         }
+        if (message.allocatedContextLength !== undefined) {
+            obj.allocatedContextLength = Math.round(message.allocatedContextLength);
+        }
         return obj;
     },
     create(base) {
@@ -5159,6 +4529,7 @@ exports.ModelLoadResult = {
         message.runtimeVersion = object.runtimeVersion ?? undefined;
         message.abiVersion = object.abiVersion ?? undefined;
         message.fallbackReason = object.fallbackReason ?? undefined;
+        message.allocatedContextLength = object.allocatedContextLength ?? undefined;
         return message;
     },
 };
@@ -5667,15 +5038,7 @@ exports.CurrentModelResult = {
     },
 };
 function createBaseModelDeleteResult() {
-    return {
-        modelId: "",
-        deletedBytes: 0,
-        filesDeleted: false,
-        registryUpdated: false,
-        wasLoaded: false,
-        warnings: [],
-        error: undefined,
-    };
+    return { modelId: "", deletedBytes: 0, error: undefined };
 }
 exports.ModelDeleteResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -5684,18 +5047,6 @@ exports.ModelDeleteResult = {
         }
         if (message.deletedBytes !== 0) {
             writer.uint32(24).int64(message.deletedBytes);
-        }
-        if (message.filesDeleted !== false) {
-            writer.uint32(32).bool(message.filesDeleted);
-        }
-        if (message.registryUpdated !== false) {
-            writer.uint32(40).bool(message.registryUpdated);
-        }
-        if (message.wasLoaded !== false) {
-            writer.uint32(48).bool(message.wasLoaded);
-        }
-        for (const v of message.warnings) {
-            writer.uint32(66).string(v);
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
@@ -5721,34 +5072,6 @@ exports.ModelDeleteResult = {
                         break;
                     }
                     message.deletedBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.filesDeleted = reader.bool();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.registryUpdated = reader.bool();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.wasLoaded = reader.bool();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.warnings.push(reader.string());
                     continue;
                 }
                 case 9: {
@@ -5778,24 +5101,6 @@ exports.ModelDeleteResult = {
                 : isSet(object.deleted_bytes)
                     ? globalThis.Number(object.deleted_bytes)
                     : 0,
-            filesDeleted: isSet(object.filesDeleted)
-                ? globalThis.Boolean(object.filesDeleted)
-                : isSet(object.files_deleted)
-                    ? globalThis.Boolean(object.files_deleted)
-                    : false,
-            registryUpdated: isSet(object.registryUpdated)
-                ? globalThis.Boolean(object.registryUpdated)
-                : isSet(object.registry_updated)
-                    ? globalThis.Boolean(object.registry_updated)
-                    : false,
-            wasLoaded: isSet(object.wasLoaded)
-                ? globalThis.Boolean(object.wasLoaded)
-                : isSet(object.was_loaded)
-                    ? globalThis.Boolean(object.was_loaded)
-                    : false,
-            warnings: globalThis.Array.isArray(object?.warnings)
-                ? object.warnings.map((e) => globalThis.String(e))
-                : [],
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -5806,18 +5111,6 @@ exports.ModelDeleteResult = {
         }
         if (message.deletedBytes !== 0) {
             obj.deletedBytes = Math.round(message.deletedBytes);
-        }
-        if (message.filesDeleted !== false) {
-            obj.filesDeleted = message.filesDeleted;
-        }
-        if (message.registryUpdated !== false) {
-            obj.registryUpdated = message.registryUpdated;
-        }
-        if (message.wasLoaded !== false) {
-            obj.wasLoaded = message.wasLoaded;
-        }
-        if (message.warnings?.length) {
-            obj.warnings = message.warnings;
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -5831,10 +5124,6 @@ exports.ModelDeleteResult = {
         const message = createBaseModelDeleteResult();
         message.modelId = object.modelId ?? "";
         message.deletedBytes = object.deletedBytes ?? 0;
-        message.filesDeleted = object.filesDeleted ?? false;
-        message.registryUpdated = object.registryUpdated ?? false;
-        message.wasLoaded = object.wasLoaded ?? false;
-        message.warnings = object.warnings?.map((e) => e) || [];
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -5844,7 +5133,6 @@ exports.ModelDeleteResult = {
 function createBaseModelCompatibilityRequest() {
     return {
         modelId: "",
-        hardwareProfile: undefined,
         availableRamBytes: 0,
         availableStorageBytes: 0,
         acceleratorPreference: undefined,
@@ -5856,20 +5144,17 @@ exports.ModelCompatibilityRequest = {
         if (message.modelId !== "") {
             writer.uint32(10).string(message.modelId);
         }
-        if (message.hardwareProfile !== undefined) {
-            hardware_profile_1.HardwareProfile.encode(message.hardwareProfile, writer.uint32(18).fork()).join();
-        }
         if (message.availableRamBytes !== 0) {
-            writer.uint32(24).int64(message.availableRamBytes);
+            writer.uint32(16).int64(message.availableRamBytes);
         }
         if (message.availableStorageBytes !== 0) {
-            writer.uint32(32).int64(message.availableStorageBytes);
+            writer.uint32(24).int64(message.availableStorageBytes);
         }
         if (message.acceleratorPreference !== undefined) {
-            writer.uint32(40).int32(message.acceleratorPreference);
+            writer.uint32(32).int32(message.acceleratorPreference);
         }
         if (message.preferredFramework !== undefined) {
-            writer.uint32(48).int32(message.preferredFramework);
+            writer.uint32(40).int32(message.preferredFramework);
         }
         return writer;
     },
@@ -5888,35 +5173,28 @@ exports.ModelCompatibilityRequest = {
                     continue;
                 }
                 case 2: {
-                    if (tag !== 18) {
+                    if (tag !== 16) {
                         break;
                     }
-                    message.hardwareProfile = hardware_profile_1.HardwareProfile.decode(reader, reader.uint32());
+                    message.availableRamBytes = longToNumber(reader.int64());
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.availableRamBytes = longToNumber(reader.int64());
+                    message.availableStorageBytes = longToNumber(reader.int64());
                     continue;
                 }
                 case 4: {
                     if (tag !== 32) {
                         break;
                     }
-                    message.availableStorageBytes = longToNumber(reader.int64());
+                    message.acceleratorPreference = reader.int32();
                     continue;
                 }
                 case 5: {
                     if (tag !== 40) {
-                        break;
-                    }
-                    message.acceleratorPreference = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
                         break;
                     }
                     message.preferredFramework = reader.int32();
@@ -5937,11 +5215,6 @@ exports.ModelCompatibilityRequest = {
                 : isSet(object.model_id)
                     ? globalThis.String(object.model_id)
                     : "",
-            hardwareProfile: isSet(object.hardwareProfile)
-                ? hardware_profile_1.HardwareProfile.fromJSON(object.hardwareProfile)
-                : isSet(object.hardware_profile)
-                    ? hardware_profile_1.HardwareProfile.fromJSON(object.hardware_profile)
-                    : undefined,
             availableRamBytes: isSet(object.availableRamBytes)
                 ? globalThis.Number(object.availableRamBytes)
                 : isSet(object.available_ram_bytes)
@@ -5969,9 +5242,6 @@ exports.ModelCompatibilityRequest = {
         if (message.modelId !== "") {
             obj.modelId = message.modelId;
         }
-        if (message.hardwareProfile !== undefined) {
-            obj.hardwareProfile = hardware_profile_1.HardwareProfile.toJSON(message.hardwareProfile);
-        }
         if (message.availableRamBytes !== 0) {
             obj.availableRamBytes = Math.round(message.availableRamBytes);
         }
@@ -5992,9 +5262,6 @@ exports.ModelCompatibilityRequest = {
     fromPartial(object) {
         const message = createBaseModelCompatibilityRequest();
         message.modelId = object.modelId ?? "";
-        message.hardwareProfile = (object.hardwareProfile !== undefined && object.hardwareProfile !== null)
-            ? hardware_profile_1.HardwareProfile.fromPartial(object.hardwareProfile)
-            : undefined;
         message.availableRamBytes = object.availableRamBytes ?? 0;
         message.availableStorageBytes = object.availableStorageBytes ?? 0;
         message.acceleratorPreference = object.acceleratorPreference ?? undefined;

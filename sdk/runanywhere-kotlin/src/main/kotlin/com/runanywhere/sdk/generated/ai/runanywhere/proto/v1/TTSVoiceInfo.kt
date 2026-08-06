@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -28,7 +27,6 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
 public class TTSVoiceInfo(
@@ -43,7 +41,8 @@ public class TTSVoiceInfo(
   )
   public val id: String = "",
   /**
-   * e.g. "Samantha".
+   * e.g. "Samantha". MUST NOT be a copy of `id` -- fall back to the model
+   * id only when the engine reports no display name.
    */
   @field:WireField(
     tag = 2,
@@ -64,59 +63,20 @@ public class TTSVoiceInfo(
     schemaIndex = 2,
   )
   public val language_code: String = "",
-  @field:WireField(
-    tag = 4,
-    adapter = "ai.runanywhere.proto.v1.TTSVoiceGender#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val gender: TTSVoiceGender = TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED,
   /**
-   * Locale, age, or style notes.
+   * The voice's native rate in Hz -- tells the caller whether naming a
+   * different TTSOptions.sample_rate buys anything.
    */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val description: String = "",
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "isNeural",
-    schemaIndex = 5,
-  )
-  public val is_neural: Boolean = false,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "isSystem",
-    schemaIndex = 6,
-  )
-  public val is_system: Boolean = false,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sampleRate",
-    schemaIndex = 7,
+    schemaIndex = 3,
   )
   public val sample_rate: Int = 0,
-  supported_styles: List<String> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSVoiceInfo, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "supportedStyles",
-    schemaIndex = 8,
-  )
-  public val supported_styles: List<String> = immutableCopyOf("supported_styles", supported_styles)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -130,12 +90,7 @@ public class TTSVoiceInfo(
     if (id != other.id) return false
     if (display_name != other.display_name) return false
     if (language_code != other.language_code) return false
-    if (gender != other.gender) return false
-    if (description != other.description) return false
-    if (is_neural != other.is_neural) return false
-    if (is_system != other.is_system) return false
     if (sample_rate != other.sample_rate) return false
-    if (supported_styles != other.supported_styles) return false
     return true
   }
 
@@ -146,12 +101,7 @@ public class TTSVoiceInfo(
       result = result * 37 + id.hashCode()
       result = result * 37 + display_name.hashCode()
       result = result * 37 + language_code.hashCode()
-      result = result * 37 + gender.hashCode()
-      result = result * 37 + description.hashCode()
-      result = result * 37 + is_neural.hashCode()
-      result = result * 37 + is_system.hashCode()
       result = result * 37 + sample_rate.hashCode()
-      result = result * 37 + supported_styles.hashCode()
       super.hashCode = result
     }
     return result
@@ -162,12 +112,7 @@ public class TTSVoiceInfo(
     result += """id=${sanitize(id)}"""
     result += """display_name=${sanitize(display_name)}"""
     result += """language_code=${sanitize(language_code)}"""
-    result += """gender=$gender"""
-    result += """description=${sanitize(description)}"""
-    result += """is_neural=$is_neural"""
-    result += """is_system=$is_system"""
     result += """sample_rate=$sample_rate"""
-    if (supported_styles.isNotEmpty()) result += """supported_styles=${sanitize(supported_styles)}"""
     return result.joinToString(prefix = "TTSVoiceInfo{", separator = ", ", postfix = "}")
   }
 
@@ -175,14 +120,9 @@ public class TTSVoiceInfo(
     id: String = this.id,
     display_name: String = this.display_name,
     language_code: String = this.language_code,
-    gender: TTSVoiceGender = this.gender,
-    description: String = this.description,
-    is_neural: Boolean = this.is_neural,
-    is_system: Boolean = this.is_system,
     sample_rate: Int = this.sample_rate,
-    supported_styles: List<String> = this.supported_styles,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSVoiceInfo = TTSVoiceInfo(id, display_name, language_code, gender, description, is_neural, is_system, sample_rate, supported_styles, unknownFields)
+  ): TTSVoiceInfo = TTSVoiceInfo(id, display_name, language_code, sample_rate, unknownFields)
 
   public companion object {
     @JvmField
@@ -205,22 +145,9 @@ public class TTSVoiceInfo(
         if (value.language_code != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.language_code)
         }
-        if (value.gender != ai.runanywhere.proto.v1.TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED) {
-          size += TTSVoiceGender.ADAPTER.encodedSizeWithTag(4, value.gender)
-        }
-        if (value.description != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.description)
-        }
-        if (value.is_neural != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.is_neural)
-        }
-        if (value.is_system != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.is_system)
-        }
         if (value.sample_rate != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.sample_rate)
         }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(9, value.supported_styles)
         return size
       }
 
@@ -234,42 +161,16 @@ public class TTSVoiceInfo(
         if (value.language_code != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.language_code)
         }
-        if (value.gender != ai.runanywhere.proto.v1.TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED) {
-          TTSVoiceGender.ADAPTER.encodeWithTag(writer, 4, value.gender)
-        }
-        if (value.description != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.description)
-        }
-        if (value.is_neural != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.is_neural)
-        }
-        if (value.is_system != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.is_system)
-        }
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 8, value.sample_rate)
         }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.supported_styles)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSVoiceInfo) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.supported_styles)
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 8, value.sample_rate)
-        }
-        if (value.is_system != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.is_system)
-        }
-        if (value.is_neural != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.is_neural)
-        }
-        if (value.description != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.description)
-        }
-        if (value.gender != ai.runanywhere.proto.v1.TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED) {
-          TTSVoiceGender.ADAPTER.encodeWithTag(writer, 4, value.gender)
         }
         if (value.language_code != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.language_code)
@@ -286,27 +187,13 @@ public class TTSVoiceInfo(
         var id: String = ""
         var display_name: String = ""
         var language_code: String = ""
-        var gender: TTSVoiceGender = TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED
-        var description: String = ""
-        var is_neural: Boolean = false
-        var is_system: Boolean = false
         var sample_rate: Int = 0
-        val supported_styles = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
             2 -> display_name = ProtoAdapter.STRING.decode(reader)
             3 -> language_code = ProtoAdapter.STRING.decode(reader)
-            4 -> try {
-              gender = TTSVoiceGender.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            5 -> description = ProtoAdapter.STRING.decode(reader)
-            6 -> is_neural = ProtoAdapter.BOOL.decode(reader)
-            7 -> is_system = ProtoAdapter.BOOL.decode(reader)
             8 -> sample_rate = ProtoAdapter.INT32.decode(reader)
-            9 -> supported_styles.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -314,12 +201,7 @@ public class TTSVoiceInfo(
           id = id,
           display_name = display_name,
           language_code = language_code,
-          gender = gender,
-          description = description,
-          is_neural = is_neural,
-          is_system = is_system,
           sample_rate = sample_rate,
-          supported_styles = supported_styles,
           unknownFields = unknownFields
         )
       }

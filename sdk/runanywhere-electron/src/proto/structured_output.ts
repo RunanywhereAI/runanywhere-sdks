@@ -16,253 +16,25 @@ import { SDKError } from "./errors";
 
 export const protobufPackage = "runanywhere.v1";
 
-export enum JSONSchemaType {
-  JSON_SCHEMA_TYPE_UNSPECIFIED = 0,
-  JSON_SCHEMA_TYPE_OBJECT = 1,
-  JSON_SCHEMA_TYPE_ARRAY = 2,
-  JSON_SCHEMA_TYPE_STRING = 3,
-  JSON_SCHEMA_TYPE_NUMBER = 4,
-  JSON_SCHEMA_TYPE_INTEGER = 5,
-  JSON_SCHEMA_TYPE_BOOLEAN = 6,
-  JSON_SCHEMA_TYPE_NULL = 7,
-  UNRECOGNIZED = -1,
-}
-
-export function jSONSchemaTypeFromJSON(object: any): JSONSchemaType {
-  switch (object) {
-    case 0:
-    case "JSON_SCHEMA_TYPE_UNSPECIFIED":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED;
-    case 1:
-    case "JSON_SCHEMA_TYPE_OBJECT":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_OBJECT;
-    case 2:
-    case "JSON_SCHEMA_TYPE_ARRAY":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_ARRAY;
-    case 3:
-    case "JSON_SCHEMA_TYPE_STRING":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_STRING;
-    case 4:
-    case "JSON_SCHEMA_TYPE_NUMBER":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_NUMBER;
-    case 5:
-    case "JSON_SCHEMA_TYPE_INTEGER":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_INTEGER;
-    case 6:
-    case "JSON_SCHEMA_TYPE_BOOLEAN":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_BOOLEAN;
-    case 7:
-    case "JSON_SCHEMA_TYPE_NULL":
-      return JSONSchemaType.JSON_SCHEMA_TYPE_NULL;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return JSONSchemaType.UNRECOGNIZED;
-  }
-}
-
-export function jSONSchemaTypeToJSON(object: JSONSchemaType): string {
-  switch (object) {
-    case JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED:
-      return "JSON_SCHEMA_TYPE_UNSPECIFIED";
-    case JSONSchemaType.JSON_SCHEMA_TYPE_OBJECT:
-      return "JSON_SCHEMA_TYPE_OBJECT";
-    case JSONSchemaType.JSON_SCHEMA_TYPE_ARRAY:
-      return "JSON_SCHEMA_TYPE_ARRAY";
-    case JSONSchemaType.JSON_SCHEMA_TYPE_STRING:
-      return "JSON_SCHEMA_TYPE_STRING";
-    case JSONSchemaType.JSON_SCHEMA_TYPE_NUMBER:
-      return "JSON_SCHEMA_TYPE_NUMBER";
-    case JSONSchemaType.JSON_SCHEMA_TYPE_INTEGER:
-      return "JSON_SCHEMA_TYPE_INTEGER";
-    case JSONSchemaType.JSON_SCHEMA_TYPE_BOOLEAN:
-      return "JSON_SCHEMA_TYPE_BOOLEAN";
-    case JSONSchemaType.JSON_SCHEMA_TYPE_NULL:
-      return "JSON_SCHEMA_TYPE_NULL";
-    case JSONSchemaType.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum StructuredOutputMode {
-  STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0,
-  STRUCTURED_OUTPUT_MODE_JSON_SCHEMA = 1,
-  STRUCTURED_OUTPUT_MODE_JSON_OBJECT = 2,
-  STRUCTURED_OUTPUT_MODE_REGEX = 3,
-  STRUCTURED_OUTPUT_MODE_GRAMMAR = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function structuredOutputModeFromJSON(object: any): StructuredOutputMode {
-  switch (object) {
-    case 0:
-    case "STRUCTURED_OUTPUT_MODE_UNSPECIFIED":
-      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED;
-    case 1:
-    case "STRUCTURED_OUTPUT_MODE_JSON_SCHEMA":
-      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA;
-    case 2:
-    case "STRUCTURED_OUTPUT_MODE_JSON_OBJECT":
-      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT;
-    case 3:
-    case "STRUCTURED_OUTPUT_MODE_REGEX":
-      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REGEX;
-    case 4:
-    case "STRUCTURED_OUTPUT_MODE_GRAMMAR":
-      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_GRAMMAR;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return StructuredOutputMode.UNRECOGNIZED;
-  }
-}
-
-export function structuredOutputModeToJSON(object: StructuredOutputMode): string {
-  switch (object) {
-    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED:
-      return "STRUCTURED_OUTPUT_MODE_UNSPECIFIED";
-    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA:
-      return "STRUCTURED_OUTPUT_MODE_JSON_SCHEMA";
-    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT:
-      return "STRUCTURED_OUTPUT_MODE_JSON_OBJECT";
-    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REGEX:
-      return "STRUCTURED_OUTPUT_MODE_REGEX";
-    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_GRAMMAR:
-      return "STRUCTURED_OUTPUT_MODE_GRAMMAR";
-    case StructuredOutputMode.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum StructuredOutputStreamEventKind {
-  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED = 0,
-  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN = 1,
-  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON = 2,
-  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION = 3,
-  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED = 4,
-  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR = 5,
-  UNRECOGNIZED = -1,
-}
-
-export function structuredOutputStreamEventKindFromJSON(object: any): StructuredOutputStreamEventKind {
-  switch (object) {
-    case 0:
-    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED":
-      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED;
-    case 1:
-    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN":
-      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN;
-    case 2:
-    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON":
-      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON;
-    case 3:
-    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION":
-      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION;
-    case 4:
-    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED":
-      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED;
-    case 5:
-    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR":
-      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return StructuredOutputStreamEventKind.UNRECOGNIZED;
-  }
-}
-
-export function structuredOutputStreamEventKindToJSON(object: StructuredOutputStreamEventKind): string {
-  switch (object) {
-    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED:
-      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED";
-    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN:
-      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN";
-    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON:
-      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON";
-    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION:
-      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION";
-    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED:
-      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED";
-    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR:
-      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR";
-    case StructuredOutputStreamEventKind.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export interface JSONSchemaProperty {
-  type: JSONSchemaType;
-  description?: string | undefined;
-  enumValues: string[];
-  format?:
-    | string
-    | undefined;
-  /** items_schema for arrays, object_schema for nested objects. */
-  itemsSchema?: JSONSchema | undefined;
-  objectSchema?: JSONSchema | undefined;
-  minimum?: number | undefined;
-  maximum?: number | undefined;
-  minLength?: number | undefined;
-  maxLength?: number | undefined;
-  pattern?: string | undefined;
-  minItems?: number | undefined;
-  maxItems?: number | undefined;
-  defaultJson?: string | undefined;
-}
-
-export interface JSONSchema {
-  type: JSONSchemaType;
-  properties: { [key: string]: JSONSchemaProperty };
-  required: string[];
-  items?: JSONSchemaProperty | undefined;
-  additionalProperties?: boolean | undefined;
-  schemaUri?: string | undefined;
-  idUri?: string | undefined;
-  title?: string | undefined;
-  description?: string | undefined;
-  definitions: { [key: string]: JSONSchema };
-  ref?: string | undefined;
-  allOf: JSONSchema[];
-  anyOf: JSONSchema[];
-  oneOf: JSONSchema[];
-  notSchema?:
-    | JSONSchema
-    | undefined;
-  /** Escape hatch for schemas the typed shape above cannot express. */
-  rawJson?: string | undefined;
-}
-
-export interface JSONSchema_PropertiesEntry {
-  key: string;
-  value?: JSONSchemaProperty | undefined;
-}
-
-export interface JSONSchema_DefinitionsEntry {
-  key: string;
-  value?: JSONSchema | undefined;
-}
-
 export interface StructuredOutputOptions {
-  includeSchemaInPrompt: boolean;
-  /** Not read by commons. */
-  strictMode?: boolean | undefined;
-  schema?: JSONSchema | undefined;
-  jsonSchema?:
+  /**
+   * Also render the schema into the system prompt, not just constrain
+   * decoding. Costs input tokens and invalidates the thread's prompt cache.
+   * Default true (matches Apple FoundationModels includeSchemaInPrompt).
+   */
+  includeSchemaInPrompt?:
+    | boolean
+    | undefined;
+  /** A JSON Schema document, verbatim. Unsupported keywords are rejected. */
+  schema?:
     | string
     | undefined;
-  /** Matches OpenAI's json_schema.name. */
-  name?: string | undefined;
-  mode: StructuredOutputMode;
-  regexPattern?: string | undefined;
+  /** GBNF/EBNF grammar text. On-device only. */
   grammar?:
     | string
     | undefined;
-  /** Attempt to repair malformed JSON before failing. */
-  repairJson: boolean;
-  maxRetries: number;
+  /** Regular expression the whole output must match. On-device only. */
+  regex?: string | undefined;
 }
 
 export interface StructuredOutputValidation {
@@ -276,7 +48,8 @@ export interface StructuredOutputValidation {
 }
 
 export interface StructuredOutputResult {
-  parsedJson: Uint8Array;
+  /** The extracted JSON document, as UTF-8 text. Parse it client-side. */
+  json: string;
   validation?: StructuredOutputValidation | undefined;
   rawText?: string | undefined;
   error?: SDKError | undefined;
@@ -294,11 +67,6 @@ export interface StructuredOutputParseRequest_MetadataEntry {
   value: string;
 }
 
-export interface StructuredOutputValidationRequest {
-  text: string;
-  options?: StructuredOutputOptions | undefined;
-}
-
 export interface StructuredOutputPromptResult {
   preparedPrompt: string;
   systemPrompt?: string | undefined;
@@ -308,966 +76,23 @@ export interface StructuredOutputPromptResult {
   error?: SDKError | undefined;
 }
 
-export interface StructuredOutputRequest {
-  requestId: string;
-  prompt: string;
-  options?: StructuredOutputOptions | undefined;
-  metadata: { [key: string]: string };
-}
-
-export interface StructuredOutputRequest_MetadataEntry {
-  key: string;
-  value: string;
-}
-
-export interface StructuredOutputStreamEvent {
-  timestampUs: number;
-  requestId: string;
-  kind: StructuredOutputStreamEventKind;
-  token: string;
-  partialJson?: string | undefined;
-  validation?: StructuredOutputValidation | undefined;
-  result?: StructuredOutputResult | undefined;
-  error?: SDKError | undefined;
-}
-
-/** Character offsets into the source text. */
-export interface NamedEntity {
-  text: string;
-  entityType: string;
-  startOffset: number;
-  endOffset: number;
-  confidence: number;
-}
-
-function createBaseJSONSchemaProperty(): JSONSchemaProperty {
-  return {
-    type: 0,
-    description: undefined,
-    enumValues: [],
-    format: undefined,
-    itemsSchema: undefined,
-    objectSchema: undefined,
-    minimum: undefined,
-    maximum: undefined,
-    minLength: undefined,
-    maxLength: undefined,
-    pattern: undefined,
-    minItems: undefined,
-    maxItems: undefined,
-    defaultJson: undefined,
-  };
-}
-
-export const JSONSchemaProperty: MessageFns<JSONSchemaProperty> = {
-  encode(message: JSONSchemaProperty, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.type !== 0) {
-      writer.uint32(8).int32(message.type);
-    }
-    if (message.description !== undefined) {
-      writer.uint32(18).string(message.description);
-    }
-    for (const v of message.enumValues) {
-      writer.uint32(26).string(v!);
-    }
-    if (message.format !== undefined) {
-      writer.uint32(34).string(message.format);
-    }
-    if (message.itemsSchema !== undefined) {
-      JSONSchema.encode(message.itemsSchema, writer.uint32(42).fork()).join();
-    }
-    if (message.objectSchema !== undefined) {
-      JSONSchema.encode(message.objectSchema, writer.uint32(50).fork()).join();
-    }
-    if (message.minimum !== undefined) {
-      writer.uint32(57).double(message.minimum);
-    }
-    if (message.maximum !== undefined) {
-      writer.uint32(65).double(message.maximum);
-    }
-    if (message.minLength !== undefined) {
-      writer.uint32(72).int32(message.minLength);
-    }
-    if (message.maxLength !== undefined) {
-      writer.uint32(80).int32(message.maxLength);
-    }
-    if (message.pattern !== undefined) {
-      writer.uint32(90).string(message.pattern);
-    }
-    if (message.minItems !== undefined) {
-      writer.uint32(96).int32(message.minItems);
-    }
-    if (message.maxItems !== undefined) {
-      writer.uint32(104).int32(message.maxItems);
-    }
-    if (message.defaultJson !== undefined) {
-      writer.uint32(114).string(message.defaultJson);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): JSONSchemaProperty {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseJSONSchemaProperty();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.type = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.description = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.enumValues.push(reader.string());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.format = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.itemsSchema = JSONSchema.decode(reader, reader.uint32());
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.objectSchema = JSONSchema.decode(reader, reader.uint32());
-          continue;
-        }
-        case 7: {
-          if (tag !== 57) {
-            break;
-          }
-
-          message.minimum = reader.double();
-          continue;
-        }
-        case 8: {
-          if (tag !== 65) {
-            break;
-          }
-
-          message.maximum = reader.double();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.minLength = reader.int32();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.maxLength = reader.int32();
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.pattern = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.minItems = reader.int32();
-          continue;
-        }
-        case 13: {
-          if (tag !== 104) {
-            break;
-          }
-
-          message.maxItems = reader.int32();
-          continue;
-        }
-        case 14: {
-          if (tag !== 114) {
-            break;
-          }
-
-          message.defaultJson = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): JSONSchemaProperty {
-    return {
-      type: isSet(object.type) ? jSONSchemaTypeFromJSON(object.type) : 0,
-      description: isSet(object.description) ? globalThis.String(object.description) : undefined,
-      enumValues: globalThis.Array.isArray(object?.enumValues)
-        ? object.enumValues.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.enum_values)
-        ? object.enum_values.map((e: any) => globalThis.String(e))
-        : [],
-      format: isSet(object.format) ? globalThis.String(object.format) : undefined,
-      itemsSchema: isSet(object.itemsSchema)
-        ? JSONSchema.fromJSON(object.itemsSchema)
-        : isSet(object.items_schema)
-        ? JSONSchema.fromJSON(object.items_schema)
-        : undefined,
-      objectSchema: isSet(object.objectSchema)
-        ? JSONSchema.fromJSON(object.objectSchema)
-        : isSet(object.object_schema)
-        ? JSONSchema.fromJSON(object.object_schema)
-        : undefined,
-      minimum: isSet(object.minimum) ? globalThis.Number(object.minimum) : undefined,
-      maximum: isSet(object.maximum) ? globalThis.Number(object.maximum) : undefined,
-      minLength: isSet(object.minLength)
-        ? globalThis.Number(object.minLength)
-        : isSet(object.min_length)
-        ? globalThis.Number(object.min_length)
-        : undefined,
-      maxLength: isSet(object.maxLength)
-        ? globalThis.Number(object.maxLength)
-        : isSet(object.max_length)
-        ? globalThis.Number(object.max_length)
-        : undefined,
-      pattern: isSet(object.pattern) ? globalThis.String(object.pattern) : undefined,
-      minItems: isSet(object.minItems)
-        ? globalThis.Number(object.minItems)
-        : isSet(object.min_items)
-        ? globalThis.Number(object.min_items)
-        : undefined,
-      maxItems: isSet(object.maxItems)
-        ? globalThis.Number(object.maxItems)
-        : isSet(object.max_items)
-        ? globalThis.Number(object.max_items)
-        : undefined,
-      defaultJson: isSet(object.defaultJson)
-        ? globalThis.String(object.defaultJson)
-        : isSet(object.default_json)
-        ? globalThis.String(object.default_json)
-        : undefined,
-    };
-  },
-
-  toJSON(message: JSONSchemaProperty): unknown {
-    const obj: any = {};
-    if (message.type !== 0) {
-      obj.type = jSONSchemaTypeToJSON(message.type);
-    }
-    if (message.description !== undefined) {
-      obj.description = message.description;
-    }
-    if (message.enumValues?.length) {
-      obj.enumValues = message.enumValues;
-    }
-    if (message.format !== undefined) {
-      obj.format = message.format;
-    }
-    if (message.itemsSchema !== undefined) {
-      obj.itemsSchema = JSONSchema.toJSON(message.itemsSchema);
-    }
-    if (message.objectSchema !== undefined) {
-      obj.objectSchema = JSONSchema.toJSON(message.objectSchema);
-    }
-    if (message.minimum !== undefined) {
-      obj.minimum = message.minimum;
-    }
-    if (message.maximum !== undefined) {
-      obj.maximum = message.maximum;
-    }
-    if (message.minLength !== undefined) {
-      obj.minLength = Math.round(message.minLength);
-    }
-    if (message.maxLength !== undefined) {
-      obj.maxLength = Math.round(message.maxLength);
-    }
-    if (message.pattern !== undefined) {
-      obj.pattern = message.pattern;
-    }
-    if (message.minItems !== undefined) {
-      obj.minItems = Math.round(message.minItems);
-    }
-    if (message.maxItems !== undefined) {
-      obj.maxItems = Math.round(message.maxItems);
-    }
-    if (message.defaultJson !== undefined) {
-      obj.defaultJson = message.defaultJson;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<JSONSchemaProperty>, I>>(base?: I): JSONSchemaProperty {
-    return JSONSchemaProperty.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<JSONSchemaProperty>, I>>(object: I): JSONSchemaProperty {
-    const message = createBaseJSONSchemaProperty();
-    message.type = object.type ?? 0;
-    message.description = object.description ?? undefined;
-    message.enumValues = object.enumValues?.map((e) => e) || [];
-    message.format = object.format ?? undefined;
-    message.itemsSchema = (object.itemsSchema !== undefined && object.itemsSchema !== null)
-      ? JSONSchema.fromPartial(object.itemsSchema)
-      : undefined;
-    message.objectSchema = (object.objectSchema !== undefined && object.objectSchema !== null)
-      ? JSONSchema.fromPartial(object.objectSchema)
-      : undefined;
-    message.minimum = object.minimum ?? undefined;
-    message.maximum = object.maximum ?? undefined;
-    message.minLength = object.minLength ?? undefined;
-    message.maxLength = object.maxLength ?? undefined;
-    message.pattern = object.pattern ?? undefined;
-    message.minItems = object.minItems ?? undefined;
-    message.maxItems = object.maxItems ?? undefined;
-    message.defaultJson = object.defaultJson ?? undefined;
-    return message;
-  },
-};
-
-function createBaseJSONSchema(): JSONSchema {
-  return {
-    type: 0,
-    properties: {},
-    required: [],
-    items: undefined,
-    additionalProperties: undefined,
-    schemaUri: undefined,
-    idUri: undefined,
-    title: undefined,
-    description: undefined,
-    definitions: {},
-    ref: undefined,
-    allOf: [],
-    anyOf: [],
-    oneOf: [],
-    notSchema: undefined,
-    rawJson: undefined,
-  };
-}
-
-export const JSONSchema: MessageFns<JSONSchema> = {
-  encode(message: JSONSchema, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.type !== 0) {
-      writer.uint32(8).int32(message.type);
-    }
-    globalThis.Object.entries(message.properties).forEach(([key, value]: [string, JSONSchemaProperty]) => {
-      JSONSchema_PropertiesEntry.encode({ key: key as any, value }, writer.uint32(18).fork()).join();
-    });
-    for (const v of message.required) {
-      writer.uint32(26).string(v!);
-    }
-    if (message.items !== undefined) {
-      JSONSchemaProperty.encode(message.items, writer.uint32(34).fork()).join();
-    }
-    if (message.additionalProperties !== undefined) {
-      writer.uint32(40).bool(message.additionalProperties);
-    }
-    if (message.schemaUri !== undefined) {
-      writer.uint32(50).string(message.schemaUri);
-    }
-    if (message.idUri !== undefined) {
-      writer.uint32(58).string(message.idUri);
-    }
-    if (message.title !== undefined) {
-      writer.uint32(66).string(message.title);
-    }
-    if (message.description !== undefined) {
-      writer.uint32(74).string(message.description);
-    }
-    globalThis.Object.entries(message.definitions).forEach(([key, value]: [string, JSONSchema]) => {
-      JSONSchema_DefinitionsEntry.encode({ key: key as any, value }, writer.uint32(82).fork()).join();
-    });
-    if (message.ref !== undefined) {
-      writer.uint32(90).string(message.ref);
-    }
-    for (const v of message.allOf) {
-      JSONSchema.encode(v!, writer.uint32(98).fork()).join();
-    }
-    for (const v of message.anyOf) {
-      JSONSchema.encode(v!, writer.uint32(106).fork()).join();
-    }
-    for (const v of message.oneOf) {
-      JSONSchema.encode(v!, writer.uint32(114).fork()).join();
-    }
-    if (message.notSchema !== undefined) {
-      JSONSchema.encode(message.notSchema, writer.uint32(122).fork()).join();
-    }
-    if (message.rawJson !== undefined) {
-      writer.uint32(130).string(message.rawJson);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): JSONSchema {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseJSONSchema();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.type = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          const entry2 = JSONSchema_PropertiesEntry.decode(reader, reader.uint32());
-          if (entry2.value !== undefined) {
-            message.properties[entry2.key] = entry2.value;
-          }
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.required.push(reader.string());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.items = JSONSchemaProperty.decode(reader, reader.uint32());
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.additionalProperties = reader.bool();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.schemaUri = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.idUri = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.title = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.description = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          const entry10 = JSONSchema_DefinitionsEntry.decode(reader, reader.uint32());
-          if (entry10.value !== undefined) {
-            message.definitions[entry10.key] = entry10.value;
-          }
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.ref = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.allOf.push(JSONSchema.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 13: {
-          if (tag !== 106) {
-            break;
-          }
-
-          message.anyOf.push(JSONSchema.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 14: {
-          if (tag !== 114) {
-            break;
-          }
-
-          message.oneOf.push(JSONSchema.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 15: {
-          if (tag !== 122) {
-            break;
-          }
-
-          message.notSchema = JSONSchema.decode(reader, reader.uint32());
-          continue;
-        }
-        case 16: {
-          if (tag !== 130) {
-            break;
-          }
-
-          message.rawJson = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): JSONSchema {
-    return {
-      type: isSet(object.type) ? jSONSchemaTypeFromJSON(object.type) : 0,
-      properties: isObject(object.properties)
-        ? (globalThis.Object.entries(object.properties) as [string, any][]).reduce(
-          (acc: { [key: string]: JSONSchemaProperty }, [key, value]: [string, any]) => {
-            acc[key] = JSONSchemaProperty.fromJSON(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
-      required: globalThis.Array.isArray(object?.required) ? object.required.map((e: any) => globalThis.String(e)) : [],
-      items: isSet(object.items) ? JSONSchemaProperty.fromJSON(object.items) : undefined,
-      additionalProperties: isSet(object.additionalProperties)
-        ? globalThis.Boolean(object.additionalProperties)
-        : isSet(object.additional_properties)
-        ? globalThis.Boolean(object.additional_properties)
-        : undefined,
-      schemaUri: isSet(object.$schema)
-        ? globalThis.String(object.$schema)
-        : isSet(object.schema_uri)
-        ? globalThis.String(object.schema_uri)
-        : undefined,
-      idUri: isSet(object.$id)
-        ? globalThis.String(object.$id)
-        : isSet(object.id_uri)
-        ? globalThis.String(object.id_uri)
-        : undefined,
-      title: isSet(object.title) ? globalThis.String(object.title) : undefined,
-      description: isSet(object.description) ? globalThis.String(object.description) : undefined,
-      definitions: isObject(object.definitions)
-        ? (globalThis.Object.entries(object.definitions) as [string, any][]).reduce(
-          (acc: { [key: string]: JSONSchema }, [key, value]: [string, any]) => {
-            acc[key] = JSONSchema.fromJSON(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
-      ref: isSet(object.$ref)
-        ? globalThis.String(object.$ref)
-        : isSet(object.ref)
-        ? globalThis.String(object.ref)
-        : undefined,
-      allOf: globalThis.Array.isArray(object?.allOf)
-        ? object.allOf.map((e: any) => JSONSchema.fromJSON(e))
-        : globalThis.Array.isArray(object?.all_of)
-        ? object.all_of.map((e: any) => JSONSchema.fromJSON(e))
-        : [],
-      anyOf: globalThis.Array.isArray(object?.anyOf)
-        ? object.anyOf.map((e: any) => JSONSchema.fromJSON(e))
-        : globalThis.Array.isArray(object?.any_of)
-        ? object.any_of.map((e: any) => JSONSchema.fromJSON(e))
-        : [],
-      oneOf: globalThis.Array.isArray(object?.oneOf)
-        ? object.oneOf.map((e: any) => JSONSchema.fromJSON(e))
-        : globalThis.Array.isArray(object?.one_of)
-        ? object.one_of.map((e: any) => JSONSchema.fromJSON(e))
-        : [],
-      notSchema: isSet(object.notSchema)
-        ? JSONSchema.fromJSON(object.notSchema)
-        : isSet(object.not_schema)
-        ? JSONSchema.fromJSON(object.not_schema)
-        : undefined,
-      rawJson: isSet(object.rawJson)
-        ? globalThis.String(object.rawJson)
-        : isSet(object.raw_json)
-        ? globalThis.String(object.raw_json)
-        : undefined,
-    };
-  },
-
-  toJSON(message: JSONSchema): unknown {
-    const obj: any = {};
-    if (message.type !== 0) {
-      obj.type = jSONSchemaTypeToJSON(message.type);
-    }
-    if (message.properties) {
-      const entries = globalThis.Object.entries(message.properties) as [string, JSONSchemaProperty][];
-      if (entries.length > 0) {
-        obj.properties = {};
-        entries.forEach(([k, v]) => {
-          obj.properties[k] = JSONSchemaProperty.toJSON(v);
-        });
-      }
-    }
-    if (message.required?.length) {
-      obj.required = message.required;
-    }
-    if (message.items !== undefined) {
-      obj.items = JSONSchemaProperty.toJSON(message.items);
-    }
-    if (message.additionalProperties !== undefined) {
-      obj.additionalProperties = message.additionalProperties;
-    }
-    if (message.schemaUri !== undefined) {
-      obj.$schema = message.schemaUri;
-    }
-    if (message.idUri !== undefined) {
-      obj.$id = message.idUri;
-    }
-    if (message.title !== undefined) {
-      obj.title = message.title;
-    }
-    if (message.description !== undefined) {
-      obj.description = message.description;
-    }
-    if (message.definitions) {
-      const entries = globalThis.Object.entries(message.definitions) as [string, JSONSchema][];
-      if (entries.length > 0) {
-        obj.definitions = {};
-        entries.forEach(([k, v]) => {
-          obj.definitions[k] = JSONSchema.toJSON(v);
-        });
-      }
-    }
-    if (message.ref !== undefined) {
-      obj.$ref = message.ref;
-    }
-    if (message.allOf?.length) {
-      obj.allOf = message.allOf.map((e) => JSONSchema.toJSON(e));
-    }
-    if (message.anyOf?.length) {
-      obj.anyOf = message.anyOf.map((e) => JSONSchema.toJSON(e));
-    }
-    if (message.oneOf?.length) {
-      obj.oneOf = message.oneOf.map((e) => JSONSchema.toJSON(e));
-    }
-    if (message.notSchema !== undefined) {
-      obj.notSchema = JSONSchema.toJSON(message.notSchema);
-    }
-    if (message.rawJson !== undefined) {
-      obj.rawJson = message.rawJson;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<JSONSchema>, I>>(base?: I): JSONSchema {
-    return JSONSchema.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<JSONSchema>, I>>(object: I): JSONSchema {
-    const message = createBaseJSONSchema();
-    message.type = object.type ?? 0;
-    message.properties = (globalThis.Object.entries(object.properties ?? {}) as [string, JSONSchemaProperty][]).reduce(
-      (acc: { [key: string]: JSONSchemaProperty }, [key, value]: [string, JSONSchemaProperty]) => {
-        if (value !== undefined) {
-          acc[key] = JSONSchemaProperty.fromPartial(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    message.required = object.required?.map((e) => e) || [];
-    message.items = (object.items !== undefined && object.items !== null)
-      ? JSONSchemaProperty.fromPartial(object.items)
-      : undefined;
-    message.additionalProperties = object.additionalProperties ?? undefined;
-    message.schemaUri = object.schemaUri ?? undefined;
-    message.idUri = object.idUri ?? undefined;
-    message.title = object.title ?? undefined;
-    message.description = object.description ?? undefined;
-    message.definitions = (globalThis.Object.entries(object.definitions ?? {}) as [string, JSONSchema][]).reduce(
-      (acc: { [key: string]: JSONSchema }, [key, value]: [string, JSONSchema]) => {
-        if (value !== undefined) {
-          acc[key] = JSONSchema.fromPartial(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    message.ref = object.ref ?? undefined;
-    message.allOf = object.allOf?.map((e) => JSONSchema.fromPartial(e)) || [];
-    message.anyOf = object.anyOf?.map((e) => JSONSchema.fromPartial(e)) || [];
-    message.oneOf = object.oneOf?.map((e) => JSONSchema.fromPartial(e)) || [];
-    message.notSchema = (object.notSchema !== undefined && object.notSchema !== null)
-      ? JSONSchema.fromPartial(object.notSchema)
-      : undefined;
-    message.rawJson = object.rawJson ?? undefined;
-    return message;
-  },
-};
-
-function createBaseJSONSchema_PropertiesEntry(): JSONSchema_PropertiesEntry {
-  return { key: "", value: undefined };
-}
-
-export const JSONSchema_PropertiesEntry: MessageFns<JSONSchema_PropertiesEntry> = {
-  encode(message: JSONSchema_PropertiesEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== undefined) {
-      JSONSchemaProperty.encode(message.value, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): JSONSchema_PropertiesEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseJSONSchema_PropertiesEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = JSONSchemaProperty.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): JSONSchema_PropertiesEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? JSONSchemaProperty.fromJSON(object.value) : undefined,
-    };
-  },
-
-  toJSON(message: JSONSchema_PropertiesEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== undefined) {
-      obj.value = JSONSchemaProperty.toJSON(message.value);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<JSONSchema_PropertiesEntry>, I>>(base?: I): JSONSchema_PropertiesEntry {
-    return JSONSchema_PropertiesEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<JSONSchema_PropertiesEntry>, I>>(object: I): JSONSchema_PropertiesEntry {
-    const message = createBaseJSONSchema_PropertiesEntry();
-    message.key = object.key ?? "";
-    message.value = (object.value !== undefined && object.value !== null)
-      ? JSONSchemaProperty.fromPartial(object.value)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseJSONSchema_DefinitionsEntry(): JSONSchema_DefinitionsEntry {
-  return { key: "", value: undefined };
-}
-
-export const JSONSchema_DefinitionsEntry: MessageFns<JSONSchema_DefinitionsEntry> = {
-  encode(message: JSONSchema_DefinitionsEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== undefined) {
-      JSONSchema.encode(message.value, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): JSONSchema_DefinitionsEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseJSONSchema_DefinitionsEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = JSONSchema.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): JSONSchema_DefinitionsEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? JSONSchema.fromJSON(object.value) : undefined,
-    };
-  },
-
-  toJSON(message: JSONSchema_DefinitionsEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== undefined) {
-      obj.value = JSONSchema.toJSON(message.value);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<JSONSchema_DefinitionsEntry>, I>>(base?: I): JSONSchema_DefinitionsEntry {
-    return JSONSchema_DefinitionsEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<JSONSchema_DefinitionsEntry>, I>>(object: I): JSONSchema_DefinitionsEntry {
-    const message = createBaseJSONSchema_DefinitionsEntry();
-    message.key = object.key ?? "";
-    message.value = (object.value !== undefined && object.value !== null)
-      ? JSONSchema.fromPartial(object.value)
-      : undefined;
-    return message;
-  },
-};
-
 function createBaseStructuredOutputOptions(): StructuredOutputOptions {
-  return {
-    includeSchemaInPrompt: false,
-    strictMode: undefined,
-    schema: undefined,
-    jsonSchema: undefined,
-    name: undefined,
-    mode: 0,
-    regexPattern: undefined,
-    grammar: undefined,
-    repairJson: false,
-    maxRetries: 0,
-  };
+  return { includeSchemaInPrompt: undefined, schema: undefined, grammar: undefined, regex: undefined };
 }
 
 export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
   encode(message: StructuredOutputOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.includeSchemaInPrompt !== false) {
-      writer.uint32(16).bool(message.includeSchemaInPrompt);
-    }
-    if (message.strictMode !== undefined) {
-      writer.uint32(24).bool(message.strictMode);
+    if (message.includeSchemaInPrompt !== undefined) {
+      writer.uint32(8).bool(message.includeSchemaInPrompt);
     }
     if (message.schema !== undefined) {
-      JSONSchema.encode(message.schema, writer.uint32(10).fork()).join();
-    }
-    if (message.jsonSchema !== undefined) {
-      writer.uint32(34).string(message.jsonSchema);
-    }
-    if (message.name !== undefined) {
-      writer.uint32(50).string(message.name);
-    }
-    if (message.mode !== 0) {
-      writer.uint32(56).int32(message.mode);
-    }
-    if (message.regexPattern !== undefined) {
-      writer.uint32(66).string(message.regexPattern);
+      writer.uint32(18).string(message.schema);
     }
     if (message.grammar !== undefined) {
-      writer.uint32(74).string(message.grammar);
+      writer.uint32(26).string(message.grammar);
     }
-    if (message.repairJson !== false) {
-      writer.uint32(80).bool(message.repairJson);
-    }
-    if (message.maxRetries !== 0) {
-      writer.uint32(88).int32(message.maxRetries);
+    if (message.regex !== undefined) {
+      writer.uint32(34).string(message.regex);
     }
     return writer;
   },
@@ -1279,28 +104,28 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 2: {
-          if (tag !== 16) {
+        case 1: {
+          if (tag !== 8) {
             break;
           }
 
           message.includeSchemaInPrompt = reader.bool();
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
+        case 2: {
+          if (tag !== 18) {
             break;
           }
 
-          message.strictMode = reader.bool();
+          message.schema = reader.string();
           continue;
         }
-        case 1: {
-          if (tag !== 10) {
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
-          message.schema = JSONSchema.decode(reader, reader.uint32());
+          message.grammar = reader.string();
           continue;
         }
         case 4: {
@@ -1308,55 +133,7 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
             break;
           }
 
-          message.jsonSchema = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.name = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.mode = reader.int32() as any;
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.regexPattern = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.grammar = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.repairJson = reader.bool();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.maxRetries = reader.int32();
+          message.regex = reader.string();
           continue;
         }
       }
@@ -1374,70 +151,26 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
         ? globalThis.Boolean(object.includeSchemaInPrompt)
         : isSet(object.include_schema_in_prompt)
         ? globalThis.Boolean(object.include_schema_in_prompt)
-        : false,
-      strictMode: isSet(object.strictMode)
-        ? globalThis.Boolean(object.strictMode)
-        : isSet(object.strict_mode)
-        ? globalThis.Boolean(object.strict_mode)
         : undefined,
-      schema: isSet(object.schema) ? JSONSchema.fromJSON(object.schema) : undefined,
-      jsonSchema: isSet(object.jsonSchema)
-        ? globalThis.String(object.jsonSchema)
-        : isSet(object.json_schema)
-        ? globalThis.String(object.json_schema)
-        : undefined,
-      name: isSet(object.name) ? globalThis.String(object.name) : undefined,
-      mode: isSet(object.mode) ? structuredOutputModeFromJSON(object.mode) : 0,
-      regexPattern: isSet(object.regexPattern)
-        ? globalThis.String(object.regexPattern)
-        : isSet(object.regex_pattern)
-        ? globalThis.String(object.regex_pattern)
-        : undefined,
+      schema: isSet(object.schema) ? globalThis.String(object.schema) : undefined,
       grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
-      repairJson: isSet(object.repairJson)
-        ? globalThis.Boolean(object.repairJson)
-        : isSet(object.repair_json)
-        ? globalThis.Boolean(object.repair_json)
-        : false,
-      maxRetries: isSet(object.maxRetries)
-        ? globalThis.Number(object.maxRetries)
-        : isSet(object.max_retries)
-        ? globalThis.Number(object.max_retries)
-        : 0,
+      regex: isSet(object.regex) ? globalThis.String(object.regex) : undefined,
     };
   },
 
   toJSON(message: StructuredOutputOptions): unknown {
     const obj: any = {};
-    if (message.includeSchemaInPrompt !== false) {
+    if (message.includeSchemaInPrompt !== undefined) {
       obj.includeSchemaInPrompt = message.includeSchemaInPrompt;
     }
-    if (message.strictMode !== undefined) {
-      obj.strictMode = message.strictMode;
-    }
     if (message.schema !== undefined) {
-      obj.schema = JSONSchema.toJSON(message.schema);
-    }
-    if (message.jsonSchema !== undefined) {
-      obj.jsonSchema = message.jsonSchema;
-    }
-    if (message.name !== undefined) {
-      obj.name = message.name;
-    }
-    if (message.mode !== 0) {
-      obj.mode = structuredOutputModeToJSON(message.mode);
-    }
-    if (message.regexPattern !== undefined) {
-      obj.regexPattern = message.regexPattern;
+      obj.schema = message.schema;
     }
     if (message.grammar !== undefined) {
       obj.grammar = message.grammar;
     }
-    if (message.repairJson !== false) {
-      obj.repairJson = message.repairJson;
-    }
-    if (message.maxRetries !== 0) {
-      obj.maxRetries = Math.round(message.maxRetries);
+    if (message.regex !== undefined) {
+      obj.regex = message.regex;
     }
     return obj;
   },
@@ -1447,18 +180,10 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
   },
   fromPartial<I extends Exact<DeepPartial<StructuredOutputOptions>, I>>(object: I): StructuredOutputOptions {
     const message = createBaseStructuredOutputOptions();
-    message.includeSchemaInPrompt = object.includeSchemaInPrompt ?? false;
-    message.strictMode = object.strictMode ?? undefined;
-    message.schema = (object.schema !== undefined && object.schema !== null)
-      ? JSONSchema.fromPartial(object.schema)
-      : undefined;
-    message.jsonSchema = object.jsonSchema ?? undefined;
-    message.name = object.name ?? undefined;
-    message.mode = object.mode ?? 0;
-    message.regexPattern = object.regexPattern ?? undefined;
+    message.includeSchemaInPrompt = object.includeSchemaInPrompt ?? undefined;
+    message.schema = object.schema ?? undefined;
     message.grammar = object.grammar ?? undefined;
-    message.repairJson = object.repairJson ?? false;
-    message.maxRetries = object.maxRetries ?? 0;
+    message.regex = object.regex ?? undefined;
     return message;
   },
 };
@@ -1484,19 +209,19 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
       writer.uint32(16).bool(message.containsJson);
     }
     if (message.rawOutput !== undefined) {
-      writer.uint32(34).string(message.rawOutput);
+      writer.uint32(26).string(message.rawOutput);
     }
     if (message.extractedJson !== undefined) {
-      writer.uint32(42).string(message.extractedJson);
+      writer.uint32(34).string(message.extractedJson);
     }
     for (const v of message.validationErrors) {
-      writer.uint32(50).string(v!);
+      writer.uint32(42).string(v!);
     }
     if (message.validationTimeMs !== 0) {
-      writer.uint32(56).int64(message.validationTimeMs);
+      writer.uint32(48).int64(message.validationTimeMs);
     }
     if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(66).fork()).join();
+      SDKError.encode(message.error, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -1524,12 +249,20 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
           message.containsJson = reader.bool();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rawOutput = reader.string();
+          continue;
+        }
         case 4: {
           if (tag !== 34) {
             break;
           }
 
-          message.rawOutput = reader.string();
+          message.extractedJson = reader.string();
           continue;
         }
         case 5: {
@@ -1537,27 +270,19 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
             break;
           }
 
-          message.extractedJson = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
           message.validationErrors.push(reader.string());
           continue;
         }
-        case 7: {
-          if (tag !== 56) {
+        case 6: {
+          if (tag !== 48) {
             break;
           }
 
           message.validationTimeMs = longToNumber(reader.int64());
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
+        case 7: {
+          if (tag !== 58) {
             break;
           }
 
@@ -1654,13 +379,13 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
 };
 
 function createBaseStructuredOutputResult(): StructuredOutputResult {
-  return { parsedJson: new Uint8Array(0), validation: undefined, rawText: undefined, error: undefined };
+  return { json: "", validation: undefined, rawText: undefined, error: undefined };
 }
 
 export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
   encode(message: StructuredOutputResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.parsedJson.length !== 0) {
-      writer.uint32(10).bytes(message.parsedJson);
+    if (message.json !== "") {
+      writer.uint32(10).string(message.json);
     }
     if (message.validation !== undefined) {
       StructuredOutputValidation.encode(message.validation, writer.uint32(18).fork()).join();
@@ -1669,7 +394,7 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
       writer.uint32(26).string(message.rawText);
     }
     if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(50).fork()).join();
+      SDKError.encode(message.error, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -1686,7 +411,7 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
             break;
           }
 
-          message.parsedJson = reader.bytes();
+          message.json = reader.string();
           continue;
         }
         case 2: {
@@ -1705,8 +430,8 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
           message.rawText = reader.string();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
@@ -1724,11 +449,7 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
 
   fromJSON(object: any): StructuredOutputResult {
     return {
-      parsedJson: isSet(object.parsedJson)
-        ? bytesFromBase64(object.parsedJson)
-        : isSet(object.parsed_json)
-        ? bytesFromBase64(object.parsed_json)
-        : new Uint8Array(0),
+      json: isSet(object.json) ? globalThis.String(object.json) : "",
       validation: isSet(object.validation) ? StructuredOutputValidation.fromJSON(object.validation) : undefined,
       rawText: isSet(object.rawText)
         ? globalThis.String(object.rawText)
@@ -1741,8 +462,8 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
 
   toJSON(message: StructuredOutputResult): unknown {
     const obj: any = {};
-    if (message.parsedJson.length !== 0) {
-      obj.parsedJson = base64FromBytes(message.parsedJson);
+    if (message.json !== "") {
+      obj.json = message.json;
     }
     if (message.validation !== undefined) {
       obj.validation = StructuredOutputValidation.toJSON(message.validation);
@@ -1761,7 +482,7 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<StructuredOutputResult>, I>>(object: I): StructuredOutputResult {
     const message = createBaseStructuredOutputResult();
-    message.parsedJson = object.parsedJson ?? new Uint8Array(0);
+    message.json = object.json ?? "";
     message.validation = (object.validation !== undefined && object.validation !== null)
       ? StructuredOutputValidation.fromPartial(object.validation)
       : undefined;
@@ -1992,88 +713,6 @@ export const StructuredOutputParseRequest_MetadataEntry: MessageFns<StructuredOu
   },
 };
 
-function createBaseStructuredOutputValidationRequest(): StructuredOutputValidationRequest {
-  return { text: "", options: undefined };
-}
-
-export const StructuredOutputValidationRequest: MessageFns<StructuredOutputValidationRequest> = {
-  encode(message: StructuredOutputValidationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.text !== "") {
-      writer.uint32(10).string(message.text);
-    }
-    if (message.options !== undefined) {
-      StructuredOutputOptions.encode(message.options, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StructuredOutputValidationRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStructuredOutputValidationRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.text = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.options = StructuredOutputOptions.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StructuredOutputValidationRequest {
-    return {
-      text: isSet(object.text) ? globalThis.String(object.text) : "",
-      options: isSet(object.options) ? StructuredOutputOptions.fromJSON(object.options) : undefined,
-    };
-  },
-
-  toJSON(message: StructuredOutputValidationRequest): unknown {
-    const obj: any = {};
-    if (message.text !== "") {
-      obj.text = message.text;
-    }
-    if (message.options !== undefined) {
-      obj.options = StructuredOutputOptions.toJSON(message.options);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(
-    base?: I,
-  ): StructuredOutputValidationRequest {
-    return StructuredOutputValidationRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(
-    object: I,
-  ): StructuredOutputValidationRequest {
-    const message = createBaseStructuredOutputValidationRequest();
-    message.text = object.text ?? "";
-    message.options = (object.options !== undefined && object.options !== null)
-      ? StructuredOutputOptions.fromPartial(object.options)
-      : undefined;
-    return message;
-  },
-};
-
 function createBaseStructuredOutputPromptResult(): StructuredOutputPromptResult {
   return {
     preparedPrompt: "",
@@ -2103,7 +742,7 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
       writer.uint32(42).string(message.grammar);
     }
     if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(66).fork()).join();
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -2155,8 +794,8 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
           message.grammar = reader.string();
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
@@ -2238,577 +877,6 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
     return message;
   },
 };
-
-function createBaseStructuredOutputRequest(): StructuredOutputRequest {
-  return { requestId: "", prompt: "", options: undefined, metadata: {} };
-}
-
-export const StructuredOutputRequest: MessageFns<StructuredOutputRequest> = {
-  encode(message: StructuredOutputRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.requestId !== "") {
-      writer.uint32(10).string(message.requestId);
-    }
-    if (message.prompt !== "") {
-      writer.uint32(18).string(message.prompt);
-    }
-    if (message.options !== undefined) {
-      StructuredOutputOptions.encode(message.options, writer.uint32(26).fork()).join();
-    }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      StructuredOutputRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).join();
-    });
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StructuredOutputRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStructuredOutputRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.requestId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.prompt = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.options = StructuredOutputOptions.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          const entry4 = StructuredOutputRequest_MetadataEntry.decode(reader, reader.uint32());
-          if (entry4.value !== undefined) {
-            message.metadata[entry4.key] = entry4.value;
-          }
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StructuredOutputRequest {
-    return {
-      requestId: isSet(object.requestId)
-        ? globalThis.String(object.requestId)
-        : isSet(object.request_id)
-        ? globalThis.String(object.request_id)
-        : "",
-      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-      options: isSet(object.options) ? StructuredOutputOptions.fromJSON(object.options) : undefined,
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
-    };
-  },
-
-  toJSON(message: StructuredOutputRequest): unknown {
-    const obj: any = {};
-    if (message.requestId !== "") {
-      obj.requestId = message.requestId;
-    }
-    if (message.prompt !== "") {
-      obj.prompt = message.prompt;
-    }
-    if (message.options !== undefined) {
-      obj.options = StructuredOutputOptions.toJSON(message.options);
-    }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(base?: I): StructuredOutputRequest {
-    return StructuredOutputRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(object: I): StructuredOutputRequest {
-    const message = createBaseStructuredOutputRequest();
-    message.requestId = object.requestId ?? "";
-    message.prompt = object.prompt ?? "";
-    message.options = (object.options !== undefined && object.options !== null)
-      ? StructuredOutputOptions.fromPartial(object.options)
-      : undefined;
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    return message;
-  },
-};
-
-function createBaseStructuredOutputRequest_MetadataEntry(): StructuredOutputRequest_MetadataEntry {
-  return { key: "", value: "" };
-}
-
-export const StructuredOutputRequest_MetadataEntry: MessageFns<StructuredOutputRequest_MetadataEntry> = {
-  encode(message: StructuredOutputRequest_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StructuredOutputRequest_MetadataEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStructuredOutputRequest_MetadataEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StructuredOutputRequest_MetadataEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: StructuredOutputRequest_MetadataEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(
-    base?: I,
-  ): StructuredOutputRequest_MetadataEntry {
-    return StructuredOutputRequest_MetadataEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(
-    object: I,
-  ): StructuredOutputRequest_MetadataEntry {
-    const message = createBaseStructuredOutputRequest_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
-    return message;
-  },
-};
-
-function createBaseStructuredOutputStreamEvent(): StructuredOutputStreamEvent {
-  return {
-    timestampUs: 0,
-    requestId: "",
-    kind: 0,
-    token: "",
-    partialJson: undefined,
-    validation: undefined,
-    result: undefined,
-    error: undefined,
-  };
-}
-
-export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent> = {
-  encode(message: StructuredOutputStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.timestampUs !== 0) {
-      writer.uint32(16).int64(message.timestampUs);
-    }
-    if (message.requestId !== "") {
-      writer.uint32(26).string(message.requestId);
-    }
-    if (message.kind !== 0) {
-      writer.uint32(32).int32(message.kind);
-    }
-    if (message.token !== "") {
-      writer.uint32(42).string(message.token);
-    }
-    if (message.partialJson !== undefined) {
-      writer.uint32(50).string(message.partialJson);
-    }
-    if (message.validation !== undefined) {
-      StructuredOutputValidation.encode(message.validation, writer.uint32(58).fork()).join();
-    }
-    if (message.result !== undefined) {
-      StructuredOutputResult.encode(message.result, writer.uint32(66).fork()).join();
-    }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(90).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StructuredOutputStreamEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStructuredOutputStreamEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.timestampUs = longToNumber(reader.int64());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.requestId = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.kind = reader.int32() as any;
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.token = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.partialJson = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.validation = StructuredOutputValidation.decode(reader, reader.uint32());
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.result = StructuredOutputResult.decode(reader, reader.uint32());
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.error = SDKError.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StructuredOutputStreamEvent {
-    return {
-      timestampUs: isSet(object.timestampUs)
-        ? globalThis.Number(object.timestampUs)
-        : isSet(object.timestamp_us)
-        ? globalThis.Number(object.timestamp_us)
-        : 0,
-      requestId: isSet(object.requestId)
-        ? globalThis.String(object.requestId)
-        : isSet(object.request_id)
-        ? globalThis.String(object.request_id)
-        : "",
-      kind: isSet(object.kind) ? structuredOutputStreamEventKindFromJSON(object.kind) : 0,
-      token: isSet(object.token) ? globalThis.String(object.token) : "",
-      partialJson: isSet(object.partialJson)
-        ? globalThis.String(object.partialJson)
-        : isSet(object.partial_json)
-        ? globalThis.String(object.partial_json)
-        : undefined,
-      validation: isSet(object.validation) ? StructuredOutputValidation.fromJSON(object.validation) : undefined,
-      result: isSet(object.result) ? StructuredOutputResult.fromJSON(object.result) : undefined,
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
-    };
-  },
-
-  toJSON(message: StructuredOutputStreamEvent): unknown {
-    const obj: any = {};
-    if (message.timestampUs !== 0) {
-      obj.timestampUs = Math.round(message.timestampUs);
-    }
-    if (message.requestId !== "") {
-      obj.requestId = message.requestId;
-    }
-    if (message.kind !== 0) {
-      obj.kind = structuredOutputStreamEventKindToJSON(message.kind);
-    }
-    if (message.token !== "") {
-      obj.token = message.token;
-    }
-    if (message.partialJson !== undefined) {
-      obj.partialJson = message.partialJson;
-    }
-    if (message.validation !== undefined) {
-      obj.validation = StructuredOutputValidation.toJSON(message.validation);
-    }
-    if (message.result !== undefined) {
-      obj.result = StructuredOutputResult.toJSON(message.result);
-    }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(base?: I): StructuredOutputStreamEvent {
-    return StructuredOutputStreamEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(object: I): StructuredOutputStreamEvent {
-    const message = createBaseStructuredOutputStreamEvent();
-    message.timestampUs = object.timestampUs ?? 0;
-    message.requestId = object.requestId ?? "";
-    message.kind = object.kind ?? 0;
-    message.token = object.token ?? "";
-    message.partialJson = object.partialJson ?? undefined;
-    message.validation = (object.validation !== undefined && object.validation !== null)
-      ? StructuredOutputValidation.fromPartial(object.validation)
-      : undefined;
-    message.result = (object.result !== undefined && object.result !== null)
-      ? StructuredOutputResult.fromPartial(object.result)
-      : undefined;
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseNamedEntity(): NamedEntity {
-  return { text: "", entityType: "", startOffset: 0, endOffset: 0, confidence: 0 };
-}
-
-export const NamedEntity: MessageFns<NamedEntity> = {
-  encode(message: NamedEntity, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.text !== "") {
-      writer.uint32(10).string(message.text);
-    }
-    if (message.entityType !== "") {
-      writer.uint32(18).string(message.entityType);
-    }
-    if (message.startOffset !== 0) {
-      writer.uint32(24).int32(message.startOffset);
-    }
-    if (message.endOffset !== 0) {
-      writer.uint32(32).int32(message.endOffset);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(45).float(message.confidence);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): NamedEntity {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseNamedEntity();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.text = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.entityType = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.startOffset = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.endOffset = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): NamedEntity {
-    return {
-      text: isSet(object.text) ? globalThis.String(object.text) : "",
-      entityType: isSet(object.entityType)
-        ? globalThis.String(object.entityType)
-        : isSet(object.entity_type)
-        ? globalThis.String(object.entity_type)
-        : "",
-      startOffset: isSet(object.startOffset)
-        ? globalThis.Number(object.startOffset)
-        : isSet(object.start_offset)
-        ? globalThis.Number(object.start_offset)
-        : 0,
-      endOffset: isSet(object.endOffset)
-        ? globalThis.Number(object.endOffset)
-        : isSet(object.end_offset)
-        ? globalThis.Number(object.end_offset)
-        : 0,
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-    };
-  },
-
-  toJSON(message: NamedEntity): unknown {
-    const obj: any = {};
-    if (message.text !== "") {
-      obj.text = message.text;
-    }
-    if (message.entityType !== "") {
-      obj.entityType = message.entityType;
-    }
-    if (message.startOffset !== 0) {
-      obj.startOffset = Math.round(message.startOffset);
-    }
-    if (message.endOffset !== 0) {
-      obj.endOffset = Math.round(message.endOffset);
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<NamedEntity>, I>>(base?: I): NamedEntity {
-    return NamedEntity.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<NamedEntity>, I>>(object: I): NamedEntity {
-    const message = createBaseNamedEntity();
-    message.text = object.text ?? "";
-    message.entityType = object.entityType ?? "";
-    message.startOffset = object.startOffset ?? 0;
-    message.endOffset = object.endOffset ?? 0;
-    message.confidence = object.confidence ?? 0;
-    return message;
-  },
-};
-
-function bytesFromBase64(b64: string): Uint8Array {
-  const bin = globalThis.atob(b64);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; ++i) {
-    arr[i] = bin.charCodeAt(i);
-  }
-  return arr;
-}
-
-function base64FromBytes(arr: Uint8Array): string {
-  const bin: string[] = [];
-  arr.forEach((byte) => {
-    bin.push(globalThis.String.fromCharCode(byte));
-  });
-  return globalThis.btoa(bin.join(""));
-}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 

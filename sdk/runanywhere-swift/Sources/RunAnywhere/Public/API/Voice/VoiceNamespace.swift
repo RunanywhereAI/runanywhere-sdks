@@ -74,15 +74,19 @@ public extension RunAnywhere {
                 if let threshold = vad.activationThreshold {
                     vadConfig.activationThreshold = threshold
                 }
-                vadConfig.maxSpeechDurationMs = Int32(vad.minSilenceMs)
                 config.vadConfig = vadConfig
             }
             if let generation {
                 config.llmGeneration = generation.toProto()
             }
-            config.sessionConfig = VoiceNamespace.sessionConfig(
-                turnHandling: turnHandling,
-                voiceId: tts.voice
+            // VoiceSessionConfig/AudioPipelineConfig were deleted outright
+            // (idl/voice_agent_service.proto): turn-taking now flows through
+            // TurnDetection, and autoPlayTts/continuousMode/voiceId have no
+            // wire home left — audio playback is unconditional (see
+            // VoiceSession), and the voice id is already set via ttsVoiceID.
+            config.turnDetection = VoiceNamespace.turnDetection(
+                vad: vad,
+                turnHandling: turnHandling
             )
 
             let handle = try await CppBridge.VoiceAgent.shared.getHandle()
@@ -95,25 +99,28 @@ public extension RunAnywhere {
             return VoiceSession(handle: handle, ttsOptions: ttsOptions)
         }
 
-        /// Only `endpointing.minDelayMs` reaches the compose ABI today; the
-        /// remaining turn-handling knobs are logged and ignored.
-        private static func sessionConfig(
-            turnHandling: TurnHandlingOptions?,
-            voiceId: String?
-        ) -> RAVoiceSessionConfig {
-            var session = RAVoiceSessionConfig()
-            session.autoPlayTts = true
-            session.continuousMode = true
-            if let voiceId, !voiceId.isEmpty {
-                session.voiceID = voiceId
+        /// `VoiceSessionConfig` was deleted outright (idl/voice_agent_service.proto):
+        /// turn-taking now flows entirely through `TurnDetection`. Only
+        /// `vad.activationThreshold` and `turnHandling.endpointing.minDelayMs`
+        /// reach the compose ABI today; the remaining knobs
+        /// (`endpointing.maxDelayMs`, `interruption`) are logged and ignored,
+        /// same as before this migration.
+        private static func turnDetection(
+            vad: VadOptions?,
+            turnHandling: TurnHandlingOptions?
+        ) -> RATurnDetection {
+            var detection = RATurnDetection()
+            detection.type = .turnDetectionTypeVad
+            if let threshold = vad?.activationThreshold {
+                detection.threshold = threshold
             }
-            guard let turnHandling else { return session }
+            guard let turnHandling else { return detection }
 
-            session.silenceDurationMs = Int32(turnHandling.endpointing.minDelayMs)
+            detection.silenceDurationMs = Int32(turnHandling.endpointing.minDelayMs)
             SDKLogger.voiceAgent.warning(
                 "TurnHandlingOptions endpointing.maxDelayMs and interruption are not carried by the compose ABI yet"
             )
-            return session
+            return detection
         }
     }
 }

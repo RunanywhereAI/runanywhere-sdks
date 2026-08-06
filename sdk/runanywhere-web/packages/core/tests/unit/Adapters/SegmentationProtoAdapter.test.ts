@@ -201,7 +201,8 @@ function fakeSegmentationModule(): FakeSegmentationHarness {
           height: 1,
           classMaskU16Le: new Uint8Array([7, 0, 7, 0]),
           diagnosticRgba: new Uint8Array([1, 2, 3, 255, 1, 2, 3, 255]),
-          classSummaries: [{ classId: 7, pixelCount: 2, fraction: 1, label: 'road' }],
+          // `SegmentationClassSummary.fraction` was deleted outright.
+          classSummaries: [{ classId: 7, pixelCount: 2, label: 'road' }],
           processingTimeMs: 2,
           modelId: 'segformer-b0',
         })).finish(),

@@ -45,12 +45,14 @@ class ImagesApi {
       modelId: null,
       category: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
     );
+    // `DiffusionResult.error` was deleted outright (idl/diffusion_options.proto):
+    // "failures travel out-of-band on the unary path (rac_proto_buffer_t
+    // status/error_message)". `generateImage` already throws SDKException
+    // on that native failure path, so a successful return here is never a
+    // failed result.
     final result = await RunAnywhereDiffusion.shared.generateImage(
       effective.toProto(prompt),
     );
-    if (result.hasError()) {
-      throw SDKException.processingFailed(result.error.message);
-    }
     return ImageResult.fromProto(result, steps: effective.steps);
   }
 

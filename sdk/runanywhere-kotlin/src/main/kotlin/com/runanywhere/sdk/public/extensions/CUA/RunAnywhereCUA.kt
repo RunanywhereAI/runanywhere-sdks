@@ -42,8 +42,16 @@ data class CuaAction(
     val text: String,
     /** Chain-of-thought the model emitted before the tool call, if any. */
     val reasoning: String,
-    /** Scroll amount for scroll/hscroll (+up / -down). */
-    val scrollPixels: Int,
+    /**
+     * Horizontal scroll amount, for [Kind.HSCROLL]. Raw model output, sign
+     * unverified against any real device trace.
+     */
+    val scrollX: Int,
+    /**
+     * Vertical scroll amount, for [Kind.SCROLL]. Raw model output, sign
+     * unverified against any real device trace.
+     */
+    val scrollY: Int,
     /** Seconds to wait for [Kind.WAIT]. */
     val waitSeconds: Double,
     /** Whether a valid tool call was found. */
@@ -94,16 +102,30 @@ data class CuaAction(
     }
 
     companion object {
-        /** Build a [CuaAction] from the decoded `runanywhere.v1.CuaAction` proto. */
+        /**
+         * Build a [CuaAction] from the decoded `runanywhere.v1.CuaAction` proto.
+         *
+         * `coordinate_valid`/`scroll_pixels`/`parse_ok` are deleted outright
+         * (idl/cua.proto): `x`/`y` presence IS "has a coordinate" now (both
+         * optional `Int?`), `scroll_pixels` split into `scroll_x`/`scroll_y`,
+         * and `parse_ok` was renamed `is_valid`. Mirrors Swift's
+         * `CUA.parseAction(_:profile:viewport:)`.
+         */
         internal fun from(proto: CuaActionProto): CuaAction =
             CuaAction(
                 kind = Kind.fromRawValue(proto.type.value),
-                coordinate = if (proto.coordinate_valid) Coordinate(proto.x, proto.y) else null,
+                coordinate =
+                    if (proto.x != null && proto.y != null) {
+                        Coordinate(proto.x, proto.y)
+                    } else {
+                        null
+                    },
                 text = proto.text,
                 reasoning = proto.reasoning,
-                scrollPixels = proto.scroll_pixels,
+                scrollX = proto.scroll_x,
+                scrollY = proto.scroll_y,
                 waitSeconds = proto.wait_seconds,
-                isValid = proto.parse_ok,
+                isValid = proto.is_valid,
             )
     }
 }

@@ -38,11 +38,12 @@ __all__ = [
 ]
 
 # runanywhere.v1.RAGStreamEventKind wire values, hardcoded so the event mapping does not
-# depend on the optional protobuf runtime being importable.
-_STREAM_CHUNK_RETRIEVED = 2
-_STREAM_TOKEN = 4
-_STREAM_COMPLETED = 5
-_STREAM_ERROR = 6
+# depend on the optional protobuf runtime being importable. The stream no longer signals a
+# distinct "chunk retrieved" stage (RAGStreamEventKind collapsed to just TOKEN/COMPLETED/ERROR
+# on top of UNSPECIFIED=0) — retrieval happens before the first token, with no separate event.
+_STREAM_TOKEN = 1
+_STREAM_COMPLETED = 2
+_STREAM_ERROR = 3
 
 
 def require_proto() -> None:
@@ -87,10 +88,7 @@ def build_config(
     message.chunk_size = cfg.chunk_size
     message.chunk_overlap = cfg.chunk_overlap
     if cfg.similarity_threshold is not None:
-        message.similarity_threshold = cfg.similarity_threshold
-    if cfg.persist_path:
-        message.index_path = cfg.persist_path
-        message.persist_index = True
+        message.score_threshold = cfg.similarity_threshold
     return message.SerializeToString()
 
 
@@ -105,18 +103,16 @@ def build_document(text: str, doc_id: str, metadata: Optional[dict]) -> bytes:
 def build_query(
     question: str,
     options: Optional[RagQueryOptions],
-    *,
-    stream: bool = False,
 ) -> bytes:
     """Serialize a RAGQueryOptions from a question plus retrieval/generation overrides."""
-    query = _pb.RAGQueryOptions(question=question)
+    query = _pb.RAGQueryOptions(query=question)
     if options is not None:
         retrieval = options.retrieval
         if retrieval is not None:
             if retrieval.top_k is not None:
-                query.retrieval_top_k = int(retrieval.top_k)
+                query.retrieval.top_k = int(retrieval.top_k)
             if retrieval.similarity_threshold is not None:
-                query.similarity_threshold = retrieval.similarity_threshold
+                query.retrieval.score_threshold = retrieval.similarity_threshold
         generation = options.generation
         if generation is not None:
             query.generation.max_output_tokens = generation.max_output_tokens
@@ -131,20 +127,19 @@ def build_query(
                 query.generation.reasoning.include_in_output = (
                     generation.reasoning.include_in_output
                 )
-    query.stream = stream
     return query.SerializeToString()
 
 
 def build_search(question: str, *, top_k: Optional[int] = None) -> bytes:
     """Serialize a RAGSearchRequest for the retrieval-only ABI."""
-    request = _pb.RAGSearchRequest(question=question)
+    request = _pb.RAGSearchRequest(query=question)
     if top_k is not None:
-        request.retrieval_top_k = int(top_k)
+        request.retrieval.top_k = int(top_k)
     return request.SerializeToString()
 
 
 def _match(pb: Any) -> Match:
-    return Match(text=pb.text, score=pb.similarity_score, metadata=dict(pb.metadata))
+    return Match(text=pb.text, score=pb.score, metadata=dict(pb.metadata))
 
 
 def parse_search_response(raw: bytes) -> List[Match]:
@@ -203,14 +198,18 @@ def parse_stats(raw: bytes) -> RagStats:
 def parse_stream_event(raw: bytes, model: str) -> Optional[RagEvent]:
     """Map one RAGStreamEvent onto the public event grammar, or None for internal stages.
 
+    ``RAGStreamEventKind`` no longer has a CHUNK_RETRIEVED/CONTEXT_READY stage — commons'
+    ``rac_rag_query_stream_proto`` only ever emitted TOKEN then a terminal COMPLETED (see
+    ``rac_rag_proto_abi.cpp``'s ``on_token``/terminal ``emit()`` calls), so retrieval sources
+    surface solely on the terminal event's ``result.retrieved_chunks`` — there was never a
+    separate mid-stream retrieval signal to lose here.
+
     Raises:
         SDKException: the pipeline reported a failure mid-stream.
     """
     pb = _pb.RAGStreamEvent()
     pb.ParseFromString(raw)
     kind = int(pb.kind)
-    if kind == _STREAM_CHUNK_RETRIEVED and pb.HasField("chunk"):
-        return RagEvent(kind=RagEventKind.RETRIEVED, matches=[_match(pb.chunk)])
     if kind == _STREAM_TOKEN:
         return RagEvent(kind=RagEventKind.TOKEN, text=pb.token, token_kind=TokenKind.TEXT)
     if kind == _STREAM_COMPLETED and pb.HasField("result"):

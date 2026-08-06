@@ -24,9 +24,11 @@ _sym_db = _symbol_database.Default()
 
 
 from runanywhere._proto import errors_pb2 as errors__pb2
+from runanywhere._proto import model_types_pb2 as model__types__pb2
+from runanywhere._proto import rac_options_pb2 as rac__options__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0esdk_init.proto\x12\x0erunanywhere.v1\x1a\x0c\x65rrors.proto\"\xac\x01\n\x14SdkInitPhase1Request\x12\x37\n\x0b\x65nvironment\x18\x01 \x01(\x0e\x32\".runanywhere.v1.SdkInitEnvironment\x12\x0f\n\x07\x61pi_key\x18\x02 \x01(\t\x12\x10\n\x08\x62\x61se_url\x18\x03 \x01(\t\x12\x11\n\tdevice_id\x18\x04 \x01(\t\x12\x10\n\x08platform\x18\x05 \x01(\t\x12\x13\n\x0bsdk_version\x18\x06 \x01(\t\"\xa8\x01\n\x14SdkInitPhase2Request\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\x12!\n\x19\x66orce_refresh_assignments\x18\x02 \x01(\x08\x12\x17\n\x0f\x66lush_telemetry\x18\x03 \x01(\x08\x12\"\n\x1a\x64iscover_downloaded_models\x18\x04 \x01(\x08\x12\x1b\n\x13rescan_local_models\x18\x05 \x01(\x08\"\xb3\x02\n\rSdkInitResult\x12+\n\x05phase\x18\x01 \x01(\x0e\x32\x1c.runanywhere.v1.SdkInitPhase\x12\'\n\x05\x65rror\x18\x03 \x01(\x0b\x32\x18.runanywhere.v1.SDKError\x12\x17\n\x0fhttp_configured\x18\x04 \x01(\x08\x12\x19\n\x11\x64\x65vice_registered\x18\x05 \x01(\x08\x12\x1b\n\x13linked_models_count\x18\x06 \x01(\r\x12\x1a\n\x12\x64iscovered_orphans\x18\x07 \x01(\r\x12\x0f\n\x07warning\x18\x08 \x01(\t\x12\x13\n\x0b\x64uration_ms\x18\t \x01(\x03\x12 \n\x18has_completed_http_setup\x18\n \x01(\x08\x12\x17\n\x0fhttp_applicable\x18\x0b \x01(\x08*}\n\x0cSdkInitPhase\x12\x1e\n\x1aSDK_INIT_PHASE_UNSPECIFIED\x10\x00\x12\x16\n\x12SDK_INIT_PHASE_ONE\x10\x01\x12\x16\n\x12SDK_INIT_PHASE_TWO\x10\x02\x12\x1d\n\x19SDK_INIT_PHASE_RETRY_HTTP\x10\x03*_\n\x12SdkInitEnvironment\x12$\n SDK_INIT_ENVIRONMENT_DEVELOPMENT\x10\x00\x12#\n\x1fSDK_INIT_ENVIRONMENT_PRODUCTION\x10\x02\x42\x87\x01\n\x17\x61i.runanywhere.proto.v1B\x0cSdkInitProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0esdk_init.proto\x12\x0erunanywhere.v1\x1a\x0c\x65rrors.proto\x1a\x11model_types.proto\x1a\x11rac_options.proto\"\x9b\x02\n\x14SdkInitPhase1Request\x12\x33\n\x0b\x65nvironment\x18\x01 \x01(\x0e\x32\x1e.runanywhere.v1.SDKEnvironment\x12\x0f\n\x07\x61pi_key\x18\x02 \x01(\t\x12\x10\n\x08\x62\x61se_url\x18\x03 \x01(\t\x12\x11\n\tdevice_id\x18\x04 \x01(\t\x12\x10\n\x08platform\x18\x05 \x01(\t\x12\x13\n\x0bsdk_version\x18\x06 \x01(\t\x12&\n\x12request_timeout_ms\x18\x07 \x01(\x05\x42\x05\xa0\xb5\x18\xe8\x07H\x00\x88\x01\x01\x12\"\n\x0bmax_retries\x18\x08 \x01(\x05\x42\x08\xa0\xb5\x18\x00\xa8\xb5\x18\nH\x01\x88\x01\x01\x42\x15\n\x13_request_timeout_msB\x0e\n\x0c_max_retries\"+\n\x14SdkInitPhase2Request\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\"\xa1\x01\n\rSdkInitResult\x12\'\n\x05\x65rror\x18\x01 \x01(\x0b\x32\x18.runanywhere.v1.SDKError\x12\x1b\n\x13linked_models_count\x18\x02 \x01(\r\x12\x0f\n\x07warning\x18\x03 \x01(\t\x12 \n\x18has_completed_http_setup\x18\x04 \x01(\x08\x12\x17\n\x0fhttp_applicable\x18\x05 \x01(\x08\x42\x87\x01\n\x17\x61i.runanywhere.proto.v1B\x0cSdkInitProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,14 +36,14 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'sdk_init_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\014SdkInitProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_SDKINITPHASE']._serialized_start=704
-  _globals['_SDKINITPHASE']._serialized_end=829
-  _globals['_SDKINITENVIRONMENT']._serialized_start=831
-  _globals['_SDKINITENVIRONMENT']._serialized_end=926
-  _globals['_SDKINITPHASE1REQUEST']._serialized_start=49
-  _globals['_SDKINITPHASE1REQUEST']._serialized_end=221
-  _globals['_SDKINITPHASE2REQUEST']._serialized_start=224
-  _globals['_SDKINITPHASE2REQUEST']._serialized_end=392
-  _globals['_SDKINITRESULT']._serialized_start=395
-  _globals['_SDKINITRESULT']._serialized_end=702
+  _globals['_SDKINITPHASE1REQUEST'].fields_by_name['request_timeout_ms']._loaded_options = None
+  _globals['_SDKINITPHASE1REQUEST'].fields_by_name['request_timeout_ms']._serialized_options = b'\240\265\030\350\007'
+  _globals['_SDKINITPHASE1REQUEST'].fields_by_name['max_retries']._loaded_options = None
+  _globals['_SDKINITPHASE1REQUEST'].fields_by_name['max_retries']._serialized_options = b'\240\265\030\000\250\265\030\n'
+  _globals['_SDKINITPHASE1REQUEST']._serialized_start=87
+  _globals['_SDKINITPHASE1REQUEST']._serialized_end=370
+  _globals['_SDKINITPHASE2REQUEST']._serialized_start=372
+  _globals['_SDKINITPHASE2REQUEST']._serialized_end=415
+  _globals['_SDKINITRESULT']._serialized_start=418
+  _globals['_SDKINITRESULT']._serialized_end=579
 # @@protoc_insertion_point(module_scope)

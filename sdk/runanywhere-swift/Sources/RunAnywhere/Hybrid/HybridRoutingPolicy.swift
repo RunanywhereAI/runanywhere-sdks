@@ -138,7 +138,19 @@ extension HybridRoutingPolicy {
         if let cascade {
             message.cascade = encodeCascade(cascade)
         }
-        message.preferLocal = preferLocal
+        // preferLocal -> mode (idl/hybrid_router.proto): the offline/online
+        // pair was replaced on the wire by an ordered `models` list plus a
+        // `mode: HybridInferenceMode` rank direction, but commons
+        // (rac_stt_hybrid_router_proto.cpp) has not wired up a `models`
+        // consumer yet — it still drives routing off two separately
+        // registered offline/online service descriptors (see
+        // HybridSTTRouter's setOfflineService/setOnlineService) and reads
+        // only `mode` from this policy to decide rank direction. Anything
+        // other than PREFER_IN_CLOUD/ONLY_IN_CLOUD is treated as
+        // local-first, so `preferLocal: true` maps to `.preferOnDevice`
+        // and `false` to `.preferInCloud` to preserve the exact old
+        // behavior.
+        message.mode = preferLocal ? .preferOnDevice : .preferInCloud
         return try [UInt8](message.serializedData())
     }
 
@@ -149,8 +161,13 @@ extension HybridRoutingPolicy {
             // bool network = 1. Setting the oneof case emits field 1 even when
             // the value is the proto default, matching the prior encoder.
             proto.network = true
-        case let .quality(tier):
-            proto.qualityTier = tier
+        case .quality:
+            // RAHybridFilter's oneof only has network/battery/custom arms
+            // (idl/hybrid_router.proto) — there has never been a wire slot
+            // for a quality tier. Matches this case's own doc comment:
+            // "v1 descriptors carry no quality tier, so commons treats this
+            // as a no-op today." Nothing to encode.
+            break
         case let .battery(minPercent):
             var battery = RABatteryFilter()
             battery.minBatteryPercent = minPercent

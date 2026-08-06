@@ -270,7 +270,7 @@ class RunAnywhereStorage {
   /// Execute a generated-proto storage delete request.
   ///
   /// Mirrors Swift `RunAnywhere.deleteStorage(_:)`; callers choose the typed
-  /// policy flags (`deleteFiles`, `clearRegistryPaths`, `unloadIfLoaded`,
+  /// policy flags (`keepFilesOnDisk`, `clearRegistryPaths`, `unloadIfLoaded`,
   /// `allowPlatformDelete`) while commons owns the actual plan/execution.
   static Future<StorageDeleteResult> deleteStorage(
     StorageDeleteRequest request,
@@ -286,11 +286,15 @@ class RunAnywhereStorage {
   /// entry returns to registered-not-downloaded (re-downloadable).
   /// Convenience over [deleteStorage] with the canonical flag set — mirrors
   /// Swift `RunAnywhere.deleteModel(_:)`.
+  ///
+  /// `delete_files` was renamed with an inverted polarity to
+  /// `keep_files_on_disk` (idl/storage_types.proto): the old
+  /// `deleteFiles: true` (do delete) is the new proto3 zero default, so it
+  /// is simply omitted below.
   static Future<StorageDeleteResult> deleteModel(String modelId) {
     return deleteStorage(
       StorageDeleteRequest(
         modelIds: [modelId],
-        deleteFiles: true,
         clearRegistryPaths: true,
         unloadIfLoaded: true,
         allowPlatformDelete: true,

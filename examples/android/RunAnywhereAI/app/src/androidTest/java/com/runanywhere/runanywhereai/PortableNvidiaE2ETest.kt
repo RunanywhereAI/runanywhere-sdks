@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai
 
-import ai.runanywhere.proto.v1.DownloadStage
 import ai.runanywhere.proto.v1.DownloadState
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import android.util.Log
@@ -104,7 +104,7 @@ class PortableNvidiaE2ETest {
                                 lastPercent = percent
                                 Log.i(
                                     tag,
-                                    "DOWNLOAD id=$modelId state=${progress.state} stage=${progress.stage} " +
+                                    "DOWNLOAD id=$modelId state=${progress.state} " +
                                         "percent=$percent bytes=${progress.bytes_downloaded}/${progress.total_bytes}",
                                 )
                             }
@@ -113,10 +113,10 @@ class PortableNvidiaE2ETest {
                 val downloadMs = System.currentTimeMillis() - downloadStarted
                 fields["downloadMs"] = downloadMs.toString()
                 fields["downloadedBytes"] = terminal.total_bytes.toString()
-                val downloadOk =
-                    terminal.state == DownloadState.DOWNLOAD_STATE_COMPLETED ||
-                        terminal.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED
-                check(downloadOk) { "download did not complete: state=${terminal.state} stage=${terminal.stage}" }
+                // DownloadStage was deleted outright; DownloadProgress.state (DownloadState)
+                // is the sole discriminator now.
+                val downloadOk = terminal.state == DownloadState.DOWNLOAD_STATE_COMPLETED
+                check(downloadOk) { "download did not complete: state=${terminal.state}" }
                 fields["memAvailKbAfterDownload"] = memAvailableKb().toString()
 
                 phase = "run"
@@ -280,7 +280,9 @@ class PortableNvidiaE2ETest {
             withTimeout(900_000) {
                 RunAnywhere.generateStream(prompt, options).collect { event ->
                     event.token?.let { if (it.isNotEmpty()) text.append(it) }
-                    if (event.is_final) {
+                    // LLMStreamEvent.is_final was deleted outright; event_kind
+                    // (COMPLETED/ERROR) is the sole terminal discriminator now.
+                    if (event.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
                         event.result?.let {
                             promptTokens = it.usage?.input_tokens ?: 0
                             completionTokens = it.usage?.output_tokens ?: 0

@@ -1,13 +1,20 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { LLMGenerationOptions } from "./llm_options";
 export declare const protobufPackage = "runanywhere.v1";
-/** Lets frontends switch on one enum instead of inspecting the oneof. */
+/**
+ * Frontends switch on the SolutionConfig oneof case. This enum exists only
+ * for logs and handles, and its numbers now match the oneof tags.
+ */
 export declare enum SolutionType {
     SOLUTION_TYPE_UNSPECIFIED = 0,
+    /** SOLUTION_TYPE_VOICE_AGENT - SolutionConfig.voice_agent = 1 */
     SOLUTION_TYPE_VOICE_AGENT = 1,
+    /** SOLUTION_TYPE_RAG - SolutionConfig.rag         = 2 */
     SOLUTION_TYPE_RAG = 2,
-    SOLUTION_TYPE_TIME_SERIES = 4,
-    SOLUTION_TYPE_AGENT_LOOP = 5,
+    /** SOLUTION_TYPE_AGENT_LOOP - SolutionConfig.agent_loop  = 4 */
+    SOLUTION_TYPE_AGENT_LOOP = 4,
+    /** SOLUTION_TYPE_TIME_SERIES - SolutionConfig.time_series = 5 */
+    SOLUTION_TYPE_TIME_SERIES = 5,
     UNRECOGNIZED = -1
 }
 export declare function solutionTypeFromJSON(object: any): SolutionType;
@@ -63,7 +70,6 @@ export interface VoiceAgentConfig {
     maxContextTokens: number;
     /** Emit partial transcripts as non-final user-said events. */
     emitPartials: boolean;
-    typeKind?: SolutionType | undefined;
 }
 export interface RAGConfig {
     embedModelId: string;
@@ -80,7 +86,6 @@ export interface RAGConfig {
     /** Reciprocal-rank-fusion smoothing constant. */
     rrfK: number;
     promptTemplate: string;
-    typeKind?: SolutionType | undefined;
 }
 export interface AgentLoopConfig {
     llmModelId: string;
@@ -88,7 +93,6 @@ export interface AgentLoopConfig {
     tools: ToolSpec[];
     maxIterations: number;
     maxContextTokens: number;
-    typeKind?: SolutionType | undefined;
 }
 export interface ToolSpec {
     name: string;
@@ -103,7 +107,6 @@ export interface TimeSeriesConfig {
     windowSize: number;
     stride: number;
     anomalyThreshold: number;
-    typeKind?: SolutionType | undefined;
 }
 export declare const SolutionConfig: MessageFns<SolutionConfig>;
 export declare const SolutionHandle: MessageFns<SolutionHandle>;

@@ -37,12 +37,14 @@ class CppBridgeSegmentationTest {
                     height = 1,
                     class_mask_u16_le = byteArrayOf(12, 0).toByteString(),
                     diagnostic_rgba = byteArrayOf(1, 2, 3, 0xff.toByte()).toByteString(),
+                    // `fraction` is deleted outright (idl); it was a pure
+                    // derivation of pixel_count over the total pixel count
+                    // with no independent wire value.
                     class_summaries =
                         listOf(
                             SegmentationClassSummary(
                                 class_id = 12,
                                 pixel_count = 1,
-                                fraction = 1f,
                                 label = "person",
                             ),
                         ),

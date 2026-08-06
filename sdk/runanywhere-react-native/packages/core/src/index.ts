@@ -204,7 +204,6 @@ export {
   sdkExceptionFromRcResult,
   throwIfRcError,
 } from './Foundation/Errors';
-export type { ErrorContext } from './Foundation/Errors';
 
 // In-SDK audio capture/playback for apps that drive their own audio UI.
 export { AudioCaptureManager } from './Features/VoiceSession/AudioCaptureManager';

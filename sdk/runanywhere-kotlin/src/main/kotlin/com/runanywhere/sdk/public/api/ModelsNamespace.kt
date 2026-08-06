@@ -8,7 +8,7 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.DownloadStage
+import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.ModelGetRequest
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.ModelLoadRequest
@@ -134,23 +134,32 @@ public class ModelsNamespace internal constructor() {
             var sequence = 0L
             val model = get(id) ?: throw SDKException.modelNotFound(id)
             emit(DownloadEvent.Started(operationId, sequence++))
-            var extractingEmitted = false
             try {
                 legacyDownloadModel(model) { progress ->
-                    if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
-                        if (!extractingEmitted) {
-                            extractingEmitted = true
-                            emit(DownloadEvent.Extracting(operationId, sequence++))
-                        }
-                    } else {
-                        emit(
-                            DownloadEvent.Progress(
-                                operationId = operationId,
-                                sequence = sequence++,
-                                bytesDone = progress.bytes_downloaded,
-                                bytesTotal = progress.total_bytes,
-                            ),
-                        )
+                    // DownloadStage was folded into DownloadState
+                    // (idl/download_service.proto) -- switch on `.state`
+                    // directly.
+                    when (progress.state) {
+                        DownloadState.DOWNLOAD_STATE_VALIDATING ->
+                            emit(DownloadEvent.Verifying(operationId, sequence++))
+                        DownloadState.DOWNLOAD_STATE_EXTRACTING ->
+                            emit(
+                                DownloadEvent.Extracting(
+                                    operationId = operationId,
+                                    sequence = sequence++,
+                                    percent = progress.stage_progress * 100,
+                                ),
+                            )
+                        else ->
+                            emit(
+                                DownloadEvent.Progress(
+                                    operationId = operationId,
+                                    sequence = sequence++,
+                                    bytesDone = progress.bytes_downloaded,
+                                    bytesTotal = progress.total_bytes,
+                                    file = progress.current_file_name.takeIf { it.isNotEmpty() },
+                                ),
+                            )
                     }
                 }
             } catch (error: SDKException) {

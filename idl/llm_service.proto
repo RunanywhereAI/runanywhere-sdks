@@ -5,10 +5,8 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "errors.proto";
-import "voice_events.proto";
 import "tool_calling.proto";
 import "llm_options.proto";
-import "token_usage.proto";
 import "chat.proto";
 
 option cc_enable_arenas      = true;
@@ -22,31 +20,22 @@ option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;r
 
 // The single request envelope for both unary and streaming generation.
 message LLMGenerateRequest {
-    string prompt           = 1;
+    reserved 1, 25, 27;
+    reserved "prompt", "metadata", "history";
+
+    // Correlation id, echoed on every LLMStreamEvent for this call. Empty =
+    // commons generates one, which is the normal case and matches industry
+    // practice (provider-generated: OpenAI `id`, Anthropic `request-id`). A
+    // non-empty caller value is honoured verbatim.
     string request_id = 14;
     string model_id = 15;
     string conversation_id = 16;
-    map<string, string> metadata = 25;
     optional LLMGenerationOptions options = 26;
 
-    // Prior turns, excluding `prompt` (the live user turn) and
-    // options.system_prompt.
-    repeated ChatMessage history = 27;
-}
-
-message LLMStreamFinalResult {
-    string text = 1;
-    optional string thinking_content = 2;
-    int64 total_time_ms = 6;
-    int64 time_to_first_token_ms = 7;
-    string finish_reason = 9;
-    int64 prompt_eval_time_ms = 12;
-    int64 decode_time_ms = 13;
-    repeated ToolCall tool_calls = 14;
-    repeated ToolResult tool_results = 15;
-
-    TokenUsage usage = 16;
-    optional SDKError error = 17;
+    // The whole conversation, oldest first, ending with the turn the model
+    // must answer. Never empty. System turns belong in
+    // options.system_prompt, not here.
+    repeated ChatMessage messages = 28;
 }
 
 enum LLMStreamEventKind {
@@ -60,26 +49,43 @@ enum LLMStreamEventKind {
     LLM_STREAM_EVENT_KIND_ERROR = 7;
 }
 
-// `result` is populated only on the terminal event.
+// LLMStreamFinalResult is deleted: the stream terminates with the same
+// LLMGenerationResult type the unary call returns (see `result` below), so
+// one mapper serves both paths instead of two near-identical ones.
+//
+// Exactly one terminal event per stream: event_kind == COMPLETED (with
+// `result` set) or == ERROR (with `error` set). `event_kind` is the primary
+// discriminator.
 message LLMStreamEvent {
+    reserved 2, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17;
+    reserved "timestamp_us", "is_final", "kind", "token_id", "logprob",
+             "conversation_id", "prompt_tokens_processed",
+             "completion_tokens_generated", "elapsed_ms";
+
     // Monotonic sequence for tool-calling session streams (#607).
     uint64 seq             = 1;
-    int64  timestamp_us    = 2;
+
+    // The delta. Answer text when event_kind == TOKEN, reasoning text when
+    // event_kind == THINKING.
     string token           = 3;
-    bool   is_final        = 4;
-    TokenKind kind         = 5;
-    uint32 token_id        = 6;
-    float  logprob         = 7;
-    string finish_reason   = 8;
-    optional LLMStreamFinalResult result = 10;
+
     LLMStreamEventKind event_kind = 12;
+
+    // Correlation id, echoed from the request on every event.
     string request_id = 13;
-    string conversation_id = 14;
-    int32 prompt_tokens_processed = 15;
-    int32 completion_tokens_generated = 16;
-    int64 elapsed_ms = 17;
+
+    FinishReason finish_reason = 21;
+
+    // Present exactly when event_kind == COMPLETED.
+    optional LLMGenerationResult result = 22;
+    // Present exactly when event_kind == TOOL_CALL.
     optional ToolCall tool_call = 18;
+    // Present exactly when event_kind == ERROR.
     optional SDKError error = 19;
+
+    // Largest complete JSON value visible in the output so far, when
+    // LLMGenerationOptions.structured_output is set.
+    optional string partial_json = 20;
 }
 
 // ToolCallingSession* messages are canonical in tool_calling.proto (see #607).

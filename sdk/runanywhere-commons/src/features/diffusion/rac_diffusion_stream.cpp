@@ -69,7 +69,9 @@ void diffusion_in_flight_release() {
 
 struct StreamSession {
     rac_handle_t handle = nullptr;
-    std::string request_id;
+    // DiffusionGenerationRequest.request_id was deleted: "Generation is
+    // single-flight, so the stream itself is the correlation" (one active
+    // session per handle, enforced by g_active_by_handle()).
     std::atomic<bool> is_cancelled{false};
 };
 
@@ -246,7 +248,6 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
         // StreamSession contains an atomic — assign fields in-place (no copy/move).
         StreamSession& session = g_sessions()[session_id];
         session.handle = handle;
-        session.request_id = parsed.request_id();
         session.is_cancelled.store(false, std::memory_order_release);
         g_active_by_handle()[handle] = session_id;
     }

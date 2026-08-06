@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -54,6 +53,9 @@ public class RAGStatistics(
     schemaIndex = 2,
   )
   public val total_tokens_indexed: Long = 0L,
+  /**
+   * Milliseconds since the Unix epoch when the index last changed.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -62,48 +64,22 @@ public class RAGStatistics(
     schemaIndex = 3,
   )
   public val last_updated_ms: Long = 0L,
+  /**
+   * Bytes the index occupies (industry: VectorStore.usage_bytes).
+   * MUST be populated by make_stats() — it is surfaced as RagStats.indexSizeBytes.
+   */
   @field:WireField(
     tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "indexPath",
-    schemaIndex = 4,
-  )
-  public val index_path: String? = null,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "statsJson",
-    schemaIndex = 5,
-  )
-  public val stats_json: String? = null,
-  @field:WireField(
-    tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "vectorStoreSizeBytes",
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
   public val vector_store_size_bytes: Long = 0L,
   @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "isPersistent",
-    schemaIndex = 7,
-  )
-  public val is_persistent: Boolean = false,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "lastQueryMs",
-    schemaIndex = 8,
-  )
-  public val last_query_ms: Long = 0L,
-  @field:WireField(
-    tag = 12,
+    tag = 6,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 9,
+    schemaIndex = 5,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -122,11 +98,7 @@ public class RAGStatistics(
     if (indexed_chunks != other.indexed_chunks) return false
     if (total_tokens_indexed != other.total_tokens_indexed) return false
     if (last_updated_ms != other.last_updated_ms) return false
-    if (index_path != other.index_path) return false
-    if (stats_json != other.stats_json) return false
     if (vector_store_size_bytes != other.vector_store_size_bytes) return false
-    if (is_persistent != other.is_persistent) return false
-    if (last_query_ms != other.last_query_ms) return false
     if (error != other.error) return false
     return true
   }
@@ -139,11 +111,7 @@ public class RAGStatistics(
       result = result * 37 + indexed_chunks.hashCode()
       result = result * 37 + total_tokens_indexed.hashCode()
       result = result * 37 + last_updated_ms.hashCode()
-      result = result * 37 + (index_path?.hashCode() ?: 0)
-      result = result * 37 + (stats_json?.hashCode() ?: 0)
       result = result * 37 + vector_store_size_bytes.hashCode()
-      result = result * 37 + is_persistent.hashCode()
-      result = result * 37 + last_query_ms.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -156,11 +124,7 @@ public class RAGStatistics(
     result += """indexed_chunks=$indexed_chunks"""
     result += """total_tokens_indexed=$total_tokens_indexed"""
     result += """last_updated_ms=$last_updated_ms"""
-    if (index_path != null) result += """index_path=${sanitize(index_path)}"""
-    if (stats_json != null) result += """stats_json=${sanitize(stats_json)}"""
     result += """vector_store_size_bytes=$vector_store_size_bytes"""
-    result += """is_persistent=$is_persistent"""
-    result += """last_query_ms=$last_query_ms"""
     if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "RAGStatistics{", separator = ", ", postfix = "}")
   }
@@ -170,14 +134,10 @@ public class RAGStatistics(
     indexed_chunks: Long = this.indexed_chunks,
     total_tokens_indexed: Long = this.total_tokens_indexed,
     last_updated_ms: Long = this.last_updated_ms,
-    index_path: String? = this.index_path,
-    stats_json: String? = this.stats_json,
     vector_store_size_bytes: Long = this.vector_store_size_bytes,
-    is_persistent: Boolean = this.is_persistent,
-    last_query_ms: Long = this.last_query_ms,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGStatistics = RAGStatistics(indexed_documents, indexed_chunks, total_tokens_indexed, last_updated_ms, index_path, stats_json, vector_store_size_bytes, is_persistent, last_query_ms, error, unknownFields)
+  ): RAGStatistics = RAGStatistics(indexed_documents, indexed_chunks, total_tokens_indexed, last_updated_ms, vector_store_size_bytes, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -203,18 +163,10 @@ public class RAGStatistics(
         if (value.last_updated_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.last_updated_ms)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.index_path)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.stats_json)
         if (value.vector_store_size_bytes != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.vector_store_size_bytes)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.vector_store_size_bytes)
         }
-        if (value.is_persistent != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.is_persistent)
-        }
-        if (value.last_query_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.last_query_ms)
-        }
-        size += SDKError.ADAPTER.encodedSizeWithTag(12, value.error)
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
@@ -231,35 +183,19 @@ public class RAGStatistics(
         if (value.last_updated_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.last_updated_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.index_path)
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.stats_json)
         if (value.vector_store_size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.vector_store_size_bytes)
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.vector_store_size_bytes)
         }
-        if (value.is_persistent != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.is_persistent)
-        }
-        if (value.last_query_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.last_query_ms)
-        }
-        SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGStatistics) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
-        if (value.last_query_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.last_query_ms)
-        }
-        if (value.is_persistent != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.is_persistent)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         if (value.vector_store_size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.vector_store_size_bytes)
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.vector_store_size_bytes)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.stats_json)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.index_path)
         if (value.last_updated_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.last_updated_ms)
         }
@@ -279,11 +215,7 @@ public class RAGStatistics(
         var indexed_chunks: Long = 0L
         var total_tokens_indexed: Long = 0L
         var last_updated_ms: Long = 0L
-        var index_path: String? = null
-        var stats_json: String? = null
         var vector_store_size_bytes: Long = 0L
-        var is_persistent: Boolean = false
-        var last_query_ms: Long = 0L
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -291,12 +223,8 @@ public class RAGStatistics(
             2 -> indexed_chunks = ProtoAdapter.INT64.decode(reader)
             3 -> total_tokens_indexed = ProtoAdapter.INT64.decode(reader)
             4 -> last_updated_ms = ProtoAdapter.INT64.decode(reader)
-            5 -> index_path = ProtoAdapter.STRING.decode(reader)
-            6 -> stats_json = ProtoAdapter.STRING.decode(reader)
-            7 -> vector_store_size_bytes = ProtoAdapter.INT64.decode(reader)
-            8 -> is_persistent = ProtoAdapter.BOOL.decode(reader)
-            9 -> last_query_ms = ProtoAdapter.INT64.decode(reader)
-            12 -> error = SDKError.ADAPTER.decode(reader)
+            5 -> vector_store_size_bytes = ProtoAdapter.INT64.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -305,11 +233,7 @@ public class RAGStatistics(
           indexed_chunks = indexed_chunks,
           total_tokens_indexed = total_tokens_indexed,
           last_updated_ms = last_updated_ms,
-          index_path = index_path,
-          stats_json = stats_json,
           vector_store_size_bytes = vector_store_size_bytes,
-          is_persistent = is_persistent,
-          last_query_ms = last_query_ms,
           error = error,
           unknownFields = unknownFields
         )

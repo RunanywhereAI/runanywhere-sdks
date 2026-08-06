@@ -8,7 +8,6 @@
 
 import type { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import type { ModelCategory, InferenceFramework, ModelInfo } from '@runanywhere/proto-ts/model_types';
-import type { JSONSchema } from '@runanywhere/proto-ts/structured_output';
 import type { ToolCall, ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 
 export type { ModelCategory, InferenceFramework, ModelInfo };
@@ -17,8 +16,15 @@ export type { ToolCall, ToolDefinition };
 /** Control-plane environment the SDK talks to. */
 export type Environment = SDKEnvironment;
 
-/** JSON schema describing a structured generation result. */
-export type JsonSchema = JSONSchema;
+/**
+ * JSON schema describing a structured generation result.
+ *
+ * `structured_output.proto`'s typed `JSONSchema`/`JSONSchemaProperty`
+ * messages are deleted outright: `StructuredOutputOptions.schema` (and the
+ * `LLMGenerationOptions.structuredOutput` path that now owns structured
+ * generation) carry the schema as a raw JSON Schema document string.
+ */
+export type JsonSchema = string;
 
 // ---------------------------------------------------------------------------
 // Core

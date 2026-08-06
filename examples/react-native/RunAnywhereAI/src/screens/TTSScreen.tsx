@@ -30,6 +30,7 @@ import {
 } from '../utils/runAnywhereLifecycle';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
+import { isModelDownloaded } from '../utils/modelDisplay';
 
 const SURPRISE_PHRASES = [
   'The quick brown fox jumps over the lazy dog.',
@@ -199,7 +200,7 @@ export const TTSScreen: React.FC = () => {
     try {
       setIsModelLoading(true);
       setError(null);
-      if (!model.isDownloaded && !model.localPath) {
+      if (!isModelDownloaded(model)) {
         Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }

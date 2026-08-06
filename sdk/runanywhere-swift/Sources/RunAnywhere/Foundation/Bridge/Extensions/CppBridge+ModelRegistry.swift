@@ -383,8 +383,11 @@ extension CppBridge {
                 throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
             }
 
+            // usageCount (tag 35) was reserved off the wire outright
+            // (idl/model_types.proto / model_registry_convert.cpp) — the C
+            // struct field has no proto source to read from or write to
+            // anymore, so lastUsedAtUnixMs alone now records "last used".
             model.lastUsedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-            model.usageCount += 1
             try update(model)
         }
 
@@ -432,7 +435,11 @@ extension CppBridge {
                     symbolName: "rac_model_registry_discover_proto",
                     responseType: RAModelDiscoveryResult.self
                 )
-                logger.info("Discovery complete via proto: \(result.linkedCount) models linked, \(result.scannedCount) scanned")
+                // linkedCount/scannedCount were deleted outright
+                // (idl/model_types.proto): RAModelDiscoveryResult now only
+                // carries discoveredModels/warnings/error, so the discovered
+                // count is read from the array directly.
+                logger.info("Discovery complete via proto: \(result.discoveredModels.count) models discovered")
                 return result
             } catch {
                 logger.warning("Discovery proto failed: \(error)")

@@ -668,14 +668,12 @@ object RunAnywhere {
                 // Phase 2.
                 initializePlatformBridgeServices()
 
-                val phase2Result =
-                    CppBridgeSdkInit.phase2(
-                        buildToken = null,
-                        forceRefreshAssignments = false,
-                        flushTelemetry = true,
-                        discoverDownloadedModels = true,
-                        rescanLocalModels = true,
-                    )
+                // forceRefreshAssignments/flushTelemetry/discoverDownloadedModels/
+                // rescanLocalModels are deleted outright from
+                // SdkInitPhase2Request (idl/sdk_init.proto): the deterministic
+                // step list now runs unconditionally in commons with no
+                // per-call opt-out.
+                val phase2Result = CppBridgeSdkInit.phase2(buildToken = null)
 
                 // Decouple "services ready" from "HTTP/auth complete" so
                 // offline/local-only Phase 2 still leaves
@@ -691,9 +689,9 @@ object RunAnywhere {
                 // must not keep retrying on every API call. A transient offline
                 // failure (config present, network down) stays applicable.
                 _httpSetupApplicable = phase2Result.http_applicable
-                _hasCompletedHTTPSetup =
-                    phase2Result.has_completed_http_setup ||
-                    phase2Result.http_configured
+                // `http_configured` is deleted outright (idl/sdk_init.proto);
+                // `has_completed_http_setup` is the sole surviving latch.
+                _hasCompletedHTTPSetup = phase2Result.has_completed_http_setup
                 _areServicesReady = true
 
                 if (phase2Result.warning.isNotEmpty()) {
@@ -820,7 +818,8 @@ object RunAnywhere {
      *
      * Tries the idempotent commons fast-path
      * `CppBridgeSdkInit.retryHTTP()` (`rac_sdk_retry_http_proto`) first: when
-     * commons reports `http_configured` / `has_completed_http_setup`, the
+     * commons reports `has_completed_http_setup` (the sole surviving latch;
+     * `http_configured` is deleted outright, idl/sdk_init.proto), the
      * retry has converged. Otherwise the SDK remains in offline-friendly mode
      * and will try again on the next guarded call.
      */
@@ -836,9 +835,7 @@ object RunAnywhere {
             currentCoroutineContext().ensureActive()
             val retryResult = CppBridgeSdkInit.retryHTTP()
             currentCoroutineContext().ensureActive()
-            val completed =
-                retryResult.has_completed_http_setup ||
-                    retryResult.http_configured
+            val completed = retryResult.has_completed_http_setup
             val committed =
                 synchronized(lock) {
                     if (!lifetimeGate.isCurrent(generation) || !_isInitialized) {

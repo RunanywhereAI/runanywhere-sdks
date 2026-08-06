@@ -13,34 +13,27 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loraAdapterCatalogEntryDefaults = exports.validateLoRAAdapterConfig = exports.loRAAdapterConfigDefaults = void 0;
+exports.loraAdapterCatalogEntryDefaults = exports.validateLoraAdapterConfig = exports.loraAdapterConfigDefaults = void 0;
 const _errors_1 = require("./_errors");
-const loRAAdapterConfigDefaults = () => ({
-    adapterPath: '',
+const loraAdapterConfigDefaults = () => ({
+    adapterId: '',
     scale: 1.0,
-    metadata: {},
-    targetModules: [],
 });
-exports.loRAAdapterConfigDefaults = loRAAdapterConfigDefaults;
-const validateLoRAAdapterConfig = (m) => {
-    if (m.adapterPath === '') {
+exports.loraAdapterConfigDefaults = loraAdapterConfigDefaults;
+const validateLoraAdapterConfig = (m) => {
+    if (m.adapterId === '') {
         throw new _errors_1.ValidationError({
-            fieldPath: 'LoRAAdapterConfig.adapter_path',
-            message: 'adapter_path is required',
+            fieldPath: 'LoraAdapterConfig.adapter_id',
+            message: 'adapter_id is required',
         });
     }
 };
-exports.validateLoRAAdapterConfig = validateLoRAAdapterConfig;
+exports.validateLoraAdapterConfig = validateLoraAdapterConfig;
 const loraAdapterCatalogEntryDefaults = () => ({
     id: '',
     name: '',
-    description: '',
-    url: '',
-    filename: '',
     compatibleModels: [],
-    sizeBytes: 0,
     defaultScale: 1.0,
     tags: [],
-    metadata: {},
 });
 exports.loraAdapterCatalogEntryDefaults = loraAdapterCatalogEntryDefaults;

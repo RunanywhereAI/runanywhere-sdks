@@ -86,8 +86,7 @@ class RagCore(FakeCore):
         result.retrieved_chunks.add(
             chunk_id="c0",
             text=(self.docs[0].text if self.docs else ""),
-            similarity_score=0.9,
-            rank=0,
+            score=0.9,
         )
         return result.SerializeToString()
 
@@ -100,8 +99,7 @@ class RagCore(FakeCore):
         response.chunks.add(
             chunk_id="c0",
             text=(self.docs[0].text if self.docs else ""),
-            similarity_score=0.9,
-            rank=0,
+            score=0.9,
         )
         return response.SerializeToString()
 
@@ -109,10 +107,6 @@ class RagCore(FakeCore):
         query = pb.RAGQueryOptions()
         query.ParseFromString(query_bytes)
         self.last_query = query
-        chunk = pb.RAGStreamEvent(kind=pb.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED)
-        chunk.chunk.text = "context"
-        chunk.chunk.similarity_score = 0.5
-        on_event(chunk.SerializeToString())
         for token in ("Par", "is"):
             event = pb.RAGStreamEvent(kind=pb.RAG_STREAM_EVENT_KIND_TOKEN, token=token)
             if on_event(event.SerializeToString()) is False:
@@ -189,12 +183,6 @@ def test_open_retrieval_only_omits_the_answer_model(rag_core) -> None:
     assert rag_core.created_config.llm_model_id == ""
 
 
-def test_persist_path_turns_on_index_persistence(rag_core) -> None:
-    _open(rag_core, config=RagConfig(persist_path="/tmp/index"))
-    assert rag_core.created_config.index_path == "/tmp/index"
-    assert rag_core.created_config.persist_index is True
-
-
 def test_open_requires_the_rag_bindings(rag_core, monkeypatch) -> None:
     class NoRag:
         pass
@@ -230,7 +218,7 @@ def test_query_returns_answer_sources_and_metrics(rag_core) -> None:
     assert result.sources[0].score == pytest.approx(0.9)
     assert result.output_tokens == 2 and result.tokens_per_second > 0
     query = rag_core.last_query
-    assert query.question == "Capital of France?"
+    assert query.query == "Capital of France?"
     assert query.generation.max_output_tokens == 64 and query.generation.top_k == 4
     assert query.generation.reasoning.mode == int(ReasoningMode.OFF)
 
@@ -247,8 +235,8 @@ def test_query_accepts_rag_query_options_with_retrieval_overrides(rag_core) -> N
     )
     assert result.answer == "Paris"
     query = rag_core.last_query
-    assert query.retrieval_top_k == 7
-    assert query.similarity_threshold == pytest.approx(0.42)
+    assert query.retrieval.top_k == 7
+    assert query.retrieval.score_threshold == pytest.approx(0.42)
     assert query.generation.max_output_tokens == 64
 
 
@@ -261,7 +249,7 @@ def test_query_stream_accepts_rag_query_options(rag_core) -> None:
         )
     )
     assert events[-1].is_completed
-    assert rag_core.last_query.retrieval_top_k == 3
+    assert rag_core.last_query.retrieval.top_k == 3
 
 
 def test_search_returns_only_matches(rag_core) -> None:
@@ -269,8 +257,8 @@ def test_search_returns_only_matches(rag_core) -> None:
     session.ingest(RagDocument("Paris is the capital of France."))
     matches = session.search("capital", top_k=2)
     assert [match.text for match in matches] == ["Paris is the capital of France."]
-    assert rag_core.last_search.question == "capital"
-    assert rag_core.last_search.retrieval_top_k == 2
+    assert rag_core.last_search.query == "capital"
+    assert rag_core.last_search.retrieval.top_k == 2
     assert rag_core.last_query is None
 
 
@@ -304,7 +292,9 @@ def test_query_raises_on_a_pipeline_error(monkeypatch, tmp_path) -> None:
 def test_query_stream_follows_the_event_grammar(rag_core) -> None:
     session = _open(rag_core)
     events = list(session.query_stream("Capital?"))
-    assert events[0].kind == RagEventKind.RETRIEVED
+    # RAGStreamEventKind has no retrieval-progress stage (collapsed to
+    # TOKEN/COMPLETED/ERROR) — the stream starts directly with answer tokens.
+    assert events[0].kind == RagEventKind.TOKEN
     assert [event.text for event in events if event.is_token] == ["Par", "is"]
     assert events[-1].is_completed and events[-1].result.answer == "Paris"
 

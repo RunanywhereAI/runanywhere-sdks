@@ -116,29 +116,85 @@ public extension RAToolValue {
 
 // MARK: - Tool Definition Helpers
 
-public extension RAToolParameter {
-    init(
+/// One parameter on a `ToolDefinition`, expressed as a JSON Schema property.
+/// `RAToolParameter`/`RAToolParameterType` were deleted outright
+/// (idl/tool_calling.proto): `ToolDefinition.parameters` is now a single raw
+/// JSON Schema object STRING — the same OpenAI `parameters` / Anthropic
+/// `input_schema` / MCP `inputSchema` shape every tool-calling API publishes.
+/// This struct is a Swift-side convenience for building that schema; it never
+/// crosses the wire on its own.
+public struct ToolParameter: Sendable {
+    /// JSON Schema primitive types (`"string"`, `"number"`, `"integer"`,
+    /// `"boolean"`, `"array"`, `"object"`).
+    public enum ParameterType: String, Sendable {
+        case string
+        case number
+        case integer
+        case boolean
+        case array
+        case object
+    }
+
+    public let name: String
+    public let type: ParameterType
+    public let description: String
+    public let required: Bool
+    public let enumValues: [String]
+
+    public init(
         name: String,
-        type: RAToolParameterType,
+        type: ParameterType,
         description: String,
         required: Bool = true,
         enumValues: [String] = []
     ) {
-        self.init()
         self.name = name
         self.type = type
-        self.description_p = description
+        self.description = description
         self.required = required
         self.enumValues = enumValues
+    }
+
+    /// This parameter's contribution to the enclosing JSON Schema `properties`
+    /// object: `["type": ..., "description": ...]`, plus `"enum"` when set.
+    var schemaProperty: [String: RAToolValue] {
+        var property: [String: RAToolValue] = [
+            "type": RAToolValue(type.rawValue),
+            "description": RAToolValue(description)
+        ]
+        if !enumValues.isEmpty {
+            property["enum"] = .array(enumValues.map { RAToolValue($0) })
+        }
+        return property
     }
 }
 
 public extension RAToolDefinition {
-    init(name: String, description: String, parameters: [RAToolParameter], category: String? = nil) {
+    /// Build a `ToolDefinition` from Swift-side `ToolParameter`s, serializing
+    /// them into the single JSON Schema object `parameters` now carries
+    /// (idl/tool_calling.proto). Mirrors the OpenAI/Anthropic/MCP tool-schema
+    /// shape: `{"type": "object", "properties": {...}, "required": [...]}`.
+    init(name: String, description: String, parameters: [ToolParameter], category: String? = nil) {
         self.init()
         self.name = name
         self.description_p = description
-        self.parameters = parameters
+        self.parameters = RAToolDefinition.jsonSchema(for: parameters)
         if let category { self.category = category }
+    }
+
+    private static func jsonSchema(for parameters: [ToolParameter]) -> String {
+        guard !parameters.isEmpty else { return "{}" }
+        let properties = parameters.reduce(into: [String: RAToolValue]()) { fields, parameter in
+            fields[parameter.name] = .object(parameter.schemaProperty)
+        }
+        let required = parameters.filter(\.required).map(\.name)
+        var schema: [String: RAToolValue] = [
+            "type": RAToolValue("object"),
+            "properties": .object(properties)
+        ]
+        if !required.isEmpty {
+            schema["required"] = .array(required.map { RAToolValue($0) })
+        }
+        return RAToolValue.jsonString(from: schema)
     }
 }

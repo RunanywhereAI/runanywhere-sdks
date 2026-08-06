@@ -12,7 +12,6 @@
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import { processVoiceTurn } from '../Public/Extensions/RunAnywhere+VoiceAgent.js';
 import type { VoiceAgentResult } from '@runanywhere/proto-ts/voice_agent_service';
-import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import { AudioCapture } from './AudioCapture.js';
 import { AudioPlayback } from './AudioPlayback.js';
 import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
@@ -272,38 +271,17 @@ export class VoiceAgentMicDriver {
   }
 
   private async playResultAudio(result: VoiceAgentResult): Promise<void> {
+    // `synthesizedAudio` is a self-describing WAV container (commons wraps
+    // the raw TTS PCM before returning it), so no separate sample-rate/
+    // encoding fields are needed to play it back.
     const bytes = result.synthesizedAudio;
-    const sampleRate = result.synthesizedAudioSampleRateHz;
-    if (!bytes || bytes.byteLength === 0 || sampleRate <= 0) return;
-    const samples = decodeAudio(bytes, result.synthesizedAudioEncoding);
-    if (samples.length > 0) await this.playback.play(samples, sampleRate);
+    if (!bytes || bytes.byteLength === 0) return;
+    await this.playback.playEncoded(bytes);
   }
 }
 
 function positiveOr(value: number | undefined, fallback: number): number {
   return value != null && value > 0 ? value : fallback;
-}
-
-function decodeAudio(bytes: Uint8Array, encoding: AudioEncoding): Float32Array {
-  if (encoding === AudioEncoding.AUDIO_ENCODING_PCM_S16_LE) {
-    const count = Math.floor(bytes.byteLength / 2);
-    const view = new DataView(bytes.buffer, bytes.byteOffset, count * 2);
-    const samples = new Float32Array(count);
-    for (let index = 0; index < count; index += 1) {
-      samples[index] = view.getInt16(index * 2, true) / 0x8000;
-    }
-    return samples;
-  }
-  if (encoding === AudioEncoding.AUDIO_ENCODING_PCM_F32_LE) {
-    const count = Math.floor(bytes.byteLength / 4);
-    const view = new DataView(bytes.buffer, bytes.byteOffset, count * 4);
-    const samples = new Float32Array(count);
-    for (let index = 0; index < count; index += 1) {
-      samples[index] = view.getFloat32(index * 4, true);
-    }
-    return samples;
-  }
-  return new Float32Array(0);
 }
 
 function rms(samples: Float32Array): number {

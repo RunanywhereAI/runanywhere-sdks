@@ -93,9 +93,11 @@ export function nPUChipToJSON(object: NPUChip): string {
 export interface DeviceStorageInfo {
   totalBytes: number;
   freeBytes: number;
+  /**
+   * Distinct from total-minus-free: this is the adapter's own reading of
+   * occupied space, not a derivation. Kept live.
+   */
   usedBytes: number;
-  /** 0.0 to 100.0, and 0.0 when total_bytes is 0. */
-  usedPercent: number;
 }
 
 export interface AppStorageInfo {
@@ -108,15 +110,16 @@ export interface AppStorageInfo {
 export interface ModelStorageMetrics {
   modelId: string;
   sizeOnDiskBytes: number;
-  /** Epoch ms of the last load. */
-  lastUsedMs?: number | undefined;
 }
 
 export interface StorageInfo {
   app?: AppStorageInfo | undefined;
   device?: DeviceStorageInfo | undefined;
   models: ModelStorageMetrics[];
-  totalModels: number;
+  /**
+   * total_models_bytes (5) is NOT a pure derivation -- kept live; see
+   * storage_event_publisher.cpp and two facade readers.
+   */
   totalModelsBytes: number;
 }
 
@@ -126,8 +129,6 @@ export interface StorageAvailability {
   availableBytes: number;
   warningMessage?: string | undefined;
   recommendation?: string | undefined;
-  shortfallBytes: number;
-  requiredToAvailableRatio: number;
 }
 
 export interface StorageInfoRequest {
@@ -146,8 +147,11 @@ export interface StorageInfoResult {
 export interface StorageAvailabilityRequest {
   modelId: string;
   requiredBytes: number;
-  /** Headroom multiplier applied on top of required_bytes. */
-  safetyMargin: number;
+  /**
+   * Absolute headroom the device must still have after the write. Same
+   * unit and same name as DownloadPlanRequest.required_free_bytes_after_download.
+   */
+  requiredFreeBytesAfterDownload: number;
   /** Count bytes already occupied by this model as reclaimable. */
   includeExistingModelBytes: boolean;
   includeDeletePlan: boolean;
@@ -174,7 +178,6 @@ export interface StorageDeletePlanRequest {
 export interface StorageDeleteCandidate {
   modelId: string;
   reclaimableBytes: number;
-  lastUsedMs?: number | undefined;
   isLoaded: boolean;
   localPath: string;
   /** Deleting this needs an unload first, or a platform-side delete. */
@@ -192,13 +195,13 @@ export interface StorageDeletePlan {
   warnings: string[];
   requiresUnload: boolean;
   requiresPlatformDelete: boolean;
-  candidateCount: number;
   error?: SDKError | undefined;
 }
 
 export interface StorageDeleteRequest {
   modelIds: string[];
-  deleteFiles: boolean;
+  /** Files are deleted; set this only to opt OUT (catalog-only bookkeeping). */
+  keepFilesOnDisk: boolean;
   clearRegistryPaths: boolean;
   unloadIfLoaded: boolean;
   dryRun: boolean;
@@ -221,7 +224,7 @@ export interface StorageDeleteResult {
 }
 
 function createBaseDeviceStorageInfo(): DeviceStorageInfo {
-  return { totalBytes: 0, freeBytes: 0, usedBytes: 0, usedPercent: 0 };
+  return { totalBytes: 0, freeBytes: 0, usedBytes: 0 };
 }
 
 export const DeviceStorageInfo: MessageFns<DeviceStorageInfo> = {
@@ -234,9 +237,6 @@ export const DeviceStorageInfo: MessageFns<DeviceStorageInfo> = {
     }
     if (message.usedBytes !== 0) {
       writer.uint32(24).int64(message.usedBytes);
-    }
-    if (message.usedPercent !== 0) {
-      writer.uint32(37).float(message.usedPercent);
     }
     return writer;
   },
@@ -272,14 +272,6 @@ export const DeviceStorageInfo: MessageFns<DeviceStorageInfo> = {
           message.usedBytes = longToNumber(reader.int64());
           continue;
         }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.usedPercent = reader.float();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -306,11 +298,6 @@ export const DeviceStorageInfo: MessageFns<DeviceStorageInfo> = {
         : isSet(object.used_bytes)
         ? globalThis.Number(object.used_bytes)
         : 0,
-      usedPercent: isSet(object.usedPercent)
-        ? globalThis.Number(object.usedPercent)
-        : isSet(object.used_percent)
-        ? globalThis.Number(object.used_percent)
-        : 0,
     };
   },
 
@@ -325,9 +312,6 @@ export const DeviceStorageInfo: MessageFns<DeviceStorageInfo> = {
     if (message.usedBytes !== 0) {
       obj.usedBytes = Math.round(message.usedBytes);
     }
-    if (message.usedPercent !== 0) {
-      obj.usedPercent = message.usedPercent;
-    }
     return obj;
   },
 
@@ -339,7 +323,6 @@ export const DeviceStorageInfo: MessageFns<DeviceStorageInfo> = {
     message.totalBytes = object.totalBytes ?? 0;
     message.freeBytes = object.freeBytes ?? 0;
     message.usedBytes = object.usedBytes ?? 0;
-    message.usedPercent = object.usedPercent ?? 0;
     return message;
   },
 };
@@ -469,7 +452,7 @@ export const AppStorageInfo: MessageFns<AppStorageInfo> = {
 };
 
 function createBaseModelStorageMetrics(): ModelStorageMetrics {
-  return { modelId: "", sizeOnDiskBytes: 0, lastUsedMs: undefined };
+  return { modelId: "", sizeOnDiskBytes: 0 };
 }
 
 export const ModelStorageMetrics: MessageFns<ModelStorageMetrics> = {
@@ -479,9 +462,6 @@ export const ModelStorageMetrics: MessageFns<ModelStorageMetrics> = {
     }
     if (message.sizeOnDiskBytes !== 0) {
       writer.uint32(16).int64(message.sizeOnDiskBytes);
-    }
-    if (message.lastUsedMs !== undefined) {
-      writer.uint32(24).int64(message.lastUsedMs);
     }
     return writer;
   },
@@ -509,14 +489,6 @@ export const ModelStorageMetrics: MessageFns<ModelStorageMetrics> = {
           message.sizeOnDiskBytes = longToNumber(reader.int64());
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.lastUsedMs = longToNumber(reader.int64());
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -538,11 +510,6 @@ export const ModelStorageMetrics: MessageFns<ModelStorageMetrics> = {
         : isSet(object.size_on_disk_bytes)
         ? globalThis.Number(object.size_on_disk_bytes)
         : 0,
-      lastUsedMs: isSet(object.lastUsedMs)
-        ? globalThis.Number(object.lastUsedMs)
-        : isSet(object.last_used_ms)
-        ? globalThis.Number(object.last_used_ms)
-        : undefined,
     };
   },
 
@@ -554,9 +521,6 @@ export const ModelStorageMetrics: MessageFns<ModelStorageMetrics> = {
     if (message.sizeOnDiskBytes !== 0) {
       obj.sizeOnDiskBytes = Math.round(message.sizeOnDiskBytes);
     }
-    if (message.lastUsedMs !== undefined) {
-      obj.lastUsedMs = Math.round(message.lastUsedMs);
-    }
     return obj;
   },
 
@@ -567,13 +531,12 @@ export const ModelStorageMetrics: MessageFns<ModelStorageMetrics> = {
     const message = createBaseModelStorageMetrics();
     message.modelId = object.modelId ?? "";
     message.sizeOnDiskBytes = object.sizeOnDiskBytes ?? 0;
-    message.lastUsedMs = object.lastUsedMs ?? undefined;
     return message;
   },
 };
 
 function createBaseStorageInfo(): StorageInfo {
-  return { app: undefined, device: undefined, models: [], totalModels: 0, totalModelsBytes: 0 };
+  return { app: undefined, device: undefined, models: [], totalModelsBytes: 0 };
 }
 
 export const StorageInfo: MessageFns<StorageInfo> = {
@@ -586,9 +549,6 @@ export const StorageInfo: MessageFns<StorageInfo> = {
     }
     for (const v of message.models) {
       ModelStorageMetrics.encode(v!, writer.uint32(26).fork()).join();
-    }
-    if (message.totalModels !== 0) {
-      writer.uint32(32).int32(message.totalModels);
     }
     if (message.totalModelsBytes !== 0) {
       writer.uint32(40).int64(message.totalModelsBytes);
@@ -627,14 +587,6 @@ export const StorageInfo: MessageFns<StorageInfo> = {
           message.models.push(ModelStorageMetrics.decode(reader, reader.uint32()));
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.totalModels = reader.int32();
-          continue;
-        }
         case 5: {
           if (tag !== 40) {
             break;
@@ -659,11 +611,6 @@ export const StorageInfo: MessageFns<StorageInfo> = {
       models: globalThis.Array.isArray(object?.models)
         ? object.models.map((e: any) => ModelStorageMetrics.fromJSON(e))
         : [],
-      totalModels: isSet(object.totalModels)
-        ? globalThis.Number(object.totalModels)
-        : isSet(object.total_models)
-        ? globalThis.Number(object.total_models)
-        : 0,
       totalModelsBytes: isSet(object.totalModelsBytes)
         ? globalThis.Number(object.totalModelsBytes)
         : isSet(object.total_models_bytes)
@@ -683,9 +630,6 @@ export const StorageInfo: MessageFns<StorageInfo> = {
     if (message.models?.length) {
       obj.models = message.models.map((e) => ModelStorageMetrics.toJSON(e));
     }
-    if (message.totalModels !== 0) {
-      obj.totalModels = Math.round(message.totalModels);
-    }
     if (message.totalModelsBytes !== 0) {
       obj.totalModelsBytes = Math.round(message.totalModelsBytes);
     }
@@ -704,7 +648,6 @@ export const StorageInfo: MessageFns<StorageInfo> = {
       ? DeviceStorageInfo.fromPartial(object.device)
       : undefined;
     message.models = object.models?.map((e) => ModelStorageMetrics.fromPartial(e)) || [];
-    message.totalModels = object.totalModels ?? 0;
     message.totalModelsBytes = object.totalModelsBytes ?? 0;
     return message;
   },
@@ -717,8 +660,6 @@ function createBaseStorageAvailability(): StorageAvailability {
     availableBytes: 0,
     warningMessage: undefined,
     recommendation: undefined,
-    shortfallBytes: 0,
-    requiredToAvailableRatio: 0,
   };
 }
 
@@ -738,12 +679,6 @@ export const StorageAvailability: MessageFns<StorageAvailability> = {
     }
     if (message.recommendation !== undefined) {
       writer.uint32(42).string(message.recommendation);
-    }
-    if (message.shortfallBytes !== 0) {
-      writer.uint32(48).int64(message.shortfallBytes);
-    }
-    if (message.requiredToAvailableRatio !== 0) {
-      writer.uint32(61).float(message.requiredToAvailableRatio);
     }
     return writer;
   },
@@ -795,22 +730,6 @@ export const StorageAvailability: MessageFns<StorageAvailability> = {
           message.recommendation = reader.string();
           continue;
         }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.shortfallBytes = longToNumber(reader.int64());
-          continue;
-        }
-        case 7: {
-          if (tag !== 61) {
-            break;
-          }
-
-          message.requiredToAvailableRatio = reader.float();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -843,16 +762,6 @@ export const StorageAvailability: MessageFns<StorageAvailability> = {
         ? globalThis.String(object.warning_message)
         : undefined,
       recommendation: isSet(object.recommendation) ? globalThis.String(object.recommendation) : undefined,
-      shortfallBytes: isSet(object.shortfallBytes)
-        ? globalThis.Number(object.shortfallBytes)
-        : isSet(object.shortfall_bytes)
-        ? globalThis.Number(object.shortfall_bytes)
-        : 0,
-      requiredToAvailableRatio: isSet(object.requiredToAvailableRatio)
-        ? globalThis.Number(object.requiredToAvailableRatio)
-        : isSet(object.required_to_available_ratio)
-        ? globalThis.Number(object.required_to_available_ratio)
-        : 0,
     };
   },
 
@@ -873,12 +782,6 @@ export const StorageAvailability: MessageFns<StorageAvailability> = {
     if (message.recommendation !== undefined) {
       obj.recommendation = message.recommendation;
     }
-    if (message.shortfallBytes !== 0) {
-      obj.shortfallBytes = Math.round(message.shortfallBytes);
-    }
-    if (message.requiredToAvailableRatio !== 0) {
-      obj.requiredToAvailableRatio = message.requiredToAvailableRatio;
-    }
     return obj;
   },
 
@@ -892,8 +795,6 @@ export const StorageAvailability: MessageFns<StorageAvailability> = {
     message.availableBytes = object.availableBytes ?? 0;
     message.warningMessage = object.warningMessage ?? undefined;
     message.recommendation = object.recommendation ?? undefined;
-    message.shortfallBytes = object.shortfallBytes ?? 0;
-    message.requiredToAvailableRatio = object.requiredToAvailableRatio ?? 0;
     return message;
   },
 };
@@ -1122,7 +1023,7 @@ function createBaseStorageAvailabilityRequest(): StorageAvailabilityRequest {
   return {
     modelId: "",
     requiredBytes: 0,
-    safetyMargin: 0,
+    requiredFreeBytesAfterDownload: 0,
     includeExistingModelBytes: false,
     includeDeletePlan: false,
     allowCacheReclamation: false,
@@ -1137,8 +1038,8 @@ export const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest> 
     if (message.requiredBytes !== 0) {
       writer.uint32(16).int64(message.requiredBytes);
     }
-    if (message.safetyMargin !== 0) {
-      writer.uint32(25).double(message.safetyMargin);
+    if (message.requiredFreeBytesAfterDownload !== 0) {
+      writer.uint32(56).int64(message.requiredFreeBytesAfterDownload);
     }
     if (message.includeExistingModelBytes !== false) {
       writer.uint32(32).bool(message.includeExistingModelBytes);
@@ -1175,12 +1076,12 @@ export const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest> 
           message.requiredBytes = longToNumber(reader.int64());
           continue;
         }
-        case 3: {
-          if (tag !== 25) {
+        case 7: {
+          if (tag !== 56) {
             break;
           }
 
-          message.safetyMargin = reader.double();
+          message.requiredFreeBytesAfterDownload = longToNumber(reader.int64());
           continue;
         }
         case 4: {
@@ -1228,10 +1129,10 @@ export const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest> 
         : isSet(object.required_bytes)
         ? globalThis.Number(object.required_bytes)
         : 0,
-      safetyMargin: isSet(object.safetyMargin)
-        ? globalThis.Number(object.safetyMargin)
-        : isSet(object.safety_margin)
-        ? globalThis.Number(object.safety_margin)
+      requiredFreeBytesAfterDownload: isSet(object.requiredFreeBytesAfterDownload)
+        ? globalThis.Number(object.requiredFreeBytesAfterDownload)
+        : isSet(object.required_free_bytes_after_download)
+        ? globalThis.Number(object.required_free_bytes_after_download)
         : 0,
       includeExistingModelBytes: isSet(object.includeExistingModelBytes)
         ? globalThis.Boolean(object.includeExistingModelBytes)
@@ -1259,8 +1160,8 @@ export const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest> 
     if (message.requiredBytes !== 0) {
       obj.requiredBytes = Math.round(message.requiredBytes);
     }
-    if (message.safetyMargin !== 0) {
-      obj.safetyMargin = message.safetyMargin;
+    if (message.requiredFreeBytesAfterDownload !== 0) {
+      obj.requiredFreeBytesAfterDownload = Math.round(message.requiredFreeBytesAfterDownload);
     }
     if (message.includeExistingModelBytes !== false) {
       obj.includeExistingModelBytes = message.includeExistingModelBytes;
@@ -1281,7 +1182,7 @@ export const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest> 
     const message = createBaseStorageAvailabilityRequest();
     message.modelId = object.modelId ?? "";
     message.requiredBytes = object.requiredBytes ?? 0;
-    message.safetyMargin = object.safetyMargin ?? 0;
+    message.requiredFreeBytesAfterDownload = object.requiredFreeBytesAfterDownload ?? 0;
     message.includeExistingModelBytes = object.includeExistingModelBytes ?? false;
     message.includeDeletePlan = object.includeDeletePlan ?? false;
     message.allowCacheReclamation = object.allowCacheReclamation ?? false;
@@ -1582,7 +1483,6 @@ function createBaseStorageDeleteCandidate(): StorageDeleteCandidate {
   return {
     modelId: "",
     reclaimableBytes: 0,
-    lastUsedMs: undefined,
     isLoaded: false,
     localPath: "",
     requiresUnload: false,
@@ -1598,9 +1498,6 @@ export const StorageDeleteCandidate: MessageFns<StorageDeleteCandidate> = {
     }
     if (message.reclaimableBytes !== 0) {
       writer.uint32(16).int64(message.reclaimableBytes);
-    }
-    if (message.lastUsedMs !== undefined) {
-      writer.uint32(24).int64(message.lastUsedMs);
     }
     if (message.isLoaded !== false) {
       writer.uint32(32).bool(message.isLoaded);
@@ -1641,14 +1538,6 @@ export const StorageDeleteCandidate: MessageFns<StorageDeleteCandidate> = {
           }
 
           message.reclaimableBytes = longToNumber(reader.int64());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.lastUsedMs = longToNumber(reader.int64());
           continue;
         }
         case 4: {
@@ -1712,11 +1601,6 @@ export const StorageDeleteCandidate: MessageFns<StorageDeleteCandidate> = {
         : isSet(object.reclaimable_bytes)
         ? globalThis.Number(object.reclaimable_bytes)
         : 0,
-      lastUsedMs: isSet(object.lastUsedMs)
-        ? globalThis.Number(object.lastUsedMs)
-        : isSet(object.last_used_ms)
-        ? globalThis.Number(object.last_used_ms)
-        : undefined,
       isLoaded: isSet(object.isLoaded)
         ? globalThis.Boolean(object.isLoaded)
         : isSet(object.is_loaded)
@@ -1753,9 +1637,6 @@ export const StorageDeleteCandidate: MessageFns<StorageDeleteCandidate> = {
     if (message.reclaimableBytes !== 0) {
       obj.reclaimableBytes = Math.round(message.reclaimableBytes);
     }
-    if (message.lastUsedMs !== undefined) {
-      obj.lastUsedMs = Math.round(message.lastUsedMs);
-    }
     if (message.isLoaded !== false) {
       obj.isLoaded = message.isLoaded;
     }
@@ -1781,7 +1662,6 @@ export const StorageDeleteCandidate: MessageFns<StorageDeleteCandidate> = {
     const message = createBaseStorageDeleteCandidate();
     message.modelId = object.modelId ?? "";
     message.reclaimableBytes = object.reclaimableBytes ?? 0;
-    message.lastUsedMs = object.lastUsedMs ?? undefined;
     message.isLoaded = object.isLoaded ?? false;
     message.localPath = object.localPath ?? "";
     message.requiresUnload = object.requiresUnload ?? false;
@@ -1800,7 +1680,6 @@ function createBaseStorageDeletePlan(): StorageDeletePlan {
     warnings: [],
     requiresUnload: false,
     requiresPlatformDelete: false,
-    candidateCount: 0,
     error: undefined,
   };
 }
@@ -1827,9 +1706,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     }
     if (message.requiresPlatformDelete !== false) {
       writer.uint32(64).bool(message.requiresPlatformDelete);
-    }
-    if (message.candidateCount !== 0) {
-      writer.uint32(72).int32(message.candidateCount);
     }
     if (message.error !== undefined) {
       SDKError.encode(message.error, writer.uint32(82).fork()).join();
@@ -1900,14 +1776,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
           message.requiresPlatformDelete = reader.bool();
           continue;
         }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.candidateCount = reader.int32();
-          continue;
-        }
         case 10: {
           if (tag !== 82) {
             break;
@@ -1958,11 +1826,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
         : isSet(object.requires_platform_delete)
         ? globalThis.Boolean(object.requires_platform_delete)
         : false,
-      candidateCount: isSet(object.candidateCount)
-        ? globalThis.Number(object.candidateCount)
-        : isSet(object.candidate_count)
-        ? globalThis.Number(object.candidate_count)
-        : 0,
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
@@ -1990,9 +1853,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     if (message.requiresPlatformDelete !== false) {
       obj.requiresPlatformDelete = message.requiresPlatformDelete;
     }
-    if (message.candidateCount !== 0) {
-      obj.candidateCount = Math.round(message.candidateCount);
-    }
     if (message.error !== undefined) {
       obj.error = SDKError.toJSON(message.error);
     }
@@ -2011,7 +1871,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     message.warnings = object.warnings?.map((e) => e) || [];
     message.requiresUnload = object.requiresUnload ?? false;
     message.requiresPlatformDelete = object.requiresPlatformDelete ?? false;
-    message.candidateCount = object.candidateCount ?? 0;
     message.error = (object.error !== undefined && object.error !== null)
       ? SDKError.fromPartial(object.error)
       : undefined;
@@ -2022,7 +1881,7 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
 function createBaseStorageDeleteRequest(): StorageDeleteRequest {
   return {
     modelIds: [],
-    deleteFiles: false,
+    keepFilesOnDisk: false,
     clearRegistryPaths: false,
     unloadIfLoaded: false,
     dryRun: false,
@@ -2037,8 +1896,8 @@ export const StorageDeleteRequest: MessageFns<StorageDeleteRequest> = {
     for (const v of message.modelIds) {
       writer.uint32(10).string(v!);
     }
-    if (message.deleteFiles !== false) {
-      writer.uint32(16).bool(message.deleteFiles);
+    if (message.keepFilesOnDisk !== false) {
+      writer.uint32(16).bool(message.keepFilesOnDisk);
     }
     if (message.clearRegistryPaths !== false) {
       writer.uint32(24).bool(message.clearRegistryPaths);
@@ -2081,7 +1940,7 @@ export const StorageDeleteRequest: MessageFns<StorageDeleteRequest> = {
             break;
           }
 
-          message.deleteFiles = reader.bool();
+          message.keepFilesOnDisk = reader.bool();
           continue;
         }
         case 3: {
@@ -2148,10 +2007,10 @@ export const StorageDeleteRequest: MessageFns<StorageDeleteRequest> = {
         : globalThis.Array.isArray(object?.model_ids)
         ? object.model_ids.map((e: any) => globalThis.String(e))
         : [],
-      deleteFiles: isSet(object.deleteFiles)
-        ? globalThis.Boolean(object.deleteFiles)
-        : isSet(object.delete_files)
-        ? globalThis.Boolean(object.delete_files)
+      keepFilesOnDisk: isSet(object.keepFilesOnDisk)
+        ? globalThis.Boolean(object.keepFilesOnDisk)
+        : isSet(object.keep_files_on_disk)
+        ? globalThis.Boolean(object.keep_files_on_disk)
         : false,
       clearRegistryPaths: isSet(object.clearRegistryPaths)
         ? globalThis.Boolean(object.clearRegistryPaths)
@@ -2187,8 +2046,8 @@ export const StorageDeleteRequest: MessageFns<StorageDeleteRequest> = {
     if (message.modelIds?.length) {
       obj.modelIds = message.modelIds;
     }
-    if (message.deleteFiles !== false) {
-      obj.deleteFiles = message.deleteFiles;
+    if (message.keepFilesOnDisk !== false) {
+      obj.keepFilesOnDisk = message.keepFilesOnDisk;
     }
     if (message.clearRegistryPaths !== false) {
       obj.clearRegistryPaths = message.clearRegistryPaths;
@@ -2217,7 +2076,7 @@ export const StorageDeleteRequest: MessageFns<StorageDeleteRequest> = {
   fromPartial<I extends Exact<DeepPartial<StorageDeleteRequest>, I>>(object: I): StorageDeleteRequest {
     const message = createBaseStorageDeleteRequest();
     message.modelIds = object.modelIds?.map((e) => e) || [];
-    message.deleteFiles = object.deleteFiles ?? false;
+    message.keepFilesOnDisk = object.keepFilesOnDisk ?? false;
     message.clearRegistryPaths = object.clearRegistryPaths ?? false;
     message.unloadIfLoaded = object.unloadIfLoaded ?? false;
     message.dryRun = object.dryRun ?? false;

@@ -35,7 +35,7 @@ import okio.ByteString
 public class EmbeddingsResult(
   vectors: List<EmbeddingVector> = emptyList(),
   /**
-   * Duplicated from each vector so consumers can size buffers in O(1).
+   * The width of every vector above, so consumers can size buffers in O(1).
    */
   @field:WireField(
     tag = 2,
@@ -71,19 +71,13 @@ public class EmbeddingsResult(
   )
   public val model_id: String? = null,
   @field:WireField(
-    tag = 8,
+    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
     schemaIndex = 5,
   )
   public val request_id: String = "",
-  @field:WireField(
-    tag = 9,
-    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 6,
-  )
-  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingsResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -113,7 +107,6 @@ public class EmbeddingsResult(
     if (tokens_used != other.tokens_used) return false
     if (model_id != other.model_id) return false
     if (request_id != other.request_id) return false
-    if (error != other.error) return false
     return true
   }
 
@@ -127,7 +120,6 @@ public class EmbeddingsResult(
       result = result * 37 + tokens_used.hashCode()
       result = result * 37 + (model_id?.hashCode() ?: 0)
       result = result * 37 + request_id.hashCode()
-      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -141,7 +133,6 @@ public class EmbeddingsResult(
     result += """tokens_used=$tokens_used"""
     if (model_id != null) result += """model_id=${sanitize(model_id)}"""
     result += """request_id=${sanitize(request_id)}"""
-    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "EmbeddingsResult{", separator = ", ", postfix = "}")
   }
 
@@ -152,9 +143,8 @@ public class EmbeddingsResult(
     tokens_used: Int = this.tokens_used,
     model_id: String? = this.model_id,
     request_id: String = this.request_id,
-    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsResult = EmbeddingsResult(vectors, dimension, processing_time_ms, tokens_used, model_id, request_id, error, unknownFields)
+  ): EmbeddingsResult = EmbeddingsResult(vectors, dimension, processing_time_ms, tokens_used, model_id, request_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -180,9 +170,8 @@ public class EmbeddingsResult(
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.model_id)
         if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.request_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.request_id)
         }
-        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
@@ -199,17 +188,15 @@ public class EmbeddingsResult(
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.request_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.request_id)
         }
-        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingsResult) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.request_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.request_id)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
         if (value.tokens_used != 0) {
@@ -231,7 +218,6 @@ public class EmbeddingsResult(
         var tokens_used: Int = 0
         var model_id: String? = null
         var request_id: String = ""
-        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> vectors.add(EmbeddingVector.ADAPTER.decode(reader))
@@ -239,8 +225,7 @@ public class EmbeddingsResult(
             3 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
             4 -> tokens_used = ProtoAdapter.INT32.decode(reader)
             5 -> model_id = ProtoAdapter.STRING.decode(reader)
-            8 -> request_id = ProtoAdapter.STRING.decode(reader)
-            9 -> error = SDKError.ADAPTER.decode(reader)
+            6 -> request_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -251,14 +236,12 @@ public class EmbeddingsResult(
           tokens_used = tokens_used,
           model_id = model_id,
           request_id = request_id,
-          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: EmbeddingsResult): EmbeddingsResult = value.copy(
         vectors = value.vectors.redactElements(EmbeddingVector.ADAPTER),
-        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

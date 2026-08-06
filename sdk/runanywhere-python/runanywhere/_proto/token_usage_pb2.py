@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11token_usage.proto\x12\x0erunanywhere.v1\"j\n\nTokenUsage\x12\x14\n\x0cinput_tokens\x18\x01 \x01(\x05\x12\x15\n\routput_tokens\x18\x02 \x01(\x05\x12\x14\n\x0ctotal_tokens\x18\x03 \x01(\x05\x12\x19\n\x11tokens_per_second\x18\x04 \x01(\x01\x42\x8a\x01\n\x17\x61i.runanywhere.proto.v1B\x0fTokenUsageProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11token_usage.proto\x12\x0erunanywhere.v1\"\x96\x01\n\nTokenUsage\x12\x14\n\x0cinput_tokens\x18\x01 \x01(\x05\x12\x15\n\routput_tokens\x18\x02 \x01(\x05\x12\x14\n\x0ctotal_tokens\x18\x03 \x01(\x05\x12 \n\x18\x64\x65\x63ode_tokens_per_second\x18\x04 \x01(\x01\x12\x12\n\nprefill_ms\x18\x05 \x01(\x03\x12\x0f\n\x07ttft_ms\x18\x06 \x01(\x03\x42\x8a\x01\n\x17\x61i.runanywhere.proto.v1B\x0fTokenUsageProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,6 +33,6 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'token_usage_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\017TokenUsageProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_TOKENUSAGE']._serialized_start=37
-  _globals['_TOKENUSAGE']._serialized_end=143
+  _globals['_TOKENUSAGE']._serialized_start=38
+  _globals['_TOKENUSAGE']._serialized_end=188
 # @@protoc_insertion_point(module_scope)

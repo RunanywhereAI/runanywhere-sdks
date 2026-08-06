@@ -23,15 +23,18 @@ class DeviceAffinity extends $pb.ProtobufEnum {
       DeviceAffinity._(2, _omitEnumNames ? '' : 'DEVICE_AFFINITY_CPU');
   static const DeviceAffinity DEVICE_AFFINITY_GPU =
       DeviceAffinity._(3, _omitEnumNames ? '' : 'DEVICE_AFFINITY_GPU');
-  static const DeviceAffinity DEVICE_AFFINITY_ANE =
-      DeviceAffinity._(4, _omitEnumNames ? '' : 'DEVICE_AFFINITY_ANE');
+
+  /// Vendor-neutral neural accelerator: Apple Neural Engine, Qualcomm
+  /// Hexagon NPU, etc. The YAML loader already accepts "npu" for this value.
+  static const DeviceAffinity DEVICE_AFFINITY_NPU =
+      DeviceAffinity._(4, _omitEnumNames ? '' : 'DEVICE_AFFINITY_NPU');
 
   static const $core.List<DeviceAffinity> values = <DeviceAffinity>[
     DEVICE_AFFINITY_UNSPECIFIED,
     DEVICE_AFFINITY_ANY,
     DEVICE_AFFINITY_CPU,
     DEVICE_AFFINITY_GPU,
-    DEVICE_AFFINITY_ANE,
+    DEVICE_AFFINITY_NPU,
   ];
 
   static final $core.List<DeviceAffinity?> _byValue =

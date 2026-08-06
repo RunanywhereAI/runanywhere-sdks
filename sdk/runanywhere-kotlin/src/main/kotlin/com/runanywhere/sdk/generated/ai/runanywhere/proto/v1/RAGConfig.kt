@@ -128,13 +128,6 @@ public class RAGConfig(
     schemaIndex = 10,
   )
   public val prompt_template: String = "",
-  @field:WireField(
-    tag = 12,
-    adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",
-    jsonName = "typeKind",
-    schemaIndex = 11,
-  )
-  public val type_kind: SolutionType? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -158,7 +151,6 @@ public class RAGConfig(
     if (bm25_b != other.bm25_b) return false
     if (rrf_k != other.rrf_k) return false
     if (prompt_template != other.prompt_template) return false
-    if (type_kind != other.type_kind) return false
     return true
   }
 
@@ -177,7 +169,6 @@ public class RAGConfig(
       result = result * 37 + bm25_b.hashCode()
       result = result * 37 + rrf_k.hashCode()
       result = result * 37 + prompt_template.hashCode()
-      result = result * 37 + (type_kind?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -196,7 +187,6 @@ public class RAGConfig(
     result += """bm25_b=$bm25_b"""
     result += """rrf_k=$rrf_k"""
     result += """prompt_template=${sanitize(prompt_template)}"""
-    if (type_kind != null) result += """type_kind=$type_kind"""
     return result.joinToString(prefix = "RAGConfig{", separator = ", ", postfix = "}")
   }
 
@@ -212,9 +202,8 @@ public class RAGConfig(
     bm25_b: Float = this.bm25_b,
     rrf_k: Int = this.rrf_k,
     prompt_template: String = this.prompt_template,
-    type_kind: SolutionType? = this.type_kind,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGConfig = RAGConfig(embed_model_id, rerank_model_id, llm_model_id, vector_store, vector_store_path, retrieve_k, rerank_top, bm25_k1, bm25_b, rrf_k, prompt_template, type_kind, unknownFields)
+  ): RAGConfig = RAGConfig(embed_model_id, rerank_model_id, llm_model_id, vector_store, vector_store_path, retrieve_k, rerank_top, bm25_k1, bm25_b, rrf_k, prompt_template, unknownFields)
 
   public companion object {
     @JvmField
@@ -261,7 +250,6 @@ public class RAGConfig(
         if (value.prompt_template != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.prompt_template)
         }
-        size += SolutionType.ADAPTER.encodedSizeWithTag(12, value.type_kind)
         return size
       }
 
@@ -299,13 +287,11 @@ public class RAGConfig(
         if (value.prompt_template != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 11, value.prompt_template)
         }
-        SolutionType.ADAPTER.encodeWithTag(writer, 12, value.type_kind)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGConfig) {
         writer.writeBytes(value.unknownFields)
-        SolutionType.ADAPTER.encodeWithTag(writer, 12, value.type_kind)
         if (value.prompt_template != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 11, value.prompt_template)
         }
@@ -353,7 +339,6 @@ public class RAGConfig(
         var bm25_b: Float = 0f
         var rrf_k: Int = 0
         var prompt_template: String = ""
-        var type_kind: SolutionType? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> embed_model_id = ProtoAdapter.STRING.decode(reader)
@@ -371,11 +356,6 @@ public class RAGConfig(
             9 -> bm25_b = ProtoAdapter.FLOAT.decode(reader)
             10 -> rrf_k = ProtoAdapter.INT32.decode(reader)
             11 -> prompt_template = ProtoAdapter.STRING.decode(reader)
-            12 -> try {
-              type_kind = SolutionType.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -391,7 +371,6 @@ public class RAGConfig(
           bm25_b = bm25_b,
           rrf_k = rrf_k,
           prompt_template = prompt_template,
-          type_kind = type_kind,
           unknownFields = unknownFields
         )
       }

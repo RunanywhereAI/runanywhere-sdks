@@ -407,10 +407,6 @@ _rac_runtime_unload
 # Name-pinned plugin selection (hybrid STT router: offline vs cloud).
 _rac_plugin_find_for_engine
 
-# SDKComponent → [InferenceFramework] query (proto ABI).
-_rac_router_frameworks_for_capability_proto
-_rac_router_frameworks_for_capability_proto_free
-
 # STT hybrid router — handle-based offline/online STT dispatch + its proto-byte
 # ABI. Called by the Swift + Flutter-iOS hybrid-router FFI; without these the
 # curated Apple -exported_symbols_list strips them from librac_commons.dylib and

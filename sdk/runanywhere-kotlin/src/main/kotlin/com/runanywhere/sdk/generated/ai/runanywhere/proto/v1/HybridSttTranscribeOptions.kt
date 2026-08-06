@@ -46,16 +46,17 @@ public class HybridSttTranscribeOptions(
   )
   public val sample_rate: Int = 0,
   /**
-   * Untyped: every other file uses the AudioFormat enum here.
+   * Container the bytes are already in. UNSPECIFIED (the proto3 zero) means
+   * headerless PCM16, which commons wraps in a WAV container.
    */
   @field:WireField(
     tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioFormat",
     schemaIndex = 2,
   )
-  public val audio_format: Int = 0,
+  public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridSttTranscribeOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -97,7 +98,7 @@ public class HybridSttTranscribeOptions(
   public fun copy(
     language: String = this.language,
     sample_rate: Int = this.sample_rate,
-    audio_format: Int = this.audio_format,
+    audio_format: AudioFormat = this.audio_format,
     unknownFields: ByteString = this.unknownFields,
   ): HybridSttTranscribeOptions = HybridSttTranscribeOptions(language, sample_rate, audio_format, unknownFields)
 
@@ -120,8 +121,8 @@ public class HybridSttTranscribeOptions(
         if (value.sample_rate != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.sample_rate)
         }
-        if (value.audio_format != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.audio_format)
+        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
+          size += AudioFormat.ADAPTER.encodedSizeWithTag(3, value.audio_format)
         }
         return size
       }
@@ -133,16 +134,16 @@ public class HybridSttTranscribeOptions(
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 2, value.sample_rate)
         }
-        if (value.audio_format != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.audio_format)
+        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
+          AudioFormat.ADAPTER.encodeWithTag(writer, 3, value.audio_format)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridSttTranscribeOptions) {
         writer.writeBytes(value.unknownFields)
-        if (value.audio_format != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.audio_format)
+        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
+          AudioFormat.ADAPTER.encodeWithTag(writer, 3, value.audio_format)
         }
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 2, value.sample_rate)
@@ -155,12 +156,16 @@ public class HybridSttTranscribeOptions(
       override fun decode(reader: ProtoReader): HybridSttTranscribeOptions {
         var language: String = ""
         var sample_rate: Int = 0
-        var audio_format: Int = 0
+        var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> language = ProtoAdapter.STRING.decode(reader)
             2 -> sample_rate = ProtoAdapter.INT32.decode(reader)
-            3 -> audio_format = ProtoAdapter.INT32.decode(reader)
+            3 -> try {
+              audio_format = AudioFormat.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }

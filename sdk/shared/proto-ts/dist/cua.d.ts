@@ -35,24 +35,52 @@ export declare function cuaActionTypeToJSON(object: CuaActionType): string;
  * TYPE->text, VISIT_URL->url, WEB_SEARCH->query, TERMINATE->answer,
  * ASK_USER/READ_PAGE_ANSWER->question, PAUSE_MEMORIZE->fact, KEY->space-joined
  * keys. `reasoning` holds any chain-of-thought preceding the tool_call.
+ *
+ * COORDINATE CONTRACT: x/y are integers in the SAME pixel space as the
+ * viewport you passed to parse_action, origin at the TOP-LEFT. That viewport
+ * must be the pixel dimensions of the exact image you handed to the VLM — if
+ * you downscaled the screenshot before sending it, pass the downscaled
+ * dimensions. On a DPR-2/3/4 display, passing logical points while sending a
+ * physical-pixel screenshot offsets every click by that factor, silently (see
+ * examples/ios/.../ComputerUseAgentViewModel.swift for the correct
+ * computation). parse_action has already rescaled out of the profile's own
+ * space (1000x1000 for `fara`), so no further scaling is ever correct.
+ *
+ * LEFT_CLICK_DRAG: x/y are the drag DESTINATION only. Fara emits no origin (it
+ * drags from the current cursor), and a touch screen has no cursor, so the
+ * HOST must supply the press point — typically the last MOUSE_MOVE target.
+ *
+ * LENGTH: `text` and `reasoning` are TRUNCATED at 2047 bytes on a UTF-8 lead
+ * byte by the fixed C buffers behind them (rac_cua_action_t.text[2048]); no
+ * field records that truncation happened. This also caps a TERMINATE answer.
  */
 export interface CuaAction {
     type: CuaActionType;
-    /** true if x/y are valid */
-    coordinateValid: boolean;
-    /** viewport-scaled pixels */
-    x: number;
-    y: number;
-    /** SCROLL/HSCROLL: +up / -down */
-    scrollPixels: number;
-    /** WAIT */
+    /** viewport pixels from the LEFT edge; presence = "has a coordinate" */
+    x?: number | undefined;
+    /** viewport pixels from the TOP edge */
+    y?: number | undefined;
+    /**
+     * HSCROLL/SCROLL axis split. Value is the model's raw `pixels` output,
+     * copied verbatim per axis — the sign is UNVERIFIED against any real
+     * device trace, so no direction convention is asserted here.
+     */
+    scrollX: number;
+    /** SCROLL */
+    scrollY: number;
+    /**
+     * WAIT: fractional seconds. Clamped by commons to [0, 100] because the
+     * value comes from untrusted model output; an unbounded parse would wedge
+     * the agent loop. 100s is a RunAnywhere-chosen ceiling, not inherited from
+     * any vendor API.
+     */
     waitSeconds: number;
     /** primary string arg (see above) */
     text: string;
     /** CoT before the tool_call, if any */
     reasoning: string;
     /** true if a valid tool_call was found */
-    parseOk: boolean;
+    isValid: boolean;
 }
 export declare const CuaAction: MessageFns<CuaAction>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

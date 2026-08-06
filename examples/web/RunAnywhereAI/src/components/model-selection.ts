@@ -1073,7 +1073,8 @@ async function startDownload(modelId: string): Promise<void> {
   try {
     for await (const event of RunAnywhere.models.download(modelId)) {
       if (event.type === 'progress') {
-        setRow(modelId, { status: 'downloading', progress: event.percent / 100 });
+        const progress = event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0;
+        setRow(modelId, { status: 'downloading', progress });
       } else if (event.type === 'extracting') {
         setRow(modelId, { status: 'downloading', progress: 1 });
       } else {
@@ -1142,8 +1143,7 @@ function completeSheetSelection(
 
 async function unloadModel(modelId: string): Promise<void> {
   try {
-    const category = getCatalog().find((entry) => entry.id === modelId)?.category;
-    await RunAnywhere.models.unload(category);
+    await RunAnywhere.models.unload(modelId);
     await refreshLoadedByCategory();
     setRow(modelId, { status: 'downloaded' });
     showToast(`Unloaded ${modelId}`, 'info');
@@ -1256,8 +1256,7 @@ function hydrateRowStatesFromRegistry(): void {
   for (const entry of catalog) {
     const state = rowStates.get(entry.id);
     if (state?.status === 'downloading' || state?.status === 'loading') continue;
-    const isDownloaded = downloadedIds.has(entry.id)
-      || Boolean(RunAnywhere.models.get(entry.id)?.isDownloaded);
+    const isDownloaded = downloadedIds.has(entry.id);
     rowStates.set(entry.id, { status: isDownloaded ? 'downloaded' : 'registered' });
   }
 

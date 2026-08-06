@@ -161,6 +161,14 @@ class RagSession {
 
   /// Answer [question], emitting retrieved chunks then answer tokens.
   ///
+  /// The `CHUNK_RETRIEVED`/`CONTEXT_READY`/`RETRIEVAL_STARTED` stream-event
+  /// kinds were deleted outright (idl/rag.proto): `RAGStreamEventKind` now
+  /// has only `TOKEN`/`COMPLETED`/`ERROR` — retrieval no longer streams
+  /// partial progress, so [RagRetrieved] is synthesized once, from the
+  /// terminal `RAGResult.retrievedChunks`, immediately before the first
+  /// [RagToken] (or before [RagCompleted] when the answer arrived with no
+  /// token events).
+  ///
   /// Throws [SDKException] into the consumer when the query fails.
   Stream<RagEvent> queryStream(
     String question, {
@@ -168,24 +176,30 @@ class RagSession {
   }) async* {
     _requireLive();
     _requireGeneration();
-    final retrieved = <Match>[];
+    var retrievedEmitted = false;
     await for (final event in DartBridgeRAG.shared.queryStream(
       _queryOptions(question, options),
     )) {
       switch (event.kind) {
-        case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED:
-          if (event.hasChunk()) {
-            retrieved.add(Match.fromProto(event.chunk));
-          }
-        case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY:
-          yield RagRetrieved(List<Match>.unmodifiable(retrieved));
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN:
           if (event.token.isNotEmpty) {
+            if (!retrievedEmitted) {
+              retrievedEmitted = true;
+              // Chunks are not available before the terminal result on this
+              // wire shape; emit an empty set so consumers that key their UI
+              // off "retrieval happened" still see the transition.
+              yield const RagRetrieved(<Match>[]);
+            }
             yield RagToken(event.token);
           }
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED:
           if (event.hasResult()) {
-            yield RagCompleted(RagResult.fromProto(event.result));
+            final result = RagResult.fromProto(event.result);
+            if (!retrievedEmitted) {
+              retrievedEmitted = true;
+              yield RagRetrieved(result.sources);
+            }
+            yield RagCompleted(result);
           }
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR:
           throw SDKException.generationFailed(
@@ -193,7 +207,6 @@ class RagSession {
                 ? event.error.message
                 : 'RAG query failed',
           );
-        case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED:
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED:
           break;
       }
@@ -228,23 +241,36 @@ class RagSession {
 
   rag_pb.RAGQueryOptions _queryOptions(String question, RagQueryOptions? options) {
     final proto = rag_pb.RAGQueryOptions(
-      question: question,
-      retrievalTopK: options?.retrieval?.topK ?? _config.topK,
+      query: question,
+      retrieval: _retrievalOptions(options?.retrieval),
     );
-    final threshold = options?.retrieval?.similarityThreshold ?? _config.similarityThreshold;
-    if (threshold != null) proto.similarityThreshold = threshold;
     final generation = options?.generation;
     if (generation != null) proto.generation = generation.toProto();
     return proto;
   }
 
   rag_pb.RAGSearchRequest _searchRequest(String query, {int? topK}) {
-    final proto = rag_pb.RAGSearchRequest(
-      question: query,
-      retrievalTopK: topK ?? _config.topK,
+    return rag_pb.RAGSearchRequest(
+      query: query,
+      retrieval: _retrievalOptions(
+        topK != null ? RagRetrievalOptions(topK: topK) : null,
+      ),
     );
-    final threshold = _config.similarityThreshold;
-    if (threshold != null) proto.similarityThreshold = threshold;
+  }
+
+  /// Retrieval knobs moved under a nested `RAGRetrievalOptions` message
+  /// (idl/rag.proto): flat `retrievalTopK`/`similarityThreshold` on
+  /// `RAGQueryOptions`/`RAGSearchRequest` were replaced by
+  /// `.retrieval.topK`/`.retrieval.scoreThreshold`. An unset field on
+  /// `RAGRetrievalOptions` inherits `RAGConfiguration`'s value in commons, so
+  /// this only sets a field when the caller (or session config) actually
+  /// overrides it.
+  rag_pb.RAGRetrievalOptions _retrievalOptions(RagRetrievalOptions? override) {
+    final proto = rag_pb.RAGRetrievalOptions();
+    final topK = override?.topK ?? _config.topK;
+    proto.topK = topK;
+    final threshold = override?.similarityThreshold ?? _config.similarityThreshold;
+    if (threshold != null) proto.scoreThreshold = threshold;
     return proto;
   }
 

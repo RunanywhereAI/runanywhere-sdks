@@ -142,8 +142,8 @@ public extension RunAnywhere {
     @available(*, deprecated, renamed: "RagSession.query(question:options:)")
     static func ragQuery(question: String, options: RARAGQueryOptions? = nil) async throws -> RARAGResult {
         var queryOptions = options ?? RARAGQueryOptions.defaults(question: question)
-        if queryOptions.question.isEmpty {
-            queryOptions.question = question
+        if queryOptions.query.isEmpty {
+            queryOptions.query = question
         }
         return try await ragQueryInternal(queryOptions)
     }
@@ -169,8 +169,8 @@ public extension RunAnywhere {
         options: RARAGQueryOptions? = nil
     ) async throws -> AsyncStream<RARAGStreamEvent> {
         var queryOptions = options ?? RARAGQueryOptions.defaults(question: question)
-        if queryOptions.question.isEmpty {
-            queryOptions.question = question
+        if queryOptions.query.isEmpty {
+            queryOptions.query = question
         }
         return try await ragQueryStreamInternal(queryOptions)
     }

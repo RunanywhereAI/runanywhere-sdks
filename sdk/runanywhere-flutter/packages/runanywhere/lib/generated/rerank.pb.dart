@@ -17,81 +17,14 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
-/// A single candidate document/passage to be scored against the query. The id is
-/// caller-supplied and echoed back on the scored item so callers can correlate
-/// results with their own records without relying on ordering.
-class RerankCandidate extends $pb.GeneratedMessage {
-  factory RerankCandidate({
-    $core.String? id,
-    $core.String? text,
-  }) {
-    final result = create();
-    if (id != null) result.id = id;
-    if (text != null) result.text = text;
-    return result;
-  }
-
-  RerankCandidate._();
-
-  factory RerankCandidate.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory RerankCandidate.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'RerankCandidate',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aOS(2, _omitFieldNames ? '' : 'text')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  RerankCandidate clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  RerankCandidate copyWith(void Function(RerankCandidate) updates) =>
-      super.copyWith((message) => updates(message as RerankCandidate))
-          as RerankCandidate;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static RerankCandidate create() => RerankCandidate._();
-  @$core.override
-  RerankCandidate createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static RerankCandidate getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<RerankCandidate>(create);
-  static RerankCandidate? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get id => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set id($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get text => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set text($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasText() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearText() => $_clearField(2);
-}
-
 class RerankOptions extends $pb.GeneratedMessage {
   factory RerankOptions({
     $core.int? topN,
+    $core.int? maxTokensPerDoc,
   }) {
     final result = create();
     if (topN != null) result.topN = topN;
+    if (maxTokensPerDoc != null) result.maxTokensPerDoc = maxTokensPerDoc;
     return result;
   }
 
@@ -109,6 +42,8 @@ class RerankOptions extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'topN', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'maxTokensPerDoc',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -141,18 +76,33 @@ class RerankOptions extends $pb.GeneratedMessage {
   $core.bool hasTopN() => $_has(0);
   @$pb.TagNumber(1)
   void clearTopN() => $_clearField(1);
+
+  /// Per-document token budget; longer documents are truncated (tail
+  /// dropped) before scoring. 0 = the SDK default budget. This is the
+  /// direct knob on peak memory and per-pair latency on device.
+  /// Industry name (Cohere v2 / vLLM `max_tokens_per_doc`).
+  @$pb.TagNumber(2)
+  $core.int get maxTokensPerDoc => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set maxTokensPerDoc($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMaxTokensPerDoc() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMaxTokensPerDoc() => $_clearField(2);
 }
 
 class RerankRequest extends $pb.GeneratedMessage {
   factory RerankRequest({
     $core.String? query,
-    $core.Iterable<RerankCandidate>? candidates,
     RerankOptions? options,
+    $core.Iterable<$core.String>? documents,
+    $core.String? modelId,
   }) {
     final result = create();
     if (query != null) result.query = query;
-    if (candidates != null) result.candidates.addAll(candidates);
     if (options != null) result.options = options;
+    if (documents != null) result.documents.addAll(documents);
+    if (modelId != null) result.modelId = modelId;
     return result;
   }
 
@@ -170,10 +120,10 @@ class RerankRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'query')
-    ..pPM<RerankCandidate>(2, _omitFieldNames ? '' : 'candidates',
-        subBuilder: RerankCandidate.create)
     ..aOM<RerankOptions>(3, _omitFieldNames ? '' : 'options',
         subBuilder: RerankOptions.create)
+    ..pPS(4, _omitFieldNames ? '' : 'documents')
+    ..aOS(5, _omitFieldNames ? '' : 'modelId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -204,33 +154,46 @@ class RerankRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearQuery() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $pb.PbList<RerankCandidate> get candidates => $_getList(1);
-
   @$pb.TagNumber(3)
-  RerankOptions get options => $_getN(2);
+  RerankOptions get options => $_getN(1);
   @$pb.TagNumber(3)
   set options(RerankOptions value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasOptions() => $_has(2);
+  $core.bool hasOptions() => $_has(1);
   @$pb.TagNumber(3)
   void clearOptions() => $_clearField(3);
   @$pb.TagNumber(3)
-  RerankOptions ensureOptions() => $_ensure(2);
+  RerankOptions ensureOptions() => $_ensure(1);
+
+  /// The passages to score, in caller order. Results point back at these by
+  /// index. Cost is LINEAR (one model pass per document), so this is a
+  /// second-stage reranker over a retriever's output, not a corpus scan;
+  /// commons rejects more than 100,000 entries with
+  /// RAC_ERROR_INVALID_PARAMETER. Industry name (Cohere/Voyage/Jina `documents`).
+  @$pb.TagNumber(4)
+  $pb.PbList<$core.String> get documents => $_getList(2);
+
+  /// Registry id of the reranker to score with. Unset = whatever model is
+  /// already resident under the rerank component. Mirrors
+  /// EmbeddingsRequest.model_id and the industry-universal `model` field.
+  @$pb.TagNumber(5)
+  $core.String get modelId => $_getSZ(3);
+  @$pb.TagNumber(5)
+  set modelId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(5)
+  $core.bool hasModelId() => $_has(3);
+  @$pb.TagNumber(5)
+  void clearModelId() => $_clearField(5);
 }
 
 class RerankScoredItem extends $pb.GeneratedMessage {
   factory RerankScoredItem({
-    $core.String? id,
     $core.double? relevanceScore,
     $core.int? index,
-    $core.int? rank,
   }) {
     final result = create();
-    if (id != null) result.id = id;
     if (relevanceScore != null) result.relevanceScore = relevanceScore;
     if (index != null) result.index = index;
-    if (rank != null) result.rank = rank;
     return result;
   }
 
@@ -247,11 +210,9 @@ class RerankScoredItem extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'RerankScoredItem',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aD(2, _omitFieldNames ? '' : 'relevanceScore',
         fieldType: $pb.PbFieldType.OF)
     ..aI(3, _omitFieldNames ? '' : 'index', fieldType: $pb.PbFieldType.OU3)
-    ..aI(4, _omitFieldNames ? '' : 'rank', fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -273,48 +234,29 @@ class RerankScoredItem extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<RerankScoredItem>(create);
   static RerankScoredItem? _defaultInstance;
 
-  /// Echo of RerankCandidate.id for correlation.
-  @$pb.TagNumber(1)
-  $core.String get id => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set id($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearId() => $_clearField(1);
-
-  /// Relevance score from the reranker (higher = more relevant). Not
-  /// normalized to a fixed range; comparable only within one result set.
+  /// Relevance of this document to the query, normalized to [0, 1] (sigmoid
+  /// of the cross-encoder logit). Ordinal, not cardinal: 0.9 is not "twice
+  /// as relevant" as 0.45, and scores are not comparable across models.
   /// Industry name (Cohere/Voyage `relevance_score`).
   @$pb.TagNumber(2)
-  $core.double get relevanceScore => $_getN(1);
+  $core.double get relevanceScore => $_getN(0);
   @$pb.TagNumber(2)
-  set relevanceScore($core.double value) => $_setFloat(1, value);
+  set relevanceScore($core.double value) => $_setFloat(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasRelevanceScore() => $_has(1);
+  $core.bool hasRelevanceScore() => $_has(0);
   @$pb.TagNumber(2)
   void clearRelevanceScore() => $_clearField(2);
 
-  /// Index of this candidate in the original RerankRequest.candidates list.
+  /// Index of this document in the original RerankRequest.documents list.
   /// Industry name (`index`).
   @$pb.TagNumber(3)
-  $core.int get index => $_getIZ(2);
+  $core.int get index => $_getIZ(1);
   @$pb.TagNumber(3)
-  set index($core.int value) => $_setUnsignedInt32(2, value);
+  set index($core.int value) => $_setUnsignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasIndex() => $_has(2);
+  $core.bool hasIndex() => $_has(1);
   @$pb.TagNumber(3)
   void clearIndex() => $_clearField(3);
-
-  /// 0-based position after sorting by score descending (0 = most relevant).
-  @$pb.TagNumber(4)
-  $core.int get rank => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set rank($core.int value) => $_setUnsignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasRank() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearRank() => $_clearField(4);
 }
 
 class RerankResult extends $pb.GeneratedMessage {

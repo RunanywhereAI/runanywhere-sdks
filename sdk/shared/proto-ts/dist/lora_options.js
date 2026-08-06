@@ -5,40 +5,41 @@
 //   protoc               v7.35.1
 // source: lora_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LoRAState = exports.LoRARemoveRequest = exports.LoRAApplyResult = exports.LoRAApplyRequest = exports.LoraCompatibilityResult = exports.LoraAdapterImportResult = exports.LoraAdapterImportRequest = exports.LoraAdapterDownloadCompletedResult = exports.LoraAdapterDownloadCompletedRequest = exports.LoraAdapterCatalogGetResult = exports.LoraAdapterCatalogGetRequest = exports.LoraAdapterCatalogListResult = exports.LoraAdapterCatalogListRequest = exports.LoraAdapterCatalogQuery = exports.LoraAdapterCatalogEntry_MetadataEntry = exports.LoraAdapterCatalogEntry = exports.LoRAAdapterInfo = exports.LoRAAdapterConfig_MetadataEntry = exports.LoRAAdapterConfig = exports.protobufPackage = void 0;
+exports.LoraState = exports.LoraRemoveRequest = exports.LoraApplyResult = exports.LoraApplyRequest = exports.LoraCompatibilityResult = exports.LoraAdapterCatalogGetResult = exports.LoraAdapterCatalogGetRequest = exports.LoraAdapterCatalogListResult = exports.LoraAdapterCatalogListRequest = exports.LoraAdapterCatalogQuery = exports.LoraAdapterCatalogEntry = exports.LoraAdapterInfo = exports.LoraAdapterConfig = exports.protobufPackage = void 0;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
 exports.protobufPackage = "runanywhere.v1";
-function createBaseLoRAAdapterConfig() {
-    return { adapterPath: "", scale: 0, adapterId: undefined, metadata: {}, targetModules: [] };
+function createBaseLoraAdapterConfig() {
+    return { adapterId: "", adapterPath: undefined, scale: undefined };
 }
-exports.LoRAAdapterConfig = {
+exports.LoraAdapterConfig = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.adapterPath !== "") {
-            writer.uint32(10).string(message.adapterPath);
-        }
-        if (message.scale !== 0) {
-            writer.uint32(21).float(message.scale);
-        }
-        if (message.adapterId !== undefined) {
+        if (message.adapterId !== "") {
             writer.uint32(26).string(message.adapterId);
         }
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.LoRAAdapterConfig_MetadataEntry.encode({ key: key, value }, writer.uint32(34).fork()).join();
-        });
-        for (const v of message.targetModules) {
-            writer.uint32(42).string(v);
+        if (message.adapterPath !== undefined) {
+            writer.uint32(10).string(message.adapterPath);
+        }
+        if (message.scale !== undefined) {
+            writer.uint32(21).float(message.scale);
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoRAAdapterConfig();
+        const message = createBaseLoraAdapterConfig();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.adapterId = reader.string();
+                    continue;
+                }
                 case 1: {
                     if (tag !== 10) {
                         break;
@@ -53,30 +54,6 @@ exports.LoRAAdapterConfig = {
                     message.scale = reader.float();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.adapterId = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    const entry4 = exports.LoRAAdapterConfig_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry4.value !== undefined) {
-                        message.metadata[entry4.key] = entry4.value;
-                    }
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.targetModules.push(reader.string());
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -87,145 +64,57 @@ exports.LoRAAdapterConfig = {
     },
     fromJSON(object) {
         return {
-            adapterPath: isSet(object.adapterPath)
-                ? globalThis.String(object.adapterPath)
-                : isSet(object.adapter_path)
-                    ? globalThis.String(object.adapter_path)
-                    : "",
-            scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
             adapterId: isSet(object.adapterId)
                 ? globalThis.String(object.adapterId)
                 : isSet(object.adapter_id)
                     ? globalThis.String(object.adapter_id)
+                    : "",
+            adapterPath: isSet(object.adapterPath)
+                ? globalThis.String(object.adapterPath)
+                : isSet(object.adapter_path)
+                    ? globalThis.String(object.adapter_path)
                     : undefined,
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
-            targetModules: globalThis.Array.isArray(object?.targetModules)
-                ? object.targetModules.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.target_modules)
-                    ? object.target_modules.map((e) => globalThis.String(e))
-                    : [],
+            scale: isSet(object.scale) ? globalThis.Number(object.scale) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.adapterPath !== "") {
-            obj.adapterPath = message.adapterPath;
-        }
-        if (message.scale !== 0) {
-            obj.scale = message.scale;
-        }
-        if (message.adapterId !== undefined) {
+        if (message.adapterId !== "") {
             obj.adapterId = message.adapterId;
         }
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
+        if (message.adapterPath !== undefined) {
+            obj.adapterPath = message.adapterPath;
         }
-        if (message.targetModules?.length) {
-            obj.targetModules = message.targetModules;
+        if (message.scale !== undefined) {
+            obj.scale = message.scale;
         }
         return obj;
     },
     create(base) {
-        return exports.LoRAAdapterConfig.fromPartial(base ?? {});
+        return exports.LoraAdapterConfig.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseLoRAAdapterConfig();
-        message.adapterPath = object.adapterPath ?? "";
-        message.scale = object.scale ?? 0;
-        message.adapterId = object.adapterId ?? undefined;
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
-        message.targetModules = object.targetModules?.map((e) => e) || [];
+        const message = createBaseLoraAdapterConfig();
+        message.adapterId = object.adapterId ?? "";
+        message.adapterPath = object.adapterPath ?? undefined;
+        message.scale = object.scale ?? undefined;
         return message;
     },
 };
-function createBaseLoRAAdapterConfig_MetadataEntry() {
-    return { key: "", value: "" };
+function createBaseLoraAdapterInfo() {
+    return {
+        adapterId: "",
+        adapterPath: "",
+        scale: 0,
+        applied: false,
+        rank: undefined,
+        alpha: undefined,
+        sizeBytes: undefined,
+        loadedAtMs: 0,
+        error: undefined,
+    };
 }
-exports.LoRAAdapterConfig_MetadataEntry = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoRAAdapterConfig_MetadataEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== "") {
-            obj.value = message.value;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LoRAAdapterConfig_MetadataEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLoRAAdapterConfig_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
-        return message;
-    },
-};
-function createBaseLoRAAdapterInfo() {
-    return { adapterId: "", adapterPath: "", scale: 0, applied: false, loadedAtMs: 0, error: undefined };
-}
-exports.LoRAAdapterInfo = {
+exports.LoraAdapterInfo = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.adapterId !== "") {
             writer.uint32(10).string(message.adapterId);
@@ -239,18 +128,27 @@ exports.LoRAAdapterInfo = {
         if (message.applied !== false) {
             writer.uint32(32).bool(message.applied);
         }
+        if (message.rank !== undefined) {
+            writer.uint32(40).int32(message.rank);
+        }
+        if (message.alpha !== undefined) {
+            writer.uint32(53).float(message.alpha);
+        }
+        if (message.sizeBytes !== undefined) {
+            writer.uint32(56).int64(message.sizeBytes);
+        }
         if (message.loadedAtMs !== 0) {
-            writer.uint32(56).int64(message.loadedAtMs);
+            writer.uint32(64).int64(message.loadedAtMs);
         }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(66).fork()).join();
+            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoRAAdapterInfo();
+        const message = createBaseLoraAdapterInfo();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -282,15 +180,36 @@ exports.LoRAAdapterInfo = {
                     message.applied = reader.bool();
                     continue;
                 }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.rank = reader.int32();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 53) {
+                        break;
+                    }
+                    message.alpha = reader.float();
+                    continue;
+                }
                 case 7: {
                     if (tag !== 56) {
+                        break;
+                    }
+                    message.sizeBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 64) {
                         break;
                     }
                     message.loadedAtMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 8: {
-                    if (tag !== 66) {
+                case 9: {
+                    if (tag !== 74) {
                         break;
                     }
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
@@ -318,6 +237,13 @@ exports.LoRAAdapterInfo = {
                     : "",
             scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
             applied: isSet(object.applied) ? globalThis.Boolean(object.applied) : false,
+            rank: isSet(object.rank) ? globalThis.Number(object.rank) : undefined,
+            alpha: isSet(object.alpha) ? globalThis.Number(object.alpha) : undefined,
+            sizeBytes: isSet(object.sizeBytes)
+                ? globalThis.Number(object.sizeBytes)
+                : isSet(object.size_bytes)
+                    ? globalThis.Number(object.size_bytes)
+                    : undefined,
             loadedAtMs: isSet(object.loadedAtMs)
                 ? globalThis.Number(object.loadedAtMs)
                 : isSet(object.loaded_at_ms)
@@ -340,6 +266,15 @@ exports.LoRAAdapterInfo = {
         if (message.applied !== false) {
             obj.applied = message.applied;
         }
+        if (message.rank !== undefined) {
+            obj.rank = Math.round(message.rank);
+        }
+        if (message.alpha !== undefined) {
+            obj.alpha = message.alpha;
+        }
+        if (message.sizeBytes !== undefined) {
+            obj.sizeBytes = Math.round(message.sizeBytes);
+        }
         if (message.loadedAtMs !== 0) {
             obj.loadedAtMs = Math.round(message.loadedAtMs);
         }
@@ -349,14 +284,17 @@ exports.LoRAAdapterInfo = {
         return obj;
     },
     create(base) {
-        return exports.LoRAAdapterInfo.fromPartial(base ?? {});
+        return exports.LoraAdapterInfo.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseLoRAAdapterInfo();
+        const message = createBaseLoraAdapterInfo();
         message.adapterId = object.adapterId ?? "";
         message.adapterPath = object.adapterPath ?? "";
         message.scale = object.scale ?? 0;
         message.applied = object.applied ?? false;
+        message.rank = object.rank ?? undefined;
+        message.alpha = object.alpha ?? undefined;
+        message.sizeBytes = object.sizeBytes ?? undefined;
         message.loadedAtMs = object.loadedAtMs ?? 0;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
@@ -365,26 +303,7 @@ exports.LoRAAdapterInfo = {
     },
 };
 function createBaseLoraAdapterCatalogEntry() {
-    return {
-        id: "",
-        name: "",
-        description: "",
-        url: "",
-        filename: "",
-        compatibleModels: [],
-        sizeBytes: 0,
-        author: undefined,
-        defaultScale: 0,
-        checksumSha256: undefined,
-        license: undefined,
-        tags: [],
-        metadata: {},
-        localPath: undefined,
-        isDownloaded: undefined,
-        downloadedAtUnixMs: undefined,
-        isImported: undefined,
-        statusMessage: undefined,
-    };
+    return { id: "", name: "", compatibleModels: [], defaultScale: undefined, tags: [], localPath: undefined };
 }
 exports.LoraAdapterCatalogEntry = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -394,53 +313,17 @@ exports.LoraAdapterCatalogEntry = {
         if (message.name !== "") {
             writer.uint32(18).string(message.name);
         }
-        if (message.description !== "") {
-            writer.uint32(26).string(message.description);
-        }
-        if (message.url !== "") {
-            writer.uint32(34).string(message.url);
-        }
-        if (message.filename !== "") {
-            writer.uint32(42).string(message.filename);
-        }
         for (const v of message.compatibleModels) {
-            writer.uint32(50).string(v);
+            writer.uint32(26).string(v);
         }
-        if (message.sizeBytes !== 0) {
-            writer.uint32(56).int64(message.sizeBytes);
-        }
-        if (message.author !== undefined) {
-            writer.uint32(66).string(message.author);
-        }
-        if (message.defaultScale !== 0) {
-            writer.uint32(77).float(message.defaultScale);
-        }
-        if (message.checksumSha256 !== undefined) {
-            writer.uint32(82).string(message.checksumSha256);
-        }
-        if (message.license !== undefined) {
-            writer.uint32(90).string(message.license);
+        if (message.defaultScale !== undefined) {
+            writer.uint32(37).float(message.defaultScale);
         }
         for (const v of message.tags) {
-            writer.uint32(98).string(v);
+            writer.uint32(42).string(v);
         }
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.LoraAdapterCatalogEntry_MetadataEntry.encode({ key: key, value }, writer.uint32(106).fork()).join();
-        });
         if (message.localPath !== undefined) {
-            writer.uint32(114).string(message.localPath);
-        }
-        if (message.isDownloaded !== undefined) {
-            writer.uint32(120).bool(message.isDownloaded);
-        }
-        if (message.downloadedAtUnixMs !== undefined) {
-            writer.uint32(128).int64(message.downloadedAtUnixMs);
-        }
-        if (message.isImported !== undefined) {
-            writer.uint32(136).bool(message.isImported);
-        }
-        if (message.statusMessage !== undefined) {
-            writer.uint32(146).string(message.statusMessage);
+            writer.uint32(50).string(message.localPath);
         }
         return writer;
     },
@@ -469,115 +352,28 @@ exports.LoraAdapterCatalogEntry = {
                     if (tag !== 26) {
                         break;
                     }
-                    message.description = reader.string();
+                    message.compatibleModels.push(reader.string());
                     continue;
                 }
                 case 4: {
-                    if (tag !== 34) {
+                    if (tag !== 37) {
                         break;
                     }
-                    message.url = reader.string();
+                    message.defaultScale = reader.float();
                     continue;
                 }
                 case 5: {
                     if (tag !== 42) {
                         break;
                     }
-                    message.filename = reader.string();
+                    message.tags.push(reader.string());
                     continue;
                 }
                 case 6: {
                     if (tag !== 50) {
                         break;
                     }
-                    message.compatibleModels.push(reader.string());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.sizeBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.author = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 77) {
-                        break;
-                    }
-                    message.defaultScale = reader.float();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.checksumSha256 = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.license = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.tags.push(reader.string());
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 106) {
-                        break;
-                    }
-                    const entry13 = exports.LoraAdapterCatalogEntry_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry13.value !== undefined) {
-                        message.metadata[entry13.key] = entry13.value;
-                    }
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 114) {
-                        break;
-                    }
                     message.localPath = reader.string();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 120) {
-                        break;
-                    }
-                    message.isDownloaded = reader.bool();
-                    continue;
-                }
-                case 16: {
-                    if (tag !== 128) {
-                        break;
-                    }
-                    message.downloadedAtUnixMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 17: {
-                    if (tag !== 136) {
-                        break;
-                    }
-                    message.isImported = reader.bool();
-                    continue;
-                }
-                case 18: {
-                    if (tag !== 146) {
-                        break;
-                    }
-                    message.statusMessage = reader.string();
                     continue;
                 }
             }
@@ -592,64 +388,21 @@ exports.LoraAdapterCatalogEntry = {
         return {
             id: isSet(object.id) ? globalThis.String(object.id) : "",
             name: isSet(object.name) ? globalThis.String(object.name) : "",
-            description: isSet(object.description) ? globalThis.String(object.description) : "",
-            url: isSet(object.url) ? globalThis.String(object.url) : "",
-            filename: isSet(object.filename) ? globalThis.String(object.filename) : "",
             compatibleModels: globalThis.Array.isArray(object?.compatibleModels)
                 ? object.compatibleModels.map((e) => globalThis.String(e))
                 : globalThis.Array.isArray(object?.compatible_models)
                     ? object.compatible_models.map((e) => globalThis.String(e))
                     : [],
-            sizeBytes: isSet(object.sizeBytes)
-                ? globalThis.Number(object.sizeBytes)
-                : isSet(object.size_bytes)
-                    ? globalThis.Number(object.size_bytes)
-                    : 0,
-            author: isSet(object.author) ? globalThis.String(object.author) : undefined,
             defaultScale: isSet(object.defaultScale)
                 ? globalThis.Number(object.defaultScale)
                 : isSet(object.default_scale)
                     ? globalThis.Number(object.default_scale)
-                    : 0,
-            checksumSha256: isSet(object.checksumSha256)
-                ? globalThis.String(object.checksumSha256)
-                : isSet(object.checksum_sha256)
-                    ? globalThis.String(object.checksum_sha256)
                     : undefined,
-            license: isSet(object.license) ? globalThis.String(object.license) : undefined,
-            tags: globalThis.Array.isArray(object?.tags)
-                ? object.tags.map((e) => globalThis.String(e))
-                : [],
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
+            tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e) => globalThis.String(e)) : [],
             localPath: isSet(object.localPath)
                 ? globalThis.String(object.localPath)
                 : isSet(object.local_path)
                     ? globalThis.String(object.local_path)
-                    : undefined,
-            isDownloaded: isSet(object.isDownloaded)
-                ? globalThis.Boolean(object.isDownloaded)
-                : isSet(object.is_downloaded)
-                    ? globalThis.Boolean(object.is_downloaded)
-                    : undefined,
-            downloadedAtUnixMs: isSet(object.downloadedAtUnixMs)
-                ? globalThis.Number(object.downloadedAtUnixMs)
-                : isSet(object.downloaded_at_unix_ms)
-                    ? globalThis.Number(object.downloaded_at_unix_ms)
-                    : undefined,
-            isImported: isSet(object.isImported)
-                ? globalThis.Boolean(object.isImported)
-                : isSet(object.is_imported)
-                    ? globalThis.Boolean(object.is_imported)
-                    : undefined,
-            statusMessage: isSet(object.statusMessage)
-                ? globalThis.String(object.statusMessage)
-                : isSet(object.status_message)
-                    ? globalThis.String(object.status_message)
                     : undefined,
         };
     },
@@ -661,59 +414,17 @@ exports.LoraAdapterCatalogEntry = {
         if (message.name !== "") {
             obj.name = message.name;
         }
-        if (message.description !== "") {
-            obj.description = message.description;
-        }
-        if (message.url !== "") {
-            obj.url = message.url;
-        }
-        if (message.filename !== "") {
-            obj.filename = message.filename;
-        }
         if (message.compatibleModels?.length) {
             obj.compatibleModels = message.compatibleModels;
         }
-        if (message.sizeBytes !== 0) {
-            obj.sizeBytes = Math.round(message.sizeBytes);
-        }
-        if (message.author !== undefined) {
-            obj.author = message.author;
-        }
-        if (message.defaultScale !== 0) {
+        if (message.defaultScale !== undefined) {
             obj.defaultScale = message.defaultScale;
-        }
-        if (message.checksumSha256 !== undefined) {
-            obj.checksumSha256 = message.checksumSha256;
-        }
-        if (message.license !== undefined) {
-            obj.license = message.license;
         }
         if (message.tags?.length) {
             obj.tags = message.tags;
         }
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
-        }
         if (message.localPath !== undefined) {
             obj.localPath = message.localPath;
-        }
-        if (message.isDownloaded !== undefined) {
-            obj.isDownloaded = message.isDownloaded;
-        }
-        if (message.downloadedAtUnixMs !== undefined) {
-            obj.downloadedAtUnixMs = Math.round(message.downloadedAtUnixMs);
-        }
-        if (message.isImported !== undefined) {
-            obj.isImported = message.isImported;
-        }
-        if (message.statusMessage !== undefined) {
-            obj.statusMessage = message.statusMessage;
         }
         return obj;
     },
@@ -724,95 +435,10 @@ exports.LoraAdapterCatalogEntry = {
         const message = createBaseLoraAdapterCatalogEntry();
         message.id = object.id ?? "";
         message.name = object.name ?? "";
-        message.description = object.description ?? "";
-        message.url = object.url ?? "";
-        message.filename = object.filename ?? "";
         message.compatibleModels = object.compatibleModels?.map((e) => e) || [];
-        message.sizeBytes = object.sizeBytes ?? 0;
-        message.author = object.author ?? undefined;
-        message.defaultScale = object.defaultScale ?? 0;
-        message.checksumSha256 = object.checksumSha256 ?? undefined;
-        message.license = object.license ?? undefined;
+        message.defaultScale = object.defaultScale ?? undefined;
         message.tags = object.tags?.map((e) => e) || [];
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
         message.localPath = object.localPath ?? undefined;
-        message.isDownloaded = object.isDownloaded ?? undefined;
-        message.downloadedAtUnixMs = object.downloadedAtUnixMs ?? undefined;
-        message.isImported = object.isImported ?? undefined;
-        message.statusMessage = object.statusMessage ?? undefined;
-        return message;
-    },
-};
-function createBaseLoraAdapterCatalogEntry_MetadataEntry() {
-    return { key: "", value: "" };
-}
-exports.LoraAdapterCatalogEntry_MetadataEntry = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoraAdapterCatalogEntry_MetadataEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== "") {
-            obj.value = message.value;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LoraAdapterCatalogEntry_MetadataEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLoraAdapterCatalogEntry_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
         return message;
     },
 };
@@ -948,15 +574,12 @@ exports.LoraAdapterCatalogQuery = {
     },
 };
 function createBaseLoraAdapterCatalogListRequest() {
-    return { query: undefined, includeCounts: false };
+    return { query: undefined };
 }
 exports.LoraAdapterCatalogListRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.query !== undefined) {
             exports.LoraAdapterCatalogQuery.encode(message.query, writer.uint32(10).fork()).join();
-        }
-        if (message.includeCounts !== false) {
-            writer.uint32(16).bool(message.includeCounts);
         }
         return writer;
     },
@@ -974,13 +597,6 @@ exports.LoraAdapterCatalogListRequest = {
                     message.query = exports.LoraAdapterCatalogQuery.decode(reader, reader.uint32());
                     continue;
                 }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.includeCounts = reader.bool();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -990,22 +606,12 @@ exports.LoraAdapterCatalogListRequest = {
         return message;
     },
     fromJSON(object) {
-        return {
-            query: isSet(object.query) ? exports.LoraAdapterCatalogQuery.fromJSON(object.query) : undefined,
-            includeCounts: isSet(object.includeCounts)
-                ? globalThis.Boolean(object.includeCounts)
-                : isSet(object.include_counts)
-                    ? globalThis.Boolean(object.include_counts)
-                    : false,
-        };
+        return { query: isSet(object.query) ? exports.LoraAdapterCatalogQuery.fromJSON(object.query) : undefined };
     },
     toJSON(message) {
         const obj = {};
         if (message.query !== undefined) {
             obj.query = exports.LoraAdapterCatalogQuery.toJSON(message.query);
-        }
-        if (message.includeCounts !== false) {
-            obj.includeCounts = message.includeCounts;
         }
         return obj;
     },
@@ -1017,29 +623,25 @@ exports.LoraAdapterCatalogListRequest = {
         message.query = (object.query !== undefined && object.query !== null)
             ? exports.LoraAdapterCatalogQuery.fromPartial(object.query)
             : undefined;
-        message.includeCounts = object.includeCounts ?? false;
         return message;
     },
 };
 function createBaseLoraAdapterCatalogListResult() {
-    return { entries: [], totalCount: 0, filteredCount: 0, downloadedCount: 0, error: undefined };
+    return { entries: [], totalCount: 0, downloadedCount: 0, error: undefined };
 }
 exports.LoraAdapterCatalogListResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         for (const v of message.entries) {
-            exports.LoraAdapterCatalogEntry.encode(v, writer.uint32(18).fork()).join();
+            exports.LoraAdapterCatalogEntry.encode(v, writer.uint32(10).fork()).join();
         }
         if (message.totalCount !== 0) {
-            writer.uint32(32).int32(message.totalCount);
-        }
-        if (message.filteredCount !== 0) {
-            writer.uint32(40).int32(message.filteredCount);
+            writer.uint32(16).int32(message.totalCount);
         }
         if (message.downloadedCount !== 0) {
-            writer.uint32(48).int32(message.downloadedCount);
+            writer.uint32(24).int32(message.downloadedCount);
         }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
+            errors_1.SDKError.encode(message.error, writer.uint32(34).fork()).join();
         }
         return writer;
     },
@@ -1050,36 +652,29 @@ exports.LoraAdapterCatalogListResult = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 2: {
-                    if (tag !== 18) {
+                case 1: {
+                    if (tag !== 10) {
                         break;
                     }
                     message.entries.push(exports.LoraAdapterCatalogEntry.decode(reader, reader.uint32()));
                     continue;
                 }
-                case 4: {
-                    if (tag !== 32) {
+                case 2: {
+                    if (tag !== 16) {
                         break;
                     }
                     message.totalCount = reader.int32();
                     continue;
                 }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.filteredCount = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
+                case 3: {
+                    if (tag !== 24) {
                         break;
                     }
                     message.downloadedCount = reader.int32();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
+                case 4: {
+                    if (tag !== 34) {
                         break;
                     }
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
@@ -1103,11 +698,6 @@ exports.LoraAdapterCatalogListResult = {
                 : isSet(object.total_count)
                     ? globalThis.Number(object.total_count)
                     : 0,
-            filteredCount: isSet(object.filteredCount)
-                ? globalThis.Number(object.filteredCount)
-                : isSet(object.filtered_count)
-                    ? globalThis.Number(object.filtered_count)
-                    : 0,
             downloadedCount: isSet(object.downloadedCount)
                 ? globalThis.Number(object.downloadedCount)
                 : isSet(object.downloaded_count)
@@ -1124,9 +714,6 @@ exports.LoraAdapterCatalogListResult = {
         if (message.totalCount !== 0) {
             obj.totalCount = Math.round(message.totalCount);
         }
-        if (message.filteredCount !== 0) {
-            obj.filteredCount = Math.round(message.filteredCount);
-        }
         if (message.downloadedCount !== 0) {
             obj.downloadedCount = Math.round(message.downloadedCount);
         }
@@ -1142,7 +729,6 @@ exports.LoraAdapterCatalogListResult = {
         const message = createBaseLoraAdapterCatalogListResult();
         message.entries = object.entries?.map((e) => exports.LoraAdapterCatalogEntry.fromPartial(e)) || [];
         message.totalCount = object.totalCount ?? 0;
-        message.filteredCount = object.filteredCount ?? 0;
         message.downloadedCount = object.downloadedCount ?? 0;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
@@ -1294,448 +880,8 @@ exports.LoraAdapterCatalogGetResult = {
         return message;
     },
 };
-function createBaseLoraAdapterDownloadCompletedRequest() {
-    return {
-        adapterId: "",
-        localPath: "",
-        sizeBytes: undefined,
-        checksumSha256: undefined,
-        completedAtUnixMs: undefined,
-        imported: false,
-        statusMessage: "",
-    };
-}
-exports.LoraAdapterDownloadCompletedRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.adapterId !== "") {
-            writer.uint32(10).string(message.adapterId);
-        }
-        if (message.localPath !== "") {
-            writer.uint32(18).string(message.localPath);
-        }
-        if (message.sizeBytes !== undefined) {
-            writer.uint32(24).int64(message.sizeBytes);
-        }
-        if (message.checksumSha256 !== undefined) {
-            writer.uint32(34).string(message.checksumSha256);
-        }
-        if (message.completedAtUnixMs !== undefined) {
-            writer.uint32(40).int64(message.completedAtUnixMs);
-        }
-        if (message.imported !== false) {
-            writer.uint32(48).bool(message.imported);
-        }
-        if (message.statusMessage !== "") {
-            writer.uint32(58).string(message.statusMessage);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoraAdapterDownloadCompletedRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.adapterId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.localPath = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.sizeBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.checksumSha256 = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.completedAtUnixMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.imported = reader.bool();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.statusMessage = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            adapterId: isSet(object.adapterId)
-                ? globalThis.String(object.adapterId)
-                : isSet(object.adapter_id)
-                    ? globalThis.String(object.adapter_id)
-                    : "",
-            localPath: isSet(object.localPath)
-                ? globalThis.String(object.localPath)
-                : isSet(object.local_path)
-                    ? globalThis.String(object.local_path)
-                    : "",
-            sizeBytes: isSet(object.sizeBytes)
-                ? globalThis.Number(object.sizeBytes)
-                : isSet(object.size_bytes)
-                    ? globalThis.Number(object.size_bytes)
-                    : undefined,
-            checksumSha256: isSet(object.checksumSha256)
-                ? globalThis.String(object.checksumSha256)
-                : isSet(object.checksum_sha256)
-                    ? globalThis.String(object.checksum_sha256)
-                    : undefined,
-            completedAtUnixMs: isSet(object.completedAtUnixMs)
-                ? globalThis.Number(object.completedAtUnixMs)
-                : isSet(object.completed_at_unix_ms)
-                    ? globalThis.Number(object.completed_at_unix_ms)
-                    : undefined,
-            imported: isSet(object.imported) ? globalThis.Boolean(object.imported) : false,
-            statusMessage: isSet(object.statusMessage)
-                ? globalThis.String(object.statusMessage)
-                : isSet(object.status_message)
-                    ? globalThis.String(object.status_message)
-                    : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.adapterId !== "") {
-            obj.adapterId = message.adapterId;
-        }
-        if (message.localPath !== "") {
-            obj.localPath = message.localPath;
-        }
-        if (message.sizeBytes !== undefined) {
-            obj.sizeBytes = Math.round(message.sizeBytes);
-        }
-        if (message.checksumSha256 !== undefined) {
-            obj.checksumSha256 = message.checksumSha256;
-        }
-        if (message.completedAtUnixMs !== undefined) {
-            obj.completedAtUnixMs = Math.round(message.completedAtUnixMs);
-        }
-        if (message.imported !== false) {
-            obj.imported = message.imported;
-        }
-        if (message.statusMessage !== "") {
-            obj.statusMessage = message.statusMessage;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LoraAdapterDownloadCompletedRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLoraAdapterDownloadCompletedRequest();
-        message.adapterId = object.adapterId ?? "";
-        message.localPath = object.localPath ?? "";
-        message.sizeBytes = object.sizeBytes ?? undefined;
-        message.checksumSha256 = object.checksumSha256 ?? undefined;
-        message.completedAtUnixMs = object.completedAtUnixMs ?? undefined;
-        message.imported = object.imported ?? false;
-        message.statusMessage = object.statusMessage ?? "";
-        return message;
-    },
-};
-function createBaseLoraAdapterDownloadCompletedResult() {
-    return { entry: undefined, persisted: false, error: undefined };
-}
-exports.LoraAdapterDownloadCompletedResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.entry !== undefined) {
-            exports.LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(18).fork()).join();
-        }
-        if (message.persisted !== false) {
-            writer.uint32(32).bool(message.persisted);
-        }
-        if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(42).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoraAdapterDownloadCompletedResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.entry = exports.LoraAdapterCatalogEntry.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.persisted = reader.bool();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            entry: isSet(object.entry) ? exports.LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
-            persisted: isSet(object.persisted) ? globalThis.Boolean(object.persisted) : false,
-            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.entry !== undefined) {
-            obj.entry = exports.LoraAdapterCatalogEntry.toJSON(message.entry);
-        }
-        if (message.persisted !== false) {
-            obj.persisted = message.persisted;
-        }
-        if (message.error !== undefined) {
-            obj.error = errors_1.SDKError.toJSON(message.error);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LoraAdapterDownloadCompletedResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLoraAdapterDownloadCompletedResult();
-        message.entry = (object.entry !== undefined && object.entry !== null)
-            ? exports.LoraAdapterCatalogEntry.fromPartial(object.entry)
-            : undefined;
-        message.persisted = object.persisted ?? false;
-        message.error = (object.error !== undefined && object.error !== null)
-            ? errors_1.SDKError.fromPartial(object.error)
-            : undefined;
-        return message;
-    },
-};
-function createBaseLoraAdapterImportRequest() {
-    return { sourcePath: "", filename: undefined };
-}
-exports.LoraAdapterImportRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.sourcePath !== "") {
-            writer.uint32(10).string(message.sourcePath);
-        }
-        if (message.filename !== undefined) {
-            writer.uint32(18).string(message.filename);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoraAdapterImportRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.sourcePath = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.filename = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            sourcePath: isSet(object.sourcePath)
-                ? globalThis.String(object.sourcePath)
-                : isSet(object.source_path)
-                    ? globalThis.String(object.source_path)
-                    : "",
-            filename: isSet(object.filename) ? globalThis.String(object.filename) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.sourcePath !== "") {
-            obj.sourcePath = message.sourcePath;
-        }
-        if (message.filename !== undefined) {
-            obj.filename = message.filename;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LoraAdapterImportRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLoraAdapterImportRequest();
-        message.sourcePath = object.sourcePath ?? "";
-        message.filename = object.filename ?? undefined;
-        return message;
-    },
-};
-function createBaseLoraAdapterImportResult() {
-    return { localPath: "", matched: false, entry: undefined, error: undefined };
-}
-exports.LoraAdapterImportResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.localPath !== "") {
-            writer.uint32(26).string(message.localPath);
-        }
-        if (message.matched !== false) {
-            writer.uint32(32).bool(message.matched);
-        }
-        if (message.entry !== undefined) {
-            exports.LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(42).fork()).join();
-        }
-        if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoraAdapterImportResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.localPath = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.matched = reader.bool();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.entry = exports.LoraAdapterCatalogEntry.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            localPath: isSet(object.localPath)
-                ? globalThis.String(object.localPath)
-                : isSet(object.local_path)
-                    ? globalThis.String(object.local_path)
-                    : "",
-            matched: isSet(object.matched) ? globalThis.Boolean(object.matched) : false,
-            entry: isSet(object.entry) ? exports.LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
-            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.localPath !== "") {
-            obj.localPath = message.localPath;
-        }
-        if (message.matched !== false) {
-            obj.matched = message.matched;
-        }
-        if (message.entry !== undefined) {
-            obj.entry = exports.LoraAdapterCatalogEntry.toJSON(message.entry);
-        }
-        if (message.error !== undefined) {
-            obj.error = errors_1.SDKError.toJSON(message.error);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.LoraAdapterImportResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseLoraAdapterImportResult();
-        message.localPath = object.localPath ?? "";
-        message.matched = object.matched ?? false;
-        message.entry = (object.entry !== undefined && object.entry !== null)
-            ? exports.LoraAdapterCatalogEntry.fromPartial(object.entry)
-            : undefined;
-        message.error = (object.error !== undefined && object.error !== null)
-            ? errors_1.SDKError.fromPartial(object.error)
-            : undefined;
-        return message;
-    },
-};
 function createBaseLoraCompatibilityResult() {
-    return { isCompatible: false, baseModelRequired: undefined, warnings: [], error: undefined };
+    return { isCompatible: false, baseModelRequired: undefined, error: undefined };
 }
 exports.LoraCompatibilityResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1743,13 +889,10 @@ exports.LoraCompatibilityResult = {
             writer.uint32(8).bool(message.isCompatible);
         }
         if (message.baseModelRequired !== undefined) {
-            writer.uint32(26).string(message.baseModelRequired);
-        }
-        for (const v of message.warnings) {
-            writer.uint32(34).string(v);
+            writer.uint32(18).string(message.baseModelRequired);
         }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
+            errors_1.SDKError.encode(message.error, writer.uint32(26).fork()).join();
         }
         return writer;
     },
@@ -1767,22 +910,15 @@ exports.LoraCompatibilityResult = {
                     message.isCompatible = reader.bool();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
+                case 2: {
+                    if (tag !== 18) {
                         break;
                     }
                     message.baseModelRequired = reader.string();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.warnings.push(reader.string());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
+                case 3: {
+                    if (tag !== 26) {
                         break;
                     }
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
@@ -1808,7 +944,6 @@ exports.LoraCompatibilityResult = {
                 : isSet(object.base_model_required)
                     ? globalThis.String(object.base_model_required)
                     : undefined,
-            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -1819,9 +954,6 @@ exports.LoraCompatibilityResult = {
         }
         if (message.baseModelRequired !== undefined) {
             obj.baseModelRequired = message.baseModelRequired;
-        }
-        if (message.warnings?.length) {
-            obj.warnings = message.warnings;
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -1835,33 +967,32 @@ exports.LoraCompatibilityResult = {
         const message = createBaseLoraCompatibilityResult();
         message.isCompatible = object.isCompatible ?? false;
         message.baseModelRequired = object.baseModelRequired ?? undefined;
-        message.warnings = object.warnings?.map((e) => e) || [];
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
         return message;
     },
 };
-function createBaseLoRAApplyRequest() {
-    return { requestId: "", adapters: [], replaceExisting: false };
+function createBaseLoraApplyRequest() {
+    return { requestId: "", adapters: [], keepExisting: false };
 }
-exports.LoRAApplyRequest = {
+exports.LoraApplyRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.requestId !== "") {
             writer.uint32(10).string(message.requestId);
         }
         for (const v of message.adapters) {
-            exports.LoRAAdapterConfig.encode(v, writer.uint32(18).fork()).join();
+            exports.LoraAdapterConfig.encode(v, writer.uint32(18).fork()).join();
         }
-        if (message.replaceExisting !== false) {
-            writer.uint32(24).bool(message.replaceExisting);
+        if (message.keepExisting !== false) {
+            writer.uint32(24).bool(message.keepExisting);
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoRAApplyRequest();
+        const message = createBaseLoraApplyRequest();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -1876,14 +1007,14 @@ exports.LoRAApplyRequest = {
                     if (tag !== 18) {
                         break;
                     }
-                    message.adapters.push(exports.LoRAAdapterConfig.decode(reader, reader.uint32()));
+                    message.adapters.push(exports.LoraAdapterConfig.decode(reader, reader.uint32()));
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.replaceExisting = reader.bool();
+                    message.keepExisting = reader.bool();
                     continue;
                 }
             }
@@ -1902,12 +1033,12 @@ exports.LoRAApplyRequest = {
                     ? globalThis.String(object.request_id)
                     : "",
             adapters: globalThis.Array.isArray(object?.adapters)
-                ? object.adapters.map((e) => exports.LoRAAdapterConfig.fromJSON(e))
+                ? object.adapters.map((e) => exports.LoraAdapterConfig.fromJSON(e))
                 : [],
-            replaceExisting: isSet(object.replaceExisting)
-                ? globalThis.Boolean(object.replaceExisting)
-                : isSet(object.replace_existing)
-                    ? globalThis.Boolean(object.replace_existing)
+            keepExisting: isSet(object.keepExisting)
+                ? globalThis.Boolean(object.keepExisting)
+                : isSet(object.keep_existing)
+                    ? globalThis.Boolean(object.keep_existing)
                     : false,
         };
     },
@@ -1917,34 +1048,34 @@ exports.LoRAApplyRequest = {
             obj.requestId = message.requestId;
         }
         if (message.adapters?.length) {
-            obj.adapters = message.adapters.map((e) => exports.LoRAAdapterConfig.toJSON(e));
+            obj.adapters = message.adapters.map((e) => exports.LoraAdapterConfig.toJSON(e));
         }
-        if (message.replaceExisting !== false) {
-            obj.replaceExisting = message.replaceExisting;
+        if (message.keepExisting !== false) {
+            obj.keepExisting = message.keepExisting;
         }
         return obj;
     },
     create(base) {
-        return exports.LoRAApplyRequest.fromPartial(base ?? {});
+        return exports.LoraApplyRequest.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseLoRAApplyRequest();
+        const message = createBaseLoraApplyRequest();
         message.requestId = object.requestId ?? "";
-        message.adapters = object.adapters?.map((e) => exports.LoRAAdapterConfig.fromPartial(e)) || [];
-        message.replaceExisting = object.replaceExisting ?? false;
+        message.adapters = object.adapters?.map((e) => exports.LoraAdapterConfig.fromPartial(e)) || [];
+        message.keepExisting = object.keepExisting ?? false;
         return message;
     },
 };
-function createBaseLoRAApplyResult() {
+function createBaseLoraApplyResult() {
     return { requestId: "", adapters: [], error: undefined };
 }
-exports.LoRAApplyResult = {
+exports.LoraApplyResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.requestId !== "") {
             writer.uint32(10).string(message.requestId);
         }
         for (const v of message.adapters) {
-            exports.LoRAAdapterInfo.encode(v, writer.uint32(18).fork()).join();
+            exports.LoraAdapterInfo.encode(v, writer.uint32(18).fork()).join();
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
@@ -1954,7 +1085,7 @@ exports.LoRAApplyResult = {
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoRAApplyResult();
+        const message = createBaseLoraApplyResult();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -1969,7 +1100,7 @@ exports.LoRAApplyResult = {
                     if (tag !== 18) {
                         break;
                     }
-                    message.adapters.push(exports.LoRAAdapterInfo.decode(reader, reader.uint32()));
+                    message.adapters.push(exports.LoraAdapterInfo.decode(reader, reader.uint32()));
                     continue;
                 }
                 case 6: {
@@ -1995,7 +1126,7 @@ exports.LoRAApplyResult = {
                     ? globalThis.String(object.request_id)
                     : "",
             adapters: globalThis.Array.isArray(object?.adapters)
-                ? object.adapters.map((e) => exports.LoRAAdapterInfo.fromJSON(e))
+                ? object.adapters.map((e) => exports.LoraAdapterInfo.fromJSON(e))
                 : [],
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
@@ -2006,7 +1137,7 @@ exports.LoRAApplyResult = {
             obj.requestId = message.requestId;
         }
         if (message.adapters?.length) {
-            obj.adapters = message.adapters.map((e) => exports.LoRAAdapterInfo.toJSON(e));
+            obj.adapters = message.adapters.map((e) => exports.LoraAdapterInfo.toJSON(e));
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -2014,41 +1145,35 @@ exports.LoRAApplyResult = {
         return obj;
     },
     create(base) {
-        return exports.LoRAApplyResult.fromPartial(base ?? {});
+        return exports.LoraApplyResult.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseLoRAApplyResult();
+        const message = createBaseLoraApplyResult();
         message.requestId = object.requestId ?? "";
-        message.adapters = object.adapters?.map((e) => exports.LoRAAdapterInfo.fromPartial(e)) || [];
+        message.adapters = object.adapters?.map((e) => exports.LoraAdapterInfo.fromPartial(e)) || [];
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
         return message;
     },
 };
-function createBaseLoRARemoveRequest() {
-    return { requestId: "", adapterIds: [], adapterPaths: [], clearAll: false };
+function createBaseLoraRemoveRequest() {
+    return { adapterIds: [], clearAll: false };
 }
-exports.LoRARemoveRequest = {
+exports.LoraRemoveRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.requestId !== "") {
-            writer.uint32(10).string(message.requestId);
-        }
         for (const v of message.adapterIds) {
-            writer.uint32(18).string(v);
-        }
-        for (const v of message.adapterPaths) {
-            writer.uint32(26).string(v);
+            writer.uint32(10).string(v);
         }
         if (message.clearAll !== false) {
-            writer.uint32(32).bool(message.clearAll);
+            writer.uint32(16).bool(message.clearAll);
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoRARemoveRequest();
+        const message = createBaseLoraRemoveRequest();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -2056,25 +1181,11 @@ exports.LoRARemoveRequest = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.requestId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
                     message.adapterIds.push(reader.string());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.adapterPaths.push(reader.string());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
+                case 2: {
+                    if (tag !== 16) {
                         break;
                     }
                     message.clearAll = reader.bool();
@@ -2090,20 +1201,10 @@ exports.LoRARemoveRequest = {
     },
     fromJSON(object) {
         return {
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
             adapterIds: globalThis.Array.isArray(object?.adapterIds)
                 ? object.adapterIds.map((e) => globalThis.String(e))
                 : globalThis.Array.isArray(object?.adapter_ids)
                     ? object.adapter_ids.map((e) => globalThis.String(e))
-                    : [],
-            adapterPaths: globalThis.Array.isArray(object?.adapterPaths)
-                ? object.adapterPaths.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.adapter_paths)
-                    ? object.adapter_paths.map((e) => globalThis.String(e))
                     : [],
             clearAll: isSet(object.clearAll)
                 ? globalThis.Boolean(object.clearAll)
@@ -2114,14 +1215,8 @@ exports.LoRARemoveRequest = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
-        }
         if (message.adapterIds?.length) {
             obj.adapterIds = message.adapterIds;
-        }
-        if (message.adapterPaths?.length) {
-            obj.adapterPaths = message.adapterPaths;
         }
         if (message.clearAll !== false) {
             obj.clearAll = message.clearAll;
@@ -2129,40 +1224,35 @@ exports.LoRARemoveRequest = {
         return obj;
     },
     create(base) {
-        return exports.LoRARemoveRequest.fromPartial(base ?? {});
+        return exports.LoraRemoveRequest.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseLoRARemoveRequest();
-        message.requestId = object.requestId ?? "";
+        const message = createBaseLoraRemoveRequest();
         message.adapterIds = object.adapterIds?.map((e) => e) || [];
-        message.adapterPaths = object.adapterPaths?.map((e) => e) || [];
         message.clearAll = object.clearAll ?? false;
         return message;
     },
 };
-function createBaseLoRAState() {
-    return { loadedAdapters: [], hasActiveAdapters: false, baseModelId: undefined, error: undefined };
+function createBaseLoraState() {
+    return { loadedAdapters: [], baseModelId: undefined, error: undefined };
 }
-exports.LoRAState = {
+exports.LoraState = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         for (const v of message.loadedAdapters) {
-            exports.LoRAAdapterInfo.encode(v, writer.uint32(10).fork()).join();
-        }
-        if (message.hasActiveAdapters !== false) {
-            writer.uint32(16).bool(message.hasActiveAdapters);
+            exports.LoraAdapterInfo.encode(v, writer.uint32(10).fork()).join();
         }
         if (message.baseModelId !== undefined) {
-            writer.uint32(26).string(message.baseModelId);
+            writer.uint32(18).string(message.baseModelId);
         }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
+            errors_1.SDKError.encode(message.error, writer.uint32(26).fork()).join();
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseLoRAState();
+        const message = createBaseLoraState();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -2170,25 +1260,18 @@ exports.LoRAState = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.loadedAdapters.push(exports.LoRAAdapterInfo.decode(reader, reader.uint32()));
+                    message.loadedAdapters.push(exports.LoraAdapterInfo.decode(reader, reader.uint32()));
                     continue;
                 }
                 case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.hasActiveAdapters = reader.bool();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
+                    if (tag !== 18) {
                         break;
                     }
                     message.baseModelId = reader.string();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 50) {
+                case 3: {
+                    if (tag !== 26) {
                         break;
                     }
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
@@ -2205,15 +1288,10 @@ exports.LoRAState = {
     fromJSON(object) {
         return {
             loadedAdapters: globalThis.Array.isArray(object?.loadedAdapters)
-                ? object.loadedAdapters.map((e) => exports.LoRAAdapterInfo.fromJSON(e))
+                ? object.loadedAdapters.map((e) => exports.LoraAdapterInfo.fromJSON(e))
                 : globalThis.Array.isArray(object?.loaded_adapters)
-                    ? object.loaded_adapters.map((e) => exports.LoRAAdapterInfo.fromJSON(e))
+                    ? object.loaded_adapters.map((e) => exports.LoraAdapterInfo.fromJSON(e))
                     : [],
-            hasActiveAdapters: isSet(object.hasActiveAdapters)
-                ? globalThis.Boolean(object.hasActiveAdapters)
-                : isSet(object.has_active_adapters)
-                    ? globalThis.Boolean(object.has_active_adapters)
-                    : false,
             baseModelId: isSet(object.baseModelId)
                 ? globalThis.String(object.baseModelId)
                 : isSet(object.base_model_id)
@@ -2225,10 +1303,7 @@ exports.LoRAState = {
     toJSON(message) {
         const obj = {};
         if (message.loadedAdapters?.length) {
-            obj.loadedAdapters = message.loadedAdapters.map((e) => exports.LoRAAdapterInfo.toJSON(e));
-        }
-        if (message.hasActiveAdapters !== false) {
-            obj.hasActiveAdapters = message.hasActiveAdapters;
+            obj.loadedAdapters = message.loadedAdapters.map((e) => exports.LoraAdapterInfo.toJSON(e));
         }
         if (message.baseModelId !== undefined) {
             obj.baseModelId = message.baseModelId;
@@ -2239,12 +1314,11 @@ exports.LoRAState = {
         return obj;
     },
     create(base) {
-        return exports.LoRAState.fromPartial(base ?? {});
+        return exports.LoraState.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseLoRAState();
-        message.loadedAdapters = object.loadedAdapters?.map((e) => exports.LoRAAdapterInfo.fromPartial(e)) || [];
-        message.hasActiveAdapters = object.hasActiveAdapters ?? false;
+        const message = createBaseLoraState();
+        message.loadedAdapters = object.loadedAdapters?.map((e) => exports.LoraAdapterInfo.fromPartial(e)) || [];
         message.baseModelId = object.baseModelId ?? undefined;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
@@ -2261,9 +1335,6 @@ function longToNumber(int64) {
         throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
     }
     return num;
-}
-function isObject(value) {
-    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

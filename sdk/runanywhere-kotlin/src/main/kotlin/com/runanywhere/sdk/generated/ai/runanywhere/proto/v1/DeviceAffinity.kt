@@ -24,9 +24,10 @@ public enum class DeviceAffinity(
   DEVICE_AFFINITY_CPU(2),
   DEVICE_AFFINITY_GPU(3),
   /**
-   * Apple Neural Engine
+   * Vendor-neutral neural accelerator: Apple Neural Engine, Qualcomm
+   * Hexagon NPU, etc. The YAML loader already accepts "npu" for this value.
    */
-  DEVICE_AFFINITY_ANE(4),
+  DEVICE_AFFINITY_NPU(4),
   ;
 
   public companion object {
@@ -45,7 +46,7 @@ public enum class DeviceAffinity(
       1 -> DEVICE_AFFINITY_ANY
       2 -> DEVICE_AFFINITY_CPU
       3 -> DEVICE_AFFINITY_GPU
-      4 -> DEVICE_AFFINITY_ANE
+      4 -> DEVICE_AFFINITY_NPU
       else -> null
     }
   }

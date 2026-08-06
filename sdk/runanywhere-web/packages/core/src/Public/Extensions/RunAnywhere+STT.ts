@@ -362,17 +362,14 @@ export function transcribeStream(
             ? detail
             : `STT stream failed: ${detail}`,
           isFinal: true,
-          requestId: event.requestId,
         });
         return;
       }
       if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL) {
         yield STTPartialResult.fromPartial({
-          ...(event.partial ?? {}),
           text: event.partial?.text || event.finalOutput?.text || '',
           isFinal: true,
-          finalOutput: event.finalOutput ?? event.partial?.finalOutput,
-          requestId: event.requestId || event.partial?.requestId,
+          language: event.partial?.language ?? event.finalOutput?.language,
         });
         return;
       }

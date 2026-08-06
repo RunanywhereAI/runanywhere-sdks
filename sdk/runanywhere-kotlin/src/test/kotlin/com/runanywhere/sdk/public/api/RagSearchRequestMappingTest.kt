@@ -1,10 +1,19 @@
 /*
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * `RAGSearchRequest.question`/`.retrieval_top_k`/`.enable_multi_query` are
+ * deleted outright (idl/rag.proto): the flat fields collapsed onto the
+ * shared `RAGRetrievalOptions` message (`query` + nested `retrieval`),
+ * matching `RAGQueryOptions`'s shape. `RAGSearchResult.similarity_score`/
+ * `.rank` are likewise deleted -- `score` (fused dense + BM25 RRF, not a raw
+ * cosine similarity) is the sole relevance field now, and rank is
+ * positional (list order), not a separate field.
  */
 
 package com.runanywhere.sdk.public.api
 
+import ai.runanywhere.proto.v1.RAGRetrievalOptions
 import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGSearchResponse
 import ai.runanywhere.proto.v1.RAGSearchResult
@@ -19,14 +28,14 @@ class RagSearchRequestMappingTest {
         val request =
             CppBridgeRAG.prepareSearch(
                 RAGSearchRequest(
-                    question = "where is rag",
-                    retrieval_top_k = 3,
+                    query = "where is rag",
+                    retrieval = RAGRetrievalOptions(top_k = 3),
                 ),
             )
         val decoded = RAGSearchRequest.ADAPTER.decode(request.requestProto)
-        assertEquals("where is rag", decoded.question)
-        assertEquals(3, decoded.retrieval_top_k)
-        assertEquals(false, decoded.enable_multi_query)
+        assertEquals("where is rag", decoded.query)
+        assertEquals(3, decoded.retrieval?.top_k)
+        assertEquals(false, decoded.retrieval?.enable_multi_query)
     }
 
     @Test
@@ -38,9 +47,8 @@ class RagSearchRequestMappingTest {
                         RAGSearchResult(
                             chunk_id = "c1",
                             text = "retrieval only",
-                            similarity_score = 0.91f,
+                            score = 0.91f,
                             source_document = "doc-a",
-                            rank = 1,
                         ),
                     ),
                 retrieval_time_ms = 12L,

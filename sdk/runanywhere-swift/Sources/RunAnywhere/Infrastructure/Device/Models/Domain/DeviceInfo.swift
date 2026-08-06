@@ -108,26 +108,112 @@ public enum DeviceInfoFactory {
         let availableMemory = getAvailableMemory()
         let osVersion = cleanVersion(processInfo.operatingSystemVersionString)
 
+        // idl/device_info.proto's DeviceInfo carries identity + runtime
+        // telemetry only. Several fields this factory used to write were
+        // deleted outright with no typed replacement:
+        //   - deviceName (user-assigned name — not in the closed schema)
+        //   - neuralEngineCores / hasNeuralEngine_p (NPU capability now
+        //     lives exclusively in hardware_profile.proto's NpuCapability;
+        //     this message only carries the boolean-ish hasNpu_p/npuCores
+        //     pair, which this factory does not populate from chip lookup
+        //     since that duplicate detail belongs in the NPU-capability path)
+        //   - efficiencyCores (only performanceCores + the overall
+        //     coreCount survive; efficiency count is coreCount - performanceCores)
+        // platform/formFactor/batteryState also moved from bare strings to
+        // closed proto enums.
         var info = RADeviceInfo()
         info.deviceModel = deviceModel
-        info.deviceName = deviceName
-        info.platform = platform
+        info.platform = DeviceInfoFactory.protoPlatform(platform)
         info.osVersion = osVersion
-        info.formFactor = formFactor
+        info.formFactor = DeviceInfoFactory.protoFormFactor(formFactor)
         info.architecture = architecture
         info.chipName = chipSpec.name
-        info.totalMemory = Int64(processInfo.physicalMemory)
-        info.availableMemory = Int64(availableMemory)
-        info.hasNeuralEngine_p = chipSpec.hasNeuralEngine
-        info.neuralEngineCores = chipSpec.neuralEngineCores
+        info.totalMemoryBytes = Int64(processInfo.physicalMemory)
+        info.availableMemoryBytes = Int64(availableMemory)
+        info.hasNpu_p = chipSpec.hasNeuralEngine
+        info.npuCores = chipSpec.neuralEngineCores
         info.gpuFamily = cachedGPUFamily
         if let batteryLevel { info.batteryLevel = batteryLevel }
-        if let batteryState { info.batteryState = batteryState }
+        if let batteryState { info.batteryState = DeviceInfoFactory.protoBatteryState(batteryState) }
         info.isLowPowerMode = processInfo.isLowPowerModeEnabled
         info.coreCount = Int32(coreCount)
         info.performanceCores = Int32(perfCores)
-        info.efficiencyCores = Int32(effCores)
+        _ = effCores // folded into coreCount - performanceCores; no separate wire field
         return info
+    }
+
+    private static func protoPlatform(_ raw: String) -> RAPlatform {
+        switch raw {
+        case "ios": return .ios
+        case "android": return .android
+        case "macos": return .macos
+        case "web": return .web
+        case "linux": return .linux
+        case "windows": return .windows
+        default: return .unspecified
+        }
+    }
+
+    private static func protoFormFactor(_ raw: String) -> RAFormFactor {
+        switch raw {
+        case "phone": return .phone
+        case "tablet": return .tablet
+        case "desktop": return .desktop
+        case "laptop": return .laptop
+        case "tv": return .tv
+        case "watch": return .watch
+        case "headset": return .headset
+        default: return .unspecified
+        }
+    }
+
+    private static func protoBatteryState(_ raw: String) -> RABatteryState {
+        switch raw {
+        case "charging": return .charging
+        case "unplugged": return .unplugged
+        case "full": return .full
+        default: return .unspecified
+        }
+    }
+
+    /// Lower-case wire spelling for callers (e.g. `CppBridge+Device.swift`)
+    /// that still hand the C ABI a bare string, now that these fields are
+    /// closed proto enums rather than strings on `RADeviceInfo` itself.
+    static func wireString(_ platform: RAPlatform) -> String {
+        switch platform {
+        case .ios: return "ios"
+        case .android: return "android"
+        case .macos: return "macos"
+        case .web: return "web"
+        case .linux: return "linux"
+        case .windows: return "windows"
+        case .tvos: return "tvos"
+        case .watchos: return "watchos"
+        case .visionos: return "visionos"
+        default: return "unspecified"
+        }
+    }
+
+    static func wireString(_ formFactor: RAFormFactor) -> String {
+        switch formFactor {
+        case .phone: return "phone"
+        case .tablet: return "tablet"
+        case .desktop: return "desktop"
+        case .laptop: return "laptop"
+        case .tv: return "tv"
+        case .watch: return "watch"
+        case .headset: return "headset"
+        default: return "unknown"
+        }
+    }
+
+    static func wireString(_ batteryState: RABatteryState) -> String {
+        switch batteryState {
+        case .charging: return "charging"
+        case .unplugged: return "unplugged"
+        case .full: return "full"
+        default: return "unspecified"
+        }
     }
 
     /// Stable hardware fingerprint: deterministic per physical device,

@@ -3,13 +3,32 @@ export declare const protobufPackage = "runanywhere.v1";
 /**
  * One token-accounting shape embedded by every result and metrics message,
  * replacing the input/output/total/throughput quadruple that was copied inline
- * across LLM, VLM, and RAG results. Names follow the OpenAI Responses API.
+ * across LLM, VLM, and RAG results. Names follow the OpenAI Responses API; the
+ * timing fields follow llama.cpp's `timings` object, which names the phase it
+ * measures.
  */
 export interface TokenUsage {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
-    tokensPerSecond: number;
+    /**
+     * Decode-phase throughput only: output_tokens / decode_ms. Excludes
+     * prefill. cf. llama.cpp timings.predicted_per_second.
+     */
+    decodeTokensPerSecond: number;
+    /**
+     * Prefill (prompt eval) wall time. cf. llama.cpp timings.prompt_ms,
+     * Ollama prompt_eval_duration. 0 when the backend does not report it.
+     */
+    prefillMs: number;
+    /**
+     * Request start to first output token. The canonical spelling for every
+     * result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
+     * report TTFT here and nowhere else. SDKEvent's own telemetry fields
+     * (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
+     * their separate event-stream spelling.
+     */
+    ttftMs: number;
 }
 export declare const TokenUsage: MessageFns<TokenUsage>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

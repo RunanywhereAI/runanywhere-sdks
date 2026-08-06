@@ -7,38 +7,13 @@
 
 import Foundation
 
-// MARK: - RAVLMConfiguration
-
-extension RAVLMConfiguration {
-    public static func defaults(modelId: String = "") -> RAVLMConfiguration {
-        var container = RAVLMConfiguration()
-        container.modelID = modelId
-        container.maxImageSizePx = 1_024
-        container.maxTokens = 0
-        return container
-    }
-}
-
-// MARK: - RAVLMGenerationOptions
-
-extension RAVLMGenerationOptions {
-    /// `defaults()` with a prompt filled in.
-    ///
-    /// The sampling values come from the generated `defaults()` in
-    /// RAConvenience.swift, which reads the rac_default annotations in
-    /// idl/vlm_options.proto. The hand-written table this replaced capped
-    /// max_tokens at 128 against the C layer's 2048, and set top_k=40 where the
-    /// C layer disables it — so a Swift caption was truncated far earlier than
-    /// the same call on any other platform.
-    ///
-    /// `prompt` is deliberately not defaulted: a `defaults()` with no arguments
-    /// must resolve unambiguously to the generated overload.
-    public static func defaults(prompt: String) -> RAVLMGenerationOptions {
-        var options = defaults()
-        options.prompt = prompt
-        return options
-    }
-}
+// RAVLMConfiguration and RAVLMGenerationOptions were both deleted outright
+// (idl/vlm_options.proto): VLMConfiguration had no commons adapter at all,
+// and VLMGenerationOptions's 11 sampling fields were name-for-name copies of
+// LLMGenerationOptions with drifted defaults. Sampling now lives on
+// RAVLMGenerationRequest.options (RALLMGenerationOptions, shared with the
+// text path); the four genuinely vision-specific knobs survive on
+// RAVLMVisionOptions.
 
 #if canImport(UIKit)
 import UIKit
@@ -56,10 +31,16 @@ import CoreGraphics
 
 extension RAVLMImage {
     /// Create a proto VLM image from an encoded JPEG / PNG / WebP byte buffer.
-    public static func fromEncoded(_ data: Data, format: RAVLMImageFormat) -> RAVLMImage {
+    ///
+    /// `img.format`/`.encoded` were deleted along with `RAVLMImageFormat`
+    /// (idl/vlm_options.proto): the oneof case name (`data`) now carries the
+    /// same discrimination the old `format` enum did, and `mediaType` (a
+    /// plain MIME string) replaces the closed format enum entirely so a new
+    /// container type is not a proto change.
+    public static func fromEncoded(_ data: Data, mediaType: String) -> RAVLMImage {
         var img = RAVLMImage()
-        img.encoded = data
-        img.format = format
+        img.data = data
+        img.mediaType = mediaType
         return img
     }
 
@@ -67,15 +48,14 @@ extension RAVLMImage {
     public static func fromFilePath(_ path: String) -> RAVLMImage {
         var img = RAVLMImage()
         img.filePath = path
-        img.format = .filePath
         return img
     }
 
     /// Create a proto VLM image from a base64-encoded string.
-    public static func fromBase64(_ base64: String) -> RAVLMImage {
+    public static func fromBase64(_ base64: String, mediaType: String) -> RAVLMImage {
         var img = RAVLMImage()
         img.base64 = base64
-        img.format = .base64
+        img.mediaType = mediaType
         return img
     }
 
@@ -85,18 +65,17 @@ extension RAVLMImage {
         img.rawRgb = data
         img.width = Int32(width)
         img.height = Int32(height)
-        img.format = .rawRgb
         return img
     }
 
     /// Create a proto VLM image from raw RGBA bytes.
-    /// (Stored in the same `rawRgb` oneof slot; format flag distinguishes it.)
+    /// `rawRgba` is now its own oneof case (idl/vlm_options.proto field 12),
+    /// not a shared `rawRgb` slot distinguished by a format flag.
     public static func fromRawRGBA(_ data: Data, width: Int, height: Int) -> RAVLMImage {
         var img = RAVLMImage()
-        img.rawRgb = data
+        img.rawRgba = data
         img.width = Int32(width)
         img.height = Int32(height)
-        img.format = .rawRgba
         return img
     }
 }

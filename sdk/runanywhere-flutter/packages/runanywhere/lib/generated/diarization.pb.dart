@@ -31,6 +31,7 @@ class DiarizationOptions extends $pb.GeneratedMessage {
     $core.double? threshold,
     $fixnum.Int64? minimumDurationMs,
     $fixnum.Int64? mergeGapMs,
+    $core.int? maxSpeakers,
   }) {
     final result = create();
     if (sampleRate != null) result.sampleRate = sampleRate;
@@ -39,6 +40,7 @@ class DiarizationOptions extends $pb.GeneratedMessage {
     if (threshold != null) result.threshold = threshold;
     if (minimumDurationMs != null) result.minimumDurationMs = minimumDurationMs;
     if (mergeGapMs != null) result.mergeGapMs = mergeGapMs;
+    if (maxSpeakers != null) result.maxSpeakers = maxSpeakers;
     return result;
   }
 
@@ -62,6 +64,7 @@ class DiarizationOptions extends $pb.GeneratedMessage {
     ..aD(4, _omitFieldNames ? '' : 'threshold', fieldType: $pb.PbFieldType.OF)
     ..aInt64(5, _omitFieldNames ? '' : 'minimumDurationMs')
     ..aInt64(6, _omitFieldNames ? '' : 'mergeGapMs')
+    ..aI(8, _omitFieldNames ? '' : 'maxSpeakers')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -83,6 +86,8 @@ class DiarizationOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<DiarizationOptions>(create);
   static DiarizationOptions? _defaultInstance;
 
+  /// Only 16 kHz is accepted: the engine does not resample, and any other
+  /// rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
   @$pb.TagNumber(1)
   $core.int get sampleRate => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -101,8 +106,11 @@ class DiarizationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearChannels() => $_clearField(2);
 
-  /// Commons normalizes either PCM representation to float samples before
-  /// dispatching to an engine.
+  /// Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+  /// AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+  /// float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+  /// and AUDIO_ENCODING_UNSPECIFIED are rejected with
+  /// RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
   @$pb.TagNumber(3)
   $1.AudioEncoding get encoding => $_getN(2);
   @$pb.TagNumber(3)
@@ -138,6 +146,20 @@ class DiarizationOptions extends $pb.GeneratedMessage {
   $core.bool hasMergeGapMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearMergeGapMs() => $_clearField(6);
+
+  /// Speaker-count hint: an upper bound, not an exact count. Unset =
+  /// auto-detect. An engine that detects more than max_speakers speakers
+  /// ranks them by total active duration, drops the weakest, and re-densifies
+  /// the speaker indices. Values above the loaded model's speaker capacity
+  /// are clamped.
+  @$pb.TagNumber(8)
+  $core.int get maxSpeakers => $_getIZ(6);
+  @$pb.TagNumber(8)
+  set maxSpeakers($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(8)
+  $core.bool hasMaxSpeakers() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearMaxSpeakers() => $_clearField(8);
 }
 
 class DiarizationRequest extends $pb.GeneratedMessage {

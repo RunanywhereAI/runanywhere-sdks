@@ -95,7 +95,7 @@ public extension RunAnywhere {
     @available(*, deprecated, renamed: "llm.generateStructured(prompt:schema:options:)")
     static func extractStructuredOutput(
         text: String,
-        schema: RAJSONSchema
+        schema: JsonSchema
     ) throws -> RAStructuredOutputResult {
         try parseStructuredOutput(text: text, schema: schema)
     }
@@ -151,7 +151,7 @@ public extension RunAnywhere {
         var tokenCount = 0
         var firstTokenTime: Date?
         let startTime = Date()
-        var finishReason = ""
+        var finishReason: RAFinishReason = .unspecified
         var terminalError: RASDKError?
         var finalEvent: RALLMStreamEvent?
 
@@ -159,19 +159,24 @@ public extension RunAnywhere {
             if !event.token.isEmpty {
                 if firstTokenTime == nil { firstTokenTime = Date() }
                 tokenCount += 1
-                if event.kind == .thought {
+                // RALLMStreamEvent's discriminator is the event-level
+                // `eventKind: RALLMStreamEventKind`, not a per-token
+                // `RATokenKind` field (`.kind` doesn't exist on this type).
+                if event.eventKind == .thinking {
                     thinkingResponse += event.token
                     if let onThinking {
                         await onThinking(thinkingResponse)
                     }
-                } else if event.kind != .toolCall {
+                } else if event.eventKind != .toolCall {
                     answerResponse += event.token
                     if let onToken {
                         await onToken(answerResponse)
                     }
                 }
             }
-            if event.isFinal {
+            // isFinal was deleted outright; .completed/.error are the
+            // terminal event_kind values now (idl/llm_service.proto).
+            if event.eventKind == .completed || event.eventKind == .error {
                 finalEvent = event
                 finishReason = event.finishReason
                 terminalError = event.hasError ? event.error : nil
@@ -214,18 +219,24 @@ public extension RunAnywhere {
         result.usage.totalTokens = final.map { $0.usage.totalTokens }
             ?? (result.usage.inputTokens + result.usage.outputTokens)
         result.modelUsed = modelID
-        result.generationTimeMs = final.map { Double($0.totalTimeMs) } ?? totalLatency
+        // totalTimeMs was deleted outright; generationTimeMs (already a
+        // Double) is the sole wall-clock field left on this message.
+        result.generationTimeMs = final.map { $0.generationTimeMs } ?? totalLatency
         result.framework = framework
         result.promptEvalTimeMs = final.map { $0.promptEvalTimeMs } ?? 0
         result.decodeTimeMs = final.map { $0.decodeTimeMs } ?? 0
-        result.usage.tokensPerSecond = final.map { $0.usage.tokensPerSecond }
+        // tokensPerSecond was renamed decodeTokensPerSecond and moved onto
+        // the shared RATokenUsage message (idl/token_usage.proto).
+        result.usage.decodeTokensPerSecond = final.map { $0.usage.decodeTokensPerSecond }
             ?? (totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0)
-        if let ttftFromFinal = final.map({ Double($0.timeToFirstTokenMs) }) {
-            result.ttftMs = ttftFromFinal
+        // ttftMs (top-level Double) was deleted outright; ttft is now
+        // Int64 milliseconds on the shared RATokenUsage message.
+        if let ttftFromFinal = final?.usage.ttftMs, ttftFromFinal > 0 {
+            result.usage.ttftMs = ttftFromFinal
         } else if let ttft {
-            result.ttftMs = ttft
+            result.usage.ttftMs = Int64(ttft.rounded())
         }
-        if !finishReason.isEmpty { result.finishReason = finishReason }
+        if finishReason != .unspecified { result.finishReason = finishReason }
         if let terminalError { result.error = terminalError }
         return result
     }

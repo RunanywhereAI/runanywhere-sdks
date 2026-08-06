@@ -31,7 +31,6 @@ abstract final class RADefaultsAudioCapture {
   static const int micSampleRateHz = 16000;
   static const int micChannels = 1;
   static const int micChannelCapacity = 128;
-  static const int micTapBufferFrames = 4096;
   static const int ttsSampleRateHz = 22050;
 }
 

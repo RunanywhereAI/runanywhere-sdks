@@ -6,7 +6,8 @@
 // Canonical runtime and catalog surface:
 //   apply / remove / list / state / checkCompatibility /
 //   register / listCatalog / queryCatalog / getCatalogEntry /
-//   markDownloadCompleted / adaptersForModel / allRegistered
+//   registerArtifact / download / importAdapter / adaptersForModel /
+//   allRegistered
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/download_service.pbenum.dart'
@@ -15,17 +16,11 @@ import 'package:runanywhere/generated/errors.pbenum.dart'
     show ErrorCategory, ErrorCode;
 import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
-import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show
-        InferenceFramework,
-        ModelCategory,
-        ModelFileRole,
-        ModelFormat,
-        ModelSource;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
+import 'package:runanywhere/public/extensions/runanywhere_storage.dart';
 
 /// LoRA (Low-Rank Adaptation) capability surface.
 ///
@@ -40,7 +35,7 @@ class RunAnywhereLoRACapability {
   // --- Runtime adapter operations ----------------------------------------
 
   /// Apply one or more LoRA adapters to the current model.
-  Future<LoRAApplyResult> apply(LoRAApplyRequest request) async {
+  Future<LoraApplyResult> apply(LoraApplyRequest request) async {
     return DartBridgeLora.shared.apply(request);
   }
 
@@ -48,7 +43,13 @@ class RunAnywhereLoRACapability {
   ///
   /// Preserves [entry.id] in the generated config so commons can validate
   /// registered catalog adapters against the loaded base model.
-  Future<LoRAApplyResult> applyCatalogAdapter(
+  ///
+  /// `replaceExisting` keeps its pre-realignment name and `false` default at
+  /// this public boundary; only proto construction below inverts it to the
+  /// wire's `keep_existing` (idl/lora_options.proto polarity inversion:
+  /// `replaceExisting: false` → `keepExisting: true`, i.e. stack on top of
+  /// the current set, the unchanged default behavior).
+  Future<LoraApplyResult> applyCatalogAdapter(
     LoraAdapterCatalogEntry entry, {
     String? localPath,
     double? scale,
@@ -70,37 +71,37 @@ class RunAnywhereLoRACapability {
             ? entry.defaultScale
             : 1.0);
     return apply(
-      LoRAApplyRequest(
+      LoraApplyRequest(
         adapters: [
-          LoRAAdapterConfig(
+          LoraAdapterConfig(
             adapterPath: adapterPath,
             adapterId: entry.id,
             scale: effectiveScale,
           ),
         ],
-        replaceExisting: replaceExisting,
+        keepExisting: !replaceExisting,
       ),
     );
   }
 
   /// Remove one or more LoRA adapters, or clear all adapters.
-  Future<LoRAState> remove(LoRARemoveRequest request) async {
+  Future<LoraState> remove(LoraRemoveRequest request) async {
     return DartBridgeLora.shared.remove(request);
   }
 
   /// Currently loaded LoRA adapters.
-  Future<LoRAState> list() async {
+  Future<LoraState> list() async {
     return DartBridgeLora.shared.list();
   }
 
   /// LoRA service state reported by commons.
-  Future<LoRAState> state() async {
+  Future<LoraState> state() async {
     return DartBridgeLora.shared.state();
   }
 
   /// Whether the current backend supports the given adapter.
   Future<LoraCompatibilityResult> checkCompatibility(
-    LoRAAdapterConfig config,
+    LoraAdapterConfig config,
   ) async {
     return DartBridgeLora.shared.checkCompatibility(config);
   }
@@ -150,47 +151,6 @@ class RunAnywhereLoRACapability {
     return DartBridgeLoraRegistry.shared.getCatalogEntry(request);
   }
 
-  /// Record native-owned download/import completion in the commons LoRA catalog.
-  Future<LoraAdapterDownloadCompletedResult> markDownloadCompleted(
-    LoraAdapterDownloadCompletedRequest request,
-  ) async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    return DartBridgeLoraRegistry.shared.markDownloadCompleted(request);
-  }
-
-  /// Record native-reported LoRA adapter import completion in commons.
-  ///
-  /// Mirrors Swift `RunAnywhere.lora.markImportCompleted(_:)`. Uses the
-  /// generated download-completed message with `imported = true`, matching the
-  /// IDL contract for platform file-picker/import completion.
-  Future<LoraAdapterDownloadCompletedResult> markImportCompleted(
-    LoraAdapterDownloadCompletedRequest request,
-  ) async {
-    final importRequest = request.deepCopy()..imported = true;
-    if (importRequest.statusMessage.isEmpty) {
-      importRequest.statusMessage = 'import completed';
-    }
-    return markDownloadCompleted(importRequest);
-  }
-
-  /// Import a user-picked local adapter file into SDK-owned storage.
-  ///
-  /// Dart only resolves platform access (file-picker temp path) before
-  /// calling; commons owns everything past the readable source path:
-  /// deterministic catalog matching, canonical placement, artifact registry
-  /// record + manifest persistence, and catalog completion for matched
-  /// entries. Mirrors Swift `RunAnywhere.lora.importAdapter(from:)`.
-  Future<LoraAdapterImportResult> importAdapter(String sourcePath) async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    return DartBridgeLoraRegistry.shared.importAdapter(
-      LoraAdapterImportRequest(sourcePath: sourcePath),
-    );
-  }
-
   /// All registered LoRA adapters compatible with [modelId].
   Future<List<LoraAdapterCatalogEntry>> adaptersForModel(String modelId) async {
     if (!DartBridge.isInitialized) {
@@ -208,121 +168,55 @@ class RunAnywhereLoRACapability {
   }
 
   // --- SDK-owned artifact registration + download -------------------------
-  // Mirrors Swift RunAnywhere+LoRADownload.swift:97-160.
+  // Mirrors Swift RunAnywhere+LoRADownload.swift.
+  //
+  // `LoraAdapterCatalogEntry` no longer carries url/filename/size/checksum
+  // metadata (idl/lora_options.proto: "everything generic about the
+  // artifact ... lives on the ModelInfo record for this adapter"), so the
+  // artifact can no longer be derived from the entry alone — callers supply
+  // the `artifact` describing where/how to fetch the adapter bytes.
 
-  static const _loraArtifactModelIdPrefix = 'lora-adapter:';
   static const _loraArtifactTag = 'lora-adapter';
 
-  /// Stable model-registry id used for an adapter's download artifact.
-  String _loraArtifactModelId(LoraAdapterCatalogEntry entry) =>
-      entry.id.startsWith(_loraArtifactModelIdPrefix)
-      ? entry.id
-      : '$_loraArtifactModelIdPrefix${entry.id}';
-
-  /// Convert a catalog entry into model-registry metadata used by the
-  /// generic download path. Catalog filtering and completion state remain
-  /// owned by the LoRA catalog ABI. Mirrors Swift
-  /// `RALoraAdapterCatalogEntry.toLoraArtifactModelInfo()`.
-  model_pb.ModelInfo _toLoraArtifactModelInfo(LoraAdapterCatalogEntry entry) {
-    final urlTail = entry.url.split('/').isNotEmpty
-        ? entry.url.split('/').last
-        : entry.url;
-    final artifactFilename = entry.filename.isNotEmpty
-        ? entry.filename
-        : urlTail.split('?').first;
-
-    final descriptor = model_pb.ModelFileDescriptor(
-      role: ModelFileRole.MODEL_FILE_ROLE_COMPANION,
-      url: entry.url,
-      filename: artifactFilename,
-      relativePath: artifactFilename,
-      isRequired: true,
-    );
-    if (entry.sizeBytes > 0) descriptor.sizeBytes = entry.sizeBytes;
-    if (entry.hasChecksumSha256() && entry.checksumSha256.isNotEmpty) {
-      descriptor.checksumSha256 = entry.checksumSha256;
-    }
-
-    final expectedFiles = model_pb.ExpectedModelFiles(
-      files: [descriptor],
-      requiredPatterns: [artifactFilename],
-      description: 'LoRA adapter artifact',
-    );
-
-    final seen = <String>{};
-    final tags = <String>[
-      _loraArtifactTag,
-      ...entry.compatibleModels.map((m) => 'base-model:$m'),
-      ...entry.tags,
-    ].where(seen.add).toList(growable: false);
-
-    final metadata = model_pb.ModelInfoMetadata(
-      description: entry.description,
-      tags: tags,
-    );
-    if (entry.hasAuthor()) metadata.author = entry.author;
-    if (entry.hasLicense()) metadata.license = entry.license;
-
-    final model = model_pb.ModelInfo(
-      id: _loraArtifactModelId(entry),
-      name: entry.name,
-      category: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
-      format: ModelFormat.MODEL_FORMAT_GGUF,
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
-      downloadUrl: entry.url,
-      source: ModelSource.MODEL_SOURCE_REMOTE,
-      singleFile: model_pb.SingleFileArtifact(
-        requiredPatterns: [artifactFilename],
-        expectedFiles: expectedFiles,
-      ),
-      expectedFiles: expectedFiles,
-      metadata: metadata,
-      isAvailable: true,
-    );
-    if (entry.sizeBytes > 0) model.downloadSizeBytes = entry.sizeBytes;
-    if (entry.hasChecksumSha256() && entry.checksumSha256.isNotEmpty) {
-      model.checksumSha256 = entry.checksumSha256;
-    }
-    return model;
-  }
-
-  /// Register both the LoRA catalog entry and its downloadable artifact
-  /// record. Does not fetch bytes. Mirrors Swift `lora.registerArtifact(_:)`
-  /// (RunAnywhere+LoRADownload.swift:97).
+  /// Register both the LoRA catalog entry and its caller-supplied
+  /// downloadable artifact record. Does not fetch bytes. Mirrors Swift
+  /// `lora.registerArtifact(_:artifact:)`.
   Future<model_pb.ModelInfo> registerArtifact(
     LoraAdapterCatalogEntry entry,
+    model_pb.ModelInfo artifact,
   ) async {
-    final registered = await register(entry);
-    final artifact = _toLoraArtifactModelInfo(registered);
+    await register(entry);
+    final tagged = artifact.deepCopy();
+    if (!tagged.metadata.tags.contains(_loraArtifactTag)) {
+      tagged.metadata.tags.add(_loraArtifactTag);
+    }
     final saved = await DartBridgeModelRegistry.instance.saveProtoModel(
-      artifact,
+      tagged,
     );
     if (!saved) {
-      // Mirrors Swift CppBridge.ModelRegistry.save failure
-      // (CppBridge+ModelRegistry.swift:160-162): `.processingFailed`.
       throw SDKException.processingFailed(
-        'Failed to save model via proto registry: ${artifact.id}',
+        'Failed to save model via proto registry: ${tagged.id}',
       );
     }
-    return artifact;
+    return tagged;
   }
 
   /// Download a LoRA adapter through the canonical model-download pipeline.
   ///
-  /// One call does everything: registers the catalog entry + artifact,
-  /// downloads with resume/checksum/progress via commons, records completion
-  /// in the LoRA catalog, and returns the stable local path of the adapter
-  /// file. Mirrors Swift `lora.download(_:onProgress:)`
-  /// (RunAnywhere+LoRADownload.swift:111).
+  /// One call does everything: registers the catalog entry + caller-supplied
+  /// [artifact], downloads with resume/checksum/progress via commons, and
+  /// returns the stable local path of the adapter file. Mirrors Swift
+  /// `lora.download(_:artifact:onProgress:)`.
   Future<String> download(
-    LoraAdapterCatalogEntry entry, {
+    LoraAdapterCatalogEntry entry,
+    model_pb.ModelInfo artifact, {
     void Function(double progress)? onProgress,
   }) async {
-    final artifact = await registerArtifact(entry);
+    final registeredArtifact = await registerArtifact(entry, artifact);
 
     String localPath = '';
     await for (final progress in RunAnywhereDownloads.shared.start(
-      artifact.id,
+      registeredArtifact.id,
     )) {
       onProgress?.call(progress.overallProgress);
       if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
@@ -343,15 +237,13 @@ class RunAnywhereLoRACapability {
     }
 
     if (localPath.isEmpty) {
-      // The import step persisted the path on the registry record.
+      // The download step persisted the path on the registry record.
       final lookup = await DartBridgeModelRegistry.instance.getProtoModel(
-        artifact.id,
+        registeredArtifact.id,
       );
       localPath = lookup?.localPath ?? '';
     }
     if (localPath.isEmpty) {
-      // Mirrors Swift RunAnywhere+LoRADownload.swift:128-134:
-      // `.downloadFailed`, network category.
       throw SDKException.make(
         code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
         message:
@@ -359,13 +251,40 @@ class RunAnywhereLoRACapability {
         category: ErrorCategory.ERROR_CATEGORY_NETWORK,
       );
     }
+    return localPath;
+  }
 
-    await markDownloadCompleted(
-      LoraAdapterDownloadCompletedRequest(
-        adapterId: entry.id,
-        localPath: localPath,
+  /// Import a user-picked LoRA adapter file (file-picker / share sheet) into
+  /// SDK-owned storage.
+  ///
+  /// `LoraAdapterImportRequest`/`Result` were deleted outright
+  /// (idl/lora_options.proto, lora-delete-download-import-bookkeeping): the
+  /// LoRA-domain import verb — which used to do deterministic catalog
+  /// matching, canonical placement, and catalog `imported=true` completion —
+  /// has no replacement in that domain. Adapter files are now acquired
+  /// exclusively through the models domain's generic import verb
+  /// (`RunAnywhereStorage.importModel`, `ModelImportRequest`/`Result`), so
+  /// this resolves the source path and imports as a plain model artifact
+  /// tagged `lora-adapter`. Unlike the retired ABI, this does NOT
+  /// automatically match the import against an existing LoRA catalog entry —
+  /// callers that need the catalog association call
+  /// `register`/`registerArtifact` with the matching entry themselves once
+  /// they know which adapter this file corresponds to. Mirrors Swift
+  /// `lora.importAdapter(from:)`.
+  Future<model_pb.ModelImportResult> importAdapter(String sourcePath) async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    final model = model_pb.ModelInfo(
+      metadata: model_pb.ModelInfoMetadata(tags: [_loraArtifactTag]),
+    );
+    return RunAnywhereStorage.importModel(
+      model_pb.ModelImportRequest(
+        model: model,
+        sourcePath: sourcePath,
+        copyIntoManagedStorage: true,
+        validateBeforeRegister: true,
       ),
     );
-    return localPath;
   }
 }

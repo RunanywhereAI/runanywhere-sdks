@@ -26,13 +26,11 @@ class DeviceStorageInfo extends $pb.GeneratedMessage {
     $fixnum.Int64? totalBytes,
     $fixnum.Int64? freeBytes,
     $fixnum.Int64? usedBytes,
-    $core.double? usedPercent,
   }) {
     final result = create();
     if (totalBytes != null) result.totalBytes = totalBytes;
     if (freeBytes != null) result.freeBytes = freeBytes;
     if (usedBytes != null) result.usedBytes = usedBytes;
-    if (usedPercent != null) result.usedPercent = usedPercent;
     return result;
   }
 
@@ -52,7 +50,6 @@ class DeviceStorageInfo extends $pb.GeneratedMessage {
     ..aInt64(1, _omitFieldNames ? '' : 'totalBytes')
     ..aInt64(2, _omitFieldNames ? '' : 'freeBytes')
     ..aInt64(3, _omitFieldNames ? '' : 'usedBytes')
-    ..aD(4, _omitFieldNames ? '' : 'usedPercent', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -92,6 +89,8 @@ class DeviceStorageInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearFreeBytes() => $_clearField(2);
 
+  /// Distinct from total-minus-free: this is the adapter's own reading of
+  /// occupied space, not a derivation. Kept live.
   @$pb.TagNumber(3)
   $fixnum.Int64 get usedBytes => $_getI64(2);
   @$pb.TagNumber(3)
@@ -100,16 +99,6 @@ class DeviceStorageInfo extends $pb.GeneratedMessage {
   $core.bool hasUsedBytes() => $_has(2);
   @$pb.TagNumber(3)
   void clearUsedBytes() => $_clearField(3);
-
-  /// 0.0 to 100.0, and 0.0 when total_bytes is 0.
-  @$pb.TagNumber(4)
-  $core.double get usedPercent => $_getN(3);
-  @$pb.TagNumber(4)
-  set usedPercent($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasUsedPercent() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearUsedPercent() => $_clearField(4);
 }
 
 class AppStorageInfo extends $pb.GeneratedMessage {
@@ -206,12 +195,10 @@ class ModelStorageMetrics extends $pb.GeneratedMessage {
   factory ModelStorageMetrics({
     $core.String? modelId,
     $fixnum.Int64? sizeOnDiskBytes,
-    $fixnum.Int64? lastUsedMs,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
     if (sizeOnDiskBytes != null) result.sizeOnDiskBytes = sizeOnDiskBytes;
-    if (lastUsedMs != null) result.lastUsedMs = lastUsedMs;
     return result;
   }
 
@@ -230,7 +217,6 @@ class ModelStorageMetrics extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aInt64(2, _omitFieldNames ? '' : 'sizeOnDiskBytes')
-    ..aInt64(3, _omitFieldNames ? '' : 'lastUsedMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -269,16 +255,6 @@ class ModelStorageMetrics extends $pb.GeneratedMessage {
   $core.bool hasSizeOnDiskBytes() => $_has(1);
   @$pb.TagNumber(2)
   void clearSizeOnDiskBytes() => $_clearField(2);
-
-  /// Epoch ms of the last load.
-  @$pb.TagNumber(3)
-  $fixnum.Int64 get lastUsedMs => $_getI64(2);
-  @$pb.TagNumber(3)
-  set lastUsedMs($fixnum.Int64 value) => $_setInt64(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasLastUsedMs() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearLastUsedMs() => $_clearField(3);
 }
 
 class StorageInfo extends $pb.GeneratedMessage {
@@ -286,14 +262,12 @@ class StorageInfo extends $pb.GeneratedMessage {
     AppStorageInfo? app,
     DeviceStorageInfo? device,
     $core.Iterable<ModelStorageMetrics>? models,
-    $core.int? totalModels,
     $fixnum.Int64? totalModelsBytes,
   }) {
     final result = create();
     if (app != null) result.app = app;
     if (device != null) result.device = device;
     if (models != null) result.models.addAll(models);
-    if (totalModels != null) result.totalModels = totalModels;
     if (totalModelsBytes != null) result.totalModelsBytes = totalModelsBytes;
     return result;
   }
@@ -317,7 +291,6 @@ class StorageInfo extends $pb.GeneratedMessage {
         subBuilder: DeviceStorageInfo.create)
     ..pPM<ModelStorageMetrics>(3, _omitFieldNames ? '' : 'models',
         subBuilder: ModelStorageMetrics.create)
-    ..aI(4, _omitFieldNames ? '' : 'totalModels')
     ..aInt64(5, _omitFieldNames ? '' : 'totalModelsBytes')
     ..hasRequiredFields = false;
 
@@ -365,21 +338,14 @@ class StorageInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   $pb.PbList<ModelStorageMetrics> get models => $_getList(2);
 
-  @$pb.TagNumber(4)
-  $core.int get totalModels => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set totalModels($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasTotalModels() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearTotalModels() => $_clearField(4);
-
+  /// total_models_bytes (5) is NOT a pure derivation -- kept live; see
+  /// storage_event_publisher.cpp and two facade readers.
   @$pb.TagNumber(5)
-  $fixnum.Int64 get totalModelsBytes => $_getI64(4);
+  $fixnum.Int64 get totalModelsBytes => $_getI64(3);
   @$pb.TagNumber(5)
-  set totalModelsBytes($fixnum.Int64 value) => $_setInt64(4, value);
+  set totalModelsBytes($fixnum.Int64 value) => $_setInt64(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasTotalModelsBytes() => $_has(4);
+  $core.bool hasTotalModelsBytes() => $_has(3);
   @$pb.TagNumber(5)
   void clearTotalModelsBytes() => $_clearField(5);
 }
@@ -391,8 +357,6 @@ class StorageAvailability extends $pb.GeneratedMessage {
     $fixnum.Int64? availableBytes,
     $core.String? warningMessage,
     $core.String? recommendation,
-    $fixnum.Int64? shortfallBytes,
-    $core.double? requiredToAvailableRatio,
   }) {
     final result = create();
     if (isAvailable != null) result.isAvailable = isAvailable;
@@ -400,9 +364,6 @@ class StorageAvailability extends $pb.GeneratedMessage {
     if (availableBytes != null) result.availableBytes = availableBytes;
     if (warningMessage != null) result.warningMessage = warningMessage;
     if (recommendation != null) result.recommendation = recommendation;
-    if (shortfallBytes != null) result.shortfallBytes = shortfallBytes;
-    if (requiredToAvailableRatio != null)
-      result.requiredToAvailableRatio = requiredToAvailableRatio;
     return result;
   }
 
@@ -424,9 +385,6 @@ class StorageAvailability extends $pb.GeneratedMessage {
     ..aInt64(3, _omitFieldNames ? '' : 'availableBytes')
     ..aOS(4, _omitFieldNames ? '' : 'warningMessage')
     ..aOS(5, _omitFieldNames ? '' : 'recommendation')
-    ..aInt64(6, _omitFieldNames ? '' : 'shortfallBytes')
-    ..aD(7, _omitFieldNames ? '' : 'requiredToAvailableRatio',
-        fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -492,24 +450,6 @@ class StorageAvailability extends $pb.GeneratedMessage {
   $core.bool hasRecommendation() => $_has(4);
   @$pb.TagNumber(5)
   void clearRecommendation() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $fixnum.Int64 get shortfallBytes => $_getI64(5);
-  @$pb.TagNumber(6)
-  set shortfallBytes($fixnum.Int64 value) => $_setInt64(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasShortfallBytes() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearShortfallBytes() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.double get requiredToAvailableRatio => $_getN(6);
-  @$pb.TagNumber(7)
-  set requiredToAvailableRatio($core.double value) => $_setFloat(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasRequiredToAvailableRatio() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearRequiredToAvailableRatio() => $_clearField(7);
 }
 
 class StorageInfoRequest extends $pb.GeneratedMessage {
@@ -684,20 +624,21 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
   factory StorageAvailabilityRequest({
     $core.String? modelId,
     $fixnum.Int64? requiredBytes,
-    $core.double? safetyMargin,
     $core.bool? includeExistingModelBytes,
     $core.bool? includeDeletePlan,
     $core.bool? allowCacheReclamation,
+    $fixnum.Int64? requiredFreeBytesAfterDownload,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
     if (requiredBytes != null) result.requiredBytes = requiredBytes;
-    if (safetyMargin != null) result.safetyMargin = safetyMargin;
     if (includeExistingModelBytes != null)
       result.includeExistingModelBytes = includeExistingModelBytes;
     if (includeDeletePlan != null) result.includeDeletePlan = includeDeletePlan;
     if (allowCacheReclamation != null)
       result.allowCacheReclamation = allowCacheReclamation;
+    if (requiredFreeBytesAfterDownload != null)
+      result.requiredFreeBytesAfterDownload = requiredFreeBytesAfterDownload;
     return result;
   }
 
@@ -716,10 +657,10 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aInt64(2, _omitFieldNames ? '' : 'requiredBytes')
-    ..aD(3, _omitFieldNames ? '' : 'safetyMargin')
     ..aOB(4, _omitFieldNames ? '' : 'includeExistingModelBytes')
     ..aOB(5, _omitFieldNames ? '' : 'includeDeletePlan')
     ..aOB(6, _omitFieldNames ? '' : 'allowCacheReclamation')
+    ..aInt64(7, _omitFieldNames ? '' : 'requiredFreeBytesAfterDownload')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -761,43 +702,45 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearRequiredBytes() => $_clearField(2);
 
-  /// Headroom multiplier applied on top of required_bytes.
-  @$pb.TagNumber(3)
-  $core.double get safetyMargin => $_getN(2);
-  @$pb.TagNumber(3)
-  set safetyMargin($core.double value) => $_setDouble(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasSafetyMargin() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearSafetyMargin() => $_clearField(3);
-
   /// Count bytes already occupied by this model as reclaimable.
   @$pb.TagNumber(4)
-  $core.bool get includeExistingModelBytes => $_getBF(3);
+  $core.bool get includeExistingModelBytes => $_getBF(2);
   @$pb.TagNumber(4)
-  set includeExistingModelBytes($core.bool value) => $_setBool(3, value);
+  set includeExistingModelBytes($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasIncludeExistingModelBytes() => $_has(3);
+  $core.bool hasIncludeExistingModelBytes() => $_has(2);
   @$pb.TagNumber(4)
   void clearIncludeExistingModelBytes() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.bool get includeDeletePlan => $_getBF(4);
+  $core.bool get includeDeletePlan => $_getBF(3);
   @$pb.TagNumber(5)
-  set includeDeletePlan($core.bool value) => $_setBool(4, value);
+  set includeDeletePlan($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasIncludeDeletePlan() => $_has(4);
+  $core.bool hasIncludeDeletePlan() => $_has(3);
   @$pb.TagNumber(5)
   void clearIncludeDeletePlan() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.bool get allowCacheReclamation => $_getBF(5);
+  $core.bool get allowCacheReclamation => $_getBF(4);
   @$pb.TagNumber(6)
-  set allowCacheReclamation($core.bool value) => $_setBool(5, value);
+  set allowCacheReclamation($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasAllowCacheReclamation() => $_has(5);
+  $core.bool hasAllowCacheReclamation() => $_has(4);
   @$pb.TagNumber(6)
   void clearAllowCacheReclamation() => $_clearField(6);
+
+  /// Absolute headroom the device must still have after the write. Same
+  /// unit and same name as DownloadPlanRequest.required_free_bytes_after_download.
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get requiredFreeBytesAfterDownload => $_getI64(5);
+  @$pb.TagNumber(7)
+  set requiredFreeBytesAfterDownload($fixnum.Int64 value) =>
+      $_setInt64(5, value);
+  @$pb.TagNumber(7)
+  $core.bool hasRequiredFreeBytesAfterDownload() => $_has(5);
+  @$pb.TagNumber(7)
+  void clearRequiredFreeBytesAfterDownload() => $_clearField(7);
 }
 
 class StorageAvailabilityResult extends $pb.GeneratedMessage {
@@ -1009,7 +952,6 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
   factory StorageDeleteCandidate({
     $core.String? modelId,
     $fixnum.Int64? reclaimableBytes,
-    $fixnum.Int64? lastUsedMs,
     $core.bool? isLoaded,
     $core.String? localPath,
     $core.bool? requiresUnload,
@@ -1019,7 +961,6 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
     final result = create();
     if (modelId != null) result.modelId = modelId;
     if (reclaimableBytes != null) result.reclaimableBytes = reclaimableBytes;
-    if (lastUsedMs != null) result.lastUsedMs = lastUsedMs;
     if (isLoaded != null) result.isLoaded = isLoaded;
     if (localPath != null) result.localPath = localPath;
     if (requiresUnload != null) result.requiresUnload = requiresUnload;
@@ -1044,7 +985,6 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aInt64(2, _omitFieldNames ? '' : 'reclaimableBytes')
-    ..aInt64(3, _omitFieldNames ? '' : 'lastUsedMs')
     ..aOB(4, _omitFieldNames ? '' : 'isLoaded')
     ..aOS(5, _omitFieldNames ? '' : 'localPath')
     ..aOB(6, _omitFieldNames ? '' : 'requiresUnload')
@@ -1090,58 +1030,49 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearReclaimableBytes() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $fixnum.Int64 get lastUsedMs => $_getI64(2);
-  @$pb.TagNumber(3)
-  set lastUsedMs($fixnum.Int64 value) => $_setInt64(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasLastUsedMs() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearLastUsedMs() => $_clearField(3);
-
   @$pb.TagNumber(4)
-  $core.bool get isLoaded => $_getBF(3);
+  $core.bool get isLoaded => $_getBF(2);
   @$pb.TagNumber(4)
-  set isLoaded($core.bool value) => $_setBool(3, value);
+  set isLoaded($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasIsLoaded() => $_has(3);
+  $core.bool hasIsLoaded() => $_has(2);
   @$pb.TagNumber(4)
   void clearIsLoaded() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get localPath => $_getSZ(4);
+  $core.String get localPath => $_getSZ(3);
   @$pb.TagNumber(5)
-  set localPath($core.String value) => $_setString(4, value);
+  set localPath($core.String value) => $_setString(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasLocalPath() => $_has(4);
+  $core.bool hasLocalPath() => $_has(3);
   @$pb.TagNumber(5)
   void clearLocalPath() => $_clearField(5);
 
   /// Deleting this needs an unload first, or a platform-side delete.
   @$pb.TagNumber(6)
-  $core.bool get requiresUnload => $_getBF(5);
+  $core.bool get requiresUnload => $_getBF(4);
   @$pb.TagNumber(6)
-  set requiresUnload($core.bool value) => $_setBool(5, value);
+  set requiresUnload($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasRequiresUnload() => $_has(5);
+  $core.bool hasRequiresUnload() => $_has(4);
   @$pb.TagNumber(6)
   void clearRequiresUnload() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.bool get requiresPlatformDelete => $_getBF(6);
+  $core.bool get requiresPlatformDelete => $_getBF(5);
   @$pb.TagNumber(7)
-  set requiresPlatformDelete($core.bool value) => $_setBool(6, value);
+  set requiresPlatformDelete($core.bool value) => $_setBool(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasRequiresPlatformDelete() => $_has(6);
+  $core.bool hasRequiresPlatformDelete() => $_has(5);
   @$pb.TagNumber(7)
   void clearRequiresPlatformDelete() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get storageKey => $_getSZ(7);
+  $core.String get storageKey => $_getSZ(6);
   @$pb.TagNumber(8)
-  set storageKey($core.String value) => $_setString(7, value);
+  set storageKey($core.String value) => $_setString(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasStorageKey() => $_has(7);
+  $core.bool hasStorageKey() => $_has(6);
   @$pb.TagNumber(8)
   void clearStorageKey() => $_clearField(8);
 }
@@ -1156,7 +1087,6 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? warnings,
     $core.bool? requiresUnload,
     $core.bool? requiresPlatformDelete,
-    $core.int? candidateCount,
     $0.SDKError? error,
   }) {
     final result = create();
@@ -1169,7 +1099,6 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
     if (requiresUnload != null) result.requiresUnload = requiresUnload;
     if (requiresPlatformDelete != null)
       result.requiresPlatformDelete = requiresPlatformDelete;
-    if (candidateCount != null) result.candidateCount = candidateCount;
     if (error != null) result.error = error;
     return result;
   }
@@ -1195,7 +1124,6 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
     ..aOB(7, _omitFieldNames ? '' : 'requiresUnload')
     ..aOB(8, _omitFieldNames ? '' : 'requiresPlatformDelete')
-    ..aI(9, _omitFieldNames ? '' : 'candidateCount')
     ..aOM<$0.SDKError>(10, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
@@ -1270,31 +1198,22 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearRequiresPlatformDelete() => $_clearField(8);
 
-  @$pb.TagNumber(9)
-  $core.int get candidateCount => $_getIZ(7);
-  @$pb.TagNumber(9)
-  set candidateCount($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(9)
-  $core.bool hasCandidateCount() => $_has(7);
-  @$pb.TagNumber(9)
-  void clearCandidateCount() => $_clearField(9);
-
   @$pb.TagNumber(10)
-  $0.SDKError get error => $_getN(8);
+  $0.SDKError get error => $_getN(7);
   @$pb.TagNumber(10)
   set error($0.SDKError value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasError() => $_has(8);
+  $core.bool hasError() => $_has(7);
   @$pb.TagNumber(10)
   void clearError() => $_clearField(10);
   @$pb.TagNumber(10)
-  $0.SDKError ensureError() => $_ensure(8);
+  $0.SDKError ensureError() => $_ensure(7);
 }
 
 class StorageDeleteRequest extends $pb.GeneratedMessage {
   factory StorageDeleteRequest({
     $core.Iterable<$core.String>? modelIds,
-    $core.bool? deleteFiles,
+    $core.bool? keepFilesOnDisk,
     $core.bool? clearRegistryPaths,
     $core.bool? unloadIfLoaded,
     $core.bool? dryRun,
@@ -1304,7 +1223,7 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (modelIds != null) result.modelIds.addAll(modelIds);
-    if (deleteFiles != null) result.deleteFiles = deleteFiles;
+    if (keepFilesOnDisk != null) result.keepFilesOnDisk = keepFilesOnDisk;
     if (clearRegistryPaths != null)
       result.clearRegistryPaths = clearRegistryPaths;
     if (unloadIfLoaded != null) result.unloadIfLoaded = unloadIfLoaded;
@@ -1330,7 +1249,7 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..pPS(1, _omitFieldNames ? '' : 'modelIds')
-    ..aOB(2, _omitFieldNames ? '' : 'deleteFiles')
+    ..aOB(2, _omitFieldNames ? '' : 'keepFilesOnDisk')
     ..aOB(3, _omitFieldNames ? '' : 'clearRegistryPaths')
     ..aOB(4, _omitFieldNames ? '' : 'unloadIfLoaded')
     ..aOB(5, _omitFieldNames ? '' : 'dryRun')
@@ -1362,14 +1281,15 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $pb.PbList<$core.String> get modelIds => $_getList(0);
 
+  /// Files are deleted; set this only to opt OUT (catalog-only bookkeeping).
   @$pb.TagNumber(2)
-  $core.bool get deleteFiles => $_getBF(1);
+  $core.bool get keepFilesOnDisk => $_getBF(1);
   @$pb.TagNumber(2)
-  set deleteFiles($core.bool value) => $_setBool(1, value);
+  set keepFilesOnDisk($core.bool value) => $_setBool(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasDeleteFiles() => $_has(1);
+  $core.bool hasKeepFilesOnDisk() => $_has(1);
   @$pb.TagNumber(2)
-  void clearDeleteFiles() => $_clearField(2);
+  void clearKeepFilesOnDisk() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.bool get clearRegistryPaths => $_getBF(2);

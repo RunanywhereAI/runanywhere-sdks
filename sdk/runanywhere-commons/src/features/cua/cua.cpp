@@ -596,14 +596,22 @@ extern "C" rac_result_t rac_cua_parse_action_proto(const char* profile_id, const
 
     runanywhere::v1::CuaAction proto;
     proto.set_type(static_cast<runanywhere::v1::CuaActionType>(action.type));
-    proto.set_coordinate_valid(action.has_coordinate != 0);
-    proto.set_x(action.x);
-    proto.set_y(action.y);
-    proto.set_scroll_pixels(action.scroll_pixels);
+    if (action.has_coordinate != 0) {
+        proto.set_x(action.x);
+        proto.set_y(action.y);
+    }
+    // The C struct keeps one scroll_pixels field (the axis is implied by
+    // action.type); the proto splits it into scroll_x (HSCROLL)/scroll_y
+    // (SCROLL) per axis.
+    if (action.type == RAC_CUA_HSCROLL) {
+        proto.set_scroll_x(action.scroll_pixels);
+    } else if (action.type == RAC_CUA_SCROLL) {
+        proto.set_scroll_y(action.scroll_pixels);
+    }
     proto.set_wait_seconds(action.wait_seconds);
     proto.set_text(action.text);
     proto.set_reasoning(action.reasoning);
-    proto.set_parse_ok(action.parse_ok != 0);
+    proto.set_is_valid(action.parse_ok != 0);
 
     std::string bytes;
     if (!proto.SerializeToString(&bytes)) {

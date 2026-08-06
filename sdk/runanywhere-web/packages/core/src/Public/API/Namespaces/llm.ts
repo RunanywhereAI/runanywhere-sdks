@@ -3,9 +3,14 @@
  * tool registry.
  */
 
-import { LLMStreamEventKind } from '@runanywhere/proto-ts/llm_service';
+import { LLMStreamEventKind, type LLMGenerateRequest } from '@runanywhere/proto-ts/llm_service';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import type { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
+import {
+  ChatMessage as ProtoChatMessageMessage,
+  MessageRole,
+  type ChatMessage as ProtoChatMessage,
+} from '@runanywhere/proto-ts/chat';
 import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../../Adapters/ModalityProtoAdapter.js';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import { ToolCalling, type ToolExecutor } from '../../Extensions/RunAnywhere+ToolCalling.js';
@@ -61,18 +66,20 @@ function splitInput(input: string | readonly ChatMessage[]): {
   };
 }
 
-function buildRequest(input: string | readonly ChatMessage[], options?: LlmOptions) {
+function buildRequest(input: string | readonly ChatMessage[], options?: LlmOptions): LLMGenerateRequest {
   const { prompt, history, systemPrompt } = splitInput(input);
   const merged: LlmOptions = systemPrompt && !options?.systemPrompt
     ? { ...options, systemPrompt }
     : { ...options };
+  const messages: ProtoChatMessage[] = [
+    ...toProtoHistory(history),
+    ProtoChatMessageMessage.fromPartial({ role: MessageRole.MESSAGE_ROLE_USER, content: prompt }),
+  ];
   return {
-    prompt,
     requestId: '',
     modelId: merged.model ?? '',
     conversationId: merged.conversationId ?? '',
-    history: toProtoHistory(history),
-    metadata: {},
+    messages,
     options: toProtoLlmOptions(merged),
   };
 }
@@ -120,9 +127,9 @@ async function generateWithToolLoop(
     finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: 0,
-    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
-    requestId: result.conversationId ?? '',
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
+    requestId: '',
     model: '',
   });
 }
@@ -143,7 +150,7 @@ async function generateCore(
   if (!structuredOutput && usesTools(options)) return generateWithToolLoop(input, options);
   const adapter = requireAdapter('llm.generate');
   const request = buildRequest(input, options);
-  if (structuredOutput) request.options.structuredOutput = structuredOutput;
+  if (structuredOutput && request.options) request.options.structuredOutput = structuredOutput;
   const result = await adapter.generate(request);
   if (!result) {
     throw SDKException.processingFailed('The LLM proto path returned no result.');
@@ -275,7 +282,9 @@ export const llm = {
                 inputTokens: result.inputTokens,
                 outputTokens: result.outputTokens,
                 totalTokens: result.inputTokens + result.outputTokens,
-                tokensPerSecond: result.tokensPerSecond,
+                decodeTokensPerSecond: result.tokensPerSecond,
+                prefillMs: 0,
+                ttftMs: result.timeToFirstTokenMs,
               },
             };
             yield { type: 'completed', requestId, result };

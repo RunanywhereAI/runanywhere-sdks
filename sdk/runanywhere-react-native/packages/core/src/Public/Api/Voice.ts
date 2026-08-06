@@ -5,8 +5,8 @@
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { VADConfiguration } from '@runanywhere/proto-ts/vad_options';
 import {
+  TurnDetection,
   VoiceAgentComposeConfig,
-  VoiceSessionConfig,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import {
   PipelineState,
@@ -71,7 +71,13 @@ function agentStateFor(state: PipelineState): AgentState | undefined {
   }
 }
 
-/** Project one native voice event onto the public grammar. */
+/**
+ * Project one native voice event onto the public grammar.
+ *
+ * `VoiceEvent.error` is deleted outright — `sessionError` is the one error
+ * payload in this domain, and it already carries its own `recoverable`
+ * boolean.
+ */
 function toVoiceEvent(event: VoiceEventProto): VoiceEvent | undefined {
   if (event.userSaid) {
     return {
@@ -92,18 +98,11 @@ function toVoiceEvent(event: VoiceEventProto): VoiceEvent | undefined {
       ? { type: 'speechStarted' }
       : { type: 'speechEnded' };
   }
-  if (event.error) {
-    return {
-      type: 'error',
-      message: event.error.message,
-      recoverable: event.error.isRecoverable,
-    };
-  }
   if (event.sessionError) {
     return {
       type: 'error',
       message: event.sessionError.message,
-      recoverable: false,
+      recoverable: event.sessionError.recoverable,
     };
   }
   return undefined;
@@ -121,20 +120,23 @@ async function resolveModel(
   await models.load(ref.id);
 }
 
+/**
+ * `VoiceSessionConfig` is deleted outright — its two commons-read fields
+ * (`silenceDurationMs`, and the threshold that used to be `speechThreshold`)
+ * now live on `TurnDetection`, following OpenAI Realtime
+ * `session.audio.input.turn_detection` naming/units.
+ */
 function toSessionConfig(
   turnHandling: TurnHandlingOptions | undefined,
   vad: VadOptions | undefined
-): VoiceSessionConfig {
+): TurnDetection {
   const vadOptions = toVadOptions(vad);
-  return VoiceSessionConfig.fromPartial({
-    autoPlayTts: true,
-    continuousMode: true,
+  const threshold = vadOptions.activationThreshold ?? 0;
+  return TurnDetection.fromPartial({
     ...(turnHandling?.endpointing?.minDelayMs !== undefined
       ? { silenceDurationMs: turnHandling.endpointing.minDelayMs }
       : { silenceDurationMs: vadOptions.minSilenceDurationMs }),
-    ...(vadOptions.activationThreshold > 0
-      ? { speechThreshold: vadOptions.activationThreshold }
-      : {}),
+    ...(threshold > 0 ? { threshold } : {}),
   });
 }
 
@@ -178,6 +180,7 @@ export const voice = {
     await ensureDefaultVAD(options.vad?.model);
 
     const vadOptions = toVadOptions(options.vad);
+    const activationThreshold = vadOptions.activationThreshold ?? 0;
     await initializeVoiceAgent(
       VoiceAgentComposeConfig.fromPartial({
         sttModelId: options.stt.id,
@@ -185,11 +188,9 @@ export const voice = {
         ...(options.tts.voice ? { ttsVoiceId: options.tts.voice } : {}),
         llmGeneration: toLlmOptions(options.generation),
         vadConfig: VADConfiguration.fromPartial({
-          ...(vadOptions.activationThreshold > 0
-            ? { activationThreshold: vadOptions.activationThreshold }
-            : {}),
+          ...(activationThreshold > 0 ? { activationThreshold } : {}),
         }),
-        sessionConfig: toSessionConfig(options.turnHandling, options.vad),
+        turnDetection: toSessionConfig(options.turnHandling, options.vad),
       })
     );
 

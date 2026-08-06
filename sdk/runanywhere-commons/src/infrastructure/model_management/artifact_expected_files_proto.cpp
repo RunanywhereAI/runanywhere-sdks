@@ -53,16 +53,6 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
     return rac::proto::copy_message(message, out, "failed to serialize ExpectedModelFiles result");
 }
 
-// Synthesise an ExpectedModelFiles whose required/optional_patterns mirror the
-// inbound shorthand. Mirrors Swift's `RAExpectedModelFiles.patterns(...)` in
-// ModelTypes+Artifacts.swift.
-void copy_patterns_into(const google::protobuf::RepeatedPtrField<std::string>& required,
-                        const google::protobuf::RepeatedPtrField<std::string>& optional,
-                        runanywhere::v1::ExpectedModelFiles* out) {
-    out->mutable_required_patterns()->CopyFrom(required);
-    out->mutable_optional_patterns()->CopyFrom(optional);
-}
-
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -96,17 +86,10 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_mode
     }
 
     // -------------------------------------------------------------------------
-    // Step 1: top-level model.expected_files short-circuit (Swift's
-    // `if hasExpectedFiles { return expectedFiles }` in
-    // RAModelInfo.expectedArtifactFiles).
-    // -------------------------------------------------------------------------
-    if (model.has_expected_files()) {
-        return copy_proto(model.expected_files(), out_proto);
-    }
-
-    // -------------------------------------------------------------------------
-    // Step 2: walk the artifact oneof. Mirrors Swift's
-    // OneOf_Artifact.expectedFiles switch.
+    // Walk the artifact oneof. Mirrors Swift's OneOf_Artifact.expectedFiles
+    // switch. ModelInfo.expected_files (top-level short-circuit) was deleted:
+    // the artifact oneof is now the ONLY way to know the bundle shape, and
+    // expected_files lives solely on SingleFileArtifact / ArchiveArtifact.
     // -------------------------------------------------------------------------
     runanywhere::v1::ExpectedModelFiles result;
 
@@ -116,8 +99,10 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_mode
             if (art.has_expected_files()) {
                 return copy_proto(art.expected_files(), out_proto);
             }
-            // Fallback: pattern shorthand → manifest.
-            copy_patterns_into(art.required_patterns(), art.optional_patterns(), &result);
+            // No expected_files manifest declared -- empty result (the
+            // required/optional_patterns shorthand that used to live
+            // directly on SingleFileArtifact now lives only on
+            // ExpectedModelFiles, so there is nothing to fall back to here).
             break;
         }
         case runanywhere::v1::ModelInfo::kArchive: {
@@ -125,7 +110,6 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_mode
             if (art.has_expected_files()) {
                 return copy_proto(art.expected_files(), out_proto);
             }
-            copy_patterns_into(art.required_patterns(), art.optional_patterns(), &result);
             break;
         }
         case runanywhere::v1::ModelInfo::kMultiFile: {
@@ -141,8 +125,8 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_mode
             break;
         }
         default:
-            // custom_strategy_id, built_in, or no artifact set. Empty manifest
-            // — matches Swift's `default: return .none`.
+            // built_in, or no artifact set. Empty manifest — matches Swift's
+            // `default: return .none`.
             break;
     }
 

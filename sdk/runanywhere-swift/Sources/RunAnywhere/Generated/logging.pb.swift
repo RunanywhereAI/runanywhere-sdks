@@ -130,7 +130,7 @@ public nonisolated struct RALogEntry: Sendable {
 
   public var modelID: String = String()
 
-  public var framework: String = String()
+  public var framework: RAInferenceFramework = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -215,7 +215,7 @@ nonisolated extension RALogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 8: try { try decoder.decodeSingularStringField(value: &self.function) }()
       case 9: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.framework) }()
+      case 11: try { try decoder.decodeSingularEnumField(value: &self.framework) }()
       default: break
       }
     }
@@ -252,8 +252,8 @@ nonisolated extension RALogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 10)
     }
-    if !self.framework.isEmpty {
-      try visitor.visitSingularStringField(value: self.framework, fieldNumber: 11)
+    if self.framework != .unspecified {
+      try visitor.visitSingularEnumField(value: self.framework, fieldNumber: 11)
     }
     try unknownFields.traverse(visitor: &visitor)
   }

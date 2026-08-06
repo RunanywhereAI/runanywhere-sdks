@@ -55,16 +55,6 @@ public class ToolPromptFormatRequest(
   )
   public val options: ToolCallingOptions? = null,
   tool_results: List<ToolResult> = emptyList(),
-  /**
-   * Assistant text emitted before tool execution, when available.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "assistantText",
-    schemaIndex = 3,
-  )
-  public val assistant_text: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolPromptFormatRequest, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -93,7 +83,6 @@ public class ToolPromptFormatRequest(
     if (user_prompt != other.user_prompt) return false
     if (options != other.options) return false
     if (tool_results != other.tool_results) return false
-    if (assistant_text != other.assistant_text) return false
     return true
   }
 
@@ -104,7 +93,6 @@ public class ToolPromptFormatRequest(
       result = result * 37 + user_prompt.hashCode()
       result = result * 37 + (options?.hashCode() ?: 0)
       result = result * 37 + tool_results.hashCode()
-      result = result * 37 + (assistant_text?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -115,7 +103,6 @@ public class ToolPromptFormatRequest(
     result += """user_prompt=${sanitize(user_prompt)}"""
     if (options != null) result += """options=$options"""
     if (tool_results.isNotEmpty()) result += """tool_results=$tool_results"""
-    if (assistant_text != null) result += """assistant_text=${sanitize(assistant_text)}"""
     return result.joinToString(prefix = "ToolPromptFormatRequest{", separator = ", ", postfix = "}")
   }
 
@@ -123,9 +110,8 @@ public class ToolPromptFormatRequest(
     user_prompt: String = this.user_prompt,
     options: ToolCallingOptions? = this.options,
     tool_results: List<ToolResult> = this.tool_results,
-    assistant_text: String? = this.assistant_text,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolPromptFormatRequest = ToolPromptFormatRequest(user_prompt, options, tool_results, assistant_text, unknownFields)
+  ): ToolPromptFormatRequest = ToolPromptFormatRequest(user_prompt, options, tool_results, unknownFields)
 
   public companion object {
     @JvmField
@@ -145,7 +131,6 @@ public class ToolPromptFormatRequest(
         }
         size += ToolCallingOptions.ADAPTER.encodedSizeWithTag(2, value.options)
         size += ToolResult.ADAPTER.asRepeated().encodedSizeWithTag(3, value.tool_results)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.assistant_text)
         return size
       }
 
@@ -155,13 +140,11 @@ public class ToolPromptFormatRequest(
         }
         ToolCallingOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
         ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.tool_results)
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.assistant_text)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolPromptFormatRequest) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.assistant_text)
         ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.tool_results)
         ToolCallingOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
         if (value.user_prompt != "") {
@@ -173,13 +156,11 @@ public class ToolPromptFormatRequest(
         var user_prompt: String = ""
         var options: ToolCallingOptions? = null
         val tool_results = mutableListOf<ToolResult>()
-        var assistant_text: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> user_prompt = ProtoAdapter.STRING.decode(reader)
             2 -> options = ToolCallingOptions.ADAPTER.decode(reader)
             3 -> tool_results.add(ToolResult.ADAPTER.decode(reader))
-            4 -> assistant_text = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -187,7 +168,6 @@ public class ToolPromptFormatRequest(
           user_prompt = user_prompt,
           options = options,
           tool_results = tool_results,
-          assistant_text = assistant_text,
           unknownFields = unknownFields
         )
       }

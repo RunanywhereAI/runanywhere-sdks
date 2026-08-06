@@ -49,12 +49,13 @@ private fun ProtoSdkEvent.toSdkEvent(): SdkEvent? {
             else -> Unit
         }
     }
-    failure?.let { event ->
-        val message = event.error?.message?.takeIf { it.isNotBlank() } ?: "SDK failure"
-        return SdkEvent.Error(message, event.recoverable)
-    }
+    // `FailureEvent` (the oneof arm) is deleted outright (idl/sdk_events.proto):
+    // every field moved onto the envelope itself -- `component`/`operation_id`
+    // already live there, and `error` is now `SDKEvent.error` directly (an
+    // optional SDKError), with `recoverable` renamed `SDKError.retryable`.
+    // Mirrors Swift's `proto.category == .failure || .error` check.
     this.error?.let {
-        return SdkEvent.Error(it.message.ifBlank { "SDK error" }, recoverable = true)
+        return SdkEvent.Error(it.message.ifBlank { "SDK error" }, recoverable = it.retryable)
     }
     return null
 }

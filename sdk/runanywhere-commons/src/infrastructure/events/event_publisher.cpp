@@ -333,12 +333,10 @@ rac_result_t rac_sdk_event_publish_failure(rac_result_t error_code, const char* 
     populate_error(event.mutable_error(), error_code, message, sdk_component,
                    runanywhere::v1::ERROR_SEVERITY_ERROR, is_recoverable);
 
-    auto* failure = event.mutable_failure();
-    failure->set_component(sdk_component);
-    if (operation)
-        failure->set_operation(operation);
-    failure->set_recoverable(is_recoverable);
-    failure->mutable_error()->CopyFrom(event.error());
+    // FailureEvent was deleted: a failure is any event with SDKEvent.error
+    // set. component/operation/error/retryable already live on the envelope
+    // (component above, operation_id above, error above, error.retryable);
+    // there is no separate payload to populate.
     return publish_message(event);
 #else
     (void)error_code;

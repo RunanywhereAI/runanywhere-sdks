@@ -47,14 +47,18 @@ public class VADServiceState(
     schemaIndex = 1,
   )
   public val is_speech_active: Boolean = false,
+  /**
+   * The threshold actually in force. After auto-calibration this differs
+   * from what was requested, which is why it is worth reading back.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "energyThreshold",
+    jsonName = "activationThreshold",
     schemaIndex = 2,
   )
-  public val energy_threshold: Float = 0f,
+  public val activation_threshold: Float = 0f,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -79,7 +83,7 @@ public class VADServiceState(
   )
   public val current_model: String? = null,
   @field:WireField(
-    tag = 9,
+    tag = 7,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 6,
   )
@@ -98,7 +102,7 @@ public class VADServiceState(
     if (unknownFields != other.unknownFields) return false
     if (is_ready != other.is_ready) return false
     if (is_speech_active != other.is_speech_active) return false
-    if (energy_threshold != other.energy_threshold) return false
+    if (activation_threshold != other.activation_threshold) return false
     if (sample_rate != other.sample_rate) return false
     if (frame_length_ms != other.frame_length_ms) return false
     if (current_model != other.current_model) return false
@@ -112,7 +116,7 @@ public class VADServiceState(
       result = unknownFields.hashCode()
       result = result * 37 + is_ready.hashCode()
       result = result * 37 + is_speech_active.hashCode()
-      result = result * 37 + energy_threshold.hashCode()
+      result = result * 37 + activation_threshold.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + frame_length_ms.hashCode()
       result = result * 37 + (current_model?.hashCode() ?: 0)
@@ -126,7 +130,7 @@ public class VADServiceState(
     val result = mutableListOf<String>()
     result += """is_ready=$is_ready"""
     result += """is_speech_active=$is_speech_active"""
-    result += """energy_threshold=$energy_threshold"""
+    result += """activation_threshold=$activation_threshold"""
     result += """sample_rate=$sample_rate"""
     result += """frame_length_ms=$frame_length_ms"""
     if (current_model != null) result += """current_model=${sanitize(current_model)}"""
@@ -137,13 +141,13 @@ public class VADServiceState(
   public fun copy(
     is_ready: Boolean = this.is_ready,
     is_speech_active: Boolean = this.is_speech_active,
-    energy_threshold: Float = this.energy_threshold,
+    activation_threshold: Float = this.activation_threshold,
     sample_rate: Int = this.sample_rate,
     frame_length_ms: Int = this.frame_length_ms,
     current_model: String? = this.current_model,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VADServiceState = VADServiceState(is_ready, is_speech_active, energy_threshold, sample_rate, frame_length_ms, current_model, error, unknownFields)
+  ): VADServiceState = VADServiceState(is_ready, is_speech_active, activation_threshold, sample_rate, frame_length_ms, current_model, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -163,8 +167,8 @@ public class VADServiceState(
         if (value.is_speech_active != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.is_speech_active)
         }
-        if (!value.energy_threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.energy_threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.activation_threshold)
         }
         if (value.sample_rate != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.sample_rate)
@@ -173,7 +177,7 @@ public class VADServiceState(
           size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.frame_length_ms)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.current_model)
-        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
@@ -184,8 +188,8 @@ public class VADServiceState(
         if (value.is_speech_active != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_speech_active)
         }
-        if (!value.energy_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.energy_threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.activation_threshold)
         }
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.sample_rate)
@@ -194,13 +198,13 @@ public class VADServiceState(
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.frame_length_ms)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.current_model)
-        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADServiceState) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.current_model)
         if (value.frame_length_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.frame_length_ms)
@@ -208,8 +212,8 @@ public class VADServiceState(
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.sample_rate)
         }
-        if (!value.energy_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.energy_threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.activation_threshold)
         }
         if (value.is_speech_active != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_speech_active)
@@ -222,7 +226,7 @@ public class VADServiceState(
       override fun decode(reader: ProtoReader): VADServiceState {
         var is_ready: Boolean = false
         var is_speech_active: Boolean = false
-        var energy_threshold: Float = 0f
+        var activation_threshold: Float = 0f
         var sample_rate: Int = 0
         var frame_length_ms: Int = 0
         var current_model: String? = null
@@ -231,18 +235,18 @@ public class VADServiceState(
           when (tag) {
             1 -> is_ready = ProtoAdapter.BOOL.decode(reader)
             2 -> is_speech_active = ProtoAdapter.BOOL.decode(reader)
-            3 -> energy_threshold = ProtoAdapter.FLOAT.decode(reader)
+            3 -> activation_threshold = ProtoAdapter.FLOAT.decode(reader)
             4 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             5 -> frame_length_ms = ProtoAdapter.INT32.decode(reader)
             6 -> current_model = ProtoAdapter.STRING.decode(reader)
-            9 -> error = SDKError.ADAPTER.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADServiceState(
           is_ready = is_ready,
           is_speech_active = is_speech_active,
-          energy_threshold = energy_threshold,
+          activation_threshold = activation_threshold,
           sample_rate = sample_rate,
           frame_length_ms = frame_length_ms,
           current_model = current_model,

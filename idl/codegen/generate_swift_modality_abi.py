@@ -68,16 +68,8 @@ OUTPUT_PATH = (
 STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
     "rac_llm_generate_stream_proto": """{ rc in
                 var event = RALLMStreamEvent()
-                event.isFinal = true
-                event.finishReason = "error"
-                if let mapped = RASDKError.from(rcResult: rc) {
-                    event.error = mapped
-                }
-                return event
-            }""",
-    "rac_structured_output_generate_stream_proto": """{ rc in
-                var event = RAStructuredOutputStreamEvent()
-                event.kind = .error
+                event.eventKind = .error
+                event.finishReason = .error
                 if let mapped = RASDKError.from(rcResult: rc) {
                     event.error = mapped
                 }
@@ -103,19 +95,14 @@ STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
 # so consumer cancellation (`AsyncStream` termination = .cancelled) tears down
 # the native producer.
 #
-# LLM + StructuredOutput both route through the lifecycle-LLM cancel symbol
-# `rac_llm_cancel_proto` (parameter-less, proto-out — the result is discarded
-# here because the consumer has already cancelled). STT/TTS streams are
+# LLM routes through the lifecycle-LLM cancel symbol `rac_llm_cancel_proto`
+# (parameter-less, proto-out — the result is discarded here because the
+# consumer has already cancelled). STT/TTS streams are
 # session-id-owned; the session handle isn't visible at this layer, so we
 # emit an empty closure that satisfies the parameter contract while leaving
 # the session to be torn down by `runRequestStream`'s native unwind.
 STREAM_ON_CANCEL_FACTORIES: dict[str, str] = {
     "rac_llm_generate_stream_proto": """{
-                var outBuffer = rac_proto_buffer_t()
-                defer { NativeProtoABI.free(&outBuffer) }
-                _ = rac_llm_cancel_proto(&outBuffer)
-            }""",
-    "rac_structured_output_generate_stream_proto": """{
                 var outBuffer = rac_proto_buffer_t()
                 defer { NativeProtoABI.free(&outBuffer) }
                 _ = rac_llm_cancel_proto(&outBuffer)

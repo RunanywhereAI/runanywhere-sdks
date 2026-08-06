@@ -25,18 +25,15 @@ import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import { ModelCategory, type SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import type { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 import {
-  DownloadEventKind,
   GenerationEventKind,
   InitializationStage,
   ModelEventKind,
   SDKEvent,
   VoiceEventKind,
   type ComponentLifecycleEvent as ProtoComponentLifecycleEvent,
-  type DownloadEvent as ProtoDownloadEvent,
   type GenerationEvent as ProtoGenerationEvent,
   type InitializationEvent as ProtoInitializationEvent,
   type ModelEvent as ProtoModelEvent,
-  type ModelRegistryEvent as ProtoModelRegistryEvent,
   type SDKEvent as ProtoSDKEvent,
   type VoiceLifecycleEvent as ProtoVoiceLifecycleEvent,
 } from '@runanywhere/proto-ts/sdk_events';
@@ -373,22 +370,23 @@ export class EventBus {
     return this.eventsOfPayload((envelope) => envelope.voicePipeline);
   }
 
-  /** Stream of `DownloadEvent` payloads (model download progress / lifecycle).
-   * Mirrors Swift `EventBus.downloadEventPayloads` (`.download` arm). */
-  get downloadEventPayloads(): AsyncIterable<ProtoDownloadEvent> {
-    return this.eventsOfPayload((envelope) => envelope.download);
+  /**
+   * Stream of `ModelEvent` payloads (model load / download / registry
+   * lifecycle). `DownloadEvent` and `ModelRegistryEvent` were absorbed into
+   * `ModelEvent` outright (idl/sdk_events.proto) -- the download- and
+   * registry-specific fields (`bytesDownloaded`, `downloadState`,
+   * `refreshResult`, `listResult`, ...) now live directly on `ModelEvent`,
+   * so this single accessor replaces the former `downloadEventPayloads` /
+   * `modelRegistryEventPayloads` pair.
+   * Mirrors Swift `EventBus.modelEventPayloads` (`.model` arm). */
+  get modelEventPayloads(): AsyncIterable<ProtoModelEvent> {
+    return this.eventsOfPayload((envelope) => envelope.model);
   }
 
   /** Stream of `ComponentLifecycleEvent` payloads.
    * Mirrors Swift `EventBus.componentLifecycleEventPayloads` (`.componentLifecycle` arm). */
   get componentLifecycleEventPayloads(): AsyncIterable<ProtoComponentLifecycleEvent> {
     return this.eventsOfPayload((envelope) => envelope.componentLifecycle);
-  }
-
-  /** Stream of `ModelRegistryEvent` payloads.
-   * Mirrors Swift `EventBus.modelRegistryEventPayloads` (`.modelRegistry` arm). */
-  get modelRegistryEventPayloads(): AsyncIterable<ProtoModelRegistryEvent> {
-    return this.eventsOfPayload((envelope) => envelope.modelRegistry);
   }
 
   /**
@@ -678,14 +676,17 @@ export class EventBus {
 // Adding a new mapping is a single-case addition here plus its reverse arm in
 // `encodeEventToProto` below.
 //
-// Coverage note: the SDKEvent proto oneof has 24 arms (initialization,
-// configuration, generation, model, performance, network, storage, framework,
-// device, component_init, voice, voice_pipeline, component_lifecycle, session,
-// auth, model_registry, download, storage_lifecycle, hardware_routing,
-// capability, telemetry, cancellation, failure). Only 5 arms (initialization,
-// model, generation, voice, download) are translated to dotted-name SDKEventMap
-// entries. The remaining 19 arms do NOT produce dotted-name events; they are
-// routed to wildcard listeners only (with `{ proto: event }` in `data`).
+// Coverage note: the SDKEvent proto oneof has 17 arms (initialization,
+// configuration, generation, model, network, storage, framework, device,
+// voice, voice_pipeline, component_lifecycle, session, auth,
+// hardware_routing, capability, telemetry, cancellation). `download` and
+// `model_registry` were absorbed into `model` outright
+// (idl/sdk_events.proto) -- ModelEvent now carries every download- and
+// registry-specific field directly. Only 4 arms (initialization, model,
+// generation, voice) are translated to dotted-name SDKEventMap entries
+// (model's translation covers both load AND download/registry kinds). The
+// remaining arms do NOT produce dotted-name events; they are routed to
+// wildcard listeners only (with `{ proto: event }` in `data`).
 //
 // For any arm not listed above, use the category-based API instead — it
 // delivers the raw proto SDKEvent regardless of dotted-name coverage and is
@@ -702,10 +703,13 @@ interface TranslatedEvent {
 
 function translateProtoEvent(event: ProtoSDKEvent): TranslatedEvent | null {
   if (event.initialization) return translateInitialization(event.initialization);
+  // `DownloadEvent` was absorbed into `ModelEvent` outright
+  // (idl/sdk_events.proto) -- translateModel already covers every
+  // MODEL_EVENT_KIND_DOWNLOAD_* kind, so there is no separate download arm
+  // to translate.
   if (event.model) return translateModel(event.model);
   if (event.generation) return translateGeneration(event.generation);
   if (event.voice) return translateVoice(event.voice);
-  if (event.download) return translateDownload(event.download);
   return null;
 }
 
@@ -774,9 +778,11 @@ function translateGeneration(e: ProtoGenerationEvent): TranslatedEvent | null {
     case GenerationEventKind.GENERATION_EVENT_KIND_STARTED:
       return generationEvent('generation.started', { prompt: e.prompt });
     case GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED:
+      // GenerationEvent.tokensUsed/latencyMs were renamed outright to
+      // outputTokens/totalDurationMs (idl/sdk_events.proto).
       return generationEvent('generation.completed', {
-        tokensUsed: e.tokensUsed,
-        latencyMs: e.latencyMs,
+        tokensUsed: e.outputTokens,
+        latencyMs: e.totalDurationMs,
       });
     case GenerationEventKind.GENERATION_EVENT_KIND_FAILED:
       return generationEvent('generation.failed', { error: e.error });
@@ -808,11 +814,16 @@ function translateVoice(e: ProtoVoiceLifecycleEvent): TranslatedEvent | null {
       return voiceEvent('playback.started', { durationMs: e.durationMs, sampleRate: 0 }, EventCategory.EVENT_CATEGORY_VOICE_AGENT);
     case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_COMPLETED:
       return voiceEvent('playback.completed', { durationMs: e.durationMs }, EventCategory.EVENT_CATEGORY_VOICE_AGENT);
-    case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED:
+    // `VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED` was deleted outright
+    // (idl/sdk_events.proto); RESPONSE_GENERATED is the closest surviving
+    // kind carrying a completed turn's transcript ("text") + assistant
+    // reply ("responseText" -- the field was also renamed from
+    // "turnResponse").
+    case VoiceEventKind.VOICE_EVENT_KIND_RESPONSE_GENERATED:
       return voiceEvent('voice.turnCompleted', {
         speechDetected: true,
-        transcription: e.transcription,
-        response: e.turnResponse,
+        transcription: e.text,
+        response: e.responseText,
       }, EventCategory.EVENT_CATEGORY_VOICE_AGENT);
     default:
       return null;
@@ -821,33 +832,6 @@ function translateVoice(e: ProtoVoiceLifecycleEvent): TranslatedEvent | null {
 
 function voiceEvent(type: string, data: Record<string, unknown>, fallback: EventCategory): TranslatedEvent {
   return { type, data, fallbackCategory: fallback };
-}
-
-function translateDownload(e: ProtoDownloadEvent): TranslatedEvent | null {
-  switch (e.kind) {
-    case DownloadEventKind.DOWNLOAD_EVENT_KIND_STARTED:
-      return downloadEvent('model.downloadStarted', { modelId: e.modelId, url: '' });
-    case DownloadEventKind.DOWNLOAD_EVENT_KIND_PROGRESS: {
-      const p = e.progress;
-      return downloadEvent('model.downloadProgress', {
-        modelId: e.modelId,
-        progress: p?.overallProgress ?? 0,
-        bytesDownloaded: p?.bytesDownloaded ?? 0,
-        totalBytes: p?.totalBytes ?? 0,
-        stage: p?.state !== undefined ? String(p.state) : undefined,
-      });
-    }
-    case DownloadEventKind.DOWNLOAD_EVENT_KIND_COMPLETED:
-      return downloadEvent('model.downloadCompleted', { modelId: e.modelId });
-    case DownloadEventKind.DOWNLOAD_EVENT_KIND_FAILED:
-      return downloadEvent('model.downloadFailed', { modelId: e.modelId, error: e.error });
-    default:
-      return null;
-  }
-}
-
-function downloadEvent(type: string, data: Record<string, unknown>): TranslatedEvent {
-  return { type, data, fallbackCategory: EventCategory.EVENT_CATEGORY_DOWNLOAD };
 }
 
 // =============================================================================
@@ -907,8 +891,8 @@ function encodeEventToProto(
         category,
         generation: {
           kind: GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED,
-          tokensUsed: numberField(data.tokensUsed),
-          latencyMs: numberField(data.latencyMs),
+          outputTokens: numberField(data.tokensUsed),
+          totalDurationMs: numberField(data.latencyMs),
         },
       });
     case 'generation.failed':

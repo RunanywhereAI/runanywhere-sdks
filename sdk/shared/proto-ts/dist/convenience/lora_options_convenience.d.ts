@@ -1,4 +1,4 @@
-import { LoRAAdapterConfig, LoraAdapterCatalogEntry } from '../lora_options';
-export declare const loRAAdapterConfigDefaults: () => LoRAAdapterConfig;
-export declare const validateLoRAAdapterConfig: (m: LoRAAdapterConfig) => void;
+import { LoraAdapterCatalogEntry, LoraAdapterConfig } from '../lora_options';
+export declare const loraAdapterConfigDefaults: () => LoraAdapterConfig;
+export declare const validateLoraAdapterConfig: (m: LoraAdapterConfig) => void;
 export declare const loraAdapterCatalogEntryDefaults: () => LoraAdapterCatalogEntry;

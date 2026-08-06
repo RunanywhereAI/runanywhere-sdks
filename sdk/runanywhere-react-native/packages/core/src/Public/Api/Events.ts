@@ -51,11 +51,15 @@ function toSdkEvent(event: SDKEvent): SdkEvent | undefined {
         return undefined;
     }
   }
-  if (event.failure?.error) {
+  // `SDKEvent.failure` (a distinct oneof arm carrying `.error`/`.recoverable`)
+  // is deleted outright — the top-level `SDKEvent.error: SDKError` is the
+  // sole error-notification channel now; `SDKError.retryable` is the
+  // closest surviving signal for "recoverable".
+  if (event.error) {
     return {
       type: 'error',
-      message: event.failure.error.message,
-      recoverable: event.failure.recoverable,
+      message: event.error.message,
+      recoverable: event.error.retryable,
     };
   }
   return undefined;

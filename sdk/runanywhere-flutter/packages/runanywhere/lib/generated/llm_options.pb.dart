@@ -33,7 +33,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     $core.double? temperature,
     $core.double? topP,
     $core.int? topK,
-    $core.double? repetitionPenalty,
+    $core.double? repeatPenalty,
     $core.Iterable<$core.String>? stopSequences,
     $5.InferenceFramework? preferredFramework,
     $core.String? systemPrompt,
@@ -46,7 +46,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     $core.int? repeatLastN,
     $core.double? minP,
     $core.bool? echoPrompt,
-    $core.int? nThreads,
     $2.ToolCallingOptions? toolCalling,
   }) {
     final result = create();
@@ -54,7 +53,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     if (temperature != null) result.temperature = temperature;
     if (topP != null) result.topP = topP;
     if (topK != null) result.topK = topK;
-    if (repetitionPenalty != null) result.repetitionPenalty = repetitionPenalty;
+    if (repeatPenalty != null) result.repeatPenalty = repeatPenalty;
     if (stopSequences != null) result.stopSequences.addAll(stopSequences);
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
@@ -68,7 +67,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     if (repeatLastN != null) result.repeatLastN = repeatLastN;
     if (minP != null) result.minP = minP;
     if (echoPrompt != null) result.echoPrompt = echoPrompt;
-    if (nThreads != null) result.nThreads = nThreads;
     if (toolCalling != null) result.toolCalling = toolCalling;
     return result;
   }
@@ -90,7 +88,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     ..aD(2, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
     ..aD(3, _omitFieldNames ? '' : 'topP', fieldType: $pb.PbFieldType.OF)
     ..aI(4, _omitFieldNames ? '' : 'topK')
-    ..aD(5, _omitFieldNames ? '' : 'repetitionPenalty',
+    ..aD(5, _omitFieldNames ? '' : 'repeatPenalty',
         fieldType: $pb.PbFieldType.OF)
     ..pPS(6, _omitFieldNames ? '' : 'stopSequences')
     ..aE<$5.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
@@ -111,7 +109,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     ..aI(18, _omitFieldNames ? '' : 'repeatLastN')
     ..aD(19, _omitFieldNames ? '' : 'minP', fieldType: $pb.PbFieldType.OF)
     ..aOB(22, _omitFieldNames ? '' : 'echoPrompt')
-    ..aI(23, _omitFieldNames ? '' : 'nThreads')
     ..aOM<$2.ToolCallingOptions>(24, _omitFieldNames ? '' : 'toolCalling',
         subBuilder: $2.ToolCallingOptions.create)
     ..hasRequiredFields = false;
@@ -135,7 +132,15 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LLMGenerationOptions>(create);
   static LLMGenerationOptions? _defaultInstance;
 
-  /// 0 = unset, so the annotated default applies.
+  /// Every knob below has explicit presence: ABSENT means the annotated
+  /// default applies, and any value the caller sets -- including 0 -- is
+  /// honoured verbatim. Nothing treats 0 as unset.
+  ///
+  /// Sampler chain order is fixed: repeat_penalty -> top_k -> top_p ->
+  /// min_p -> temperature (llama.cpp order, minus the samplers we do not
+  /// expose). top_k/min_p/repeat_penalty default ON to match llama.cpp and
+  /// Ollama, which both ship these on because small quantized models loop
+  /// without them.
   @$pb.TagNumber(1)
   $core.int get maxOutputTokens => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -145,7 +150,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearMaxOutputTokens() => $_clearField(1);
 
-  /// 0.0 = greedy decoding.
+  /// 0.0 = greedy decoding, and is honoured as an explicit request.
   @$pb.TagNumber(2)
   $core.double get temperature => $_getN(1);
   @$pb.TagNumber(2)
@@ -164,7 +169,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearTopP() => $_clearField(3);
 
-  /// Commons treats 0 as unset for every sampling knob below.
   @$pb.TagNumber(4)
   $core.int get topK => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -174,14 +178,15 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearTopK() => $_clearField(4);
 
+  /// Industry name: llama.cpp and Ollama both spell this repeat_penalty.
   @$pb.TagNumber(5)
-  $core.double get repetitionPenalty => $_getN(4);
+  $core.double get repeatPenalty => $_getN(4);
   @$pb.TagNumber(5)
-  set repetitionPenalty($core.double value) => $_setFloat(4, value);
+  set repeatPenalty($core.double value) => $_setFloat(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasRepetitionPenalty() => $_has(4);
+  $core.bool hasRepeatPenalty() => $_has(4);
   @$pb.TagNumber(5)
-  void clearRepetitionPenalty() => $_clearField(5);
+  void clearRepeatPenalty() => $_clearField(5);
 
   @$pb.TagNumber(6)
   $pb.PbList<$core.String> get stopSequences => $_getList(5);
@@ -292,25 +297,16 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(22)
   void clearEchoPrompt() => $_clearField(22);
 
-  @$pb.TagNumber(23)
-  $core.int get nThreads => $_getIZ(17);
-  @$pb.TagNumber(23)
-  set nThreads($core.int value) => $_setSignedInt32(17, value);
-  @$pb.TagNumber(23)
-  $core.bool hasNThreads() => $_has(17);
-  @$pb.TagNumber(23)
-  void clearNThreads() => $_clearField(23);
-
   @$pb.TagNumber(24)
-  $2.ToolCallingOptions get toolCalling => $_getN(18);
+  $2.ToolCallingOptions get toolCalling => $_getN(17);
   @$pb.TagNumber(24)
   set toolCalling($2.ToolCallingOptions value) => $_setField(24, value);
   @$pb.TagNumber(24)
-  $core.bool hasToolCalling() => $_has(18);
+  $core.bool hasToolCalling() => $_has(17);
   @$pb.TagNumber(24)
   void clearToolCalling() => $_clearField(24);
   @$pb.TagNumber(24)
-  $2.ToolCallingOptions ensureToolCalling() => $_ensure(18);
+  $2.ToolCallingOptions ensureToolCalling() => $_ensure(17);
 }
 
 class LLMGenerationResult extends $pb.GeneratedMessage {
@@ -319,9 +315,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     $core.String? thinkingContent,
     $core.String? modelUsed,
     $core.double? generationTimeMs,
-    $core.double? ttftMs,
     $core.String? framework,
-    $core.String? finishReason,
     $core.int? thinkingTokens,
     $core.int? responseTokens,
     $core.String? jsonOutput,
@@ -335,15 +329,15 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     $core.Iterable<$2.ToolResult>? toolResults,
     $3.TokenUsage? usage,
     $4.SDKError? error,
+    FinishReason? finishReason,
+    $core.String? stopSequence,
   }) {
     final result = create();
     if (text != null) result.text = text;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
     if (modelUsed != null) result.modelUsed = modelUsed;
     if (generationTimeMs != null) result.generationTimeMs = generationTimeMs;
-    if (ttftMs != null) result.ttftMs = ttftMs;
     if (framework != null) result.framework = framework;
-    if (finishReason != null) result.finishReason = finishReason;
     if (thinkingTokens != null) result.thinkingTokens = thinkingTokens;
     if (responseTokens != null) result.responseTokens = responseTokens;
     if (jsonOutput != null) result.jsonOutput = jsonOutput;
@@ -359,6 +353,8 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     if (toolResults != null) result.toolResults.addAll(toolResults);
     if (usage != null) result.usage = usage;
     if (error != null) result.error = error;
+    if (finishReason != null) result.finishReason = finishReason;
+    if (stopSequence != null) result.stopSequence = stopSequence;
     return result;
   }
 
@@ -379,9 +375,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'thinkingContent')
     ..aOS(5, _omitFieldNames ? '' : 'modelUsed')
     ..aD(6, _omitFieldNames ? '' : 'generationTimeMs')
-    ..aD(7, _omitFieldNames ? '' : 'ttftMs')
     ..aOS(9, _omitFieldNames ? '' : 'framework')
-    ..aOS(10, _omitFieldNames ? '' : 'finishReason')
     ..aI(11, _omitFieldNames ? '' : 'thinkingTokens')
     ..aI(12, _omitFieldNames ? '' : 'responseTokens')
     ..aOS(13, _omitFieldNames ? '' : 'jsonOutput')
@@ -403,6 +397,9 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
         subBuilder: $3.TokenUsage.create)
     ..aOM<$4.SDKError>(26, _omitFieldNames ? '' : 'error',
         subBuilder: $4.SDKError.create)
+    ..aE<FinishReason>(27, _omitFieldNames ? '' : 'finishReason',
+        enumValues: FinishReason.values)
+    ..aOS(28, _omitFieldNames ? '' : 'stopSequence')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -460,148 +457,151 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearGenerationTimeMs() => $_clearField(6);
 
-  @$pb.TagNumber(7)
-  $core.double get ttftMs => $_getN(4);
-  @$pb.TagNumber(7)
-  set ttftMs($core.double value) => $_setDouble(4, value);
-  @$pb.TagNumber(7)
-  $core.bool hasTtftMs() => $_has(4);
-  @$pb.TagNumber(7)
-  void clearTtftMs() => $_clearField(7);
-
   @$pb.TagNumber(9)
-  $core.String get framework => $_getSZ(5);
+  $core.String get framework => $_getSZ(4);
   @$pb.TagNumber(9)
-  set framework($core.String value) => $_setString(5, value);
+  set framework($core.String value) => $_setString(4, value);
   @$pb.TagNumber(9)
-  $core.bool hasFramework() => $_has(5);
+  $core.bool hasFramework() => $_has(4);
   @$pb.TagNumber(9)
   void clearFramework() => $_clearField(9);
 
-  @$pb.TagNumber(10)
-  $core.String get finishReason => $_getSZ(6);
-  @$pb.TagNumber(10)
-  set finishReason($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(10)
-  $core.bool hasFinishReason() => $_has(6);
-  @$pb.TagNumber(10)
-  void clearFinishReason() => $_clearField(10);
-
   @$pb.TagNumber(11)
-  $core.int get thinkingTokens => $_getIZ(7);
+  $core.int get thinkingTokens => $_getIZ(5);
   @$pb.TagNumber(11)
-  set thinkingTokens($core.int value) => $_setSignedInt32(7, value);
+  set thinkingTokens($core.int value) => $_setSignedInt32(5, value);
   @$pb.TagNumber(11)
-  $core.bool hasThinkingTokens() => $_has(7);
+  $core.bool hasThinkingTokens() => $_has(5);
   @$pb.TagNumber(11)
   void clearThinkingTokens() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.int get responseTokens => $_getIZ(8);
+  $core.int get responseTokens => $_getIZ(6);
   @$pb.TagNumber(12)
-  set responseTokens($core.int value) => $_setSignedInt32(8, value);
+  set responseTokens($core.int value) => $_setSignedInt32(6, value);
   @$pb.TagNumber(12)
-  $core.bool hasResponseTokens() => $_has(8);
+  $core.bool hasResponseTokens() => $_has(6);
   @$pb.TagNumber(12)
   void clearResponseTokens() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.String get jsonOutput => $_getSZ(9);
+  $core.String get jsonOutput => $_getSZ(7);
   @$pb.TagNumber(13)
-  set jsonOutput($core.String value) => $_setString(9, value);
+  set jsonOutput($core.String value) => $_setString(7, value);
   @$pb.TagNumber(13)
-  $core.bool hasJsonOutput() => $_has(9);
+  $core.bool hasJsonOutput() => $_has(7);
   @$pb.TagNumber(13)
   void clearJsonOutput() => $_clearField(13);
 
   /// Nothing reads performance or executed_on.
   @$pb.TagNumber(14)
-  PerformanceMetrics get performance => $_getN(10);
+  PerformanceMetrics get performance => $_getN(8);
   @$pb.TagNumber(14)
   set performance(PerformanceMetrics value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasPerformance() => $_has(10);
+  $core.bool hasPerformance() => $_has(8);
   @$pb.TagNumber(14)
   void clearPerformance() => $_clearField(14);
   @$pb.TagNumber(14)
-  PerformanceMetrics ensurePerformance() => $_ensure(10);
+  PerformanceMetrics ensurePerformance() => $_ensure(8);
 
   @$pb.TagNumber(15)
-  ExecutionTarget get executedOn => $_getN(11);
+  ExecutionTarget get executedOn => $_getN(9);
   @$pb.TagNumber(15)
   set executedOn(ExecutionTarget value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasExecutedOn() => $_has(11);
+  $core.bool hasExecutedOn() => $_has(9);
   @$pb.TagNumber(15)
   void clearExecutedOn() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $1.StructuredOutputValidation get structuredOutputValidation => $_getN(12);
+  $1.StructuredOutputValidation get structuredOutputValidation => $_getN(10);
   @$pb.TagNumber(16)
   set structuredOutputValidation($1.StructuredOutputValidation value) =>
       $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasStructuredOutputValidation() => $_has(12);
+  $core.bool hasStructuredOutputValidation() => $_has(10);
   @$pb.TagNumber(16)
   void clearStructuredOutputValidation() => $_clearField(16);
   @$pb.TagNumber(16)
   $1.StructuredOutputValidation ensureStructuredOutputValidation() =>
-      $_ensure(12);
+      $_ensure(10);
 
   @$pb.TagNumber(20)
-  $core.int get cachedPromptTokens => $_getIZ(13);
+  $core.int get cachedPromptTokens => $_getIZ(11);
   @$pb.TagNumber(20)
-  set cachedPromptTokens($core.int value) => $_setSignedInt32(13, value);
+  set cachedPromptTokens($core.int value) => $_setSignedInt32(11, value);
   @$pb.TagNumber(20)
-  $core.bool hasCachedPromptTokens() => $_has(13);
+  $core.bool hasCachedPromptTokens() => $_has(11);
   @$pb.TagNumber(20)
   void clearCachedPromptTokens() => $_clearField(20);
 
   @$pb.TagNumber(21)
-  $fixnum.Int64 get promptEvalTimeMs => $_getI64(14);
+  $fixnum.Int64 get promptEvalTimeMs => $_getI64(12);
   @$pb.TagNumber(21)
-  set promptEvalTimeMs($fixnum.Int64 value) => $_setInt64(14, value);
+  set promptEvalTimeMs($fixnum.Int64 value) => $_setInt64(12, value);
   @$pb.TagNumber(21)
-  $core.bool hasPromptEvalTimeMs() => $_has(14);
+  $core.bool hasPromptEvalTimeMs() => $_has(12);
   @$pb.TagNumber(21)
   void clearPromptEvalTimeMs() => $_clearField(21);
 
   @$pb.TagNumber(22)
-  $fixnum.Int64 get decodeTimeMs => $_getI64(15);
+  $fixnum.Int64 get decodeTimeMs => $_getI64(13);
   @$pb.TagNumber(22)
-  set decodeTimeMs($fixnum.Int64 value) => $_setInt64(15, value);
+  set decodeTimeMs($fixnum.Int64 value) => $_setInt64(13, value);
   @$pb.TagNumber(22)
-  $core.bool hasDecodeTimeMs() => $_has(15);
+  $core.bool hasDecodeTimeMs() => $_has(13);
   @$pb.TagNumber(22)
   void clearDecodeTimeMs() => $_clearField(22);
 
   @$pb.TagNumber(23)
-  $pb.PbList<$2.ToolCall> get toolCalls => $_getList(16);
+  $pb.PbList<$2.ToolCall> get toolCalls => $_getList(14);
 
   @$pb.TagNumber(24)
-  $pb.PbList<$2.ToolResult> get toolResults => $_getList(17);
+  $pb.PbList<$2.ToolResult> get toolResults => $_getList(15);
 
   @$pb.TagNumber(25)
-  $3.TokenUsage get usage => $_getN(18);
+  $3.TokenUsage get usage => $_getN(16);
   @$pb.TagNumber(25)
   set usage($3.TokenUsage value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasUsage() => $_has(18);
+  $core.bool hasUsage() => $_has(16);
   @$pb.TagNumber(25)
   void clearUsage() => $_clearField(25);
   @$pb.TagNumber(25)
-  $3.TokenUsage ensureUsage() => $_ensure(18);
+  $3.TokenUsage ensureUsage() => $_ensure(16);
 
   @$pb.TagNumber(26)
-  $4.SDKError get error => $_getN(19);
+  $4.SDKError get error => $_getN(17);
   @$pb.TagNumber(26)
   set error($4.SDKError value) => $_setField(26, value);
   @$pb.TagNumber(26)
-  $core.bool hasError() => $_has(19);
+  $core.bool hasError() => $_has(17);
   @$pb.TagNumber(26)
   void clearError() => $_clearField(26);
   @$pb.TagNumber(26)
-  $4.SDKError ensureError() => $_ensure(19);
+  $4.SDKError ensureError() => $_ensure(17);
+
+  @$pb.TagNumber(27)
+  FinishReason get finishReason => $_getN(18);
+  @$pb.TagNumber(27)
+  set finishReason(FinishReason value) => $_setField(27, value);
+  @$pb.TagNumber(27)
+  $core.bool hasFinishReason() => $_has(18);
+  @$pb.TagNumber(27)
+  void clearFinishReason() => $_clearField(27);
+
+  /// Which of options.stop_sequences fired. Set only when finish_reason ==
+  /// FINISH_REASON_STOP_SEQUENCE. Industry: Anthropic `stop_sequence`,
+  /// llama.cpp `stopping_word`.
+  @$pb.TagNumber(28)
+  $core.String get stopSequence => $_getSZ(19);
+  @$pb.TagNumber(28)
+  set stopSequence($core.String value) => $_setString(19, value);
+  @$pb.TagNumber(28)
+  $core.bool hasStopSequence() => $_has(19);
+  @$pb.TagNumber(28)
+  void clearStopSequence() => $_clearField(28);
 }
 
 class LLMConfiguration extends $pb.GeneratedMessage {

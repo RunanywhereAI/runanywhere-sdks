@@ -14,46 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// The JPEG/PNG/WEBP and RAW_RGBA values are reserved: no backend detects
-/// containers yet, and no SDK passes straight RGBA. Swift's Apple-only uiImage
-/// and pixelBuffer cases flatten to RAW_RGB before crossing the C ABI.
-class VLMImageFormat extends $pb.ProtobufEnum {
-  static const VLMImageFormat VLM_IMAGE_FORMAT_UNSPECIFIED =
-      VLMImageFormat._(0, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_UNSPECIFIED');
-  static const VLMImageFormat VLM_IMAGE_FORMAT_JPEG =
-      VLMImageFormat._(1, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_JPEG');
-  static const VLMImageFormat VLM_IMAGE_FORMAT_PNG =
-      VLMImageFormat._(2, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_PNG');
-  static const VLMImageFormat VLM_IMAGE_FORMAT_WEBP =
-      VLMImageFormat._(3, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_WEBP');
-  static const VLMImageFormat VLM_IMAGE_FORMAT_RAW_RGB =
-      VLMImageFormat._(4, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_RAW_RGB');
-  static const VLMImageFormat VLM_IMAGE_FORMAT_RAW_RGBA =
-      VLMImageFormat._(5, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_RAW_RGBA');
-  static const VLMImageFormat VLM_IMAGE_FORMAT_BASE64 =
-      VLMImageFormat._(6, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_BASE64');
-  static const VLMImageFormat VLM_IMAGE_FORMAT_FILE_PATH =
-      VLMImageFormat._(7, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_FILE_PATH');
-
-  static const $core.List<VLMImageFormat> values = <VLMImageFormat>[
-    VLM_IMAGE_FORMAT_UNSPECIFIED,
-    VLM_IMAGE_FORMAT_JPEG,
-    VLM_IMAGE_FORMAT_PNG,
-    VLM_IMAGE_FORMAT_WEBP,
-    VLM_IMAGE_FORMAT_RAW_RGB,
-    VLM_IMAGE_FORMAT_RAW_RGBA,
-    VLM_IMAGE_FORMAT_BASE64,
-    VLM_IMAGE_FORMAT_FILE_PATH,
-  ];
-
-  static final $core.List<VLMImageFormat?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 7);
-  static VLMImageFormat? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const VLMImageFormat._(super.value, super.name);
-}
-
 class VLMModelFamily extends $pb.ProtobufEnum {
   static const VLMModelFamily VLM_MODEL_FAMILY_UNSPECIFIED =
       VLMModelFamily._(0, _omitEnumNames ? '' : 'VLM_MODEL_FAMILY_UNSPECIFIED');
@@ -91,6 +51,11 @@ class VLMStreamEventKind extends $pb.ProtobufEnum {
   static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_STARTED =
       VLMStreamEventKind._(
           1, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_STARTED');
+
+  /// Emitted when the vision encoder finishes and decoding begins -- the
+  /// cue for a UI to switch from "analysing image" to "writing". Emitted
+  /// where the backend measures the encode boundary
+  /// (VLMResult.image_encode_time_ms comes from the same measurement).
   static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_IMAGE_ENCODED =
       VLMStreamEventKind._(
           2, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_IMAGE_ENCODED');

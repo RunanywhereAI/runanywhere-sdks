@@ -22,6 +22,80 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+/// One declared vocabulary, used in every place a finish reason is reported
+/// on the LLM generation path (LLMGenerationResult, LLMStreamEvent).
+public nonisolated enum RAFinishReason: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+
+  /// End-of-turn token. OpenAI "stop" / Anthropic "end_turn".
+  case stop // = 1
+
+  /// Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens".
+  case length // = 2
+
+  /// One of options.stop_sequences fired; see `stop_sequence`.
+  case stopSequence // = 3
+
+  /// Model wants a tool run before it can continue.
+  case toolCalls // = 4
+
+  /// Caller cancelled. No cloud analogue.
+  case cancelled // = 5
+
+  /// Conversation exceeded the allocated context window.
+  case contextOverflow // = 6
+
+  /// Generation failed; see `error`.
+  case error // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .stop
+    case 2: self = .length
+    case 3: self = .stopSequence
+    case 4: self = .toolCalls
+    case 5: self = .cancelled
+    case 6: self = .contextOverflow
+    case 7: self = .error
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .stop: return 1
+    case .length: return 2
+    case .stopSequence: return 3
+    case .toolCalls: return 4
+    case .cancelled: return 5
+    case .contextOverflow: return 6
+    case .error: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAFinishReason] = [
+    .unspecified,
+    .stop,
+    .length,
+    .stopSequence,
+    .toolCalls,
+    .cancelled,
+    .contextOverflow,
+    .error,
+  ]
+
+}
+
 public nonisolated enum RAExecutionTarget: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -69,33 +143,61 @@ public nonisolated struct RALLMGenerationOptions: @unchecked Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// 0 = unset, so the annotated default applies.
+  /// Every knob below has explicit presence: ABSENT means the annotated
+  /// default applies, and any value the caller sets -- including 0 -- is
+  /// honoured verbatim. Nothing treats 0 as unset.
+  ///
+  /// Sampler chain order is fixed: repeat_penalty -> top_k -> top_p ->
+  /// min_p -> temperature (llama.cpp order, minus the samplers we do not
+  /// expose). top_k/min_p/repeat_penalty default ON to match llama.cpp and
+  /// Ollama, which both ship these on because small quantized models loop
+  /// without them.
   public var maxOutputTokens: Int32 {
-    get {_storage._maxOutputTokens}
+    get {_storage._maxOutputTokens ?? 0}
     set {_uniqueStorage()._maxOutputTokens = newValue}
   }
+  /// Returns true if `maxOutputTokens` has been explicitly set.
+  public var hasMaxOutputTokens: Bool {_storage._maxOutputTokens != nil}
+  /// Clears the value of `maxOutputTokens`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxOutputTokens() {_uniqueStorage()._maxOutputTokens = nil}
 
-  /// 0.0 = greedy decoding.
+  /// 0.0 = greedy decoding, and is honoured as an explicit request.
   public var temperature: Float {
-    get {_storage._temperature}
+    get {_storage._temperature ?? 0}
     set {_uniqueStorage()._temperature = newValue}
   }
+  /// Returns true if `temperature` has been explicitly set.
+  public var hasTemperature: Bool {_storage._temperature != nil}
+  /// Clears the value of `temperature`. Subsequent reads from it will return its default value.
+  public mutating func clearTemperature() {_uniqueStorage()._temperature = nil}
 
   public var topP: Float {
-    get {_storage._topP}
+    get {_storage._topP ?? 0}
     set {_uniqueStorage()._topP = newValue}
   }
+  /// Returns true if `topP` has been explicitly set.
+  public var hasTopP: Bool {_storage._topP != nil}
+  /// Clears the value of `topP`. Subsequent reads from it will return its default value.
+  public mutating func clearTopP() {_uniqueStorage()._topP = nil}
 
-  /// Commons treats 0 as unset for every sampling knob below.
   public var topK: Int32 {
-    get {_storage._topK}
+    get {_storage._topK ?? 0}
     set {_uniqueStorage()._topK = newValue}
   }
+  /// Returns true if `topK` has been explicitly set.
+  public var hasTopK: Bool {_storage._topK != nil}
+  /// Clears the value of `topK`. Subsequent reads from it will return its default value.
+  public mutating func clearTopK() {_uniqueStorage()._topK = nil}
 
-  public var repetitionPenalty: Float {
-    get {_storage._repetitionPenalty}
-    set {_uniqueStorage()._repetitionPenalty = newValue}
+  /// Industry name: llama.cpp and Ollama both spell this repeat_penalty.
+  public var repeatPenalty: Float {
+    get {_storage._repeatPenalty ?? 0}
+    set {_uniqueStorage()._repeatPenalty = newValue}
   }
+  /// Returns true if `repeatPenalty` has been explicitly set.
+  public var hasRepeatPenalty: Bool {_storage._repeatPenalty != nil}
+  /// Clears the value of `repeatPenalty`. Subsequent reads from it will return its default value.
+  public mutating func clearRepeatPenalty() {_uniqueStorage()._repeatPenalty = nil}
 
   public var stopSequences: [String] {
     get {_storage._stopSequences}
@@ -145,19 +247,31 @@ public nonisolated struct RALLMGenerationOptions: @unchecked Sendable {
   public mutating func clearStructuredOutput() {_uniqueStorage()._structuredOutput = nil}
 
   public var seed: Int64 {
-    get {_storage._seed}
+    get {_storage._seed ?? 0}
     set {_uniqueStorage()._seed = newValue}
   }
+  /// Returns true if `seed` has been explicitly set.
+  public var hasSeed: Bool {_storage._seed != nil}
+  /// Clears the value of `seed`. Subsequent reads from it will return its default value.
+  public mutating func clearSeed() {_uniqueStorage()._seed = nil}
 
   public var frequencyPenalty: Float {
-    get {_storage._frequencyPenalty}
+    get {_storage._frequencyPenalty ?? 0}
     set {_uniqueStorage()._frequencyPenalty = newValue}
   }
+  /// Returns true if `frequencyPenalty` has been explicitly set.
+  public var hasFrequencyPenalty: Bool {_storage._frequencyPenalty != nil}
+  /// Clears the value of `frequencyPenalty`. Subsequent reads from it will return its default value.
+  public mutating func clearFrequencyPenalty() {_uniqueStorage()._frequencyPenalty = nil}
 
   public var presencePenalty: Float {
-    get {_storage._presencePenalty}
+    get {_storage._presencePenalty ?? 0}
     set {_uniqueStorage()._presencePenalty = newValue}
   }
+  /// Returns true if `presencePenalty` has been explicitly set.
+  public var hasPresencePenalty: Bool {_storage._presencePenalty != nil}
+  /// Clears the value of `presencePenalty`. Subsequent reads from it will return its default value.
+  public mutating func clearPresencePenalty() {_uniqueStorage()._presencePenalty = nil}
 
   /// No engine reads repeat_last_n or echo_prompt.
   public var repeatLastN: Int32 {
@@ -166,18 +280,17 @@ public nonisolated struct RALLMGenerationOptions: @unchecked Sendable {
   }
 
   public var minP: Float {
-    get {_storage._minP}
+    get {_storage._minP ?? 0}
     set {_uniqueStorage()._minP = newValue}
   }
+  /// Returns true if `minP` has been explicitly set.
+  public var hasMinP: Bool {_storage._minP != nil}
+  /// Clears the value of `minP`. Subsequent reads from it will return its default value.
+  public mutating func clearMinP() {_uniqueStorage()._minP = nil}
 
   public var echoPrompt: Bool {
     get {_storage._echoPrompt}
     set {_uniqueStorage()._echoPrompt = newValue}
-  }
-
-  public var nThreads: Int32 {
-    get {_storage._nThreads}
-    set {_uniqueStorage()._nThreads = newValue}
   }
 
   public var toolCalling: RAToolCallingOptions {
@@ -225,15 +338,6 @@ public nonisolated struct RALLMGenerationResult: @unchecked Sendable {
     set {_uniqueStorage()._generationTimeMs = newValue}
   }
 
-  public var ttftMs: Double {
-    get {_storage._ttftMs ?? 0}
-    set {_uniqueStorage()._ttftMs = newValue}
-  }
-  /// Returns true if `ttftMs` has been explicitly set.
-  public var hasTtftMs: Bool {_storage._ttftMs != nil}
-  /// Clears the value of `ttftMs`. Subsequent reads from it will return its default value.
-  public mutating func clearTtftMs() {_uniqueStorage()._ttftMs = nil}
-
   public var framework: String {
     get {_storage._framework ?? String()}
     set {_uniqueStorage()._framework = newValue}
@@ -242,11 +346,6 @@ public nonisolated struct RALLMGenerationResult: @unchecked Sendable {
   public var hasFramework: Bool {_storage._framework != nil}
   /// Clears the value of `framework`. Subsequent reads from it will return its default value.
   public mutating func clearFramework() {_uniqueStorage()._framework = nil}
-
-  public var finishReason: String {
-    get {_storage._finishReason}
-    set {_uniqueStorage()._finishReason = newValue}
-  }
 
   public var thinkingTokens: Int32 {
     get {_storage._thinkingTokens}
@@ -266,6 +365,23 @@ public nonisolated struct RALLMGenerationResult: @unchecked Sendable {
   public var hasJsonOutput: Bool {_storage._jsonOutput != nil}
   /// Clears the value of `jsonOutput`. Subsequent reads from it will return its default value.
   public mutating func clearJsonOutput() {_uniqueStorage()._jsonOutput = nil}
+
+  public var finishReason: RAFinishReason {
+    get {_storage._finishReason}
+    set {_uniqueStorage()._finishReason = newValue}
+  }
+
+  /// Which of options.stop_sequences fired. Set only when finish_reason ==
+  /// FINISH_REASON_STOP_SEQUENCE. Industry: Anthropic `stop_sequence`,
+  /// llama.cpp `stopping_word`.
+  public var stopSequence: String {
+    get {_storage._stopSequence ?? String()}
+    set {_uniqueStorage()._stopSequence = newValue}
+  }
+  /// Returns true if `stopSequence` has been explicitly set.
+  public var hasStopSequence: Bool {_storage._stopSequence != nil}
+  /// Clears the value of `stopSequence`. Subsequent reads from it will return its default value.
+  public mutating func clearStopSequence() {_uniqueStorage()._stopSequence = nil}
 
   /// Nothing reads performance or executed_on.
   public var performance: RAPerformanceMetrics {
@@ -435,33 +551,36 @@ public nonisolated struct RAPerformanceMetrics: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
+nonisolated extension RAFinishReason: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0FINISH_REASON_UNSPECIFIED\0\u{1}FINISH_REASON_STOP\0\u{1}FINISH_REASON_LENGTH\0\u{1}FINISH_REASON_STOP_SEQUENCE\0\u{1}FINISH_REASON_TOOL_CALLS\0\u{1}FINISH_REASON_CANCELLED\0\u{1}FINISH_REASON_CONTEXT_OVERFLOW\0\u{1}FINISH_REASON_ERROR\0")
+}
+
 nonisolated extension RAExecutionTarget: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EXECUTION_TARGET_UNSPECIFIED\0\u{1}EXECUTION_TARGET_ON_DEVICE\0\u{1}EXECUTION_TARGET_CLOUD\0\u{1}EXECUTION_TARGET_AUTO\0")
 }
 
 nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}max_output_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{4}\u{2}preferred_framework\0\u{3}system_prompt\0\u{2}\u{2}reasoning\0\u{3}execution_target\0\u{3}structured_output\0\u{2}\u{2}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}repeat_last_n\0\u{3}min_p\0\u{4}\u{3}echo_prompt\0\u{3}n_threads\0\u{3}tool_calling\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}max_output_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}repeat_penalty\0\u{3}stop_sequences\0\u{4}\u{2}preferred_framework\0\u{3}system_prompt\0\u{2}\u{2}reasoning\0\u{3}execution_target\0\u{3}structured_output\0\u{2}\u{2}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}repeat_last_n\0\u{3}min_p\0\u{4}\u{3}echo_prompt\0\u{4}\u{2}tool_calling\0\u{b}n_threads\0\u{c}\u{17}\u{1}")
 
   fileprivate class _StorageClass {
-    var _maxOutputTokens: Int32 = 0
-    var _temperature: Float = 0
-    var _topP: Float = 0
-    var _topK: Int32 = 0
-    var _repetitionPenalty: Float = 0
+    var _maxOutputTokens: Int32? = nil
+    var _temperature: Float? = nil
+    var _topP: Float? = nil
+    var _topK: Int32? = nil
+    var _repeatPenalty: Float? = nil
     var _stopSequences: [String] = []
     var _preferredFramework: RAInferenceFramework = .unspecified
     var _systemPrompt: String? = nil
     var _reasoning: RAReasoningOptions? = nil
     var _executionTarget: RAExecutionTarget? = nil
     var _structuredOutput: RAStructuredOutputOptions? = nil
-    var _seed: Int64 = 0
-    var _frequencyPenalty: Float = 0
-    var _presencePenalty: Float = 0
+    var _seed: Int64? = nil
+    var _frequencyPenalty: Float? = nil
+    var _presencePenalty: Float? = nil
     var _repeatLastN: Int32 = 0
-    var _minP: Float = 0
+    var _minP: Float? = nil
     var _echoPrompt: Bool = false
-    var _nThreads: Int32 = 0
     var _toolCalling: RAToolCallingOptions? = nil
 
       // This property is used as the initial default value for new instances of the type.
@@ -477,7 +596,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       _temperature = source._temperature
       _topP = source._topP
       _topK = source._topK
-      _repetitionPenalty = source._repetitionPenalty
+      _repeatPenalty = source._repeatPenalty
       _stopSequences = source._stopSequences
       _preferredFramework = source._preferredFramework
       _systemPrompt = source._systemPrompt
@@ -490,7 +609,6 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       _repeatLastN = source._repeatLastN
       _minP = source._minP
       _echoPrompt = source._echoPrompt
-      _nThreads = source._nThreads
       _toolCalling = source._toolCalling
     }
   }
@@ -514,7 +632,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         case 2: try { try decoder.decodeSingularFloatField(value: &_storage._temperature) }()
         case 3: try { try decoder.decodeSingularFloatField(value: &_storage._topP) }()
         case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._topK) }()
-        case 5: try { try decoder.decodeSingularFloatField(value: &_storage._repetitionPenalty) }()
+        case 5: try { try decoder.decodeSingularFloatField(value: &_storage._repeatPenalty) }()
         case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._stopSequences) }()
         case 8: try { try decoder.decodeSingularEnumField(value: &_storage._preferredFramework) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._systemPrompt) }()
@@ -527,7 +645,6 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         case 18: try { try decoder.decodeSingularInt32Field(value: &_storage._repeatLastN) }()
         case 19: try { try decoder.decodeSingularFloatField(value: &_storage._minP) }()
         case 22: try { try decoder.decodeSingularBoolField(value: &_storage._echoPrompt) }()
-        case 23: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
         case 24: try { try decoder.decodeSingularMessageField(value: &_storage._toolCalling) }()
         default: break
         }
@@ -541,21 +658,21 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       // allocates stack space for every if/case branch local when no optimizations
       // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
       // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._maxOutputTokens != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._maxOutputTokens, fieldNumber: 1)
-      }
-      if _storage._temperature.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._temperature, fieldNumber: 2)
-      }
-      if _storage._topP.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._topP, fieldNumber: 3)
-      }
-      if _storage._topK != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._topK, fieldNumber: 4)
-      }
-      if _storage._repetitionPenalty.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._repetitionPenalty, fieldNumber: 5)
-      }
+      try { if let v = _storage._maxOutputTokens {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._temperature {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._topP {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._topK {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._repeatPenalty {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 5)
+      } }()
       if !_storage._stopSequences.isEmpty {
         try visitor.visitRepeatedStringField(value: _storage._stopSequences, fieldNumber: 6)
       }
@@ -574,26 +691,23 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       try { if let v = _storage._structuredOutput {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
       } }()
-      if _storage._seed != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._seed, fieldNumber: 15)
-      }
-      if _storage._frequencyPenalty.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._frequencyPenalty, fieldNumber: 16)
-      }
-      if _storage._presencePenalty.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._presencePenalty, fieldNumber: 17)
-      }
+      try { if let v = _storage._seed {
+        try visitor.visitSingularInt64Field(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._frequencyPenalty {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._presencePenalty {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 17)
+      } }()
       if _storage._repeatLastN != 0 {
         try visitor.visitSingularInt32Field(value: _storage._repeatLastN, fieldNumber: 18)
       }
-      if _storage._minP.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._minP, fieldNumber: 19)
-      }
+      try { if let v = _storage._minP {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 19)
+      } }()
       if _storage._echoPrompt != false {
         try visitor.visitSingularBoolField(value: _storage._echoPrompt, fieldNumber: 22)
-      }
-      if _storage._nThreads != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._nThreads, fieldNumber: 23)
       }
       try { if let v = _storage._toolCalling {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
@@ -611,7 +725,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         if _storage._temperature != rhs_storage._temperature {return false}
         if _storage._topP != rhs_storage._topP {return false}
         if _storage._topK != rhs_storage._topK {return false}
-        if _storage._repetitionPenalty != rhs_storage._repetitionPenalty {return false}
+        if _storage._repeatPenalty != rhs_storage._repeatPenalty {return false}
         if _storage._stopSequences != rhs_storage._stopSequences {return false}
         if _storage._preferredFramework != rhs_storage._preferredFramework {return false}
         if _storage._systemPrompt != rhs_storage._systemPrompt {return false}
@@ -624,7 +738,6 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         if _storage._repeatLastN != rhs_storage._repeatLastN {return false}
         if _storage._minP != rhs_storage._minP {return false}
         if _storage._echoPrompt != rhs_storage._echoPrompt {return false}
-        if _storage._nThreads != rhs_storage._nThreads {return false}
         if _storage._toolCalling != rhs_storage._toolCalling {return false}
         return true
       }
@@ -637,19 +750,19 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{3}model_used\0\u{3}generation_time_ms\0\u{3}ttft_ms\0\u{2}\u{2}framework\0\u{3}finish_reason\0\u{3}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{4}\u{4}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{3}model_used\0\u{3}generation_time_ms\0\u{2}\u{3}framework\0\u{4}\u{2}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{4}\u{4}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0\u{3}finish_reason\0\u{3}stop_sequence\0\u{c}\u{a}\u{1}")
 
   fileprivate class _StorageClass {
     var _text: String = String()
     var _thinkingContent: String? = nil
     var _modelUsed: String = String()
     var _generationTimeMs: Double = 0
-    var _ttftMs: Double? = nil
     var _framework: String? = nil
-    var _finishReason: String = String()
     var _thinkingTokens: Int32 = 0
     var _responseTokens: Int32 = 0
     var _jsonOutput: String? = nil
+    var _finishReason: RAFinishReason = .unspecified
+    var _stopSequence: String? = nil
     var _performance: RAPerformanceMetrics? = nil
     var _executedOn: RAExecutionTarget? = nil
     var _structuredOutputValidation: RAStructuredOutputValidation? = nil
@@ -674,12 +787,12 @@ nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobu
       _thinkingContent = source._thinkingContent
       _modelUsed = source._modelUsed
       _generationTimeMs = source._generationTimeMs
-      _ttftMs = source._ttftMs
       _framework = source._framework
-      _finishReason = source._finishReason
       _thinkingTokens = source._thinkingTokens
       _responseTokens = source._responseTokens
       _jsonOutput = source._jsonOutput
+      _finishReason = source._finishReason
+      _stopSequence = source._stopSequence
       _performance = source._performance
       _executedOn = source._executedOn
       _structuredOutputValidation = source._structuredOutputValidation
@@ -712,9 +825,7 @@ nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobu
         case 2: try { try decoder.decodeSingularStringField(value: &_storage._thinkingContent) }()
         case 5: try { try decoder.decodeSingularStringField(value: &_storage._modelUsed) }()
         case 6: try { try decoder.decodeSingularDoubleField(value: &_storage._generationTimeMs) }()
-        case 7: try { try decoder.decodeSingularDoubleField(value: &_storage._ttftMs) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._framework) }()
-        case 10: try { try decoder.decodeSingularStringField(value: &_storage._finishReason) }()
         case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._thinkingTokens) }()
         case 12: try { try decoder.decodeSingularInt32Field(value: &_storage._responseTokens) }()
         case 13: try { try decoder.decodeSingularStringField(value: &_storage._jsonOutput) }()
@@ -728,6 +839,8 @@ nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobu
         case 24: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolResults) }()
         case 25: try { try decoder.decodeSingularMessageField(value: &_storage._usage) }()
         case 26: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        case 27: try { try decoder.decodeSingularEnumField(value: &_storage._finishReason) }()
+        case 28: try { try decoder.decodeSingularStringField(value: &_storage._stopSequence) }()
         default: break
         }
       }
@@ -752,15 +865,9 @@ nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobu
       if _storage._generationTimeMs.bitPattern != 0 {
         try visitor.visitSingularDoubleField(value: _storage._generationTimeMs, fieldNumber: 6)
       }
-      try { if let v = _storage._ttftMs {
-        try visitor.visitSingularDoubleField(value: v, fieldNumber: 7)
-      } }()
       try { if let v = _storage._framework {
         try visitor.visitSingularStringField(value: v, fieldNumber: 9)
       } }()
-      if !_storage._finishReason.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._finishReason, fieldNumber: 10)
-      }
       if _storage._thinkingTokens != 0 {
         try visitor.visitSingularInt32Field(value: _storage._thinkingTokens, fieldNumber: 11)
       }
@@ -800,6 +907,12 @@ nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobu
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
       } }()
+      if _storage._finishReason != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._finishReason, fieldNumber: 27)
+      }
+      try { if let v = _storage._stopSequence {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 28)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -813,12 +926,12 @@ nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobu
         if _storage._thinkingContent != rhs_storage._thinkingContent {return false}
         if _storage._modelUsed != rhs_storage._modelUsed {return false}
         if _storage._generationTimeMs != rhs_storage._generationTimeMs {return false}
-        if _storage._ttftMs != rhs_storage._ttftMs {return false}
         if _storage._framework != rhs_storage._framework {return false}
-        if _storage._finishReason != rhs_storage._finishReason {return false}
         if _storage._thinkingTokens != rhs_storage._thinkingTokens {return false}
         if _storage._responseTokens != rhs_storage._responseTokens {return false}
         if _storage._jsonOutput != rhs_storage._jsonOutput {return false}
+        if _storage._finishReason != rhs_storage._finishReason {return false}
+        if _storage._stopSequence != rhs_storage._stopSequence {return false}
         if _storage._performance != rhs_storage._performance {return false}
         if _storage._executedOn != rhs_storage._executedOn {return false}
         if _storage._structuredOutputValidation != rhs_storage._structuredOutputValidation {return false}

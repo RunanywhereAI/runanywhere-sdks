@@ -42,17 +42,20 @@ describe('cua_profile IDL round-trip', () => {
       id: 'fara1.5-4b-q4_k_m',
       name: 'Fara1.5 4B',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      // `ModelFileDescriptor.isRequired` was renamed `isOptional`, with
+      // INVERTED polarity (required=true means optional=false) — both
+      // files here are required, so isOptional is false.
       files: [
         {
           url: 'https://example.com/fara.gguf',
           filename: 'fara.gguf',
-          isRequired: true,
+          isOptional: false,
           role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
         },
         {
           url: 'https://example.com/mmproj-fara.gguf',
           filename: 'mmproj-fara.gguf',
-          isRequired: true,
+          isOptional: false,
           role: ModelFileRole.MODEL_FILE_ROLE_COMPANION,
         },
       ],

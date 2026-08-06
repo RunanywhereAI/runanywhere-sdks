@@ -373,12 +373,28 @@ test('generateStream yields token events then a final event with metrics', { ski
   assert.equal(final.result.tokenCount, 2);
 });
 
-test('catalog() returns the built-in model catalog', { skip: SKIP }, () => {
-  const { exposed } = freshPreload();
-  const cat = exposed.runanywhere.catalog();
-  assert.equal(typeof cat, 'object');
-  assert.ok(cat['qwen3.5-0.8b'], 'includes a known catalog id');
-  assert.equal(cat['qwen3.5-0.8b'].type, 'llm');
+test('catalog() returns whatever the process has registered', { skip: SKIP }, () => {
+  // catalog.ts is a per-process REGISTRY, not a built-in catalog (the app
+  // supplies its own table via registerCatalog()) -- register a fixture so
+  // catalog() has something to return.
+  const { registerCatalog, clearCatalog } = require('../../dist/catalog');
+  clearCatalog();
+  registerCatalog({
+    'fixture-llm': {
+      type: 'llm',
+      files: [{ url: 'https://example.com/model.gguf', as: 'model.gguf' }],
+      primary: 'model.gguf',
+    },
+  });
+  try {
+    const { exposed } = freshPreload();
+    const cat = exposed.runanywhere.catalog();
+    assert.equal(typeof cat, 'object');
+    assert.ok(cat['fixture-llm'], 'includes the registered catalog id');
+    assert.equal(cat['fixture-llm'].type, 'llm');
+  } finally {
+    clearCatalog();
+  }
 });
 
 test('onEvent subscribes to lifecycle events and returns an unsubscribe', { skip: SKIP }, async () => {

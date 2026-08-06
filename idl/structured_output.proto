@@ -1,8 +1,13 @@
 // RunAnywhere IDL — structured output (JSON Schema, regex, grammar).
 //
-// Generation entry points are first-class C ABI calls, not service RPCs: they
-// consume StructuredOutputRequest and emit StructuredOutputResult or
-// StructuredOutputStreamEvent directly.
+// Structured GENERATION is LLMGenerationOptions.structured_output on the
+// ordinary LLM request (llm_options.proto), which already carries
+// max_output_tokens, temperature, stop_sequences and system_prompt.
+//
+// What remains here is the extract / validate / prepare-prompt surface. Those
+// entry points are first-class C ABI calls, not service RPCs: they consume
+// StructuredOutputParseRequest and emit StructuredOutputResult,
+// StructuredOutputValidation or StructuredOutputPromptResult directly.
 
 syntax = "proto3";
 
@@ -20,110 +25,43 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-enum JSONSchemaType {
-    JSON_SCHEMA_TYPE_UNSPECIFIED = 0;
-    JSON_SCHEMA_TYPE_OBJECT      = 1;
-    JSON_SCHEMA_TYPE_ARRAY       = 2;
-    JSON_SCHEMA_TYPE_STRING      = 3;
-    JSON_SCHEMA_TYPE_NUMBER      = 4;
-    JSON_SCHEMA_TYPE_INTEGER     = 5;
-    JSON_SCHEMA_TYPE_BOOLEAN     = 6;
-    JSON_SCHEMA_TYPE_NULL        = 7;
-}
-
-enum StructuredOutputMode {
-    STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0;
-    STRUCTURED_OUTPUT_MODE_JSON_SCHEMA = 1;
-    STRUCTURED_OUTPUT_MODE_JSON_OBJECT = 2;
-    STRUCTURED_OUTPUT_MODE_REGEX       = 3;
-    STRUCTURED_OUTPUT_MODE_GRAMMAR     = 4;
-}
-
-message JSONSchemaProperty {
-    JSONSchemaType  type             = 1;
-    optional string description      = 2;
-    repeated string enum_values      = 3;
-    optional string format           = 4;
-
-    // items_schema for arrays, object_schema for nested objects.
-    optional JSONSchema items_schema = 5;
-    optional JSONSchema object_schema = 6;
-
-    optional double minimum = 7;
-    optional double maximum = 8;
-    optional int32 min_length = 9;
-    optional int32 max_length = 10;
-    optional string pattern = 11;
-    optional int32 min_items = 12;
-    optional int32 max_items = 13;
-    optional string default_json = 14;
-}
-
-message JSONSchema {
-    JSONSchemaType                       type                  = 1;
-    map<string, JSONSchemaProperty>      properties            = 2;
-    repeated string                      required              = 3;
-    optional JSONSchemaProperty          items                 = 4;
-    optional bool                        additional_properties = 5;
-    optional string                      schema_uri            = 6 [json_name = "$schema"];
-    optional string                      id_uri                = 7 [json_name = "$id"];
-    optional string                      title                 = 8;
-    optional string                      description           = 9;
-    map<string, JSONSchema>              definitions           = 10;
-    optional string                      ref                   = 11 [json_name = "$ref"];
-    repeated JSONSchema                  all_of                = 12;
-    repeated JSONSchema                  any_of                = 13;
-    repeated JSONSchema                  one_of                = 14;
-    optional JSONSchema                  not_schema            = 15;
-
-    // Escape hatch for schemas the typed shape above cannot express.
-    optional string                      raw_json              = 16;
-}
-
 message StructuredOutputOptions {
-    bool           include_schema_in_prompt = 2;
-
-    // Not read by commons.
-    optional bool  strict_mode              = 3;
-
-    // Exactly one arm. Commons prefers json_schema when both could be set, so
-    // setting the typed `schema` and the string form together is an error.
-    oneof schema_source {
-        JSONSchema schema      = 1;
-        string     json_schema = 4;
-    }
-
-    // Matches OpenAI's json_schema.name.
-    optional string name                    = 6;
-
-    StructuredOutputMode mode               = 7;
-    optional string regex_pattern           = 8;
-    optional string grammar                 = 9;
-
-    // Attempt to repair malformed JSON before failing.
-    bool repair_json                        = 10;
-
-    int32 max_retries                       = 11 [
-        (runanywhere.v1.rac_default) = "0",
-        (runanywhere.v1.rac_min) = 0
+    // Also render the schema into the system prompt, not just constrain
+    // decoding. Costs input tokens and invalidates the thread's prompt cache.
+    // Default true (matches Apple FoundationModels includeSchemaInPrompt).
+    optional bool  include_schema_in_prompt = 1 [
+        (runanywhere.v1.rac_default) = "true"
     ];
+
+    // Exactly one arm; the arm selects the constraint kind. Absent = free text.
+    // A present arm constrains the DECODER. An engine that cannot enforce the
+    // arm it was given fails the call; it never degrades to free generation.
+    oneof constraint {
+        // A JSON Schema document, verbatim. Unsupported keywords are rejected.
+        string schema  = 2;
+        // GBNF/EBNF grammar text. On-device only.
+        string grammar = 3;
+        // Regular expression the whole output must match. On-device only.
+        string regex   = 4;
+    }
 }
 
 message StructuredOutputValidation {
-    bool            is_valid       = 1;
-    bool            contains_json  = 2;
-    optional string raw_output     = 4;
-    optional string extracted_json = 5;
-    repeated string validation_errors = 6;
-    int64 validation_time_ms = 7;
-    optional SDKError error     = 8;
+    bool            is_valid          = 1;
+    bool            contains_json     = 2;
+    optional string raw_output        = 3;
+    optional string extracted_json    = 4;
+    repeated string validation_errors = 5;
+    int64           validation_time_ms = 6;
+    optional SDKError error            = 7;
 }
 
 message StructuredOutputResult {
-    bytes                       parsed_json = 1;
+    // The extracted JSON document, as UTF-8 text. Parse it client-side.
+    string                      json        = 1;
     StructuredOutputValidation  validation  = 2;
     optional string             raw_text    = 3;
-    optional SDKError           error       = 6;
+    optional SDKError           error       = 4;
 }
 
 message StructuredOutputParseRequest {
@@ -133,52 +71,11 @@ message StructuredOutputParseRequest {
     map<string, string> metadata = 4;
 }
 
-message StructuredOutputValidationRequest {
-    string text = 1;
-    optional StructuredOutputOptions options = 2;
-}
-
 message StructuredOutputPromptResult {
     string prepared_prompt = 1;
     optional string system_prompt = 2;
     optional string json_schema = 3;
     optional string regex_pattern = 4;
     optional string grammar = 5;
-    optional SDKError error = 8;
-}
-
-message StructuredOutputRequest {
-    string request_id = 1;
-    string prompt = 2;
-    optional StructuredOutputOptions options = 3;
-    map<string, string> metadata = 4;
-}
-
-enum StructuredOutputStreamEventKind {
-    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED = 0;
-    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN = 1;
-    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON = 2;
-    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION = 3;
-    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED = 4;
-    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR = 5;
-}
-
-message StructuredOutputStreamEvent {
-    int64 timestamp_us = 2;
-    string request_id = 3;
-    StructuredOutputStreamEventKind kind = 4;
-    string token = 5;
-    optional string partial_json = 6;
-    optional StructuredOutputValidation validation = 7;
-    optional StructuredOutputResult result = 8;
-    optional SDKError error = 11;
-}
-
-// Character offsets into the source text.
-message NamedEntity {
-    string text         = 1;
-    string entity_type  = 2;
-    int32  start_offset = 3;
-    int32  end_offset   = 4;
-    float  confidence   = 5;
+    optional SDKError error = 6;
 }

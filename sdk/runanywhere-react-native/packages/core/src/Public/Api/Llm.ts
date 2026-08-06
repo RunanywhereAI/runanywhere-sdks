@@ -13,16 +13,16 @@ import {
   LLMStreamEventKind,
 } from '@runanywhere/proto-ts/llm_service';
 import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/tool_calling';
-import { TokenKind as ProtoTokenKind } from '@runanywhere/proto-ts/voice_events';
 import {
   ToolCall,
   ToolCallingResult,
+  ToolCallingRole,
   ToolResult,
   type ToolDefinition,
 } from '@runanywhere/proto-ts/tool_calling';
 import {
   StructuredOutputOptions,
-  StructuredOutputRequest,
+  StructuredOutputParseRequest,
   StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
 
@@ -81,6 +81,13 @@ async function toolsForRequest(options?: LlmOptions): Promise<ToolDefinition[]> 
   return getRegisteredTools();
 }
 
+/**
+ * `LLMGenerateRequest.prompt`/`history` are deleted outright — `messages`
+ * (the whole conversation, oldest first, ending with the turn the model
+ * must answer) is the sole input channel now (idl comment: "System turns
+ * belong in options.system_prompt, not here"). The final user turn that
+ * used to be the separate `prompt` field is appended to `messages` here.
+ */
 async function buildRequest(
   input: string | ChatMessage[],
   options: LlmOptions | undefined,
@@ -96,14 +103,24 @@ async function buildRequest(
     generation.toolCalling = toToolCallingOptions(tools, options);
   }
   return LLMGenerateRequest.fromPartial({
-    prompt,
     requestId,
     ...(options?.model ? { modelId: options.model } : {}),
     options: generation,
-    history: toChatMessages(history),
+    messages: toChatMessages([
+      ...history,
+      { role: 'user', content: prompt },
+    ]),
   });
 }
 
+/**
+ * `ToolCallingSessionCreateRequest` collapsed to `prompt`/`history`/`options`
+ * (idl tools-collapse-options-and-session-request): every flat knob this used
+ * to re-publish now lives on `options: ToolCallingOptions` alone, and
+ * `history` is now `ToolCallingHistoryTurn[]` (role + content), not
+ * `string[]` — `temperature`/`maxTokens` have no channel left at all (the
+ * run loop keeps commons' own greedy generation defaults).
+ */
 async function generateWithToolLoop(
   input: string | ChatMessage[],
   options: LlmOptions | undefined,
@@ -115,28 +132,19 @@ async function generateWithToolLoop(
   if (options?.model) {
     await ensureModelLoaded(options.model, ModelCategory.MODEL_CATEGORY_LANGUAGE);
   }
-  const generation = toLlmOptions(options);
   const toolCalling = toToolCallingOptions(tools, options);
   const request = ToolCallingSessionCreateRequest.fromPartial({
     prompt,
-    maxTokens: generation.maxOutputTokens,
-    temperature: generation.temperature,
-    topP: generation.topP,
-    systemPrompt: generation.systemPrompt ?? '',
-    tools: toolCalling.tools,
-    format: toolCalling.format,
-    maxToolCalls: toolCalling.maxToolCalls,
-    keepToolsAvailable: toolCalling.keepToolsAvailable,
-    toolChoice: toolCalling.toolChoice,
-    forcedToolName: toolCalling.forcedToolName,
-    disableThinking: toolCalling.disableThinking,
-    autoExecute: toolCalling.autoExecute,
-    replaceSystemPrompt: toolCalling.replaceSystemPrompt,
-    requireJsonArguments: toolCalling.requireJsonArguments,
-    parallelToolCalls: toolCalling.parallelToolCalls,
-    // Prior turns flattened to [user0, asst0, ...] message contents; commons
+    // Prior turns flattened to [user0, asst0, ...] role-tagged turns; commons
     // threads these into every generate in the loop (mirrors ToolCallingOrchestrator.kt).
-    history: history.map((message) => message.content),
+    history: history.map((message) => ({
+      role:
+        message.role === 'assistant'
+          ? ToolCallingRole.TOOL_CALLING_ROLE_ASSISTANT
+          : ToolCallingRole.TOOL_CALLING_ROLE_USER,
+      content: message.content,
+    })),
+    options: toolCalling,
   });
 
   const resultBytes = await native.toolRunLoopProtoWithHandle(
@@ -161,16 +169,15 @@ async function generateWithToolLoop(
     finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: 0,
-    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId,
     model: options?.model ?? '',
   };
 }
 
 function tokenKind(event: LLMStreamEvent): 'text' | 'thought' {
-  return event.kind === ProtoTokenKind.TOKEN_KIND_THOUGHT ||
-    event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING
+  return event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING
     ? 'thought'
     : 'text';
 }
@@ -268,7 +275,7 @@ export const llm = {
                 }
                 controller.push({ type: 'token', text: event.token, kind });
               }
-              if (event.isFinal) {
+              if (event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
                 sawCompletion = true;
                 controller.push({
                   type: 'completed',
@@ -330,9 +337,14 @@ export const llm = {
    * - `'constrained'`: engine-constrained decoding — fails preflight until a
    *   constrained-decoding engine is wired in.
    *
-   * Sampling knobs in `options` are not forwarded: commons'
-   * `StructuredOutputRequest` carries no generation submessage, so the
-   * structured pipeline applies its own defaults. `options.model` is honoured.
+   * `StructuredOutputRequest` and the standalone
+   * `rac_structured_output_generate_proto` ABI are deleted outright: idl's
+   * own file header now states structured GENERATION is
+   * `LLMGenerationOptions.structuredOutput` on the ordinary LLM request, so
+   * this routes through the normal `llmGenerateProto` call (honoring every
+   * sampling knob in `options`) and then extracts/validates the raw text via
+   * `structuredOutputParseProto` (`StructuredOutputParseRequest`), matching
+   * the Web/Swift `extractStructuredOutput` pattern.
    *
    * @throws SDKException when `mode` cannot be honored, generation fails, or
    * the output cannot be parsed.
@@ -357,35 +369,48 @@ export const llm = {
         ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
     }
-    const runOnce = async (text: string): Promise<StructuredOutputResult> => {
-      const request = StructuredOutputRequest.fromPartial({
+    const effectiveOptions: LlmOptions = {
+      ...options,
+      structuredOutput: { schema, strict: options?.structuredOutput?.strict },
+    };
+
+    const extract = async (text: string): Promise<StructuredOutputResult> => {
+      const parseRequest = StructuredOutputParseRequest.fromPartial({
         requestId,
-        prompt: text,
+        text,
         options: StructuredOutputOptions.fromPartial({
           schema,
-          strictMode: options?.structuredOutput?.strict ?? true,
           includeSchemaInPrompt: true,
         }),
       });
-      const resultBytes = await native.structuredOutputGenerateProto(
-        encode(request, StructuredOutputRequest)
+      const resultBytes = await native.structuredOutputParseProto(
+        encode(parseRequest, StructuredOutputParseRequest)
       );
-      return decode(resultBytes, StructuredOutputResult, 'structuredOutputGenerate');
+      return decode(resultBytes, StructuredOutputResult, 'structuredOutputParse');
     };
 
-    let result = await runOnce(prompt);
+    const runOnce = async (text: string): Promise<GenerationResult> => {
+      const request = await buildRequest(text, effectiveOptions, requestId, []);
+      const resultBytes = await native.llmGenerateProto(
+        encode(request, LLMGenerateRequest)
+      );
+      return toGenerationResult(
+        decode(resultBytes, LLMGenerationResult, 'llmGenerate'),
+        requestId
+      );
+    };
+
+    let generation = await runOnce(prompt);
+    let result = await extract(generation.text);
     if (mode === 'repair' && !(result.validation?.isValid ?? true)) {
       const repairPrompt =
         `${prompt}\n\nYour previous answer did not match the required JSON schema. ` +
         'Reply again with ONLY JSON that satisfies this schema.\n\n' +
-        `Previous invalid answer: ${result.rawText ?? ''}`;
-      result = await runOnce(repairPrompt);
+        `Previous invalid answer: ${result.rawText ?? generation.text}`;
+      generation = await runOnce(repairPrompt);
+      result = await extract(generation.text);
     }
-    return toStructuredResult<T>(
-      result,
-      emptyGenerationResult(requestId, options?.model ?? ''),
-      mode
-    );
+    return toStructuredResult<T>(result, generation, mode);
   },
 
   /** Tools the model may call during generation. */

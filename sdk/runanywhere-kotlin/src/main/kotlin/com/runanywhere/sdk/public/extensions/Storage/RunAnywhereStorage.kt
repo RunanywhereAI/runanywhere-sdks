@@ -246,7 +246,11 @@ suspend fun RunAnywhere.deleteModel(modelId: String): StorageDeleteResult =
     deleteStorage(
         StorageDeleteRequest(
             model_ids = listOf(modelId),
-            delete_files = true,
+            // `delete_files` is deleted outright (idl/storage_types.proto)
+            // and inverted into `keep_files_on_disk`: files are deleted by
+            // default now, so this only opts OUT when true. Leaving it at
+            // its `false` default is the equivalent of the old
+            // `delete_files = true`.
             clear_registry_paths = true,
             unload_if_loaded = true,
             allow_platform_delete = true,

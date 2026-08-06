@@ -76,7 +76,8 @@ suspend fun RunAnywhere.detectVoiceActivity(
     val result = CppBridgeVAD.processLifecycle(request)
 
     if (result.is_speech) {
-        vadLogger.debug("Speech detected (confidence: ${String.format("%.2f", result.confidence)})")
+        // `confidence` renamed `probability` (idl/vad_options.proto).
+        vadLogger.debug("Speech detected (confidence: ${String.format("%.2f", result.probability)})")
     }
 
     return result

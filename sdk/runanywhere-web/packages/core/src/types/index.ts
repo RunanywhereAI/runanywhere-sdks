@@ -88,24 +88,25 @@ export function applyLLMGenerationDefaults(
 // ---------------------------------------------------------------------------
 // VLM — proto-ts canonical types + Web-only browser shapes
 // ---------------------------------------------------------------------------
-// VLMImage, VLMGenerationOptions, and VLMResult are re-exported as runtime
-// values (not `export type`) because the lifecycle VLM adapter calls
-// `.encode()` / `.decode()` on them. ts-proto generates a dual interface +
-// const for each message, so the runtime export still carries the full type
-// shape as well.
+// VLMImage and VLMResult are re-exported as runtime values (not `export
+// type`) because the lifecycle VLM adapter calls `.encode()` / `.decode()`
+// on them. ts-proto generates a dual interface + const for each message, so
+// the runtime export still carries the full type shape as well.
+//
+// `VLMConfiguration`, `VLMServiceState`, and `VLMImageFormat` were deleted
+// outright from idl/vlm_options.proto. `VLMGenerationOptions` was replaced
+// by the plain `LLMGenerationOptions` (same text-generation knobs) plus the
+// narrower `VLMVisionOptions` for the vision-only knobs.
 export {
   VLMImage,
-  VLMGenerationOptions,
   VLMResult,
 } from '@runanywhere/proto-ts/vlm_options';
 export type {
-  VLMConfiguration,
   VLMGenerationRequest,
   VLMStreamEvent,
-  VLMServiceState,
+  VLMVisionOptions,
 } from '@runanywhere/proto-ts/vlm_options';
 export {
-  VLMImageFormat,
   VLMModelFamily,
   VLMStreamEventKind,
 } from '@runanywhere/proto-ts/vlm_options';
@@ -144,16 +145,15 @@ export interface STTStreamingSession {
 // ---------------------------------------------------------------------------
 // TTS — proto-ts canonical types + Web-only browser shapes
 // ---------------------------------------------------------------------------
+// `TTSConfiguration`, `TTSPhonemeTimestamp`, and `TTSVoiceGender` were
+// deleted outright from idl/tts_options.proto.
 export type {
-  TTSConfiguration,
   TTSOptions,
   TTSOutput,
   TTSSpeakResult,
   TTSVoiceInfo,
-  TTSPhonemeTimestamp,
   TTSSynthesisMetadata,
 } from '@runanywhere/proto-ts/tts_options';
-export { TTSVoiceGender } from '@runanywhere/proto-ts/tts_options';
 import type { TTSOptions } from '@runanywhere/proto-ts/tts_options';
 
 // Web-only synthesis result (Float32Array PCM for direct Web Audio playback).
@@ -191,24 +191,26 @@ export interface SpeechSegment {
 // ---------------------------------------------------------------------------
 // LoRA — proto-ts canonical types
 // ---------------------------------------------------------------------------
-// Web SDK uses proto names directly: `adapterPath`, `url`,
-// `compatibleModels`, `sizeBytes`, `errorMessage`.
+// Web SDK uses proto names directly. `LoraAdapterCatalogEntry` was trimmed
+// to 6 adapter-specific fields (id/name/compatibleModels/defaultScale/tags/
+// localPath) — generic artifact facts now live on the ModelInfo record.
+// `LoraAdapterDownloadCompletedRequest`/`Result` and
+// `LoraAdapterImportRequest`/`Result` were deleted outright: adapter files
+// are acquired through the models domain's download/import verbs now.
 export type {
-  LoRAAdapterConfig,
-  LoRAAdapterInfo,
-  LoRAApplyRequest,
-  LoRAApplyResult,
-  LoRARemoveRequest,
-  LoRAState,
   LoraAdapterCatalogEntry,
   LoraAdapterCatalogGetRequest,
   LoraAdapterCatalogGetResult,
   LoraAdapterCatalogListRequest,
   LoraAdapterCatalogListResult,
   LoraAdapterCatalogQuery,
-  LoraAdapterDownloadCompletedRequest,
-  LoraAdapterDownloadCompletedResult,
+  LoraAdapterConfig,
+  LoraAdapterInfo,
+  LoraApplyRequest,
+  LoraApplyResult,
   LoraCompatibilityResult,
+  LoraRemoveRequest,
+  LoraState,
 } from '@runanywhere/proto-ts/lora_options';
 
 // ---------------------------------------------------------------------------
@@ -225,10 +227,11 @@ export type {
 // ---------------------------------------------------------------------------
 // Voice Agent — proto-ts canonical + Web-only ergonomic shapes
 // ---------------------------------------------------------------------------
+// `VoiceSessionConfig` was deleted outright; `VoiceAgentComposeConfig` is the
+// sole session-configuration message now.
 export type {
   VoiceAgentResult,
   VoiceAgentComposeConfig,
-  VoiceSessionConfig,
 } from '@runanywhere/proto-ts/voice_agent_service';
 export type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
 // Former ComponentLoadState re-exported as the canonical
@@ -266,14 +269,14 @@ export type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 // The short Web aliases (`SDKEnvironment.Development`,
 // `ModelCategory.Language`, etc.) are intentionally not re-exported here.
 // ---------------------------------------------------------------------------
+// `ModelQuerySortField` was deleted outright.
 export {
   AudioFormat,
   InferenceFramework,
+  ModelArtifactType,
   ModelCategory,
   ModelFileRole,
   ModelFormat,
-  ModelArtifactType,
-  ModelQuerySortField,
   ModelRegistryStatus,
   ModelSource,
   RoutingPolicy,
@@ -288,7 +291,9 @@ export {
   SDKComponent,
 } from '@runanywhere/proto-ts/sdk_events';
 export { ErrorSeverity } from '@runanywhere/proto-ts/errors';
-export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
+// `DownloadStage` was deleted outright; `DownloadState` is the sole
+// download-phase enum now.
+export { DownloadState } from '@runanywhere/proto-ts/download_service';
 export { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
 
 export type {

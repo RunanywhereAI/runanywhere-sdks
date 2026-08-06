@@ -178,7 +178,7 @@ async function runBenchmark(scenario: string, maxTokens: number): Promise<void> 
       maxOutputTokens: maxTokens,
       temperature: 0,
     })) {
-      if (event.type === 'token') {
+      if (event.type === 'textDelta') {
         if (firstTokenAt == null) firstTokenAt = performance.now();
         tokenCount += 1;
       } else if (event.type === 'completed') {

@@ -7,8 +7,6 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
-import "component_types.proto";
-import "errors.proto";
 import "model_types.proto";
 import "voice_events.proto";
 import "tts_options.proto";
@@ -24,16 +22,6 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// Subscription parameters for the agent's event stream.
-message VoiceAgentRequest {
-    string event_filter = 1;
-    string session_id = 2;
-    repeated EventCategory categories = 3;
-    ErrorSeverity min_severity = 4;
-    uint64 replay_from_seq = 5;
-    bool include_audio = 6;
-}
-
 message VoiceAgentResult {
     bool speech_detected = 1;
     optional string transcription = 2;
@@ -41,91 +29,109 @@ message VoiceAgentResult {
     optional string thinking_content = 4;
     optional bytes synthesized_audio = 5;
     optional VoiceAgentComponentStates final_state = 6;
+}
 
-    // Required to interpret synthesized_audio.
-    int32 synthesized_audio_sample_rate_hz = 7;
-    int32 synthesized_audio_channels       = 8;
-    AudioEncoding synthesized_audio_encoding = 9;
+// Turn detection. Field names, units and semantics follow OpenAI Realtime
+// `session.audio.input.turn_detection`.
+message TurnDetection {
+    enum Type {
+        TURN_DETECTION_TYPE_UNSPECIFIED = 0;  // treated as VAD
+        TURN_DETECTION_TYPE_VAD         = 1;  // the VAD decides end-of-turn
+        TURN_DETECTION_TYPE_MANUAL      = 2;  // push-to-talk: app closes the turn
+    }
+    Type  type                 = 1;
 
-    string session_id = 10;
-    string turn_id = 11;
+    // Activation threshold, 0..1 — the same normalized scale as
+    // VADConfiguration.activation_threshold, and the value that wins on the
+    // voice-agent path when both are set. Raise it for noisy rooms.
+    // 0 means unset; commons applies 0.5.
+    float threshold            = 2;
 
-    // Per-stage timings, then the wall-clock total.
-    int64 stt_time_ms = 12;
-    int64 llm_time_ms = 13;
-    int64 tts_time_ms = 14;
-    int64 total_time_ms = 15;
+    // Silence after speech before the turn is closed.
+    // 0 means unset; commons applies 500.
+    int32 silence_duration_ms  = 3;
 
-    optional SDKError error = 18;
+    // Audio retained before speech onset so the first word is not clipped.
+    // 0 means unset; commons applies 300.
+    int32 prefix_padding_ms    = 4;
+
+    // Unset means true. False makes the agent finish its sentence
+    // (kiosk, scripted disclosure).
+    optional bool interrupt_response = 5;
+
+    // Unset means true. False means the app drives replies itself via say().
+    optional bool create_response    = 6;
 }
 
 // One-shot turn: audio in, transcription plus response plus audio out.
+//
+// audio_data must be PCM signed 16-bit little-endian, mono, 16 kHz. Commons
+// rejects any other encoding, but it does NOT check or resample the sample
+// rate or the channel count — feeding anything else yields a wrong transcript
+// rather than an error.
 message VoiceAgentTurnRequest {
     string request_id = 1;
     string session_id = 2;
     bytes audio_data = 3;
-    int32 sample_rate_hz = 4;
-    int32 channels = 5;
-    AudioEncoding encoding = 6;
-    optional VoiceSessionConfig session_config = 7;
-    map<string, string> metadata = 8;
+
+    // BCP-47 STT language for this turn only. Overrides
+    // VoiceAgentComposeConfig.language. Unset means the session language, or
+    // model auto-detection when that is unset too.
+    optional string language = 4;
+
+    map<string, string> metadata = 5;
 }
 
+// Streamed capture frame. Same fixed input contract as VoiceAgentTurnRequest.
 message VoiceAgentAudioFrame {
     bytes audio_data = 1;
-    int32 sample_rate = 2;
+    int32 sample_rate_hz = 2;
     int32 channels = 3;
+
+    // Commons accepts AUDIO_ENCODING_UNSPECIFIED and AUDIO_ENCODING_PCM_S16_LE
+    // and rejects every other value.
     AudioEncoding encoding = 4;
     bool is_final = 5;
 }
 
-// Commons reads silence_duration_ms and max_tokens. The remaining fields are
-// declared but not consumed by the C++ voice agent.
-message VoiceSessionConfig {
-    int32 silence_duration_ms = 1;
-    float speech_threshold = 2;
-    bool  auto_play_tts = 3;
-    bool  continuous_mode = 4;
-    bool  thinking_mode_enabled = 5;
-    int32 max_tokens = 6;
-    int32 max_recording_duration_ms = 7;
-    optional string language_code = 8;
-    optional string voice_id = 9;
-}
-
-message AudioPipelineConfig {
-    int32 cooldown_duration_ms = 1;
-    bool  strict_transitions   = 2;
-    int32 max_tts_duration_ms  = 3;
-}
-
-// Each component takes a path, an id, or a name; commons resolves whichever is
-// present through the model registry.
+// Each component takes a path or an id; commons resolves the id through the
+// model registry.
 message VoiceAgentComposeConfig {
+    // Normal choice is the id (resolved via the model registry); path is the
+    // escape hatch for an artifact you staged yourself.
     optional string stt_model_path = 1;
     optional string stt_model_id   = 2;
-    optional string stt_model_name = 3;
-    optional string llm_model_path = 4;
-    optional string llm_model_id   = 5;
-    optional string llm_model_name = 6;
-    optional string tts_voice_path = 7;
-    optional string tts_voice_id   = 8;
-    optional string tts_voice_name = 9;
-    optional VADConfiguration vad_config = 24;
-    optional LLMGenerationOptions llm_generation = 25;
-    optional VoiceSessionConfig session_config = 20;
-    optional AudioPipelineConfig audio_pipeline_config = 21;
-    optional string session_id = 22;
-    optional string default_language_code = 23;
+    optional string llm_model_path = 3;
+    optional string llm_model_id   = 4;
+    optional string tts_voice_path = 5;
+    optional string tts_voice_id   = 6;
+
+    optional VADConfiguration vad_config = 7;
+    optional LLMGenerationOptions llm_generation = 8;
+
+    // System prompt for the agent. Governs persona AND spoken delivery
+    // ("talk quickly", "sound warm"), not just content. Same name and role as
+    // OpenAI Realtime `session.instructions`. Unset uses the commons voice
+    // default (short, spoken, no markdown).
+    //
+    // This is the only system prompt the voice path reads:
+    // llm_generation.system_prompt is IGNORED here.
+    optional string instructions = 9;
+
+    optional TurnDetection turn_detection = 10;
+
+    // BCP-47 STT language for the whole session. One spelling across this
+    // domain and stt_options.proto. Unset means the model auto-detects.
+    // Per-turn override: VoiceAgentTurnRequest.language.
+    optional string language = 11;
 }
 
 message VoiceAgentTranscribeProtoRequest {
-    bytes  audio_data    = 1;
-    string session_id    = 2;
-    int32  sample_rate   = 3;
-    string language_hint = 4;
-    int32  channels      = 5;
-    AudioEncoding encoding = 6;
+    bytes  audio_data = 1;
+    string session_id = 2;
+
+    // BCP-47. Empty means auto-detect.
+    string language   = 3;
 }
 
 message VoiceAgentSynthesizeSpeechProtoRequest {

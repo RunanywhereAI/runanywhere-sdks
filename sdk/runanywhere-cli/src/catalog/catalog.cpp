@@ -1047,7 +1047,7 @@ rac_result_t register_entry(const CatalogEntry &entry) {
       runanywhere::v1::ModelFileDescriptor *file = request.add_files();
       file->set_url(entry.files[i].url);
       file->set_filename(entry.files[i].filename);
-      file->set_is_required(entry.files[i].required);
+      file->set_is_optional(!entry.files[i].required);
       if (entry.files[i].size_bytes > 0) {
         file->set_size_bytes(entry.files[i].size_bytes);
       }

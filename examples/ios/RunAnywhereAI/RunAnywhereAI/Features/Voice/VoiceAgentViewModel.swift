@@ -391,15 +391,18 @@ final class VoiceAgentViewModel: ObservableObject {
         let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
         let errorMessage = event.model.error.isEmpty ? event.generation.error : event.model.error
 
+        // `GenerationEventKind.MODEL_LOADED`/`.MODEL_UNLOADED` were deleted
+        // outright (idl/sdk_events.proto: "Model load/unload -> ModelEventKind")
+        // -- `event.model.kind` is the sole load/unload signal now.
         switch (event.model.kind, event.generation.kind) {
         case (.loadStarted, _):
             llmModelState = .loading
-        case (.loadCompleted, _), (_, .modelLoaded):
+        case (.loadCompleted, _):
             llmModelState = .loaded
             updateModel(.llm, id: modelId)
         case (.loadFailed, _), (_, .failed):
             llmModelState = .error(errorMessage.isEmpty ? "Unknown error" : errorMessage)
-        case (.unloadCompleted, _), (_, .modelUnloaded):
+        case (.unloadCompleted, _):
             llmModelState = .notLoaded
             llmModel = nil
         default:

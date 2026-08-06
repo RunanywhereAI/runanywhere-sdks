@@ -14,21 +14,18 @@ import {
   type LLMGenerateRequest,
   type LLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
-import type { ChatMessage } from '@runanywhere/proto-ts/chat';
+import { ChatMessage as ChatMessageMessage, MessageRole, type ChatMessage } from '@runanywhere/proto-ts/chat';
 import {
+  FinishReason,
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
   type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import type { ToolCall } from '@runanywhere/proto-ts/tool_calling';
-import {
-  StructuredOutputMode,
-  StructuredOutputStreamEvent as StructuredOutputStreamEventMessage,
-  StructuredOutputStreamEventKind,
-  type StructuredOutputOptions,
-  type StructuredOutputResult,
-  type StructuredOutputStreamEvent,
+import type {
+  StructuredOutputOptions,
+  StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
 import {
   inferenceFrameworkToJSON,
@@ -47,7 +44,19 @@ import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
-export type { StructuredOutputResult, StructuredOutputStreamEvent };
+export type { StructuredOutputResult };
+
+/**
+ * A discriminated structured-output stream event. `StructuredOutputStreamEvent`
+ * and `StructuredOutputStreamEventKind` were deleted outright from
+ * idl/structured_output.proto (API-realignment so-p2) — structured
+ * generation now rides the ordinary LLM stream
+ * (`LLMGenerationOptions.structuredOutput`), so this is a Web-local type
+ * describing the token/completed events `generateStructuredStream` yields.
+ */
+export type StructuredOutputStreamEvent =
+  | { kind: 'token'; token: string }
+  | { kind: 'completed'; result: StructuredOutputResult };
 
 export type TextGenerationOptions = Partial<LLMGenerationOptions> & {
   prompt: string;
@@ -80,13 +89,15 @@ function buildLLMGenerateRequest(
     ...lLMGenerationOptionsDefaults(),
     ...generationOptions,
   });
+  const messages: ChatMessage[] = [
+    ...(history ?? []),
+    ChatMessageMessage.fromPartial({ role: MessageRole.MESSAGE_ROLE_USER, content: prompt }),
+  ];
   return {
-    prompt,
     requestId: '',
     modelId: '',
     conversationId: conversationId ?? '',
-    history: history ?? [],
-    metadata: {},
+    messages,
     options: canonicalOptions,
   };
 }
@@ -120,10 +131,7 @@ function structuredOutputOptionsFromSchema(
 ): StructuredOutputOptions {
   return {
     includeSchemaInPrompt: true,
-    jsonSchema: schema.jsonSchema,
-    mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-    repairJson: false,
-    maxRetries: 0,
+    schema: schema.jsonSchema,
   };
 }
 
@@ -230,7 +238,7 @@ function finalLLMResult(
   streamedToolCalls: ToolCall[] = [],
 ): LLMGenerationResult {
   const final = finalEvent?.result;
-  const generationTimeMs = final?.totalTimeMs ?? performance.now() - startedAt;
+  const generationTimeMs = final?.generationTimeMs ?? performance.now() - startedAt;
   const inputTokens = final?.usage?.inputTokens ?? 0;
   const outputTokens = final?.usage?.outputTokens ?? tokenCount;
   // Prefer tool_calls from the final LLMGenerationResult (whole-call snapshot)
@@ -242,21 +250,25 @@ function finalLLMResult(
   // text so UI consumers never remain stuck on an empty answer channel.
   const answerText = (final?.text ?? fullText).trim();
   const text = answerText || thinkingContent || '';
+  const decodeMs = generationTimeMs - (final?.promptEvalTimeMs ?? 0);
   return {
     text,
     thinkingContent: answerText ? thinkingContent : undefined,
     modelUsed: '',
     generationTimeMs,
-    ttftMs: final?.timeToFirstTokenMs,
-    finishReason: finalEvent?.finishReason || final?.finishReason || '',
+    finishReason: finalEvent?.finishReason
+      || final?.finishReason
+      || FinishReason.FINISH_REASON_UNSPECIFIED,
     thinkingTokens: 0,
     responseTokens: outputTokens,
     usage: {
       inputTokens,
       outputTokens,
       totalTokens: final?.usage?.totalTokens ?? inputTokens + outputTokens,
-      tokensPerSecond: final?.usage?.tokensPerSecond
-        ?? (generationTimeMs > 0 ? (outputTokens / generationTimeMs) * 1000 : 0),
+      decodeTokensPerSecond: final?.usage?.decodeTokensPerSecond
+        ?? (decodeMs > 0 ? (outputTokens / decodeMs) * 1000 : 0),
+      prefillMs: final?.usage?.prefillMs ?? 0,
+      ttftMs: final?.usage?.ttftMs ?? 0,
     },
     error: final?.error ?? finalEvent?.error,
     cachedPromptTokens: 0,
@@ -405,6 +417,8 @@ export async function aggregateStream(
   // recompute totalTokens from that estimate when absent.
   const inputTokens = (result.usage?.inputTokens ?? 0) || Math.max(1, Math.floor(prompt.length / 4));
   const outputTokens = (result.usage?.outputTokens ?? 0) || tokenCount;
+  const generationTimeMs = result.generationTimeMs || totalLatencyMs;
+  const decodeMs = generationTimeMs - (result.promptEvalTimeMs ?? 0);
   return {
     ...result,
     text: result.text || fullResponse,
@@ -414,15 +428,16 @@ export async function aggregateStream(
       inputTokens,
       outputTokens,
       totalTokens: (result.usage?.totalTokens ?? 0) || inputTokens + outputTokens,
-      tokensPerSecond: (result.usage?.tokensPerSecond ?? 0)
+      decodeTokensPerSecond: (result.usage?.decodeTokensPerSecond ?? 0)
         || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
+      prefillMs: result.usage?.prefillMs ?? 0,
+      ttftMs: result.usage?.ttftMs ?? (ttftMs ?? 0),
     },
     modelUsed: model?.id ?? '',
     framework: model ? inferenceFrameworkToJSON(model.framework) : '',
-    generationTimeMs: result.generationTimeMs || totalLatencyMs,
-    ttftMs: result.ttftMs ?? ttftMs,
+    generationTimeMs,
     promptEvalTimeMs: result.promptEvalTimeMs ?? 0,
-    decodeTimeMs: result.decodeTimeMs ?? 0,
+    decodeTimeMs: result.decodeTimeMs || decodeMs,
   };
 }
 
@@ -468,19 +483,13 @@ export async function* generateStructuredStream(
     for await (const token of streaming.stream) {
       if (!token) continue;
       accumulated += token;
-      yield StructuredOutputStreamEventMessage.fromPartial({
-        kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
-        token,
-      });
+      yield { kind: 'token', token };
     }
     nativeStreamDone = true;
     // Surface in-flight generation failures as throws before parsing.
     await streaming.result;
     const result = extractStructuredOutput(accumulated, schema);
-    yield StructuredOutputStreamEventMessage.fromPartial({
-      kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
-      result,
-    });
+    yield { kind: 'completed', result };
   } catch (error) {
     // Producer self-terminated (stream/result/parse failure) — never fire
     // the native cancel for it. Swallow the duplicate rejection carried by

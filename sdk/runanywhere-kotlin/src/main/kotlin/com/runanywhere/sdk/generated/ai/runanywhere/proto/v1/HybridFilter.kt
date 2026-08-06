@@ -40,36 +40,25 @@ public class HybridFilter(
     schemaIndex = 0,
   )
   public val network: Boolean? = null,
-  /**
-   * Documented as a no-op in the Dart policy.
-   */
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    jsonName = "qualityTier",
+    tag = 2,
+    adapter = "ai.runanywhere.proto.v1.BatteryFilter#ADAPTER",
     oneofName = "kind",
     schemaIndex = 1,
   )
-  public val quality_tier: Int? = null,
-  @field:WireField(
-    tag = 4,
-    adapter = "ai.runanywhere.proto.v1.BatteryFilter#ADAPTER",
-    oneofName = "kind",
-    schemaIndex = 2,
-  )
   public val battery: BatteryFilter? = null,
   @field:WireField(
-    tag = 5,
+    tag = 3,
     adapter = "ai.runanywhere.proto.v1.CustomFilter#ADAPTER",
     oneofName = "kind",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val custom: CustomFilter? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridFilter, Nothing>(ADAPTER, unknownFields) {
   init {
-    require(countNonNull(network, quality_tier, battery, custom) <= 1) {
-      "At most one of network, quality_tier, battery, custom may be non-null"
+    require(countNonNull(network, battery, custom) <= 1) {
+      "At most one of network, battery, custom may be non-null"
     }
   }
 
@@ -84,7 +73,6 @@ public class HybridFilter(
     if (other !is HybridFilter) return false
     if (unknownFields != other.unknownFields) return false
     if (network != other.network) return false
-    if (quality_tier != other.quality_tier) return false
     if (battery != other.battery) return false
     if (custom != other.custom) return false
     return true
@@ -95,7 +83,6 @@ public class HybridFilter(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + (network?.hashCode() ?: 0)
-      result = result * 37 + (quality_tier?.hashCode() ?: 0)
       result = result * 37 + (battery?.hashCode() ?: 0)
       result = result * 37 + (custom?.hashCode() ?: 0)
       super.hashCode = result
@@ -106,7 +93,6 @@ public class HybridFilter(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (network != null) result += """network=$network"""
-    if (quality_tier != null) result += """quality_tier=$quality_tier"""
     if (battery != null) result += """battery=$battery"""
     if (custom != null) result += """custom=$custom"""
     return result.joinToString(prefix = "HybridFilter{", separator = ", ", postfix = "}")
@@ -114,11 +100,10 @@ public class HybridFilter(
 
   public fun copy(
     network: Boolean? = this.network,
-    quality_tier: Int? = this.quality_tier,
     battery: BatteryFilter? = this.battery,
     custom: CustomFilter? = this.custom,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridFilter = HybridFilter(network, quality_tier, battery, custom, unknownFields)
+  ): HybridFilter = HybridFilter(network, battery, custom, unknownFields)
 
   public companion object {
     @JvmField
@@ -133,45 +118,39 @@ public class HybridFilter(
       override fun encodedSize(`value`: HybridFilter): Int {
         var size = value.unknownFields.size
         size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.network)
-        size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.quality_tier)
-        size += BatteryFilter.ADAPTER.encodedSizeWithTag(4, value.battery)
-        size += CustomFilter.ADAPTER.encodedSizeWithTag(5, value.custom)
+        size += BatteryFilter.ADAPTER.encodedSizeWithTag(2, value.battery)
+        size += CustomFilter.ADAPTER.encodedSizeWithTag(3, value.custom)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: HybridFilter) {
         ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.network)
-        ProtoAdapter.INT32.encodeWithTag(writer, 3, value.quality_tier)
-        BatteryFilter.ADAPTER.encodeWithTag(writer, 4, value.battery)
-        CustomFilter.ADAPTER.encodeWithTag(writer, 5, value.custom)
+        BatteryFilter.ADAPTER.encodeWithTag(writer, 2, value.battery)
+        CustomFilter.ADAPTER.encodeWithTag(writer, 3, value.custom)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridFilter) {
         writer.writeBytes(value.unknownFields)
-        CustomFilter.ADAPTER.encodeWithTag(writer, 5, value.custom)
-        BatteryFilter.ADAPTER.encodeWithTag(writer, 4, value.battery)
-        ProtoAdapter.INT32.encodeWithTag(writer, 3, value.quality_tier)
+        CustomFilter.ADAPTER.encodeWithTag(writer, 3, value.custom)
+        BatteryFilter.ADAPTER.encodeWithTag(writer, 2, value.battery)
         ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.network)
       }
 
       override fun decode(reader: ProtoReader): HybridFilter {
         var network: Boolean? = null
-        var quality_tier: Int? = null
         var battery: BatteryFilter? = null
         var custom: CustomFilter? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> network = ProtoAdapter.BOOL.decode(reader)
-            3 -> quality_tier = ProtoAdapter.INT32.decode(reader)
-            4 -> battery = BatteryFilter.ADAPTER.decode(reader)
-            5 -> custom = CustomFilter.ADAPTER.decode(reader)
+            2 -> battery = BatteryFilter.ADAPTER.decode(reader)
+            3 -> custom = CustomFilter.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return HybridFilter(
           network = network,
-          quality_tier = quality_tier,
           battery = battery,
           custom = custom,
           unknownFields = unknownFields

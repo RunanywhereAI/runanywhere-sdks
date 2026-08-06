@@ -129,7 +129,8 @@ export class VoiceAgentMicDriver {
             encodeProtoMessage(
               VoiceAgentAudioFrame.fromPartial({
                 audioData: chunk,
-                sampleRate: SAMPLE_RATE_HZ,
+                // Renamed from `sampleRate`.
+                sampleRateHz: SAMPLE_RATE_HZ,
                 channels: CHANNELS,
                 encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
                 isFinal: false,
@@ -142,8 +143,11 @@ export class VoiceAgentMicDriver {
           if (bytes.byteLength === 0) continue; // utterance still open
 
           const result = VoiceAgentResultMessage.decode(bytes);
-          if (result.error) {
-            this.logger.warning(`Voice turn failed: ${result.error.message}`);
+          // `VoiceAgentResult.error` is deleted outright — a turn failure now
+          // surfaces on `finalState.error` (`VoiceAgentComponentStates`).
+          const turnError = result.finalState?.error;
+          if (turnError) {
+            this.logger.warning(`Voice turn failed: ${turnError.message}`);
           }
           if (await this.playReply(result)) {
             // Drop frames captured during the turn + playback.

@@ -286,7 +286,10 @@ class STTViewModel: VoiceComponentViewModelBase {
             let router = try ensureHybridRouter(offlineModelId: offlineModelId, onlineModelId: onlineModelId)
             var options = HybridTranscribeOptions()
             options.sampleRate = 16_000
-            options.audioFormat = CloudAudioFormat.wav.nativeValue
+            // `HybridSttTranscribeOptions.audio_format` was retyped from a raw
+            // int32 to the shared `AudioFormat` enum (idl/hybrid_router.proto:
+            // "Untyped: every other file uses the AudioFormat enum here.").
+            options.audioFormat = .wav
 
             let result = try router.transcribe(audioBuffer, options: options)
             transcription = result.text
@@ -353,9 +356,14 @@ class STTViewModel: VoiceComponentViewModelBase {
         var filters: [HybridFilter] = []
         if hybridRequireNetwork { filters.append(.network) }
         filters.append(.battery(minPercent: Int32(hybridMinBattery)))
+        // `HybridModel.onlineCloud(_:)` no longer takes `provider:`
+        // (idl/hybrid_router.proto deleted `HybridModelDescriptor.provider`
+        // outright) -- the concrete provider is resolved by the cloud engine
+        // from the config registered via `Cloud.register(id:provider:...)`
+        // in `registerCloudProvider()` above, keyed by `onlineModelId`.
         try router.setPair(
             offline: .offlineSherpa(offlineModelId),
-            online: .onlineCloud(onlineModelId, provider: cloudProvider),
+            online: .onlineCloud(onlineModelId),
             policy: HybridRoutingPolicy(
                 hardFilters: filters,
                 cascade: .confidence(threshold: Float(hybridConfidenceThreshold)),

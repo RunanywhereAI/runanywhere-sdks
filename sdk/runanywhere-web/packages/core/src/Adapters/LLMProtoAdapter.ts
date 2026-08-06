@@ -1,10 +1,12 @@
 import {
   LLMGenerateRequest,
   LLMStreamEvent,
+  LLMStreamEventKind,
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
 import {
+  FinishReason,
   LLMGenerationOptions,
   LLMGenerationResult,
   type LLMGenerationResult as ProtoLLMGenerationResult,
@@ -61,6 +63,15 @@ export function requireLlamaWorkerHost(
     );
   }
   return host;
+}
+
+/**
+ * `LLMStreamEvent` has no `isFinal` boolean; the terminal discriminator is
+ * `eventKind === COMPLETED | ERROR`.
+ */
+function isTerminalLLMStreamEvent(event: ProtoLLMStreamEvent): boolean {
+  return event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED
+    || event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR;
 }
 
 export class LLMProtoAdapter {
@@ -129,7 +140,7 @@ export class LLMProtoAdapter {
         { kind: 'stream.llm.generate', handle: 0, requestBytes: encoded },
         LLMStreamEvent,
         {
-          stopWhen: (event) => event.isFinal,
+          stopWhen: isTerminalLLMStreamEvent,
           onCancel: () => { this.cancel(); },
         },
       );
@@ -148,7 +159,7 @@ export class LLMProtoAdapter {
           )
         ))
       ),
-      (event) => event.isFinal,
+      isTerminalLLMStreamEvent,
       () => {
         this.cancel();
       },
@@ -156,8 +167,8 @@ export class LLMProtoAdapter {
       // rc synthesizes a terminal error event instead of rejecting the
       // iterator.
       (rc) => LLMStreamEvent.fromPartial({
-        isFinal: true,
-        finishReason: 'error',
+        eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
+        finishReason: FinishReason.FINISH_REASON_ERROR,
         error: SDKException.fromRACResult(
           rc,
           `LLM stream failed: ${rc}`,

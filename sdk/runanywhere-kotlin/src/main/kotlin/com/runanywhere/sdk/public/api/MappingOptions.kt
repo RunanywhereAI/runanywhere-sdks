@@ -10,7 +10,6 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
-import ai.runanywhere.proto.v1.DiffusionMode
 import ai.runanywhere.proto.v1.EmbeddingsOptions
 import ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy
 import ai.runanywhere.proto.v1.LLMGenerationOptions
@@ -18,16 +17,17 @@ import ai.runanywhere.proto.v1.MessageRole
 import ai.runanywhere.proto.v1.ModelQuery
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGQueryOptions
+import ai.runanywhere.proto.v1.RAGRetrievalOptions
 import ai.runanywhere.proto.v1.RerankOptions
 import ai.runanywhere.proto.v1.STTOptions
-import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.ThinkingTagPattern
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.ToolChoiceMode
 import ai.runanywhere.proto.v1.VADOptions
-import ai.runanywhere.proto.v1.VLMGenerationOptions
+import ai.runanywhere.proto.v1.VLMGenerationRequest
+import ai.runanywhere.proto.v1.VLMImage
 import com.runanywhere.sdk.generated.convenience.defaults
 import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
 import ai.runanywhere.proto.v1.DiarizationOptions as ProtoDiarizationOptions
@@ -36,7 +36,7 @@ import ai.runanywhere.proto.v1.ReasoningOptions as ProtoReasoningOptions
 import ai.runanywhere.proto.v1.SegmentationOptions as ProtoSegmentationOptions
 
 /** The IDL's neutral repetition penalty, used when the caller leaves it unset. */
-private val NEUTRAL_REPETITION_PENALTY = LLMGenerationOptions.defaults().repetition_penalty
+private val NEUTRAL_REPETITION_PENALTY = LLMGenerationOptions.defaults().repeat_penalty
 
 internal fun LlmOptions?.orDefault(): LlmOptions = this ?: LlmOptions()
 
@@ -53,7 +53,7 @@ internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLM
         min_p = minP ?: 0f,
         frequency_penalty = frequencyPenalty ?: 0f,
         presence_penalty = presencePenalty ?: 0f,
-        repetition_penalty = repetitionPenalty ?: NEUTRAL_REPETITION_PENALTY,
+        repeat_penalty = repetitionPenalty ?: NEUTRAL_REPETITION_PENALTY,
         seed = seed?.toLong() ?: 0L,
         stop_sequences = stopSequences,
         system_prompt = systemPrompt,
@@ -62,19 +62,20 @@ internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLM
         tool_calling = toolCallingProto(),
     )
 
-internal fun LlmOptions.toVlmProto(prompt: String): VLMGenerationOptions =
-    VLMGenerationOptions(
+/**
+ * Build the VLM request envelope. `VLMGenerationOptions` was deleted outright
+ * (idl/vlm_options.proto): its 11 sampling fields were name-for-name copies
+ * of `LLMGenerationOptions` with drifted defaults, so VLM now shares the
+ * exact same [toProto] options this file already builds for `llm`.
+ * `vision`/`images` carry the four genuinely vision-specific knobs and the
+ * image payload; neither has a public [LlmOptions] knob yet, so `vision`
+ * stays default (mirrors Swift `LlmOptions.toVLMRequest(prompt:images:)`).
+ */
+internal fun LlmOptions.toVlmProto(prompt: String, images: List<VLMImage>): VLMGenerationRequest =
+    VLMGenerationRequest(
         prompt = prompt,
-        max_output_tokens = maxOutputTokens,
-        temperature = temperature,
-        top_p = topP,
-        top_k = topK ?: 0,
-        min_p = minP ?: 0f,
-        repetition_penalty = repetitionPenalty ?: NEUTRAL_REPETITION_PENALTY,
-        system_prompt = systemPrompt,
-        stop_sequences = stopSequences,
-        seed = seed?.toLong() ?: 0L,
-        reasoning = reasoning?.toProto(),
+        images = images,
+        options = toProto(),
     )
 
 private fun LlmOptions.toolCallingProto(): ToolCallingOptions? {
@@ -110,25 +111,34 @@ internal fun ReasoningOptions.toProto(): ProtoReasoningOptions =
             },
     )
 
+/**
+ * `StructuredOutputOptions.strict_mode`/`.mode`/`.repair_json` are all
+ * deleted (idl/structured_output.proto): the message shrank to
+ * `include_schema_in_prompt` plus a `oneof constraint { schema | grammar |
+ * regex }`. [StructuredOutput.strict] has no wire home any more — retry
+ * behaviour for an invalid first pass is owned entirely by the Kotlin-side
+ * `llm.generateStructured(mode = REPAIR)` loop, not by a commons flag.
+ */
 internal fun StructuredOutput.toProto(): StructuredOutputOptions =
     StructuredOutputOptions(
-        schema = schema,
-        strict_mode = strict,
-        mode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
+        schema = schema.rawJson,
         include_schema_in_prompt = true,
-        repair_json = !strict,
     )
 
 internal fun SttOptions?.orDefault(): SttOptions = this ?: SttOptions()
 
+// enable_diarization / max_speakers / translate_to_english are renamed or
+// deleted (idl/stt_options.proto): diarize (bool) replaces enable_diarization,
+// speakers_expected (optional int32) replaces max_speakers (0 no longer means
+// "unset" -- omitting the field does), and translate_to_english has no
+// surviving field at all.
 internal fun SttOptions.toProto(): STTOptions =
     STTOptions(
         language = language,
         enable_punctuation = punctuation,
         enable_word_timestamps = wordTimestamps,
-        enable_diarization = diarization,
-        max_speakers = maxSpeakers ?: 0,
-        translate_to_english = translateToEnglish,
+        diarize = diarization,
+        speakers_expected = maxSpeakers,
     )
 
 internal fun TtsOptions?.orDefault(): TtsOptions = this ?: TtsOptions()
@@ -184,6 +194,11 @@ internal fun SegmentationOptions.toProto(): ProtoSegmentationOptions =
 
 internal fun ImageOptions?.orDefault(): ImageOptions = this ?: ImageOptions()
 
+// Mode is inferred, never declared (idl/diffusion.proto): no image =
+// text-to-image, image = image-to-image, image + mask_image = inpainting.
+// DiffusionMode / input_image / input_image_media_type /
+// report_intermediate_images are all deleted; the surviving fields are
+// `image` / `image_media_type` / `strength`.
 internal fun ImageOptions.toProto(prompt: String): DiffusionGenerationOptions {
     val inpaint = mode as? ImageMode.Inpaint
     return DiffusionGenerationOptions(
@@ -194,17 +209,10 @@ internal fun ImageOptions.toProto(prompt: String): DiffusionGenerationOptions {
         steps = steps ?: 0,
         guidance_scale = guidanceScale ?: 0f,
         seed = seed?.toLong() ?: -1L,
-        mode =
-            if (inpaint != null) {
-                DiffusionMode.DIFFUSION_MODE_INPAINTING
-            } else {
-                DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE
-            },
-        input_image = inpaint?.input?.encodedBytes(),
+        image = inpaint?.input?.encodedBytes(),
         mask_image = inpaint?.mask?.encodedBytes(),
-        input_image_media_type = inpaint?.input?.encodedMediaType(),
+        image_media_type = inpaint?.input?.encodedMediaType(),
         mask_image_media_type = inpaint?.mask?.encodedMediaType(),
-        report_intermediate_images = reportPartials,
     )
 }
 
@@ -217,25 +225,32 @@ internal fun RagConfig.toProto(embeddingModelId: String, llmModelId: String): RA
         top_k = topK,
         chunk_size = chunkSize,
         chunk_overlap = chunkOverlap,
-        similarity_threshold = similarityThreshold,
-        index_path = persistPath,
-        persist_index = persistPath != null,
+        score_threshold = similarityThreshold,
         rerank_results = rerank,
     )
 
+// `RAGQueryOptions.stream` is deleted outright (idl/rag.proto): the C++ ABI
+// (rac_rag_proto_abi.cpp) never read it -- streaming vs. blocking is chosen
+// entirely by which entry point the caller invokes (rac_rag_query_proto vs.
+// rac_rag_query_stream_proto), both parsing the identical RAGQueryOptions
+// payload, so this builder no longer takes a `stream` flag.
+// `question`/`retrieval_top_k`/`similarity_threshold` are likewise gone: the
+// flat fields collapsed onto the shared `RAGRetrievalOptions` message
+// (`query` + nested `retrieval`), matching RAGSearchRequest's shape.
 internal fun ragQueryProto(
     question: String,
     config: RagConfig,
     options: RagQueryOptions?,
-    stream: Boolean,
 ): RAGQueryOptions =
     RAGQueryOptions(
-        question = question,
+        query = question,
+        retrieval =
+            RAGRetrievalOptions(
+                top_k = options?.retrieval?.topK ?: config.topK,
+                score_threshold = options?.retrieval?.similarityThreshold ?: config.similarityThreshold,
+                enable_multi_query = config.multiQuery,
+            ),
         generation = options?.generation?.toProto(),
-        retrieval_top_k = options?.retrieval?.topK ?: config.topK,
-        similarity_threshold = options?.retrieval?.similarityThreshold ?: config.similarityThreshold,
-        stream = stream,
-        enable_multi_query = config.multiQuery,
     )
 
 internal fun ModelFilter?.toProto(): ModelQuery? {
@@ -244,7 +259,6 @@ internal fun ModelFilter?.toProto(): ModelQuery? {
         category = category,
         framework = framework,
         downloaded_only = downloadedOnly,
-        available_only = availableOnly,
         search_query = search.orEmpty(),
     )
 }

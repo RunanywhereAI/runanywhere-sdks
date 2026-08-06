@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -43,58 +42,13 @@ public class RAGSearchRequest(
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val question: String = "",
-  /**
-   * Retrieval depth for this call, overriding RAGConfiguration.top_k.
-   * Zero means "use the session default".
-   */
+  public val query: String = "",
   @field:WireField(
     tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "retrievalTopK",
+    adapter = "ai.runanywhere.proto.v1.RAGRetrievalOptions#ADAPTER",
     schemaIndex = 1,
   )
-  public val retrieval_top_k: Int = 0,
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    jsonName = "similarityThreshold",
-    schemaIndex = 2,
-  )
-  public val similarity_threshold: Float? = null,
-  /**
-   * Expand the question into several queries and merge the results.
-   * Requires a session LLM (same as RAGQueryOptions.enable_multi_query).
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "enableMultiQuery",
-    schemaIndex = 3,
-  )
-  public val enable_multi_query: Boolean = false,
-  @RacDefaultOption("3")
-  @RacMinOption(1)
-  @RacMaxOption(8)
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    jsonName = "multiQueryCount",
-    schemaIndex = 4,
-  )
-  public val multi_query_count: Int? = null,
-  /**
-   * Restrict retrieval to chunks whose source matches this prefix.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "scopePrefix",
-    schemaIndex = 5,
-  )
-  public val scope_prefix: String? = null,
+  public val retrieval: RAGRetrievalOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGSearchRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -107,12 +61,8 @@ public class RAGSearchRequest(
     if (other === this) return true
     if (other !is RAGSearchRequest) return false
     if (unknownFields != other.unknownFields) return false
-    if (question != other.question) return false
-    if (retrieval_top_k != other.retrieval_top_k) return false
-    if (similarity_threshold != other.similarity_threshold) return false
-    if (enable_multi_query != other.enable_multi_query) return false
-    if (multi_query_count != other.multi_query_count) return false
-    if (scope_prefix != other.scope_prefix) return false
+    if (query != other.query) return false
+    if (retrieval != other.retrieval) return false
     return true
   }
 
@@ -120,12 +70,8 @@ public class RAGSearchRequest(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + question.hashCode()
-      result = result * 37 + retrieval_top_k.hashCode()
-      result = result * 37 + (similarity_threshold?.hashCode() ?: 0)
-      result = result * 37 + enable_multi_query.hashCode()
-      result = result * 37 + (multi_query_count?.hashCode() ?: 0)
-      result = result * 37 + (scope_prefix?.hashCode() ?: 0)
+      result = result * 37 + query.hashCode()
+      result = result * 37 + (retrieval?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -133,24 +79,16 @@ public class RAGSearchRequest(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """question=${sanitize(question)}"""
-    result += """retrieval_top_k=$retrieval_top_k"""
-    if (similarity_threshold != null) result += """similarity_threshold=$similarity_threshold"""
-    result += """enable_multi_query=$enable_multi_query"""
-    if (multi_query_count != null) result += """multi_query_count=$multi_query_count"""
-    if (scope_prefix != null) result += """scope_prefix=${sanitize(scope_prefix)}"""
+    result += """query=${sanitize(query)}"""
+    if (retrieval != null) result += """retrieval=$retrieval"""
     return result.joinToString(prefix = "RAGSearchRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    question: String = this.question,
-    retrieval_top_k: Int = this.retrieval_top_k,
-    similarity_threshold: Float? = this.similarity_threshold,
-    enable_multi_query: Boolean = this.enable_multi_query,
-    multi_query_count: Int? = this.multi_query_count,
-    scope_prefix: String? = this.scope_prefix,
+    query: String = this.query,
+    retrieval: RAGRetrievalOptions? = this.retrieval,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGSearchRequest = RAGSearchRequest(question, retrieval_top_k, similarity_threshold, enable_multi_query, multi_query_count, scope_prefix, unknownFields)
+  ): RAGSearchRequest = RAGSearchRequest(query, retrieval, unknownFields)
 
   public companion object {
     @JvmField
@@ -164,83 +102,48 @@ public class RAGSearchRequest(
     ) {
       override fun encodedSize(`value`: RAGSearchRequest): Int {
         var size = value.unknownFields.size
-        if (value.question != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.question)
+        if (value.query != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.query)
         }
-        if (value.retrieval_top_k != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.retrieval_top_k)
-        }
-        size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.similarity_threshold)
-        if (value.enable_multi_query != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.enable_multi_query)
-        }
-        size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.multi_query_count)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.scope_prefix)
+        size += RAGRetrievalOptions.ADAPTER.encodedSizeWithTag(2, value.retrieval)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: RAGSearchRequest) {
-        if (value.question != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.question)
+        if (value.query != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.query)
         }
-        if (value.retrieval_top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.retrieval_top_k)
-        }
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.similarity_threshold)
-        if (value.enable_multi_query != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.enable_multi_query)
-        }
-        ProtoAdapter.INT32.encodeWithTag(writer, 5, value.multi_query_count)
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.scope_prefix)
+        RAGRetrievalOptions.ADAPTER.encodeWithTag(writer, 2, value.retrieval)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGSearchRequest) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.scope_prefix)
-        ProtoAdapter.INT32.encodeWithTag(writer, 5, value.multi_query_count)
-        if (value.enable_multi_query != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.enable_multi_query)
-        }
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.similarity_threshold)
-        if (value.retrieval_top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.retrieval_top_k)
-        }
-        if (value.question != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.question)
+        RAGRetrievalOptions.ADAPTER.encodeWithTag(writer, 2, value.retrieval)
+        if (value.query != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.query)
         }
       }
 
       override fun decode(reader: ProtoReader): RAGSearchRequest {
-        var question: String = ""
-        var retrieval_top_k: Int = 0
-        var similarity_threshold: Float? = null
-        var enable_multi_query: Boolean = false
-        var multi_query_count: Int? = null
-        var scope_prefix: String? = null
+        var query: String = ""
+        var retrieval: RAGRetrievalOptions? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> question = ProtoAdapter.STRING.decode(reader)
-            2 -> retrieval_top_k = ProtoAdapter.INT32.decode(reader)
-            3 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
-            4 -> enable_multi_query = ProtoAdapter.BOOL.decode(reader)
-            5 -> multi_query_count = ProtoAdapter.INT32.decode(reader)
-            6 -> scope_prefix = ProtoAdapter.STRING.decode(reader)
+            1 -> query = ProtoAdapter.STRING.decode(reader)
+            2 -> retrieval = RAGRetrievalOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RAGSearchRequest(
-          question = question,
-          retrieval_top_k = retrieval_top_k,
-          similarity_threshold = similarity_threshold,
-          enable_multi_query = enable_multi_query,
-          multi_query_count = multi_query_count,
-          scope_prefix = scope_prefix,
+          query = query,
+          retrieval = retrieval,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: RAGSearchRequest): RAGSearchRequest = value.copy(
+        retrieval = value.retrieval?.let(RAGRetrievalOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

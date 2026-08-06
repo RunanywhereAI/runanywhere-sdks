@@ -13,43 +13,13 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateEmbeddingsOptions = exports.embeddingsOptionsDefaults = exports.validateEmbeddingsConfiguration = exports.embeddingsConfigurationDefaults = void 0;
-/* eslint-disable */
-const embeddings_options_1 = require("../embeddings_options");
+exports.validateEmbeddingsOptions = exports.embeddingsOptionsDefaults = void 0;
 const _errors_1 = require("./_errors");
-const embeddingsConfigurationDefaults = () => ({
-    modelId: '',
-    embeddingDimension: 384,
-    maxSequenceLength: 512,
-    normalize: true,
-    pooling: embeddings_options_1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
-});
-exports.embeddingsConfigurationDefaults = embeddingsConfigurationDefaults;
-const validateEmbeddingsConfiguration = (m) => {
-    if (m.modelId === '') {
-        throw new _errors_1.ValidationError({
-            fieldPath: 'EmbeddingsConfiguration.model_id',
-            message: 'model_id is required',
-        });
-    }
-    if (m.embeddingDimension < 1) {
-        throw new _errors_1.ValidationError({
-            fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
-            message: `embedding_dimension must be >= 1 (got ${m.embeddingDimension})`,
-        });
-    }
-    if (m.maxSequenceLength < 1) {
-        throw new _errors_1.ValidationError({
-            fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
-            message: `max_sequence_length must be >= 1 (got ${m.maxSequenceLength})`,
-        });
-    }
-};
-exports.validateEmbeddingsConfiguration = validateEmbeddingsConfiguration;
 const embeddingsOptionsDefaults = () => ({
-    normalize: false,
+    normalize: true,
     pooling: 0,
     nThreads: 0,
+    inputType: 0,
 });
 exports.embeddingsOptionsDefaults = embeddingsOptionsDefaults;
 const validateEmbeddingsOptions = (m) => {
@@ -57,6 +27,12 @@ const validateEmbeddingsOptions = (m) => {
         throw new _errors_1.ValidationError({
             fieldPath: 'EmbeddingsOptions.batch_size',
             message: `batch_size must be in 1...8192 (got ${m.batchSize})`,
+        });
+    }
+    if (m.dimensions !== undefined && (m.dimensions < 1)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'EmbeddingsOptions.dimensions',
+            message: `dimensions must be >= 1 (got ${m.dimensions})`,
         });
     }
 };

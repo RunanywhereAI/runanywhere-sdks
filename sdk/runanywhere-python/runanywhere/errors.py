@@ -133,9 +133,7 @@ class SDKException(Exception):
             category = ErrorCategory(err.category)
         except ValueError:
             category = None
-        field_path = None
-        if err.HasField("context") and err.context.HasField("field_path"):
-            field_path = err.context.field_path
+        field_path = err.param if err.HasField("param") else None
         return SDKException.of(
             code,
             err.message,

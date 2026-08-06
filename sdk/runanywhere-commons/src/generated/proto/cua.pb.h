@@ -294,12 +294,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CuaAction final : public ::google::
     kTextFieldNumber = 7,
     kReasoningFieldNumber = 8,
     kTypeFieldNumber = 1,
-    kXFieldNumber = 3,
-    kYFieldNumber = 4,
-    kScrollPixelsFieldNumber = 5,
+    kXFieldNumber = 2,
+    kYFieldNumber = 3,
+    kScrollXFieldNumber = 4,
     kWaitSecondsFieldNumber = 6,
-    kCoordinateValidFieldNumber = 2,
-    kParseOkFieldNumber = 9,
+    kScrollYFieldNumber = 5,
+    kIsValidFieldNumber = 9,
   };
   // string text = 7;
   void clear_text() ;
@@ -341,7 +341,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CuaAction final : public ::google::
   void _internal_set_type(::runanywhere::v1::CuaActionType value);
 
   public:
-  // int32 x = 3;
+  // optional int32 x = 2;
+  [[nodiscard]] bool has_x()
+      const;
   void clear_x() ;
   [[nodiscard]] ::int32_t x() const;
   void set_x(::int32_t value);
@@ -351,7 +353,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CuaAction final : public ::google::
   void _internal_set_x(::int32_t value);
 
   public:
-  // int32 y = 4;
+  // optional int32 y = 3;
+  [[nodiscard]] bool has_y()
+      const;
   void clear_y() ;
   [[nodiscard]] ::int32_t y() const;
   void set_y(::int32_t value);
@@ -361,14 +365,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CuaAction final : public ::google::
   void _internal_set_y(::int32_t value);
 
   public:
-  // int32 scroll_pixels = 5;
-  void clear_scroll_pixels() ;
-  [[nodiscard]] ::int32_t scroll_pixels() const;
-  void set_scroll_pixels(::int32_t value);
+  // int32 scroll_x = 4;
+  void clear_scroll_x() ;
+  [[nodiscard]] ::int32_t scroll_x() const;
+  void set_scroll_x(::int32_t value);
 
   private:
-  ::int32_t _internal_scroll_pixels() const;
-  void _internal_set_scroll_pixels(::int32_t value);
+  ::int32_t _internal_scroll_x() const;
+  void _internal_set_scroll_x(::int32_t value);
 
   public:
   // double wait_seconds = 6;
@@ -381,24 +385,24 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CuaAction final : public ::google::
   void _internal_set_wait_seconds(double value);
 
   public:
-  // bool coordinate_valid = 2;
-  void clear_coordinate_valid() ;
-  [[nodiscard]] bool coordinate_valid() const;
-  void set_coordinate_valid(bool value);
+  // int32 scroll_y = 5;
+  void clear_scroll_y() ;
+  [[nodiscard]] ::int32_t scroll_y() const;
+  void set_scroll_y(::int32_t value);
 
   private:
-  bool _internal_coordinate_valid() const;
-  void _internal_set_coordinate_valid(bool value);
+  ::int32_t _internal_scroll_y() const;
+  void _internal_set_scroll_y(::int32_t value);
 
   public:
-  // bool parse_ok = 9;
-  void clear_parse_ok() ;
-  [[nodiscard]] bool parse_ok() const;
-  void set_parse_ok(bool value);
+  // bool is_valid = 9;
+  void clear_is_valid() ;
+  [[nodiscard]] bool is_valid() const;
+  void set_is_valid(bool value);
 
   private:
-  bool _internal_parse_ok() const;
-  void _internal_set_parse_ok(bool value);
+  bool _internal_is_valid() const;
+  void _internal_set_is_valid(bool value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.CuaAction)
@@ -439,10 +443,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CuaAction final : public ::google::
     int type_;
     ::int32_t x_;
     ::int32_t y_;
-    ::int32_t scroll_pixels_;
+    ::int32_t scroll_x_;
     double wait_seconds_;
-    bool coordinate_valid_;
-    bool parse_ok_;
+    ::int32_t scroll_y_;
+    bool is_valid_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -489,31 +493,11 @@ inline void CuaAction::_internal_set_type(::runanywhere::v1::CuaActionType value
   _impl_.type_ = value;
 }
 
-// bool coordinate_valid = 2;
-inline void CuaAction::clear_coordinate_valid() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.coordinate_valid_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+// optional int32 x = 2;
+inline bool CuaAction::has_x() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  return value;
 }
-inline bool CuaAction::coordinate_valid() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.CuaAction.coordinate_valid)
-  return _internal_coordinate_valid();
-}
-inline void CuaAction::set_coordinate_valid(bool value) {
-  _internal_set_coordinate_valid(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.CuaAction.coordinate_valid)
-}
-inline bool CuaAction::_internal_coordinate_valid() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.coordinate_valid_;
-}
-inline void CuaAction::_internal_set_coordinate_valid(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.coordinate_valid_ = value;
-}
-
-// int32 x = 3;
 inline void CuaAction::clear_x() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.x_ = 0;
@@ -537,7 +521,11 @@ inline void CuaAction::_internal_set_x(::int32_t value) {
   _impl_.x_ = value;
 }
 
-// int32 y = 4;
+// optional int32 y = 3;
+inline bool CuaAction::has_y() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  return value;
+}
 inline void CuaAction::clear_y() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.y_ = 0;
@@ -561,28 +549,52 @@ inline void CuaAction::_internal_set_y(::int32_t value) {
   _impl_.y_ = value;
 }
 
-// int32 scroll_pixels = 5;
-inline void CuaAction::clear_scroll_pixels() {
+// int32 scroll_x = 4;
+inline void CuaAction::clear_scroll_x() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.scroll_pixels_ = 0;
+  _impl_.scroll_x_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
-inline ::int32_t CuaAction::scroll_pixels() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.CuaAction.scroll_pixels)
-  return _internal_scroll_pixels();
+inline ::int32_t CuaAction::scroll_x() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CuaAction.scroll_x)
+  return _internal_scroll_x();
 }
-inline void CuaAction::set_scroll_pixels(::int32_t value) {
-  _internal_set_scroll_pixels(value);
+inline void CuaAction::set_scroll_x(::int32_t value) {
+  _internal_set_scroll_x(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.CuaAction.scroll_pixels)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CuaAction.scroll_x)
 }
-inline ::int32_t CuaAction::_internal_scroll_pixels() const {
+inline ::int32_t CuaAction::_internal_scroll_x() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.scroll_pixels_;
+  return _impl_.scroll_x_;
 }
-inline void CuaAction::_internal_set_scroll_pixels(::int32_t value) {
+inline void CuaAction::_internal_set_scroll_x(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.scroll_pixels_ = value;
+  _impl_.scroll_x_ = value;
+}
+
+// int32 scroll_y = 5;
+inline void CuaAction::clear_scroll_y() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.scroll_y_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+}
+inline ::int32_t CuaAction::scroll_y() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CuaAction.scroll_y)
+  return _internal_scroll_y();
+}
+inline void CuaAction::set_scroll_y(::int32_t value) {
+  _internal_set_scroll_y(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CuaAction.scroll_y)
+}
+inline ::int32_t CuaAction::_internal_scroll_y() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.scroll_y_;
+}
+inline void CuaAction::_internal_set_scroll_y(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.scroll_y_ = value;
 }
 
 // double wait_seconds = 6;
@@ -737,28 +749,28 @@ inline void CuaAction::set_allocated_reasoning(::std::string* PROTOBUF_NULLABLE 
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.CuaAction.reasoning)
 }
 
-// bool parse_ok = 9;
-inline void CuaAction::clear_parse_ok() {
+// bool is_valid = 9;
+inline void CuaAction::clear_is_valid() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.parse_ok_ = false;
+  _impl_.is_valid_ = false;
   ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
-inline bool CuaAction::parse_ok() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.CuaAction.parse_ok)
-  return _internal_parse_ok();
+inline bool CuaAction::is_valid() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CuaAction.is_valid)
+  return _internal_is_valid();
 }
-inline void CuaAction::set_parse_ok(bool value) {
-  _internal_set_parse_ok(value);
+inline void CuaAction::set_is_valid(bool value) {
+  _internal_set_is_valid(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.CuaAction.parse_ok)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CuaAction.is_valid)
 }
-inline bool CuaAction::_internal_parse_ok() const {
+inline bool CuaAction::_internal_is_valid() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.parse_ok_;
+  return _impl_.is_valid_;
 }
-inline void CuaAction::_internal_set_parse_ok(bool value) {
+inline void CuaAction::_internal_set_is_valid(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.parse_ok_ = value;
+  _impl_.is_valid_ = value;
 }
 
 #ifdef __GNUC__

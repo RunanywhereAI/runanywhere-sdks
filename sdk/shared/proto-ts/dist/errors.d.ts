@@ -2,8 +2,10 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
- * into COMPONENT; the modality is recoverable from c_abi_code and
- * ErrorContext.operation, so it is not encoded twice.
+ * into COMPONENT; use SDKError.component to tell them apart.
+ *
+ * The rac_wire_string values are the one form every SDK prints, so a crash
+ * report written by Swift and one written by Web say the same word.
  */
 export declare enum ErrorCategory {
     ERROR_CATEGORY_UNSPECIFIED = 0,
@@ -316,43 +318,17 @@ export declare enum ErrorCode {
 export declare function errorCodeFromJSON(object: any): ErrorCode;
 export declare function errorCodeToJSON(object: ErrorCode): string;
 /**
- * Debugging metadata captured at the throw site. Stack traces are deliberately
- * absent: they are platform-shaped and belong in platform-local logging.
- */
-export interface ErrorContext {
-    /** Telemetry tagging. */
-    metadata: {
-        [key: string]: string;
-    };
-    sourceFile?: string | undefined;
-    sourceLine?: number | undefined;
-    /**
-     * Logical operation ("loadModel", "generate", "transcribeStream"), so
-     * clients can route without parsing free text.
-     */
-    operation?: string | undefined;
-    /**
-     * "<Message>.<field>" for validation errors. The generated validate()
-     * emits this.
-     */
-    fieldPath?: string | undefined;
-}
-export interface ErrorContext_MetadataEntry {
-    key: string;
-    value: string;
-}
-/**
  * The unified error payload every SDK throws or returns.
  *
  * `code` is always non-zero: an SDKError implies failure, and success is
  * signalled by its absence. `message` is non-localized; localization is a
- * consumer concern.
+ * consumer concern. Stack traces are deliberately absent: they are
+ * platform-shaped and belong in platform-local logging.
  */
 export interface SDKError {
     code: ErrorCode;
     category: ErrorCategory;
     message: string;
-    context?: ErrorContext | undefined;
     /**
      * Signed rac_result_t. Equals -code for codes <= 899. Unset for the
      * Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
@@ -361,19 +337,27 @@ export interface SDKError {
     cAbiCode?: number | undefined;
     /** The "caused by" chain. */
     nestedMessage?: string | undefined;
-    /**
-     * `component` is a stable lowercase key ("llm", "stt", "rag", "download").
-     * SDKEvent carries the enum-typed component instead.
-     */
     timestampMs: number;
     severity: ErrorSeverity;
+    /**
+     * Which subsystem raised the error, written as SDKComponent's
+     * rac_wire_string ("llm", "stt", "rag", "rerank"). Producers MUST write
+     * the wire string, never the proto constant name. Errors raised outside
+     * any SDKComponent may carry their own lowercase key.
+     */
     component: string;
     retryable: boolean;
-    remediationHint: string;
-    correlationId: string;
+    /**
+     * Ties this failure to the operation that produced it. Named for
+     * Anthropic's body-level `request_id`. Producers MUST set it.
+     */
+    requestId: string;
+    /**
+     * "<Message>.<field>" for validation errors, e.g. "STTOptions.sampleRate".
+     * OpenAI's `param`. The generated validate() emits this.
+     */
+    param?: string | undefined;
 }
-export declare const ErrorContext: MessageFns<ErrorContext>;
-export declare const ErrorContext_MetadataEntry: MessageFns<ErrorContext_MetadataEntry>;
 export declare const SDKError: MessageFns<SDKError>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

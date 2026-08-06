@@ -10,7 +10,6 @@
       "systemPrompt": "You are a helpful assistant.",
       "temperature": 0.7
     },
-    "maxContextTokens": 4096,
-    "typeKind": "SOLUTION_TYPE_VOICE_AGENT"
+    "maxContextTokens": 4096
   }
 }

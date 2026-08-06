@@ -430,7 +430,7 @@ int main() {
         model.set_category(runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION);
         model.set_format(runanywhere::v1::MODEL_FORMAT_ONNX);
         model.set_local_path(model_path.string());
-        model.set_is_downloaded(true);
+        model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
         model.set_is_available(true);
         std::string model_bytes;
         CHECK(model.SerializeToString(&model_bytes) &&

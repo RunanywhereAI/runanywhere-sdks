@@ -13,22 +13,11 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateStructuredOutputOptions = exports.structuredOutputOptionsDefaults = void 0;
-const _errors_1 = require("./_errors");
+exports.structuredOutputOptionsDefaults = void 0;
 const structuredOutputOptionsDefaults = () => ({
-    includeSchemaInPrompt: false,
-    jsonSchema: '',
-    mode: 0,
-    repairJson: false,
-    maxRetries: 0,
+    includeSchemaInPrompt: true,
+    schema: '',
+    grammar: '',
+    regex: '',
 });
 exports.structuredOutputOptionsDefaults = structuredOutputOptionsDefaults;
-const validateStructuredOutputOptions = (m) => {
-    if (m.maxRetries < 0) {
-        throw new _errors_1.ValidationError({
-            fieldPath: 'StructuredOutputOptions.max_retries',
-            message: `max_retries must be >= 0 (got ${m.maxRetries})`,
-        });
-    }
-};
-exports.validateStructuredOutputOptions = validateStructuredOutputOptions;

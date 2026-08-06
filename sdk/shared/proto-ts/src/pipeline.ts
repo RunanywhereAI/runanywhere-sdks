@@ -14,8 +14,11 @@ export enum DeviceAffinity {
   DEVICE_AFFINITY_ANY = 1,
   DEVICE_AFFINITY_CPU = 2,
   DEVICE_AFFINITY_GPU = 3,
-  /** DEVICE_AFFINITY_ANE - Apple Neural Engine */
-  DEVICE_AFFINITY_ANE = 4,
+  /**
+   * DEVICE_AFFINITY_NPU - Vendor-neutral neural accelerator: Apple Neural Engine, Qualcomm
+   * Hexagon NPU, etc. The YAML loader already accepts "npu" for this value.
+   */
+  DEVICE_AFFINITY_NPU = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -34,8 +37,8 @@ export function deviceAffinityFromJSON(object: any): DeviceAffinity {
     case "DEVICE_AFFINITY_GPU":
       return DeviceAffinity.DEVICE_AFFINITY_GPU;
     case 4:
-    case "DEVICE_AFFINITY_ANE":
-      return DeviceAffinity.DEVICE_AFFINITY_ANE;
+    case "DEVICE_AFFINITY_NPU":
+      return DeviceAffinity.DEVICE_AFFINITY_NPU;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -53,8 +56,8 @@ export function deviceAffinityToJSON(object: DeviceAffinity): string {
       return "DEVICE_AFFINITY_CPU";
     case DeviceAffinity.DEVICE_AFFINITY_GPU:
       return "DEVICE_AFFINITY_GPU";
-    case DeviceAffinity.DEVICE_AFFINITY_ANE:
-      return "DEVICE_AFFINITY_ANE";
+    case DeviceAffinity.DEVICE_AFFINITY_NPU:
+      return "DEVICE_AFFINITY_NPU";
     case DeviceAffinity.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

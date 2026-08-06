@@ -457,14 +457,11 @@ public enum RunAnywhere {
         await MainActor.run { CppBridge.initializeServices() }
 
         // Step 3 (C++): auth, device registration, model assignments,
-        // telemetry flush, and downloaded-model discovery.
-        let phase2Result = try CppBridge.SdkInit.phase2(
-            forceRefreshAssignments: false,
-            flushTelemetry: true,
-            discoverDownloadedModels: true,
-            rescanLocalModels: true
-        )
-        let completedHTTPSetup = phase2Result.hasCompletedHTTPSetup_p || phase2Result.httpConfigured
+        // telemetry flush, and downloaded-model discovery. The four opt-out
+        // knobs this call used to take were deleted outright
+        // (idl/sdk_init.proto) — commons now always runs the full step list.
+        let phase2Result = try CppBridge.SdkInit.phase2()
+        let completedHTTPSetup = phase2Result.hasCompletedHTTPSetup_p
         if !phase2Result.warning.isEmpty {
             logger.info("Phase 2 completed with a warning; details omitted")
         }
@@ -561,7 +558,9 @@ public enum RunAnywhere {
         }
 
         guard !Task.isCancelled else { return }
-        let completedHTTPSetup = proto.hasCompletedHTTPSetup_p || proto.httpConfigured
+        // httpConfigured was deleted outright (idl/sdk_init.proto);
+        // hasCompletedHTTPSetup_p is the sole signal now.
+        let completedHTTPSetup = proto.hasCompletedHTTPSetup_p
         let committed = state.withLock { lockedState -> Bool in
             guard lockedState.lifetime.permitsCompletion(generation: generation),
                   lockedState.isInitialized else {

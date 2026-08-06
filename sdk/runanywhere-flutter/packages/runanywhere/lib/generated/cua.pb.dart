@@ -25,28 +25,46 @@ export 'cua.pbenum.dart';
 /// TYPE->text, VISIT_URL->url, WEB_SEARCH->query, TERMINATE->answer,
 /// ASK_USER/READ_PAGE_ANSWER->question, PAUSE_MEMORIZE->fact, KEY->space-joined
 /// keys. `reasoning` holds any chain-of-thought preceding the tool_call.
+///
+/// COORDINATE CONTRACT: x/y are integers in the SAME pixel space as the
+/// viewport you passed to parse_action, origin at the TOP-LEFT. That viewport
+/// must be the pixel dimensions of the exact image you handed to the VLM — if
+/// you downscaled the screenshot before sending it, pass the downscaled
+/// dimensions. On a DPR-2/3/4 display, passing logical points while sending a
+/// physical-pixel screenshot offsets every click by that factor, silently (see
+/// examples/ios/.../ComputerUseAgentViewModel.swift for the correct
+/// computation). parse_action has already rescaled out of the profile's own
+/// space (1000x1000 for `fara`), so no further scaling is ever correct.
+///
+/// LEFT_CLICK_DRAG: x/y are the drag DESTINATION only. Fara emits no origin (it
+/// drags from the current cursor), and a touch screen has no cursor, so the
+/// HOST must supply the press point — typically the last MOUSE_MOVE target.
+///
+/// LENGTH: `text` and `reasoning` are TRUNCATED at 2047 bytes on a UTF-8 lead
+/// byte by the fixed C buffers behind them (rac_cua_action_t.text[2048]); no
+/// field records that truncation happened. This also caps a TERMINATE answer.
 class CuaAction extends $pb.GeneratedMessage {
   factory CuaAction({
     CuaActionType? type,
-    $core.bool? coordinateValid,
     $core.int? x,
     $core.int? y,
-    $core.int? scrollPixels,
+    $core.int? scrollX,
+    $core.int? scrollY,
     $core.double? waitSeconds,
     $core.String? text,
     $core.String? reasoning,
-    $core.bool? parseOk,
+    $core.bool? isValid,
   }) {
     final result = create();
     if (type != null) result.type = type;
-    if (coordinateValid != null) result.coordinateValid = coordinateValid;
     if (x != null) result.x = x;
     if (y != null) result.y = y;
-    if (scrollPixels != null) result.scrollPixels = scrollPixels;
+    if (scrollX != null) result.scrollX = scrollX;
+    if (scrollY != null) result.scrollY = scrollY;
     if (waitSeconds != null) result.waitSeconds = waitSeconds;
     if (text != null) result.text = text;
     if (reasoning != null) result.reasoning = reasoning;
-    if (parseOk != null) result.parseOk = parseOk;
+    if (isValid != null) result.isValid = isValid;
     return result;
   }
 
@@ -65,14 +83,14 @@ class CuaAction extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aE<CuaActionType>(1, _omitFieldNames ? '' : 'type',
         enumValues: CuaActionType.values)
-    ..aOB(2, _omitFieldNames ? '' : 'coordinateValid')
-    ..aI(3, _omitFieldNames ? '' : 'x')
-    ..aI(4, _omitFieldNames ? '' : 'y')
-    ..aI(5, _omitFieldNames ? '' : 'scrollPixels')
+    ..aI(2, _omitFieldNames ? '' : 'x')
+    ..aI(3, _omitFieldNames ? '' : 'y')
+    ..aI(4, _omitFieldNames ? '' : 'scrollX')
+    ..aI(5, _omitFieldNames ? '' : 'scrollY')
     ..aD(6, _omitFieldNames ? '' : 'waitSeconds')
     ..aOS(7, _omitFieldNames ? '' : 'text')
     ..aOS(8, _omitFieldNames ? '' : 'reasoning')
-    ..aOB(9, _omitFieldNames ? '' : 'parseOk')
+    ..aOB(9, _omitFieldNames ? '' : 'isValid')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -103,41 +121,48 @@ class CuaAction extends $pb.GeneratedMessage {
   void clearType() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.bool get coordinateValid => $_getBF(1);
+  $core.int get x => $_getIZ(1);
   @$pb.TagNumber(2)
-  set coordinateValid($core.bool value) => $_setBool(1, value);
+  set x($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasCoordinateValid() => $_has(1);
+  $core.bool hasX() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCoordinateValid() => $_clearField(2);
+  void clearX() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get x => $_getIZ(2);
+  $core.int get y => $_getIZ(2);
   @$pb.TagNumber(3)
-  set x($core.int value) => $_setSignedInt32(2, value);
+  set y($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasX() => $_has(2);
+  $core.bool hasY() => $_has(2);
   @$pb.TagNumber(3)
-  void clearX() => $_clearField(3);
+  void clearY() => $_clearField(3);
 
+  /// HSCROLL/SCROLL axis split. Value is the model's raw `pixels` output,
+  /// copied verbatim per axis — the sign is UNVERIFIED against any real
+  /// device trace, so no direction convention is asserted here.
   @$pb.TagNumber(4)
-  $core.int get y => $_getIZ(3);
+  $core.int get scrollX => $_getIZ(3);
   @$pb.TagNumber(4)
-  set y($core.int value) => $_setSignedInt32(3, value);
+  set scrollX($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasY() => $_has(3);
+  $core.bool hasScrollX() => $_has(3);
   @$pb.TagNumber(4)
-  void clearY() => $_clearField(4);
+  void clearScrollX() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get scrollPixels => $_getIZ(4);
+  $core.int get scrollY => $_getIZ(4);
   @$pb.TagNumber(5)
-  set scrollPixels($core.int value) => $_setSignedInt32(4, value);
+  set scrollY($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasScrollPixels() => $_has(4);
+  $core.bool hasScrollY() => $_has(4);
   @$pb.TagNumber(5)
-  void clearScrollPixels() => $_clearField(5);
+  void clearScrollY() => $_clearField(5);
 
+  /// WAIT: fractional seconds. Clamped by commons to [0, 100] because the
+  /// value comes from untrusted model output; an unbounded parse would wedge
+  /// the agent loop. 100s is a RunAnywhere-chosen ceiling, not inherited from
+  /// any vendor API.
   @$pb.TagNumber(6)
   $core.double get waitSeconds => $_getN(5);
   @$pb.TagNumber(6)
@@ -166,13 +191,13 @@ class CuaAction extends $pb.GeneratedMessage {
   void clearReasoning() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.bool get parseOk => $_getBF(8);
+  $core.bool get isValid => $_getBF(8);
   @$pb.TagNumber(9)
-  set parseOk($core.bool value) => $_setBool(8, value);
+  set isValid($core.bool value) => $_setBool(8, value);
   @$pb.TagNumber(9)
-  $core.bool hasParseOk() => $_has(8);
+  $core.bool hasIsValid() => $_has(8);
   @$pb.TagNumber(9)
-  void clearParseOk() => $_clearField(9);
+  void clearIsValid() => $_clearField(9);
 }
 
 const $core.bool _omitFieldNames =

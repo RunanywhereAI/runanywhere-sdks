@@ -98,8 +98,7 @@ enum InferenceFramework {
     reserved 8, 9, 10, 17, 18;
 }
 
-// What a model does. There is no RERANK member, which is why the rerank
-// primitive cannot auto-load a model.
+// What a model does.
 enum ModelCategory {
     MODEL_CATEGORY_UNSPECIFIED              = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
     MODEL_CATEGORY_LANGUAGE                 = 1  [(runanywhere.v1.rac_wire_string) = "language"];
@@ -113,6 +112,7 @@ enum ModelCategory {
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9  [(runanywhere.v1.rac_wire_string) = "voice-activity-detection"];  // present in Swift only pre-IDL
     MODEL_CATEGORY_SPEAKER_DIARIZATION      = 10 [(runanywhere.v1.rac_wire_string) = "speaker-diarization"];
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION    = 11 [(runanywhere.v1.rac_wire_string) = "semantic-segmentation"];
+    MODEL_CATEGORY_RERANK                   = 12 [(runanywhere.v1.rac_wire_string) = "rerank"];
 }
 
 // ---------------------------------------------------------------------------
@@ -180,15 +180,6 @@ enum ModelRegistryStatus {
     MODEL_REGISTRY_STATUS_ERROR       = 6;
 }
 
-enum ModelQuerySortField {
-    MODEL_QUERY_SORT_FIELD_UNSPECIFIED         = 0;
-    MODEL_QUERY_SORT_FIELD_NAME                = 1;
-    MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS  = 2;
-    MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS  = 3;
-    MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4;
-    MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5;
-    MODEL_QUERY_SORT_FIELD_USAGE_COUNT         = 6;
-}
 
 // Role of a file inside a single/multi-file artifact. The generic COMPANION
 // role covers arbitrary sidecars; specific roles document common public
@@ -283,21 +274,18 @@ message ModelInfo {
     // Structured public catalog metadata, including the model description.
     optional ModelInfoMetadata metadata = 19;
 
+    // The one declaration of what this bundle is. The variant decides the
+    // fetch-and-verify strategy; the expected-file manifest hangs off the
+    // variant that owns it.
     oneof artifact {
         SingleFileArtifact single_file        = 20;
         ArchiveArtifact    archive            = 21;
         MultiFileArtifact  multi_file         = 22;
-        string             custom_strategy_id = 23;
         bool               built_in           = 24;
     }
-
-    // High-level artifact classification, complementary to the `artifact`
-    // oneof above. Allows catalog entries to carry a coarse type tag without
-    // resolving the full strategy variant.
-    optional ModelArtifactType      artifact_type           = 25;
-
-    // Manifest of files that are expected on disk after fetch/extraction.
-    optional ExpectedModelFiles     expected_files          = 26;
+    reserved 23, 25, 26;  // custom_strategy_id (undocumented registry),
+                          // artifact_type (restates the oneof),
+                          // expected_files (belongs on the variant)
 
     // Preferred hardware acceleration backend for this model.
     optional AccelerationPreference acceleration_preference = 27;
@@ -310,15 +298,17 @@ message ModelInfo {
     optional ModelRuntimeCompatibility compatibility = 29;
     optional InferenceFramework        preferred_framework = 30;
 
-    // Durable registry state. Live byte progress belongs to
-    // download_service.DownloadProgress, not ModelInfo.
+    // The single durable state of this entry, and the only downloaded-ness
+    // signal. A non-empty local_path (7) is location data, NOT state: it
+    // stays populated for an entry whose files were deleted. Live byte
+    // progress belongs to download_service.DownloadProgress, not ModelInfo.
     optional ModelRegistryStatus registry_status = 31;
-    optional bool                is_downloaded   = 32;
+    reserved 32;  // was is_downloaded: a bool cannot express DOWNLOADING
     optional bool                is_available    = 33;
     optional int64               last_used_at_unix_ms = 34;
-    optional int32               usage_count          = 35;
-    optional bool                sync_pending         = 36;
-    optional string              status_message       = 37;
+    reserved 35, 36, 37;  // usage_count (a "use" was never defined),
+                          // sync_pending (no producer), status_message
+                          // (SDKError already carries it)
 
     // Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
     // this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
@@ -334,20 +324,14 @@ message ModelInfoList {
 }
 
 message SingleFileArtifact {
-    repeated string required_patterns = 1;
-    repeated string optional_patterns = 2;
-
-    // Full manifest form for SDK-local wrappers that attach expected files to
-    // a single-file artifact. The pattern fields above remain for existing
-    // generated consumers.
+    reserved 1, 2;  // patterns live on ExpectedModelFiles (3, 4) only
     optional ExpectedModelFiles expected_files = 3;
 }
 
 message ArchiveArtifact {
     ArchiveType      type              = 1;
     ArchiveStructure structure         = 2;
-    repeated string  required_patterns = 3;
-    repeated string  optional_patterns = 4;
+    reserved 3, 4;  // patterns live on ExpectedModelFiles (3, 4) only
 
     // Full manifest form for archive artifacts after extraction. Archive
     // extraction policy is portable; native filesystem permissions and handles
@@ -358,12 +342,14 @@ message ArchiveArtifact {
 message ModelFileDescriptor {
     string url         = 1;
     string filename    = 2;
-    bool   is_required = 3;
 
-    // Extended descriptor fields (Flutter model_types.dart:~350,
-    // Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
-    // canonical "required" flag — the documented `required` boolean from
-    // newer SDK sources maps onto it (default true, mirrored in Swift).
+    // Files are required by default, which proto3 cannot say with a bool.
+    // NOTE: a NEW tag, because ModelFileDescriptor is persisted in
+    // .rac-manifest.binpb and reusing tag 3 would silently flip every
+    // manifest already on a device.
+    reserved 3;  // was is_required
+    bool   is_optional = 12;
+
     // Exact on-disk artifact size, verified after download.
     optional int64  size_bytes = 4;
 
@@ -402,19 +388,20 @@ message ExpectedModelFiles {
 // Registry/query filters shared by SDK model-management APIs. UI-only
 // presentation state and platform filesystem handles are intentionally not
 // represented here.
+// Filters only. Ordering is the client's -- a local catalog is tens of rows.
 message ModelQuery {
     optional InferenceFramework framework       = 1;
     optional ModelCategory      category        = 2;
     optional ModelFormat        format          = 3;
     optional bool               downloaded_only = 4;
-    optional bool               available_only  = 5;
     optional int64              max_size_bytes  = 6;
-    string                      search_query    = 7;
-    optional ModelSource        source          = 8;
-    optional ModelQuerySortField sort_field     = 9;
-    optional bool               descending      = 10;
+    // Optional so "no search" is expressible; empty string is not a filter.
+    optional string             search_query    = 7;
     optional ModelRegistryStatus registry_status = 11;
+    reserved 5, 8, 9, 10;  // available_only, source, sort_field, descending
 }
+
+// enum ModelQuerySortField: deleted.
 
 // Registry and lifecycle workflow contracts. Platform-owned inputs (Android
 // content URIs, iOS security-scoped bookmarks, browser FileSystemHandles, auth
@@ -447,33 +434,23 @@ message ModelRegistryRefreshRequest {
 
 message ModelRegistryRefreshResult {
     ModelInfoList models              = 2;
-    int32         registered_count    = 3;
-    int32         updated_count       = 4;
-    int32         discovered_count    = 5;
-    int32         pruned_count        = 6;
     int64         refreshed_at_unix_ms = 7;
     repeated string warnings          = 8;
-    int32         downloaded_count    = 10;
-    int32         available_count     = 11;
-    int32         error_count         = 12;
     optional SDKError error           = 13;
+    reserved 3, 4, 5, 6, 10, 11, 12;  // counts over `models`
 }
 
 message ModelListRequest {
     // Set query.downloaded_only for downloaded-only lists.
     optional ModelQuery query = 1;
-
-    // Include denormalized counts in ModelListResult.
-    bool include_counts = 2;
+    reserved 2;  // include_counts: no facade ever SET it, so the gated
+                 // counts below were never populated in practice
 }
 
 message ModelListResult {
     ModelInfoList models        = 2;
-    int32         total_count   = 4;
-    int32         downloaded_count = 5;
-    int32         available_count  = 6;
-    int32         filtered_count   = 7;
     optional SDKError error      = 8;
+    reserved 4, 5, 6, 7;  // counts over `models`
 }
 
 message ModelGetRequest {
@@ -537,12 +514,18 @@ message DiscoveredModel {
 
 message ModelDiscoveryResult {
     repeated DiscoveredModel discovered_models = 2;
-    int32                 linked_count      = 3;
-    int32                 purged_count      = 4;
     repeated string       warnings          = 5;
-    int32                 scanned_count     = 7;
-    int32                 imported_count    = 8;
     optional SDKError     error             = 9;
+    reserved 3, 4, 7, 8;  // counts over `discovered_models`
+}
+
+// Requested execution placement for a load. LiteRT/ExecuTorch-aligned.
+enum AcceleratorPolicy {
+    ACCELERATOR_POLICY_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    ACCELERATOR_POLICY_AUTO        = 1  [(runanywhere.v1.rac_wire_string) = "auto"];
+    ACCELERATOR_POLICY_CPU         = 2  [(runanywhere.v1.rac_wire_string) = "cpu"];
+    ACCELERATOR_POLICY_GPU         = 3  [(runanywhere.v1.rac_wire_string) = "gpu"];
+    ACCELERATOR_POLICY_NPU         = 4  [(runanywhere.v1.rac_wire_string) = "npu"];
 }
 
 message ModelLoadRequest {
@@ -554,14 +537,15 @@ message ModelLoadRequest {
     bool               force_reload     = 4;
     bool               validate_availability = 5;
 
-    // v4 placement knobs (honored end-to-end; never silently dropped).
+    // The one load knob every on-device runtime exposes. Unset or 0 means
+    // "take it from the model" (llama.cpp --ctx-size semantics) -- never a
+    // hardcoded small default. Carried by the native load ABI.
     optional int32     context_length   = 6;
-    optional int32     threads          = 7;
+    reserved 7;  // threads: retired -- travelled an advisory JSON path, never
+                 // a hard runtime guarantee
     optional bool      use_gpu          = 8; // deprecated adapter; maps to accelerator
     repeated InferenceFramework backend_preferences = 9;
-    // AcceleratorPolicy values live in public_api_v4.proto; stored as int32
-    // here to avoid a circular import with LoadedModelInfo helpers.
-    optional int32     accelerator_policy = 10;
+    optional AcceleratorPolicy accelerator_policy = 10;
 }
 
 message ModelLoadResult {
@@ -588,6 +572,10 @@ message ModelLoadResult {
     optional string    runtime_version   = 16;
     optional string    abi_version       = 17;
     optional string    fallback_reason   = 18;
+
+    // What context length the runtime actually allocated -- a request is
+    // not a promise.
+    optional int32     allocated_context_length = 19;
 }
 
 message ModelUnloadRequest {
@@ -622,14 +610,16 @@ message CurrentModelResult {
     optional SDKError error      = 11;
 }
 
+// delete(model_id) frees DISK. It always unloads the model first if it is
+// resident -- there is no flag, and no failure mode for "still loaded".
+// Entries whose source is MODEL_SOURCE_BUILT_IN are never deletable and fail
+// with an SDKError. Success is the absence of `error`.
 message ModelDeleteResult {
     string model_id         = 2;
     int64  deleted_bytes    = 3;
-    bool   files_deleted    = 4;
-    bool   registry_updated = 5;
-    bool   was_loaded       = 6;
-    repeated string warnings = 8;
     optional SDKError error  = 9;
+    reserved 4, 5, 6, 8;  // files_deleted, registry_updated, was_loaded,
+                          // warnings: no reader in any SDK
 }
 
 // ---------------------------------------------------------------------------
@@ -644,22 +634,17 @@ message ModelCompatibilityRequest {
     // Required. Model identifier to evaluate.
     string model_id = 1;
 
-    // Optional cached hardware profile from the platform adapter. If
-    // unset, commons will read whatever it has cached internally; the
-    // RAM/storage values below remain authoritative for the verdict.
-    optional HardwareProfile hardware_profile = 2;
-
     // Available RAM in bytes (from device probe). 0 = unknown — commons
     // will treat the requirement as satisfied.
-    int64 available_ram_bytes = 3;
+    int64 available_ram_bytes = 2;
 
     // Available storage in bytes (from filesystem probe). 0 = unknown.
-    int64 available_storage_bytes = 4;
+    int64 available_storage_bytes = 3;
 
     // Optional caller preferences (acceleration, framework). Reserved for
     // future use; today's verdict is based on memory/storage alone.
-    optional AccelerationPreference accelerator_preference = 5;
-    optional InferenceFramework preferred_framework = 6;
+    optional AccelerationPreference accelerator_preference = 4;
+    optional InferenceFramework preferred_framework = 5;
 }
 
 message ModelCompatibilityResult {

@@ -152,14 +152,14 @@ function cuaActionTypeToJSON(object) {
 function createBaseCuaAction() {
     return {
         type: 0,
-        coordinateValid: false,
-        x: 0,
-        y: 0,
-        scrollPixels: 0,
+        x: undefined,
+        y: undefined,
+        scrollX: 0,
+        scrollY: 0,
         waitSeconds: 0,
         text: "",
         reasoning: "",
-        parseOk: false,
+        isValid: false,
     };
 }
 exports.CuaAction = {
@@ -167,17 +167,17 @@ exports.CuaAction = {
         if (message.type !== 0) {
             writer.uint32(8).int32(message.type);
         }
-        if (message.coordinateValid !== false) {
-            writer.uint32(16).bool(message.coordinateValid);
+        if (message.x !== undefined) {
+            writer.uint32(16).int32(message.x);
         }
-        if (message.x !== 0) {
-            writer.uint32(24).int32(message.x);
+        if (message.y !== undefined) {
+            writer.uint32(24).int32(message.y);
         }
-        if (message.y !== 0) {
-            writer.uint32(32).int32(message.y);
+        if (message.scrollX !== 0) {
+            writer.uint32(32).int32(message.scrollX);
         }
-        if (message.scrollPixels !== 0) {
-            writer.uint32(40).int32(message.scrollPixels);
+        if (message.scrollY !== 0) {
+            writer.uint32(40).int32(message.scrollY);
         }
         if (message.waitSeconds !== 0) {
             writer.uint32(49).double(message.waitSeconds);
@@ -188,8 +188,8 @@ exports.CuaAction = {
         if (message.reasoning !== "") {
             writer.uint32(66).string(message.reasoning);
         }
-        if (message.parseOk !== false) {
-            writer.uint32(72).bool(message.parseOk);
+        if (message.isValid !== false) {
+            writer.uint32(72).bool(message.isValid);
         }
         return writer;
     },
@@ -211,28 +211,28 @@ exports.CuaAction = {
                     if (tag !== 16) {
                         break;
                     }
-                    message.coordinateValid = reader.bool();
+                    message.x = reader.int32();
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.x = reader.int32();
+                    message.y = reader.int32();
                     continue;
                 }
                 case 4: {
                     if (tag !== 32) {
                         break;
                     }
-                    message.y = reader.int32();
+                    message.scrollX = reader.int32();
                     continue;
                 }
                 case 5: {
                     if (tag !== 40) {
                         break;
                     }
-                    message.scrollPixels = reader.int32();
+                    message.scrollY = reader.int32();
                     continue;
                 }
                 case 6: {
@@ -260,7 +260,7 @@ exports.CuaAction = {
                     if (tag !== 72) {
                         break;
                     }
-                    message.parseOk = reader.bool();
+                    message.isValid = reader.bool();
                     continue;
                 }
             }
@@ -274,17 +274,17 @@ exports.CuaAction = {
     fromJSON(object) {
         return {
             type: isSet(object.type) ? cuaActionTypeFromJSON(object.type) : 0,
-            coordinateValid: isSet(object.coordinateValid)
-                ? globalThis.Boolean(object.coordinateValid)
-                : isSet(object.coordinate_valid)
-                    ? globalThis.Boolean(object.coordinate_valid)
-                    : false,
-            x: isSet(object.x) ? globalThis.Number(object.x) : 0,
-            y: isSet(object.y) ? globalThis.Number(object.y) : 0,
-            scrollPixels: isSet(object.scrollPixels)
-                ? globalThis.Number(object.scrollPixels)
-                : isSet(object.scroll_pixels)
-                    ? globalThis.Number(object.scroll_pixels)
+            x: isSet(object.x) ? globalThis.Number(object.x) : undefined,
+            y: isSet(object.y) ? globalThis.Number(object.y) : undefined,
+            scrollX: isSet(object.scrollX)
+                ? globalThis.Number(object.scrollX)
+                : isSet(object.scroll_x)
+                    ? globalThis.Number(object.scroll_x)
+                    : 0,
+            scrollY: isSet(object.scrollY)
+                ? globalThis.Number(object.scrollY)
+                : isSet(object.scroll_y)
+                    ? globalThis.Number(object.scroll_y)
                     : 0,
             waitSeconds: isSet(object.waitSeconds)
                 ? globalThis.Number(object.waitSeconds)
@@ -293,10 +293,10 @@ exports.CuaAction = {
                     : 0,
             text: isSet(object.text) ? globalThis.String(object.text) : "",
             reasoning: isSet(object.reasoning) ? globalThis.String(object.reasoning) : "",
-            parseOk: isSet(object.parseOk)
-                ? globalThis.Boolean(object.parseOk)
-                : isSet(object.parse_ok)
-                    ? globalThis.Boolean(object.parse_ok)
+            isValid: isSet(object.isValid)
+                ? globalThis.Boolean(object.isValid)
+                : isSet(object.is_valid)
+                    ? globalThis.Boolean(object.is_valid)
                     : false,
         };
     },
@@ -305,17 +305,17 @@ exports.CuaAction = {
         if (message.type !== 0) {
             obj.type = cuaActionTypeToJSON(message.type);
         }
-        if (message.coordinateValid !== false) {
-            obj.coordinateValid = message.coordinateValid;
-        }
-        if (message.x !== 0) {
+        if (message.x !== undefined) {
             obj.x = Math.round(message.x);
         }
-        if (message.y !== 0) {
+        if (message.y !== undefined) {
             obj.y = Math.round(message.y);
         }
-        if (message.scrollPixels !== 0) {
-            obj.scrollPixels = Math.round(message.scrollPixels);
+        if (message.scrollX !== 0) {
+            obj.scrollX = Math.round(message.scrollX);
+        }
+        if (message.scrollY !== 0) {
+            obj.scrollY = Math.round(message.scrollY);
         }
         if (message.waitSeconds !== 0) {
             obj.waitSeconds = message.waitSeconds;
@@ -326,8 +326,8 @@ exports.CuaAction = {
         if (message.reasoning !== "") {
             obj.reasoning = message.reasoning;
         }
-        if (message.parseOk !== false) {
-            obj.parseOk = message.parseOk;
+        if (message.isValid !== false) {
+            obj.isValid = message.isValid;
         }
         return obj;
     },
@@ -337,14 +337,14 @@ exports.CuaAction = {
     fromPartial(object) {
         const message = createBaseCuaAction();
         message.type = object.type ?? 0;
-        message.coordinateValid = object.coordinateValid ?? false;
-        message.x = object.x ?? 0;
-        message.y = object.y ?? 0;
-        message.scrollPixels = object.scrollPixels ?? 0;
+        message.x = object.x ?? undefined;
+        message.y = object.y ?? undefined;
+        message.scrollX = object.scrollX ?? 0;
+        message.scrollY = object.scrollY ?? 0;
         message.waitSeconds = object.waitSeconds ?? 0;
         message.text = object.text ?? "";
         message.reasoning = object.reasoning ?? "";
-        message.parseOk = object.parseOk ?? false;
+        message.isValid = object.isValid ?? false;
         return message;
     },
 };

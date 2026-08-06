@@ -1,8 +1,14 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
-import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
+/**
+ * The required public spelling in every SDK is exactly "mean" / "cls" / "last".
+ * LAST is the final token's hidden state (llama.cpp --pooling last), which
+ * decoder-style embedders require. It is NOT max-pooling; no SDK may expose
+ * it as "max".
+ */
 export declare enum EmbeddingsPoolingStrategy {
+    /** EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED - inherit the bundle's pooling */
     EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
     EMBEDDINGS_POOLING_STRATEGY_MEAN = 1,
     EMBEDDINGS_POOLING_STRATEGY_CLS = 2,
@@ -11,56 +17,60 @@ export declare enum EmbeddingsPoolingStrategy {
 }
 export declare function embeddingsPoolingStrategyFromJSON(object: any): EmbeddingsPoolingStrategy;
 export declare function embeddingsPoolingStrategyToJSON(object: EmbeddingsPoolingStrategy): string;
-/** Applied at service creation. */
-export interface EmbeddingsConfiguration {
-    /** Registry id or local path. */
-    modelId: string;
-    /**
-     * Must match the loaded model's hidden size: 384 for all-MiniLM-L6-v2,
-     * 768 for bge-base, 1024 for bge-large.
-     */
-    embeddingDimension: number;
-    /** Truncation or sliding window past this length is backend-decided. */
-    maxSequenceLength: number;
-    preferredFramework?: InferenceFramework | undefined;
-    normalize: boolean;
-    pooling: EmbeddingsPoolingStrategy;
-    /** Backend-specific config such as tokenizer or vocab companion paths. */
-    configJson?: string | undefined;
+export declare enum EmbeddingsInputType {
+    /** EMBEDDINGS_INPUT_TYPE_UNSPECIFIED - model default / symmetric model */
+    EMBEDDINGS_INPUT_TYPE_UNSPECIFIED = 0,
+    EMBEDDINGS_INPUT_TYPE_QUERY = 1,
+    EMBEDDINGS_INPUT_TYPE_DOCUMENT = 2,
+    UNRECOGNIZED = -1
 }
-/** Per-call overrides. Unset fields fall back to the component configuration. */
+export declare function embeddingsInputTypeFromJSON(object: any): EmbeddingsInputType;
+export declare function embeddingsInputTypeToJSON(object: EmbeddingsInputType): string;
+/** Per-call overrides. Unset fields fall back to the loaded bundle's defaults. */
 export interface EmbeddingsOptions {
     /**
-     * Truncate over-long inputs instead of erroring. Unset = backend default,
-     * currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
+     * true  = clip an over-long input to the model's context and embed it.
+     * false = fail the call.
+     * Unset = true. A backend may instead aggregate over a sliding window,
+     * which embeds the whole document rather than discarding its tail.
      */
     truncate?: boolean | undefined;
     /** Unset = backend chooses (512, capped at 8192). */
     batchSize?: number | undefined;
-    normalize: boolean;
+    /**
+     * L2-normalize every vector to unit length (what cosine search expects).
+     * Unset = true. false returns the raw pooled vector.
+     */
+    normalize?: boolean | undefined;
     pooling: EmbeddingsPoolingStrategy;
     /** 0 = auto */
     nThreads: number;
+    /**
+     * What the vector will be used for. Asymmetric embedders (bge, e5,
+     * nomic-embed, gte, EmbeddingGemma) prepend a different prompt for a query
+     * than for a document. The prefix table must be added to the model manifest
+     * as part of honouring this field; it does not exist today. A bundle that
+     * declares no prompts ignores input_type and returns the identical vector
+     * for QUERY and DOCUMENT — it never errors.
+     */
+    inputType: EmbeddingsInputType;
+    /**
+     * Matryoshka (MRL) output width: truncate each vector to this many floats
+     * and re-normalize. Unset = the model's native width. Accepts any width in
+     * [1, the native width]; a width the model was not MRL-trained at is
+     * silently worse. This is the request-side width — EmbeddingsResult.dimension
+     * reports the width actually produced.
+     */
+    dimensions?: number | undefined;
 }
 export interface EmbeddingVector {
     /** Length equals EmbeddingsResult.dimension. */
     values: number[];
     /**
-     * Populated when the backend computes it, letting consumers score
-     * similarity without recomputing.
+     * Zero-based position in the request batch. ALWAYS set, on every entry
+     * point, including index 0.
      */
-    norm?: number | undefined;
-    /** Lets batch callers correlate vectors with inputs without tracking order. */
-    text?: string | undefined;
-    dimension: number;
     inputIndex: number;
-    metadata: {
-        [key: string]: string;
-    };
-}
-export interface EmbeddingVector_MetadataEntry {
-    key: string;
-    value: string;
 }
 /** One text = embed, multiple texts = embed_batch. */
 export interface EmbeddingsRequest {
@@ -68,31 +78,21 @@ export interface EmbeddingsRequest {
     options?: EmbeddingsOptions | undefined;
     requestId: string;
     modelId?: string | undefined;
-    metadata: {
-        [key: string]: string;
-    };
-}
-export interface EmbeddingsRequest_MetadataEntry {
-    key: string;
-    value: string;
 }
 export interface EmbeddingsResult {
     /** One vector per input text, in input order. */
     vectors: EmbeddingVector[];
-    /** Duplicated from each vector so consumers can size buffers in O(1). */
+    /** The width of every vector above, so consumers can size buffers in O(1). */
     dimension: number;
     processingTimeMs: number;
     /** Across all inputs, post-truncation. */
     tokensUsed: number;
     modelId?: string | undefined;
     requestId: string;
-    error?: SDKError | undefined;
 }
 export interface EmbeddingsCreateRequest {
     /** Registry id or absolute model path. */
     modelId: string;
-    /** Unset = commons defaults; set fields override per-component defaults. */
-    configuration?: EmbeddingsConfiguration | undefined;
     /** For backends needing companion file paths, e.g. {"vocab_path":"..."}. */
     configJson?: string | undefined;
 }
@@ -106,12 +106,9 @@ export interface EmbeddingsCreateResult {
     maxTokens: number;
     error?: SDKError | undefined;
 }
-export declare const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration>;
 export declare const EmbeddingsOptions: MessageFns<EmbeddingsOptions>;
 export declare const EmbeddingVector: MessageFns<EmbeddingVector>;
-export declare const EmbeddingVector_MetadataEntry: MessageFns<EmbeddingVector_MetadataEntry>;
 export declare const EmbeddingsRequest: MessageFns<EmbeddingsRequest>;
-export declare const EmbeddingsRequest_MetadataEntry: MessageFns<EmbeddingsRequest_MetadataEntry>;
 export declare const EmbeddingsResult: MessageFns<EmbeddingsResult>;
 export declare const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest>;
 export declare const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult>;

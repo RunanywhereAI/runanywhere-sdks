@@ -227,14 +227,21 @@ export const CUA = {
           ? (rawType as CuaActionKind)
           : CuaActionKind.Unknown;
 
+      // `CuaAction.coordinateValid`/`.scrollPixels`/`.parseOk` were
+      // renamed/restructured: presence of `x`/`y` (both optional now) IS
+      // "has a coordinate" (no separate boolean); `scrollPixels` was split
+      // into per-axis `scrollX`/`scrollY` (HScroll uses X, Scroll uses Y);
+      // `parseOk` was renamed to `isValid`.
       return {
         kind,
-        coordinate: proto.coordinateValid ? { x: proto.x, y: proto.y } : null,
+        coordinate: proto.x !== undefined && proto.y !== undefined
+          ? { x: proto.x, y: proto.y }
+          : null,
         text: proto.text,
         reasoning: proto.reasoning,
-        scrollPixels: proto.scrollPixels,
+        scrollPixels: kind === CuaActionKind.HScroll ? proto.scrollX : proto.scrollY,
         waitSeconds: proto.waitSeconds,
-        isValid: proto.parseOk,
+        isValid: proto.isValid,
       };
     } finally {
       module._free(outputPtr);

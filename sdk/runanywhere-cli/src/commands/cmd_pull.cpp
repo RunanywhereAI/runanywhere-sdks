@@ -105,7 +105,6 @@ int pull_model_flow(const GlobalOptions &options, const std::string &model_id) {
   v1::DownloadPlanRequest plan_request;
   plan_request.set_model_id(resolved.model_id);
   *plan_request.mutable_model() = model_info;
-  plan_request.set_resume_existing(true);
   const std::string plan_bytes = proto::serialize(plan_request);
 
   rac_proto_buffer_t plan_out;
@@ -142,12 +141,12 @@ int pull_model_flow(const GlobalOptions &options, const std::string &model_id) {
   progress::ProgressRenderer renderer(!options.no_progress && !options.json);
 
   // Start
+  // skip_registry_update left unset: default (false) means "do NOT skip" —
+  // the registry is updated on completion, same behavior the deleted
+  // explicit set_update_registry_on_completion(true) call used to request.
   v1::DownloadStartRequest start_request;
   start_request.set_model_id(resolved.model_id);
   *start_request.mutable_plan() = plan;
-  start_request.set_resume(plan.can_resume());
-  start_request.set_resume_token(plan.resume_token());
-  start_request.set_update_registry_on_completion(true);
   const std::string start_bytes = proto::serialize(start_request);
 
   rac_proto_buffer_t start_out;

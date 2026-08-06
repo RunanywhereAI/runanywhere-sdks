@@ -17,213 +17,10 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'diffusion_options.pbenum.dart';
 import 'errors.pb.dart' as $0;
-import 'model_types.pbenum.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'diffusion_options.pbenum.dart';
-
-class DiffusionTokenizerSource extends $pb.GeneratedMessage {
-  factory DiffusionTokenizerSource({
-    DiffusionTokenizerSourceKind? kind,
-    $core.String? customPath,
-    $core.bool? autoDownload,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (customPath != null) result.customPath = customPath;
-    if (autoDownload != null) result.autoDownload = autoDownload;
-    return result;
-  }
-
-  DiffusionTokenizerSource._();
-
-  factory DiffusionTokenizerSource.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DiffusionTokenizerSource.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DiffusionTokenizerSource',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<DiffusionTokenizerSourceKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: DiffusionTokenizerSourceKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'customPath')
-    ..aOB(3, _omitFieldNames ? '' : 'autoDownload')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DiffusionTokenizerSource clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DiffusionTokenizerSource copyWith(
-          void Function(DiffusionTokenizerSource) updates) =>
-      super.copyWith((message) => updates(message as DiffusionTokenizerSource))
-          as DiffusionTokenizerSource;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DiffusionTokenizerSource create() => DiffusionTokenizerSource._();
-  @$core.override
-  DiffusionTokenizerSource createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DiffusionTokenizerSource getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DiffusionTokenizerSource>(create);
-  static DiffusionTokenizerSource? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  DiffusionTokenizerSourceKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(DiffusionTokenizerSourceKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get customPath => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set customPath($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasCustomPath() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCustomPath() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get autoDownload => $_getBF(2);
-  @$pb.TagNumber(3)
-  set autoDownload($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasAutoDownload() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearAutoDownload() => $_clearField(3);
-}
-
-class DiffusionConfiguration extends $pb.GeneratedMessage {
-  factory DiffusionConfiguration({
-    DiffusionModelVariant? modelVariant,
-    DiffusionTokenizerSource? tokenizerSource,
-    $core.bool? enableSafetyChecker,
-    $core.int? maxMemoryMb,
-    $core.String? modelId,
-    $1.InferenceFramework? preferredFramework,
-  }) {
-    final result = create();
-    if (modelVariant != null) result.modelVariant = modelVariant;
-    if (tokenizerSource != null) result.tokenizerSource = tokenizerSource;
-    if (enableSafetyChecker != null)
-      result.enableSafetyChecker = enableSafetyChecker;
-    if (maxMemoryMb != null) result.maxMemoryMb = maxMemoryMb;
-    if (modelId != null) result.modelId = modelId;
-    if (preferredFramework != null)
-      result.preferredFramework = preferredFramework;
-    return result;
-  }
-
-  DiffusionConfiguration._();
-
-  factory DiffusionConfiguration.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DiffusionConfiguration.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DiffusionConfiguration',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<DiffusionModelVariant>(1, _omitFieldNames ? '' : 'modelVariant',
-        enumValues: DiffusionModelVariant.values)
-    ..aOM<DiffusionTokenizerSource>(2, _omitFieldNames ? '' : 'tokenizerSource',
-        subBuilder: DiffusionTokenizerSource.create)
-    ..aOB(3, _omitFieldNames ? '' : 'enableSafetyChecker')
-    ..aI(4, _omitFieldNames ? '' : 'maxMemoryMb')
-    ..aOS(5, _omitFieldNames ? '' : 'modelId')
-    ..aE<$1.InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $1.InferenceFramework.values)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DiffusionConfiguration clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DiffusionConfiguration copyWith(
-          void Function(DiffusionConfiguration) updates) =>
-      super.copyWith((message) => updates(message as DiffusionConfiguration))
-          as DiffusionConfiguration;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DiffusionConfiguration create() => DiffusionConfiguration._();
-  @$core.override
-  DiffusionConfiguration createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DiffusionConfiguration getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DiffusionConfiguration>(create);
-  static DiffusionConfiguration? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  DiffusionModelVariant get modelVariant => $_getN(0);
-  @$pb.TagNumber(1)
-  set modelVariant(DiffusionModelVariant value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasModelVariant() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearModelVariant() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  DiffusionTokenizerSource get tokenizerSource => $_getN(1);
-  @$pb.TagNumber(2)
-  set tokenizerSource(DiffusionTokenizerSource value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasTokenizerSource() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearTokenizerSource() => $_clearField(2);
-  @$pb.TagNumber(2)
-  DiffusionTokenizerSource ensureTokenizerSource() => $_ensure(1);
-
-  @$pb.TagNumber(3)
-  $core.bool get enableSafetyChecker => $_getBF(2);
-  @$pb.TagNumber(3)
-  set enableSafetyChecker($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasEnableSafetyChecker() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearEnableSafetyChecker() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get maxMemoryMb => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set maxMemoryMb($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasMaxMemoryMb() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearMaxMemoryMb() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get modelId => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set modelId($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasModelId() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearModelId() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $1.InferenceFramework get preferredFramework => $_getN(5);
-  @$pb.TagNumber(6)
-  set preferredFramework($1.InferenceFramework value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasPreferredFramework() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearPreferredFramework() => $_clearField(6);
-}
 
 class DiffusionGenerationOptions extends $pb.GeneratedMessage {
   factory DiffusionGenerationOptions({
@@ -235,18 +32,13 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
     $core.double? guidanceScale,
     $fixnum.Int64? seed,
     DiffusionScheduler? scheduler,
-    DiffusionMode? mode,
-    $core.List<$core.int>? inputImage,
+    $core.List<$core.int>? image,
     $core.List<$core.int>? maskImage,
-    $core.double? denoiseStrength,
-    $core.bool? reportIntermediateImages,
-    $core.int? progressStride,
-    $core.int? inputImageWidth,
-    $core.int? inputImageHeight,
-    $core.String? inputImageMediaType,
+    $core.double? strength,
+    $core.String? imageMediaType,
     $core.String? maskImageMediaType,
-    $core.int? batchSize,
-    $core.bool? returnLatents,
+    $core.int? n,
+    DiffusionOutputFormat? outputFormat,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
@@ -257,21 +49,14 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
     if (guidanceScale != null) result.guidanceScale = guidanceScale;
     if (seed != null) result.seed = seed;
     if (scheduler != null) result.scheduler = scheduler;
-    if (mode != null) result.mode = mode;
-    if (inputImage != null) result.inputImage = inputImage;
+    if (image != null) result.image = image;
     if (maskImage != null) result.maskImage = maskImage;
-    if (denoiseStrength != null) result.denoiseStrength = denoiseStrength;
-    if (reportIntermediateImages != null)
-      result.reportIntermediateImages = reportIntermediateImages;
-    if (progressStride != null) result.progressStride = progressStride;
-    if (inputImageWidth != null) result.inputImageWidth = inputImageWidth;
-    if (inputImageHeight != null) result.inputImageHeight = inputImageHeight;
-    if (inputImageMediaType != null)
-      result.inputImageMediaType = inputImageMediaType;
+    if (strength != null) result.strength = strength;
+    if (imageMediaType != null) result.imageMediaType = imageMediaType;
     if (maskImageMediaType != null)
       result.maskImageMediaType = maskImageMediaType;
-    if (batchSize != null) result.batchSize = batchSize;
-    if (returnLatents != null) result.returnLatents = returnLatents;
+    if (n != null) result.n = n;
+    if (outputFormat != null) result.outputFormat = outputFormat;
     return result;
   }
 
@@ -298,22 +83,16 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
     ..aInt64(7, _omitFieldNames ? '' : 'seed')
     ..aE<DiffusionScheduler>(8, _omitFieldNames ? '' : 'scheduler',
         enumValues: DiffusionScheduler.values)
-    ..aE<DiffusionMode>(9, _omitFieldNames ? '' : 'mode',
-        enumValues: DiffusionMode.values)
     ..a<$core.List<$core.int>>(
-        10, _omitFieldNames ? '' : 'inputImage', $pb.PbFieldType.OY)
+        9, _omitFieldNames ? '' : 'image', $pb.PbFieldType.OY)
     ..a<$core.List<$core.int>>(
-        11, _omitFieldNames ? '' : 'maskImage', $pb.PbFieldType.OY)
-    ..aD(12, _omitFieldNames ? '' : 'denoiseStrength',
-        fieldType: $pb.PbFieldType.OF)
-    ..aOB(13, _omitFieldNames ? '' : 'reportIntermediateImages')
-    ..aI(14, _omitFieldNames ? '' : 'progressStride')
-    ..aI(15, _omitFieldNames ? '' : 'inputImageWidth')
-    ..aI(16, _omitFieldNames ? '' : 'inputImageHeight')
-    ..aOS(17, _omitFieldNames ? '' : 'inputImageMediaType')
-    ..aOS(18, _omitFieldNames ? '' : 'maskImageMediaType')
-    ..aI(19, _omitFieldNames ? '' : 'batchSize')
-    ..aOB(20, _omitFieldNames ? '' : 'returnLatents')
+        10, _omitFieldNames ? '' : 'maskImage', $pb.PbFieldType.OY)
+    ..aD(11, _omitFieldNames ? '' : 'strength', fieldType: $pb.PbFieldType.OF)
+    ..aOS(12, _omitFieldNames ? '' : 'imageMediaType')
+    ..aOS(13, _omitFieldNames ? '' : 'maskImageMediaType')
+    ..aI(14, _omitFieldNames ? '' : 'n')
+    ..aE<DiffusionOutputFormat>(15, _omitFieldNames ? '' : 'outputFormat',
+        enumValues: DiffusionOutputFormat.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -392,7 +171,8 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearGuidanceScale() => $_clearField(6);
 
-  /// -1 = random.
+  /// Absent = pick a fresh random seed. Any present value is literal,
+  /// including 0. The seed actually used comes back on each result image.
   @$pb.TagNumber(7)
   $fixnum.Int64 get seed => $_getI64(6);
   @$pb.TagNumber(7)
@@ -411,129 +191,89 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearScheduler() => $_clearField(8);
 
+  /// Source picture. Its presence promotes the request to image-to-image;
+  /// adding `mask_image` promotes it to inpainting. Must be an encoded
+  /// PNG or JPEG container.
   @$pb.TagNumber(9)
-  DiffusionMode get mode => $_getN(8);
+  $core.List<$core.int> get image => $_getN(8);
   @$pb.TagNumber(9)
-  set mode(DiffusionMode value) => $_setField(9, value);
+  set image($core.List<$core.int> value) => $_setBytes(8, value);
   @$pb.TagNumber(9)
-  $core.bool hasMode() => $_has(8);
+  $core.bool hasImage() => $_has(8);
   @$pb.TagNumber(9)
-  void clearMode() => $_clearField(9);
+  void clearImage() => $_clearField(9);
 
-  /// For IMAGE_TO_IMAGE and INPAINTING.
+  /// White = repaint. Same dimensions as `image`.
   @$pb.TagNumber(10)
-  $core.List<$core.int> get inputImage => $_getN(9);
+  $core.List<$core.int> get maskImage => $_getN(9);
   @$pb.TagNumber(10)
-  set inputImage($core.List<$core.int> value) => $_setBytes(9, value);
+  set maskImage($core.List<$core.int> value) => $_setBytes(9, value);
   @$pb.TagNumber(10)
-  $core.bool hasInputImage() => $_has(9);
+  $core.bool hasMaskImage() => $_has(9);
   @$pb.TagNumber(10)
-  void clearInputImage() => $_clearField(10);
+  void clearMaskImage() => $_clearField(10);
 
+  /// How far from the source image to travel. Only meaningful with `image`.
+  /// Effective steps = ceil(steps * strength), so a low value is
+  /// proportionally cheaper -- on device that is battery.
   @$pb.TagNumber(11)
-  $core.List<$core.int> get maskImage => $_getN(10);
+  $core.double get strength => $_getN(10);
   @$pb.TagNumber(11)
-  set maskImage($core.List<$core.int> value) => $_setBytes(10, value);
+  set strength($core.double value) => $_setFloat(10, value);
   @$pb.TagNumber(11)
-  $core.bool hasMaskImage() => $_has(10);
+  $core.bool hasStrength() => $_has(10);
   @$pb.TagNumber(11)
-  void clearMaskImage() => $_clearField(11);
+  void clearStrength() => $_clearField(11);
 
+  /// Container of the bytes above, as supplied by the caller. Request-side;
+  /// the result carries its own media type per image.
   @$pb.TagNumber(12)
-  $core.double get denoiseStrength => $_getN(11);
+  $core.String get imageMediaType => $_getSZ(11);
   @$pb.TagNumber(12)
-  set denoiseStrength($core.double value) => $_setFloat(11, value);
+  set imageMediaType($core.String value) => $_setString(11, value);
   @$pb.TagNumber(12)
-  $core.bool hasDenoiseStrength() => $_has(11);
+  $core.bool hasImageMediaType() => $_has(11);
   @$pb.TagNumber(12)
-  void clearDenoiseStrength() => $_clearField(12);
+  void clearImageMediaType() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.bool get reportIntermediateImages => $_getBF(12);
+  $core.String get maskImageMediaType => $_getSZ(12);
   @$pb.TagNumber(13)
-  set reportIntermediateImages($core.bool value) => $_setBool(12, value);
+  set maskImageMediaType($core.String value) => $_setString(12, value);
   @$pb.TagNumber(13)
-  $core.bool hasReportIntermediateImages() => $_has(12);
+  $core.bool hasMaskImageMediaType() => $_has(12);
   @$pb.TagNumber(13)
-  void clearReportIntermediateImages() => $_clearField(13);
+  void clearMaskImageMediaType() => $_clearField(13);
 
+  /// How many images to generate for this prompt. Absent = 1.
   @$pb.TagNumber(14)
-  $core.int get progressStride => $_getIZ(13);
+  $core.int get n => $_getIZ(13);
   @$pb.TagNumber(14)
-  set progressStride($core.int value) => $_setSignedInt32(13, value);
+  set n($core.int value) => $_setSignedInt32(13, value);
   @$pb.TagNumber(14)
-  $core.bool hasProgressStride() => $_has(13);
+  $core.bool hasN() => $_has(13);
   @$pb.TagNumber(14)
-  void clearProgressStride() => $_clearField(14);
+  void clearN() => $_clearField(14);
 
+  /// Encoding of the returned image bytes.
   @$pb.TagNumber(15)
-  $core.int get inputImageWidth => $_getIZ(14);
+  DiffusionOutputFormat get outputFormat => $_getN(14);
   @$pb.TagNumber(15)
-  set inputImageWidth($core.int value) => $_setSignedInt32(14, value);
+  set outputFormat(DiffusionOutputFormat value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasInputImageWidth() => $_has(14);
+  $core.bool hasOutputFormat() => $_has(14);
   @$pb.TagNumber(15)
-  void clearInputImageWidth() => $_clearField(15);
-
-  @$pb.TagNumber(16)
-  $core.int get inputImageHeight => $_getIZ(15);
-  @$pb.TagNumber(16)
-  set inputImageHeight($core.int value) => $_setSignedInt32(15, value);
-  @$pb.TagNumber(16)
-  $core.bool hasInputImageHeight() => $_has(15);
-  @$pb.TagNumber(16)
-  void clearInputImageHeight() => $_clearField(16);
-
-  @$pb.TagNumber(17)
-  $core.String get inputImageMediaType => $_getSZ(16);
-  @$pb.TagNumber(17)
-  set inputImageMediaType($core.String value) => $_setString(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasInputImageMediaType() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearInputImageMediaType() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  $core.String get maskImageMediaType => $_getSZ(17);
-  @$pb.TagNumber(18)
-  set maskImageMediaType($core.String value) => $_setString(17, value);
-  @$pb.TagNumber(18)
-  $core.bool hasMaskImageMediaType() => $_has(17);
-  @$pb.TagNumber(18)
-  void clearMaskImageMediaType() => $_clearField(18);
-
-  /// 0 = one image.
-  @$pb.TagNumber(19)
-  $core.int get batchSize => $_getIZ(18);
-  @$pb.TagNumber(19)
-  set batchSize($core.int value) => $_setSignedInt32(18, value);
-  @$pb.TagNumber(19)
-  $core.bool hasBatchSize() => $_has(18);
-  @$pb.TagNumber(19)
-  void clearBatchSize() => $_clearField(19);
-
-  @$pb.TagNumber(20)
-  $core.bool get returnLatents => $_getBF(19);
-  @$pb.TagNumber(20)
-  set returnLatents($core.bool value) => $_setBool(19, value);
-  @$pb.TagNumber(20)
-  $core.bool hasReturnLatents() => $_has(19);
-  @$pb.TagNumber(20)
-  void clearReturnLatents() => $_clearField(20);
+  void clearOutputFormat() => $_clearField(15);
 }
 
 class DiffusionGenerationRequest extends $pb.GeneratedMessage {
   factory DiffusionGenerationRequest({
-    $core.String? requestId,
     DiffusionGenerationOptions? options,
     $core.String? modelId,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
   }) {
     final result = create();
-    if (requestId != null) result.requestId = requestId;
     if (options != null) result.options = options;
     if (modelId != null) result.modelId = modelId;
-    if (metadata != null) result.metadata.addEntries(metadata);
     return result;
   }
 
@@ -550,15 +290,9 @@ class DiffusionGenerationRequest extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DiffusionGenerationRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..aOM<DiffusionGenerationOptions>(2, _omitFieldNames ? '' : 'options',
+    ..aOM<DiffusionGenerationOptions>(1, _omitFieldNames ? '' : 'options',
         subBuilder: DiffusionGenerationOptions.create)
-    ..aOS(3, _omitFieldNames ? '' : 'modelId')
-    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'DiffusionGenerationRequest.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
+    ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -583,66 +317,37 @@ class DiffusionGenerationRequest extends $pb.GeneratedMessage {
   static DiffusionGenerationRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get requestId => $_getSZ(0);
+  DiffusionGenerationOptions get options => $_getN(0);
   @$pb.TagNumber(1)
-  set requestId($core.String value) => $_setString(0, value);
+  set options(DiffusionGenerationOptions value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasRequestId() => $_has(0);
+  $core.bool hasOptions() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRequestId() => $_clearField(1);
+  void clearOptions() => $_clearField(1);
+  @$pb.TagNumber(1)
+  DiffusionGenerationOptions ensureOptions() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  DiffusionGenerationOptions get options => $_getN(1);
+  $core.String get modelId => $_getSZ(1);
   @$pb.TagNumber(2)
-  set options(DiffusionGenerationOptions value) => $_setField(2, value);
+  set modelId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasOptions() => $_has(1);
+  $core.bool hasModelId() => $_has(1);
   @$pb.TagNumber(2)
-  void clearOptions() => $_clearField(2);
-  @$pb.TagNumber(2)
-  DiffusionGenerationOptions ensureOptions() => $_ensure(1);
-
-  @$pb.TagNumber(3)
-  $core.String get modelId => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set modelId($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasModelId() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearModelId() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(3);
+  void clearModelId() => $_clearField(2);
 }
 
 class DiffusionProgress extends $pb.GeneratedMessage {
   factory DiffusionProgress({
-    $core.double? progressPercent,
     $core.int? currentStep,
     $core.int? totalSteps,
-    $core.String? stage,
     $core.List<$core.int>? intermediateImageData,
-    $core.int? intermediateImageWidth,
-    $core.int? intermediateImageHeight,
-    $fixnum.Int64? timestampMs,
-    $fixnum.Int64? etaMs,
-    $core.String? intermediateImageMediaType,
   }) {
     final result = create();
-    if (progressPercent != null) result.progressPercent = progressPercent;
     if (currentStep != null) result.currentStep = currentStep;
     if (totalSteps != null) result.totalSteps = totalSteps;
-    if (stage != null) result.stage = stage;
     if (intermediateImageData != null)
       result.intermediateImageData = intermediateImageData;
-    if (intermediateImageWidth != null)
-      result.intermediateImageWidth = intermediateImageWidth;
-    if (intermediateImageHeight != null)
-      result.intermediateImageHeight = intermediateImageHeight;
-    if (timestampMs != null) result.timestampMs = timestampMs;
-    if (etaMs != null) result.etaMs = etaMs;
-    if (intermediateImageMediaType != null)
-      result.intermediateImageMediaType = intermediateImageMediaType;
     return result;
   }
 
@@ -659,18 +364,10 @@ class DiffusionProgress extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DiffusionProgress',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aD(1, _omitFieldNames ? '' : 'progressPercent',
-        fieldType: $pb.PbFieldType.OF)
-    ..aI(2, _omitFieldNames ? '' : 'currentStep')
-    ..aI(3, _omitFieldNames ? '' : 'totalSteps')
-    ..aOS(4, _omitFieldNames ? '' : 'stage')
+    ..aI(1, _omitFieldNames ? '' : 'currentStep')
+    ..aI(2, _omitFieldNames ? '' : 'totalSteps')
     ..a<$core.List<$core.int>>(
-        5, _omitFieldNames ? '' : 'intermediateImageData', $pb.PbFieldType.OY)
-    ..aI(6, _omitFieldNames ? '' : 'intermediateImageWidth')
-    ..aI(7, _omitFieldNames ? '' : 'intermediateImageHeight')
-    ..aInt64(8, _omitFieldNames ? '' : 'timestampMs')
-    ..aInt64(9, _omitFieldNames ? '' : 'etaMs')
-    ..aOS(10, _omitFieldNames ? '' : 'intermediateImageMediaType')
+        3, _omitFieldNames ? '' : 'intermediateImageData', $pb.PbFieldType.OY)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -693,123 +390,160 @@ class DiffusionProgress extends $pb.GeneratedMessage {
   static DiffusionProgress? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.double get progressPercent => $_getN(0);
+  $core.int get currentStep => $_getIZ(0);
   @$pb.TagNumber(1)
-  set progressPercent($core.double value) => $_setFloat(0, value);
+  set currentStep($core.int value) => $_setSignedInt32(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasProgressPercent() => $_has(0);
+  $core.bool hasCurrentStep() => $_has(0);
   @$pb.TagNumber(1)
-  void clearProgressPercent() => $_clearField(1);
+  void clearCurrentStep() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get currentStep => $_getIZ(1);
+  $core.int get totalSteps => $_getIZ(1);
   @$pb.TagNumber(2)
-  set currentStep($core.int value) => $_setSignedInt32(1, value);
+  set totalSteps($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasCurrentStep() => $_has(1);
+  $core.bool hasTotalSteps() => $_has(1);
   @$pb.TagNumber(2)
-  void clearCurrentStep() => $_clearField(2);
+  void clearTotalSteps() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get totalSteps => $_getIZ(2);
+  $core.List<$core.int> get intermediateImageData => $_getN(2);
   @$pb.TagNumber(3)
-  set totalSteps($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasTotalSteps() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearTotalSteps() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get stage => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set stage($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasStage() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearStage() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.List<$core.int> get intermediateImageData => $_getN(4);
-  @$pb.TagNumber(5)
   set intermediateImageData($core.List<$core.int> value) =>
-      $_setBytes(4, value);
+      $_setBytes(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasIntermediateImageData() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearIntermediateImageData() => $_clearField(3);
+}
+
+/// One generated image. Per-image, because with n > 1 each image has its
+/// own seed and its own safety verdict (Stability `seeds`/`finish_reasons`,
+/// Diffusers `nsfw_content_detected`).
+class DiffusionImage extends $pb.GeneratedMessage {
+  factory DiffusionImage({
+    $core.List<$core.int>? data,
+    $core.int? width,
+    $core.int? height,
+    $fixnum.Int64? seedUsed,
+    $core.bool? safetyFlag,
+    $core.String? mediaType,
+  }) {
+    final result = create();
+    if (data != null) result.data = data;
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    if (seedUsed != null) result.seedUsed = seedUsed;
+    if (safetyFlag != null) result.safetyFlag = safetyFlag;
+    if (mediaType != null) result.mediaType = mediaType;
+    return result;
+  }
+
+  DiffusionImage._();
+
+  factory DiffusionImage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DiffusionImage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DiffusionImage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aI(2, _omitFieldNames ? '' : 'width')
+    ..aI(3, _omitFieldNames ? '' : 'height')
+    ..aInt64(4, _omitFieldNames ? '' : 'seedUsed')
+    ..aOB(5, _omitFieldNames ? '' : 'safetyFlag')
+    ..aOS(6, _omitFieldNames ? '' : 'mediaType')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DiffusionImage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DiffusionImage copyWith(void Function(DiffusionImage) updates) =>
+      super.copyWith((message) => updates(message as DiffusionImage))
+          as DiffusionImage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DiffusionImage create() => DiffusionImage._();
+  @$core.override
+  DiffusionImage createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DiffusionImage getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DiffusionImage>(create);
+  static DiffusionImage? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get data => $_getN(0);
+  @$pb.TagNumber(1)
+  set data($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearData() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get width => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set width($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWidth() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWidth() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get height => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set height($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasHeight() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearHeight() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get seedUsed => $_getI64(3);
+  @$pb.TagNumber(4)
+  set seedUsed($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSeedUsed() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSeedUsed() => $_clearField(4);
+
   @$pb.TagNumber(5)
-  $core.bool hasIntermediateImageData() => $_has(4);
+  $core.bool get safetyFlag => $_getBF(4);
   @$pb.TagNumber(5)
-  void clearIntermediateImageData() => $_clearField(5);
+  set safetyFlag($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSafetyFlag() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSafetyFlag() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get intermediateImageWidth => $_getIZ(5);
+  $core.String get mediaType => $_getSZ(5);
   @$pb.TagNumber(6)
-  set intermediateImageWidth($core.int value) => $_setSignedInt32(5, value);
+  set mediaType($core.String value) => $_setString(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasIntermediateImageWidth() => $_has(5);
+  $core.bool hasMediaType() => $_has(5);
   @$pb.TagNumber(6)
-  void clearIntermediateImageWidth() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.int get intermediateImageHeight => $_getIZ(6);
-  @$pb.TagNumber(7)
-  set intermediateImageHeight($core.int value) => $_setSignedInt32(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasIntermediateImageHeight() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearIntermediateImageHeight() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $fixnum.Int64 get timestampMs => $_getI64(7);
-  @$pb.TagNumber(8)
-  set timestampMs($fixnum.Int64 value) => $_setInt64(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasTimestampMs() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearTimestampMs() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $fixnum.Int64 get etaMs => $_getI64(8);
-  @$pb.TagNumber(9)
-  set etaMs($fixnum.Int64 value) => $_setInt64(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasEtaMs() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearEtaMs() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.String get intermediateImageMediaType => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set intermediateImageMediaType($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasIntermediateImageMediaType() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearIntermediateImageMediaType() => $_clearField(10);
+  void clearMediaType() => $_clearField(6);
 }
 
 class DiffusionResult extends $pb.GeneratedMessage {
   factory DiffusionResult({
-    $core.List<$core.int>? imageData,
-    $core.int? width,
-    $core.int? height,
-    $fixnum.Int64? seedUsed,
+    $core.Iterable<DiffusionImage>? images,
     $fixnum.Int64? totalTimeMs,
-    $core.bool? safetyFlag,
-    DiffusionScheduler? usedScheduler,
-    $core.String? imageMediaType,
-    $core.Iterable<$core.List<$core.int>>? batchImages,
-    $core.int? imagesGenerated,
-    $0.SDKError? error,
   }) {
     final result = create();
-    if (imageData != null) result.imageData = imageData;
-    if (width != null) result.width = width;
-    if (height != null) result.height = height;
-    if (seedUsed != null) result.seedUsed = seedUsed;
+    if (images != null) result.images.addAll(images);
     if (totalTimeMs != null) result.totalTimeMs = totalTimeMs;
-    if (safetyFlag != null) result.safetyFlag = safetyFlag;
-    if (usedScheduler != null) result.usedScheduler = usedScheduler;
-    if (imageMediaType != null) result.imageMediaType = imageMediaType;
-    if (batchImages != null) result.batchImages.addAll(batchImages);
-    if (imagesGenerated != null) result.imagesGenerated = imagesGenerated;
-    if (error != null) result.error = error;
     return result;
   }
 
@@ -826,21 +560,9 @@ class DiffusionResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DiffusionResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..a<$core.List<$core.int>>(
-        1, _omitFieldNames ? '' : 'imageData', $pb.PbFieldType.OY)
-    ..aI(2, _omitFieldNames ? '' : 'width')
-    ..aI(3, _omitFieldNames ? '' : 'height')
-    ..aInt64(4, _omitFieldNames ? '' : 'seedUsed')
-    ..aInt64(5, _omitFieldNames ? '' : 'totalTimeMs')
-    ..aOB(6, _omitFieldNames ? '' : 'safetyFlag')
-    ..aE<DiffusionScheduler>(7, _omitFieldNames ? '' : 'usedScheduler',
-        enumValues: DiffusionScheduler.values)
-    ..aOS(10, _omitFieldNames ? '' : 'imageMediaType')
-    ..p<$core.List<$core.int>>(
-        11, _omitFieldNames ? '' : 'batchImages', $pb.PbFieldType.PY)
-    ..aI(12, _omitFieldNames ? '' : 'imagesGenerated')
-    ..aOM<$0.SDKError>(13, _omitFieldNames ? '' : 'error',
-        subBuilder: $0.SDKError.create)
+    ..pPM<DiffusionImage>(1, _omitFieldNames ? '' : 'images',
+        subBuilder: DiffusionImage.create)
+    ..aInt64(2, _omitFieldNames ? '' : 'totalTimeMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -862,107 +584,25 @@ class DiffusionResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<DiffusionResult>(create);
   static DiffusionResult? _defaultInstance;
 
+  /// One entry per requested image, in request order. commons emits exactly
+  /// one entry until the C ABI grows a list: rac_diffusion_result_t is a
+  /// single-image struct with one image_data/image_size pair.
   @$pb.TagNumber(1)
-  $core.List<$core.int> get imageData => $_getN(0);
-  @$pb.TagNumber(1)
-  set imageData($core.List<$core.int> value) => $_setBytes(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasImageData() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearImageData() => $_clearField(1);
+  $pb.PbList<DiffusionImage> get images => $_getList(0);
 
   @$pb.TagNumber(2)
-  $core.int get width => $_getIZ(1);
+  $fixnum.Int64 get totalTimeMs => $_getI64(1);
   @$pb.TagNumber(2)
-  set width($core.int value) => $_setSignedInt32(1, value);
+  set totalTimeMs($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasWidth() => $_has(1);
+  $core.bool hasTotalTimeMs() => $_has(1);
   @$pb.TagNumber(2)
-  void clearWidth() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.int get height => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set height($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasHeight() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearHeight() => $_clearField(3);
-
-  /// The resolved seed, so a run can be reproduced when seed was -1.
-  @$pb.TagNumber(4)
-  $fixnum.Int64 get seedUsed => $_getI64(3);
-  @$pb.TagNumber(4)
-  set seedUsed($fixnum.Int64 value) => $_setInt64(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasSeedUsed() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearSeedUsed() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get totalTimeMs => $_getI64(4);
-  @$pb.TagNumber(5)
-  set totalTimeMs($fixnum.Int64 value) => $_setInt64(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasTotalTimeMs() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearTotalTimeMs() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.bool get safetyFlag => $_getBF(5);
-  @$pb.TagNumber(6)
-  set safetyFlag($core.bool value) => $_setBool(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasSafetyFlag() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearSafetyFlag() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  DiffusionScheduler get usedScheduler => $_getN(6);
-  @$pb.TagNumber(7)
-  set usedScheduler(DiffusionScheduler value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasUsedScheduler() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearUsedScheduler() => $_clearField(7);
-
-  @$pb.TagNumber(10)
-  $core.String get imageMediaType => $_getSZ(7);
-  @$pb.TagNumber(10)
-  set imageMediaType($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(10)
-  $core.bool hasImageMediaType() => $_has(7);
-  @$pb.TagNumber(10)
-  void clearImageMediaType() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $pb.PbList<$core.List<$core.int>> get batchImages => $_getList(8);
-
-  @$pb.TagNumber(12)
-  $core.int get imagesGenerated => $_getIZ(9);
-  @$pb.TagNumber(12)
-  set imagesGenerated($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(12)
-  $core.bool hasImagesGenerated() => $_has(9);
-  @$pb.TagNumber(12)
-  void clearImagesGenerated() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  $0.SDKError get error => $_getN(10);
-  @$pb.TagNumber(13)
-  set error($0.SDKError value) => $_setField(13, value);
-  @$pb.TagNumber(13)
-  $core.bool hasError() => $_has(10);
-  @$pb.TagNumber(13)
-  void clearError() => $_clearField(13);
-  @$pb.TagNumber(13)
-  $0.SDKError ensureError() => $_ensure(10);
+  void clearTotalTimeMs() => $_clearField(2);
 }
 
 class DiffusionStreamEvent extends $pb.GeneratedMessage {
   factory DiffusionStreamEvent({
     $fixnum.Int64? timestampUs,
-    $core.String? requestId,
     DiffusionStreamEventKind? kind,
     DiffusionProgress? progress,
     DiffusionResult? result,
@@ -970,7 +610,6 @@ class DiffusionStreamEvent extends $pb.GeneratedMessage {
   }) {
     final result$ = create();
     if (timestampUs != null) result$.timestampUs = timestampUs;
-    if (requestId != null) result$.requestId = requestId;
     if (kind != null) result$.kind = kind;
     if (progress != null) result$.progress = progress;
     if (result != null) result$.result = result;
@@ -991,15 +630,14 @@ class DiffusionStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DiffusionStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
-    ..aOS(3, _omitFieldNames ? '' : 'requestId')
-    ..aE<DiffusionStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
+    ..aInt64(1, _omitFieldNames ? '' : 'timestampUs')
+    ..aE<DiffusionStreamEventKind>(2, _omitFieldNames ? '' : 'kind',
         enumValues: DiffusionStreamEventKind.values)
-    ..aOM<DiffusionProgress>(5, _omitFieldNames ? '' : 'progress',
+    ..aOM<DiffusionProgress>(3, _omitFieldNames ? '' : 'progress',
         subBuilder: DiffusionProgress.create)
-    ..aOM<DiffusionResult>(6, _omitFieldNames ? '' : 'result',
+    ..aOM<DiffusionResult>(4, _omitFieldNames ? '' : 'result',
         subBuilder: DiffusionResult.create)
-    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
+    ..aOM<$0.SDKError>(5, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
@@ -1022,65 +660,57 @@ class DiffusionStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<DiffusionStreamEvent>(create);
   static DiffusionStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(2)
+  /// Generation is single-flight, so the stream itself is the correlation.
+  @$pb.TagNumber(1)
   $fixnum.Int64 get timestampUs => $_getI64(0);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   $core.bool hasTimestampUs() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTimestampUs() => $_clearField(1);
+
   @$pb.TagNumber(2)
-  void clearTimestampUs() => $_clearField(2);
+  DiffusionStreamEventKind get kind => $_getN(1);
+  @$pb.TagNumber(2)
+  set kind(DiffusionStreamEventKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKind() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKind() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get requestId => $_getSZ(1);
+  DiffusionProgress get progress => $_getN(2);
   @$pb.TagNumber(3)
-  set requestId($core.String value) => $_setString(1, value);
+  set progress(DiffusionProgress value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasRequestId() => $_has(1);
+  $core.bool hasProgress() => $_has(2);
   @$pb.TagNumber(3)
-  void clearRequestId() => $_clearField(3);
+  void clearProgress() => $_clearField(3);
+  @$pb.TagNumber(3)
+  DiffusionProgress ensureProgress() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  DiffusionStreamEventKind get kind => $_getN(2);
+  DiffusionResult get result => $_getN(3);
   @$pb.TagNumber(4)
-  set kind(DiffusionStreamEventKind value) => $_setField(4, value);
+  set result(DiffusionResult value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(2);
+  $core.bool hasResult() => $_has(3);
   @$pb.TagNumber(4)
-  void clearKind() => $_clearField(4);
+  void clearResult() => $_clearField(4);
+  @$pb.TagNumber(4)
+  DiffusionResult ensureResult() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  DiffusionProgress get progress => $_getN(3);
+  $0.SDKError get error => $_getN(4);
   @$pb.TagNumber(5)
-  set progress(DiffusionProgress value) => $_setField(5, value);
+  set error($0.SDKError value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasProgress() => $_has(3);
+  $core.bool hasError() => $_has(4);
   @$pb.TagNumber(5)
-  void clearProgress() => $_clearField(5);
+  void clearError() => $_clearField(5);
   @$pb.TagNumber(5)
-  DiffusionProgress ensureProgress() => $_ensure(3);
-
-  @$pb.TagNumber(6)
-  DiffusionResult get result => $_getN(4);
-  @$pb.TagNumber(6)
-  set result(DiffusionResult value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasResult() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearResult() => $_clearField(6);
-  @$pb.TagNumber(6)
-  DiffusionResult ensureResult() => $_ensure(4);
-
-  @$pb.TagNumber(9)
-  $0.SDKError get error => $_getN(5);
-  @$pb.TagNumber(9)
-  set error($0.SDKError value) => $_setField(9, value);
-  @$pb.TagNumber(9)
-  $core.bool hasError() => $_has(5);
-  @$pb.TagNumber(9)
-  void clearError() => $_clearField(9);
-  @$pb.TagNumber(9)
-  $0.SDKError ensureError() => $_ensure(5);
+  $0.SDKError ensureError() => $_ensure(4);
 }
 
 const $core.bool _omitFieldNames =

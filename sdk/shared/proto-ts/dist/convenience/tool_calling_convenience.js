@@ -17,9 +17,9 @@ exports.validateToolCallingOptions = exports.toolCallingOptionsDefaults = void 0
 const _errors_1 = require("./_errors");
 const toolCallingOptionsDefaults = () => ({
     tools: [],
-    autoExecute: true,
     replaceSystemPrompt: false,
     keepToolsAvailable: false,
+    parallelToolCalls: false,
     maxToolCalls: 5,
     toolChoice: 0,
     requireJsonArguments: false,

@@ -223,9 +223,9 @@ int main(int argc, char** argv) {
         g->set_kind(v1::GENERATION_EVENT_KIND_COMPLETED);
         g->set_model_id("rcli-live-test");
         g->set_input_tokens(10);
-        g->set_tokens_used(20);
+        g->set_output_tokens(20);
         g->set_tokens_per_second(40.0);
-        g->set_prompt_eval_time_ms(100);
+        g->set_prefill_duration_ms(100);
         send_and_assert(mgr, &state, ev, "llm");
     }
     // Embeddings

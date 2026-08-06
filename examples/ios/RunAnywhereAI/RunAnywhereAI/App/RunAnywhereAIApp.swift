@@ -240,7 +240,11 @@ struct RunAnywhereAIApp: App {
 
         do {
             let models = try await RunAnywhere.models.list()
-            let downloaded = models.filter(\.isDownloaded).count
+            // ModelInfo.isDownloaded was deleted outright (idl/model_types.proto:
+            // "reserved 32; // was is_downloaded: a bool cannot express
+            // DOWNLOADING") -- a non-empty localPath is the simplest local
+            // proxy, same as every other read site in the SDK.
+            let downloaded = models.filter { !$0.localPath.isEmpty }.count
             let available = models.filter(\.isAvailableForUse).count
             logger.info(
                 "Model registry: registered=\(models.count), downloaded=\(downloaded), available=\(available)"

@@ -151,7 +151,7 @@ enum CalendarTool {
                 inventing an event.
                 """,
             parameters: [
-                RAToolParameter(
+                ToolParameter(
                     name: "date",
                     type: .string,
                     description: """
@@ -162,7 +162,7 @@ enum CalendarTool {
                         """,
                     required: false
                 ),
-                RAToolParameter(
+                ToolParameter(
                     name: "start_date",
                     type: .string,
                     description: """
@@ -172,7 +172,7 @@ enum CalendarTool {
                         """,
                     required: false
                 ),
-                RAToolParameter(
+                ToolParameter(
                     name: "end_date",
                     type: .string,
                     description: "End of the custom date range (inclusive), as \"YYYY-MM-DD\". Only used together with start_date.",

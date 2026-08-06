@@ -21,6 +21,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 #include "rac/core/rac_types.h"
@@ -64,9 +65,12 @@ struct LLMStreamEventParams {
 
     // Optional terminal aggregate result. Only populated on the
     // is_final=true event by callers that have access to libprotobuf
-    // (proto_service path). When null, proto3 omits field 10.
+    // (proto_service path). When null, proto3 omits field 22.
+    // LLMStreamFinalResult was deleted (idl/llm_service.proto): the stream's
+    // terminal result is now the same LLMGenerationResult the unary call
+    // returns, carried on LLMStreamEvent.result (fresh tag 22).
 #ifdef RAC_HAVE_PROTOBUF
-    const runanywhere::v1::LLMStreamFinalResult* final_result = nullptr;
+    const runanywhere::v1::LLMGenerationResult* final_result = nullptr;
     // optional tool_call payload (proto field 18). Populated
     // by the tool-calling boundary-detection path in llm_component.cpp /
     // rac_llm_proto_service.cpp so streaming consumers can observe the tool
@@ -96,6 +100,50 @@ struct LLMStreamEventParams {
  * consumed by the hand-encoded WASM path (no libprotobuf there).
  */
 int derive_event_kind(int kind, bool is_final, const char* error_message);
+
+/**
+ * @brief Map a producer's plain-string finish reason ("stop", "length",
+ *        "cancelled", "error", "unknown", …) to the wire-int value of
+ *        `runanywhere.v1.FinishReason` (idl/llm_options.proto).
+ *
+ * `LLMStreamEvent.finish_reason` (proto field 21) and
+ * `LLMGenerationResult.finish_reason` (proto field 27) were both widened
+ * from a bare `string` to this enum in the API-realignment pass. Producers
+ * in this file still reason in terms of short English strings (easier to
+ * fall through several honesty-preserving heuristics with), so this single
+ * mapping keeps every call site consistent. Returns a plain int (matching
+ * FinishReason's wire ordinals) so the hand-encoded WASM path can use it
+ * without linking libprotobuf. Unrecognized/empty input maps to
+ * FINISH_REASON_UNSPECIFIED (0).
+ */
+inline int finish_reason_from_string(const char* s) {
+    if (s == nullptr || s[0] == '\0') {
+        return 0;  // FINISH_REASON_UNSPECIFIED
+    }
+    if (std::strcmp(s, "stop") == 0) {
+        return 1;  // FINISH_REASON_STOP
+    }
+    if (std::strcmp(s, "length") == 0) {
+        return 2;  // FINISH_REASON_LENGTH
+    }
+    if (std::strcmp(s, "stop_sequence") == 0) {
+        return 3;  // FINISH_REASON_STOP_SEQUENCE
+    }
+    if (std::strcmp(s, "tool_calls") == 0) {
+        return 4;  // FINISH_REASON_TOOL_CALLS
+    }
+    if (std::strcmp(s, "cancelled") == 0) {
+        return 5;  // FINISH_REASON_CANCELLED
+    }
+    if (std::strcmp(s, "context_overflow") == 0) {
+        return 6;  // FINISH_REASON_CONTEXT_OVERFLOW
+    }
+    if (std::strcmp(s, "error") == 0) {
+        return 7;  // FINISH_REASON_ERROR
+    }
+    // "unknown" and anything else unrecognized -> UNSPECIFIED. Do not guess.
+    return 0;
+}
 
 /**
  * @brief Serialize a `LLMStreamEvent` into the supplied vector.

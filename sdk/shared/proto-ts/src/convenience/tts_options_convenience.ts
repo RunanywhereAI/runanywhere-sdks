@@ -14,14 +14,9 @@
 
 /* eslint-disable */
 
-import { TTSConfiguration, TTSOptions } from '../tts_options';
+import { TTSOptions } from '../tts_options';
 import { AudioFormat } from '../model_types';
 import { ValidationError } from './_errors';
-
-export const tTSConfigurationDefaults = (): TTSConfiguration => ({
-  modelId: '',
-  enableNeuralVoice: true,
-});
 
 export const tTSOptionsDefaults = (): TTSOptions => ({
   voice: '',
@@ -29,10 +24,8 @@ export const tTSOptionsDefaults = (): TTSOptions => ({
   speed: 1.0,
   pitch: 1.0,
   volume: 1.0,
-  enableSsml: false,
   audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-  sampleRate: 22050,
-  speakerId: 0,
+  sampleRate: 0,
 });
 
 export const validateTTSOptions = (m: TTSOptions): void => {
@@ -40,6 +33,12 @@ export const validateTTSOptions = (m: TTSOptions): void => {
     throw new ValidationError({
       fieldPath: 'TTSOptions.speed',
       message: `speed must be in 0.5...2.0 (got ${m.speed})`,
+    });
+  }
+  if (!Number.isFinite(m.pitch) || m.pitch < 0.5 || m.pitch > 2.0) {
+    throw new ValidationError({
+      fieldPath: 'TTSOptions.pitch',
+      message: `pitch must be in 0.5...2.0 (got ${m.pitch})`,
     });
   }
 };

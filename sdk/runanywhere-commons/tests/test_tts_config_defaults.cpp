@@ -2,12 +2,15 @@
  * @file test_tts_config_defaults.cpp
  * @brief Parity tests for rac_tts_configuration_defaults_proto.
  *
- * Verifies the canonical TTSConfiguration defaults emitted by commons match
- * Swift's `RATTSConfiguration.defaults()`
+ * TTSConfiguration was deleted from tts_options.proto entirely (it was
+ * write-only: engine pinning already resolves off ModelLoadRequest, and
+ * "which voice" is TTSOptions.model). rac_tts_configuration_defaults_proto
+ * now populates the surviving TTSOptions message directly with the same
+ * canonical defaults Swift's `RATTSConfiguration.defaults()` used to carry
  * (sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/TTS/
- * RATTSConfiguration+Helpers.swift). When the Swift extension is slimmed,
- * every SDK will call into this ABI for default-population so a single
- * source of truth governs the values.
+ * RATTSConfiguration+Helpers.swift), minus the two fields that no longer
+ * exist: enable_neural_voice (was TTSConfiguration-only, no replacement) and
+ * enable_ssml (reserved outright in TTSOptions -- no backend parses SSML).
  */
 
 #include <cstdint>
@@ -53,18 +56,16 @@ namespace {
 
 #ifdef RAC_HAVE_PROTOBUF
 
-// Verifies the returned proto bytes parse to the canonical default values
-// from Swift's RATTSConfiguration.defaults():
-//   model_id                       = ""
-//   default_options.voice          = "default"
-//   default_options.language_code  = "en-US"
-//   default_options.speed          = 1.0
-//   default_options.pitch          = 1.0
-//   default_options.volume         = 1.0
-//   default_options.audio_format   = AUDIO_FORMAT_PCM
-//   default_options.sample_rate    = 22050
-//   enable_neural_voice            = true
-//   default_options.enable_ssml    = false
+// Verifies the returned proto bytes parse to the canonical TTSOptions
+// defaults rac_tts_configuration_defaults_proto populates directly (see
+// rac_tts_config_defaults.cpp):
+//   voice          = "default"
+//   language_code  = "en-US"
+//   speed          = 1.0
+//   pitch          = 1.0
+//   volume         = 1.0
+//   audio_format   = AUDIO_FORMAT_PCM
+//   sample_rate    = 0   (0 = "native rate" -- naming a rate forces a resample)
 int test_tts_configuration_defaults_match_swift() {
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
@@ -73,20 +74,16 @@ int test_tts_configuration_defaults_match_swift() {
     ASSERT_EQ(rc, RAC_SUCCESS);
     ASSERT_EQ(buffer.status, RAC_SUCCESS);
 
-    runanywhere::v1::TTSConfiguration cfg;
-    ASSERT_TRUE(cfg.ParseFromArray(buffer.data, static_cast<int>(buffer.size)));
+    runanywhere::v1::TTSOptions opts;
+    ASSERT_TRUE(opts.ParseFromArray(buffer.data, static_cast<int>(buffer.size)));
 
-    ASSERT_EQ(cfg.model_id(), std::string(""));
-    ASSERT_TRUE(cfg.has_default_options());
-    ASSERT_EQ(cfg.default_options().voice(), std::string("default"));
-    ASSERT_EQ(cfg.default_options().language_code(), std::string("en-US"));
-    ASSERT_FLOAT_EQ(cfg.default_options().speed(), 1.0f);
-    ASSERT_FLOAT_EQ(cfg.default_options().pitch(), 1.0f);
-    ASSERT_FLOAT_EQ(cfg.default_options().volume(), 1.0f);
-    ASSERT_EQ(cfg.default_options().audio_format(), runanywhere::v1::AUDIO_FORMAT_PCM);
-    ASSERT_EQ(cfg.default_options().sample_rate(), 22050);
-    ASSERT_EQ(cfg.enable_neural_voice(), true);
-    ASSERT_EQ(cfg.default_options().enable_ssml(), false);
+    ASSERT_EQ(opts.voice(), std::string("default"));
+    ASSERT_EQ(opts.language_code(), std::string("en-US"));
+    ASSERT_FLOAT_EQ(opts.speed(), 1.0f);
+    ASSERT_FLOAT_EQ(opts.pitch(), 1.0f);
+    ASSERT_FLOAT_EQ(opts.volume(), 1.0f);
+    ASSERT_EQ(opts.audio_format(), runanywhere::v1::AUDIO_FORMAT_PCM);
+    ASSERT_EQ(opts.sample_rate(), 0);
 
     rac_proto_buffer_free(&buffer);
     return 0;

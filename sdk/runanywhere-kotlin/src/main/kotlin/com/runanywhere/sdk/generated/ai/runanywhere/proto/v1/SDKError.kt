@@ -34,7 +34,8 @@ import okio.ByteString
  *
  * `code` is always non-zero: an SDKError implies failure, and success is
  * signalled by its absence. `message` is non-localized; localization is a
- * consumer concern.
+ * consumer concern. Stack traces are deliberately absent: they are
+ * platform-shaped and belong in platform-local logging.
  */
 public class SDKError(
   @field:WireField(
@@ -58,83 +59,86 @@ public class SDKError(
     schemaIndex = 2,
   )
   public val message: String = "",
-  @field:WireField(
-    tag = 4,
-    adapter = "ai.runanywhere.proto.v1.ErrorContext#ADAPTER",
-    schemaIndex = 3,
-  )
-  public val context: ErrorContext? = null,
   /**
    * Signed rac_result_t. Equals -code for codes <= 899. Unset for the
    * Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
    * failures originating outside the C ABI.
    */
   @field:WireField(
-    tag = 5,
+    tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     jsonName = "cAbiCode",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val c_abi_code: Int? = null,
   /**
    * The "caused by" chain.
    */
   @field:WireField(
-    tag = 6,
+    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "nestedMessage",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val nested_message: String? = null,
-  /**
-   * `component` is a stable lowercase key ("llm", "stt", "rag", "download").
-   * SDKEvent carries the enum-typed component instead.
-   */
   @field:WireField(
-    tag = 7,
+    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampMs",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val timestamp_ms: Long = 0L,
   @field:WireField(
-    tag = 8,
+    tag = 7,
     adapter = "ai.runanywhere.proto.v1.ErrorSeverity#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 6,
+  )
+  public val severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
+  /**
+   * Which subsystem raised the error, written as SDKComponent's
+   * rac_wire_string ("llm", "stt", "rag", "rerank"). Producers MUST write
+   * the wire string, never the proto constant name. Errors raised outside
+   * any SDKComponent may carry their own lowercase key.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 7,
   )
-  public val severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
+  public val component: String = "",
   @field:WireField(
     tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 8,
   )
-  public val component: String = "",
+  public val retryable: Boolean = false,
+  /**
+   * Ties this failure to the operation that produced it. Named for
+   * Anthropic's body-level `request_id`. Producers MUST set it.
+   */
   @field:WireField(
     tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requestId",
     schemaIndex = 9,
   )
-  public val retryable: Boolean = false,
+  public val request_id: String = "",
+  /**
+   * "<Message>.<field>" for validation errors, e.g. "STTOptions.sampleRate".
+   * OpenAI's `param`. The generated validate() emits this.
+   */
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "remediationHint",
+    declaredName = "param",
     schemaIndex = 10,
   )
-  public val remediation_hint: String = "",
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "correlationId",
-    schemaIndex = 11,
-  )
-  public val correlation_id: String = "",
+  public val param_: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SDKError, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -150,15 +154,14 @@ public class SDKError(
     if (code != other.code) return false
     if (category != other.category) return false
     if (message != other.message) return false
-    if (context != other.context) return false
     if (c_abi_code != other.c_abi_code) return false
     if (nested_message != other.nested_message) return false
     if (timestamp_ms != other.timestamp_ms) return false
     if (severity != other.severity) return false
     if (component != other.component) return false
     if (retryable != other.retryable) return false
-    if (remediation_hint != other.remediation_hint) return false
-    if (correlation_id != other.correlation_id) return false
+    if (request_id != other.request_id) return false
+    if (param_ != other.param_) return false
     return true
   }
 
@@ -169,15 +172,14 @@ public class SDKError(
       result = result * 37 + code.hashCode()
       result = result * 37 + category.hashCode()
       result = result * 37 + message.hashCode()
-      result = result * 37 + (context?.hashCode() ?: 0)
       result = result * 37 + (c_abi_code?.hashCode() ?: 0)
       result = result * 37 + (nested_message?.hashCode() ?: 0)
       result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + severity.hashCode()
       result = result * 37 + component.hashCode()
       result = result * 37 + retryable.hashCode()
-      result = result * 37 + remediation_hint.hashCode()
-      result = result * 37 + correlation_id.hashCode()
+      result = result * 37 + request_id.hashCode()
+      result = result * 37 + (param_?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -188,15 +190,14 @@ public class SDKError(
     result += """code=$code"""
     result += """category=$category"""
     result += """message=${sanitize(message)}"""
-    if (context != null) result += """context=$context"""
     if (c_abi_code != null) result += """c_abi_code=$c_abi_code"""
     if (nested_message != null) result += """nested_message=${sanitize(nested_message)}"""
     result += """timestamp_ms=$timestamp_ms"""
     result += """severity=$severity"""
     result += """component=${sanitize(component)}"""
     result += """retryable=$retryable"""
-    result += """remediation_hint=${sanitize(remediation_hint)}"""
-    result += """correlation_id=${sanitize(correlation_id)}"""
+    result += """request_id=${sanitize(request_id)}"""
+    if (param_ != null) result += """param_=${sanitize(param_)}"""
     return result.joinToString(prefix = "SDKError{", separator = ", ", postfix = "}")
   }
 
@@ -204,17 +205,16 @@ public class SDKError(
     code: ErrorCode = this.code,
     category: ErrorCategory = this.category,
     message: String = this.message,
-    context: ErrorContext? = this.context,
     c_abi_code: Int? = this.c_abi_code,
     nested_message: String? = this.nested_message,
     timestamp_ms: Long = this.timestamp_ms,
     severity: ErrorSeverity = this.severity,
     component: String = this.component,
     retryable: Boolean = this.retryable,
-    remediation_hint: String = this.remediation_hint,
-    correlation_id: String = this.correlation_id,
+    request_id: String = this.request_id,
+    param_: String? = this.param_,
     unknownFields: ByteString = this.unknownFields,
-  ): SDKError = SDKError(code, category, message, context, c_abi_code, nested_message, timestamp_ms, severity, component, retryable, remediation_hint, correlation_id, unknownFields)
+  ): SDKError = SDKError(code, category, message, c_abi_code, nested_message, timestamp_ms, severity, component, retryable, request_id, param_, unknownFields)
 
   public companion object {
     @JvmField
@@ -237,27 +237,24 @@ public class SDKError(
         if (value.message != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.message)
         }
-        size += ErrorContext.ADAPTER.encodedSizeWithTag(4, value.context)
-        size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.c_abi_code)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.nested_message)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.c_abi_code)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.nested_message)
         if (value.timestamp_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.timestamp_ms)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.timestamp_ms)
         }
         if (value.severity != ai.runanywhere.proto.v1.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) {
-          size += ErrorSeverity.ADAPTER.encodedSizeWithTag(8, value.severity)
+          size += ErrorSeverity.ADAPTER.encodedSizeWithTag(7, value.severity)
         }
         if (value.component != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.component)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.component)
         }
         if (value.retryable != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.retryable)
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.retryable)
         }
-        if (value.remediation_hint != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.remediation_hint)
+        if (value.request_id != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.request_id)
         }
-        if (value.correlation_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.correlation_id)
-        }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.param_)
         return size
       }
 
@@ -271,53 +268,47 @@ public class SDKError(
         if (value.message != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.message)
         }
-        ErrorContext.ADAPTER.encodeWithTag(writer, 4, value.context)
-        ProtoAdapter.INT32.encodeWithTag(writer, 5, value.c_abi_code)
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.nested_message)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.c_abi_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.nested_message)
         if (value.timestamp_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.timestamp_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.timestamp_ms)
         }
         if (value.severity != ai.runanywhere.proto.v1.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) {
-          ErrorSeverity.ADAPTER.encodeWithTag(writer, 8, value.severity)
+          ErrorSeverity.ADAPTER.encodeWithTag(writer, 7, value.severity)
         }
         if (value.component != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.component)
+          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.component)
         }
         if (value.retryable != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.retryable)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.retryable)
         }
-        if (value.remediation_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.remediation_hint)
+        if (value.request_id != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.request_id)
         }
-        if (value.correlation_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.correlation_id)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.param_)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SDKError) {
         writer.writeBytes(value.unknownFields)
-        if (value.correlation_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.correlation_id)
-        }
-        if (value.remediation_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.remediation_hint)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.param_)
+        if (value.request_id != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.request_id)
         }
         if (value.retryable != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.retryable)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.retryable)
         }
         if (value.component != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.component)
+          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.component)
         }
         if (value.severity != ai.runanywhere.proto.v1.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED) {
-          ErrorSeverity.ADAPTER.encodeWithTag(writer, 8, value.severity)
+          ErrorSeverity.ADAPTER.encodeWithTag(writer, 7, value.severity)
         }
         if (value.timestamp_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.timestamp_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.timestamp_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.nested_message)
-        ProtoAdapter.INT32.encodeWithTag(writer, 5, value.c_abi_code)
-        ErrorContext.ADAPTER.encodeWithTag(writer, 4, value.context)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.nested_message)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.c_abi_code)
         if (value.message != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.message)
         }
@@ -333,15 +324,14 @@ public class SDKError(
         var code: ErrorCode = ErrorCode.ERROR_CODE_UNSPECIFIED
         var category: ErrorCategory = ErrorCategory.ERROR_CATEGORY_UNSPECIFIED
         var message: String = ""
-        var context: ErrorContext? = null
         var c_abi_code: Int? = null
         var nested_message: String? = null
         var timestamp_ms: Long = 0L
         var severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
         var component: String = ""
         var retryable: Boolean = false
-        var remediation_hint: String = ""
-        var correlation_id: String = ""
+        var request_id: String = ""
+        var param_: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -355,19 +345,18 @@ public class SDKError(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             3 -> message = ProtoAdapter.STRING.decode(reader)
-            4 -> context = ErrorContext.ADAPTER.decode(reader)
-            5 -> c_abi_code = ProtoAdapter.INT32.decode(reader)
-            6 -> nested_message = ProtoAdapter.STRING.decode(reader)
-            7 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
-            8 -> try {
+            4 -> c_abi_code = ProtoAdapter.INT32.decode(reader)
+            5 -> nested_message = ProtoAdapter.STRING.decode(reader)
+            6 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> try {
               severity = ErrorSeverity.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            9 -> component = ProtoAdapter.STRING.decode(reader)
-            10 -> retryable = ProtoAdapter.BOOL.decode(reader)
-            11 -> remediation_hint = ProtoAdapter.STRING.decode(reader)
-            12 -> correlation_id = ProtoAdapter.STRING.decode(reader)
+            8 -> component = ProtoAdapter.STRING.decode(reader)
+            9 -> retryable = ProtoAdapter.BOOL.decode(reader)
+            10 -> request_id = ProtoAdapter.STRING.decode(reader)
+            11 -> param_ = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -375,21 +364,19 @@ public class SDKError(
           code = code,
           category = category,
           message = message,
-          context = context,
           c_abi_code = c_abi_code,
           nested_message = nested_message,
           timestamp_ms = timestamp_ms,
           severity = severity,
           component = component,
           retryable = retryable,
-          remediation_hint = remediation_hint,
-          correlation_id = correlation_id,
+          request_id = request_id,
+          param_ = param_,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: SDKError): SDKError = value.copy(
-        context = value.context?.let(ErrorContext.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

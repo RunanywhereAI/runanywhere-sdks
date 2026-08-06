@@ -13,7 +13,7 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.archiveStructureFromWireString = exports.archiveStructureWireString = exports.modelSourceFromWireString = exports.modelSourceWireString = exports.sDKEnvironmentFromWireString = exports.sDKEnvironmentWireString = exports.modelCategoryFromWireString = exports.modelCategoryWireString = exports.audioFormatFromWireString = exports.audioFormatWireString = void 0;
+exports.acceleratorPolicyFromWireString = exports.acceleratorPolicyWireString = exports.archiveStructureFromWireString = exports.archiveStructureWireString = exports.modelSourceFromWireString = exports.modelSourceWireString = exports.sDKEnvironmentFromWireString = exports.sDKEnvironmentWireString = exports.modelCategoryFromWireString = exports.modelCategoryWireString = exports.audioFormatFromWireString = exports.audioFormatWireString = void 0;
 /* eslint-disable */
 const model_types_1 = require("../model_types");
 const audioFormatWireString = (e) => {
@@ -96,6 +96,8 @@ const modelCategoryWireString = (e) => {
             return 'speaker-diarization';
         case model_types_1.ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return 'semantic-segmentation';
+        case model_types_1.ModelCategory.MODEL_CATEGORY_RERANK:
+            return 'rerank';
         default:
             return '';
     }
@@ -127,6 +129,8 @@ const modelCategoryFromWireString = (s) => {
             return model_types_1.ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
         case 'semantic-segmentation':
             return model_types_1.ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+        case 'rerank':
+            return model_types_1.ModelCategory.MODEL_CATEGORY_RERANK;
         default:
             return undefined;
     }
@@ -222,3 +226,37 @@ const archiveStructureFromWireString = (s) => {
     }
 };
 exports.archiveStructureFromWireString = archiveStructureFromWireString;
+const acceleratorPolicyWireString = (e) => {
+    switch (e) {
+        case model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED:
+            return 'unspecified';
+        case model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_AUTO:
+            return 'auto';
+        case model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_CPU:
+            return 'cpu';
+        case model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_GPU:
+            return 'gpu';
+        case model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_NPU:
+            return 'npu';
+        default:
+            return '';
+    }
+};
+exports.acceleratorPolicyWireString = acceleratorPolicyWireString;
+const acceleratorPolicyFromWireString = (s) => {
+    switch (s.toLowerCase()) {
+        case 'unspecified':
+            return model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED;
+        case 'auto':
+            return model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_AUTO;
+        case 'cpu':
+            return model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_CPU;
+        case 'gpu':
+            return model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_GPU;
+        case 'npu':
+            return model_types_1.AcceleratorPolicy.ACCELERATOR_POLICY_NPU;
+        default:
+            return undefined;
+    }
+};
+exports.acceleratorPolicyFromWireString = acceleratorPolicyFromWireString;

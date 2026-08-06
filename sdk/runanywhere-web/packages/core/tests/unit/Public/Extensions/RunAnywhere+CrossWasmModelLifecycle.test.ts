@@ -317,10 +317,10 @@ function fakeLifecycleRuntime(
       const match = Array.from(loaded).find(([, category]) => (
         request.category === undefined || request.category === category
       ));
+      // `CurrentModelResult.errorMessage` was deleted outright -- `error?: SDKError` replaced it.
       const resultBytes = CurrentModelResult.encode(CurrentModelResult.create({
         modelId: match?.[0] ?? '',
         found: Boolean(match),
-        errorMessage: '',
         category: match?.[1] ?? ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
         framework: request.framework ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
         resolvedPath: '',

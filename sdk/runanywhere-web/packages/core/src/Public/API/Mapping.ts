@@ -6,13 +6,14 @@
 
 import { AudioFormat, InferenceFramework, type ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
+  FinishReason as ProtoFinishReason,
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
   type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { ToolChoiceMode } from '@runanywhere/proto-ts/tool_calling';
-import { StructuredOutputMode as ProtoStructuredOutputMode, type StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
+import type { StructuredOutputOptions, StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
 import type { STTOptions, STTOutput } from '@runanywhere/proto-ts/stt_options';
 import type { TTSOptions, TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
 import type { VADOptions, VADResult as ProtoVadResult } from '@runanywhere/proto-ts/vad_options';
@@ -21,18 +22,16 @@ import {
   type EmbeddingsOptions,
   type EmbeddingsResult,
 } from '@runanywhere/proto-ts/embeddings_options';
-import {
-  DiffusionMode,
-  type DiffusionGenerationOptions,
-  type DiffusionResult,
+import type {
+  DiffusionGenerationOptions,
+  DiffusionResult,
 } from '@runanywhere/proto-ts/diffusion_options';
 import type { DiarizationOptions as ProtoDiarizationOptions, DiarizationResult as ProtoDiarizationResult } from '@runanywhere/proto-ts/diarization';
 import type { SegmentationResult as ProtoSegmentationResult } from '@runanywhere/proto-ts/segmentation';
 import type { RerankResult } from '@runanywhere/proto-ts/rerank';
 import type { RAGResult, RAGSearchResult, RAGStatistics } from '@runanywhere/proto-ts/rag';
 import type { VLMResult } from '@runanywhere/proto-ts/vlm_options';
-import type { LLMStreamFinalResult } from '@runanywhere/proto-ts/llm_service';
-import type { LoRAState } from '@runanywhere/proto-ts/lora_options';
+import type { LoraState as ProtoLoraState } from '@runanywhere/proto-ts/lora_options';
 import { Runtime } from '../../Foundation/RuntimeConfig.js';
 import type {
   Backend,
@@ -139,7 +138,7 @@ export function toProtoLlmOptions(options?: LlmOptions): LLMGenerationOptions {
     minP: options?.minP ?? defaults.minP,
     frequencyPenalty: options?.frequencyPenalty ?? defaults.frequencyPenalty,
     presencePenalty: options?.presencePenalty ?? defaults.presencePenalty,
-    repetitionPenalty: options?.repetitionPenalty ?? defaults.repetitionPenalty,
+    repeatPenalty: options?.repetitionPenalty ?? defaults.repeatPenalty,
     seed: options?.seed ?? defaults.seed,
     stopSequences: options?.stopSequences ?? defaults.stopSequences,
     systemPrompt: options?.systemPrompt,
@@ -192,7 +191,35 @@ export function toProtoHistory(messages: readonly ChatMessage[]): ProtoChatMessa
   }));
 }
 
-function finishReasonFrom(raw: string | undefined, cancelled: boolean): FinishReason {
+/**
+ * Map the proto `FinishReason` enum to the public string union. `finishReason`
+ * is a typed enum now, not a raw string to substring-match against.
+ */
+function finishReasonFrom(reason: ProtoFinishReason, cancelled: boolean): FinishReason {
+  if (cancelled) return 'cancelled';
+  switch (reason) {
+    case ProtoFinishReason.FINISH_REASON_STOP:
+    case ProtoFinishReason.FINISH_REASON_STOP_SEQUENCE:
+      return 'stop';
+    case ProtoFinishReason.FINISH_REASON_LENGTH:
+    case ProtoFinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
+      return 'length';
+    case ProtoFinishReason.FINISH_REASON_TOOL_CALLS:
+      return 'toolCalls';
+    case ProtoFinishReason.FINISH_REASON_CANCELLED:
+      return 'cancelled';
+    case ProtoFinishReason.FINISH_REASON_ERROR:
+      return 'unknown';
+    default:
+      return 'unknown';
+  }
+}
+
+/**
+ * Map a raw finish-reason string (VLMResult.finishReason, which stayed a
+ * plain string on the wire) to the public union.
+ */
+function finishReasonFromString(raw: string | undefined, cancelled: boolean): FinishReason {
   if (cancelled) return 'cancelled';
   const value = (raw ?? '').toLowerCase();
   if (!value) return 'stop';
@@ -208,8 +235,8 @@ function metricsFrom(result: LLMGenerationResult, requestId: string): Generation
   return {
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: Math.round(result.ttftMs ?? 0),
-    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId,
     model: result.modelUsed,
   };
@@ -227,14 +254,18 @@ export function toGenerationResult(
     thinkingText: result.thinkingContent,
     toolCalls: result.toolCalls,
     finishReason: finishReasonFrom(result.finishReason, cancelled),
-    rawFinishReason: result.finishReason || undefined,
+    rawFinishReason: result.finishReason ? String(result.finishReason) : undefined,
     actualDevice: currentDevicePlacement(),
   };
 }
 
-/** Convert a streamed terminal result to the public shape. */
+/**
+ * Convert a streamed terminal result to the public shape. `LLMStreamEvent`
+ * carries its terminal payload directly on `.result: LLMGenerationResult`
+ * now — the standalone `LLMStreamFinalResult` message was deleted outright.
+ */
 export function streamFinalToGenerationResult(
-  final: LLMStreamFinalResult,
+  final: LLMGenerationResult,
   requestId: string,
   model: string,
   fallback: { text: string; thinkingText: string; outputTokens: number; ttftMs: number; tokensPerSecond: number },
@@ -245,11 +276,11 @@ export function streamFinalToGenerationResult(
     thinkingText: final.thinkingContent || fallback.thinkingText || undefined,
     toolCalls: final.toolCalls,
     finishReason: finishReasonFrom(final.finishReason, false),
-    rawFinishReason: final.finishReason || undefined,
+    rawFinishReason: final.finishReason ? String(final.finishReason) : undefined,
     inputTokens: final.usage?.inputTokens ?? 0,
     outputTokens,
-    timeToFirstTokenMs: Math.round(final.timeToFirstTokenMs || fallback.ttftMs),
-    tokensPerSecond: (final.usage?.tokensPerSecond ?? 0) || fallback.tokensPerSecond,
+    timeToFirstTokenMs: Math.round((final.usage?.ttftMs ?? 0) || fallback.ttftMs),
+    tokensPerSecond: (final.usage?.decodeTokensPerSecond ?? 0) || fallback.tokensPerSecond,
     requestId,
     model,
     actualDevice: currentDevicePlacement(),
@@ -262,12 +293,12 @@ export function vlmToGenerationResult(result: VLMResult, requestId = ''): Genera
     text: result.text,
     thinkingText: undefined,
     toolCalls: [],
-    finishReason: finishReasonFrom(result.finishReason, false),
+    finishReason: finishReasonFromString(result.finishReason, false),
     rawFinishReason: result.finishReason || undefined,
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: Math.round(result.timeToFirstTokenMs),
-    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId,
     model: '',
     actualDevice: currentDevicePlacement(),
@@ -278,26 +309,19 @@ export function vlmToGenerationResult(result: VLMResult, requestId = ''): Genera
  * Build the proto structured-output request options for one
  * `llm.generateStructured` call. `CONSTRAINED` is not wired on Web (no
  * grammar-constrained decoding hook) — callers must preflight-reject it
- * before reaching this helper.
+ * before reaching this helper. `StructuredOutputOptions` no longer carries a
+ * `mode`/`strictMode`/`repairJson` knob: it is just
+ * `includeSchemaInPrompt`/`schema`/`grammar`/`regex` now, so `mode` is kept
+ * only as the caller-facing enforcement level threaded through to
+ * `toStructuredResult` — commons always validates+extracts on the result.
  */
 export function toProtoStructuredOutputOptions(
   json: string,
-  mode: Exclude<StructuredOutputMode, 'constrained'>,
-): {
-  includeSchemaInPrompt: boolean;
-  jsonSchema: string;
-  strictMode: boolean;
-  mode: ProtoStructuredOutputMode;
-  repairJson: boolean;
-  maxRetries: number;
-} {
+  _mode: Exclude<StructuredOutputMode, 'constrained'>,
+): StructuredOutputOptions {
   return {
     includeSchemaInPrompt: true,
-    jsonSchema: json,
-    strictMode: mode === 'validationOnly',
-    mode: ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-    repairJson: mode === 'repair',
-    maxRetries: mode === 'repair' ? 1 : 0,
+    schema: json,
   };
 }
 
@@ -309,10 +333,9 @@ export function toStructuredResult(
   parse?: (text: string) => unknown,
 ): StructuredResult {
   const raw = parsed.rawText ?? generation.text;
-  const decoded = new TextDecoder().decode(parsed.parsedJson);
   let value: unknown;
   try {
-    value = parse ? parse(raw) : JSON.parse(decoded || raw);
+    value = parse ? parse(raw) : JSON.parse(parsed.json || raw);
   } catch {
     value = undefined;
   }
@@ -338,9 +361,8 @@ export function toProtoSttOptions(options?: SttOptions): STTOptions {
     language: options?.language,
     enablePunctuation: options?.punctuation ?? defaults.enablePunctuation,
     enableWordTimestamps: options?.wordTimestamps ?? defaults.enableWordTimestamps,
-    enableDiarization: options?.diarization ?? defaults.enableDiarization,
-    maxSpeakers: options?.maxSpeakers ?? defaults.maxSpeakers,
-    translateToEnglish: options?.translateToEnglish ?? defaults.translateToEnglish,
+    diarize: options?.diarization ?? defaults.diarize,
+    speakersExpected: options?.maxSpeakers ?? defaults.speakersExpected,
   };
 }
 
@@ -403,7 +425,6 @@ export function toVoice(info: TTSVoiceInfo): Voice {
     id: info.id,
     name: info.displayName,
     language: info.languageCode,
-    isNeural: info.isNeural,
   };
 }
 
@@ -419,15 +440,17 @@ export function toProtoVadOptions(options?: VadOptions): VADOptions {
   };
 }
 
-/** Convert a proto VAD verdict to the public shape. */
+/**
+ * Convert a proto VAD verdict to the public shape. `VADResult` (a one-shot
+ * detect() response) carries no span info -- no `startTimeMs`/`endTimeMs`
+ * ever existed on this message; span data lives on the streaming
+ * `SpeechActivityEvent` instead. `segments` is therefore always empty here.
+ */
 export function toVadResult(result: ProtoVadResult): VadResult {
-  const hasSpan = result.endTimeMs > result.startTimeMs;
   return {
     isSpeech: result.isSpeech,
-    probability: result.confidence,
-    segments: result.isSpeech && hasSpan
-      ? [{ startMs: result.startTimeMs, endMs: result.endTimeMs }]
-      : [],
+    probability: result.probability,
+    segments: [],
   };
 }
 
@@ -457,7 +480,13 @@ export function toEmbeddings(result: EmbeddingsResult): Embedding[] {
   }));
 }
 
-/** Build the proto diffusion options, filling gaps from the IDL defaults. */
+/**
+ * Build the proto diffusion options, filling gaps from the IDL defaults.
+ * `DiffusionMode`/`reportIntermediateImages` were deleted outright: adding
+ * `maskImage` on top of `image` promotes a request to inpainting (there is
+ * no explicit mode enum any more), and progress/intermediate images ride
+ * the streaming `DiffusionStreamEvent.progress` arm instead of a request flag.
+ */
 export function toProtoImageOptions(
   prompt: string,
   options?: ImageOptions,
@@ -472,26 +501,26 @@ export function toProtoImageOptions(
     steps: options?.steps ?? defaults.steps,
     guidanceScale: options?.guidanceScale ?? defaults.guidanceScale,
     seed: options?.seed ?? defaults.seed,
-    mode: inpaint ? DiffusionMode.DIFFUSION_MODE_INPAINTING : DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
-    inputImage: inpaint?.input,
+    image: inpaint?.input,
     maskImage: inpaint?.mask,
-    reportIntermediateImages: options?.reportPartials ?? defaults.reportIntermediateImages,
   };
 }
 
 /**
  * Convert a proto diffusion result to the public shape. The proto carries no
  * step count, so the requested `steps` is threaded back in by the caller.
+ * `DiffusionResult.images` is now a list of `DiffusionImage` (data/width/
+ * height/seedUsed/mediaType each), not a single imageData+batchImages pair.
  */
 export function toImageResult(result: DiffusionResult, steps: number): ImageResult {
-  const extra = result.batchImages.map((bytes) => ({
-    bytes,
-    width: result.width,
-    height: result.height,
-  }));
+  const [first, ...rest] = result.images;
   return {
-    images: [{ bytes: result.imageData, width: result.width, height: result.height }, ...extra],
-    seed: result.seedUsed,
+    images: (first ? [first, ...rest] : []).map((image) => ({
+      bytes: image.data,
+      width: image.width,
+      height: image.height,
+    })),
+    seed: first?.seedUsed ?? 0,
     steps,
   };
 }
@@ -521,6 +550,7 @@ export function toDiarizationResult(result: ProtoDiarizationResult): Diarization
 
 /** Convert a proto segmentation result to the public shape. */
 export function toSegmentationResult(result: ProtoSegmentationResult): SegmentationResult {
+  const totalPixels = result.width * result.height;
   return {
     classMask: result.classMaskU16Le,
     width: result.width,
@@ -530,7 +560,7 @@ export function toSegmentationResult(result: ProtoSegmentationResult): Segmentat
       id: summary.classId,
       label: summary.label,
       pixelCount: summary.pixelCount,
-      fraction: summary.fraction,
+      fraction: totalPixels > 0 ? summary.pixelCount / totalPixels : 0,
     })),
   };
 }
@@ -546,21 +576,22 @@ export function toRankedResults(result: RerankResult): RankedResult[] {
 export function toMatch(chunk: RAGSearchResult): Match {
   return {
     text: chunk.text,
-    score: chunk.similarityScore,
+    score: chunk.score,
     metadata: chunk.metadata ?? {},
   };
 }
 
 /** Convert a proto RAG result to the public shape. */
 export function toRagResult(result: RAGResult): RagResult {
-  const totalMs = result.generationTimeMs || result.totalTimeMs;
+  const totalMs = result.retrievalTimeMs + result.generationTimeMs;
   return {
     answer: result.answer,
     sources: result.retrievedChunks.map(toMatch),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: 0,
-    tokensPerSecond: totalMs > 0 ? ((result.usage?.outputTokens ?? 0) / totalMs) * 1000 : 0,
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond
+      ?? (totalMs > 0 ? ((result.usage?.outputTokens ?? 0) / totalMs) * 1000 : 0),
     requestId: result.requestId ?? '',
     model: '',
   };
@@ -571,12 +602,12 @@ export function toRagStats(statistics: RAGStatistics): RagStats {
   return {
     documentCount: statistics.indexedDocuments,
     chunkCount: statistics.indexedChunks,
-    indexSizeBytes: statistics.totalTokensIndexed,
+    indexSizeBytes: statistics.vectorStoreSizeBytes,
   };
 }
 
 /** Convert a proto LoRA state to the public shape. */
-export function toLoraState(state: LoRAState): LoraState {
+export function toLoraState(state: ProtoLoraState): LoraState {
   return {
     applied: state.loadedAdapters
       .filter((adapter) => adapter.applied)

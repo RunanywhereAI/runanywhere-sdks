@@ -39,6 +39,7 @@ import {
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
+import { isModelDownloaded } from '../utils/modelDisplay';
 
 const CAPTURE_SAMPLE_RATE = 16000;
 const CAPTURE_BYTES_PER_MS = (CAPTURE_SAMPLE_RATE * 2) / 1000;
@@ -200,7 +201,7 @@ export const STTScreen: React.FC = () => {
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      if (!model.isDownloaded && !model.localPath) {
+      if (!isModelDownloaded(model)) {
         Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }
@@ -362,16 +363,16 @@ export const STTScreen: React.FC = () => {
       let step = await iterator.next();
       while (!step.done) {
         const event = step.value;
-        if (event.type === 'final') {
-          const text = event.transcription.text.trim();
+        if (event.type === 'transcriptFinal') {
+          const text = event.segment.text.trim();
           if (text) {
             accumulatedTranscriptRef.current = text;
             setTranscript(text);
             setPartialTranscript('');
-            setConfidence(event.transcription.confidence);
+            setConfidence(event.segment.confidence);
           }
         } else if (event.type === 'partial') {
-          const text = event.text.trim();
+          const text = (event.alternatives[0]?.text ?? '').trim();
           if (text) setPartialTranscript(text);
         }
         step = await iterator.next();

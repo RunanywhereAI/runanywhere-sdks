@@ -3,22 +3,40 @@
  *
  * Public model / backend identity + transcribe-result types for the STT hybrid
  * router. Mirrors the Kotlin RACModel / Backend / TranscribeResult shapes and
- * the Swift HybridModel, all keyed off the wire enums in
- * `@runanywhere/proto-ts/hybrid_router`.
+ * the Swift HybridModel.
  *
- * Provider is data: a cloud candidate carries its concrete HTTP provider (e.g.
- * "sarvam") in the descriptor's `provider` field — there is no provider-specific
- * backend kind.
+ * Provider is data: a cloud candidate carries its concrete HTTP provider
+ * (e.g. "sarvam") through `createService`'s `configJson`
+ * (`CloudSTT.configJSON`) — there is no provider-specific backend kind, and
+ * no wire descriptor field for it either (see `HybridBackendKind` below).
  */
 
-import {
-  HybridBackendKind,
-  type HybridRoutedMetadata,
-  type HybridSttTranscribeOptions,
+import type {
+  HybridRoutedMetadata,
+  HybridSttTranscribeOptions,
 } from '@runanywhere/proto-ts/hybrid_router';
 
-export { HybridBackendKind };
 export type { HybridRoutedMetadata };
+
+/**
+ * The plugin-registry engine a hybrid candidate runs on.
+ *
+ * `HybridBackendKind` is deleted from `hybrid_router.proto` outright:
+ * `HybridModelDescriptor` now carries `isOnDevice: boolean` + a free-form
+ * `engine: string` (the plugin-registry name) instead of this enum. This
+ * type is kept RN-side only, as the ergonomic input to
+ * {@link offlineSherpa}/{@link onlineCloud}/{@link pinnedEngineName}, and is
+ * mapped onto the wire descriptor's `isOnDevice`/`engine` fields at the
+ * `HybridSTTRouter.descriptorBytes` boundary — it never crosses the wire
+ * itself.
+ */
+export enum HybridBackendKind {
+  HYBRID_BACKEND_UNSPECIFIED = 0,
+  HYBRID_BACKEND_LLAMACPP = 1,
+  HYBRID_BACKEND_OPENROUTER = 2,
+  HYBRID_BACKEND_SHERPA = 3,
+  HYBRID_BACKEND_CLOUD = 4,
+}
 
 /** Default cloud STT provider when a caller omits one. */
 export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
@@ -37,9 +55,9 @@ export interface HybridModel {
   readonly backend: HybridBackendKind;
   /**
    * Concrete cloud provider when `backend === HYBRID_BACKEND_CLOUD` (e.g.
-   * "sarvam"). Empty for non-cloud backends; marshalled into the descriptor's
-   * `provider` field (proto tag 4) so the cloud engine selects the HTTP
-   * backend.
+   * "sarvam"). Empty for non-cloud backends; forwarded via
+   * `CloudSTT.configJSON` at service-creation time — the wire
+   * `HybridModelDescriptor` carries no provider field.
    */
   readonly provider: string;
 }

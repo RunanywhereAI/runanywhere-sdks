@@ -25,7 +25,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * "list registered backends" query)
  * - **QHEXRT** — [QHexRT.probeNpu] is a real public device probe; a part outside
  *   the V75/V79/V81 support set (or an x86 emulator) reports
- *   `qhexrt_supported = false`. This is authoritative and correct for both the
+ *   `supported = false`. This is authoritative and correct for both the
  *   NPU-only and the full build.
  * - **LlamaCPP / ONNX / Sherpa** — no public runtime signal exists. The SDK
  *   modules register these at bootstrap and swallow failures (logging, never
@@ -73,7 +73,7 @@ object BackendAvailability {
         // main thread (viewModelScope defaults to Main).
         val qhexrtSupported = withContext(Dispatchers.IO) {
             try {
-                QHexRT.probeNpu().qhexrt_supported
+                QHexRT.probeNpu().supported
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -64,11 +64,14 @@ v1::ComponentLifecycleState voice_agent_state_to_proto(rac_voice_agent_component
     }
 }
 
-// Emit a voice-agent component-state transition as a ComponentInitializationEvent.
+// Emit a voice-agent component-state transition as a ComponentLifecycleEvent
+// (ComponentInitializationEvent was deleted: its fields and kinds moved into
+// ComponentLifecycleEvent / ComponentLifecycleEventKind -- see
+// idl/sdk_events.proto).
 void emit_voice_agent_state(v1::SDKComponent component, rac_voice_agent_component_state_t state,
                             const char* model_id, const char* error_message) {
-    v1::ComponentInitializationEvent ev;
-    ev.set_kind(v1::COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED);
+    v1::ComponentLifecycleEvent ev;
+    ev.set_kind(v1::COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED);
     ev.set_component(component);
     if (model_id)
         ev.set_model_id(model_id);
@@ -76,7 +79,7 @@ void emit_voice_agent_state(v1::SDKComponent component, rac_voice_agent_componen
         rac::foundation::populate_sdk_error(ev.mutable_error(), RAC_ERROR_COMPONENT_NOT_READY);
         ev.mutable_error()->set_message(error_message);
     }
-    ev.set_current_lifecycle_state(voice_agent_state_to_proto(state));
+    ev.set_current_state(voice_agent_state_to_proto(state));
     rac::events::publish(component, v1::EVENT_CATEGORY_COMPONENT, std::move(ev));
 }
 
@@ -100,7 +103,7 @@ void emit_llm_generation_started(const char* generation_id, const char* model_id
     if (model_id)
         g.set_model_id(model_id);
     g.set_is_streaming(is_streaming);
-    g.set_framework(framework_to_proto_int(framework));
+    g.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     g.set_temperature(temperature);
     g.set_max_tokens(max_tokens);
     g.set_context_length(context_length);
@@ -119,13 +122,14 @@ void emit_llm_generation_completed(const char* generation_id, const char* model_
     if (model_id)
         g.set_model_id(model_id);
     g.set_input_tokens(input_tokens);
-    g.set_tokens_used(output_tokens);
-    g.set_latency_ms(static_cast<int64_t>(duration_ms));
-    g.set_duration_ms(duration_ms);
+    // tokens_used/tokens_count folded into output_tokens; latency_ms/duration_ms
+    // (two spellings of the same number) collapsed into total_duration_ms.
+    g.set_output_tokens(output_tokens);
+    g.set_total_duration_ms(static_cast<int64_t>(duration_ms));
     g.set_tokens_per_second(tokens_per_second);
     g.set_is_streaming(is_streaming);
     g.set_time_to_first_token_ms(static_cast<int64_t>(time_to_first_token_ms));
-    g.set_framework(framework_to_proto_int(framework));
+    g.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     g.set_temperature(temperature);
     g.set_max_tokens(max_tokens);
     g.set_context_length(context_length);
@@ -154,8 +158,10 @@ void emit_llm_first_token(const char* generation_id, const char* model_id,
     g.set_kind(v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED);
     if (model_id)
         g.set_model_id(model_id);
-    g.set_first_token_latency_ms(static_cast<int64_t>(time_to_first_token_ms));
-    g.set_framework(framework_to_proto_int(framework));
+    // first_token_latency_ms folded into the one surviving spelling,
+    // time_to_first_token_ms.
+    g.set_time_to_first_token_ms(static_cast<int64_t>(time_to_first_token_ms));
+    g.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g),
                          generation_id);
 }
@@ -163,7 +169,9 @@ void emit_llm_first_token(const char* generation_id, const char* model_id,
 void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generated) {
     v1::GenerationEvent g;
     g.set_kind(v1::GENERATION_EVENT_KIND_STREAMING_UPDATE);
-    g.set_tokens_count(tokens_generated);
+    // tokens_count folded into output_tokens (the running count on
+    // STREAMING_UPDATE, the final count on COMPLETED).
+    g.set_output_tokens(tokens_generated);
     publish_with_session(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_LLM, std::move(g), generation_id,
                          legacy_destination_public());
 }
@@ -177,7 +185,7 @@ void emit_llm_model_load_completed(const char* model_id, const char* model_name,
     if (model_name)
         m.set_model_name(model_name);
     m.set_duration_ms(static_cast<int64_t>(duration_ms));
-    m.set_framework(framework_to_proto_int(framework));
+    m.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     publish(v1::SDK_COMPONENT_LLM, v1::EVENT_CATEGORY_MODEL, std::move(m));
 }
 
@@ -192,7 +200,7 @@ void emit_llm_model_load_failed(const char* model_id, const char* model_name, do
     if (model_name)
         m->set_model_name(model_name);
     m->set_duration_ms(static_cast<int64_t>(duration_ms));
-    m->set_framework(framework_to_proto_int(framework));
+    m->set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     if (error_message)
         m->set_error(error_message);
     set_event_error(event, error_code, error_message);
@@ -215,13 +223,15 @@ void emit_stt_transcription_started(const char* transcription_id, const char* mo
     voice.set_kind(v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED);
     if (model_id)
         voice.set_model_id(model_id);
-    voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
-    voice.set_audio_size_bytes(audio_size_bytes);
+    // audio_length_ms/audio_size_bytes renamed to input_audio_duration_ms /
+    // input_audio_bytes (the latter widened int32->int64).
+    voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
+    voice.set_input_audio_bytes(audio_size_bytes);
     if (language)
         voice.set_language(language);
     voice.set_is_streaming(is_streaming);
     voice.set_sample_rate(sample_rate);
-    voice.set_framework(framework_to_proto_int(framework));
+    voice.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     publish_with_session(v1::SDK_COMPONENT_STT, v1::EVENT_CATEGORY_STT, std::move(voice),
                          transcription_id);
 }
@@ -239,14 +249,18 @@ void emit_stt_transcription_completed(const char* transcription_id, const char* 
     if (text)
         voice.set_text(text);
     voice.set_confidence(confidence);
-    voice.set_duration_ms(static_cast<int64_t>(duration_ms));
-    voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
-    voice.set_audio_size_bytes(audio_size_bytes);
+    // duration_ms (tag 7) is for RECORDING_STOPPED/PLAYBACK_*, not STT
+    // processing time; processing_duration_ms ("telemetry processing_time_ms")
+    // is the shared STT+TTS home for that number. audio_length_ms/
+    // audio_size_bytes renamed to input_audio_duration_ms/input_audio_bytes.
+    voice.set_processing_duration_ms(static_cast<int64_t>(duration_ms));
+    voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
+    voice.set_input_audio_bytes(audio_size_bytes);
     voice.set_word_count(word_count);
     if (language)
         voice.set_language(language);
     voice.set_sample_rate(sample_rate);
-    voice.set_framework(framework_to_proto_int(framework));
+    voice.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     publish_with_session(v1::SDK_COMPONENT_STT, v1::EVENT_CATEGORY_STT, std::move(voice),
                          transcription_id);
 }
@@ -275,7 +289,7 @@ void emit_tts_synthesis_started(const char* synthesis_id, const char* model_id,
         voice.set_model_id(model_id);
     voice.set_character_count(character_count);
     voice.set_sample_rate(sample_rate);
-    voice.set_framework(framework_to_proto_int(framework));
+    voice.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     publish_with_session(v1::SDK_COMPONENT_TTS, v1::EVENT_CATEGORY_TTS, std::move(voice),
                          synthesis_id);
 }
@@ -290,11 +304,14 @@ void emit_tts_synthesis_completed(const char* synthesis_id, const char* model_id
     if (model_id)
         voice.set_model_id(model_id);
     voice.set_character_count(character_count);
-    voice.set_audio_duration_ms(static_cast<int64_t>(audio_duration_ms));
-    voice.set_audio_size_bytes_tts(audio_size_bytes);
+    // audio_duration_ms/audio_size_bytes_tts renamed to
+    // output_audio_duration_ms/output_audio_bytes (the latter widened
+    // int32->int64).
+    voice.set_output_audio_duration_ms(static_cast<int64_t>(audio_duration_ms));
+    voice.set_output_audio_bytes(audio_size_bytes);
     voice.set_processing_duration_ms(static_cast<int64_t>(processing_duration_ms));
     voice.set_sample_rate(sample_rate);
-    voice.set_framework(framework_to_proto_int(framework));
+    voice.set_framework(static_cast<v1::InferenceFramework>(framework_to_proto_int(framework)));
     publish_with_session(v1::SDK_COMPONENT_TTS, v1::EVENT_CATEGORY_TTS, std::move(voice),
                          synthesis_id);
 }
@@ -577,12 +594,15 @@ void emit_network_connectivity_changed(bool is_online) {
 // SDK ERROR EVENTS
 // =============================================================================
 
+// FailureEvent was deleted: every field already exists on the envelope --
+// component -> SDKEvent.component, operation -> SDKEvent.operation_id,
+// error -> SDKEvent.error, recoverable -> SDKError.retryable. A failure is
+// any event whose envelope `error` is set; there is no separate payload.
 void emit_sdk_error(rac_result_t error_code, const char* error_message, const char* operation,
                     const char* context) {
     v1::SDKEvent event;
-    auto* f = event.mutable_failure();
     if (operation)
-        f->set_operation(operation);
+        event.set_operation_id(operation);
     if (context)
         (*event.mutable_properties())["context"] = context;
     set_event_error(event, error_code, error_message);
@@ -609,9 +629,9 @@ void emit_voice_agent_tts_state_changed(rac_voice_agent_component_state_t state,
 }
 
 void emit_voice_agent_all_ready() {
-    v1::ComponentInitializationEvent ev;
-    ev.set_kind(v1::COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY);
-    ev.set_current_lifecycle_state(v1::COMPONENT_LIFECYCLE_STATE_READY);
+    v1::ComponentLifecycleEvent ev;
+    ev.set_kind(v1::COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY);
+    ev.set_current_state(v1::COMPONENT_LIFECYCLE_STATE_READY);
     publish(v1::SDK_COMPONENT_VOICE_AGENT, v1::EVENT_CATEGORY_COMPONENT, std::move(ev));
 }
 

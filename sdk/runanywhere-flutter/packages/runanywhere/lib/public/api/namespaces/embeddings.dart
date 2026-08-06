@@ -6,7 +6,7 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart'
     show EmbeddingsRequest;
 import 'package:runanywhere/generated/rerank.pb.dart'
-    show RerankCandidate, RerankOptions, RerankRequest;
+    show RerankOptions, RerankRequest;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_embeddings.dart';
@@ -51,9 +51,9 @@ class EmbeddingsApi {
         modelId: modelId,
       ),
     );
-    if (result.hasError()) {
-      throw SDKException.processingFailed(result.error.message);
-    }
+    // `EmbeddingsResult.error` was deleted outright (idl/embeddings_options.
+    // proto) — failure surfaces as an empty `vectors` list, not a typed
+    // error field.
     final vectors = result.vectors.map(Embedding.fromProto).toList()
       ..sort((a, b) => a.index.compareTo(b.index));
     return List<Embedding>.unmodifiable(vectors);
@@ -90,12 +90,13 @@ class RerankApi {
     if (snapshot == null) {
       throw SDKException.componentNotReady('Rerank');
     }
+    // `RerankCandidate` is deleted (idl/rerank.proto): every facade already
+    // built it with `id` set to the stringified array index, so the flat
+    // `documents` list carries the same information — results point back
+    // at documents by `index`.
     final request = RerankRequest(
       query: query,
-      candidates: List<RerankCandidate>.generate(
-        documents.length,
-        (i) => RerankCandidate(id: '$i', text: documents[i]),
-      ),
+      documents: documents,
       options: RerankOptions(topN: topN ?? 0),
     );
     final result = DartBridgeRerank.shared.rerank(request, snapshot);

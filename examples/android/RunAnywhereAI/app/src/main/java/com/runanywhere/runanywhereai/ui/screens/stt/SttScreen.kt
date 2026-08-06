@@ -343,11 +343,15 @@ private fun RoutingRows(routing: HybridRoutedMetadata) {
             }
             Text(routing.chosen_model_id, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (!routing.confidence.isNaN()) {
-            RoutingStat("Confidence", String.format(Locale.US, "%.0f%%", routing.confidence * 100))
+        // HybridRoutedMetadata.confidence/primary_confidence are now optional
+        // Float?, so "absent" is a real presence-tracked state, not NaN.
+        routing.confidence?.takeIf { !it.isNaN() }?.let { confidence ->
+            RoutingStat("Confidence", String.format(Locale.US, "%.0f%%", confidence * 100))
         }
-        if (onCloud && !routing.primary_confidence.isNaN()) {
-            RoutingStat("On-device score", String.format(Locale.US, "%.0f%%", routing.primary_confidence * 100))
+        if (onCloud) {
+            routing.primary_confidence?.takeIf { !it.isNaN() }?.let { primaryConfidence ->
+                RoutingStat("On-device score", String.format(Locale.US, "%.0f%%", primaryConfidence * 100))
+            }
         }
         if (routing.attempt_count > 1) RoutingStat("Attempts", routing.attempt_count.toString())
     }

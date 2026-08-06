@@ -71,7 +71,7 @@ The command surface is the [public API spec](../../thoughts/shared/plans/public_
 | `rcli models load <model>` | Load a model now instead of on first use |
 | `rcli models unload [category]` | Free loaded models, all of them by default |
 | `rcli models state` | Report resident models and disk usage |
-| `rcli lora {apply,remove,list,catalog,import}` | Attach LoRA adapters to a language model |
+| `rcli lora {apply,remove,list,catalog}` | Attach LoRA adapters to a language model |
 | `rcli serve [model]` | OpenAI-compatible HTTP server (`/v1/chat/completions`, `/v1/models`, `/health`) |
 | `rcli bench [model]` | Benchmark downloaded LLM/STT/TTS/VLM models |
 | `rcli telemetry {emit,blast}` | Drive the control-plane telemetry pipeline (no model needed) |
@@ -184,8 +184,8 @@ bash sdk/runanywhere-commons/tests/scripts/run-cli-e2e-linux.sh
 - `rcli voice` with thinking models may speak reasoning text — use a non-thinking LLM (`--llm lfm2`) until voice-agent thinking control lands.
 - macOS x86_64, Linux ARM64, and Windows ARM64 binaries are not published yet.
 - Spec verbs with no standalone command yet: `tts speak` (commons synthesizes to a buffer and has no playback path), and `rag open` / `rag ingest` (RAG indexes are in-memory per process). `rcli rag query` and `rcli rag search` open, ingest, then ask or retrieve in one invocation instead.
-- `llm generate` and `llm stream` have no `--seed`: `LLMGenerationOptions` has no seed field. `vlm generate` and `image generate` do, and both take the flag.
-- `vlm generate` has no `--frequency-penalty` or `--presence-penalty`; `VLMGenerationOptions` stops at the repetition penalty. Passing them through the `run --image` alias prints a note instead of pretending.
+- `VLMGenerationOptions` was deleted; `vlm generate` (and `run --image`) now share the exact `LLMGenerationOptions` the text path uses, so `--seed`, `--frequency-penalty`, and `--presence-penalty` all apply to VLM generation too.
+- `rcli lora import` was removed: `idl/lora_options.proto` deleted `LoraAdapterImportRequest`/`Result` outright, and commons permanently stubs `rac_lora_adapter_import_proto` to `RAC_ERROR_NOT_IMPLEMENTED`. No replacement verb exists in this namespace yet.
 - `models load` takes `--engine` and `--category` only. `ModelLoadRequest` carries no context length, thread count or GPU switch; `rcli serve` has `--context`, `--threads` and `--gpu-layers` for the server it runs.
 - `vad detect` exposes `--activation-threshold`. The spec's `minSpeechMs`, `minSilenceMs` and `prefixPaddingMs` are stream-level knobs that the per-frame `rac_vad_component_process` call does not accept.
 - `stt transcribe` has no `--translate-to-english`: `rac_stt_options_t` has no field for it.

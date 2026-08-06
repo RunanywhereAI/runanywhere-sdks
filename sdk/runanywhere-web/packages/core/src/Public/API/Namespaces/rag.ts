@@ -67,8 +67,11 @@ function normalizeQueryOptions(options?: RagQueryOptions | LlmOptions): RAGQuery
   if (!options) return {};
   if (isRagQueryOptions(options)) {
     return {
-      retrievalTopK: options.retrieval?.topK,
-      similarityThreshold: options.retrieval?.similarityThreshold,
+      retrieval: {
+        topK: options.retrieval?.topK,
+        scoreThreshold: options.retrieval?.similarityThreshold,
+        enableMultiQuery: false,
+      },
       generation: options.generation ? toProtoLlmOptions(options.generation) : undefined,
     };
   }
@@ -81,15 +84,18 @@ function toProtoConfig(
   config: RagConfig | undefined,
 ) {
   const defaults = optionDefaults.rag();
+  // `RAGConfiguration.indexPath`/`.persistIndex` were deleted outright
+  // (idl/rag.proto) with no replacement -- the RAG index is in-memory only
+  // now. `RagConfig.persistPath` is kept on the public option bag for API
+  // stability (Swift parity: Options.swift's RagConfig.persistPath doc
+  // comment) but has no effect on the built proto.
   return {
     embeddingModelId: embeddingModel.id,
     llmModelId: llmModel?.id ?? '',
     topK: config?.topK ?? defaults.topK,
     chunkSize: config?.chunkSize ?? defaults.chunkSize,
     chunkOverlap: config?.chunkOverlap ?? defaults.chunkOverlap,
-    similarityThreshold: config?.similarityThreshold ?? defaults.similarityThreshold,
-    persistIndex: config?.persistPath !== undefined,
-    indexPath: config?.persistPath,
+    scoreThreshold: config?.similarityThreshold ?? defaults.scoreThreshold,
     rerankResults: defaults.rerankResults,
   };
 }
@@ -104,7 +110,6 @@ function createSession(): RagSession {
           id: document.name ?? '',
           text: document.text,
           metadata: document.metadata ?? {},
-          sizeBytes: document.text.length,
         });
       }
     },

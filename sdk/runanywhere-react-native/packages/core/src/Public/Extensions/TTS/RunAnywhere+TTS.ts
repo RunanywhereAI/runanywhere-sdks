@@ -81,11 +81,12 @@ function encodeTTSSynthesisRequest(
   text: string,
   options?: Partial<TTSOptions>
 ): ArrayBuffer {
+  // `TTSSynthesisRequest.metadata` is deleted outright — the message is
+  // now just `requestId`/`text`/`options`.
   const request = TTSSynthesisRequest.fromPartial({
     requestId: nextTTSRequestId(),
     text,
     options: buildTTSOptions(options),
-    metadata: {},
   });
   return encodeProtoMessage(request, TTSSynthesisRequest);
 }

@@ -36,40 +36,41 @@ extension CppBridge {
             )
         }
 
+        /// idl/structured_output.proto (so-p2) deleted the dedicated
+        /// StructuredOutputRequest message outright: StructuredOutputParseRequest
+        /// (request_id, text, options, metadata) is now the sole envelope shared
+        /// by parse/validate/prepare-prompt, with `text` playing the role the
+        /// old `prompt` field did.
         static func preparePrompt(
             prompt: String,
             options: RAStructuredOutputOptions,
             requestID: String = UUID().uuidString
         ) throws -> RAStructuredOutputPromptResult {
-            try NativeProtoABI.invoke(
-                makeGenerateRequest(prompt: prompt, options: options, requestID: requestID),
+            var request = RAStructuredOutputParseRequest()
+            request.requestID = requestID
+            request.text = prompt
+            request.options = options
+            return try NativeProtoABI.invoke(
+                request,
                 symbol: StructuredOutputGeneratedProtoABI.preparePrompt,
                 symbolName: StructuredOutputGeneratedProtoABI.preparePromptName,
                 responseType: RAStructuredOutputPromptResult.self
             )
         }
 
+        /// `RAJSONSchema` was deleted outright (idl/structured_output.proto):
+        /// `StructuredOutputOptions.schema` is now a single JSON Schema
+        /// STRING (the `oneof constraint` arm), so `schema` here is the raw
+        /// schema text rather than a typed message.
         static func makeParseRequest(
             text: String,
-            schema: RAJSONSchema,
+            schema: String,
             requestID: String = UUID().uuidString
         ) -> RAStructuredOutputParseRequest {
             var request = RAStructuredOutputParseRequest()
             request.requestID = requestID
             request.text = text
             request.options = .defaults(schema: schema)
-            return request
-        }
-
-        static func makeGenerateRequest(
-            prompt: String,
-            options: RAStructuredOutputOptions,
-            requestID: String = UUID().uuidString
-        ) -> RAStructuredOutputRequest {
-            var request = RAStructuredOutputRequest()
-            request.requestID = requestID
-            request.prompt = prompt
-            request.options = options
             return request
         }
     }

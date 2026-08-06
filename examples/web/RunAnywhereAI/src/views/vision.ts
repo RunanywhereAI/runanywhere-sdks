@@ -405,7 +405,7 @@ async function onAnalyze(): Promise<void> {
   try {
     for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
       const event = step.value;
-      if (event.type === 'token') {
+      if (event.type === 'textDelta') {
         lastResult = (lastResult ?? '') + event.text;
         updateOutput(lastResult);
       } else if (event.type === 'completed') {

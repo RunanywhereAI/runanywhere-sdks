@@ -36,6 +36,24 @@ import okio.ByteString
  * TYPE->text, VISIT_URL->url, WEB_SEARCH->query, TERMINATE->answer,
  * ASK_USER/READ_PAGE_ANSWER->question, PAUSE_MEMORIZE->fact, KEY->space-joined
  * keys. `reasoning` holds any chain-of-thought preceding the tool_call.
+ *
+ * COORDINATE CONTRACT: x/y are integers in the SAME pixel space as the
+ * viewport you passed to parse_action, origin at the TOP-LEFT. That viewport
+ * must be the pixel dimensions of the exact image you handed to the VLM — if
+ * you downscaled the screenshot before sending it, pass the downscaled
+ * dimensions. On a DPR-2/3/4 display, passing logical points while sending a
+ * physical-pixel screenshot offsets every click by that factor, silently (see
+ * examples/ios/.../ComputerUseAgentViewModel.swift for the correct
+ * computation). parse_action has already rescaled out of the profile's own
+ * space (1000x1000 for `fara`), so no further scaling is ever correct.
+ *
+ * LEFT_CLICK_DRAG: x/y are the drag DESTINATION only. Fara emits no origin (it
+ * drags from the current cursor), and a touch screen has no cursor, so the
+ * HOST must supply the press point — typically the last MOUSE_MOVE target.
+ *
+ * LENGTH: `text` and `reasoning` are TRUNCATED at 2047 bytes on a UTF-8 lead
+ * byte by the fixed C buffers behind them (rac_cua_action_t.text\[2048\]); no
+ * field records that truncation happened. This also caps a TERMINATE answer.
  */
 public class CuaAction(
   @field:WireField(
@@ -46,46 +64,53 @@ public class CuaAction(
   )
   public val type: CuaActionType = CuaActionType.CUA_ACTION_TYPE_UNSPECIFIED,
   /**
-   * true if x/y are valid
+   * viewport pixels from the LEFT edge; presence = "has a coordinate"
    */
   @field:WireField(
     tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "coordinateValid",
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
     schemaIndex = 1,
   )
-  public val coordinate_valid: Boolean = false,
+  public val x: Int? = null,
   /**
-   * viewport-scaled pixels
+   * viewport pixels from the TOP edge
    */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val x: Int = 0,
+  public val y: Int? = null,
+  /**
+   * HSCROLL/SCROLL axis split. Value is the model's raw `pixels` output,
+   * copied verbatim per axis — the sign is UNVERIFIED against any real
+   * device trace, so no direction convention is asserted here.
+   * HSCROLL
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "scrollX",
     schemaIndex = 3,
   )
-  public val y: Int = 0,
+  public val scroll_x: Int = 0,
   /**
-   * SCROLL/HSCROLL: +up / -down
+   * SCROLL
    */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "scrollPixels",
+    jsonName = "scrollY",
     schemaIndex = 4,
   )
-  public val scroll_pixels: Int = 0,
+  public val scroll_y: Int = 0,
   /**
-   * WAIT
+   * WAIT: fractional seconds. Clamped by commons to \[0, 100\] because the
+   * value comes from untrusted model output; an unbounded parse would wedge
+   * the agent loop. 100s is a RunAnywhere-chosen ceiling, not inherited from
+   * any vendor API.
    */
   @field:WireField(
     tag = 6,
@@ -122,10 +147,10 @@ public class CuaAction(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "parseOk",
+    jsonName = "isValid",
     schemaIndex = 8,
   )
-  public val parse_ok: Boolean = false,
+  public val is_valid: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<CuaAction, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -139,14 +164,14 @@ public class CuaAction(
     if (other !is CuaAction) return false
     if (unknownFields != other.unknownFields) return false
     if (type != other.type) return false
-    if (coordinate_valid != other.coordinate_valid) return false
     if (x != other.x) return false
     if (y != other.y) return false
-    if (scroll_pixels != other.scroll_pixels) return false
+    if (scroll_x != other.scroll_x) return false
+    if (scroll_y != other.scroll_y) return false
     if (wait_seconds != other.wait_seconds) return false
     if (text != other.text) return false
     if (reasoning != other.reasoning) return false
-    if (parse_ok != other.parse_ok) return false
+    if (is_valid != other.is_valid) return false
     return true
   }
 
@@ -155,14 +180,14 @@ public class CuaAction(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + type.hashCode()
-      result = result * 37 + coordinate_valid.hashCode()
-      result = result * 37 + x.hashCode()
-      result = result * 37 + y.hashCode()
-      result = result * 37 + scroll_pixels.hashCode()
+      result = result * 37 + (x?.hashCode() ?: 0)
+      result = result * 37 + (y?.hashCode() ?: 0)
+      result = result * 37 + scroll_x.hashCode()
+      result = result * 37 + scroll_y.hashCode()
       result = result * 37 + wait_seconds.hashCode()
       result = result * 37 + text.hashCode()
       result = result * 37 + reasoning.hashCode()
-      result = result * 37 + parse_ok.hashCode()
+      result = result * 37 + is_valid.hashCode()
       super.hashCode = result
     }
     return result
@@ -171,29 +196,29 @@ public class CuaAction(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """type=$type"""
-    result += """coordinate_valid=$coordinate_valid"""
-    result += """x=$x"""
-    result += """y=$y"""
-    result += """scroll_pixels=$scroll_pixels"""
+    if (x != null) result += """x=$x"""
+    if (y != null) result += """y=$y"""
+    result += """scroll_x=$scroll_x"""
+    result += """scroll_y=$scroll_y"""
     result += """wait_seconds=$wait_seconds"""
     result += """text=${sanitize(text)}"""
     result += """reasoning=${sanitize(reasoning)}"""
-    result += """parse_ok=$parse_ok"""
+    result += """is_valid=$is_valid"""
     return result.joinToString(prefix = "CuaAction{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     type: CuaActionType = this.type,
-    coordinate_valid: Boolean = this.coordinate_valid,
-    x: Int = this.x,
-    y: Int = this.y,
-    scroll_pixels: Int = this.scroll_pixels,
+    x: Int? = this.x,
+    y: Int? = this.y,
+    scroll_x: Int = this.scroll_x,
+    scroll_y: Int = this.scroll_y,
     wait_seconds: Double = this.wait_seconds,
     text: String = this.text,
     reasoning: String = this.reasoning,
-    parse_ok: Boolean = this.parse_ok,
+    is_valid: Boolean = this.is_valid,
     unknownFields: ByteString = this.unknownFields,
-  ): CuaAction = CuaAction(type, coordinate_valid, x, y, scroll_pixels, wait_seconds, text, reasoning, parse_ok, unknownFields)
+  ): CuaAction = CuaAction(type, x, y, scroll_x, scroll_y, wait_seconds, text, reasoning, is_valid, unknownFields)
 
   public companion object {
     @JvmField
@@ -210,17 +235,13 @@ public class CuaAction(
         if (value.type != ai.runanywhere.proto.v1.CuaActionType.CUA_ACTION_TYPE_UNSPECIFIED) {
           size += CuaActionType.ADAPTER.encodedSizeWithTag(1, value.type)
         }
-        if (value.coordinate_valid != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.coordinate_valid)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.x)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.y)
+        if (value.scroll_x != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.scroll_x)
         }
-        if (value.x != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.x)
-        }
-        if (value.y != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.y)
-        }
-        if (value.scroll_pixels != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.scroll_pixels)
+        if (value.scroll_y != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.scroll_y)
         }
         if (!value.wait_seconds.equals(0.0)) {
           size += ProtoAdapter.DOUBLE.encodedSizeWithTag(6, value.wait_seconds)
@@ -231,8 +252,8 @@ public class CuaAction(
         if (value.reasoning != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.reasoning)
         }
-        if (value.parse_ok != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.parse_ok)
+        if (value.is_valid != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.is_valid)
         }
         return size
       }
@@ -241,17 +262,13 @@ public class CuaAction(
         if (value.type != ai.runanywhere.proto.v1.CuaActionType.CUA_ACTION_TYPE_UNSPECIFIED) {
           CuaActionType.ADAPTER.encodeWithTag(writer, 1, value.type)
         }
-        if (value.coordinate_valid != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.coordinate_valid)
+        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.x)
+        ProtoAdapter.INT32.encodeWithTag(writer, 3, value.y)
+        if (value.scroll_x != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.scroll_x)
         }
-        if (value.x != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.x)
-        }
-        if (value.y != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.y)
-        }
-        if (value.scroll_pixels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.scroll_pixels)
+        if (value.scroll_y != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.scroll_y)
         }
         if (!value.wait_seconds.equals(0.0)) {
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.wait_seconds)
@@ -262,16 +279,16 @@ public class CuaAction(
         if (value.reasoning != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 8, value.reasoning)
         }
-        if (value.parse_ok != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.parse_ok)
+        if (value.is_valid != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_valid)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: CuaAction) {
         writer.writeBytes(value.unknownFields)
-        if (value.parse_ok != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.parse_ok)
+        if (value.is_valid != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_valid)
         }
         if (value.reasoning != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 8, value.reasoning)
@@ -282,18 +299,14 @@ public class CuaAction(
         if (!value.wait_seconds.equals(0.0)) {
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.wait_seconds)
         }
-        if (value.scroll_pixels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.scroll_pixels)
+        if (value.scroll_y != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.scroll_y)
         }
-        if (value.y != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.y)
+        if (value.scroll_x != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.scroll_x)
         }
-        if (value.x != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.x)
-        }
-        if (value.coordinate_valid != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.coordinate_valid)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 3, value.y)
+        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.x)
         if (value.type != ai.runanywhere.proto.v1.CuaActionType.CUA_ACTION_TYPE_UNSPECIFIED) {
           CuaActionType.ADAPTER.encodeWithTag(writer, 1, value.type)
         }
@@ -301,14 +314,14 @@ public class CuaAction(
 
       override fun decode(reader: ProtoReader): CuaAction {
         var type: CuaActionType = CuaActionType.CUA_ACTION_TYPE_UNSPECIFIED
-        var coordinate_valid: Boolean = false
-        var x: Int = 0
-        var y: Int = 0
-        var scroll_pixels: Int = 0
+        var x: Int? = null
+        var y: Int? = null
+        var scroll_x: Int = 0
+        var scroll_y: Int = 0
         var wait_seconds: Double = 0.0
         var text: String = ""
         var reasoning: String = ""
-        var parse_ok: Boolean = false
+        var is_valid: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -316,27 +329,27 @@ public class CuaAction(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            2 -> coordinate_valid = ProtoAdapter.BOOL.decode(reader)
-            3 -> x = ProtoAdapter.INT32.decode(reader)
-            4 -> y = ProtoAdapter.INT32.decode(reader)
-            5 -> scroll_pixels = ProtoAdapter.INT32.decode(reader)
+            2 -> x = ProtoAdapter.INT32.decode(reader)
+            3 -> y = ProtoAdapter.INT32.decode(reader)
+            4 -> scroll_x = ProtoAdapter.INT32.decode(reader)
+            5 -> scroll_y = ProtoAdapter.INT32.decode(reader)
             6 -> wait_seconds = ProtoAdapter.DOUBLE.decode(reader)
             7 -> text = ProtoAdapter.STRING.decode(reader)
             8 -> reasoning = ProtoAdapter.STRING.decode(reader)
-            9 -> parse_ok = ProtoAdapter.BOOL.decode(reader)
+            9 -> is_valid = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return CuaAction(
           type = type,
-          coordinate_valid = coordinate_valid,
           x = x,
           y = y,
-          scroll_pixels = scroll_pixels,
+          scroll_x = scroll_x,
+          scroll_y = scroll_y,
           wait_seconds = wait_seconds,
           text = text,
           reasoning = reasoning,
-          parse_ok = parse_ok,
+          is_valid = is_valid,
           unknownFields = unknownFields
         )
       }

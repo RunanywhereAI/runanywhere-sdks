@@ -32,8 +32,9 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
   case cpu // = 2
   case gpu // = 3
 
-  /// Apple Neural Engine
-  case ane // = 4
+  /// Vendor-neutral neural accelerator: Apple Neural Engine, Qualcomm
+  /// Hexagon NPU, etc. The YAML loader already accepts "npu" for this value.
+  case npu // = 4
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -46,7 +47,7 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
     case 1: self = .any
     case 2: self = .cpu
     case 3: self = .gpu
-    case 4: self = .ane
+    case 4: self = .npu
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -57,7 +58,7 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
     case .any: return 1
     case .cpu: return 2
     case .gpu: return 3
-    case .ane: return 4
+    case .npu: return 4
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -68,7 +69,7 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
     .any,
     .cpu,
     .gpu,
-    .ane,
+    .npu,
   ]
 
 }
@@ -207,7 +208,7 @@ public nonisolated struct RAPipelineOptions: Sendable {
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RADeviceAffinity: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DEVICE_AFFINITY_UNSPECIFIED\0\u{1}DEVICE_AFFINITY_ANY\0\u{1}DEVICE_AFFINITY_CPU\0\u{1}DEVICE_AFFINITY_GPU\0\u{1}DEVICE_AFFINITY_ANE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DEVICE_AFFINITY_UNSPECIFIED\0\u{1}DEVICE_AFFINITY_ANY\0\u{1}DEVICE_AFFINITY_CPU\0\u{1}DEVICE_AFFINITY_GPU\0\u{1}DEVICE_AFFINITY_NPU\0")
 }
 
 nonisolated extension RAEdgePolicy: SwiftProtobuf._ProtoNameProviding {

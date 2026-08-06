@@ -14,6 +14,7 @@ import type * as BackendWorkerHostModule from '../../../src/runtime/BackendWorke
 import { LLMGenerateRequest } from '@runanywhere/proto-ts/llm_service';
 import { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 import { VLMResult } from '@runanywhere/proto-ts/vlm_options';
+import { MessageRole } from '@runanywhere/proto-ts/chat';
 
 vi.mock('../../../src/runtime/BackendWorkerHost.js', async () => {
   const actual = await vi.importActual<typeof BackendWorkerHostModule>(
@@ -51,7 +52,9 @@ describe('Worker routing policy (commons-first)', () => {
 
     const adapter = new LLMProtoAdapter({} as never);
     const result = await adapter.generate(
-      LLMGenerateRequest.fromPartial({ prompt: 'hi' }),
+      LLMGenerateRequest.fromPartial({
+        messages: [{ role: MessageRole.MESSAGE_ROLE_USER, content: 'hi' }],
+      }),
     );
 
     expect(host.infer).toHaveBeenCalledWith(
@@ -67,7 +70,9 @@ describe('Worker routing policy (commons-first)', () => {
 
     const adapter = new LLMProtoAdapter({} as never);
     await expect(
-      adapter.generate(LLMGenerateRequest.fromPartial({ prompt: 'hi' })),
+      adapter.generate(LLMGenerateRequest.fromPartial({
+        messages: [{ role: MessageRole.MESSAGE_ROLE_USER, content: 'hi' }],
+      })),
     ).rejects.toThrow(/Backend not available for: llm\.generate|BackendWorker is required/);
   });
 
@@ -82,7 +87,8 @@ describe('Worker routing policy (commons-first)', () => {
     const adapter = new VLMProtoAdapter({} as never);
     const result = await adapter.process(
       { data: new Uint8Array([1, 2, 3]), mimeType: 'image/png' } as never,
-      { prompt: 'what?' } as never,
+      'what?',
+      {} as never,
     );
 
     expect(host.infer).toHaveBeenCalledWith(

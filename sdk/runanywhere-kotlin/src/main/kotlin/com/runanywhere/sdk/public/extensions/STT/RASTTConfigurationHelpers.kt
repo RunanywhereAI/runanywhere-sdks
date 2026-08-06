@@ -57,28 +57,17 @@ val WordTimestamp.endTime: Double
 val WordTimestamp.duration: Double
     get() = (endTime - startTime).coerceAtLeast(0.0)
 
-// MARK: - TranscriptionMetadata
-
-/**
- * Computed real-time-factor (processing_time_ms / audio_length_ms).
- * Returns 0 when audio length is zero. Mirrors Swift
- * `RATranscriptionMetadata.realTimeFactorComputed`.
- */
-val TranscriptionMetadata.realTimeFactorComputed: Double
-    get() =
-        if (audio_length_ms > 0) {
-            processing_time_ms.toDouble() / audio_length_ms.toDouble()
-        } else {
-            0.0
-        }
+// `TranscriptionMetadata.audio_length_ms` is deleted outright
+// (idl/stt_options.proto) with no replacement field; `realTimeFactorComputed`
+// and `audioLength` were pure derivations of it with no independent wire
+// value, so both are dropped rather than rehomed, matching Swift's
+// `RASTTConfiguration+Helpers.swift`, which carries neither any more.
+// `processingTime` (processing_time_ms / 1000.0) still stands on its own
+// surviving field.
 
 /** Processing time in seconds. */
 val TranscriptionMetadata.processingTime: Double
     get() = processing_time_ms.toDouble() / 1000.0
-
-/** Audio length in seconds. */
-val TranscriptionMetadata.audioLength: Double
-    get() = audio_length_ms.toDouble() / 1000.0
 
 // MARK: - TranscriptionAlternative
 

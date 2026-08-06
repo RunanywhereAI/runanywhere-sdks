@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: vad_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VADServiceState = exports.VADStreamEvent = exports.SpeechActivityEvent = exports.VADStatistics = exports.VADResult = exports.VADProcessRequest_MetadataEntry = exports.VADProcessRequest = exports.VADAudioSource = exports.VADOptions = exports.VADConfiguration = exports.VADStreamEventKind = exports.SpeechActivityKind = exports.protobufPackage = void 0;
+exports.VADServiceState = exports.VADStreamEvent = exports.SpeechActivityEvent = exports.VADStatistics = exports.VADResult = exports.VADProcessRequest = exports.VADAudioSource = exports.VADOptions = exports.VADConfiguration = exports.VADStreamEventKind = exports.SpeechActivityKind = exports.protobufPackage = void 0;
 exports.speechActivityKindFromJSON = speechActivityKindFromJSON;
 exports.speechActivityKindToJSON = speechActivityKindToJSON;
 exports.vADStreamEventKindFromJSON = vADStreamEventKindFromJSON;
@@ -58,20 +58,17 @@ function speechActivityKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+/**
+ * Every value here is emitted by commons. Barge-in is a session-level
+ * decision, not a detector verdict: it lives on InterruptedEvent /
+ * InterruptReason in voice_events.proto.
+ */
 var VADStreamEventKind;
 (function (VADStreamEventKind) {
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "VAD_STREAM_EVENT_KIND_UNSPECIFIED";
-    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_STARTED"] = 1] = "VAD_STREAM_EVENT_KIND_STARTED";
-    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_FRAME"] = 2] = "VAD_STREAM_EVENT_KIND_FRAME";
-    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY"] = 3] = "VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY";
-    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_STATISTICS"] = 4] = "VAD_STREAM_EVENT_KIND_STATISTICS";
-    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_STOPPED"] = 5] = "VAD_STREAM_EVENT_KIND_STOPPED";
-    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_ERROR"] = 6] = "VAD_STREAM_EVENT_KIND_ERROR";
-    /**
-     * VAD_STREAM_EVENT_KIND_BARGE_IN - Speech that interrupts active assistant playback. Downstream pipeline
-     * also routes this through InterruptedEvent/InterruptReason.
-     */
-    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_BARGE_IN"] = 7] = "VAD_STREAM_EVENT_KIND_BARGE_IN";
+    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_FRAME"] = 1] = "VAD_STREAM_EVENT_KIND_FRAME";
+    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY"] = 2] = "VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY";
+    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_ERROR"] = 3] = "VAD_STREAM_EVENT_KIND_ERROR";
     VADStreamEventKind[VADStreamEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(VADStreamEventKind || (exports.VADStreamEventKind = VADStreamEventKind = {}));
 function vADStreamEventKindFromJSON(object) {
@@ -80,26 +77,14 @@ function vADStreamEventKindFromJSON(object) {
         case "VAD_STREAM_EVENT_KIND_UNSPECIFIED":
             return VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED;
         case 1:
-        case "VAD_STREAM_EVENT_KIND_STARTED":
-            return VADStreamEventKind.VAD_STREAM_EVENT_KIND_STARTED;
-        case 2:
         case "VAD_STREAM_EVENT_KIND_FRAME":
             return VADStreamEventKind.VAD_STREAM_EVENT_KIND_FRAME;
-        case 3:
+        case 2:
         case "VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY":
             return VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY;
-        case 4:
-        case "VAD_STREAM_EVENT_KIND_STATISTICS":
-            return VADStreamEventKind.VAD_STREAM_EVENT_KIND_STATISTICS;
-        case 5:
-        case "VAD_STREAM_EVENT_KIND_STOPPED":
-            return VADStreamEventKind.VAD_STREAM_EVENT_KIND_STOPPED;
-        case 6:
+        case 3:
         case "VAD_STREAM_EVENT_KIND_ERROR":
             return VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR;
-        case 7:
-        case "VAD_STREAM_EVENT_KIND_BARGE_IN":
-            return VADStreamEventKind.VAD_STREAM_EVENT_KIND_BARGE_IN;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -110,20 +95,12 @@ function vADStreamEventKindToJSON(object) {
     switch (object) {
         case VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED:
             return "VAD_STREAM_EVENT_KIND_UNSPECIFIED";
-        case VADStreamEventKind.VAD_STREAM_EVENT_KIND_STARTED:
-            return "VAD_STREAM_EVENT_KIND_STARTED";
         case VADStreamEventKind.VAD_STREAM_EVENT_KIND_FRAME:
             return "VAD_STREAM_EVENT_KIND_FRAME";
         case VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
             return "VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY";
-        case VADStreamEventKind.VAD_STREAM_EVENT_KIND_STATISTICS:
-            return "VAD_STREAM_EVENT_KIND_STATISTICS";
-        case VADStreamEventKind.VAD_STREAM_EVENT_KIND_STOPPED:
-            return "VAD_STREAM_EVENT_KIND_STOPPED";
         case VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR:
             return "VAD_STREAM_EVENT_KIND_ERROR";
-        case VADStreamEventKind.VAD_STREAM_EVENT_KIND_BARGE_IN:
-            return "VAD_STREAM_EVENT_KIND_BARGE_IN";
         case VADStreamEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -139,8 +116,6 @@ function createBaseVADConfiguration() {
         calibrationMultiplier: 0,
         preferredFramework: undefined,
         modelPath: undefined,
-        windowSizeSamples: 0,
-        maxSpeechDurationMs: 0,
     };
 }
 exports.VADConfiguration = {
@@ -168,12 +143,6 @@ exports.VADConfiguration = {
         }
         if (message.modelPath !== undefined) {
             writer.uint32(66).string(message.modelPath);
-        }
-        if (message.windowSizeSamples !== 0) {
-            writer.uint32(72).int32(message.windowSizeSamples);
-        }
-        if (message.maxSpeechDurationMs !== 0) {
-            writer.uint32(80).int32(message.maxSpeechDurationMs);
         }
         return writer;
     },
@@ -240,20 +209,6 @@ exports.VADConfiguration = {
                     message.modelPath = reader.string();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.windowSizeSamples = reader.int32();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.maxSpeechDurationMs = reader.int32();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -304,16 +259,6 @@ exports.VADConfiguration = {
                 : isSet(object.model_path)
                     ? globalThis.String(object.model_path)
                     : undefined,
-            windowSizeSamples: isSet(object.windowSizeSamples)
-                ? globalThis.Number(object.windowSizeSamples)
-                : isSet(object.window_size_samples)
-                    ? globalThis.Number(object.window_size_samples)
-                    : 0,
-            maxSpeechDurationMs: isSet(object.maxSpeechDurationMs)
-                ? globalThis.Number(object.maxSpeechDurationMs)
-                : isSet(object.max_speech_duration_ms)
-                    ? globalThis.Number(object.max_speech_duration_ms)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -342,12 +287,6 @@ exports.VADConfiguration = {
         if (message.modelPath !== undefined) {
             obj.modelPath = message.modelPath;
         }
-        if (message.windowSizeSamples !== 0) {
-            obj.windowSizeSamples = Math.round(message.windowSizeSamples);
-        }
-        if (message.maxSpeechDurationMs !== 0) {
-            obj.maxSpeechDurationMs = Math.round(message.maxSpeechDurationMs);
-        }
         return obj;
     },
     create(base) {
@@ -363,25 +302,23 @@ exports.VADConfiguration = {
         message.calibrationMultiplier = object.calibrationMultiplier ?? 0;
         message.preferredFramework = object.preferredFramework ?? undefined;
         message.modelPath = object.modelPath ?? undefined;
-        message.windowSizeSamples = object.windowSizeSamples ?? 0;
-        message.maxSpeechDurationMs = object.maxSpeechDurationMs ?? 0;
         return message;
     },
 };
 function createBaseVADOptions() {
     return {
-        activationThreshold: 0,
+        activationThreshold: undefined,
         minSpeechDurationMs: 0,
         minSilenceDurationMs: 0,
-        maxSpeechDurationMs: 0,
+        maxSpeechDurationMs: undefined,
         prefixPaddingMs: 0,
-        includeStatistics: false,
+        sampleRate: 0,
     };
 }
 exports.VADOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.activationThreshold !== 0) {
-            writer.uint32(53).float(message.activationThreshold);
+        if (message.activationThreshold !== undefined) {
+            writer.uint32(13).float(message.activationThreshold);
         }
         if (message.minSpeechDurationMs !== 0) {
             writer.uint32(16).int32(message.minSpeechDurationMs);
@@ -389,14 +326,14 @@ exports.VADOptions = {
         if (message.minSilenceDurationMs !== 0) {
             writer.uint32(24).int32(message.minSilenceDurationMs);
         }
-        if (message.maxSpeechDurationMs !== 0) {
+        if (message.maxSpeechDurationMs !== undefined) {
             writer.uint32(32).int32(message.maxSpeechDurationMs);
         }
         if (message.prefixPaddingMs !== 0) {
-            writer.uint32(56).int32(message.prefixPaddingMs);
+            writer.uint32(40).int32(message.prefixPaddingMs);
         }
-        if (message.includeStatistics !== false) {
-            writer.uint32(40).bool(message.includeStatistics);
+        if (message.sampleRate !== 0) {
+            writer.uint32(48).int32(message.sampleRate);
         }
         return writer;
     },
@@ -407,8 +344,8 @@ exports.VADOptions = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 6: {
-                    if (tag !== 53) {
+                case 1: {
+                    if (tag !== 13) {
                         break;
                     }
                     message.activationThreshold = reader.float();
@@ -435,18 +372,18 @@ exports.VADOptions = {
                     message.maxSpeechDurationMs = reader.int32();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
+                case 5: {
+                    if (tag !== 40) {
                         break;
                     }
                     message.prefixPaddingMs = reader.int32();
                     continue;
                 }
-                case 5: {
-                    if (tag !== 40) {
+                case 6: {
+                    if (tag !== 48) {
                         break;
                     }
-                    message.includeStatistics = reader.bool();
+                    message.sampleRate = reader.int32();
                     continue;
                 }
             }
@@ -463,7 +400,7 @@ exports.VADOptions = {
                 ? globalThis.Number(object.activationThreshold)
                 : isSet(object.activation_threshold)
                     ? globalThis.Number(object.activation_threshold)
-                    : 0,
+                    : undefined,
             minSpeechDurationMs: isSet(object.minSpeechDurationMs)
                 ? globalThis.Number(object.minSpeechDurationMs)
                 : isSet(object.min_speech_duration_ms)
@@ -478,22 +415,22 @@ exports.VADOptions = {
                 ? globalThis.Number(object.maxSpeechDurationMs)
                 : isSet(object.max_speech_duration_ms)
                     ? globalThis.Number(object.max_speech_duration_ms)
-                    : 0,
+                    : undefined,
             prefixPaddingMs: isSet(object.prefixPaddingMs)
                 ? globalThis.Number(object.prefixPaddingMs)
                 : isSet(object.prefix_padding_ms)
                     ? globalThis.Number(object.prefix_padding_ms)
                     : 0,
-            includeStatistics: isSet(object.includeStatistics)
-                ? globalThis.Boolean(object.includeStatistics)
-                : isSet(object.include_statistics)
-                    ? globalThis.Boolean(object.include_statistics)
-                    : false,
+            sampleRate: isSet(object.sampleRate)
+                ? globalThis.Number(object.sampleRate)
+                : isSet(object.sample_rate)
+                    ? globalThis.Number(object.sample_rate)
+                    : 0,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.activationThreshold !== 0) {
+        if (message.activationThreshold !== undefined) {
             obj.activationThreshold = message.activationThreshold;
         }
         if (message.minSpeechDurationMs !== 0) {
@@ -502,14 +439,14 @@ exports.VADOptions = {
         if (message.minSilenceDurationMs !== 0) {
             obj.minSilenceDurationMs = Math.round(message.minSilenceDurationMs);
         }
-        if (message.maxSpeechDurationMs !== 0) {
+        if (message.maxSpeechDurationMs !== undefined) {
             obj.maxSpeechDurationMs = Math.round(message.maxSpeechDurationMs);
         }
         if (message.prefixPaddingMs !== 0) {
             obj.prefixPaddingMs = Math.round(message.prefixPaddingMs);
         }
-        if (message.includeStatistics !== false) {
-            obj.includeStatistics = message.includeStatistics;
+        if (message.sampleRate !== 0) {
+            obj.sampleRate = Math.round(message.sampleRate);
         }
         return obj;
     },
@@ -518,37 +455,34 @@ exports.VADOptions = {
     },
     fromPartial(object) {
         const message = createBaseVADOptions();
-        message.activationThreshold = object.activationThreshold ?? 0;
+        message.activationThreshold = object.activationThreshold ?? undefined;
         message.minSpeechDurationMs = object.minSpeechDurationMs ?? 0;
         message.minSilenceDurationMs = object.minSilenceDurationMs ?? 0;
-        message.maxSpeechDurationMs = object.maxSpeechDurationMs ?? 0;
+        message.maxSpeechDurationMs = object.maxSpeechDurationMs ?? undefined;
         message.prefixPaddingMs = object.prefixPaddingMs ?? 0;
-        message.includeStatistics = object.includeStatistics ?? false;
+        message.sampleRate = object.sampleRate ?? 0;
         return message;
     },
 };
 function createBaseVADAudioSource() {
-    return { audioData: undefined, adapterHandle: undefined, encoding: 0, sampleRate: 0, channels: 0, frameOffsetMs: 0 };
+    return { audioData: new Uint8Array(0), encoding: 0, sampleRate: 0, channels: 0, frameOffsetMs: 0 };
 }
 exports.VADAudioSource = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.audioData !== undefined) {
+        if (message.audioData.length !== 0) {
             writer.uint32(10).bytes(message.audioData);
         }
-        if (message.adapterHandle !== undefined) {
-            writer.uint32(18).string(message.adapterHandle);
-        }
         if (message.encoding !== 0) {
-            writer.uint32(24).int32(message.encoding);
+            writer.uint32(16).int32(message.encoding);
         }
         if (message.sampleRate !== 0) {
-            writer.uint32(32).int32(message.sampleRate);
+            writer.uint32(24).int32(message.sampleRate);
         }
         if (message.channels !== 0) {
-            writer.uint32(40).int32(message.channels);
+            writer.uint32(32).int32(message.channels);
         }
         if (message.frameOffsetMs !== 0) {
-            writer.uint32(48).int64(message.frameOffsetMs);
+            writer.uint32(40).int64(message.frameOffsetMs);
         }
         return writer;
     },
@@ -567,35 +501,28 @@ exports.VADAudioSource = {
                     continue;
                 }
                 case 2: {
-                    if (tag !== 18) {
+                    if (tag !== 16) {
                         break;
                     }
-                    message.adapterHandle = reader.string();
+                    message.encoding = reader.int32();
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.encoding = reader.int32();
+                    message.sampleRate = reader.int32();
                     continue;
                 }
                 case 4: {
                     if (tag !== 32) {
                         break;
                     }
-                    message.sampleRate = reader.int32();
+                    message.channels = reader.int32();
                     continue;
                 }
                 case 5: {
                     if (tag !== 40) {
-                        break;
-                    }
-                    message.channels = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
                         break;
                     }
                     message.frameOffsetMs = longToNumber(reader.int64());
@@ -615,12 +542,7 @@ exports.VADAudioSource = {
                 ? bytesFromBase64(object.audioData)
                 : isSet(object.audio_data)
                     ? bytesFromBase64(object.audio_data)
-                    : undefined,
-            adapterHandle: isSet(object.adapterHandle)
-                ? globalThis.String(object.adapterHandle)
-                : isSet(object.adapter_handle)
-                    ? globalThis.String(object.adapter_handle)
-                    : undefined,
+                    : new Uint8Array(0),
             encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             sampleRate: isSet(object.sampleRate)
                 ? globalThis.Number(object.sampleRate)
@@ -637,11 +559,8 @@ exports.VADAudioSource = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.audioData !== undefined) {
+        if (message.audioData.length !== 0) {
             obj.audioData = base64FromBytes(message.audioData);
-        }
-        if (message.adapterHandle !== undefined) {
-            obj.adapterHandle = message.adapterHandle;
         }
         if (message.encoding !== 0) {
             obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
@@ -662,8 +581,7 @@ exports.VADAudioSource = {
     },
     fromPartial(object) {
         const message = createBaseVADAudioSource();
-        message.audioData = object.audioData ?? undefined;
-        message.adapterHandle = object.adapterHandle ?? undefined;
+        message.audioData = object.audioData ?? new Uint8Array(0);
         message.encoding = object.encoding ?? 0;
         message.sampleRate = object.sampleRate ?? 0;
         message.channels = object.channels ?? 0;
@@ -672,22 +590,16 @@ exports.VADAudioSource = {
     },
 };
 function createBaseVADProcessRequest() {
-    return { requestId: "", audio: undefined, options: undefined, metadata: {} };
+    return { audio: undefined, options: undefined };
 }
 exports.VADProcessRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.requestId !== "") {
-            writer.uint32(10).string(message.requestId);
-        }
         if (message.audio !== undefined) {
-            exports.VADAudioSource.encode(message.audio, writer.uint32(18).fork()).join();
+            exports.VADAudioSource.encode(message.audio, writer.uint32(10).fork()).join();
         }
         if (message.options !== undefined) {
-            exports.VADOptions.encode(message.options, writer.uint32(26).fork()).join();
+            exports.VADOptions.encode(message.options, writer.uint32(18).fork()).join();
         }
-        globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.VADProcessRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(34).fork()).join();
-        });
         return writer;
     },
     decode(input, length) {
@@ -701,31 +613,14 @@ exports.VADProcessRequest = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.requestId = reader.string();
+                    message.audio = exports.VADAudioSource.decode(reader, reader.uint32());
                     continue;
                 }
                 case 2: {
                     if (tag !== 18) {
                         break;
                     }
-                    message.audio = exports.VADAudioSource.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
                     message.options = exports.VADOptions.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    const entry4 = exports.VADProcessRequest_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry4.value !== undefined) {
-                        message.metadata[entry4.key] = entry4.value;
-                    }
                     continue;
                 }
             }
@@ -738,40 +633,17 @@ exports.VADProcessRequest = {
     },
     fromJSON(object) {
         return {
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
             audio: isSet(object.audio) ? exports.VADAudioSource.fromJSON(object.audio) : undefined,
             options: isSet(object.options) ? exports.VADOptions.fromJSON(object.options) : undefined,
-            metadata: isObject(object.metadata)
-                ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
-                    acc[key] = globalThis.String(value);
-                    return acc;
-                }, {})
-                : {},
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
-        }
         if (message.audio !== undefined) {
             obj.audio = exports.VADAudioSource.toJSON(message.audio);
         }
         if (message.options !== undefined) {
             obj.options = exports.VADOptions.toJSON(message.options);
-        }
-        if (message.metadata) {
-            const entries = globalThis.Object.entries(message.metadata);
-            if (entries.length > 0) {
-                obj.metadata = {};
-                entries.forEach(([k, v]) => {
-                    obj.metadata[k] = v;
-                });
-            }
         }
         return obj;
     },
@@ -780,110 +652,25 @@ exports.VADProcessRequest = {
     },
     fromPartial(object) {
         const message = createBaseVADProcessRequest();
-        message.requestId = object.requestId ?? "";
         message.audio = (object.audio !== undefined && object.audio !== null)
             ? exports.VADAudioSource.fromPartial(object.audio)
             : undefined;
         message.options = (object.options !== undefined && object.options !== null)
             ? exports.VADOptions.fromPartial(object.options)
             : undefined;
-        message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = globalThis.String(value);
-            }
-            return acc;
-        }, {});
-        return message;
-    },
-};
-function createBaseVADProcessRequest_MetadataEntry() {
-    return { key: "", value: "" };
-}
-exports.VADProcessRequest_MetadataEntry = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== "") {
-            writer.uint32(18).string(message.value);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseVADProcessRequest_MetadataEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? globalThis.String(object.value) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== "") {
-            obj.value = message.value;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.VADProcessRequest_MetadataEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseVADProcessRequest_MetadataEntry();
-        message.key = object.key ?? "";
-        message.value = object.value ?? "";
         return message;
     },
 };
 function createBaseVADResult() {
-    return {
-        isSpeech: false,
-        confidence: 0,
-        energy: 0,
-        durationMs: 0,
-        timestampMs: 0,
-        startTimeMs: 0,
-        endTimeMs: 0,
-        statistics: undefined,
-        error: undefined,
-    };
+    return { isSpeech: false, probability: 0, energy: 0, durationMs: 0, timestampMs: 0, error: undefined };
 }
 exports.VADResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.isSpeech !== false) {
             writer.uint32(8).bool(message.isSpeech);
         }
-        if (message.confidence !== 0) {
-            writer.uint32(21).float(message.confidence);
+        if (message.probability !== 0) {
+            writer.uint32(21).float(message.probability);
         }
         if (message.energy !== 0) {
             writer.uint32(29).float(message.energy);
@@ -894,17 +681,8 @@ exports.VADResult = {
         if (message.timestampMs !== 0) {
             writer.uint32(40).int64(message.timestampMs);
         }
-        if (message.startTimeMs !== 0) {
-            writer.uint32(48).int64(message.startTimeMs);
-        }
-        if (message.endTimeMs !== 0) {
-            writer.uint32(56).int64(message.endTimeMs);
-        }
-        if (message.statistics !== undefined) {
-            exports.VADStatistics.encode(message.statistics, writer.uint32(66).fork()).join();
-        }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(90).fork()).join();
+            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -926,7 +704,7 @@ exports.VADResult = {
                     if (tag !== 21) {
                         break;
                     }
-                    message.confidence = reader.float();
+                    message.probability = reader.float();
                     continue;
                 }
                 case 3: {
@@ -951,28 +729,7 @@ exports.VADResult = {
                     continue;
                 }
                 case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.startTimeMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.endTimeMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.statistics = exports.VADStatistics.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
+                    if (tag !== 50) {
                         break;
                     }
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
@@ -993,7 +750,7 @@ exports.VADResult = {
                 : isSet(object.is_speech)
                     ? globalThis.Boolean(object.is_speech)
                     : false,
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+            probability: isSet(object.probability) ? globalThis.Number(object.probability) : 0,
             energy: isSet(object.energy) ? globalThis.Number(object.energy) : 0,
             durationMs: isSet(object.durationMs)
                 ? globalThis.Number(object.durationMs)
@@ -1005,17 +762,6 @@ exports.VADResult = {
                 : isSet(object.timestamp_ms)
                     ? globalThis.Number(object.timestamp_ms)
                     : 0,
-            startTimeMs: isSet(object.startTimeMs)
-                ? globalThis.Number(object.startTimeMs)
-                : isSet(object.start_time_ms)
-                    ? globalThis.Number(object.start_time_ms)
-                    : 0,
-            endTimeMs: isSet(object.endTimeMs)
-                ? globalThis.Number(object.endTimeMs)
-                : isSet(object.end_time_ms)
-                    ? globalThis.Number(object.end_time_ms)
-                    : 0,
-            statistics: isSet(object.statistics) ? exports.VADStatistics.fromJSON(object.statistics) : undefined,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -1024,8 +770,8 @@ exports.VADResult = {
         if (message.isSpeech !== false) {
             obj.isSpeech = message.isSpeech;
         }
-        if (message.confidence !== 0) {
-            obj.confidence = message.confidence;
+        if (message.probability !== 0) {
+            obj.probability = message.probability;
         }
         if (message.energy !== 0) {
             obj.energy = message.energy;
@@ -1035,15 +781,6 @@ exports.VADResult = {
         }
         if (message.timestampMs !== 0) {
             obj.timestampMs = Math.round(message.timestampMs);
-        }
-        if (message.startTimeMs !== 0) {
-            obj.startTimeMs = Math.round(message.startTimeMs);
-        }
-        if (message.endTimeMs !== 0) {
-            obj.endTimeMs = Math.round(message.endTimeMs);
-        }
-        if (message.statistics !== undefined) {
-            obj.statistics = exports.VADStatistics.toJSON(message.statistics);
         }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
@@ -1056,15 +793,10 @@ exports.VADResult = {
     fromPartial(object) {
         const message = createBaseVADResult();
         message.isSpeech = object.isSpeech ?? false;
-        message.confidence = object.confidence ?? 0;
+        message.probability = object.probability ?? 0;
         message.energy = object.energy ?? 0;
         message.durationMs = object.durationMs ?? 0;
         message.timestampMs = object.timestampMs ?? 0;
-        message.startTimeMs = object.startTimeMs ?? 0;
-        message.endTimeMs = object.endTimeMs ?? 0;
-        message.statistics = (object.statistics !== undefined && object.statistics !== null)
-            ? exports.VADStatistics.fromPartial(object.statistics)
-            : undefined;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -1291,7 +1023,7 @@ exports.VADStatistics = {
     },
 };
 function createBaseSpeechActivityEvent() {
-    return { eventType: 0, timestampMs: 0, durationMs: 0, confidence: 0, result: undefined, segmentId: undefined };
+    return { eventType: 0, timestampMs: 0, audioStartMs: 0, audioEndMs: 0, segmentId: undefined };
 }
 exports.SpeechActivityEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1301,17 +1033,14 @@ exports.SpeechActivityEvent = {
         if (message.timestampMs !== 0) {
             writer.uint32(16).int64(message.timestampMs);
         }
-        if (message.durationMs !== 0) {
-            writer.uint32(24).int32(message.durationMs);
+        if (message.audioStartMs !== 0) {
+            writer.uint32(24).int64(message.audioStartMs);
         }
-        if (message.confidence !== 0) {
-            writer.uint32(37).float(message.confidence);
-        }
-        if (message.result !== undefined) {
-            exports.VADResult.encode(message.result, writer.uint32(42).fork()).join();
+        if (message.audioEndMs !== 0) {
+            writer.uint32(32).int64(message.audioEndMs);
         }
         if (message.segmentId !== undefined) {
-            writer.uint32(50).string(message.segmentId);
+            writer.uint32(42).string(message.segmentId);
         }
         return writer;
     },
@@ -1340,25 +1069,18 @@ exports.SpeechActivityEvent = {
                     if (tag !== 24) {
                         break;
                     }
-                    message.durationMs = reader.int32();
+                    message.audioStartMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 4: {
-                    if (tag !== 37) {
+                    if (tag !== 32) {
                         break;
                     }
-                    message.confidence = reader.float();
+                    message.audioEndMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 5: {
                     if (tag !== 42) {
-                        break;
-                    }
-                    message.result = exports.VADResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
                         break;
                     }
                     message.segmentId = reader.string();
@@ -1384,13 +1106,16 @@ exports.SpeechActivityEvent = {
                 : isSet(object.timestamp_ms)
                     ? globalThis.Number(object.timestamp_ms)
                     : 0,
-            durationMs: isSet(object.durationMs)
-                ? globalThis.Number(object.durationMs)
-                : isSet(object.duration_ms)
-                    ? globalThis.Number(object.duration_ms)
+            audioStartMs: isSet(object.audioStartMs)
+                ? globalThis.Number(object.audioStartMs)
+                : isSet(object.audio_start_ms)
+                    ? globalThis.Number(object.audio_start_ms)
                     : 0,
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-            result: isSet(object.result) ? exports.VADResult.fromJSON(object.result) : undefined,
+            audioEndMs: isSet(object.audioEndMs)
+                ? globalThis.Number(object.audioEndMs)
+                : isSet(object.audio_end_ms)
+                    ? globalThis.Number(object.audio_end_ms)
+                    : 0,
             segmentId: isSet(object.segmentId)
                 ? globalThis.String(object.segmentId)
                 : isSet(object.segment_id)
@@ -1406,14 +1131,11 @@ exports.SpeechActivityEvent = {
         if (message.timestampMs !== 0) {
             obj.timestampMs = Math.round(message.timestampMs);
         }
-        if (message.durationMs !== 0) {
-            obj.durationMs = Math.round(message.durationMs);
+        if (message.audioStartMs !== 0) {
+            obj.audioStartMs = Math.round(message.audioStartMs);
         }
-        if (message.confidence !== 0) {
-            obj.confidence = message.confidence;
-        }
-        if (message.result !== undefined) {
-            obj.result = exports.VADResult.toJSON(message.result);
+        if (message.audioEndMs !== 0) {
+            obj.audioEndMs = Math.round(message.audioEndMs);
         }
         if (message.segmentId !== undefined) {
             obj.segmentId = message.segmentId;
@@ -1427,26 +1149,14 @@ exports.SpeechActivityEvent = {
         const message = createBaseSpeechActivityEvent();
         message.eventType = object.eventType ?? 0;
         message.timestampMs = object.timestampMs ?? 0;
-        message.durationMs = object.durationMs ?? 0;
-        message.confidence = object.confidence ?? 0;
-        message.result = (object.result !== undefined && object.result !== null)
-            ? exports.VADResult.fromPartial(object.result)
-            : undefined;
+        message.audioStartMs = object.audioStartMs ?? 0;
+        message.audioEndMs = object.audioEndMs ?? 0;
         message.segmentId = object.segmentId ?? undefined;
         return message;
     },
 };
 function createBaseVADStreamEvent() {
-    return {
-        seq: 0,
-        timestampUs: 0,
-        requestId: "",
-        kind: 0,
-        result: undefined,
-        activity: undefined,
-        statistics: undefined,
-        error: undefined,
-    };
+    return { seq: 0, timestampUs: 0, requestId: "", kind: 0, result: undefined, activity: undefined, error: undefined };
 }
 exports.VADStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1468,11 +1178,8 @@ exports.VADStreamEvent = {
         if (message.activity !== undefined) {
             exports.SpeechActivityEvent.encode(message.activity, writer.uint32(50).fork()).join();
         }
-        if (message.statistics !== undefined) {
-            exports.VADStatistics.encode(message.statistics, writer.uint32(58).fork()).join();
-        }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(82).fork()).join();
+            errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
         }
         return writer;
     },
@@ -1529,13 +1236,6 @@ exports.VADStreamEvent = {
                     if (tag !== 58) {
                         break;
                     }
-                    message.statistics = exports.VADStatistics.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
@@ -1563,7 +1263,6 @@ exports.VADStreamEvent = {
             kind: isSet(object.kind) ? vADStreamEventKindFromJSON(object.kind) : 0,
             result: isSet(object.result) ? exports.VADResult.fromJSON(object.result) : undefined,
             activity: isSet(object.activity) ? exports.SpeechActivityEvent.fromJSON(object.activity) : undefined,
-            statistics: isSet(object.statistics) ? exports.VADStatistics.fromJSON(object.statistics) : undefined,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
@@ -1587,9 +1286,6 @@ exports.VADStreamEvent = {
         if (message.activity !== undefined) {
             obj.activity = exports.SpeechActivityEvent.toJSON(message.activity);
         }
-        if (message.statistics !== undefined) {
-            obj.statistics = exports.VADStatistics.toJSON(message.statistics);
-        }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
         }
@@ -1610,9 +1306,6 @@ exports.VADStreamEvent = {
         message.activity = (object.activity !== undefined && object.activity !== null)
             ? exports.SpeechActivityEvent.fromPartial(object.activity)
             : undefined;
-        message.statistics = (object.statistics !== undefined && object.statistics !== null)
-            ? exports.VADStatistics.fromPartial(object.statistics)
-            : undefined;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;
@@ -1623,7 +1316,7 @@ function createBaseVADServiceState() {
     return {
         isReady: false,
         isSpeechActive: false,
-        energyThreshold: 0,
+        activationThreshold: 0,
         sampleRate: 0,
         frameLengthMs: 0,
         currentModel: undefined,
@@ -1638,8 +1331,8 @@ exports.VADServiceState = {
         if (message.isSpeechActive !== false) {
             writer.uint32(16).bool(message.isSpeechActive);
         }
-        if (message.energyThreshold !== 0) {
-            writer.uint32(29).float(message.energyThreshold);
+        if (message.activationThreshold !== 0) {
+            writer.uint32(29).float(message.activationThreshold);
         }
         if (message.sampleRate !== 0) {
             writer.uint32(32).int32(message.sampleRate);
@@ -1651,7 +1344,7 @@ exports.VADServiceState = {
             writer.uint32(50).string(message.currentModel);
         }
         if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
+            errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
         }
         return writer;
     },
@@ -1680,7 +1373,7 @@ exports.VADServiceState = {
                     if (tag !== 29) {
                         break;
                     }
-                    message.energyThreshold = reader.float();
+                    message.activationThreshold = reader.float();
                     continue;
                 }
                 case 4: {
@@ -1704,8 +1397,8 @@ exports.VADServiceState = {
                     message.currentModel = reader.string();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 74) {
+                case 7: {
+                    if (tag !== 58) {
                         break;
                     }
                     message.error = errors_1.SDKError.decode(reader, reader.uint32());
@@ -1731,10 +1424,10 @@ exports.VADServiceState = {
                 : isSet(object.is_speech_active)
                     ? globalThis.Boolean(object.is_speech_active)
                     : false,
-            energyThreshold: isSet(object.energyThreshold)
-                ? globalThis.Number(object.energyThreshold)
-                : isSet(object.energy_threshold)
-                    ? globalThis.Number(object.energy_threshold)
+            activationThreshold: isSet(object.activationThreshold)
+                ? globalThis.Number(object.activationThreshold)
+                : isSet(object.activation_threshold)
+                    ? globalThis.Number(object.activation_threshold)
                     : 0,
             sampleRate: isSet(object.sampleRate)
                 ? globalThis.Number(object.sampleRate)
@@ -1762,8 +1455,8 @@ exports.VADServiceState = {
         if (message.isSpeechActive !== false) {
             obj.isSpeechActive = message.isSpeechActive;
         }
-        if (message.energyThreshold !== 0) {
-            obj.energyThreshold = message.energyThreshold;
+        if (message.activationThreshold !== 0) {
+            obj.activationThreshold = message.activationThreshold;
         }
         if (message.sampleRate !== 0) {
             obj.sampleRate = Math.round(message.sampleRate);
@@ -1786,7 +1479,7 @@ exports.VADServiceState = {
         const message = createBaseVADServiceState();
         message.isReady = object.isReady ?? false;
         message.isSpeechActive = object.isSpeechActive ?? false;
-        message.energyThreshold = object.energyThreshold ?? 0;
+        message.activationThreshold = object.activationThreshold ?? 0;
         message.sampleRate = object.sampleRate ?? 0;
         message.frameLengthMs = object.frameLengthMs ?? 0;
         message.currentModel = object.currentModel ?? undefined;
@@ -1820,9 +1513,6 @@ function longToNumber(int64) {
         throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
     }
     return num;
-}
-function isObject(value) {
-    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

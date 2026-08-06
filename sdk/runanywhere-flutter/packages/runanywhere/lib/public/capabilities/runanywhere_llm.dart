@@ -7,6 +7,8 @@ import 'dart:async';
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/chat.pb.dart' as chat_pb;
+import 'package:runanywhere/generated/chat.pbenum.dart' show MessageRole;
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
@@ -20,7 +22,7 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/structured_output.pb.dart'
-    show JSONSchema, StructuredOutputResult;
+    show StructuredOutputResult;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
@@ -215,9 +217,13 @@ class RunAnywhereLLM {
     String prompt,
     LLMGenerationOptions? options,
   ) {
+    // `LLMGenerateRequest.prompt` is reserved (idl/llm_service.proto): the
+    // whole conversation now travels as `messages`, oldest first, ending
+    // with the turn the model must answer. This single-prompt entry point
+    // has no history, so `messages` is just the one live user turn.
     return LLMGenerateRequest(
-      prompt: prompt,
       options: _canonicalOptions(options),
+      messages: [chat_pb.ChatMessage(role: MessageRole.MESSAGE_ROLE_USER, content: prompt)],
     );
   }
 
@@ -236,9 +242,9 @@ class RunAnywhereLLM {
     if (!requestOptions.hasTopP() || requestOptions.topP <= 0) {
       requestOptions.topP = d.topP;
     }
-    if (!requestOptions.hasRepetitionPenalty() ||
-        requestOptions.repetitionPenalty <= 0) {
-      requestOptions.repetitionPenalty = d.repetitionPenalty;
+    if (!requestOptions.hasRepeatPenalty() ||
+        requestOptions.repeatPenalty <= 0) {
+      requestOptions.repeatPenalty = d.repeatPenalty;
     }
     return requestOptions;
   }
@@ -267,7 +273,7 @@ class RunAnywhereLLM {
   /// `RunAnywhere+TextGeneration.swift`.
   StructuredOutputResult extractStructuredOutput({
     required String text,
-    required JSONSchema schema,
+    required String schema,
   }) {
     return DartBridgeStructuredOutput.shared.parse(
       DartBridgeStructuredOutput.shared.makeParseRequest(

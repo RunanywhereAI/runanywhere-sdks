@@ -4,17 +4,18 @@
 
 import 'dart:async';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/chat.pb.dart' as chat_pb;
+import 'package:runanywhere/generated/chat.pbenum.dart' show MessageRole;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
 import 'package:runanywhere/generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent;
-import 'package:runanywhere/generated/structured_output.pb.dart'
-    show JSONSchema;
+import 'package:runanywhere/generated/llm_service.pbenum.dart'
+    show LLMStreamEventKind;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show ToolCall, ToolDefinition, ToolResult;
 import 'package:runanywhere/generated/tool_calling.pbenum.dart'
     show ToolChoiceMode;
-import 'package:runanywhere/generated/voice_events.pbenum.dart' as voice_pb;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/public/api/internal/model_gate.dart';
@@ -73,7 +74,7 @@ class LlmApi {
     final request = await _chatRequest(messages, options);
     if (_usesTools(request)) {
       return _generateWithTools(
-        request.prompt,
+        _livePrompt(request),
         request,
         history: messages
             .where((m) => m.role != ChatRole.system)
@@ -123,7 +124,7 @@ class LlmApi {
   /// or the output cannot be parsed against the schema.
   Future<StructuredResult> generateStructured(
     String prompt,
-    JSONSchema schema, {
+    String schema, {
     StructuredOutputMode mode = StructuredOutputMode.validationOnly,
     LlmOptions? options,
   }) async {
@@ -183,6 +184,12 @@ class LlmApi {
         calling.toolChoice != ToolChoiceMode.TOOL_CHOICE_MODE_NONE;
   }
 
+  /// The live (last) turn's text — `LLMGenerateRequest.prompt` is reserved
+  /// (idl/llm_service.proto): the whole conversation now travels as
+  /// `messages`, oldest first, ending with the turn the model must answer.
+  static String _livePrompt(LLMGenerateRequest request) =>
+      request.messages.isNotEmpty ? request.messages.last.content : '';
+
   Future<GenerationResult> _generateWithTools(
     String prompt,
     LLMGenerateRequest request, {
@@ -209,7 +216,7 @@ class LlmApi {
           : FinishReason.toolCalls,
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
-      tokensPerSecond: result.usage.tokensPerSecond,
+      tokensPerSecond: result.usage.decodeTokensPerSecond,
       requestId: request.requestId,
       model:
           await ModelGate.currentId(ModelCategory.MODEL_CATEGORY_LANGUAGE) ?? '',
@@ -255,7 +262,7 @@ class LlmApi {
       if (_usesTools(request)) {
         // The tool-execution loop lives behind the session ABI, which has no
         // token stream: the turn is delivered as one chunk once tools resolve.
-        final result = await _generateWithTools(request.prompt, request);
+        final result = await _generateWithTools(_livePrompt(request), request);
         if (result.text.isNotEmpty) {
           controller.add(GenerationTextDelta(result.text, requestId: requestId));
         }
@@ -283,10 +290,10 @@ class LlmApi {
         request,
       )) {
         if (event.token.isNotEmpty) {
-          final kind = event.kind == voice_pb.TokenKind.TOKEN_KIND_THOUGHT
-              ? TokenKind.thought
-              : TokenKind.text;
-          if (kind == TokenKind.thought) {
+          // `LLMStreamEvent`'s discriminator is event-level (`eventKind`:
+          // THINKING vs TOKEN), not a per-token `TokenKind`/`kind` field
+          // (both reserved — idl/llm_service.proto).
+          if (event.eventKind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
             thinking.write(event.token);
             controller.add(
               GenerationReasoningDelta(event.token, requestId: requestId),
@@ -303,7 +310,8 @@ class LlmApi {
             GenerationToolCallAdded(event.toolCall, requestId: requestId),
           );
         }
-        if (event.isFinal) {
+        if (event.eventKind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+            event.eventKind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR) {
           terminal = event;
           break;
         }
@@ -335,16 +343,16 @@ class LlmApi {
         return;
       }
 
+      // `LLMStreamFinalResult` is deleted: the stream terminates with the
+      // same `LLMGenerationResult` carried on `LLMStreamEvent.result`
+      // (idl/llm_service.proto), so the terminal event routes through
+      // `GenerationResult.fromLlm` directly instead of a separate factory.
       final result = terminal != null && terminal.hasResult()
-          ? GenerationResult.fromStreamFinal(
-              terminal.result,
-              requestId: requestId,
-              model: model,
-            )
+          ? GenerationResult.fromLlm(terminal.result, requestId: requestId)
           : GenerationResult(
               text: buffer.toString(),
               thinkingText: thinking.isEmpty ? null : thinking.toString(),
-              finishReason: _finish(terminal?.finishReason),
+              finishReason: FinishReason.stop,
               outputTokens: 0,
               requestId: requestId,
               model: model,
@@ -379,17 +387,6 @@ class LlmApi {
     }
   }
 
-  static FinishReason _finish(String? wire) {
-    switch (wire) {
-      case 'length':
-        return FinishReason.length;
-      case 'cancelled':
-        return FinishReason.cancelled;
-      default:
-        return FinishReason.stop;
-    }
-  }
-
   Future<LLMGenerateRequest> _request({
     required String prompt,
     LlmOptions? options,
@@ -398,10 +395,14 @@ class LlmApi {
       modelId: options?.model,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     );
+    // `LLMGenerateRequest.prompt` is reserved (idl/llm_service.proto): the
+    // whole conversation now travels as `messages`, ending with the turn
+    // the model must answer. A single-prompt call has no history, so
+    // `messages` is just the one live user turn.
     return LLMGenerateRequest(
-      prompt: prompt,
       requestId: _requestId(),
       options: _options(options),
+      messages: [chat_pb.ChatMessage(role: MessageRole.MESSAGE_ROLE_USER, content: prompt)],
     );
   }
 
@@ -425,17 +426,19 @@ class LlmApi {
     if (turns.isEmpty) {
       throw SDKException.invalidInput('messages must carry a non-system turn');
     }
-    final live = turns.removeLast();
 
     final proto = _options(options);
     if (system.isNotEmpty && !proto.hasSystemPrompt()) {
       proto.systemPrompt = system;
     }
+    // `LLMGenerateRequest.prompt`/`.history` are reserved (idl/llm_service.
+    // proto): the whole conversation, oldest first ending with the live
+    // turn, now travels as `messages` — system turns stay off this list
+    // (they went into `options.systemPrompt` above).
     return LLMGenerateRequest(
-      prompt: live.content,
       requestId: _requestId(),
       options: proto,
-      history: turns.map((m) => m.toProto()),
+      messages: turns.map((m) => m.toProto()),
     );
   }
 

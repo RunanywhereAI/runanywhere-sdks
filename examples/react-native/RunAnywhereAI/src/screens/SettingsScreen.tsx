@@ -31,7 +31,10 @@ import {
   getModelDownloadSizeBytes,
   getPrimaryFramework,
 } from '../utils/modelDisplay';
-import { registerDemoTools as registerSharedDemoTools } from '../utils/chatSampleTools';
+import {
+  registerDemoTools as registerSharedDemoTools,
+  toolParameterNames,
+} from '../utils/chatSampleTools';
 import { Icon, useTheme } from '../theme/system';
 
 import { RunAnywhere, formatFramework } from '@runanywhere/core';
@@ -476,7 +479,8 @@ export const SettingsScreen: React.FC = () => {
     Array<{
       name: string;
       description: string;
-      parameters: Array<{ name: string }>;
+      /** Property names parsed from the tool's JSON Schema `parameters` string. */
+      parameterNames: string[];
     }>
   >([]);
 
@@ -663,7 +667,7 @@ export const SettingsScreen: React.FC = () => {
       tools.map((t) => ({
         name: t.name,
         description: t.description,
-        parameters: t.parameters || [],
+        parameterNames: toolParameterNames(t.parameters),
       }))
     );
   };
@@ -1378,11 +1382,11 @@ export const SettingsScreen: React.FC = () => {
                       >
                         {tool.description}
                       </Text>
-                      {tool.parameters.length > 0 && (
+                      {tool.parameterNames.length > 0 && (
                         <View style={styles.chipRow}>
-                          {tool.parameters.map((p) => (
+                          {tool.parameterNames.map((name) => (
                             <View
-                              key={p.name}
+                              key={name}
                               style={[
                                 styles.chip,
                                 {
@@ -1397,7 +1401,7 @@ export const SettingsScreen: React.FC = () => {
                                   { color: colors.onSecondaryContainer },
                                 ]}
                               >
-                                {p.name}
+                                {name}
                               </Text>
                             </View>
                           ))}

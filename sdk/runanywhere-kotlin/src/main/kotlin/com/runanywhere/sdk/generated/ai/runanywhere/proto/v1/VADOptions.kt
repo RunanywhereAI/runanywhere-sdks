@@ -34,19 +34,23 @@ import okio.ByteString
  */
 public class VADOptions(
   /**
-   * 0 = keep the configured threshold.
+   * Unset = keep the loaded detector's calibrated value. Same normalized
+   * \[0,1\] scale as VADConfiguration.activation_threshold.
    */
+  @RacDefaultOption("0.5")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
   @field:WireField(
-    tag = 6,
+    tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "activationThreshold",
     schemaIndex = 0,
   )
-  public val activation_threshold: Float = 0f,
-  @RacDefaultOption("100")
+  public val activation_threshold: Float? = null,
+  /**
+   * Debounce: speech shorter than this is discarded (coughs, clicks, taps).
+   */
+  @RacDefaultOption("250")
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -55,7 +59,12 @@ public class VADOptions(
     schemaIndex = 1,
   )
   public val min_speech_duration_ms: Int = 0,
-  @RacDefaultOption("300")
+  /**
+   * Hangover: continuous silence this long ends the turn. This is the
+   * primary latency dial. Defaulted for TURN-TAKING (OpenAI
+   * silence_duration_ms = 500), not for ASR segmentation (Silero = 100).
+   */
+  @RacDefaultOption("500")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -65,38 +74,46 @@ public class VADOptions(
   )
   public val min_silence_duration_ms: Int = 0,
   /**
-   * 0 = backend default, for both of these.
+   * Force-split a monologue longer than this. Unset = unbounded.
    */
-  @RacDefaultOption("0")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "maxSpeechDurationMs",
     schemaIndex = 3,
   )
-  public val max_speech_duration_ms: Int = 0,
+  public val max_speech_duration_ms: Int? = null,
   /**
-   * Audio retained before SPEECH_STARTED so segments don't clip the first
-   * syllable.
+   * Pre-roll kept before SPEECH_STARTED so the first phoneme survives.
+   * Included in the emitted segment's audio_start_ms (OpenAI semantics).
    */
-  @RacDefaultOption("0")
+  @RacDefaultOption("300")
   @field:WireField(
-    tag = 7,
+    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "prefixPaddingMs",
     schemaIndex = 4,
   )
   public val prefix_padding_ms: Int = 0,
+  /**
+   * Capture rate of the audio fed to the detector, for the whole session.
+   * Nothing resamples: a mismatch yields wrong segment durations. Bound is
+   * identical to VADConfiguration.sample_rate and the commons validator —
+   * if the project narrows to Silero/LiveKit's {8000,16000}, change all
+   * three together.
+   */
+  @RacDefaultOption("16000")
+  @RacMinOption(8_000)
+  @RacMaxOption(48_000)
   @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "includeStatistics",
+    jsonName = "sampleRate",
     schemaIndex = 5,
   )
-  public val include_statistics: Boolean = false,
+  public val sample_rate: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -114,7 +131,7 @@ public class VADOptions(
     if (min_silence_duration_ms != other.min_silence_duration_ms) return false
     if (max_speech_duration_ms != other.max_speech_duration_ms) return false
     if (prefix_padding_ms != other.prefix_padding_ms) return false
-    if (include_statistics != other.include_statistics) return false
+    if (sample_rate != other.sample_rate) return false
     return true
   }
 
@@ -122,12 +139,12 @@ public class VADOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + activation_threshold.hashCode()
+      result = result * 37 + (activation_threshold?.hashCode() ?: 0)
       result = result * 37 + min_speech_duration_ms.hashCode()
       result = result * 37 + min_silence_duration_ms.hashCode()
-      result = result * 37 + max_speech_duration_ms.hashCode()
+      result = result * 37 + (max_speech_duration_ms?.hashCode() ?: 0)
       result = result * 37 + prefix_padding_ms.hashCode()
-      result = result * 37 + include_statistics.hashCode()
+      result = result * 37 + sample_rate.hashCode()
       super.hashCode = result
     }
     return result
@@ -135,24 +152,24 @@ public class VADOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """activation_threshold=$activation_threshold"""
+    if (activation_threshold != null) result += """activation_threshold=$activation_threshold"""
     result += """min_speech_duration_ms=$min_speech_duration_ms"""
     result += """min_silence_duration_ms=$min_silence_duration_ms"""
-    result += """max_speech_duration_ms=$max_speech_duration_ms"""
+    if (max_speech_duration_ms != null) result += """max_speech_duration_ms=$max_speech_duration_ms"""
     result += """prefix_padding_ms=$prefix_padding_ms"""
-    result += """include_statistics=$include_statistics"""
+    result += """sample_rate=$sample_rate"""
     return result.joinToString(prefix = "VADOptions{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    activation_threshold: Float = this.activation_threshold,
+    activation_threshold: Float? = this.activation_threshold,
     min_speech_duration_ms: Int = this.min_speech_duration_ms,
     min_silence_duration_ms: Int = this.min_silence_duration_ms,
-    max_speech_duration_ms: Int = this.max_speech_duration_ms,
+    max_speech_duration_ms: Int? = this.max_speech_duration_ms,
     prefix_padding_ms: Int = this.prefix_padding_ms,
-    include_statistics: Boolean = this.include_statistics,
+    sample_rate: Int = this.sample_rate,
     unknownFields: ByteString = this.unknownFields,
-  ): VADOptions = VADOptions(activation_threshold, min_speech_duration_ms, min_silence_duration_ms, max_speech_duration_ms, prefix_padding_ms, include_statistics, unknownFields)
+  ): VADOptions = VADOptions(activation_threshold, min_speech_duration_ms, min_silence_duration_ms, max_speech_duration_ms, prefix_padding_ms, sample_rate, unknownFields)
 
   public companion object {
     @JvmField
@@ -166,86 +183,74 @@ public class VADOptions(
     ) {
       override fun encodedSize(`value`: VADOptions): Int {
         var size = value.unknownFields.size
-        if (!value.activation_threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.activation_threshold)
-        }
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(1, value.activation_threshold)
         if (value.min_speech_duration_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.min_speech_duration_ms)
         }
         if (value.min_silence_duration_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.min_silence_duration_ms)
         }
-        if (value.max_speech_duration_ms != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.max_speech_duration_ms)
-        }
+        size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.max_speech_duration_ms)
         if (value.prefix_padding_ms != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.prefix_padding_ms)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.prefix_padding_ms)
         }
-        if (value.include_statistics != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.include_statistics)
+        if (value.sample_rate != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.sample_rate)
         }
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: VADOptions) {
-        if (!value.activation_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.activation_threshold)
-        }
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 1, value.activation_threshold)
         if (value.min_speech_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 2, value.min_speech_duration_ms)
         }
         if (value.min_silence_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.min_silence_duration_ms)
         }
-        if (value.max_speech_duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speech_duration_ms)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speech_duration_ms)
         if (value.prefix_padding_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.prefix_padding_ms)
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.prefix_padding_ms)
         }
-        if (value.include_statistics != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.include_statistics)
+        if (value.sample_rate != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.sample_rate)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADOptions) {
         writer.writeBytes(value.unknownFields)
-        if (value.include_statistics != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.include_statistics)
+        if (value.sample_rate != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.sample_rate)
         }
         if (value.prefix_padding_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.prefix_padding_ms)
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.prefix_padding_ms)
         }
-        if (value.max_speech_duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speech_duration_ms)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speech_duration_ms)
         if (value.min_silence_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.min_silence_duration_ms)
         }
         if (value.min_speech_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 2, value.min_speech_duration_ms)
         }
-        if (!value.activation_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.activation_threshold)
-        }
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 1, value.activation_threshold)
       }
 
       override fun decode(reader: ProtoReader): VADOptions {
-        var activation_threshold: Float = 0f
+        var activation_threshold: Float? = null
         var min_speech_duration_ms: Int = 0
         var min_silence_duration_ms: Int = 0
-        var max_speech_duration_ms: Int = 0
+        var max_speech_duration_ms: Int? = null
         var prefix_padding_ms: Int = 0
-        var include_statistics: Boolean = false
+        var sample_rate: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            6 -> activation_threshold = ProtoAdapter.FLOAT.decode(reader)
+            1 -> activation_threshold = ProtoAdapter.FLOAT.decode(reader)
             2 -> min_speech_duration_ms = ProtoAdapter.INT32.decode(reader)
             3 -> min_silence_duration_ms = ProtoAdapter.INT32.decode(reader)
             4 -> max_speech_duration_ms = ProtoAdapter.INT32.decode(reader)
-            7 -> prefix_padding_ms = ProtoAdapter.INT32.decode(reader)
-            5 -> include_statistics = ProtoAdapter.BOOL.decode(reader)
+            5 -> prefix_padding_ms = ProtoAdapter.INT32.decode(reader)
+            6 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -255,7 +260,7 @@ public class VADOptions(
           min_silence_duration_ms = min_silence_duration_ms,
           max_speech_duration_ms = max_speech_duration_ms,
           prefix_padding_ms = prefix_padding_ms,
-          include_statistics = include_statistics,
+          sample_rate = sample_rate,
           unknownFields = unknownFields
         )
       }

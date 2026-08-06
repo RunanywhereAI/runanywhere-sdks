@@ -34,8 +34,6 @@ class VADConfiguration extends $pb.GeneratedMessage {
     $core.double? calibrationMultiplier,
     $1.InferenceFramework? preferredFramework,
     $core.String? modelPath,
-    $core.int? windowSizeSamples,
-    $core.int? maxSpeechDurationMs,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -50,9 +48,6 @@ class VADConfiguration extends $pb.GeneratedMessage {
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
     if (modelPath != null) result.modelPath = modelPath;
-    if (windowSizeSamples != null) result.windowSizeSamples = windowSizeSamples;
-    if (maxSpeechDurationMs != null)
-      result.maxSpeechDurationMs = maxSpeechDurationMs;
     return result;
   }
 
@@ -80,8 +75,6 @@ class VADConfiguration extends $pb.GeneratedMessage {
     ..aE<$1.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: $1.InferenceFramework.values)
     ..aOS(8, _omitFieldNames ? '' : 'modelPath')
-    ..aI(9, _omitFieldNames ? '' : 'windowSizeSamples')
-    ..aI(10, _omitFieldNames ? '' : 'maxSpeechDurationMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -122,8 +115,8 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSampleRate() => $_clearField(2);
 
-  /// Milliseconds on the wire; Swift/Kotlin/Dart/C hold seconds, so generated
-  /// bindings divide by 1000 when they bind to those types.
+  /// Milliseconds, on the wire AND in every generated binding. Only the
+  /// internal rac_vad_config_t holds seconds; commons converts there.
   @$pb.TagNumber(3)
   $core.int get frameLengthMs => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -133,7 +126,13 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearFrameLengthMs() => $_clearField(3);
 
-  /// Commons rejects values outside [0, 1] and warns below 0.002 or above 0.1.
+  /// Normalized activation sensitivity in [0,1]; higher = harder to trigger.
+  /// 0.5 is the industry default (OpenAI turn_detection.threshold, Silero,
+  /// LiveKit activation_threshold). Each backend maps it onto its own units:
+  /// a probability model uses it 1:1, the built-in energy detector converts
+  /// it to an RMS bar. That conversion is backend-owned and is NOT fixed
+  /// here; the built-in energy path and the voice-agent path calibrate
+  /// separately today.
   @$pb.TagNumber(4)
   $core.double get activationThreshold => $_getN(3);
   @$pb.TagNumber(4)
@@ -182,48 +181,29 @@ class VADConfiguration extends $pb.GeneratedMessage {
   $core.bool hasModelPath() => $_has(7);
   @$pb.TagNumber(8)
   void clearModelPath() => $_clearField(8);
-
-  /// 0 = backend default, for both of these.
-  @$pb.TagNumber(9)
-  $core.int get windowSizeSamples => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set windowSizeSamples($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasWindowSizeSamples() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearWindowSizeSamples() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.int get maxSpeechDurationMs => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set maxSpeechDurationMs($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasMaxSpeechDurationMs() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearMaxSpeechDurationMs() => $_clearField(10);
 }
 
 /// Per-call options. Field vocabulary follows LiveKit/Silero naming.
 class VADOptions extends $pb.GeneratedMessage {
   factory VADOptions({
+    $core.double? activationThreshold,
     $core.int? minSpeechDurationMs,
     $core.int? minSilenceDurationMs,
     $core.int? maxSpeechDurationMs,
-    $core.bool? includeStatistics,
-    $core.double? activationThreshold,
     $core.int? prefixPaddingMs,
+    $core.int? sampleRate,
   }) {
     final result = create();
+    if (activationThreshold != null)
+      result.activationThreshold = activationThreshold;
     if (minSpeechDurationMs != null)
       result.minSpeechDurationMs = minSpeechDurationMs;
     if (minSilenceDurationMs != null)
       result.minSilenceDurationMs = minSilenceDurationMs;
     if (maxSpeechDurationMs != null)
       result.maxSpeechDurationMs = maxSpeechDurationMs;
-    if (includeStatistics != null) result.includeStatistics = includeStatistics;
-    if (activationThreshold != null)
-      result.activationThreshold = activationThreshold;
     if (prefixPaddingMs != null) result.prefixPaddingMs = prefixPaddingMs;
+    if (sampleRate != null) result.sampleRate = sampleRate;
     return result;
   }
 
@@ -240,13 +220,13 @@ class VADOptions extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'VADOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'activationThreshold',
+        fieldType: $pb.PbFieldType.OF)
     ..aI(2, _omitFieldNames ? '' : 'minSpeechDurationMs')
     ..aI(3, _omitFieldNames ? '' : 'minSilenceDurationMs')
     ..aI(4, _omitFieldNames ? '' : 'maxSpeechDurationMs')
-    ..aOB(5, _omitFieldNames ? '' : 'includeStatistics')
-    ..aD(6, _omitFieldNames ? '' : 'activationThreshold',
-        fieldType: $pb.PbFieldType.OF)
-    ..aI(7, _omitFieldNames ? '' : 'prefixPaddingMs')
+    ..aI(5, _omitFieldNames ? '' : 'prefixPaddingMs')
+    ..aI(6, _omitFieldNames ? '' : 'sampleRate')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -267,71 +247,78 @@ class VADOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VADOptions>(create);
   static VADOptions? _defaultInstance;
 
+  /// Unset = keep the loaded detector's calibrated value. Same normalized
+  /// [0,1] scale as VADConfiguration.activation_threshold.
+  @$pb.TagNumber(1)
+  $core.double get activationThreshold => $_getN(0);
+  @$pb.TagNumber(1)
+  set activationThreshold($core.double value) => $_setFloat(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasActivationThreshold() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearActivationThreshold() => $_clearField(1);
+
+  /// Debounce: speech shorter than this is discarded (coughs, clicks, taps).
   @$pb.TagNumber(2)
-  $core.int get minSpeechDurationMs => $_getIZ(0);
+  $core.int get minSpeechDurationMs => $_getIZ(1);
   @$pb.TagNumber(2)
-  set minSpeechDurationMs($core.int value) => $_setSignedInt32(0, value);
+  set minSpeechDurationMs($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasMinSpeechDurationMs() => $_has(0);
+  $core.bool hasMinSpeechDurationMs() => $_has(1);
   @$pb.TagNumber(2)
   void clearMinSpeechDurationMs() => $_clearField(2);
 
+  /// Hangover: continuous silence this long ends the turn. This is the
+  /// primary latency dial. Defaulted for TURN-TAKING (OpenAI
+  /// silence_duration_ms = 500), not for ASR segmentation (Silero = 100).
   @$pb.TagNumber(3)
-  $core.int get minSilenceDurationMs => $_getIZ(1);
+  $core.int get minSilenceDurationMs => $_getIZ(2);
   @$pb.TagNumber(3)
-  set minSilenceDurationMs($core.int value) => $_setSignedInt32(1, value);
+  set minSilenceDurationMs($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasMinSilenceDurationMs() => $_has(1);
+  $core.bool hasMinSilenceDurationMs() => $_has(2);
   @$pb.TagNumber(3)
   void clearMinSilenceDurationMs() => $_clearField(3);
 
-  /// 0 = backend default, for both of these.
+  /// Force-split a monologue longer than this. Unset = unbounded.
   @$pb.TagNumber(4)
-  $core.int get maxSpeechDurationMs => $_getIZ(2);
+  $core.int get maxSpeechDurationMs => $_getIZ(3);
   @$pb.TagNumber(4)
-  set maxSpeechDurationMs($core.int value) => $_setSignedInt32(2, value);
+  set maxSpeechDurationMs($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasMaxSpeechDurationMs() => $_has(2);
+  $core.bool hasMaxSpeechDurationMs() => $_has(3);
   @$pb.TagNumber(4)
   void clearMaxSpeechDurationMs() => $_clearField(4);
 
+  /// Pre-roll kept before SPEECH_STARTED so the first phoneme survives.
+  /// Included in the emitted segment's audio_start_ms (OpenAI semantics).
   @$pb.TagNumber(5)
-  $core.bool get includeStatistics => $_getBF(3);
+  $core.int get prefixPaddingMs => $_getIZ(4);
   @$pb.TagNumber(5)
-  set includeStatistics($core.bool value) => $_setBool(3, value);
+  set prefixPaddingMs($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasIncludeStatistics() => $_has(3);
+  $core.bool hasPrefixPaddingMs() => $_has(4);
   @$pb.TagNumber(5)
-  void clearIncludeStatistics() => $_clearField(5);
+  void clearPrefixPaddingMs() => $_clearField(5);
 
-  /// 0 = keep the configured threshold.
+  /// Capture rate of the audio fed to the detector, for the whole session.
+  /// Nothing resamples: a mismatch yields wrong segment durations. Bound is
+  /// identical to VADConfiguration.sample_rate and the commons validator —
+  /// if the project narrows to Silero/LiveKit's {8000,16000}, change all
+  /// three together.
   @$pb.TagNumber(6)
-  $core.double get activationThreshold => $_getN(4);
+  $core.int get sampleRate => $_getIZ(5);
   @$pb.TagNumber(6)
-  set activationThreshold($core.double value) => $_setFloat(4, value);
+  set sampleRate($core.int value) => $_setSignedInt32(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasActivationThreshold() => $_has(4);
+  $core.bool hasSampleRate() => $_has(5);
   @$pb.TagNumber(6)
-  void clearActivationThreshold() => $_clearField(6);
-
-  /// Audio retained before SPEECH_STARTED so segments don't clip the first
-  /// syllable.
-  @$pb.TagNumber(7)
-  $core.int get prefixPaddingMs => $_getIZ(5);
-  @$pb.TagNumber(7)
-  set prefixPaddingMs($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(7)
-  $core.bool hasPrefixPaddingMs() => $_has(5);
-  @$pb.TagNumber(7)
-  void clearPrefixPaddingMs() => $_clearField(7);
+  void clearSampleRate() => $_clearField(6);
 }
-
-enum VADAudioSource_Source { audioData, adapterHandle, notSet }
 
 class VADAudioSource extends $pb.GeneratedMessage {
   factory VADAudioSource({
     $core.List<$core.int>? audioData,
-    $core.String? adapterHandle,
     $1.AudioEncoding? encoding,
     $core.int? sampleRate,
     $core.int? channels,
@@ -339,7 +326,6 @@ class VADAudioSource extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (audioData != null) result.audioData = audioData;
-    if (adapterHandle != null) result.adapterHandle = adapterHandle;
     if (encoding != null) result.encoding = encoding;
     if (sampleRate != null) result.sampleRate = sampleRate;
     if (channels != null) result.channels = channels;
@@ -356,25 +342,17 @@ class VADAudioSource extends $pb.GeneratedMessage {
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
-  static const $core.Map<$core.int, VADAudioSource_Source>
-      _VADAudioSource_SourceByTag = {
-    1: VADAudioSource_Source.audioData,
-    2: VADAudioSource_Source.adapterHandle,
-    0: VADAudioSource_Source.notSet
-  };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'VADAudioSource',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2])
     ..a<$core.List<$core.int>>(
         1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
-    ..aOS(2, _omitFieldNames ? '' : 'adapterHandle')
-    ..aE<$1.AudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
+    ..aE<$1.AudioEncoding>(2, _omitFieldNames ? '' : 'encoding',
         enumValues: $1.AudioEncoding.values)
-    ..aI(4, _omitFieldNames ? '' : 'sampleRate')
-    ..aI(5, _omitFieldNames ? '' : 'channels')
-    ..aInt64(6, _omitFieldNames ? '' : 'frameOffsetMs')
+    ..aI(3, _omitFieldNames ? '' : 'sampleRate')
+    ..aI(4, _omitFieldNames ? '' : 'channels')
+    ..aInt64(5, _omitFieldNames ? '' : 'frameOffsetMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -397,14 +375,6 @@ class VADAudioSource extends $pb.GeneratedMessage {
   static VADAudioSource? _defaultInstance;
 
   @$pb.TagNumber(1)
-  @$pb.TagNumber(2)
-  VADAudioSource_Source whichSource() =>
-      _VADAudioSource_SourceByTag[$_whichOneof(0)]!;
-  @$pb.TagNumber(1)
-  @$pb.TagNumber(2)
-  void clearSource() => $_clearField($_whichOneof(0));
-
-  @$pb.TagNumber(1)
   $core.List<$core.int> get audioData => $_getN(0);
   @$pb.TagNumber(1)
   set audioData($core.List<$core.int> value) => $_setBytes(0, value);
@@ -414,63 +384,54 @@ class VADAudioSource extends $pb.GeneratedMessage {
   void clearAudioData() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.String get adapterHandle => $_getSZ(1);
+  $1.AudioEncoding get encoding => $_getN(1);
   @$pb.TagNumber(2)
-  set adapterHandle($core.String value) => $_setString(1, value);
+  set encoding($1.AudioEncoding value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasAdapterHandle() => $_has(1);
+  $core.bool hasEncoding() => $_has(1);
   @$pb.TagNumber(2)
-  void clearAdapterHandle() => $_clearField(2);
+  void clearEncoding() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $1.AudioEncoding get encoding => $_getN(2);
+  $core.int get sampleRate => $_getIZ(2);
   @$pb.TagNumber(3)
-  set encoding($1.AudioEncoding value) => $_setField(3, value);
+  set sampleRate($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasEncoding() => $_has(2);
+  $core.bool hasSampleRate() => $_has(2);
   @$pb.TagNumber(3)
-  void clearEncoding() => $_clearField(3);
+  void clearSampleRate() => $_clearField(3);
 
+  /// Kept: commons rejects channels > 1 with RAC_ERROR_NOT_SUPPORTED, and
+  /// this is the only signal that a caller pushed interleaved stereo.
   @$pb.TagNumber(4)
-  $core.int get sampleRate => $_getIZ(3);
+  $core.int get channels => $_getIZ(3);
   @$pb.TagNumber(4)
-  set sampleRate($core.int value) => $_setSignedInt32(3, value);
+  set channels($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasSampleRate() => $_has(3);
+  $core.bool hasChannels() => $_has(3);
   @$pb.TagNumber(4)
-  void clearSampleRate() => $_clearField(4);
+  void clearChannels() => $_clearField(4);
 
+  /// Position of this chunk on the session timeline; feeds
+  /// SpeechActivityEvent.audio_start_ms / audio_end_ms.
   @$pb.TagNumber(5)
-  $core.int get channels => $_getIZ(4);
+  $fixnum.Int64 get frameOffsetMs => $_getI64(4);
   @$pb.TagNumber(5)
-  set channels($core.int value) => $_setSignedInt32(4, value);
+  set frameOffsetMs($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasChannels() => $_has(4);
+  $core.bool hasFrameOffsetMs() => $_has(4);
   @$pb.TagNumber(5)
-  void clearChannels() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $fixnum.Int64 get frameOffsetMs => $_getI64(5);
-  @$pb.TagNumber(6)
-  set frameOffsetMs($fixnum.Int64 value) => $_setInt64(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasFrameOffsetMs() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearFrameOffsetMs() => $_clearField(6);
+  void clearFrameOffsetMs() => $_clearField(5);
 }
 
 class VADProcessRequest extends $pb.GeneratedMessage {
   factory VADProcessRequest({
-    $core.String? requestId,
     VADAudioSource? audio,
     VADOptions? options,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
   }) {
     final result = create();
-    if (requestId != null) result.requestId = requestId;
     if (audio != null) result.audio = audio;
     if (options != null) result.options = options;
-    if (metadata != null) result.metadata.addEntries(metadata);
     return result;
   }
 
@@ -487,16 +448,10 @@ class VADProcessRequest extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'VADProcessRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..aOM<VADAudioSource>(2, _omitFieldNames ? '' : 'audio',
+    ..aOM<VADAudioSource>(1, _omitFieldNames ? '' : 'audio',
         subBuilder: VADAudioSource.create)
-    ..aOM<VADOptions>(3, _omitFieldNames ? '' : 'options',
+    ..aOM<VADOptions>(2, _omitFieldNames ? '' : 'options',
         subBuilder: VADOptions.create)
-    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'VADProcessRequest.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -519,61 +474,43 @@ class VADProcessRequest extends $pb.GeneratedMessage {
   static VADProcessRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get requestId => $_getSZ(0);
+  VADAudioSource get audio => $_getN(0);
   @$pb.TagNumber(1)
-  set requestId($core.String value) => $_setString(0, value);
+  set audio(VADAudioSource value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasRequestId() => $_has(0);
+  $core.bool hasAudio() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRequestId() => $_clearField(1);
+  void clearAudio() => $_clearField(1);
+  @$pb.TagNumber(1)
+  VADAudioSource ensureAudio() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  VADAudioSource get audio => $_getN(1);
+  VADOptions get options => $_getN(1);
   @$pb.TagNumber(2)
-  set audio(VADAudioSource value) => $_setField(2, value);
+  set options(VADOptions value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasAudio() => $_has(1);
+  $core.bool hasOptions() => $_has(1);
   @$pb.TagNumber(2)
-  void clearAudio() => $_clearField(2);
+  void clearOptions() => $_clearField(2);
   @$pb.TagNumber(2)
-  VADAudioSource ensureAudio() => $_ensure(1);
-
-  @$pb.TagNumber(3)
-  VADOptions get options => $_getN(2);
-  @$pb.TagNumber(3)
-  set options(VADOptions value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasOptions() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearOptions() => $_clearField(3);
-  @$pb.TagNumber(3)
-  VADOptions ensureOptions() => $_ensure(2);
-
-  @$pb.TagNumber(4)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(3);
+  VADOptions ensureOptions() => $_ensure(1);
 }
 
 class VADResult extends $pb.GeneratedMessage {
   factory VADResult({
     $core.bool? isSpeech,
-    $core.double? confidence,
+    $core.double? probability,
     $core.double? energy,
     $core.int? durationMs,
     $fixnum.Int64? timestampMs,
-    $fixnum.Int64? startTimeMs,
-    $fixnum.Int64? endTimeMs,
-    VADStatistics? statistics,
     $0.SDKError? error,
   }) {
     final result = create();
     if (isSpeech != null) result.isSpeech = isSpeech;
-    if (confidence != null) result.confidence = confidence;
+    if (probability != null) result.probability = probability;
     if (energy != null) result.energy = energy;
     if (durationMs != null) result.durationMs = durationMs;
     if (timestampMs != null) result.timestampMs = timestampMs;
-    if (startTimeMs != null) result.startTimeMs = startTimeMs;
-    if (endTimeMs != null) result.endTimeMs = endTimeMs;
-    if (statistics != null) result.statistics = statistics;
     if (error != null) result.error = error;
     return result;
   }
@@ -592,15 +529,11 @@ class VADResult extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'isSpeech')
-    ..aD(2, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
+    ..aD(2, _omitFieldNames ? '' : 'probability', fieldType: $pb.PbFieldType.OF)
     ..aD(3, _omitFieldNames ? '' : 'energy', fieldType: $pb.PbFieldType.OF)
     ..aI(4, _omitFieldNames ? '' : 'durationMs')
     ..aInt64(5, _omitFieldNames ? '' : 'timestampMs')
-    ..aInt64(6, _omitFieldNames ? '' : 'startTimeMs')
-    ..aInt64(7, _omitFieldNames ? '' : 'endTimeMs')
-    ..aOM<VADStatistics>(8, _omitFieldNames ? '' : 'statistics',
-        subBuilder: VADStatistics.create)
-    ..aOM<$0.SDKError>(11, _omitFieldNames ? '' : 'error',
+    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
@@ -631,15 +564,19 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearIsSpeech() => $_clearField(1);
 
-  /// [0.0, 1.0], backend-dependent.
+  /// [0.0, 1.0], backend- AND path-dependent. On the one-shot detect path the
+  /// built-in energy VAD reports min(1.0, energy/threshold), which saturates
+  /// at 1.0; on the streaming per-frame path it is binary 0.0/1.0. A model
+  /// backend reports its own speech probability. Not comparable across
+  /// backends — do not re-threshold on it.
   @$pb.TagNumber(2)
-  $core.double get confidence => $_getN(1);
+  $core.double get probability => $_getN(1);
   @$pb.TagNumber(2)
-  set confidence($core.double value) => $_setFloat(1, value);
+  set probability($core.double value) => $_setFloat(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasConfidence() => $_has(1);
+  $core.bool hasProbability() => $_has(1);
   @$pb.TagNumber(2)
-  void clearConfidence() => $_clearField(2);
+  void clearProbability() => $_clearField(2);
 
   /// RMS energy of the analyzed frame.
   @$pb.TagNumber(3)
@@ -671,46 +608,16 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearTimestampMs() => $_clearField(5);
 
-  /// 0 = unset.
   @$pb.TagNumber(6)
-  $fixnum.Int64 get startTimeMs => $_getI64(5);
+  $0.SDKError get error => $_getN(5);
   @$pb.TagNumber(6)
-  set startTimeMs($fixnum.Int64 value) => $_setInt64(5, value);
+  set error($0.SDKError value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasStartTimeMs() => $_has(5);
+  $core.bool hasError() => $_has(5);
   @$pb.TagNumber(6)
-  void clearStartTimeMs() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $fixnum.Int64 get endTimeMs => $_getI64(6);
-  @$pb.TagNumber(7)
-  set endTimeMs($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasEndTimeMs() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearEndTimeMs() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  VADStatistics get statistics => $_getN(7);
-  @$pb.TagNumber(8)
-  set statistics(VADStatistics value) => $_setField(8, value);
-  @$pb.TagNumber(8)
-  $core.bool hasStatistics() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearStatistics() => $_clearField(8);
-  @$pb.TagNumber(8)
-  VADStatistics ensureStatistics() => $_ensure(7);
-
-  @$pb.TagNumber(11)
-  $0.SDKError get error => $_getN(8);
-  @$pb.TagNumber(11)
-  set error($0.SDKError value) => $_setField(11, value);
-  @$pb.TagNumber(11)
-  $core.bool hasError() => $_has(8);
-  @$pb.TagNumber(11)
-  void clearError() => $_clearField(11);
-  @$pb.TagNumber(11)
-  $0.SDKError ensureError() => $_ensure(8);
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.SDKError ensureError() => $_ensure(5);
 }
 
 /// Exposed for debugging and waveform UIs.
@@ -873,25 +780,24 @@ class VADStatistics extends $pb.GeneratedMessage {
   void clearPeakEnergy() => $_clearField(9);
 }
 
-/// Narrow component-level transition. voice_events.proto's VADEvent carries the
-/// broader pipeline taxonomy (BARGE_IN, END_OF_UTTERANCE) via VADStreamEventKind.
+/// Narrow component-level transition: this detector said speech started or
+/// ended. Barge-in is a session-level decision, not a detector verdict — it is
+/// reported by InterruptedEvent / InterruptReason in voice_events.proto.
 class SpeechActivityEvent extends $pb.GeneratedMessage {
   factory SpeechActivityEvent({
     SpeechActivityKind? eventType,
     $fixnum.Int64? timestampMs,
-    $core.int? durationMs,
-    $core.double? confidence,
-    VADResult? result,
+    $fixnum.Int64? audioStartMs,
+    $fixnum.Int64? audioEndMs,
     $core.String? segmentId,
   }) {
-    final result$ = create();
-    if (eventType != null) result$.eventType = eventType;
-    if (timestampMs != null) result$.timestampMs = timestampMs;
-    if (durationMs != null) result$.durationMs = durationMs;
-    if (confidence != null) result$.confidence = confidence;
-    if (result != null) result$.result = result;
-    if (segmentId != null) result$.segmentId = segmentId;
-    return result$;
+    final result = create();
+    if (eventType != null) result.eventType = eventType;
+    if (timestampMs != null) result.timestampMs = timestampMs;
+    if (audioStartMs != null) result.audioStartMs = audioStartMs;
+    if (audioEndMs != null) result.audioEndMs = audioEndMs;
+    if (segmentId != null) result.segmentId = segmentId;
+    return result;
   }
 
   SpeechActivityEvent._();
@@ -910,11 +816,9 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
     ..aE<SpeechActivityKind>(1, _omitFieldNames ? '' : 'eventType',
         enumValues: SpeechActivityKind.values)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampMs')
-    ..aI(3, _omitFieldNames ? '' : 'durationMs')
-    ..aD(4, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
-    ..aOM<VADResult>(5, _omitFieldNames ? '' : 'result',
-        subBuilder: VADResult.create)
-    ..aOS(6, _omitFieldNames ? '' : 'segmentId')
+    ..aInt64(3, _omitFieldNames ? '' : 'audioStartMs')
+    ..aInt64(4, _omitFieldNames ? '' : 'audioEndMs')
+    ..aOS(5, _omitFieldNames ? '' : 'segmentId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -955,45 +859,37 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTimestampMs() => $_clearField(2);
 
-  /// Length of the just-finished utterance on SPEECH_ENDED; zero on
-  /// SPEECH_STARTED.
+  /// Ms from the start of session audio when speech began. Set on both
+  /// STARTED and ENDED. Includes prefix_padding_ms (OpenAI audio_start_ms).
   @$pb.TagNumber(3)
-  $core.int get durationMs => $_getIZ(2);
+  $fixnum.Int64 get audioStartMs => $_getI64(2);
   @$pb.TagNumber(3)
-  set durationMs($core.int value) => $_setSignedInt32(2, value);
+  set audioStartMs($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasDurationMs() => $_has(2);
+  $core.bool hasAudioStartMs() => $_has(2);
   @$pb.TagNumber(3)
-  void clearDurationMs() => $_clearField(3);
+  void clearAudioStartMs() => $_clearField(3);
 
+  /// Ms from the start of session audio when speech ended; 0 on STARTED.
+  /// Includes min_silence_duration_ms (OpenAI audio_end_ms).
   @$pb.TagNumber(4)
-  $core.double get confidence => $_getN(3);
+  $fixnum.Int64 get audioEndMs => $_getI64(3);
   @$pb.TagNumber(4)
-  set confidence($core.double value) => $_setFloat(3, value);
+  set audioEndMs($fixnum.Int64 value) => $_setInt64(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasConfidence() => $_has(3);
+  $core.bool hasAudioEndMs() => $_has(3);
   @$pb.TagNumber(4)
-  void clearConfidence() => $_clearField(4);
+  void clearAudioEndMs() => $_clearField(4);
 
+  /// Correlates STARTED with its ENDED (OpenAI item_id).
   @$pb.TagNumber(5)
-  VADResult get result => $_getN(4);
+  $core.String get segmentId => $_getSZ(4);
   @$pb.TagNumber(5)
-  set result(VADResult value) => $_setField(5, value);
+  set segmentId($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasResult() => $_has(4);
+  $core.bool hasSegmentId() => $_has(4);
   @$pb.TagNumber(5)
-  void clearResult() => $_clearField(5);
-  @$pb.TagNumber(5)
-  VADResult ensureResult() => $_ensure(4);
-
-  @$pb.TagNumber(6)
-  $core.String get segmentId => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set segmentId($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasSegmentId() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearSegmentId() => $_clearField(6);
+  void clearSegmentId() => $_clearField(5);
 }
 
 class VADStreamEvent extends $pb.GeneratedMessage {
@@ -1004,7 +900,6 @@ class VADStreamEvent extends $pb.GeneratedMessage {
     VADStreamEventKind? kind,
     VADResult? result,
     SpeechActivityEvent? activity,
-    VADStatistics? statistics,
     $0.SDKError? error,
   }) {
     final result$ = create();
@@ -1014,7 +909,6 @@ class VADStreamEvent extends $pb.GeneratedMessage {
     if (kind != null) result$.kind = kind;
     if (result != null) result$.result = result;
     if (activity != null) result$.activity = activity;
-    if (statistics != null) result$.statistics = statistics;
     if (error != null) result$.error = error;
     return result$;
   }
@@ -1042,9 +936,7 @@ class VADStreamEvent extends $pb.GeneratedMessage {
         subBuilder: VADResult.create)
     ..aOM<SpeechActivityEvent>(6, _omitFieldNames ? '' : 'activity',
         subBuilder: SpeechActivityEvent.create)
-    ..aOM<VADStatistics>(7, _omitFieldNames ? '' : 'statistics',
-        subBuilder: VADStatistics.create)
-    ..aOM<$0.SDKError>(10, _omitFieldNames ? '' : 'error',
+    ..aOM<$0.SDKError>(7, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
@@ -1076,6 +968,8 @@ class VADStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSeq() => $_clearField(1);
 
+  /// Microseconds since epoch. Genuine sub-millisecond precision: the
+  /// streaming dispatcher stamps this from a microsecond clock.
   @$pb.TagNumber(2)
   $fixnum.Int64 get timestampUs => $_getI64(1);
   @$pb.TagNumber(2)
@@ -1126,33 +1020,22 @@ class VADStreamEvent extends $pb.GeneratedMessage {
   SpeechActivityEvent ensureActivity() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  VADStatistics get statistics => $_getN(6);
+  $0.SDKError get error => $_getN(6);
   @$pb.TagNumber(7)
-  set statistics(VADStatistics value) => $_setField(7, value);
+  set error($0.SDKError value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasStatistics() => $_has(6);
+  $core.bool hasError() => $_has(6);
   @$pb.TagNumber(7)
-  void clearStatistics() => $_clearField(7);
+  void clearError() => $_clearField(7);
   @$pb.TagNumber(7)
-  VADStatistics ensureStatistics() => $_ensure(6);
-
-  @$pb.TagNumber(10)
-  $0.SDKError get error => $_getN(7);
-  @$pb.TagNumber(10)
-  set error($0.SDKError value) => $_setField(10, value);
-  @$pb.TagNumber(10)
-  $core.bool hasError() => $_has(7);
-  @$pb.TagNumber(10)
-  void clearError() => $_clearField(10);
-  @$pb.TagNumber(10)
-  $0.SDKError ensureError() => $_ensure(7);
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 class VADServiceState extends $pb.GeneratedMessage {
   factory VADServiceState({
     $core.bool? isReady,
     $core.bool? isSpeechActive,
-    $core.double? energyThreshold,
+    $core.double? activationThreshold,
     $core.int? sampleRate,
     $core.int? frameLengthMs,
     $core.String? currentModel,
@@ -1161,7 +1044,8 @@ class VADServiceState extends $pb.GeneratedMessage {
     final result = create();
     if (isReady != null) result.isReady = isReady;
     if (isSpeechActive != null) result.isSpeechActive = isSpeechActive;
-    if (energyThreshold != null) result.energyThreshold = energyThreshold;
+    if (activationThreshold != null)
+      result.activationThreshold = activationThreshold;
     if (sampleRate != null) result.sampleRate = sampleRate;
     if (frameLengthMs != null) result.frameLengthMs = frameLengthMs;
     if (currentModel != null) result.currentModel = currentModel;
@@ -1184,12 +1068,12 @@ class VADServiceState extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'isReady')
     ..aOB(2, _omitFieldNames ? '' : 'isSpeechActive')
-    ..aD(3, _omitFieldNames ? '' : 'energyThreshold',
+    ..aD(3, _omitFieldNames ? '' : 'activationThreshold',
         fieldType: $pb.PbFieldType.OF)
     ..aI(4, _omitFieldNames ? '' : 'sampleRate')
     ..aI(5, _omitFieldNames ? '' : 'frameLengthMs')
     ..aOS(6, _omitFieldNames ? '' : 'currentModel')
-    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
+    ..aOM<$0.SDKError>(7, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
@@ -1230,14 +1114,16 @@ class VADServiceState extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearIsSpeechActive() => $_clearField(2);
 
+  /// The threshold actually in force. After auto-calibration this differs
+  /// from what was requested, which is why it is worth reading back.
   @$pb.TagNumber(3)
-  $core.double get energyThreshold => $_getN(2);
+  $core.double get activationThreshold => $_getN(2);
   @$pb.TagNumber(3)
-  set energyThreshold($core.double value) => $_setFloat(2, value);
+  set activationThreshold($core.double value) => $_setFloat(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasEnergyThreshold() => $_has(2);
+  $core.bool hasActivationThreshold() => $_has(2);
   @$pb.TagNumber(3)
-  void clearEnergyThreshold() => $_clearField(3);
+  void clearActivationThreshold() => $_clearField(3);
 
   @$pb.TagNumber(4)
   $core.int get sampleRate => $_getIZ(3);
@@ -1266,15 +1152,15 @@ class VADServiceState extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearCurrentModel() => $_clearField(6);
 
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(7)
   $0.SDKError get error => $_getN(6);
-  @$pb.TagNumber(9)
-  set error($0.SDKError value) => $_setField(9, value);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(7)
+  set error($0.SDKError value) => $_setField(7, value);
+  @$pb.TagNumber(7)
   $core.bool hasError() => $_has(6);
-  @$pb.TagNumber(9)
-  void clearError() => $_clearField(9);
-  @$pb.TagNumber(9)
+  @$pb.TagNumber(7)
+  void clearError() => $_clearField(7);
+  @$pb.TagNumber(7)
   $0.SDKError ensureError() => $_ensure(6);
 }
 

@@ -1,8 +1,10 @@
 package com.runanywhere.sdk.infrastructure.logging
 
+import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LogEntry
 import ai.runanywhere.proto.v1.LogLevel
 import ai.runanywhere.proto.v1.LoggingConfiguration
+import com.runanywhere.sdk.foundation.bridge.extensions.wireString
 import com.runanywhere.sdk.kotlin.BuildConfig
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
@@ -190,7 +192,7 @@ object Logging {
         function: String? = null,
         errorCode: Int? = null,
         modelId: String? = null,
-        framework: String? = null,
+        framework: InferenceFramework? = null,
     ) {
         val config = _configuration
 
@@ -219,7 +221,7 @@ object Logging {
                 function = if (includeSource) function.orEmpty() else "",
                 error_code = errorCode ?: 0,
                 model_id = modelId.orEmpty(),
-                framework = framework.orEmpty(),
+                framework = framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
             )
 
         // Write to console if local logging enabled
@@ -324,12 +326,14 @@ object Logging {
                 // Add error code if present
                 if (entry.error_code != 0) append(" [code=${entry.error_code}]")
 
-                // Add model info if present
-                if (entry.model_id.isNotEmpty() || entry.framework.isNotEmpty()) {
+                // Add model info if present. `framework` is a typed enum now
+                // (idl); its proto3 zero is UNSPECIFIED, not an empty string.
+                val hasFramework = entry.framework != InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
+                if (entry.model_id.isNotEmpty() || hasFramework) {
                     append(" [")
                     if (entry.model_id.isNotEmpty()) append("model=${entry.model_id}")
-                    if (entry.model_id.isNotEmpty() && entry.framework.isNotEmpty()) append(", ")
-                    if (entry.framework.isNotEmpty()) append("framework=${entry.framework}")
+                    if (entry.model_id.isNotEmpty() && hasFramework) append(", ")
+                    if (hasFramework) append("framework=${entry.framework.wireString}")
                     append("]")
                 }
             }
@@ -606,7 +610,7 @@ class SDKLogger(
     fun logModelInfo(
         message: String,
         modelId: String,
-        framework: String? = null,
+        framework: InferenceFramework? = null,
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
@@ -625,7 +629,7 @@ class SDKLogger(
     fun logModelError(
         message: String,
         modelId: String,
-        framework: String? = null,
+        framework: InferenceFramework? = null,
         errorCode: Int? = null,
         metadata: Map<String, Any?>? = null,
     ) {

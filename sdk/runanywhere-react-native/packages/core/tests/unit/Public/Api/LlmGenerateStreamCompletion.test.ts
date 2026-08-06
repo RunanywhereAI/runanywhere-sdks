@@ -44,10 +44,11 @@ jest.mock('../../../../src/native/NitroModulesGlobalInit', () => ({
 import { SdkInitResult } from '@runanywhere/proto-ts/sdk_init';
 import {
   LLMStreamEvent,
+  LLMStreamEventKind,
   type LLMStreamEvent as LLMStreamEventMessage,
   type DeepPartial,
 } from '@runanywhere/proto-ts/llm_service';
-import { TokenKind } from '@runanywhere/proto-ts/voice_events';
+import { FinishReason } from '@runanywhere/proto-ts/llm_options';
 import {
   RunAnywhere,
   completeServicesInitialization,
@@ -57,10 +58,11 @@ import type { GenerationEvent } from '../../../../src/Public/Api/Types';
 import { bytesToArrayBuffer } from '../../../../src/services/ProtoBytes';
 
 function phase2Payload(): ArrayBuffer {
+  // `SdkInitResult.httpConfigured` is deleted outright —
+  // `hasCompletedHttpSetup` is the sole cross-phase latched bit now.
   const bytes = SdkInitResult.encode(
     SdkInitResult.create({
       hasCompletedHttpSetup: true,
-      httpConfigured: true,
       httpApplicable: true,
     })
   ).finish();
@@ -114,14 +116,27 @@ describe('llm.generateStream native-completion contract', () => {
 
   test('native resolving without isFinal emits failed instead of a fabricated completion', async () => {
     // Native sends tokens, then the promise from `llmGenerateStreamProto`
-    // resolves without ever sending a terminal `isFinal` event -- a
+    // resolves without ever sending a terminal COMPLETED/ERROR event -- a
     // legitimate native-boundary shutdown (e.g. backend cooperative stop),
     // not a bridge failure. The v4 grammar reports this as `failed` rather
     // than fabricating a successful `completed`.
+    //
+    // `LLMStreamEvent.isFinal` is deleted outright — `eventKind` (TOKEN vs.
+    // COMPLETED/ERROR) is the sole terminal signal now.
     mockNative.llmGenerateStreamProto.mockImplementation(
       async (_bytes, onEvent) => {
-        onEvent(encodeEvent({ token: 'Hel', isFinal: false }));
-        onEvent(encodeEvent({ token: 'lo', isFinal: false }));
+        onEvent(
+          encodeEvent({
+            token: 'Hel',
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+          })
+        );
+        onEvent(
+          encodeEvent({
+            token: 'lo',
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+          })
+        );
       }
     );
 
@@ -141,15 +156,20 @@ describe('llm.generateStream native-completion contract', () => {
     expect(failed.error.message).toMatch(/terminal event/);
   });
 
-  test('a terminal isFinal event still wins and is not double-emitted', async () => {
+  test('a terminal COMPLETED event still wins and is not double-emitted', async () => {
     mockNative.llmGenerateStreamProto.mockImplementation(
       async (_bytes, onEvent) => {
-        onEvent(encodeEvent({ token: 'Hi', isFinal: false }));
+        onEvent(
+          encodeEvent({
+            token: 'Hi',
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+          })
+        );
         onEvent(
           encodeEvent({
             token: '',
-            isFinal: true,
-            result: { text: 'Hi', finishReason: 'stop' },
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+            result: { text: 'Hi', finishReason: FinishReason.FINISH_REASON_STOP },
           })
         );
       }
@@ -176,16 +196,23 @@ describe('llm.generateStream native-completion contract', () => {
   });
 
   test('thinking tokens accumulate into the partial text reported on a terminal failure', async () => {
+    // Thinking vs. answer tokens are distinguished by `eventKind`
+    // (THINKING vs. TOKEN) now — the separate `TokenKind` field on the
+    // stream event is deleted outright.
     mockNative.llmGenerateStreamProto.mockImplementation(
       async (_bytes, onEvent) => {
         onEvent(
           encodeEvent({
             token: 'thinking...',
-            isFinal: false,
-            kind: TokenKind.TOKEN_KIND_THOUGHT,
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING,
           })
         );
-        onEvent(encodeEvent({ token: 'answer', isFinal: false }));
+        onEvent(
+          encodeEvent({
+            token: 'answer',
+            eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+          })
+        );
       }
     );
 

@@ -13,17 +13,19 @@ import { toMatch } from '../../../../src/Public/Api/Results';
 describe('rag.search proto mapping', () => {
   it('encodes RAGSearchRequest without generation knobs', () => {
     const request = RAGSearchRequest.fromPartial({
-      question: 'what is blue?',
-      retrievalTopK: 3,
-      similarityThreshold: 0.4,
+      query: 'what is blue?',
+      retrieval: {
+        topK: 3,
+        scoreThreshold: 0.4,
+      },
     });
     const bytes = RAGSearchRequest.encode(request).finish();
     const decoded = RAGSearchRequest.decode(bytes);
 
-    expect(decoded.question).toBe('what is blue?');
-    expect(decoded.retrievalTopK).toBe(3);
-    expect(decoded.similarityThreshold).toBeCloseTo(0.4);
-    expect(decoded.enableMultiQuery).toBe(false);
+    expect(decoded.query).toBe('what is blue?');
+    expect(decoded.retrieval?.topK).toBe(3);
+    expect(decoded.retrieval?.scoreThreshold).toBeCloseTo(0.4);
+    expect(decoded.retrieval?.enableMultiQuery).toBe(false);
   });
 
   it('maps RAGSearchResponse chunks onto public Match', () => {
@@ -31,15 +33,13 @@ describe('rag.search proto mapping', () => {
       chunks: [
         {
           text: 'the sky is blue',
-          similarityScore: 0.91,
+          score: 0.91,
           metadata: { source: 'facts' },
-          rank: 1,
         },
         {
           text: 'water looks blue',
-          similarityScore: 0.72,
+          score: 0.72,
           metadata: {},
-          rank: 2,
         },
       ],
       retrievalTimeMs: 12,

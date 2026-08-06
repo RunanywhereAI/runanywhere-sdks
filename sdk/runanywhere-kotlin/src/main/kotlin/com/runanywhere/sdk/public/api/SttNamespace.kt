@@ -7,6 +7,7 @@
 
 package com.runanywhere.sdk.public.api
 
+import ai.runanywhere.proto.v1.STTOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,9 +53,19 @@ private class KotlinSttStream(
                 legacyTranscribeStream(frames.consumeAsFlow(), options.orDefault().toProto()).collect { partial ->
                     announceStarted()
                     if (partial.is_final) {
-                        partial.final_output?.let { output ->
-                            outbox.trySend(TranscriptionEvent.TranscriptFinal(requestId, sequence++, output.toTranscription()))
-                        }
+                        // `STTPartialResult` collapsed to `text`/`is_final`/`language`
+                        // (idl/stt_options.proto): `final_output`/`confidence`/
+                        // `audio_start_ms`/`audio_end_ms` no longer exist on it, so
+                        // this synthesizes a terminal STTOutput from just `text`/
+                        // `language`, mirroring Swift's `transcription(from:)`.
+                        val synthesized =
+                            STTOutput(
+                                text = partial.text,
+                                language = partial.language?.takeIf { it.isNotEmpty() },
+                            )
+                        outbox.trySend(
+                            TranscriptionEvent.TranscriptFinal(requestId, sequence++, synthesized.toTranscription()),
+                        )
                         outbox.trySend(TranscriptionEvent.Completed(requestId))
                     } else if (partial.text.isNotEmpty()) {
                         outbox.trySend(

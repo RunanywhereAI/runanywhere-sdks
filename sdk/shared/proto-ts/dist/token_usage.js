@@ -10,7 +10,7 @@ exports.TokenUsage = exports.protobufPackage = void 0;
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
 function createBaseTokenUsage() {
-    return { inputTokens: 0, outputTokens: 0, totalTokens: 0, tokensPerSecond: 0 };
+    return { inputTokens: 0, outputTokens: 0, totalTokens: 0, decodeTokensPerSecond: 0, prefillMs: 0, ttftMs: 0 };
 }
 exports.TokenUsage = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -23,8 +23,14 @@ exports.TokenUsage = {
         if (message.totalTokens !== 0) {
             writer.uint32(24).int32(message.totalTokens);
         }
-        if (message.tokensPerSecond !== 0) {
-            writer.uint32(33).double(message.tokensPerSecond);
+        if (message.decodeTokensPerSecond !== 0) {
+            writer.uint32(33).double(message.decodeTokensPerSecond);
+        }
+        if (message.prefillMs !== 0) {
+            writer.uint32(40).int64(message.prefillMs);
+        }
+        if (message.ttftMs !== 0) {
+            writer.uint32(48).int64(message.ttftMs);
         }
         return writer;
     },
@@ -60,7 +66,21 @@ exports.TokenUsage = {
                     if (tag !== 33) {
                         break;
                     }
-                    message.tokensPerSecond = reader.double();
+                    message.decodeTokensPerSecond = reader.double();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.prefillMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.ttftMs = longToNumber(reader.int64());
                     continue;
                 }
             }
@@ -88,10 +108,20 @@ exports.TokenUsage = {
                 : isSet(object.total_tokens)
                     ? globalThis.Number(object.total_tokens)
                     : 0,
-            tokensPerSecond: isSet(object.tokensPerSecond)
-                ? globalThis.Number(object.tokensPerSecond)
-                : isSet(object.tokens_per_second)
-                    ? globalThis.Number(object.tokens_per_second)
+            decodeTokensPerSecond: isSet(object.decodeTokensPerSecond)
+                ? globalThis.Number(object.decodeTokensPerSecond)
+                : isSet(object.decode_tokens_per_second)
+                    ? globalThis.Number(object.decode_tokens_per_second)
+                    : 0,
+            prefillMs: isSet(object.prefillMs)
+                ? globalThis.Number(object.prefillMs)
+                : isSet(object.prefill_ms)
+                    ? globalThis.Number(object.prefill_ms)
+                    : 0,
+            ttftMs: isSet(object.ttftMs)
+                ? globalThis.Number(object.ttftMs)
+                : isSet(object.ttft_ms)
+                    ? globalThis.Number(object.ttft_ms)
                     : 0,
         };
     },
@@ -106,8 +136,14 @@ exports.TokenUsage = {
         if (message.totalTokens !== 0) {
             obj.totalTokens = Math.round(message.totalTokens);
         }
-        if (message.tokensPerSecond !== 0) {
-            obj.tokensPerSecond = message.tokensPerSecond;
+        if (message.decodeTokensPerSecond !== 0) {
+            obj.decodeTokensPerSecond = message.decodeTokensPerSecond;
+        }
+        if (message.prefillMs !== 0) {
+            obj.prefillMs = Math.round(message.prefillMs);
+        }
+        if (message.ttftMs !== 0) {
+            obj.ttftMs = Math.round(message.ttftMs);
         }
         return obj;
     },
@@ -119,10 +155,22 @@ exports.TokenUsage = {
         message.inputTokens = object.inputTokens ?? 0;
         message.outputTokens = object.outputTokens ?? 0;
         message.totalTokens = object.totalTokens ?? 0;
-        message.tokensPerSecond = object.tokensPerSecond ?? 0;
+        message.decodeTokensPerSecond = object.decodeTokensPerSecond ?? 0;
+        message.prefillMs = object.prefillMs ?? 0;
+        message.ttftMs = object.ttftMs ?? 0;
         return message;
     },
 };
+function longToNumber(int64) {
+    const num = globalThis.Number(int64.toString());
+    if (num > globalThis.Number.MAX_SAFE_INTEGER) {
+        throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+    }
+    if (num < globalThis.Number.MIN_SAFE_INTEGER) {
+        throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+    }
+    return num;
+}
 function isSet(value) {
     return value !== null && value !== undefined;
 }

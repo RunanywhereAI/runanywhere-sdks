@@ -35,13 +35,18 @@ import okio.ByteString
  * before this call; this message is purely the data envelope.
  */
 public class SdkInitPhase1Request(
+  /**
+   * model_types.proto's SDKEnvironment is the single environment vocabulary.
+   * Its zero is UNSPECIFIED, so an omitted field means unset, not
+   * "development": commons must fail closed rather than pick an environment.
+   */
   @field:WireField(
     tag = 1,
-    adapter = "ai.runanywhere.proto.v1.SdkInitEnvironment#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.SDKEnvironment#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val environment: SdkInitEnvironment = SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT,
+  public val environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED,
   /**
    * May be empty in development mode.
    */
@@ -90,6 +95,32 @@ public class SdkInitPhase1Request(
     schemaIndex = 5,
   )
   public val sdk_version: String = "",
+  /**
+   * Caller override for NetworkDefaults.request_timeout_ms. Unset = the pool
+   * default (60000). openai-python / anthropic-python `timeout`.
+   */
+  @RacMinOption(1_000)
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "requestTimeoutMs",
+    schemaIndex = 6,
+  )
+  public val request_timeout_ms: Int? = null,
+  /**
+   * Caller override for NetworkDefaults.max_retries. Unset = the pool
+   * default (3). openai-python / anthropic-python `max_retries`; 0 disables
+   * retries.
+   */
+  @RacMinOption(0)
+  @RacMaxOption(10)
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "maxRetries",
+    schemaIndex = 7,
+  )
+  public val max_retries: Int? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SdkInitPhase1Request, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -108,6 +139,8 @@ public class SdkInitPhase1Request(
     if (device_id != other.device_id) return false
     if (platform != other.platform) return false
     if (sdk_version != other.sdk_version) return false
+    if (request_timeout_ms != other.request_timeout_ms) return false
+    if (max_retries != other.max_retries) return false
     return true
   }
 
@@ -121,6 +154,8 @@ public class SdkInitPhase1Request(
       result = result * 37 + device_id.hashCode()
       result = result * 37 + platform.hashCode()
       result = result * 37 + sdk_version.hashCode()
+      result = result * 37 + (request_timeout_ms?.hashCode() ?: 0)
+      result = result * 37 + (max_retries?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -134,18 +169,22 @@ public class SdkInitPhase1Request(
     result += """device_id=${sanitize(device_id)}"""
     result += """platform=${sanitize(platform)}"""
     result += """sdk_version=${sanitize(sdk_version)}"""
+    if (request_timeout_ms != null) result += """request_timeout_ms=$request_timeout_ms"""
+    if (max_retries != null) result += """max_retries=$max_retries"""
     return result.joinToString(prefix = "SdkInitPhase1Request{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    environment: SdkInitEnvironment = this.environment,
+    environment: SDKEnvironment = this.environment,
     api_key: String = this.api_key,
     base_url: String = this.base_url,
     device_id: String = this.device_id,
     platform: String = this.platform,
     sdk_version: String = this.sdk_version,
+    request_timeout_ms: Int? = this.request_timeout_ms,
+    max_retries: Int? = this.max_retries,
     unknownFields: ByteString = this.unknownFields,
-  ): SdkInitPhase1Request = SdkInitPhase1Request(environment, api_key, base_url, device_id, platform, sdk_version, unknownFields)
+  ): SdkInitPhase1Request = SdkInitPhase1Request(environment, api_key, base_url, device_id, platform, sdk_version, request_timeout_ms, max_retries, unknownFields)
 
   public companion object {
     @JvmField
@@ -160,8 +199,8 @@ public class SdkInitPhase1Request(
     ) {
       override fun encodedSize(`value`: SdkInitPhase1Request): Int {
         var size = value.unknownFields.size
-        if (value.environment != ai.runanywhere.proto.v1.SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT) {
-          size += SdkInitEnvironment.ADAPTER.encodedSizeWithTag(1, value.environment)
+        if (value.environment != ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED) {
+          size += SDKEnvironment.ADAPTER.encodedSizeWithTag(1, value.environment)
         }
         if (value.api_key != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.api_key)
@@ -178,12 +217,14 @@ public class SdkInitPhase1Request(
         if (value.sdk_version != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.sdk_version)
         }
+        size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.request_timeout_ms)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.max_retries)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: SdkInitPhase1Request) {
-        if (value.environment != ai.runanywhere.proto.v1.SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT) {
-          SdkInitEnvironment.ADAPTER.encodeWithTag(writer, 1, value.environment)
+        if (value.environment != ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED) {
+          SDKEnvironment.ADAPTER.encodeWithTag(writer, 1, value.environment)
         }
         if (value.api_key != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.api_key)
@@ -200,11 +241,15 @@ public class SdkInitPhase1Request(
         if (value.sdk_version != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 6, value.sdk_version)
         }
+        ProtoAdapter.INT32.encodeWithTag(writer, 7, value.request_timeout_ms)
+        ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_retries)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SdkInitPhase1Request) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_retries)
+        ProtoAdapter.INT32.encodeWithTag(writer, 7, value.request_timeout_ms)
         if (value.sdk_version != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 6, value.sdk_version)
         }
@@ -220,22 +265,24 @@ public class SdkInitPhase1Request(
         if (value.api_key != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.api_key)
         }
-        if (value.environment != ai.runanywhere.proto.v1.SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT) {
-          SdkInitEnvironment.ADAPTER.encodeWithTag(writer, 1, value.environment)
+        if (value.environment != ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED) {
+          SDKEnvironment.ADAPTER.encodeWithTag(writer, 1, value.environment)
         }
       }
 
       override fun decode(reader: ProtoReader): SdkInitPhase1Request {
-        var environment: SdkInitEnvironment = SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT
+        var environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED
         var api_key: String = ""
         var base_url: String = ""
         var device_id: String = ""
         var platform: String = ""
         var sdk_version: String = ""
+        var request_timeout_ms: Int? = null
+        var max_retries: Int? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
-              environment = SdkInitEnvironment.ADAPTER.decode(reader)
+              environment = SDKEnvironment.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
@@ -244,6 +291,8 @@ public class SdkInitPhase1Request(
             4 -> device_id = ProtoAdapter.STRING.decode(reader)
             5 -> platform = ProtoAdapter.STRING.decode(reader)
             6 -> sdk_version = ProtoAdapter.STRING.decode(reader)
+            7 -> request_timeout_ms = ProtoAdapter.INT32.decode(reader)
+            8 -> max_retries = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -254,6 +303,8 @@ public class SdkInitPhase1Request(
           device_id = device_id,
           platform = platform,
           sdk_version = sdk_version,
+          request_timeout_ms = request_timeout_ms,
+          max_retries = max_retries,
           unknownFields = unknownFields
         )
       }

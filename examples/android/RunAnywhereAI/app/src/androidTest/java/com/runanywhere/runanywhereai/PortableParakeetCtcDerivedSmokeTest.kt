@@ -170,7 +170,9 @@ class PortableParakeetCtcDerivedSmokeTest {
         ModelFileDescriptor(
             url = "local://$MODEL_ID/${file.name}",
             filename = file.name,
-            is_required = true,
+            // Wire polarity: is_required -> is_optional (inverted). Every local
+            // file here is required, so is_optional = false.
+            is_optional = false,
             size_bytes = file.length(),
             relative_path = file.name,
             local_path = file.path,

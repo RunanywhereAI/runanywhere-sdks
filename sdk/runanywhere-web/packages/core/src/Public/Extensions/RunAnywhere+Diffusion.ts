@@ -9,7 +9,6 @@
 import {
   DiffusionGenerationOptions as DiffusionGenerationOptionsMessage,
   DiffusionGenerationRequest as DiffusionGenerationRequestMessage,
-  DiffusionMode,
   DiffusionStreamEventKind,
   type DiffusionGenerationOptions,
   type DiffusionProgress,
@@ -79,13 +78,12 @@ function modelNotLoadedException(message: string): SDKException {
     cAbiCode: -ProtoErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
     message,
     nestedMessage: undefined,
-    context: undefined,
     timestampMs: Date.now(),
     severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
     component: 'diffusion',
     retryable: false,
-    remediationHint: '',
-    correlationId: '',
+    requestId: '',
+    param: undefined,
   });
 }
 
@@ -163,7 +161,6 @@ export async function* generateImageStream(
 
   yield {
     timestampUs: Math.floor(performance.now() * 1000),
-    requestId: '',
     kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_STARTED,
   } satisfies DiffusionStreamEvent;
 
@@ -179,7 +176,6 @@ export async function* generateImageStream(
     }
     yield {
       timestampUs: Math.floor(performance.now() * 1000),
-      requestId: '',
       kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_COMPLETED,
       result,
     } satisfies DiffusionStreamEvent;
@@ -188,7 +184,6 @@ export async function* generateImageStream(
     const message = error instanceof Error ? error.message : String(error);
     yield {
       timestampUs: Math.floor(performance.now() * 1000),
-      requestId: '',
       kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
       error: SDKException.processingFailed(message).proto,
     } satisfies DiffusionStreamEvent;
@@ -210,8 +205,9 @@ export async function cancelImageGeneration(): Promise<void> {
 }
 
 /**
- * Inpaint an encoded PNG/JPEG — Kotlin parity sugar over
- * `DIFFUSION_MODE_INPAINTING`. Commons validates media types.
+ * Inpaint an encoded PNG/JPEG — Kotlin parity sugar. Adding `maskImage` on top
+ * of `image` promotes the request to inpainting; commons validates media
+ * types.
  */
 export async function inpaint(options: {
   inputImage: Uint8Array;
@@ -239,10 +235,9 @@ export async function inpaint(options: {
     prompt: options.prompt?.trim() || 'Remove the masked region.',
     width: options.width ?? 512,
     height: options.height ?? 512,
-    mode: DiffusionMode.DIFFUSION_MODE_INPAINTING,
-    inputImage: options.inputImage,
+    image: options.inputImage,
     maskImage: options.maskImage,
-    inputImageMediaType: inputMediaType,
+    imageMediaType: inputMediaType,
     maskImageMediaType: maskMediaType,
   }, options.modelId);
 }

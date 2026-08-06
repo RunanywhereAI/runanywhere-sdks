@@ -17,7 +17,6 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.countNonNull
-import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -29,11 +28,17 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
+/**
+ * Pixel buffers are tightly packed with NO row padding: RGB is 3 bytes/px,
+ * RGBA is 4, and width * height * channels MUST equal the buffer length or
+ * the request is rejected. raw_rgba drops alpha at the boundary.
+ */
 public class VLMImage(
+  /**
+   * Local file. The on-device analogue of a cloud Files-API file_id.
+   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -43,17 +48,20 @@ public class VLMImage(
   )
   public val file_path: String? = null,
   /**
-   * JPEG/PNG/WEBP container bytes
+   * Compressed container bytes -- image/jpeg, image/png, image/webp.
+   * Decoded by commons. Set media_type alongside. Same slot name and
+   * meaning as ChatAttachment.data and Anthropic source.data.
    */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    declaredName = "data",
     oneofName = "source",
     schemaIndex = 1,
   )
-  public val encoded: ByteString? = null,
+  public val data_: ByteString? = null,
   /**
-   * RAW_RGB or RAW_RGBA pixel buffer
+   * 3 bytes/px
    */
   @field:WireField(
     tag = 3,
@@ -63,6 +71,9 @@ public class VLMImage(
     schemaIndex = 2,
   )
   public val raw_rgb: ByteString? = null,
+  /**
+   * same container formats as `data`, base64-encoded
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -70,62 +81,55 @@ public class VLMImage(
     schemaIndex = 3,
   )
   public val base64: String? = null,
+  /**
+   * 4 bytes/px; commons drops alpha
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    jsonName = "rawRgba",
+    oneofName = "source",
+    schemaIndex = 4,
+  )
+  public val raw_rgba: ByteString? = null,
+  /**
+   * required for raw_rgb / raw_rgba
+   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
+    schemaIndex = 5,
   )
   public val width: Int = 0,
+  /**
+   * required for raw_rgb / raw_rgba
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
-  )
-  public val height: Int = 0,
-  @field:WireField(
-    tag = 7,
-    adapter = "ai.runanywhere.proto.v1.VLMImageFormat#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 6,
   )
-  public val format: VLMImageFormat = VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED,
+  public val height: Int = 0,
+  /**
+   * MIME type of `data`/`base64`. Required when either is set. An open
+   * string, as everywhere in the industry, so adding HEIC is not a proto
+   * change.
+   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "mediaType",
     schemaIndex = 7,
   )
-  public val media_type: String? = null,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 8,
-  )
-  public val name: String? = null,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sizeBytes",
-    schemaIndex = 9,
-  )
-  public val size_bytes: Long = 0L,
-  metadata: Map<String, String> = emptyMap(),
+  public val media_type: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMImage, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 11,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 10,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
-
   init {
-    require(countNonNull(file_path, encoded, raw_rgb, base64) <= 1) {
-      "At most one of file_path, encoded, raw_rgb, base64 may be non-null"
+    require(countNonNull(file_path, data_, raw_rgb, base64, raw_rgba) <= 1) {
+      "At most one of file_path, data_, raw_rgb, base64, raw_rgba may be non-null"
     }
   }
 
@@ -140,16 +144,13 @@ public class VLMImage(
     if (other !is VLMImage) return false
     if (unknownFields != other.unknownFields) return false
     if (file_path != other.file_path) return false
-    if (encoded != other.encoded) return false
+    if (data_ != other.data_) return false
     if (raw_rgb != other.raw_rgb) return false
     if (base64 != other.base64) return false
+    if (raw_rgba != other.raw_rgba) return false
     if (width != other.width) return false
     if (height != other.height) return false
-    if (format != other.format) return false
     if (media_type != other.media_type) return false
-    if (name != other.name) return false
-    if (size_bytes != other.size_bytes) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -158,16 +159,13 @@ public class VLMImage(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + (file_path?.hashCode() ?: 0)
-      result = result * 37 + (encoded?.hashCode() ?: 0)
+      result = result * 37 + (data_?.hashCode() ?: 0)
       result = result * 37 + (raw_rgb?.hashCode() ?: 0)
       result = result * 37 + (base64?.hashCode() ?: 0)
+      result = result * 37 + (raw_rgba?.hashCode() ?: 0)
       result = result * 37 + width.hashCode()
       result = result * 37 + height.hashCode()
-      result = result * 37 + format.hashCode()
-      result = result * 37 + (media_type?.hashCode() ?: 0)
-      result = result * 37 + (name?.hashCode() ?: 0)
-      result = result * 37 + size_bytes.hashCode()
-      result = result * 37 + metadata.hashCode()
+      result = result * 37 + media_type.hashCode()
       super.hashCode = result
     }
     return result
@@ -176,33 +174,27 @@ public class VLMImage(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (file_path != null) result += """file_path=${sanitize(file_path)}"""
-    if (encoded != null) result += """encoded=$encoded"""
+    if (data_ != null) result += """data_=$data_"""
     if (raw_rgb != null) result += """raw_rgb=$raw_rgb"""
     if (base64 != null) result += """base64=${sanitize(base64)}"""
+    if (raw_rgba != null) result += """raw_rgba=$raw_rgba"""
     result += """width=$width"""
     result += """height=$height"""
-    result += """format=$format"""
-    if (media_type != null) result += """media_type=${sanitize(media_type)}"""
-    if (name != null) result += """name=${sanitize(name)}"""
-    result += """size_bytes=$size_bytes"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
+    result += """media_type=${sanitize(media_type)}"""
     return result.joinToString(prefix = "VLMImage{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     file_path: String? = this.file_path,
-    encoded: ByteString? = this.encoded,
+    data_: ByteString? = this.data_,
     raw_rgb: ByteString? = this.raw_rgb,
     base64: String? = this.base64,
+    raw_rgba: ByteString? = this.raw_rgba,
     width: Int = this.width,
     height: Int = this.height,
-    format: VLMImageFormat = this.format,
-    media_type: String? = this.media_type,
-    name: String? = this.name,
-    size_bytes: Long = this.size_bytes,
-    metadata: Map<String, String> = this.metadata,
+    media_type: String = this.media_type,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMImage = VLMImage(file_path, encoded, raw_rgb, base64, width, height, format, media_type, name, size_bytes, metadata, unknownFields)
+  ): VLMImage = VLMImage(file_path, data_, raw_rgb, base64, raw_rgba, width, height, media_type, unknownFields)
 
   public companion object {
     @JvmField
@@ -214,30 +206,22 @@ public class VLMImage(
       null, 
       "vlm_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: VLMImage): Int {
         var size = value.unknownFields.size
         size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.file_path)
-        size += ProtoAdapter.BYTES.encodedSizeWithTag(2, value.encoded)
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(2, value.data_)
         size += ProtoAdapter.BYTES.encodedSizeWithTag(3, value.raw_rgb)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.base64)
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(12, value.raw_rgba)
         if (value.width != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.width)
         }
         if (value.height != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.height)
         }
-        if (value.format != ai.runanywhere.proto.v1.VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED) {
-          size += VLMImageFormat.ADAPTER.encodedSizeWithTag(7, value.format)
+        if (value.media_type != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.media_type)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.media_type)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.name)
-        if (value.size_bytes != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(10, value.size_bytes)
-        }
-        size += metadataAdapter.encodedSizeWithTag(11, value.metadata)
         return size
       }
 
@@ -248,36 +232,26 @@ public class VLMImage(
         if (value.height != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.height)
         }
-        if (value.format != ai.runanywhere.proto.v1.VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED) {
-          VLMImageFormat.ADAPTER.encodeWithTag(writer, 7, value.format)
+        if (value.media_type != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.media_type)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.media_type)
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.name)
-        if (value.size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.size_bytes)
-        }
-        metadataAdapter.encodeWithTag(writer, 11, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 1, value.file_path)
-        ProtoAdapter.BYTES.encodeWithTag(writer, 2, value.encoded)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 2, value.data_)
         ProtoAdapter.BYTES.encodeWithTag(writer, 3, value.raw_rgb)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.base64)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 12, value.raw_rgba)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMImage) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 12, value.raw_rgba)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.base64)
         ProtoAdapter.BYTES.encodeWithTag(writer, 3, value.raw_rgb)
-        ProtoAdapter.BYTES.encodeWithTag(writer, 2, value.encoded)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 2, value.data_)
         ProtoAdapter.STRING.encodeWithTag(writer, 1, value.file_path)
-        metadataAdapter.encodeWithTag(writer, 11, value.metadata)
-        if (value.size_bytes != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.size_bytes)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.name)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.media_type)
-        if (value.format != ai.runanywhere.proto.v1.VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED) {
-          VLMImageFormat.ADAPTER.encodeWithTag(writer, 7, value.format)
+        if (value.media_type != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.media_type)
         }
         if (value.height != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.height)
@@ -289,48 +263,35 @@ public class VLMImage(
 
       override fun decode(reader: ProtoReader): VLMImage {
         var file_path: String? = null
-        var encoded: ByteString? = null
+        var data_: ByteString? = null
         var raw_rgb: ByteString? = null
         var base64: String? = null
+        var raw_rgba: ByteString? = null
         var width: Int = 0
         var height: Int = 0
-        var format: VLMImageFormat = VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED
-        var media_type: String? = null
-        var name: String? = null
-        var size_bytes: Long = 0L
-        val metadata = mutableMapOf<String, String>()
+        var media_type: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> file_path = ProtoAdapter.STRING.decode(reader)
-            2 -> encoded = ProtoAdapter.BYTES.decode(reader)
+            2 -> data_ = ProtoAdapter.BYTES.decode(reader)
             3 -> raw_rgb = ProtoAdapter.BYTES.decode(reader)
             4 -> base64 = ProtoAdapter.STRING.decode(reader)
+            12 -> raw_rgba = ProtoAdapter.BYTES.decode(reader)
             5 -> width = ProtoAdapter.INT32.decode(reader)
             6 -> height = ProtoAdapter.INT32.decode(reader)
-            7 -> try {
-              format = VLMImageFormat.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
             8 -> media_type = ProtoAdapter.STRING.decode(reader)
-            9 -> name = ProtoAdapter.STRING.decode(reader)
-            10 -> size_bytes = ProtoAdapter.INT64.decode(reader)
-            11 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
         return VLMImage(
           file_path = file_path,
-          encoded = encoded,
+          data_ = data_,
           raw_rgb = raw_rgb,
           base64 = base64,
+          raw_rgba = raw_rgba,
           width = width,
           height = height,
-          format = format,
           media_type = media_type,
-          name = name,
-          size_bytes = size_bytes,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }

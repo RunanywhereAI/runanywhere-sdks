@@ -95,7 +95,9 @@ describe('lifecycle-owned Web TTS', () => {
       componentDestroys: 0,
     });
 
-    expect(WebModelLifecycle.currentModel({})).toMatchObject({
+    // `CurrentModelRequest.includeModelMetadata` is a required boolean now
+    // (not optional); the default parameter covers the zero-arg call.
+    expect(WebModelLifecycle.currentModel()).toMatchObject({
       modelId: 'piper-en-us',
     });
   });

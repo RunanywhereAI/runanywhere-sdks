@@ -17,14 +17,6 @@
 import { SegmentationImage } from '../segmentation';
 import { ValidationError } from './_errors';
 
-export const segmentationImageDefaults = (): SegmentationImage => ({
-  data: new Uint8Array(0),
-  width: 0,
-  height: 0,
-  pixelFormat: 0,
-  strideBytes: 0,
-});
-
 export const validateSegmentationImage = (m: SegmentationImage): void => {
   if (m.width === 0) {
     throw new ValidationError({
@@ -32,10 +24,22 @@ export const validateSegmentationImage = (m: SegmentationImage): void => {
       message: 'width is required',
     });
   }
+  if (m.width < 1 || m.width > 4096) {
+    throw new ValidationError({
+      fieldPath: 'SegmentationImage.width',
+      message: `width must be in 1...4096 (got ${m.width})`,
+    });
+  }
   if (m.height === 0) {
     throw new ValidationError({
       fieldPath: 'SegmentationImage.height',
       message: 'height is required',
+    });
+  }
+  if (m.height < 1 || m.height > 4096) {
+    throw new ValidationError({
+      fieldPath: 'SegmentationImage.height',
+      message: `height must be in 1...4096 (got ${m.height})`,
     });
   }
 };

@@ -57,8 +57,10 @@ public actor RagSession {
     public func search(query: String, topK: Int? = nil) async throws -> [Match] {
         try requireOpen()
         var request = RARAGSearchRequest()
-        request.question = query
-        request.retrievalTopK = Int32(topK ?? defaultTopK)
+        request.query = query
+        var retrieval = RARAGRetrievalOptions()
+        retrieval.topK = Int32(topK ?? defaultTopK)
+        request.retrieval = retrieval
         let response = try CppBridge.RAG.shared.search(handle: handle, request)
         try RagSession.throwIfFailed(response)
         return response.chunks.map(Match.init(proto:))
@@ -105,19 +107,20 @@ public actor RagSession {
         return AsyncThrowingStream { continuation in
             let task = Task {
                 var retrievedProtos: [RARAGSearchResult] = []
-                var retrieved: [Match] = []
                 var answer = ""
                 var sawCompletion = false
                 for await event in events {
                     if Task.isCancelled { break }
+                    // RAGStreamEventKind collapsed to unspecified/token/
+                    // completed/error (idl/rag.proto): the RETRIEVAL_STARTED/
+                    // CHUNK_RETRIEVED/CONTEXT_READY progress cases were
+                    // deleted outright, so retrieved chunks no longer stream
+                    // incrementally. They arrive only on the terminal
+                    // `.completed` event's `result.retrievedChunks`; this
+                    // synthesizes the `.retrieved` event from that payload
+                    // immediately before `.completed`, the closest
+                    // equivalent the surviving wire shape supports.
                     switch event.kind {
-                    case .chunkRetrieved:
-                        if event.hasChunk {
-                            retrievedProtos.append(event.chunk)
-                            retrieved.append(Match(proto: event.chunk))
-                        }
-                    case .contextReady:
-                        continuation.yield(.retrieved(retrieved))
                     case .token:
                         if !event.token.isEmpty {
                             answer += event.token
@@ -125,6 +128,8 @@ public actor RagSession {
                         }
                     case .completed:
                         let result = event.hasResult ? event.result : RARAGResult()
+                        retrievedProtos = result.retrievedChunks
+                        continuation.yield(.retrieved(retrievedProtos.map(Match.init(proto:))))
                         continuation.yield(.completed(RagResult(proto: result, model: model)))
                         sawCompletion = true
                     case .error:
@@ -197,10 +202,14 @@ public actor RagSession {
 
     private func queryOptions(question: String, options: RagQueryOptions?) -> RARAGQueryOptions {
         var queryOptions = RARAGQueryOptions.defaults(question: question)
-        queryOptions.retrievalTopK = Int32(options?.retrievalTopK ?? defaultTopK)
+        // retrievalTopK/similarityThreshold moved onto the nested
+        // `RAGRetrievalOptions retrieval` sub-message (idl/rag.proto).
+        var retrieval = RARAGRetrievalOptions()
+        retrieval.topK = Int32(options?.retrievalTopK ?? defaultTopK)
         if let similarityThreshold = options?.similarityThreshold {
-            queryOptions.similarityThreshold = similarityThreshold
+            retrieval.scoreThreshold = similarityThreshold
         }
+        queryOptions.retrieval = retrieval
         if let generation = options?.generation {
             queryOptions.generation = generation.toProto()
         }

@@ -68,12 +68,13 @@ describe('lifecycle-owned Web STT', () => {
       componentDestroys: 0,
     });
     expect(harness.requests).toHaveLength(1);
+    // STTAudioSource.bits_per_sample was deleted outright (idl/stt_options.proto):
+    // sample width is determined by `encoding`.
     expect(harness.requests[0]?.audio).toMatchObject({
       encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
       sampleRate: 16_000,
       channels: 1,
-      bitsPerSample: 16,
     });
     expect(Array.from(harness.requests[0]?.audio?.audioData ?? [])).toEqual([
       0, 0, 0, 64, 1, 192,
@@ -181,8 +182,6 @@ function fakeSTTModule(): FakeSTTHarness {
       heap32[pointer >>> 2] = value;
     },
     _rac_voice_agent_set_proto_callback: () => 0,
-    _rac_llm_set_stream_proto_callback: () => 0,
-    _rac_llm_unset_stream_proto_callback: () => 0,
     _rac_backend_onnx_register: () => 0,
     _rac_backend_sherpa_register: () => 0,
     _rac_wasm_sizeof_proto_buffer: () => 16,

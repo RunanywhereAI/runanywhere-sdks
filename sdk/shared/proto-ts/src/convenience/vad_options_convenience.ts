@@ -21,11 +21,9 @@ export const vADConfigurationDefaults = (): VADConfiguration => ({
   modelId: '',
   sampleRate: 16000,
   frameLengthMs: 100,
-  activationThreshold: 0.015,
+  activationThreshold: 0.5,
   enableAutoCalibration: false,
   calibrationMultiplier: 2.0,
-  windowSizeSamples: 0,
-  maxSpeechDurationMs: 0,
 });
 
 export const validateVADConfiguration = (m: VADConfiguration): void => {
@@ -56,19 +54,24 @@ export const validateVADConfiguration = (m: VADConfiguration): void => {
 };
 
 export const vADOptionsDefaults = (): VADOptions => ({
-  activationThreshold: 0,
-  minSpeechDurationMs: 100,
-  minSilenceDurationMs: 300,
-  maxSpeechDurationMs: 0,
-  prefixPaddingMs: 0,
-  includeStatistics: false,
+  activationThreshold: 0.5,
+  minSpeechDurationMs: 250,
+  minSilenceDurationMs: 500,
+  prefixPaddingMs: 300,
+  sampleRate: 16000,
 });
 
 export const validateVADOptions = (m: VADOptions): void => {
-  if (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0) {
+  if (m.activationThreshold !== undefined && (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0)) {
     throw new ValidationError({
       fieldPath: 'VADOptions.activation_threshold',
       message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
+    });
+  }
+  if (m.sampleRate < 8000 || m.sampleRate > 48000) {
+    throw new ValidationError({
+      fieldPath: 'VADOptions.sample_rate',
+      message: `sample_rate must be in 8000...48000 (got ${m.sampleRate})`,
     });
   }
 };

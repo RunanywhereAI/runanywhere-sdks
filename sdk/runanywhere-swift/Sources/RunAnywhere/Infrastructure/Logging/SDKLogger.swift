@@ -144,7 +144,7 @@ public final class Logging: @unchecked Sendable {
             let deviceInfo = DeviceInfoFactory.current
             stringMetadata["device_model"] = deviceInfo.deviceModel
             stringMetadata["os_version"] = deviceInfo.osVersion
-            stringMetadata["platform"] = deviceInfo.platform
+            stringMetadata["platform"] = DeviceInfoFactory.wireString(deviceInfo.platform)
         }
 
         var entry = RALogEntry()

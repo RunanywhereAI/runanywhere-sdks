@@ -756,8 +756,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.
     src/plugin/rac_runtime_registry.cpp
-    # Proto-serialised SDKComponent → [InferenceFramework] query.
-    src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_orchestrator.cpp
     # model_registry.cpp was split per SRP into five TUs (slim core + struct
     # CRUD, proto<->C conversion, proto-byte ABI, filesystem discovery, and
@@ -1410,7 +1408,6 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
     # Shared TokenUsage embedded by LLM/VLM/RAG result + metrics messages (D4).
     ${_RAC_PROTO_GEN_DIR}/token_usage.pb.cc
-    ${_RAC_PROTO_GEN_DIR}/router.pb.cc
     ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
     ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc
     # Two-phase SDK init request/result envelope.

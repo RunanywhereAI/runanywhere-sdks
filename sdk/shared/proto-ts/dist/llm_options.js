@@ -5,7 +5,9 @@
 //   protoc               v7.35.1
 // source: llm_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PerformanceMetrics = exports.StreamToken = exports.LLMConfiguration = exports.LLMGenerationResult = exports.LLMGenerationOptions = exports.ExecutionTarget = exports.protobufPackage = void 0;
+exports.PerformanceMetrics = exports.StreamToken = exports.LLMConfiguration = exports.LLMGenerationResult = exports.LLMGenerationOptions = exports.ExecutionTarget = exports.FinishReason = exports.protobufPackage = void 0;
+exports.finishReasonFromJSON = finishReasonFromJSON;
+exports.finishReasonToJSON = finishReasonToJSON;
 exports.executionTargetFromJSON = executionTargetFromJSON;
 exports.executionTargetToJSON = executionTargetToJSON;
 /* eslint-disable */
@@ -17,6 +19,84 @@ const thinking_tag_pattern_1 = require("./thinking_tag_pattern");
 const token_usage_1 = require("./token_usage");
 const tool_calling_1 = require("./tool_calling");
 exports.protobufPackage = "runanywhere.v1";
+/**
+ * One declared vocabulary, used in every place a finish reason is reported
+ * on the LLM generation path (LLMGenerationResult, LLMStreamEvent).
+ */
+var FinishReason;
+(function (FinishReason) {
+    FinishReason[FinishReason["FINISH_REASON_UNSPECIFIED"] = 0] = "FINISH_REASON_UNSPECIFIED";
+    /** FINISH_REASON_STOP - End-of-turn token. OpenAI "stop" / Anthropic "end_turn". */
+    FinishReason[FinishReason["FINISH_REASON_STOP"] = 1] = "FINISH_REASON_STOP";
+    /** FINISH_REASON_LENGTH - Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens". */
+    FinishReason[FinishReason["FINISH_REASON_LENGTH"] = 2] = "FINISH_REASON_LENGTH";
+    /** FINISH_REASON_STOP_SEQUENCE - One of options.stop_sequences fired; see `stop_sequence`. */
+    FinishReason[FinishReason["FINISH_REASON_STOP_SEQUENCE"] = 3] = "FINISH_REASON_STOP_SEQUENCE";
+    /** FINISH_REASON_TOOL_CALLS - Model wants a tool run before it can continue. */
+    FinishReason[FinishReason["FINISH_REASON_TOOL_CALLS"] = 4] = "FINISH_REASON_TOOL_CALLS";
+    /** FINISH_REASON_CANCELLED - Caller cancelled. No cloud analogue. */
+    FinishReason[FinishReason["FINISH_REASON_CANCELLED"] = 5] = "FINISH_REASON_CANCELLED";
+    /** FINISH_REASON_CONTEXT_OVERFLOW - Conversation exceeded the allocated context window. */
+    FinishReason[FinishReason["FINISH_REASON_CONTEXT_OVERFLOW"] = 6] = "FINISH_REASON_CONTEXT_OVERFLOW";
+    /** FINISH_REASON_ERROR - Generation failed; see `error`. */
+    FinishReason[FinishReason["FINISH_REASON_ERROR"] = 7] = "FINISH_REASON_ERROR";
+    FinishReason[FinishReason["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(FinishReason || (exports.FinishReason = FinishReason = {}));
+function finishReasonFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "FINISH_REASON_UNSPECIFIED":
+            return FinishReason.FINISH_REASON_UNSPECIFIED;
+        case 1:
+        case "FINISH_REASON_STOP":
+            return FinishReason.FINISH_REASON_STOP;
+        case 2:
+        case "FINISH_REASON_LENGTH":
+            return FinishReason.FINISH_REASON_LENGTH;
+        case 3:
+        case "FINISH_REASON_STOP_SEQUENCE":
+            return FinishReason.FINISH_REASON_STOP_SEQUENCE;
+        case 4:
+        case "FINISH_REASON_TOOL_CALLS":
+            return FinishReason.FINISH_REASON_TOOL_CALLS;
+        case 5:
+        case "FINISH_REASON_CANCELLED":
+            return FinishReason.FINISH_REASON_CANCELLED;
+        case 6:
+        case "FINISH_REASON_CONTEXT_OVERFLOW":
+            return FinishReason.FINISH_REASON_CONTEXT_OVERFLOW;
+        case 7:
+        case "FINISH_REASON_ERROR":
+            return FinishReason.FINISH_REASON_ERROR;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return FinishReason.UNRECOGNIZED;
+    }
+}
+function finishReasonToJSON(object) {
+    switch (object) {
+        case FinishReason.FINISH_REASON_UNSPECIFIED:
+            return "FINISH_REASON_UNSPECIFIED";
+        case FinishReason.FINISH_REASON_STOP:
+            return "FINISH_REASON_STOP";
+        case FinishReason.FINISH_REASON_LENGTH:
+            return "FINISH_REASON_LENGTH";
+        case FinishReason.FINISH_REASON_STOP_SEQUENCE:
+            return "FINISH_REASON_STOP_SEQUENCE";
+        case FinishReason.FINISH_REASON_TOOL_CALLS:
+            return "FINISH_REASON_TOOL_CALLS";
+        case FinishReason.FINISH_REASON_CANCELLED:
+            return "FINISH_REASON_CANCELLED";
+        case FinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
+            return "FINISH_REASON_CONTEXT_OVERFLOW";
+        case FinishReason.FINISH_REASON_ERROR:
+            return "FINISH_REASON_ERROR";
+        case FinishReason.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 var ExecutionTarget;
 (function (ExecutionTarget) {
     ExecutionTarget[ExecutionTarget["EXECUTION_TARGET_UNSPECIFIED"] = 0] = "EXECUTION_TARGET_UNSPECIFIED";
@@ -62,43 +142,42 @@ function executionTargetToJSON(object) {
 }
 function createBaseLLMGenerationOptions() {
     return {
-        maxOutputTokens: 0,
-        temperature: 0,
-        topP: 0,
-        topK: 0,
-        repetitionPenalty: 0,
+        maxOutputTokens: undefined,
+        temperature: undefined,
+        topP: undefined,
+        topK: undefined,
+        repeatPenalty: undefined,
         stopSequences: [],
         preferredFramework: 0,
         systemPrompt: undefined,
         reasoning: undefined,
         executionTarget: undefined,
         structuredOutput: undefined,
-        seed: 0,
-        frequencyPenalty: 0,
-        presencePenalty: 0,
+        seed: undefined,
+        frequencyPenalty: undefined,
+        presencePenalty: undefined,
         repeatLastN: 0,
-        minP: 0,
+        minP: undefined,
         echoPrompt: false,
-        nThreads: 0,
         toolCalling: undefined,
     };
 }
 exports.LLMGenerationOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.maxOutputTokens !== 0) {
+        if (message.maxOutputTokens !== undefined) {
             writer.uint32(8).int32(message.maxOutputTokens);
         }
-        if (message.temperature !== 0) {
+        if (message.temperature !== undefined) {
             writer.uint32(21).float(message.temperature);
         }
-        if (message.topP !== 0) {
+        if (message.topP !== undefined) {
             writer.uint32(29).float(message.topP);
         }
-        if (message.topK !== 0) {
+        if (message.topK !== undefined) {
             writer.uint32(32).int32(message.topK);
         }
-        if (message.repetitionPenalty !== 0) {
-            writer.uint32(45).float(message.repetitionPenalty);
+        if (message.repeatPenalty !== undefined) {
+            writer.uint32(45).float(message.repeatPenalty);
         }
         for (const v of message.stopSequences) {
             writer.uint32(50).string(v);
@@ -118,26 +197,23 @@ exports.LLMGenerationOptions = {
         if (message.structuredOutput !== undefined) {
             structured_output_1.StructuredOutputOptions.encode(message.structuredOutput, writer.uint32(106).fork()).join();
         }
-        if (message.seed !== 0) {
+        if (message.seed !== undefined) {
             writer.uint32(120).int64(message.seed);
         }
-        if (message.frequencyPenalty !== 0) {
+        if (message.frequencyPenalty !== undefined) {
             writer.uint32(133).float(message.frequencyPenalty);
         }
-        if (message.presencePenalty !== 0) {
+        if (message.presencePenalty !== undefined) {
             writer.uint32(141).float(message.presencePenalty);
         }
         if (message.repeatLastN !== 0) {
             writer.uint32(144).int32(message.repeatLastN);
         }
-        if (message.minP !== 0) {
+        if (message.minP !== undefined) {
             writer.uint32(157).float(message.minP);
         }
         if (message.echoPrompt !== false) {
             writer.uint32(176).bool(message.echoPrompt);
-        }
-        if (message.nThreads !== 0) {
-            writer.uint32(184).int32(message.nThreads);
         }
         if (message.toolCalling !== undefined) {
             tool_calling_1.ToolCallingOptions.encode(message.toolCalling, writer.uint32(194).fork()).join();
@@ -183,7 +259,7 @@ exports.LLMGenerationOptions = {
                     if (tag !== 45) {
                         break;
                     }
-                    message.repetitionPenalty = reader.float();
+                    message.repeatPenalty = reader.float();
                     continue;
                 }
                 case 6: {
@@ -270,13 +346,6 @@ exports.LLMGenerationOptions = {
                     message.echoPrompt = reader.bool();
                     continue;
                 }
-                case 23: {
-                    if (tag !== 184) {
-                        break;
-                    }
-                    message.nThreads = reader.int32();
-                    continue;
-                }
                 case 24: {
                     if (tag !== 194) {
                         break;
@@ -298,23 +367,23 @@ exports.LLMGenerationOptions = {
                 ? globalThis.Number(object.maxOutputTokens)
                 : isSet(object.max_output_tokens)
                     ? globalThis.Number(object.max_output_tokens)
-                    : 0,
-            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
+                    : undefined,
+            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : undefined,
             topP: isSet(object.topP)
                 ? globalThis.Number(object.topP)
                 : isSet(object.top_p)
                     ? globalThis.Number(object.top_p)
-                    : 0,
+                    : undefined,
             topK: isSet(object.topK)
                 ? globalThis.Number(object.topK)
                 : isSet(object.top_k)
                     ? globalThis.Number(object.top_k)
-                    : 0,
-            repetitionPenalty: isSet(object.repetitionPenalty)
-                ? globalThis.Number(object.repetitionPenalty)
-                : isSet(object.repetition_penalty)
-                    ? globalThis.Number(object.repetition_penalty)
-                    : 0,
+                    : undefined,
+            repeatPenalty: isSet(object.repeatPenalty)
+                ? globalThis.Number(object.repeatPenalty)
+                : isSet(object.repeat_penalty)
+                    ? globalThis.Number(object.repeat_penalty)
+                    : undefined,
             stopSequences: globalThis.Array.isArray(object?.stopSequences)
                 ? object.stopSequences.map((e) => globalThis.String(e))
                 : globalThis.Array.isArray(object?.stop_sequences)
@@ -341,17 +410,17 @@ exports.LLMGenerationOptions = {
                 : isSet(object.structured_output)
                     ? structured_output_1.StructuredOutputOptions.fromJSON(object.structured_output)
                     : undefined,
-            seed: isSet(object.seed) ? globalThis.Number(object.seed) : 0,
+            seed: isSet(object.seed) ? globalThis.Number(object.seed) : undefined,
             frequencyPenalty: isSet(object.frequencyPenalty)
                 ? globalThis.Number(object.frequencyPenalty)
                 : isSet(object.frequency_penalty)
                     ? globalThis.Number(object.frequency_penalty)
-                    : 0,
+                    : undefined,
             presencePenalty: isSet(object.presencePenalty)
                 ? globalThis.Number(object.presencePenalty)
                 : isSet(object.presence_penalty)
                     ? globalThis.Number(object.presence_penalty)
-                    : 0,
+                    : undefined,
             repeatLastN: isSet(object.repeatLastN)
                 ? globalThis.Number(object.repeatLastN)
                 : isSet(object.repeat_last_n)
@@ -361,17 +430,12 @@ exports.LLMGenerationOptions = {
                 ? globalThis.Number(object.minP)
                 : isSet(object.min_p)
                     ? globalThis.Number(object.min_p)
-                    : 0,
+                    : undefined,
             echoPrompt: isSet(object.echoPrompt)
                 ? globalThis.Boolean(object.echoPrompt)
                 : isSet(object.echo_prompt)
                     ? globalThis.Boolean(object.echo_prompt)
                     : false,
-            nThreads: isSet(object.nThreads)
-                ? globalThis.Number(object.nThreads)
-                : isSet(object.n_threads)
-                    ? globalThis.Number(object.n_threads)
-                    : 0,
             toolCalling: isSet(object.toolCalling)
                 ? tool_calling_1.ToolCallingOptions.fromJSON(object.toolCalling)
                 : isSet(object.tool_calling)
@@ -381,20 +445,20 @@ exports.LLMGenerationOptions = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.maxOutputTokens !== 0) {
+        if (message.maxOutputTokens !== undefined) {
             obj.maxOutputTokens = Math.round(message.maxOutputTokens);
         }
-        if (message.temperature !== 0) {
+        if (message.temperature !== undefined) {
             obj.temperature = message.temperature;
         }
-        if (message.topP !== 0) {
+        if (message.topP !== undefined) {
             obj.topP = message.topP;
         }
-        if (message.topK !== 0) {
+        if (message.topK !== undefined) {
             obj.topK = Math.round(message.topK);
         }
-        if (message.repetitionPenalty !== 0) {
-            obj.repetitionPenalty = message.repetitionPenalty;
+        if (message.repeatPenalty !== undefined) {
+            obj.repeatPenalty = message.repeatPenalty;
         }
         if (message.stopSequences?.length) {
             obj.stopSequences = message.stopSequences;
@@ -414,26 +478,23 @@ exports.LLMGenerationOptions = {
         if (message.structuredOutput !== undefined) {
             obj.structuredOutput = structured_output_1.StructuredOutputOptions.toJSON(message.structuredOutput);
         }
-        if (message.seed !== 0) {
+        if (message.seed !== undefined) {
             obj.seed = Math.round(message.seed);
         }
-        if (message.frequencyPenalty !== 0) {
+        if (message.frequencyPenalty !== undefined) {
             obj.frequencyPenalty = message.frequencyPenalty;
         }
-        if (message.presencePenalty !== 0) {
+        if (message.presencePenalty !== undefined) {
             obj.presencePenalty = message.presencePenalty;
         }
         if (message.repeatLastN !== 0) {
             obj.repeatLastN = Math.round(message.repeatLastN);
         }
-        if (message.minP !== 0) {
+        if (message.minP !== undefined) {
             obj.minP = message.minP;
         }
         if (message.echoPrompt !== false) {
             obj.echoPrompt = message.echoPrompt;
-        }
-        if (message.nThreads !== 0) {
-            obj.nThreads = Math.round(message.nThreads);
         }
         if (message.toolCalling !== undefined) {
             obj.toolCalling = tool_calling_1.ToolCallingOptions.toJSON(message.toolCalling);
@@ -445,11 +506,11 @@ exports.LLMGenerationOptions = {
     },
     fromPartial(object) {
         const message = createBaseLLMGenerationOptions();
-        message.maxOutputTokens = object.maxOutputTokens ?? 0;
-        message.temperature = object.temperature ?? 0;
-        message.topP = object.topP ?? 0;
-        message.topK = object.topK ?? 0;
-        message.repetitionPenalty = object.repetitionPenalty ?? 0;
+        message.maxOutputTokens = object.maxOutputTokens ?? undefined;
+        message.temperature = object.temperature ?? undefined;
+        message.topP = object.topP ?? undefined;
+        message.topK = object.topK ?? undefined;
+        message.repeatPenalty = object.repeatPenalty ?? undefined;
         message.stopSequences = object.stopSequences?.map((e) => e) || [];
         message.preferredFramework = object.preferredFramework ?? 0;
         message.systemPrompt = object.systemPrompt ?? undefined;
@@ -460,13 +521,12 @@ exports.LLMGenerationOptions = {
         message.structuredOutput = (object.structuredOutput !== undefined && object.structuredOutput !== null)
             ? structured_output_1.StructuredOutputOptions.fromPartial(object.structuredOutput)
             : undefined;
-        message.seed = object.seed ?? 0;
-        message.frequencyPenalty = object.frequencyPenalty ?? 0;
-        message.presencePenalty = object.presencePenalty ?? 0;
+        message.seed = object.seed ?? undefined;
+        message.frequencyPenalty = object.frequencyPenalty ?? undefined;
+        message.presencePenalty = object.presencePenalty ?? undefined;
         message.repeatLastN = object.repeatLastN ?? 0;
-        message.minP = object.minP ?? 0;
+        message.minP = object.minP ?? undefined;
         message.echoPrompt = object.echoPrompt ?? false;
-        message.nThreads = object.nThreads ?? 0;
         message.toolCalling = (object.toolCalling !== undefined && object.toolCalling !== null)
             ? tool_calling_1.ToolCallingOptions.fromPartial(object.toolCalling)
             : undefined;
@@ -479,12 +539,12 @@ function createBaseLLMGenerationResult() {
         thinkingContent: undefined,
         modelUsed: "",
         generationTimeMs: 0,
-        ttftMs: undefined,
         framework: undefined,
-        finishReason: "",
         thinkingTokens: 0,
         responseTokens: 0,
         jsonOutput: undefined,
+        finishReason: 0,
+        stopSequence: undefined,
         performance: undefined,
         executedOn: undefined,
         structuredOutputValidation: undefined,
@@ -511,14 +571,8 @@ exports.LLMGenerationResult = {
         if (message.generationTimeMs !== 0) {
             writer.uint32(49).double(message.generationTimeMs);
         }
-        if (message.ttftMs !== undefined) {
-            writer.uint32(57).double(message.ttftMs);
-        }
         if (message.framework !== undefined) {
             writer.uint32(74).string(message.framework);
-        }
-        if (message.finishReason !== "") {
-            writer.uint32(82).string(message.finishReason);
         }
         if (message.thinkingTokens !== 0) {
             writer.uint32(88).int32(message.thinkingTokens);
@@ -528,6 +582,12 @@ exports.LLMGenerationResult = {
         }
         if (message.jsonOutput !== undefined) {
             writer.uint32(106).string(message.jsonOutput);
+        }
+        if (message.finishReason !== 0) {
+            writer.uint32(216).int32(message.finishReason);
+        }
+        if (message.stopSequence !== undefined) {
+            writer.uint32(226).string(message.stopSequence);
         }
         if (message.performance !== undefined) {
             exports.PerformanceMetrics.encode(message.performance, writer.uint32(114).fork()).join();
@@ -596,25 +656,11 @@ exports.LLMGenerationResult = {
                     message.generationTimeMs = reader.double();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 57) {
-                        break;
-                    }
-                    message.ttftMs = reader.double();
-                    continue;
-                }
                 case 9: {
                     if (tag !== 74) {
                         break;
                     }
                     message.framework = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.finishReason = reader.string();
                     continue;
                 }
                 case 11: {
@@ -636,6 +682,20 @@ exports.LLMGenerationResult = {
                         break;
                     }
                     message.jsonOutput = reader.string();
+                    continue;
+                }
+                case 27: {
+                    if (tag !== 216) {
+                        break;
+                    }
+                    message.finishReason = reader.int32();
+                    continue;
+                }
+                case 28: {
+                    if (tag !== 226) {
+                        break;
+                    }
+                    message.stopSequence = reader.string();
                     continue;
                 }
                 case 14: {
@@ -734,17 +794,7 @@ exports.LLMGenerationResult = {
                 : isSet(object.generation_time_ms)
                     ? globalThis.Number(object.generation_time_ms)
                     : 0,
-            ttftMs: isSet(object.ttftMs)
-                ? globalThis.Number(object.ttftMs)
-                : isSet(object.ttft_ms)
-                    ? globalThis.Number(object.ttft_ms)
-                    : undefined,
             framework: isSet(object.framework) ? globalThis.String(object.framework) : undefined,
-            finishReason: isSet(object.finishReason)
-                ? globalThis.String(object.finishReason)
-                : isSet(object.finish_reason)
-                    ? globalThis.String(object.finish_reason)
-                    : "",
             thinkingTokens: isSet(object.thinkingTokens)
                 ? globalThis.Number(object.thinkingTokens)
                 : isSet(object.thinking_tokens)
@@ -759,6 +809,16 @@ exports.LLMGenerationResult = {
                 ? globalThis.String(object.jsonOutput)
                 : isSet(object.json_output)
                     ? globalThis.String(object.json_output)
+                    : undefined,
+            finishReason: isSet(object.finishReason)
+                ? finishReasonFromJSON(object.finishReason)
+                : isSet(object.finish_reason)
+                    ? finishReasonFromJSON(object.finish_reason)
+                    : 0,
+            stopSequence: isSet(object.stopSequence)
+                ? globalThis.String(object.stopSequence)
+                : isSet(object.stop_sequence)
+                    ? globalThis.String(object.stop_sequence)
                     : undefined,
             performance: isSet(object.performance) ? exports.PerformanceMetrics.fromJSON(object.performance) : undefined,
             executedOn: isSet(object.executedOn)
@@ -814,14 +874,8 @@ exports.LLMGenerationResult = {
         if (message.generationTimeMs !== 0) {
             obj.generationTimeMs = message.generationTimeMs;
         }
-        if (message.ttftMs !== undefined) {
-            obj.ttftMs = message.ttftMs;
-        }
         if (message.framework !== undefined) {
             obj.framework = message.framework;
-        }
-        if (message.finishReason !== "") {
-            obj.finishReason = message.finishReason;
         }
         if (message.thinkingTokens !== 0) {
             obj.thinkingTokens = Math.round(message.thinkingTokens);
@@ -831,6 +885,12 @@ exports.LLMGenerationResult = {
         }
         if (message.jsonOutput !== undefined) {
             obj.jsonOutput = message.jsonOutput;
+        }
+        if (message.finishReason !== 0) {
+            obj.finishReason = finishReasonToJSON(message.finishReason);
+        }
+        if (message.stopSequence !== undefined) {
+            obj.stopSequence = message.stopSequence;
         }
         if (message.performance !== undefined) {
             obj.performance = exports.PerformanceMetrics.toJSON(message.performance);
@@ -873,12 +933,12 @@ exports.LLMGenerationResult = {
         message.thinkingContent = object.thinkingContent ?? undefined;
         message.modelUsed = object.modelUsed ?? "";
         message.generationTimeMs = object.generationTimeMs ?? 0;
-        message.ttftMs = object.ttftMs ?? undefined;
         message.framework = object.framework ?? undefined;
-        message.finishReason = object.finishReason ?? "";
         message.thinkingTokens = object.thinkingTokens ?? 0;
         message.responseTokens = object.responseTokens ?? 0;
         message.jsonOutput = object.jsonOutput ?? undefined;
+        message.finishReason = object.finishReason ?? 0;
+        message.stopSequence = object.stopSequence ?? undefined;
         message.performance = (object.performance !== undefined && object.performance !== null)
             ? exports.PerformanceMetrics.fromPartial(object.performance)
             : undefined;

@@ -227,12 +227,10 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
     options.set_format(ctx.format);
     options.set_max_tool_calls(static_cast<int32_t>(ctx.max_tool_calls));
     options.set_keep_tools_available(ctx.keep_tools_available);
-    if (ctx.generation.max_tokens > 0) {
-        options.set_max_tokens(ctx.generation.max_tokens);
-    }
-    if (ctx.generation.temperature > 0.0f) {
-        options.set_temperature(ctx.generation.temperature);
-    }
+    // ToolCallingOptions.max_tokens/temperature were deleted outright
+    // (idl/tool_calling.proto, llm-tool-options-no-shadow) — they duplicated
+    // the enclosing LLMGenerationOptions wherever one exists; there is no
+    // field here to forward ctx.generation.{max_tokens,temperature} onto.
     if (!ctx.generation.system_prompt.empty()) {
         options.set_system_prompt(ctx.generation.system_prompt);
     }
@@ -442,7 +440,12 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     // (e.g. Swift withTaskCancellationHandler) will land on the live state.
     on_handle_published(handle, on_handle_user_data);
 
-    // Reuse ToolCallingSessionCreateRequest as the input shape.
+    // Reuse ToolCallingSessionCreateRequest as the input shape. The
+    // API-realignment pass (tools-collapse-options-and-session-request)
+    // collapsed this message to 3 fields — prompt(1), history(2),
+    // ToolCallingOptions options(3) — deleting the 14 knobs that used to be
+    // re-published here; every one of them now lives on `options` alone (or,
+    // for temperature/max_tokens, nowhere — see below).
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     if (in_size > 0 && !request.ParseFromArray(in_request_bytes, static_cast<int>(in_size))) {
         emit_failure(out_result, RAC_ERROR_DECODING_ERROR,
@@ -453,68 +456,84 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         emit_failure(out_result, RAC_ERROR_INVALID_ARGUMENT, "prompt is required");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    const runanywhere::v1::ToolCallingOptions& req_options = request.options();
 
     LoopContext ctx;
     ctx.user_prompt = request.prompt();
-    ctx.generation.max_tokens = request.max_tokens();
-    ctx.generation.temperature = request.temperature();
-    ctx.generation.top_p = request.top_p();
-    ctx.generation.system_prompt = request.system_prompt();
+    // ToolCallingOptions.temperature/max_tokens were deleted outright
+    // (idl/tool_calling.proto, llm-tool-options-no-shadow): they duplicated
+    // the enclosing LLMGenerationOptions in the two embeddings that had one,
+    // and this request has none. ctx.generation.{max_tokens,temperature}
+    // keep GenerationState's own defaults (0 / 0.0f == explicit greedy).
+    ctx.generation.top_p = req_options.top_p();
+    ctx.generation.system_prompt = req_options.system_prompt();
     // Derive the wire format from the loaded model when the caller left it
     // UNSPECIFIED — a bare JSON default garbles models whose native dialect
     // differs (e.g. LFM2). This aligns prompt + grammar + parser (#607 shipped
     // without per-model derivation).
     ctx.format = rac::llm::tool_calling::resolve_tool_call_format_for_model(
-        request.format(), rac::llm::lifecycle_llm_model_id());
+        req_options.format(), rac::llm::lifecycle_llm_model_id());
     // Probe grammar capability once up front (cheap acquire/release) so the prompt can
     // be built in the bare-Pythonic format the QHexRT grammar enforces. Non-grammar
     // engines keep the caller's declared format — a strict no-op for them (RUN-80).
     ctx.grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     ctx.max_tool_calls =
-        request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
-    ctx.auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
-    ctx.replace_system_prompt = request.replace_system_prompt();
-    ctx.require_json_arguments = request.require_json_arguments();
-    ctx.keep_tools_available = request.keep_tools_available();
-    ctx.generation.disable_thinking = request.disable_thinking();
-    // Prior conversation turns (tool_calling.proto field 19). Threaded onto the
-    // generation snapshot so EVERY generate in the loop inherits it — the initial
-    // tool-decision generate (generation_for_tool_step copies base) and the
-    // follow-up generate (followup_ctx = ctx copies it). request.history already
-    // EXCLUDES the current turn (which travels as prompt) and is pre-alternated
-    // [user,asst,...], so we forward it as-is and do NOT pop a trailing turn —
-    // unlike llm_module's normalizer, whose history includes the current turn.
-    ctx.generation.history.assign(request.history().begin(), request.history().end());
+        req_options.max_tool_calls() == 0 ? kDefaultMaxToolCalls : req_options.max_tool_calls();
+    ctx.auto_execute = req_options.has_auto_execute() ? req_options.auto_execute() : true;
+    ctx.replace_system_prompt = req_options.replace_system_prompt();
+    ctx.require_json_arguments = req_options.require_json_arguments();
+    ctx.keep_tools_available = req_options.keep_tools_available();
+    ctx.generation.disable_thinking = req_options.disable_thinking();
+    // Prior conversation turns. ToolCallingSessionCreateRequest.history is now
+    // `repeated ToolCallingHistoryTurn` (role + content) instead of
+    // `repeated string` (idl/tool_calling.proto, tools-typed-history) — flatten
+    // USER/ASSISTANT turns into the role-less alternating string list
+    // GenerationState still carries; SYSTEM turns (if any slipped through)
+    // are dropped here since options.system_prompt is the system-prompt
+    // channel. Threaded onto the generation snapshot so EVERY generate in the
+    // loop inherits it — the initial tool-decision generate
+    // (generation_for_tool_step copies base) and the follow-up generate
+    // (followup_ctx = ctx copies it). request.history already EXCLUDES the
+    // current turn (which travels as prompt).
+    ctx.generation.history.clear();
+    ctx.generation.history.reserve(static_cast<size_t>(request.history_size()));
+    for (const auto& turn : request.history()) {
+        if (turn.role() == runanywhere::v1::TOOL_CALLING_ROLE_USER ||
+            turn.role() == runanywhere::v1::TOOL_CALLING_ROLE_ASSISTANT) {
+            ctx.generation.history.push_back(turn.content());
+        }
+    }
     // Positional-parity safety net. The history slot is role-less and positional
-    // [user0, asst0, user1, ...], so the CALLER owns full normalization — drop
-    // leading-assistant, coalesce consecutive same-role, exclude the current turn —
-    // exactly as the standard path's commons normalizer (llm_module.cpp) does for a
-    // role-tagged ChatMessage list (the Android app mirrors it in
-    // ChatRequestPolicy.toToolCallingHistory). This guard only corrects an ODD count
-    // (a dangling trailing turn); it deliberately does NOT coalesce interior same-role
-    // runs, which role-less strings cannot detect — that must happen upstream.
+    // [user0, asst0, user1, ...] once flattened, so this guard only corrects an
+    // ODD count (a dangling trailing turn) exactly as the standard path's
+    // commons normalizer (llm_module.cpp) does for a role-tagged ChatMessage
+    // list (the Android app mirrors it in ChatRequestPolicy.toToolCallingHistory).
+    // It deliberately does NOT coalesce interior same-role runs, which
+    // role-less strings cannot detect — that must happen upstream.
     if (ctx.generation.history.size() % 2 != 0) {
         ctx.generation.history.pop_back();
     }
-    // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
-    // The field is `optional bool` so we can preserve the documented default
-    // (validate=true) when the caller did not set it, while still letting hosts
-    // that delegate validation/authorization to their executor opt out by
-    // explicitly setting validate_calls=false.
-    ctx.validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
+    // Honor ToolCallingOptions.validate_calls (idl/tool_calling.proto, moved
+    // here from ToolCallingSessionCreateRequest by
+    // tools-collapse-options-and-session-request). The field is `optional
+    // bool` so we can preserve the documented default (validate=true) when
+    // the caller did not set it, while still letting hosts that delegate
+    // validation/authorization to their executor opt out by explicitly
+    // setting validate_calls=false.
+    ctx.validate_calls = req_options.has_validate_calls() ? req_options.validate_calls() : true;
     // pick up the request-level OpenAI-style tool_choice and
-    // forced_tool_name knobs (idl/tool_calling.proto fields 7/8) — these are
-    // copied onto every ToolCallingOptions snapshot the loop synthesizes for
-    // format/validate proto calls.
-    if (request.has_tool_choice()) {
+    // forced_tool_name knobs (now on ToolCallingOptions fields 13/14) — these
+    // are copied onto every ToolCallingOptions snapshot the loop synthesizes
+    // for format/validate proto calls.
+    if (req_options.tool_choice() != runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED) {
         ctx.has_tool_choice = true;
-        ctx.tool_choice = request.tool_choice();
+        ctx.tool_choice = req_options.tool_choice();
     }
-    if (request.has_forced_tool_name()) {
-        ctx.forced_tool_name = request.forced_tool_name();
+    if (req_options.has_forced_tool_name()) {
+        ctx.forced_tool_name = req_options.forced_tool_name();
     }
-    ctx.parallel_tool_calls = request.parallel_tool_calls();
-    for (const auto& tool : request.tools()) {
+    ctx.parallel_tool_calls = req_options.parallel_tool_calls();
+    for (const auto& tool : req_options.tools()) {
         *ctx.tool_options.add_tools() = tool;
     }
     std::string tool_choice_error;
@@ -703,7 +722,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                 failed.set_tool_call_id(parsed_call.id());
                 failed.set_name(parsed_call.name());
                 failed.set_error(policy_error);
-                failed.set_success(false);
+                failed.set_is_error(true);
                 failed.set_started_at_ms(now_ms());
                 failed.set_completed_at_ms(now_ms());
                 *final_result.add_tool_calls() = parsed_call;
@@ -729,7 +748,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                     failed.set_tool_call_id(parsed_call.id());
                     failed.set_name(parsed_call.name());
                     failed.set_error(msg);
-                    failed.set_success(false);
+                    failed.set_is_error(true);
                     failed.set_started_at_ms(now_ms());
                     failed.set_completed_at_ms(now_ms());
                     *final_result.add_tool_calls() = parsed_call;
@@ -803,7 +822,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                                                             : "tool executor returned an error";
                 }
                 tool_result.Clear();
-                tool_result.set_success(false);
+                tool_result.set_is_error(true);
                 tool_result.set_error(executor_error);
             }
             tool_result.set_tool_call_id(parsed_call.id());

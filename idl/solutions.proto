@@ -27,13 +27,14 @@ message SolutionConfig {
     }
 }
 
-// Lets frontends switch on one enum instead of inspecting the oneof.
+// Frontends switch on the SolutionConfig oneof case. This enum exists only
+// for logs and handles, and its numbers now match the oneof tags.
 enum SolutionType {
     SOLUTION_TYPE_UNSPECIFIED = 0;
-    SOLUTION_TYPE_VOICE_AGENT = 1;
-    SOLUTION_TYPE_RAG         = 2;
-    SOLUTION_TYPE_TIME_SERIES = 4;
-    SOLUTION_TYPE_AGENT_LOOP  = 5;
+    SOLUTION_TYPE_VOICE_AGENT = 1;   // SolutionConfig.voice_agent = 1
+    SOLUTION_TYPE_RAG         = 2;   // SolutionConfig.rag         = 2
+    SOLUTION_TYPE_AGENT_LOOP  = 4;   // SolutionConfig.agent_loop  = 4
+    SOLUTION_TYPE_TIME_SERIES = 5;   // SolutionConfig.time_series = 5
 }
 
 message SolutionHandle {
@@ -50,26 +51,24 @@ message VoiceAgentConfig {
     string stt_model_id = 2;
     string tts_model_id = 3;
     string vad_model_id = 4;
-    string tts_voice_id = 17;
+    string tts_voice_id = 5;
 
-    int32  sample_rate_hz = 5;
-    int32  chunk_ms       = 6;
+    int32  sample_rate_hz = 6;
+    int32  chunk_ms       = 7;
 
     // audio_file_path applies when audio_source is FILE.
-    AudioSource audio_source = 7;
-    string audio_file_path = 15;
+    AudioSource audio_source = 8;
+    string audio_file_path = 9;
 
     // Unset means enabled.
-    optional bool enable_barge_in = 8;
-    int32  barge_in_threshold_ms = 9;
+    optional bool enable_barge_in = 10;
+    int32  barge_in_threshold_ms = 11;
 
-    optional LLMGenerationOptions generation = 18;
-    int32  max_context_tokens = 11;
+    optional LLMGenerationOptions generation = 12;
+    int32  max_context_tokens = 13;
 
     // Emit partial transcripts as non-final user-said events.
-    bool   emit_partials = 13;
-
-    optional SolutionType type_kind = 16;
+    bool   emit_partials = 14;
 }
 
 enum AudioSource {
@@ -99,7 +98,6 @@ message RAGConfig {
     int32  rrf_k   = 10;
 
     string prompt_template = 11;
-    optional SolutionType type_kind = 12;
 }
 
 enum VectorStore {
@@ -114,7 +112,6 @@ message AgentLoopConfig {
     repeated ToolSpec tools = 3;
     int32  max_iterations = 4;
     int32  max_context_tokens = 5;
-    optional SolutionType type_kind = 6;
 }
 
 message ToolSpec {
@@ -134,5 +131,4 @@ message TimeSeriesConfig {
     int32  stride           = 4;
 
     float  anomaly_threshold = 5;
-    optional SolutionType type_kind = 6;
 }

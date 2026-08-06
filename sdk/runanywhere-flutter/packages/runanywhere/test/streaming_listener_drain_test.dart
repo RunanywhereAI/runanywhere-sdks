@@ -63,11 +63,13 @@ void main() {
       final subscription =
           fake.stream.listen(received.add, onDone: completer.complete);
 
+      // `STTPartialResult.segmentIndex` was deleted outright
+      // (idl/stt_options.proto — the message trimmed to `text`/`isFinal`/
+      // `language`); ordering is asserted via `text` instead.
       for (var i = 0; i < 10; i++) {
         fake.dispatch(STTPartialResult(
           text: 'partial-$i',
           isFinal: i == 9,
-          segmentIndex: i,
         ));
       }
       await fake.close();
@@ -77,7 +79,6 @@ void main() {
       expect(received, hasLength(10));
       for (var i = 0; i < 10; i++) {
         expect(received[i].text, equals('partial-$i'));
-        expect(received[i].segmentIndex, equals(i));
       }
       expect(received.last.isFinal, isTrue);
     });
@@ -97,7 +98,7 @@ void main() {
       });
 
       for (var i = 0; i < 5; i++) {
-        fake.dispatch(STTPartialResult(text: 'p$i', segmentIndex: i));
+        fake.dispatch(STTPartialResult(text: 'p$i'));
         await Future<void>.delayed(Duration.zero);
       }
 
@@ -115,7 +116,7 @@ void main() {
       // simulate that here and verify post-close dispatches are dropped by
       // the listener's `isClosed` short-circuit.
       await fake.close();
-      fake.dispatch(STTPartialResult(text: 'post-close', segmentIndex: 99));
+      fake.dispatch(STTPartialResult(text: 'post-close'));
       expect(received, hasLength(2),
           reason: 'closed-controller guard in the listener must drop '
               'late-arriving events');
@@ -384,11 +385,15 @@ void main() {
   // -------------------------------------------------------------------------
   group('streaming listener drain — processImageStream (VLMStreamEvent)', () {
     test('queue-N drain delivers 10 listener events in order with '
-        'auto-close on isFinal', () async {
-      // Mirrors the VLM bridge: `event.isFinal` triggers controller.close().
+        'auto-close on kind == COMPLETED', () async {
+      // `VLMStreamEvent.isFinal` was deleted outright (idl/vlm_options.
+      // proto); terminal-ness is now `kind == COMPLETED || kind == ERROR`.
+      // Mirrors the VLM bridge's kind-based auto-close.
       final fake = FakeNativeListenerStream<VLMStreamEvent>(
         autoCloseOnFinal: true,
-        isFinal: (event) => event.isFinal,
+        isFinal: (event) =>
+            event.kind == VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED ||
+            event.kind == VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR,
       );
       final received = <VLMStreamEvent>[];
       final completer = Completer<void>();
@@ -399,7 +404,6 @@ void main() {
         fake.dispatch(VLMStreamEvent(
           tokenIndex: i,
           token: 'tok-$i',
-          isFinal: i == 9,
           kind: i == 9
               ? VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED
               : VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN,
@@ -413,10 +417,10 @@ void main() {
         expect(received[i].tokenIndex, equals(i));
         expect(received[i].token, equals('tok-$i'));
       }
-      expect(received.last.isFinal, isTrue);
+      expect(received.last.kind, VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED);
       expect(fake.isClosed, isTrue,
-          reason: 'isFinal=true must auto-close the controller, matching '
-              'processImageStreamProto');
+          reason: 'kind == COMPLETED must auto-close the controller, '
+              'matching processImageStreamProto');
     });
 
     test('drain-while-cancellation halts after subscription cancel', () async {

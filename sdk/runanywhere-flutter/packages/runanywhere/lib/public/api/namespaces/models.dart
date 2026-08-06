@@ -5,12 +5,12 @@
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/download_service.pb.dart'
-    show DownloadStage, DownloadState;
+    show DownloadState;
 import 'package:runanywhere/generated/lora_options.pb.dart'
     show
-        LoRAAdapterConfig,
-        LoRAApplyRequest,
-        LoRARemoveRequest,
+        LoraAdapterConfig,
+        LoraApplyRequest,
+        LoraRemoveRequest,
         LoraAdapterCatalogEntry,
         LoraAdapterCatalogGetRequest,
         LoraAdapterCatalogQuery;
@@ -164,12 +164,15 @@ class ModelsApi {
           yield DownloadCompleted(operationId, model, sequence: sequence++);
           return;
         default:
-          if (progress.stage == DownloadStage.DOWNLOAD_STAGE_VALIDATING) {
+          // `DownloadStage` was deleted outright (idl/download_service.proto)
+          // — it duplicated `DownloadState`; `state` is the single phase
+          // field now.
+          if (progress.state == DownloadState.DOWNLOAD_STATE_VALIDATING) {
             if (!verifying) {
               verifying = true;
               yield DownloadVerifying(operationId, sequence: sequence++);
             }
-          } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
+          } else if (progress.state == DownloadState.DOWNLOAD_STATE_EXTRACTING) {
             if (!extracting) {
               extracting = true;
               yield DownloadExtracting(
@@ -284,9 +287,7 @@ class ModelsApi {
         );
       }
     }
-    final hasArtifacts = model.hasIsDownloaded()
-        ? model.isDownloaded
-        : model.localPath.isNotEmpty;
+    final hasArtifacts = model.localPath.isNotEmpty;
     if (hasArtifacts) {
       throw SDKException.invalidState(
         "Model '$id' still has local artifacts. Call models.delete('$id') before unregister.",
@@ -365,9 +366,9 @@ class LoraApi {
       );
     }
     final result = await RunAnywhereLoRACapability.shared.apply(
-      LoRAApplyRequest(
+      LoraApplyRequest(
         adapters: [
-          LoRAAdapterConfig(
+          LoraAdapterConfig(
             adapterPath: path,
             adapterId: adapterId,
             scale:
@@ -377,6 +378,10 @@ class LoraApi {
                     : 1.0),
           ),
         ],
+        // Stack on top of the currently-applied set (old default behavior,
+        // preserved through the replace_existing -> keep_existing polarity
+        // inversion: old default `replace_existing=false` meant "stack").
+        keepExisting: true,
       ),
     );
     if (result.hasError()) {
@@ -398,7 +403,7 @@ class LoraApi {
       throw SDKException.notInitialized();
     }
     final state = await RunAnywhereLoRACapability.shared.remove(
-      LoRARemoveRequest(adapterIds: [adapterId]),
+      LoraRemoveRequest(adapterIds: [adapterId]),
     );
     if (state.hasError()) {
       throw SDKException.invalidState(state.error.message);
@@ -413,7 +418,7 @@ class LoraApi {
       throw SDKException.notInitialized();
     }
     final state = await RunAnywhereLoRACapability.shared.remove(
-      LoRARemoveRequest(clearAll: true),
+      LoraRemoveRequest(clearAll: true),
     );
     if (state.hasError()) {
       throw SDKException.invalidState(state.error.message);
@@ -436,11 +441,21 @@ class LoraApi {
   // has no field for, so the catalog verbs stay public until the spec covers
   // them.
 
-  /// Add [adapter] to the LoRA catalog and register its downloadable artifact.
+  /// Add [adapter] to the LoRA catalog and register its downloadable
+  /// [artifact].
+  ///
+  /// `LoraAdapterCatalogEntry` no longer carries url/filename/size/checksum
+  /// metadata (idl/lora_options.proto: "everything generic about the
+  /// artifact ... lives on the ModelInfo record for this adapter"), so the
+  /// caller supplies the [artifact] describing where/how to fetch the
+  /// adapter bytes.
   ///
   /// Throws [SDKException] when registration fails.
-  Future<void> register(LoraAdapterCatalogEntry adapter) async {
-    await RunAnywhereLoRACapability.shared.registerArtifact(adapter);
+  Future<void> register(
+    LoraAdapterCatalogEntry adapter,
+    ModelInfo artifact,
+  ) async {
+    await RunAnywhereLoRACapability.shared.registerArtifact(adapter, artifact);
   }
 
   /// Catalogued adapters, optionally narrowed to those compatible with
@@ -458,14 +473,17 @@ class LoraApi {
     return List<LoraAdapterCatalogEntry>.unmodifiable(result.entries);
   }
 
-  /// Fetch [adapter]'s weights and return their local path.
+  /// Fetch [adapter]'s weights (described by [artifact]) and return their
+  /// local path.
   ///
   /// Throws [SDKException] when the transfer fails.
   Future<String> download(
-    LoraAdapterCatalogEntry adapter, {
+    LoraAdapterCatalogEntry adapter,
+    ModelInfo artifact, {
     void Function(double progress)? onProgress,
   }) => RunAnywhereLoRACapability.shared.download(
     adapter,
+    artifact,
     onProgress: onProgress,
   );
 }

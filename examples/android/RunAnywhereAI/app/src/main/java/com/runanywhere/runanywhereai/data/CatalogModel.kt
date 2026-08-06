@@ -133,7 +133,9 @@ internal data class MultiFileModel(
             ModelFileDescriptor(
                 url = file.url,
                 filename = file.filename,
-                is_required = true,
+                // Wire polarity: is_required -> is_optional (inverted). All
+                // catalog files here are required, so is_optional = false.
+                is_optional = false,
                 size_bytes = file.sizeBytes,
                 checksum_sha256 = file.checksumSha256,
                 role = if (idx == 0) {

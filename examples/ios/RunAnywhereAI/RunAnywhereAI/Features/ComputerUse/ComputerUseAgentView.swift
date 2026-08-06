@@ -239,7 +239,9 @@ struct ComputerUseAgentView: View {
                         row("Coordinate", "(\(point.x), \(point.y)) px")
                     }
                     if !action.text.isEmpty { row("Text", action.text) }
-                    if action.scrollPixels != 0 { row("Scroll", "\(action.scrollPixels)") }
+                    if action.scrollX != 0 || action.scrollY != 0 {
+                        row("Scroll", "(\(action.scrollX), \(action.scrollY)) px")
+                    }
                     if action.waitSeconds != 0 { row("Wait", "\(action.waitSeconds)s") }
                     if !action.reasoning.isEmpty {
                         Text(action.reasoning)

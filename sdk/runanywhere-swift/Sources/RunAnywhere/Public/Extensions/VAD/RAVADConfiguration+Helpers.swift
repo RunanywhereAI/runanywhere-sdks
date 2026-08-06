@@ -32,7 +32,12 @@ extension RASpeechActivityEvent {
         Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
     }
 
-    public var duration: TimeInterval { TimeInterval(durationMs) / 1000.0 }
+    // durationMs was deleted outright (idl/vad_options.proto); derive it
+    // from audioStartMs/audioEndMs instead (0 on a STARTED event, whose
+    // audioEndMs is always 0).
+    public var duration: TimeInterval {
+        TimeInterval(max(0, audioEndMs - audioStartMs)) / 1000.0
+    }
 }
 
 // MARK: - RASpeechActivityKind

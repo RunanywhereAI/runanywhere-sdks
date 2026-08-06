@@ -39,7 +39,7 @@ final class LLMViewModel {
 
     // MARK: - LoRA Adapter State
 
-    private(set) var loraAdapters: [RALoRAAdapterInfo] = []
+    private(set) var loraAdapters: [RALoraAdapterInfo] = []
     private(set) var isLoadingLoRA = false
 
     // MARK: - LoRA Adapter Catalog State
@@ -535,10 +535,10 @@ final class LLMViewModel {
         isLoadingLoRA = true
         error = nil
         do {
-            var config = RALoRAAdapterConfig()
+            var config = RALoraAdapterConfig()
             config.adapterPath = path
             config.scale = scale
-            var request = RALoRAApplyRequest()
+            var request = RALoraApplyRequest()
             request.adapters = [config]
             let result = try await RunAnywhere.lora.apply(request)
             guard !result.hasError else {
@@ -578,10 +578,25 @@ final class LLMViewModel {
         isLoadingLoRA = false
     }
 
+    /// `RALoraRemoveRequest.adapterPaths` was deleted outright
+    /// (idl/lora_options.proto): removal is by catalog adapter id, or
+    /// `clearAll_p`, only now. A loose adapter applied straight from a file
+    /// path (no catalog id) can only be removed individually when it is the
+    /// sole loaded adapter, via `clearAll_p` -- the SDK no longer exposes a
+    /// path-keyed removal for that case when other adapters are also loaded.
     func removeLoraAdapter(path: String) async {
         do {
-            var request = RALoRARemoveRequest()
-            request.adapterPaths = [path]
+            let target = loraAdapters.first { $0.adapterPath == path }
+            var request = RALoraRemoveRequest()
+            if let adapterID = target?.adapterID, !adapterID.isEmpty {
+                request.adapterIds = [adapterID]
+            } else if loraAdapters.count <= 1 {
+                request.clearAll_p = true
+            } else {
+                throw LLMError.custom(
+                    "Can't remove this adapter individually: it has no catalog id and other adapters are also loaded."
+                )
+            }
             let state = try await RunAnywhere.lora.remove(request)
             try handleLoraState(state)
         } catch {
@@ -592,7 +607,7 @@ final class LLMViewModel {
 
     func clearLoraAdapters() async {
         do {
-            var request = RALoRARemoveRequest()
+            var request = RALoraRemoveRequest()
             request.clearAll_p = true
             let state = try await RunAnywhere.lora.remove(request)
             try handleLoraState(state)
@@ -614,7 +629,7 @@ final class LLMViewModel {
         }
     }
 
-    private func handleLoraState(_ state: RALoRAState) throws {
+    private func handleLoraState(_ state: RALoraState) throws {
         if state.hasError, !state.error.message.isEmpty {
             throw LLMError.custom(state.error.message)
         }
@@ -651,7 +666,10 @@ final class LLMViewModel {
     }
 
     func localPath(for adapter: RALoraAdapterCatalogEntry) -> String? {
-        guard adapter.isDownloaded, adapter.hasLocalPath, !adapter.localPath.isEmpty else {
+        // `RALoraAdapterCatalogEntry.isDownloaded` was deleted outright
+        // (idl/lora_options.proto); a non-empty `localPath` is the single
+        // definition of "downloaded" now.
+        guard adapter.hasLocalPath, !adapter.localPath.isEmpty else {
             return nil
         }
         return FileManager.default.fileExists(atPath: adapter.localPath) ? adapter.localPath : nil
@@ -680,20 +698,23 @@ final class LLMViewModel {
 
     /// Imports a user-selected LoRA file through the SDK (sandbox access,
     /// on-disk placement, and catalog completion are SDK-owned), then applies it.
+    ///
+    /// `importAdapter(from:)` no longer auto-matches the import against an
+    /// existing catalog entry (idl/lora_options.proto,
+    /// lora-delete-download-import-bookkeeping): it returns a plain
+    /// `RAModelImportResult`, not a catalog-entry match. A caller that knows
+    /// which catalog adapter this file corresponds to would call
+    /// `register(_:)`/`registerArtifact(_:)` itself; a user-picked file from
+    /// the document picker has no such known catalog id, so it is always
+    /// applied as a loose adapter path.
     func importAndLoadLoraAdapter(url: URL, scale: Float) async {
         isLoadingLoRA = true
         error = nil
 
         do {
             let imported = try await RunAnywhere.lora.importAdapter(from: url)
-            if imported.matched, imported.hasEntry {
-                updateAvailableAdapter(imported.entry)
-                isLoadingLoRA = false
-                await loadCatalogLoraAdapter(imported.entry, localPath: imported.localPath, scale: scale)
-            } else {
-                isLoadingLoRA = false
-                await loadLoraAdapter(path: imported.localPath, scale: scale)
-            }
+            isLoadingLoRA = false
+            await loadLoraAdapter(path: imported.localPath, scale: scale)
         } catch {
             logger.error("Failed to import LoRA adapter: \(error)")
             self.error = error
@@ -707,7 +728,6 @@ final class LLMViewModel {
         if let localPath = localPath(for: adapter) {
             var entry = adapter
             entry.localPath = localPath
-            entry.isDownloaded = true
             return entry
         }
 
@@ -715,13 +735,21 @@ final class LLMViewModel {
             throw LLMError.custom("LoRA catalog adapter id is required")
         }
 
+        // `RALoraAdapterCatalogEntry` no longer carries url/filename/size
+        // (idl/lora_options.proto), so the downloadable bytes are described
+        // by the companion `RAModelInfo` artifact registered at bootstrap
+        // time under the SDK's `lora-adapter:{id}` convention
+        // (`ModelCatalogBootstrap.registerLoraAdapters()`).
+        guard let artifact = await RunAnywhere.models.get(id: adapter.loraArtifactModelID) else {
+            throw LLMError.custom("LoRA adapter '\(adapter.id)' has no registered download artifact")
+        }
+
         // One SDK call owns everything: artifact registration, transfer with
         // resume/checksum/progress, on-disk placement, and catalog completion.
-        let localPath = try await RunAnywhere.lora.download(adapter)
+        let localPath = try await RunAnywhere.lora.download(adapter, artifact: artifact)
 
         var entry = adapter
         entry.localPath = localPath
-        entry.isDownloaded = true
         return entry
     }
 

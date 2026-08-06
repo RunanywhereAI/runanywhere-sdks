@@ -290,13 +290,14 @@ class RunAnywhereSTT {
     final sourceEncoding =
         encoding ?? AudioEncoding.AUDIO_ENCODING_CONTAINER;
 
+    // `bits_per_sample` was deleted outright (idl/stt_options.proto) — it is
+    // implied by `encoding` now, so it is no longer set here.
     final request = STTTranscriptionRequest(
       audio: STTAudioSource(
         audioData: audio,
         encoding: sourceEncoding,
         sampleRate: RADefaultsAudioCapture.micSampleRateHz,
         channels: 1,
-        bitsPerSample: _bitsPerSample(sourceEncoding),
       ),
       options: opts,
       metadata: <String, String>{'model_id': modelId}.entries,
@@ -339,19 +340,6 @@ class RunAnywhereSTT {
     return opts;
   }
 
-  int _bitsPerSample(AudioEncoding encoding) {
-    switch (encoding) {
-      case AudioEncoding.AUDIO_ENCODING_PCM_F32_LE:
-        return 32;
-      case AudioEncoding.AUDIO_ENCODING_PCM_S16_LE:
-        return 16;
-      case AudioEncoding.AUDIO_ENCODING_UNSPECIFIED:
-      case AudioEncoding.AUDIO_ENCODING_CONTAINER:
-        return 0;
-      default:
-        return 0;
-    }
-  }
 
   ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
       RunAnywhereModelLifecycle.shared.componentSnapshot(

@@ -122,10 +122,12 @@ void erase_session(uint64_t session_id) {
 
 #if defined(RAC_HAVE_PROTOBUF)
 namespace rac::tts {
+// TTSStreamEvent was cut to timestamp_us/request_id/kind/output/error only --
+// phoneme/speak_result/progress/chunk_index/total_chunks/elapsed_ms/
+// status_message were all deleted, so this dispatcher no longer threads them
+// through.
 void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEventKind kind,
                                const runanywhere::v1::TTSOutput* output,
-                               const runanywhere::v1::TTSPhonemeTimestamp* phoneme,
-                               const runanywhere::v1::TTSSpeakResult* speak_result,
                                const char* error_message, int error_code, uint64_t session_id = 0);
 }  // namespace rac::tts
 #endif
@@ -184,8 +186,7 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
                                static_cast<int>(request_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
-    const bool use_ssml = parsed.has_ssml() && !parsed.ssml().empty();
-    if (parsed.text().empty() && !use_ssml) {
+    if (parsed.text().empty()) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -197,9 +198,6 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
     }
     if (parsed.has_options() && parsed.options().sample_rate() > 0) {
         options.sample_rate = parsed.options().sample_rate();
-    }
-    if (use_ssml) {
-        options.use_ssml = RAC_TRUE;
     }
 
     const uint64_t session_id = g_session_ids.next();
@@ -215,7 +213,7 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
     }
     *out_session_id = session_id;
 
-    const std::string& text = use_ssml ? parsed.ssml() : parsed.text();
+    const std::string& text = parsed.text();
     const char* voice_id = options.voice ? options.voice : rac_tts_component_get_voice_id(handle);
     struct StreamContext {
         rac_handle_t handle;
@@ -237,7 +235,7 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
               .chunk_index = 0};
 
     rac::tts::dispatch_tts_stream_event(handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_STARTED,
-                                        nullptr, nullptr, nullptr, nullptr, 0, session_id);
+                                        nullptr, nullptr, 0, session_id);
 
     auto bridge = [](const void* audio_data, size_t audio_size, void* opaque) {
         auto* ctx = static_cast<StreamContext*>(opaque);
@@ -251,15 +249,14 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
         output.set_audio_format(proto_audio_format(ctx->audio_format));
         output.set_sample_rate(ctx->sample_rate);
         output.set_timestamp_ms(now_us() / 1000);
-        output.set_audio_size_bytes(static_cast<int64_t>(audio_size));
         output.set_chunk_index(ctx->chunk_index++);
         auto* metadata = output.mutable_metadata();
         metadata->set_voice_id(ctx->voice_id);
         metadata->set_language_code(ctx->language_code);
-        metadata->set_character_count(ctx->character_count);
+        metadata->set_input_bytes(ctx->character_count);
         rac::tts::dispatch_tts_stream_event(ctx->handle,
                                             runanywhere::v1::TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
-                                            &output, nullptr, nullptr, nullptr, 0, ctx->session_id);
+                                            &output, nullptr, 0, ctx->session_id);
     };
 
     rac_result_t rc =
@@ -269,11 +266,10 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
         if (rc == RAC_SUCCESS) {
             rac::tts::dispatch_tts_stream_event(handle,
                                                 runanywhere::v1::TTS_STREAM_EVENT_KIND_COMPLETED,
-                                                nullptr, nullptr, nullptr, nullptr, 0, session_id);
+                                                nullptr, nullptr, 0, session_id);
         } else {
-            rac::tts::dispatch_tts_stream_event(
-                handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_ERROR, nullptr, nullptr, nullptr,
-                rac_error_message(rc), rc, session_id);
+            rac::tts::dispatch_tts_stream_event(handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_ERROR,
+                                                nullptr, rac_error_message(rc), rc, session_id);
         }
     }
     erase_session(session_id);
@@ -312,8 +308,6 @@ namespace rac::tts {
 
 void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEventKind kind,
                                const runanywhere::v1::TTSOutput* output,
-                               const runanywhere::v1::TTSPhonemeTimestamp* phoneme,
-                               const runanywhere::v1::TTSSpeakResult* speak_result,
                                const char* error_message, int error_code, uint64_t session_id) {
     rac::stream::InFlightGuard guard(g_in_flight);
     CallbackSlot slot;
@@ -354,12 +348,6 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
     proto_event.set_kind(kind);
     if (output) {
         *proto_event.mutable_output() = *output;
-    }
-    if (phoneme) {
-        *proto_event.mutable_phoneme() = *phoneme;
-    }
-    if (speak_result) {
-        *proto_event.mutable_speak_result() = *speak_result;
     }
     if (error_code != 0 || (error_message && error_message[0] != '\0')) {
         rac::foundation::populate_sdk_error(

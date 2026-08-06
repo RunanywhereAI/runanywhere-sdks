@@ -13,16 +13,31 @@ export declare enum DiarizationStreamEventKind {
 export declare function diarizationStreamEventKindFromJSON(object: any): DiarizationStreamEventKind;
 export declare function diarizationStreamEventKindToJSON(object: DiarizationStreamEventKind): string;
 export interface DiarizationOptions {
+    /**
+     * Only 16 kHz is accepted: the engine does not resample, and any other
+     * rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
+     */
     sampleRate?: number | undefined;
     channels?: number | undefined;
     /**
-     * Commons normalizes either PCM representation to float samples before
-     * dispatching to an engine.
+     * Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+     * AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+     * float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+     * and AUDIO_ENCODING_UNSPECIFIED are rejected with
+     * RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
      */
     encoding?: AudioEncoding | undefined;
     threshold?: number | undefined;
     minimumDurationMs: number;
     mergeGapMs: number;
+    /**
+     * Speaker-count hint: an upper bound, not an exact count. Unset =
+     * auto-detect. An engine that detects more than max_speakers speakers
+     * ranks them by total active duration, drops the weakest, and re-densifies
+     * the speaker indices. Values above the loaded model's speaker capacity
+     * are clamped.
+     */
+    maxSpeakers?: number | undefined;
 }
 export interface DiarizationRequest {
     audioData: Uint8Array;

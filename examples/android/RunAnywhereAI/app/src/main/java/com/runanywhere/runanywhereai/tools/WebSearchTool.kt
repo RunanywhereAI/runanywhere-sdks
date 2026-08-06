@@ -1,7 +1,5 @@
 package com.runanywhere.runanywhereai.tools
 
-import ai.runanywhere.proto.v1.ToolParameter
-import ai.runanywhere.proto.v1.ToolParameterType
 import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.data.settings.WebSearchConsentPolicy
@@ -9,10 +7,12 @@ import com.runanywhere.runanywhereai.data.settings.WebSearchConsentState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
+import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
+import com.runanywhere.sdk.public.extensions.LLM.ToolParameter
+import com.runanywhere.sdk.public.extensions.LLM.ToolParameterType
 import com.runanywhere.sdk.public.extensions.LLM.array
 import com.runanywhere.sdk.public.extensions.LLM.`object`
 import com.runanywhere.sdk.public.extensions.LLM.string
-import com.runanywhere.sdk.public.types.RAToolDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -62,19 +62,27 @@ internal object WebSearchTool {
         .followSslRedirects(false)
         .build()
 
-    val definition = RAToolDefinition(
-        name = "search_web",
-        description = "Searches the web for current information and returns source links.",
-        parameters = listOf(
-            ToolParameter(
-                name = "query",
-                type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-                description = "A concise web search query.",
-                required = true,
+    // Lazy: the Kotlin-side ToolDefinition(...) builder serializes `parameters`
+    // into a JSON-Schema string via the native rac_tool_value_to_json_proto
+    // JNI thunk (idl/tool_calling.proto's ToolParameter/ToolParameterType were
+    // deleted outright). An eager top-level val would run that native call at
+    // WebSearchTool's class-init time, before the native library is loaded --
+    // e.g. under plain JVM unit tests that never touch this property.
+    val definition: ToolDefinition by lazy {
+        ToolDefinition(
+            name = "search_web",
+            description = "Searches the web for current information and returns source links.",
+            parameters = listOf(
+                ToolParameter(
+                    name = "query",
+                    type = ToolParameterType.STRING,
+                    description = "A concise web search query.",
+                    required = true,
+                ),
             ),
-        ),
-        category = "Web",
-    )
+            category = "Web",
+        )
+    }
 
     suspend fun execute(args: Map<String, RAToolValue>): Map<String, RAToolValue> {
         val settings = SettingsRepository.settings

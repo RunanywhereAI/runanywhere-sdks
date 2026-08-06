@@ -158,7 +158,10 @@ export async function deleteModel(
   return deleteStorage(
     StorageDeleteRequest.fromPartial({
       modelIds: [modelId],
-      deleteFiles: true,
+      // `deleteFiles` was renamed `keepFilesOnDisk`, with INVERTED polarity:
+      // files are deleted by default now ("set this only to opt OUT"), so
+      // the old `deleteFiles: true` is simply omitting this field (its
+      // proto3 zero value, false, is the "delete" behavior).
       clearRegistryPaths: true,
       unloadIfLoaded: true,
       allowPlatformDelete: true,

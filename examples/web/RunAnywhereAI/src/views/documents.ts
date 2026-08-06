@@ -153,8 +153,9 @@ function refreshModelButtons(): void {
   for (const [kind, modelId] of pairs) {
     const btn = container.querySelector<HTMLButtonElement>(`#docs-${kind}-download-btn`);
     if (!btn) continue;
-    const model = modelId ? RunAnywhere.models.get(modelId) : null;
-    const downloaded = !!(model?.isDownloaded || model?.localPath);
+    const downloaded = modelId
+      ? RunAnywhere.models.list({ downloadedOnly: true }).some((model) => model.id === modelId)
+      : false;
     btn.disabled = isBusy || !modelId || downloaded;
     btn.textContent = downloaded ? 'Downloaded' : 'Download';
   }
@@ -179,7 +180,8 @@ async function downloadSelectedModel(
   try {
     for await (const event of RunAnywhere.models.download(modelId)) {
       if (event.type === 'progress') {
-        setModelStatus(`Downloading ${label} model… ${Math.round(event.percent)}%`);
+        const percent = event.bytesTotal > 0 ? (event.bytesDone / event.bytesTotal) * 100 : 0;
+        setModelStatus(`Downloading ${label} model… ${Math.round(percent)}%`);
       } else if (event.type === 'extracting') {
         setModelStatus(`Extracting ${label} model…`);
       }
@@ -339,9 +341,11 @@ async function askQuestion(): Promise<void> {
     const suppressThinking = selectedLlmSupportsThinking()
       && !getGenerationSettings().thinkingModeEnabled;
     const result = await session.query(question, {
-      maxOutputTokens: 512,
-      temperature: 0.4,
-      reasoning: suppressThinking ? { mode: 'off' } : { mode: 'on', includeInOutput: true },
+      generation: {
+        maxOutputTokens: 512,
+        temperature: 0.4,
+        reasoning: suppressThinking ? { mode: 'off' } : { mode: 'on', includeInOutput: true },
+      },
     });
 
     if (result.sources.length === 0) {

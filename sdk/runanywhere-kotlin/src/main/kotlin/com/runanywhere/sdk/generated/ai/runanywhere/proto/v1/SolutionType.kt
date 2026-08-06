@@ -17,16 +17,29 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * Lets frontends switch on one enum instead of inspecting the oneof.
+ * Frontends switch on the SolutionConfig oneof case. This enum exists only
+ * for logs and handles, and its numbers now match the oneof tags.
  */
 public enum class SolutionType(
   override val `value`: Int,
 ) : WireEnum {
   SOLUTION_TYPE_UNSPECIFIED(0),
+  /**
+   * SolutionConfig.voice_agent = 1
+   */
   SOLUTION_TYPE_VOICE_AGENT(1),
+  /**
+   * SolutionConfig.rag         = 2
+   */
   SOLUTION_TYPE_RAG(2),
-  SOLUTION_TYPE_TIME_SERIES(4),
-  SOLUTION_TYPE_AGENT_LOOP(5),
+  /**
+   * SolutionConfig.agent_loop  = 4
+   */
+  SOLUTION_TYPE_AGENT_LOOP(4),
+  /**
+   * SolutionConfig.time_series = 5
+   */
+  SOLUTION_TYPE_TIME_SERIES(5),
   ;
 
   public companion object {
@@ -44,8 +57,8 @@ public enum class SolutionType(
       0 -> SOLUTION_TYPE_UNSPECIFIED
       1 -> SOLUTION_TYPE_VOICE_AGENT
       2 -> SOLUTION_TYPE_RAG
-      4 -> SOLUTION_TYPE_TIME_SERIES
-      5 -> SOLUTION_TYPE_AGENT_LOOP
+      4 -> SOLUTION_TYPE_AGENT_LOOP
+      5 -> SOLUTION_TYPE_TIME_SERIES
       else -> null
     }
   }

@@ -377,12 +377,12 @@ constexpr LogEntry::ParseTableT_ LogEntry::InternalGenerateParseTable_(const ::_
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
       // int64 timestamp_unix_ms = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(LogEntry, _impl_.timestamp_unix_ms_), 6>(),
-       {8, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(LogEntry, _impl_.timestamp_unix_ms_), 5>(),
+       {8, 5, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.timestamp_unix_ms_)}},
       // .runanywhere.v1.LogLevel level = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LogEntry, _impl_.level_), 7>(),
-       {16, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LogEntry, _impl_.level_), 6>(),
+       {16, 6, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.level_)}},
       // string category = 3;
       {::_pbi::TcParser::FastUS1,
@@ -398,24 +398,24 @@ constexpr LogEntry::ParseTableT_ LogEntry::InternalGenerateParseTable_(const ::_
        {50, 2, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.file_)}},
       // int32 line = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LogEntry, _impl_.line_), 8>(),
-       {56, 8, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LogEntry, _impl_.line_), 7>(),
+       {56, 7, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.line_)}},
       // string function = 8;
       {::_pbi::TcParser::FastUS1,
        {66, 3, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.function_)}},
       // int32 error_code = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LogEntry, _impl_.error_code_), 9>(),
-       {72, 9, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LogEntry, _impl_.error_code_), 8>(),
+       {72, 8, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.error_code_)}},
       // string model_id = 10;
       {::_pbi::TcParser::FastUS1,
        {82, 4, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.model_id_)}},
-      // string framework = 11;
-      {::_pbi::TcParser::FastUS1,
-       {90, 5, 0,
+      // .runanywhere.v1.InferenceFramework framework = 11;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LogEntry, _impl_.framework_), 9>(),
+       {88, 9, 0,
         PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.framework_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -425,9 +425,9 @@ constexpr LogEntry::ParseTableT_ LogEntry::InternalGenerateParseTable_(const ::_
       65535, 65535
     }}, {{
       // int64 timestamp_unix_ms = 1;
-      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.timestamp_unix_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.timestamp_unix_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // .runanywhere.v1.LogLevel level = 2;
-      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.level_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.level_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // string category = 3;
       {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.category_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string message = 4;
@@ -437,22 +437,22 @@ constexpr LogEntry::ParseTableT_ LogEntry::InternalGenerateParseTable_(const ::_
       // string file = 6;
       {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.file_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 line = 7;
-      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.line_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.line_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // string function = 8;
       {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.function_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 error_code = 9;
-      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.error_code_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.error_code_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // string model_id = 10;
       {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.model_id_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string framework = 11;
-      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.framework_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.InferenceFramework framework = 11;
+      {PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.framework_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     }},
     {{
         {::_pbi::TcParser::GetMapAuxInfo(
             1, 0, 9, 9, 0)},
     }},
     {{
-      "\27\0\0\10\7\10\4\0\10\0\10\11\0\0\0\0"
+      "\27\0\0\10\7\10\4\0\10\0\10\0\0\0\0\0"
       "runanywhere.v1.LogEntry"
       "category"
       "message"
@@ -460,7 +460,6 @@ constexpr LogEntry::ParseTableT_ LogEntry::InternalGenerateParseTable_(const ::_
       "file"
       "function"
       "model_id"
-      "framework"
     }},
   };
 }
@@ -485,13 +484,11 @@ inline constexpr LogEntry::Impl_::Impl_(
         model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        framework_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         timestamp_unix_ms_{::int64_t{0}},
         level_{static_cast< ::runanywhere::v1::LogLevel >(0)},
         line_{0},
         error_code_{0},
+        framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
         metadata_ { visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::LogEntry,
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LogEntry, _impl_.metadata_)>()
@@ -633,17 +630,17 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LogEntry, _impl_.error_code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LogEntry, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LogEntry, _impl_.framework_),
+        5,
         6,
-        7,
         0,
         1,
         10,
         2,
-        8,
+        7,
         3,
-        9,
+        8,
         4,
-        5,
+        9,
 };
 
 static const ::_pbi::MigrationSchema
@@ -660,46 +657,49 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_logging_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\rlogging.proto\022\016runanywhere.v1\032\021rac_opt"
-    "ions.proto\"\320\001\n\024LoggingConfiguration\022&\n\024e"
-    "nable_local_logging\030\001 \001(\010B\010\212\265\030\004true\022/\n\rm"
-    "in_log_level\030\002 \001(\0162\030.runanywhere.v1.LogL"
-    "evel\022\037\n\027include_source_location\030\003 \001(\010\022\037\n"
-    "\027include_device_metadata\030\004 \001(\010\022\035\n\025enable"
-    "_remote_logging\030\005 \001(\010\"\303\002\n\010LogEntry\022\031\n\021ti"
-    "mestamp_unix_ms\030\001 \001(\003\022\'\n\005level\030\002 \001(\0162\030.r"
-    "unanywhere.v1.LogLevel\022\020\n\010category\030\003 \001(\t"
-    "\022\017\n\007message\030\004 \001(\t\0228\n\010metadata\030\005 \003(\0132&.ru"
-    "nanywhere.v1.LogEntry.MetadataEntry\022\014\n\004f"
-    "ile\030\006 \001(\t\022\014\n\004line\030\007 \001(\005\022\020\n\010function\030\010 \001("
-    "\t\022\022\n\nerror_code\030\t \001(\005\022\020\n\010model_id\030\n \001(\t\022"
-    "\021\n\tframework\030\013 \001(\t\032/\n\rMetadataEntry\022\013\n\003k"
-    "ey\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001*\203\002\n\010LogLevel"
-    "\022\'\n\017LOG_LEVEL_TRACE\020\000\032\022\322\265\030\005Trace\342\265\030\005trac"
-    "e\022\'\n\017LOG_LEVEL_DEBUG\020\001\032\022\322\265\030\005Debug\342\265\030\005deb"
-    "ug\022$\n\016LOG_LEVEL_INFO\020\002\032\020\322\265\030\004Info\342\265\030\004info"
-    "\022-\n\021LOG_LEVEL_WARNING\020\003\032\026\322\265\030\007Warning\342\265\030\007"
-    "warning\022\'\n\017LOG_LEVEL_ERROR\020\004\032\022\322\265\030\005Error\342"
-    "\265\030\005error\022\'\n\017LOG_LEVEL_FATAL\020\005\032\022\322\265\030\005Fatal"
-    "\342\265\030\005fatalB\207\001\n\027ai.runanywhere.proto.v1B\014L"
-    "oggingProtoP\001Z<github.com/runanywhere/ru"
-    "nanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002"
-    "\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\n\rlogging.proto\022\016runanywhere.v1\032\021model_t"
+    "ypes.proto\032\021rac_options.proto\"\320\001\n\024Loggin"
+    "gConfiguration\022&\n\024enable_local_logging\030\001"
+    " \001(\010B\010\212\265\030\004true\022/\n\rmin_log_level\030\002 \001(\0162\030."
+    "runanywhere.v1.LogLevel\022\037\n\027include_sourc"
+    "e_location\030\003 \001(\010\022\037\n\027include_device_metad"
+    "ata\030\004 \001(\010\022\035\n\025enable_remote_logging\030\005 \001(\010"
+    "\"\347\002\n\010LogEntry\022\031\n\021timestamp_unix_ms\030\001 \001(\003"
+    "\022\'\n\005level\030\002 \001(\0162\030.runanywhere.v1.LogLeve"
+    "l\022\020\n\010category\030\003 \001(\t\022\017\n\007message\030\004 \001(\t\0228\n\010"
+    "metadata\030\005 \003(\0132&.runanywhere.v1.LogEntry"
+    ".MetadataEntry\022\014\n\004file\030\006 \001(\t\022\014\n\004line\030\007 \001"
+    "(\005\022\020\n\010function\030\010 \001(\t\022\022\n\nerror_code\030\t \001(\005"
+    "\022\020\n\010model_id\030\n \001(\t\0225\n\tframework\030\013 \001(\0162\"."
+    "runanywhere.v1.InferenceFramework\032/\n\rMet"
+    "adataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\002"
+    "8\001*\203\002\n\010LogLevel\022\'\n\017LOG_LEVEL_TRACE\020\000\032\022\322\265"
+    "\030\005Trace\342\265\030\005trace\022\'\n\017LOG_LEVEL_DEBUG\020\001\032\022\322"
+    "\265\030\005Debug\342\265\030\005debug\022$\n\016LOG_LEVEL_INFO\020\002\032\020\322"
+    "\265\030\004Info\342\265\030\004info\022-\n\021LOG_LEVEL_WARNING\020\003\032\026"
+    "\322\265\030\007Warning\342\265\030\007warning\022\'\n\017LOG_LEVEL_ERRO"
+    "R\020\004\032\022\322\265\030\005Error\342\265\030\005error\022\'\n\017LOG_LEVEL_FAT"
+    "AL\020\005\032\022\322\265\030\005Fatal\342\265\030\005fatalB\207\001\n\027ai.runanywh"
+    "ere.proto.v1B\014LoggingProtoP\001Z<github.com"
+    "/runanywhere/runanywhere-sdks/idl/v1;run"
+    "anywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002"
+    "RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_logging_2eproto_deps[1] = {
+    descriptor_table_logging_2eproto_deps[2] = {
+        &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_logging_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_logging_2eproto = {
     false,
     false,
-    995,
+    1050,
     descriptor_table_protodef_logging_2eproto,
     "logging.proto",
     &descriptor_table_logging_2eproto_once,
     descriptor_table_logging_2eproto_deps,
-    1,
+    2,
     3,
     schemas,
     file_message_globals,
@@ -1063,7 +1063,6 @@ PROTOBUF_NDEBUG_INLINE LogEntry::Impl_::Impl_(
         file_(arena, from.file_),
         function_(arena, from.function_),
         model_id_(arena, from.model_id_),
-        framework_(arena, from.framework_),
         metadata_ {
           visibility, ::_pbi::InternalMetadataOffset::Build<
               ::runanywhere::v1::LogEntry,
@@ -1090,9 +1089,9 @@ LogEntry::LogEntry(
                offsetof(Impl_, timestamp_unix_ms_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, timestamp_unix_ms_),
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, framework_) -
                offsetof(Impl_, timestamp_unix_ms_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::framework_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.LogEntry)
 }
@@ -1105,7 +1104,6 @@ PROTOBUF_NDEBUG_INLINE LogEntry::Impl_::Impl_(
         file_(arena),
         function_(arena),
         model_id_(arena),
-        framework_(arena),
         metadata_ { visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::LogEntry,
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LogEntry, _impl_.metadata_)>()
@@ -1117,9 +1115,9 @@ inline void LogEntry::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, timestamp_unix_ms_),
            0,
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, framework_) -
                offsetof(Impl_, timestamp_unix_ms_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::framework_));
 }
 LogEntry::~LogEntry() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.LogEntry)
@@ -1137,7 +1135,6 @@ inline void LogEntry::SharedDtor(MessageLite& self) {
   this_._impl_.file_.Destroy();
   this_._impl_.function_.Destroy();
   this_._impl_.model_id_.Destroy();
-  this_._impl_.framework_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -1175,7 +1172,7 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.category_.ClearNonDefaultToEmpty();
     }
@@ -1191,19 +1188,16 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      _impl_.framework_.ClearNonDefaultToEmpty();
-    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000c0U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
     ::memset(&_impl_.timestamp_unix_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.level_) -
-        reinterpret_cast<char*>(&_impl_.timestamp_unix_ms_)) + sizeof(_impl_.level_));
+        reinterpret_cast<char*>(&_impl_.line_) -
+        reinterpret_cast<char*>(&_impl_.timestamp_unix_ms_)) + sizeof(_impl_.line_));
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
-    ::memset(&_impl_.line_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.line_)) + sizeof(_impl_.error_code_));
+    ::memset(&_impl_.error_code_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.framework_) -
+        reinterpret_cast<char*>(&_impl_.error_code_)) + sizeof(_impl_.framework_));
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       _impl_.metadata_.Clear();
     }
@@ -1232,7 +1226,7 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // int64 timestamp_unix_ms = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_timestamp_unix_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<1>(
@@ -1241,7 +1235,7 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
   }
 
   // .runanywhere.v1.LogLevel level = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_level() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1315,7 +1309,7 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
   }
 
   // int32 line = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_line() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
@@ -1334,7 +1328,7 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
   }
 
   // int32 error_code = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_error_code() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
@@ -1352,13 +1346,12 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
     }
   }
 
-  // string framework = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (!this_._internal_framework().empty()) {
-      const ::std::string& _s = this_._internal_framework();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LogEntry.framework");
-      target = stream->WriteStringMaybeAliased(11, _s, target);
+  // .runanywhere.v1.InferenceFramework framework = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (this_._internal_framework() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          11, this_._internal_framework(), target);
     }
   }
 
@@ -1423,41 +1416,41 @@ PROTOBUF_NOINLINE void LogEntry::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string framework = 11;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (!this_._internal_framework().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_framework());
-      }
-    }
     // int64 timestamp_unix_ms = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_timestamp_unix_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_unix_ms());
       }
     }
     // .runanywhere.v1.LogLevel level = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_level() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_level());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
     // int32 line = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_line() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_line());
       }
     }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
     // int32 error_code = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_error_code() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_error_code());
+      }
+    }
+    // .runanywhere.v1.InferenceFramework framework = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (this_._internal_framework() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_framework());
       }
     }
     // map<string, string> metadata = 5;
@@ -1535,34 +1528,30 @@ void LogEntry::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (!from._internal_framework().empty()) {
-        _this->_internal_set_framework(from._internal_framework());
-      } else {
-        if (_this->_impl_.framework_.IsDefault()) {
-          _this->_internal_set_framework("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_timestamp_unix_ms() != 0) {
         _this->_impl_.timestamp_unix_ms_ = from._impl_.timestamp_unix_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_level() != 0) {
         _this->_impl_.level_ = from._impl_.level_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_line() != 0) {
+        _this->_impl_.line_ = from._impl_.line_;
       }
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_line() != 0) {
-        _this->_impl_.line_ = from._impl_.line_;
+      if (from._internal_error_code() != 0) {
+        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
+      if (from._internal_framework() != 0) {
+        _this->_impl_.framework_ = from._impl_.framework_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
@@ -1593,10 +1582,9 @@ void LogEntry::InternalSwap(LogEntry* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) 
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.file_, &other->_impl_.file_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.function_, &other->_impl_.function_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.framework_, &other->_impl_.framework_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.error_code_)
-      + sizeof(LogEntry::_impl_.error_code_)
+      PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.framework_)
+      + sizeof(LogEntry::_impl_.framework_)
       - PROTOBUF_FIELD_OFFSET(LogEntry, _impl_.timestamp_unix_ms_)>(
           reinterpret_cast<char*>(&_impl_.timestamp_unix_ms_),
           reinterpret_cast<char*>(&other->_impl_.timestamp_unix_ms_));

@@ -25,6 +25,8 @@ import 'package:protobuf/protobuf.dart' as $pb;
 /// RN's ComponentInitializationEvent.components: SDKComponent[] but not yet
 /// in any SDK's enum).
 /// ---------------------------------------------------------------------------
+/// The rac_wire_string values are the stable lowercase keys that SDKError.component
+/// carries; producers stringify through them, never through the constant name.
 class SDKComponent extends $pb.ProtobufEnum {
   static const SDKComponent SDK_COMPONENT_UNSPECIFIED =
       SDKComponent._(0, _omitEnumNames ? '' : 'SDK_COMPONENT_UNSPECIFIED');
@@ -195,57 +197,6 @@ class ConfigurationEventKind extends $pb.ProtobufEnum {
   static const ConfigurationEventKind CONFIGURATION_EVENT_KIND_SYNC_FAILED =
       ConfigurationEventKind._(
           8, _omitEnumNames ? '' : 'CONFIGURATION_EVENT_KIND_SYNC_FAILED');
-  static const ConfigurationEventKind CONFIGURATION_EVENT_KIND_SYNC_REQUESTED =
-      ConfigurationEventKind._(
-          9, _omitEnumNames ? '' : 'CONFIGURATION_EVENT_KIND_SYNC_REQUESTED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED = ConfigurationEventKind._(10,
-          _omitEnumNames ? '' : 'CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED = ConfigurationEventKind._(11,
-          _omitEnumNames ? '' : 'CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED =
-      ConfigurationEventKind._(
-          12,
-          _omitEnumNames
-              ? ''
-              : 'CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED =
-      ConfigurationEventKind._(
-          13,
-          _omitEnumNames
-              ? ''
-              : 'CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED =
-      ConfigurationEventKind._(
-          14,
-          _omitEnumNames
-              ? ''
-              : 'CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED =
-      ConfigurationEventKind._(
-          15,
-          _omitEnumNames
-              ? ''
-              : 'CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED =
-      ConfigurationEventKind._(
-          16,
-          _omitEnumNames
-              ? ''
-              : 'CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED');
-  static const ConfigurationEventKind
-      CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED =
-      ConfigurationEventKind._(
-          17,
-          _omitEnumNames
-              ? ''
-              : 'CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED');
   static const ConfigurationEventKind CONFIGURATION_EVENT_KIND_CHANGED =
       ConfigurationEventKind._(
           18, _omitEnumNames ? '' : 'CONFIGURATION_EVENT_KIND_CHANGED');
@@ -261,154 +212,196 @@ class ConfigurationEventKind extends $pb.ProtobufEnum {
     CONFIGURATION_EVENT_KIND_SYNC_STARTED,
     CONFIGURATION_EVENT_KIND_SYNC_COMPLETED,
     CONFIGURATION_EVENT_KIND_SYNC_FAILED,
-    CONFIGURATION_EVENT_KIND_SYNC_REQUESTED,
-    CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED,
-    CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED,
-    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED,
-    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED,
-    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED,
-    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED,
-    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED,
-    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED,
     CONFIGURATION_EVENT_KIND_CHANGED,
   ];
 
-  static final $core.List<ConfigurationEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 18);
-  static ConfigurationEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
+  static final $core.Map<$core.int, ConfigurationEventKind> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static ConfigurationEventKind? valueOf($core.int value) => _byValue[value];
 
   const ConfigurationEventKind._(super.value, super.name);
 }
 
-class ComponentInitializationEventKind extends $pb.ProtobufEnum {
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_UNSPECIFIED =
-      ComponentInitializationEventKind._(
-          0, _omitEnumNames ? '' : 'COMPONENT_INIT_EVENT_KIND_UNSPECIFIED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED =
-      ComponentInitializationEventKind._(
-          1,
-          _omitEnumNames
-              ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED =
-      ComponentInitializationEventKind._(
+class ComponentLifecycleEventKind extends $pb.ProtobufEnum {
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED =
+      ComponentLifecycleEventKind._(0,
+          _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED =
+      ComponentLifecycleEventKind._(1,
+          _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED =
+      ComponentLifecycleEventKind._(
           2,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED =
+      ComponentLifecycleEventKind._(
           3,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING =
-      ComponentInitializationEventKind._(4,
-          _omitEnumNames ? '' : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED =
+      ComponentLifecycleEventKind._(
+          4,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS =
+      ComponentLifecycleEventKind._(
           5,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY =
+      ComponentLifecycleEventKind._(
           6,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED =
+      ComponentLifecycleEventKind._(
           7,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED =
-      ComponentInitializationEventKind._(
-          8,
-          _omitEnumNames
-              ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT = ComponentLifecycleEventKind._(
+          8, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT =
+      ComponentLifecycleEventKind._(
           9,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_READY =
-      ComponentInitializationEventKind._(10,
-          _omitEnumNames ? '' : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_READY');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED =
-      ComponentInitializationEventKind._(11,
-          _omitEnumNames ? '' : 'COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN =
+      ComponentLifecycleEventKind._(
+          10,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN');
+
+  /// Absorbed from ComponentInitializationEventKind.
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED =
+      ComponentLifecycleEventKind._(
+          11,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED =
+      ComponentLifecycleEventKind._(
           12,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING =
+      ComponentLifecycleEventKind._(
           13,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY =
-      ComponentInitializationEventKind._(
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED =
+      ComponentLifecycleEventKind._(
           14,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY');
-  static const ComponentInitializationEventKind
-      COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY =
-      ComponentInitializationEventKind._(
-          15,
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING =
+      ComponentLifecycleEventKind._(
+          17,
           _omitEnumNames
               ? ''
-              : 'COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY');
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY =
+      ComponentLifecycleEventKind._(
+          18,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED =
+      ComponentLifecycleEventKind._(
+          19,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED =
+      ComponentLifecycleEventKind._(
+          20,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED =
+      ComponentLifecycleEventKind._(
+          21,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY =
+      ComponentLifecycleEventKind._(
+          22,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY');
+  static const ComponentLifecycleEventKind
+      COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY =
+      ComponentLifecycleEventKind._(
+          23,
+          _omitEnumNames
+              ? ''
+              : 'COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY');
 
-  static const $core.List<ComponentInitializationEventKind> values =
-      <ComponentInitializationEventKind>[
-    COMPONENT_INIT_EVENT_KIND_UNSPECIFIED,
-    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED,
-    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_READY,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED,
-    COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED,
-    COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED,
-    COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY,
-    COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY,
+  static const $core.List<ComponentLifecycleEventKind> values =
+      <ComponentLifecycleEventKind>[
+    COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS,
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY,
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT,
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN,
+    COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED,
+    COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY,
   ];
 
-  static final $core.List<ComponentInitializationEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 15);
-  static ComponentInitializationEventKind? valueOf($core.int value) =>
+  static final $core.List<ComponentLifecycleEventKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 23);
+  static ComponentLifecycleEventKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
-  const ComponentInitializationEventKind._(super.value, super.name);
+  const ComponentLifecycleEventKind._(super.value, super.name);
 }
 
 class SessionEventKind extends $pb.ProtobufEnum {
@@ -453,12 +446,6 @@ class GenerationEventKind extends $pb.ProtobufEnum {
   static const GenerationEventKind GENERATION_EVENT_KIND_UNSPECIFIED =
       GenerationEventKind._(
           0, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_UNSPECIFIED');
-  static const GenerationEventKind GENERATION_EVENT_KIND_SESSION_STARTED =
-      GenerationEventKind._(
-          1, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_SESSION_STARTED');
-  static const GenerationEventKind GENERATION_EVENT_KIND_SESSION_ENDED =
-      GenerationEventKind._(
-          2, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_SESSION_ENDED');
   static const GenerationEventKind GENERATION_EVENT_KIND_STARTED =
       GenerationEventKind._(
           3, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_STARTED');
@@ -471,30 +458,17 @@ class GenerationEventKind extends $pb.ProtobufEnum {
   static const GenerationEventKind GENERATION_EVENT_KIND_STREAMING_UPDATE =
       GenerationEventKind._(
           6, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_STREAMING_UPDATE');
+
+  /// Exactly one success terminal, one failure terminal, one cancel terminal.
   static const GenerationEventKind GENERATION_EVENT_KIND_COMPLETED =
       GenerationEventKind._(
           7, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_COMPLETED');
   static const GenerationEventKind GENERATION_EVENT_KIND_FAILED =
       GenerationEventKind._(
           8, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_FAILED');
-  static const GenerationEventKind GENERATION_EVENT_KIND_MODEL_LOADED =
-      GenerationEventKind._(
-          9, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_MODEL_LOADED');
-  static const GenerationEventKind GENERATION_EVENT_KIND_MODEL_UNLOADED =
-      GenerationEventKind._(
-          10, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_MODEL_UNLOADED');
-  static const GenerationEventKind GENERATION_EVENT_KIND_COST_CALCULATED =
-      GenerationEventKind._(
-          11, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_COST_CALCULATED');
   static const GenerationEventKind GENERATION_EVENT_KIND_ROUTING_DECISION =
       GenerationEventKind._(
           12, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_ROUTING_DECISION');
-  static const GenerationEventKind GENERATION_EVENT_KIND_STREAM_COMPLETED =
-      GenerationEventKind._(
-          13, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_STREAM_COMPLETED');
-  static const GenerationEventKind GENERATION_EVENT_KIND_CANCEL_REQUESTED =
-      GenerationEventKind._(
-          14, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_CANCEL_REQUESTED');
   static const GenerationEventKind GENERATION_EVENT_KIND_CANCELLED =
       GenerationEventKind._(
           15, _omitEnumNames ? '' : 'GENERATION_EVENT_KIND_CANCELLED');
@@ -537,20 +511,13 @@ class GenerationEventKind extends $pb.ProtobufEnum {
 
   static const $core.List<GenerationEventKind> values = <GenerationEventKind>[
     GENERATION_EVENT_KIND_UNSPECIFIED,
-    GENERATION_EVENT_KIND_SESSION_STARTED,
-    GENERATION_EVENT_KIND_SESSION_ENDED,
     GENERATION_EVENT_KIND_STARTED,
     GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
     GENERATION_EVENT_KIND_TOKEN_GENERATED,
     GENERATION_EVENT_KIND_STREAMING_UPDATE,
     GENERATION_EVENT_KIND_COMPLETED,
     GENERATION_EVENT_KIND_FAILED,
-    GENERATION_EVENT_KIND_MODEL_LOADED,
-    GENERATION_EVENT_KIND_MODEL_UNLOADED,
-    GENERATION_EVENT_KIND_COST_CALCULATED,
     GENERATION_EVENT_KIND_ROUTING_DECISION,
-    GENERATION_EVENT_KIND_STREAM_COMPLETED,
-    GENERATION_EVENT_KIND_CANCEL_REQUESTED,
     GENERATION_EVENT_KIND_CANCELLED,
     GENERATION_EVENT_KIND_TOOL_CALL_STARTED,
     GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED,
@@ -582,9 +549,6 @@ class VoiceEventKind extends $pb.ProtobufEnum {
   static const VoiceEventKind VOICE_EVENT_KIND_LISTENING_ENDED =
       VoiceEventKind._(
           2, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_LISTENING_ENDED');
-  static const VoiceEventKind VOICE_EVENT_KIND_SPEECH_DETECTED =
-      VoiceEventKind._(
-          3, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_SPEECH_DETECTED');
 
   /// Transcription.
   static const VoiceEventKind VOICE_EVENT_KIND_TRANSCRIPTION_STARTED =
@@ -692,47 +656,6 @@ class VoiceEventKind extends $pb.ProtobufEnum {
       VoiceEventKind._(
           36, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_PLAYBACK_FAILED');
 
-  /// Voice session orchestration (RN events.ts:177-187).
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_STARTED =
-      VoiceEventKind._(
-          37, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_STARTED');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_LISTENING =
-      VoiceEventKind._(
-          38, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_LISTENING');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED =
-      VoiceEventKind._(
-          39,
-          _omitEnumNames
-              ? ''
-              : 'VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED =
-      VoiceEventKind._(40,
-          _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING =
-      VoiceEventKind._(41,
-          _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED =
-      VoiceEventKind._(42,
-          _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED =
-      VoiceEventKind._(
-          43, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING =
-      VoiceEventKind._(
-          44, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED =
-      VoiceEventKind._(
-          45,
-          _omitEnumNames
-              ? ''
-              : 'VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_STOPPED =
-      VoiceEventKind._(
-          46, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_STOPPED');
-  static const VoiceEventKind VOICE_EVENT_KIND_VOICE_SESSION_ERROR =
-      VoiceEventKind._(
-          47, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VOICE_SESSION_ERROR');
-
   /// VAD pause/resume (telemetry-only metrics).
   static const VoiceEventKind VOICE_EVENT_KIND_VAD_PAUSED =
       VoiceEventKind._(48, _omitEnumNames ? '' : 'VOICE_EVENT_KIND_VAD_PAUSED');
@@ -743,7 +666,6 @@ class VoiceEventKind extends $pb.ProtobufEnum {
     VOICE_EVENT_KIND_UNSPECIFIED,
     VOICE_EVENT_KIND_LISTENING_STARTED,
     VOICE_EVENT_KIND_LISTENING_ENDED,
-    VOICE_EVENT_KIND_SPEECH_DETECTED,
     VOICE_EVENT_KIND_TRANSCRIPTION_STARTED,
     VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL,
     VOICE_EVENT_KIND_TRANSCRIPTION_FINAL,
@@ -777,17 +699,6 @@ class VoiceEventKind extends $pb.ProtobufEnum {
     VOICE_EVENT_KIND_PLAYBACK_PAUSED,
     VOICE_EVENT_KIND_PLAYBACK_RESUMED,
     VOICE_EVENT_KIND_PLAYBACK_FAILED,
-    VOICE_EVENT_KIND_VOICE_SESSION_STARTED,
-    VOICE_EVENT_KIND_VOICE_SESSION_LISTENING,
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED,
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED,
-    VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING,
-    VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED,
-    VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED,
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING,
-    VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED,
-    VOICE_EVENT_KIND_VOICE_SESSION_STOPPED,
-    VOICE_EVENT_KIND_VOICE_SESSION_ERROR,
     VOICE_EVENT_KIND_VAD_PAUSED,
     VOICE_EVENT_KIND_VAD_RESUMED,
   ];
@@ -986,9 +897,6 @@ class ModelEventKind extends $pb.ProtobufEnum {
   static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_CANCELLED =
       ModelEventKind._(
           12, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_CANCELLED');
-  static const ModelEventKind MODEL_EVENT_KIND_LIST_REQUESTED =
-      ModelEventKind._(
-          13, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_LIST_REQUESTED');
   static const ModelEventKind MODEL_EVENT_KIND_LIST_COMPLETED =
       ModelEventKind._(
           14, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_LIST_COMPLETED');
@@ -1024,6 +932,87 @@ class ModelEventKind extends $pb.ProtobufEnum {
       ModelEventKind._(
           25, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_EXTRACTION_FAILED');
 
+  /// Absorbed from ModelRegistryEventKind.
+  static const ModelEventKind MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED =
+      ModelEventKind._(26,
+          _omitEnumNames ? '' : 'MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED');
+  static const ModelEventKind MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED =
+      ModelEventKind._(27,
+          _omitEnumNames ? '' : 'MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED');
+  static const ModelEventKind MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED =
+      ModelEventKind._(
+          28, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED');
+  static const ModelEventKind MODEL_EVENT_KIND_ASSIGNMENT_STARTED =
+      ModelEventKind._(
+          29, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_ASSIGNMENT_STARTED');
+  static const ModelEventKind MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED =
+      ModelEventKind._(
+          30, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED');
+  static const ModelEventKind MODEL_EVENT_KIND_ASSIGNMENT_FAILED =
+      ModelEventKind._(
+          31, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_ASSIGNMENT_FAILED');
+  static const ModelEventKind MODEL_EVENT_KIND_IMPORT_STARTED =
+      ModelEventKind._(
+          32, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_IMPORT_STARTED');
+  static const ModelEventKind MODEL_EVENT_KIND_IMPORT_COMPLETED =
+      ModelEventKind._(
+          33, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_IMPORT_COMPLETED');
+  static const ModelEventKind MODEL_EVENT_KIND_IMPORT_FAILED = ModelEventKind._(
+      34, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_IMPORT_FAILED');
+  static const ModelEventKind MODEL_EVENT_KIND_DISCOVERY_STARTED =
+      ModelEventKind._(
+          35, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DISCOVERY_STARTED');
+  static const ModelEventKind MODEL_EVENT_KIND_DISCOVERY_COMPLETED =
+      ModelEventKind._(
+          36, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DISCOVERY_COMPLETED');
+  static const ModelEventKind MODEL_EVENT_KIND_DISCOVERY_FAILED =
+      ModelEventKind._(
+          37, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DISCOVERY_FAILED');
+  static const ModelEventKind MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED =
+      ModelEventKind._(
+          38, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED');
+  static const ModelEventKind MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED =
+      ModelEventKind._(
+          40, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED');
+  static const ModelEventKind MODEL_EVENT_KIND_REGISTRY_GET_FAILED =
+      ModelEventKind._(
+          41, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_REGISTRY_GET_FAILED');
+  static const ModelEventKind MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED =
+      ModelEventKind._(
+          43, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED');
+  static const ModelEventKind MODEL_EVENT_KIND_REGISTRY_LIST_FAILED =
+      ModelEventKind._(
+          44, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_REGISTRY_LIST_FAILED');
+
+  /// Absorbed from DownloadEventKind.
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED =
+      ModelEventKind._(
+          45, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED');
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED =
+      ModelEventKind._(
+          46, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED');
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED =
+      ModelEventKind._(
+          47, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED');
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED =
+      ModelEventKind._(48,
+          _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED');
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED =
+      ModelEventKind._(49,
+          _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED');
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_RESUMED =
+      ModelEventKind._(
+          50, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_RESUMED');
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_PAUSED =
+      ModelEventKind._(
+          51, _omitEnumNames ? '' : 'MODEL_EVENT_KIND_DOWNLOAD_PAUSED');
+  static const ModelEventKind MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED =
+      ModelEventKind._(
+          52,
+          _omitEnumNames
+              ? ''
+              : 'MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED');
+
   static const $core.List<ModelEventKind> values = <ModelEventKind>[
     MODEL_EVENT_KIND_UNSPECIFIED,
     MODEL_EVENT_KIND_LOAD_STARTED,
@@ -1038,7 +1027,6 @@ class ModelEventKind extends $pb.ProtobufEnum {
     MODEL_EVENT_KIND_DOWNLOAD_COMPLETED,
     MODEL_EVENT_KIND_DOWNLOAD_FAILED,
     MODEL_EVENT_KIND_DOWNLOAD_CANCELLED,
-    MODEL_EVENT_KIND_LIST_REQUESTED,
     MODEL_EVENT_KIND_LIST_COMPLETED,
     MODEL_EVENT_KIND_LIST_FAILED,
     MODEL_EVENT_KIND_CATALOG_LOADED,
@@ -1051,202 +1039,48 @@ class ModelEventKind extends $pb.ProtobufEnum {
     MODEL_EVENT_KIND_EXTRACTION_PROGRESS,
     MODEL_EVENT_KIND_EXTRACTION_COMPLETED,
     MODEL_EVENT_KIND_EXTRACTION_FAILED,
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED,
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED,
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED,
+    MODEL_EVENT_KIND_ASSIGNMENT_STARTED,
+    MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED,
+    MODEL_EVENT_KIND_ASSIGNMENT_FAILED,
+    MODEL_EVENT_KIND_IMPORT_STARTED,
+    MODEL_EVENT_KIND_IMPORT_COMPLETED,
+    MODEL_EVENT_KIND_IMPORT_FAILED,
+    MODEL_EVENT_KIND_DISCOVERY_STARTED,
+    MODEL_EVENT_KIND_DISCOVERY_COMPLETED,
+    MODEL_EVENT_KIND_DISCOVERY_FAILED,
+    MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED,
+    MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED,
+    MODEL_EVENT_KIND_REGISTRY_GET_FAILED,
+    MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED,
+    MODEL_EVENT_KIND_REGISTRY_LIST_FAILED,
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED,
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED,
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED,
+    MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED,
+    MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED,
+    MODEL_EVENT_KIND_DOWNLOAD_RESUMED,
+    MODEL_EVENT_KIND_DOWNLOAD_PAUSED,
+    MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED,
   ];
 
   static final $core.List<ModelEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 25);
+      $pb.ProtobufEnum.$_initByValueList(values, 52);
   static ModelEventKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const ModelEventKind._(super.value, super.name);
 }
 
-class ModelRegistryEventKind extends $pb.ProtobufEnum {
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED =
-      ModelRegistryEventKind._(
-          0, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED = ModelRegistryEventKind._(
-          1, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED = ModelRegistryEventKind._(2,
-          _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED =
-      ModelRegistryEventKind._(
-          3, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED = ModelRegistryEventKind._(4,
-          _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED = ModelRegistryEventKind._(
-          5,
-          _omitEnumNames
-              ? ''
-              : 'MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED = ModelRegistryEventKind._(6,
-          _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED =
-      ModelRegistryEventKind._(
-          7, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED = ModelRegistryEventKind._(8,
-          _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED =
-      ModelRegistryEventKind._(
-          9, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED = ModelRegistryEventKind._(10,
-          _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED = ModelRegistryEventKind._(
-          11,
-          _omitEnumNames
-              ? ''
-              : 'MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED = ModelRegistryEventKind._(12,
-          _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED');
-  static const ModelRegistryEventKind
-      MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED =
-      ModelRegistryEventKind._(
-          13,
-          _omitEnumNames
-              ? ''
-              : 'MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_LIST_STARTED =
-      ModelRegistryEventKind._(
-          14, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_LIST_STARTED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED =
-      ModelRegistryEventKind._(
-          15, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_LIST_FAILED =
-      ModelRegistryEventKind._(
-          16, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_LIST_FAILED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_GET_STARTED =
-      ModelRegistryEventKind._(
-          17, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_GET_STARTED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED =
-      ModelRegistryEventKind._(
-          18, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED');
-  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_GET_FAILED =
-      ModelRegistryEventKind._(
-          19, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_GET_FAILED');
-
-  static const $core.List<ModelRegistryEventKind> values =
-      <ModelRegistryEventKind>[
-    MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED,
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED,
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED,
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED,
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED,
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED,
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED,
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED,
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED,
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED,
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED,
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED,
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED,
-    MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED,
-    MODEL_REGISTRY_EVENT_KIND_LIST_STARTED,
-    MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED,
-    MODEL_REGISTRY_EVENT_KIND_LIST_FAILED,
-    MODEL_REGISTRY_EVENT_KIND_GET_STARTED,
-    MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED,
-    MODEL_REGISTRY_EVENT_KIND_GET_FAILED,
-  ];
-
-  static final $core.List<ModelRegistryEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 19);
-  static ModelRegistryEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const ModelRegistryEventKind._(super.value, super.name);
-}
-
-class DownloadEventKind extends $pb.ProtobufEnum {
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_UNSPECIFIED =
-      DownloadEventKind._(
-          0, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_UNSPECIFIED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PLAN_STARTED =
-      DownloadEventKind._(
-          1, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PLAN_STARTED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PLAN_COMPLETED =
-      DownloadEventKind._(
-          2, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PLAN_COMPLETED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PLAN_FAILED =
-      DownloadEventKind._(
-          3, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PLAN_FAILED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_STARTED =
-      DownloadEventKind._(
-          4, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_STARTED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PROGRESS =
-      DownloadEventKind._(
-          5, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PROGRESS');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED =
-      DownloadEventKind._(
-          6, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_CANCELLED =
-      DownloadEventKind._(
-          7, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_CANCELLED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_RESUME_REQUESTED =
-      DownloadEventKind._(
-          8, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_RESUME_REQUESTED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_RESUMED =
-      DownloadEventKind._(
-          9, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_RESUMED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_COMPLETED =
-      DownloadEventKind._(
-          10, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_COMPLETED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_FAILED =
-      DownloadEventKind._(
-          11, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_FAILED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PAUSED =
-      DownloadEventKind._(
-          12, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PAUSED');
-  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED =
-      DownloadEventKind._(13,
-          _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED');
-
-  static const $core.List<DownloadEventKind> values = <DownloadEventKind>[
-    DOWNLOAD_EVENT_KIND_UNSPECIFIED,
-    DOWNLOAD_EVENT_KIND_PLAN_STARTED,
-    DOWNLOAD_EVENT_KIND_PLAN_COMPLETED,
-    DOWNLOAD_EVENT_KIND_PLAN_FAILED,
-    DOWNLOAD_EVENT_KIND_STARTED,
-    DOWNLOAD_EVENT_KIND_PROGRESS,
-    DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED,
-    DOWNLOAD_EVENT_KIND_CANCELLED,
-    DOWNLOAD_EVENT_KIND_RESUME_REQUESTED,
-    DOWNLOAD_EVENT_KIND_RESUMED,
-    DOWNLOAD_EVENT_KIND_COMPLETED,
-    DOWNLOAD_EVENT_KIND_FAILED,
-    DOWNLOAD_EVENT_KIND_PAUSED,
-    DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED,
-  ];
-
-  static final $core.List<DownloadEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 13);
-  static DownloadEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const DownloadEventKind._(super.value, super.name);
-}
-
 class StorageEventKind extends $pb.ProtobufEnum {
   static const StorageEventKind STORAGE_EVENT_KIND_UNSPECIFIED =
       StorageEventKind._(
           0, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_UNSPECIFIED');
-  static const StorageEventKind STORAGE_EVENT_KIND_INFO_REQUESTED =
-      StorageEventKind._(
-          1, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_INFO_REQUESTED');
   static const StorageEventKind STORAGE_EVENT_KIND_INFO_RETRIEVED =
       StorageEventKind._(
           2, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_INFO_RETRIEVED');
-  static const StorageEventKind STORAGE_EVENT_KIND_MODELS_REQUESTED =
-      StorageEventKind._(
-          3, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_MODELS_REQUESTED');
   static const StorageEventKind STORAGE_EVENT_KIND_MODELS_RETRIEVED =
       StorageEventKind._(
           4, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_MODELS_RETRIEVED');
@@ -1290,11 +1124,35 @@ class StorageEventKind extends $pb.ProtobufEnum {
       StorageEventKind._(
           17, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_DISK_FULL');
 
+  /// Absorbed from StorageLifecycleEventKind.
+  static const StorageEventKind STORAGE_EVENT_KIND_AVAILABILITY_CHECKED =
+      StorageEventKind._(
+          18, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_AVAILABILITY_CHECKED');
+  static const StorageEventKind STORAGE_EVENT_KIND_AVAILABILITY_FAILED =
+      StorageEventKind._(
+          19, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_AVAILABILITY_FAILED');
+  static const StorageEventKind STORAGE_EVENT_KIND_DELETE_PLAN_CREATED =
+      StorageEventKind._(
+          20, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_DELETE_PLAN_CREATED');
+  static const StorageEventKind STORAGE_EVENT_KIND_DELETE_PLAN_FAILED =
+      StorageEventKind._(
+          21, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_DELETE_PLAN_FAILED');
+  static const StorageEventKind STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED =
+      StorageEventKind._(22,
+          _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED');
+  static const StorageEventKind STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED =
+      StorageEventKind._(
+          23, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED');
+  static const StorageEventKind STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED =
+      StorageEventKind._(24,
+          _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED');
+  static const StorageEventKind STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED =
+      StorageEventKind._(
+          25, _omitEnumNames ? '' : 'STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED');
+
   static const $core.List<StorageEventKind> values = <StorageEventKind>[
     STORAGE_EVENT_KIND_UNSPECIFIED,
-    STORAGE_EVENT_KIND_INFO_REQUESTED,
     STORAGE_EVENT_KIND_INFO_RETRIEVED,
-    STORAGE_EVENT_KIND_MODELS_REQUESTED,
     STORAGE_EVENT_KIND_MODELS_RETRIEVED,
     STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED,
     STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED,
@@ -1309,123 +1167,22 @@ class StorageEventKind extends $pb.ProtobufEnum {
     STORAGE_EVENT_KIND_CACHE_MISS,
     STORAGE_EVENT_KIND_EVICTION,
     STORAGE_EVENT_KIND_DISK_FULL,
+    STORAGE_EVENT_KIND_AVAILABILITY_CHECKED,
+    STORAGE_EVENT_KIND_AVAILABILITY_FAILED,
+    STORAGE_EVENT_KIND_DELETE_PLAN_CREATED,
+    STORAGE_EVENT_KIND_DELETE_PLAN_FAILED,
+    STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED,
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED,
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED,
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED,
   ];
 
   static final $core.List<StorageEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 17);
+      $pb.ProtobufEnum.$_initByValueList(values, 25);
   static StorageEventKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const StorageEventKind._(super.value, super.name);
-}
-
-class StorageLifecycleEventKind extends $pb.ProtobufEnum {
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED = StorageLifecycleEventKind._(
-          0, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED = StorageLifecycleEventKind._(
-          1, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED = StorageLifecycleEventKind._(
-          2,
-          _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED =
-      StorageLifecycleEventKind._(
-          3,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED =
-      StorageLifecycleEventKind._(
-          4,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED = StorageLifecycleEventKind._(
-          5,
-          _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED =
-      StorageLifecycleEventKind._(
-          6,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED = StorageLifecycleEventKind._(
-          7,
-          _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED =
-      StorageLifecycleEventKind._(
-          8,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED =
-      StorageLifecycleEventKind._(
-          9,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED =
-      StorageLifecycleEventKind._(
-          10,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED =
-      StorageLifecycleEventKind._(
-          11,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED =
-      StorageLifecycleEventKind._(
-          12,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED');
-  static const StorageLifecycleEventKind
-      STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED =
-      StorageLifecycleEventKind._(
-          13,
-          _omitEnumNames
-              ? ''
-              : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED');
-
-  static const $core.List<StorageLifecycleEventKind> values =
-      <StorageLifecycleEventKind>[
-    STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED,
-    STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED,
-    STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED,
-    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED,
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED,
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED,
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED,
-    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED,
-  ];
-
-  static final $core.List<StorageLifecycleEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 13);
-  static StorageLifecycleEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const StorageLifecycleEventKind._(super.value, super.name);
 }
 
 class AuthEventKind extends $pb.ProtobufEnum {
@@ -1582,52 +1339,6 @@ class FrameworkEventKind extends $pb.ProtobufEnum {
   static const FrameworkEventKind FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED =
       FrameworkEventKind._(
           2, _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED');
-  static const FrameworkEventKind FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED =
-      FrameworkEventKind._(
-          3, _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED');
-  static const FrameworkEventKind FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED =
-      FrameworkEventKind._(
-          4, _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED');
-  static const FrameworkEventKind FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED =
-      FrameworkEventKind._(
-          5, _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED');
-  static const FrameworkEventKind FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED =
-      FrameworkEventKind._(
-          6, _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED');
-  static const FrameworkEventKind FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED =
-      FrameworkEventKind._(7,
-          _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED');
-  static const FrameworkEventKind FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED =
-      FrameworkEventKind._(8,
-          _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED');
-  static const FrameworkEventKind
-      FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED =
-      FrameworkEventKind._(
-          9,
-          _omitEnumNames
-              ? ''
-              : 'FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED');
-  static const FrameworkEventKind
-      FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED =
-      FrameworkEventKind._(
-          10,
-          _omitEnumNames
-              ? ''
-              : 'FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED');
-  static const FrameworkEventKind
-      FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED =
-      FrameworkEventKind._(
-          11,
-          _omitEnumNames
-              ? ''
-              : 'FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED');
-  static const FrameworkEventKind
-      FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED =
-      FrameworkEventKind._(
-          12,
-          _omitEnumNames
-              ? ''
-              : 'FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED');
   static const FrameworkEventKind FRAMEWORK_EVENT_KIND_ERROR =
       FrameworkEventKind._(
           13, _omitEnumNames ? '' : 'FRAMEWORK_EVENT_KIND_ERROR');
@@ -1636,23 +1347,12 @@ class FrameworkEventKind extends $pb.ProtobufEnum {
     FRAMEWORK_EVENT_KIND_UNSPECIFIED,
     FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED,
     FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED,
-    FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED,
-    FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED,
-    FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED,
-    FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED,
-    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED,
-    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED,
     FRAMEWORK_EVENT_KIND_ERROR,
   ];
 
-  static final $core.List<FrameworkEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 13);
-  static FrameworkEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
+  static final $core.Map<$core.int, FrameworkEventKind> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static FrameworkEventKind? valueOf($core.int value) => _byValue[value];
 
   const FrameworkEventKind._(super.value, super.name);
 }
@@ -1714,39 +1414,6 @@ class HardwareRoutingEventKind extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const HardwareRoutingEventKind._(super.value, super.name);
-}
-
-class PerformanceEventKind extends $pb.ProtobufEnum {
-  static const PerformanceEventKind PERFORMANCE_EVENT_KIND_UNSPECIFIED =
-      PerformanceEventKind._(
-          0, _omitEnumNames ? '' : 'PERFORMANCE_EVENT_KIND_UNSPECIFIED');
-  static const PerformanceEventKind PERFORMANCE_EVENT_KIND_MEMORY_WARNING =
-      PerformanceEventKind._(
-          1, _omitEnumNames ? '' : 'PERFORMANCE_EVENT_KIND_MEMORY_WARNING');
-  static const PerformanceEventKind
-      PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED = PerformanceEventKind._(2,
-          _omitEnumNames ? '' : 'PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED');
-  static const PerformanceEventKind PERFORMANCE_EVENT_KIND_LATENCY_MEASURED =
-      PerformanceEventKind._(
-          3, _omitEnumNames ? '' : 'PERFORMANCE_EVENT_KIND_LATENCY_MEASURED');
-  static const PerformanceEventKind PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED =
-      PerformanceEventKind._(4,
-          _omitEnumNames ? '' : 'PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED');
-
-  static const $core.List<PerformanceEventKind> values = <PerformanceEventKind>[
-    PERFORMANCE_EVENT_KIND_UNSPECIFIED,
-    PERFORMANCE_EVENT_KIND_MEMORY_WARNING,
-    PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED,
-    PERFORMANCE_EVENT_KIND_LATENCY_MEASURED,
-    PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED,
-  ];
-
-  static final $core.List<PerformanceEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
-  static PerformanceEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const PerformanceEventKind._(super.value, super.name);
 }
 
 class TelemetryEventKind extends $pb.ProtobufEnum {

@@ -51,6 +51,7 @@
 #include "diffusion_options.pb.h"
 #include "embeddings_options.pb.h"
 #include "errors.pb.h"
+#include "llm_options.pb.h"
 #include "lora_options.pb.h"
 #include "rag.pb.h"
 #include "storage_types.pb.h"
@@ -156,8 +157,8 @@ bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt
         out->language = nullptr;
     }
     out->enable_punctuation = in.enable_punctuation() ? RAC_TRUE : RAC_FALSE;
-    out->enable_diarization = in.enable_diarization() ? RAC_TRUE : RAC_FALSE;
-    out->max_speakers = in.max_speakers();
+    out->enable_diarization = in.diarize() ? RAC_TRUE : RAC_FALSE;
+    out->max_speakers = in.has_speakers_expected() ? in.speakers_expected() : 0;
     out->enable_timestamps = in.enable_word_timestamps() ? RAC_TRUE : RAC_FALSE;
     return true;
 }
@@ -192,7 +193,9 @@ bool rac_transcription_metadata_to_proto(const rac_transcription_metadata_t* in,
     if (in->model_id)
         out->set_model_id(in->model_id);
     out->set_processing_time_ms(in->processing_time_ms);
-    out->set_audio_length_ms(in->audio_length_ms);
+    // audio_length_ms deleted from TranscriptionMetadata: STTOutput.duration_ms
+    // is the one home for that value now (STTOutput is the message that
+    // embeds this TranscriptionMetadata).
     return true;
 }
 
@@ -202,7 +205,7 @@ bool rac_transcription_metadata_from_proto(const ::runanywhere::v1::Transcriptio
         return false;
     out->model_id = copy_string(in.model_id());
     out->processing_time_ms = in.processing_time_ms();
-    out->audio_length_ms = in.audio_length_ms();
+    out->audio_length_ms = 0;  // field deleted from the proto; no source left
     return true;
 }
 
@@ -263,32 +266,15 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts
     if (in.volume() > 0.0f)
         out->volume = in.volume();
     out->audio_format = audio_format_from_proto(in.audio_format());
-    out->use_ssml = in.enable_ssml() ? RAC_TRUE : RAC_FALSE;
+    // enable_ssml deleted from TTSOptions -- no backend parses SSML. use_ssml
+    // stays at RAC_TTS_OPTIONS_DEFAULT's value (false).
     // sample_rate has no proto field on TTSOptions; keep default.
     return true;
 }
 
-bool rac_tts_phoneme_timestamp_to_proto(const rac_tts_phoneme_timestamp_t* in,
-                                        ::runanywhere::v1::TTSPhonemeTimestamp* out) {
-    if (!in || !out)
-        return false;
-    out->Clear();
-    if (in->phoneme)
-        out->set_phoneme(in->phoneme);
-    out->set_start_ms(in->start_time_ms);
-    out->set_end_ms(in->end_time_ms);
-    return true;
-}
-
-bool rac_tts_phoneme_timestamp_from_proto(const ::runanywhere::v1::TTSPhonemeTimestamp& in,
-                                          rac_tts_phoneme_timestamp_t* out) {
-    if (!out)
-        return false;
-    out->phoneme = copy_string_required(in.phoneme());
-    out->start_time_ms = in.start_ms();
-    out->end_time_ms = in.end_ms();
-    return true;
-}
+// rac_tts_phoneme_timestamp_to_proto / _from_proto deleted: TTSPhonemeTimestamp
+// was deleted from tts_options.proto outright ("never produced, and the wrong
+// granularity" -- see idl/tts_options.proto). No wire type remains to adapt.
 
 bool rac_tts_synthesis_metadata_to_proto(const rac_tts_synthesis_metadata_t* in,
                                          ::runanywhere::v1::TTSSynthesisMetadata* out) {
@@ -300,10 +286,10 @@ bool rac_tts_synthesis_metadata_to_proto(const rac_tts_synthesis_metadata_t* in,
     if (in->language)
         out->set_language_code(in->language);
     out->set_processing_time_ms(in->processing_time_ms);
-    out->set_character_count(in->character_count);
-    // proto has audio_duration_ms; the C metadata struct has no such field
-    // (it's on the parent rac_tts_output_t::duration_ms). Caller must set this
-    // separately when emitting metadata-only TTSSpeakResult.
+    // character_count renamed to input_bytes (UTF-8 byte length, not codepoint
+    // count -- see idl/tts_options.proto). audio_duration_ms was deleted
+    // (reserved 5): it duplicated the parent rac_tts_output_t::duration_ms.
+    out->set_input_bytes(in->character_count);
     return true;
 }
 
@@ -314,10 +300,10 @@ bool rac_tts_synthesis_metadata_from_proto(const ::runanywhere::v1::TTSSynthesis
     out->voice = copy_string(in.voice_id());
     out->language = copy_string(in.language_code());
     out->processing_time_ms = in.processing_time_ms();
-    out->character_count = in.character_count();
+    out->character_count = in.input_bytes();
     // Compute characters_per_second from processing_time_ms.
     out->characters_per_second = (in.processing_time_ms() > 0)
-                                     ? static_cast<float>(in.character_count()) /
+                                     ? static_cast<float>(in.input_bytes()) /
                                            (static_cast<float>(in.processing_time_ms()) / 1000.0f)
                                      : 0.0f;
     return true;
@@ -336,7 +322,8 @@ bool rac_tts_result_to_proto(const rac_tts_result_t* in, ::runanywhere::v1::TTSO
     out->set_duration_ms(in->duration_ms);
     auto* meta = out->mutable_metadata();
     meta->set_processing_time_ms(in->processing_time_ms);
-    meta->set_audio_duration_ms(in->duration_ms);
+    // audio_duration_ms deleted from TTSSynthesisMetadata: it duplicated this
+    // same TTSOutput.duration_ms set above.
     return true;
 }
 
@@ -348,43 +335,84 @@ bool rac_tts_result_to_proto(const rac_tts_result_t* in, ::runanywhere::v1::TTSO
 // VLM
 // ===========================================================================
 
-bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
-                                rac_vlm_options_t* out, const char** out_prompt) {
+bool rac_vlm_options_from_proto(const ::runanywhere::v1::LLMGenerationOptions& in,
+                                const ::runanywhere::v1::VLMVisionOptions* vision,
+                                rac_vlm_options_t* out) {
     if (!out)
         return false;
     rac_vlm_options_t defaults = RAC_VLM_OPTIONS_DEFAULT;
     *out = defaults;
-    if (in.max_output_tokens() > 0)
+    // LLMGenerationOptions has explicit presence on every knob: ABSENT means
+    // the annotated default applies (already loaded via RAC_VLM_OPTIONS_DEFAULT
+    // above), and any value the caller sets -- including 0 -- is honoured
+    // verbatim (idl/llm_options.proto).
+    if (in.has_max_output_tokens())
         out->max_tokens = in.max_output_tokens();
-    // VLMGenerationOptions is an explicit per-request value. Zero is the
-    // documented greedy-decoding sentinel, not an absent scalar; callers that
-    // want the sampled default construct VLMGenerationOptions.defaults().
-    out->temperature = in.temperature();
-    if (in.top_p() > 0.0f)
+    if (in.has_temperature())
+        out->temperature = in.temperature();
+    if (in.has_top_p())
         out->top_p = in.top_p();
-    if (in.max_image_size() > 0)
-        out->max_image_size = in.max_image_size();
-    if (in.n_threads() > 0)
-        out->n_threads = in.n_threads();
-    out->use_gpu = in.use_gpu() ? RAC_TRUE : RAC_FALSE;
-    switch (in.model_family()) {
-        case ::runanywhere::v1::VLM_MODEL_FAMILY_QWEN2_VL:
-            out->model_family = RAC_VLM_MODEL_FAMILY_QWEN2_VL;
-            break;
-        case ::runanywhere::v1::VLM_MODEL_FAMILY_SMOLVLM:
-            out->model_family = RAC_VLM_MODEL_FAMILY_SMOLVLM;
-            break;
-        case ::runanywhere::v1::VLM_MODEL_FAMILY_LLAVA:
-            out->model_family = RAC_VLM_MODEL_FAMILY_LLAVA;
-            break;
-        case ::runanywhere::v1::VLM_MODEL_FAMILY_CUSTOM:
-            out->model_family = RAC_VLM_MODEL_FAMILY_CUSTOM;
-            break;
-        case ::runanywhere::v1::VLM_MODEL_FAMILY_AUTO:
-        case ::runanywhere::v1::VLM_MODEL_FAMILY_UNSPECIFIED:
-        default:
-            out->model_family = RAC_VLM_MODEL_FAMILY_AUTO;
-            break;
+    if (in.has_top_k())
+        out->top_k = in.top_k();
+    if (in.has_repeat_penalty())
+        out->repetition_penalty = in.repeat_penalty();
+    if (in.has_min_p())
+        out->min_p = in.min_p();
+    if (in.has_seed())
+        out->seed = in.seed();
+
+    // max_image_size, n_threads, use_gpu, and emit_image_embeddings had no
+    // LLMGenerationOptions or VLMVisionOptions equivalent (max_image_size /
+    // use_gpu were converted at the C boundary and read by no engine per
+    // idl/vlm_options.proto's deletion note); leave them at the C default.
+
+    if (vision != nullptr) {
+        switch (vision->model_family()) {
+            case ::runanywhere::v1::VLM_MODEL_FAMILY_QWEN2_VL:
+                out->model_family = RAC_VLM_MODEL_FAMILY_QWEN2_VL;
+                break;
+            case ::runanywhere::v1::VLM_MODEL_FAMILY_SMOLVLM:
+                out->model_family = RAC_VLM_MODEL_FAMILY_SMOLVLM;
+                break;
+            case ::runanywhere::v1::VLM_MODEL_FAMILY_LLAVA:
+                out->model_family = RAC_VLM_MODEL_FAMILY_LLAVA;
+                break;
+            case ::runanywhere::v1::VLM_MODEL_FAMILY_CUSTOM:
+                out->model_family = RAC_VLM_MODEL_FAMILY_CUSTOM;
+                break;
+            case ::runanywhere::v1::VLM_MODEL_FAMILY_AUTO:
+            case ::runanywhere::v1::VLM_MODEL_FAMILY_UNSPECIFIED:
+            default:
+                out->model_family = RAC_VLM_MODEL_FAMILY_AUTO;
+                break;
+        }
+
+        // Allocate a heap rac_vlm_chat_template_t and its owned
+        // strings when the proto carries a custom_chat_template, and rac_strdup
+        // image_marker_override. rac_vlm_options_free_owned releases both.
+        if (vision->has_custom_chat_template()) {
+            const auto& proto_tpl = vision->custom_chat_template();
+            auto* tpl =
+                static_cast<rac_vlm_chat_template_t*>(rac_alloc(sizeof(rac_vlm_chat_template_t)));
+            if (tpl) {
+                tpl->template_str = proto_tpl.template_text().empty()
+                                        ? nullptr
+                                        : rac_strdup(proto_tpl.template_text().c_str());
+                tpl->image_marker = proto_tpl.has_image_marker()
+                                        ? rac_strdup(proto_tpl.image_marker().c_str())
+                                        : nullptr;
+                tpl->default_system_prompt =
+                    proto_tpl.has_default_system_prompt()
+                        ? rac_strdup(proto_tpl.default_system_prompt().c_str())
+                        : nullptr;
+                out->custom_chat_template = tpl;
+            }
+        }
+        if (vision->has_image_marker_override() && !vision->image_marker_override().empty()) {
+            out->image_marker_override = rac_strdup(vision->image_marker_override().c_str());
+        }
+    } else {
+        out->model_family = RAC_VLM_MODEL_FAMILY_AUTO;
     }
 
     // Carry request-owned strings into
@@ -420,50 +448,9 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         }
     }
 
-    // Allocate a heap rac_vlm_chat_template_t and its owned
-    // strings when the proto carries a custom_chat_template, and rac_strdup
-    // image_marker_override. rac_vlm_options_free_owned releases both.
-    if (in.has_custom_chat_template()) {
-        const auto& proto_tpl = in.custom_chat_template();
-        auto* tpl =
-            static_cast<rac_vlm_chat_template_t*>(rac_alloc(sizeof(rac_vlm_chat_template_t)));
-        if (tpl) {
-            tpl->template_str = proto_tpl.template_text().empty()
-                                    ? nullptr
-                                    : rac_strdup(proto_tpl.template_text().c_str());
-            tpl->image_marker = proto_tpl.has_image_marker()
-                                    ? rac_strdup(proto_tpl.image_marker().c_str())
-                                    : nullptr;
-            tpl->default_system_prompt = proto_tpl.has_default_system_prompt()
-                                             ? rac_strdup(proto_tpl.default_system_prompt().c_str())
-                                             : nullptr;
-            out->custom_chat_template = tpl;
-        }
-    }
-    if (in.has_image_marker_override() && !in.image_marker_override().empty()) {
-        out->image_marker_override = rac_strdup(in.image_marker_override().c_str());
-    }
-
-    // Extended sampling knobs round-trip into the C struct so
-    // the llama.cpp VLM engine can honor them in configure_sampler(). All
-    // scalars — no allocation needed; rac_vlm_options_free_owned is unaffected.
-    if (in.top_k() > 0) {
-        out->top_k = in.top_k();
-    }
-    if (in.seed() != 0) {
-        out->seed = in.seed();
-    }
-    if (in.repetition_penalty() > 0.0f) {
-        out->repetition_penalty = in.repetition_penalty();
-    }
-    if (in.min_p() > 0.0f) {
-        out->min_p = in.min_p();
-    }
-    out->emit_image_embeddings = in.emit_image_embeddings() ? RAC_TRUE : RAC_FALSE;
-
-    if (out_prompt) {
-        *out_prompt = in.prompt().empty() ? nullptr : rac_strdup(in.prompt().c_str());
-    }
+    // emit_image_embeddings had no LLMGenerationOptions/VLMVisionOptions
+    // equivalent after the merge; leave it at the C default (false, per
+    // RAC_VLM_OPTIONS_DEFAULT).
     return true;
 }
 
@@ -521,10 +508,15 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMR
     out->set_image_tokens(in->image_tokens);
     out->mutable_usage()->set_output_tokens(in->completion_tokens);
     out->mutable_usage()->set_total_tokens(in->total_tokens);
-    out->set_time_to_first_token_ms(in->time_to_first_token_ms);
+    // time_to_first_token_ms deleted from VLMResult: TokenUsage.ttft_ms is the
+    // one canonical spelling now.
+    out->mutable_usage()->set_ttft_ms(in->time_to_first_token_ms);
     out->set_image_encode_time_ms(in->image_encode_time_ms);
-    out->set_processing_time_ms(in->total_time_ms);
-    out->mutable_usage()->set_tokens_per_second(in->tokens_per_second);
+    // processing_time_ms renamed to total_time_ms.
+    out->set_total_time_ms(in->total_time_ms);
+    // TokenUsage has no tokens_per_second field; decode_tokens_per_second is
+    // the decode-phase-only throughput this maps onto.
+    out->mutable_usage()->set_decode_tokens_per_second(in->tokens_per_second);
     return true;
 }
 
@@ -538,45 +530,47 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
         out->file_path = copy_string_required(in.file_path());
     } else if (in.has_raw_rgb()) {
-        // The `raw_rgb` oneof slot carries either RAW_RGB (3 B/px) or
-        // RAW_RGBA (4 B/px); only `in.format()` distinguishes them. The
+        // 3 bytes/px, tightly packed -- no alpha to drop.
+        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
+        const ::std::string& src = in.raw_rgb();
+        out->data_size = src.size();
+        if (out->data_size > 0) {
+            uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
+            std::memcpy(buf, src.data(), out->data_size);
+            out->pixel_data = buf;
+        }
+    } else if (in.has_raw_rgba()) {
+        // raw_rgba is now its own oneof arm (4 B/px) instead of being
+        // disambiguated out of raw_rgb via a deleted `format` field. The
         // C ABI / mtmd backend speak RGB only, so downsample RGBA → RGB at
         // the proto boundary — mirrors RAVLMImage.fromUIImage's CGContext
         // path. Without this, a 4 B/px buffer reaches mtmd_bitmap_init,
         // which reads it as 3 B/px, overshoots the heap by 33%, and either
         // hallucinates or EXC_BAD_ACCESSes.
         out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
-        const ::std::string& src = in.raw_rgb();
-        if (in.format() == ::runanywhere::v1::VLM_IMAGE_FORMAT_RAW_RGBA) {
-            const size_t pixels = static_cast<size_t>(out->width) * out->height;
-            if (pixels == 0 || src.size() < pixels * 4) {
-                // Dimensions inconsistent with RGBA payload — refuse rather
-                // than read past the buffer.
-                return false;
-            }
-            out->data_size = pixels * 3;
-            uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-            const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
-            for (size_t i = 0; i < pixels; ++i) {
-                buf[i * 3 + 0] = in_px[i * 4 + 0];
-                buf[i * 3 + 1] = in_px[i * 4 + 1];
-                buf[i * 3 + 2] = in_px[i * 4 + 2];
-            }
-            out->pixel_data = buf;
-        } else {
-            out->data_size = src.size();
-            if (out->data_size > 0) {
-                uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-                std::memcpy(buf, src.data(), out->data_size);
-                out->pixel_data = buf;
-            }
+        const ::std::string& src = in.raw_rgba();
+        const size_t pixels = static_cast<size_t>(out->width) * out->height;
+        if (pixels == 0 || src.size() < pixels * 4) {
+            // Dimensions inconsistent with RGBA payload — refuse rather
+            // than read past the buffer.
+            return false;
         }
+        out->data_size = pixels * 3;
+        uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
+        const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
+        for (size_t i = 0; i < pixels; ++i) {
+            buf[i * 3 + 0] = in_px[i * 4 + 0];
+            buf[i * 3 + 1] = in_px[i * 4 + 1];
+            buf[i * 3 + 2] = in_px[i * 4 + 2];
+        }
+        out->pixel_data = buf;
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
         out->base64_data = copy_string_required(in.base64());
         out->data_size = in.base64().size();
-    } else if (in.has_encoded()) {
-        // The C ABI has no carrier for encoded JPEG/PNG/WEBP containers.
+    } else if (in.has_data()) {
+        // `data` (renamed from `encoded`) carries compressed JPEG/PNG/WEBP
+        // container bytes. The C ABI has no carrier for those containers.
         // Coercing them into RGB_PIXELS would silently feed container bytes
         // into mtmd_bitmap_init (which expects width*height*3 raw pixels)
         // and crash the engine. Mirror the BASE64 hotspot fix — refuse at
@@ -606,9 +600,6 @@ rac_diffusion_scheduler_t diffusion_scheduler_from_proto(::runanywhere::v1::Diff
             return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M;
         case ::runanywhere::v1::DIFFUSION_SCHEDULER_DDIM:
             return RAC_DIFFUSION_SCHEDULER_DDIM;
-        case ::runanywhere::v1::DIFFUSION_SCHEDULER_DDPM:
-            // No C carrier. Fold to the recommended default per drift notes.
-            return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS;
         case ::runanywhere::v1::DIFFUSION_SCHEDULER_EULER:
             return RAC_DIFFUSION_SCHEDULER_EULER;
         case ::runanywhere::v1::DIFFUSION_SCHEDULER_EULER_A:
@@ -617,25 +608,24 @@ rac_diffusion_scheduler_t diffusion_scheduler_from_proto(::runanywhere::v1::Diff
             return RAC_DIFFUSION_SCHEDULER_PNDM;
         case ::runanywhere::v1::DIFFUSION_SCHEDULER_LMS:
             return RAC_DIFFUSION_SCHEDULER_LMS;
-        case ::runanywhere::v1::DIFFUSION_SCHEDULER_LCM:
-            // No C carrier. Fold to recommended default.
-            return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS;
+        // DDPM and LCM were deleted from the proto enum outright (no C
+        // carrier existed for either); DPMPP_2M_SDE has no C carrier either
+        // and falls through to the default below, same as UNSPECIFIED.
         default:
             return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS;
     }
 }
 
-rac_diffusion_mode_t diffusion_mode_from_proto(::runanywhere::v1::DiffusionMode p) {
-    switch (p) {
-        case ::runanywhere::v1::DIFFUSION_MODE_TEXT_TO_IMAGE:
-            return RAC_DIFFUSION_MODE_TEXT_TO_IMAGE;
-        case ::runanywhere::v1::DIFFUSION_MODE_IMAGE_TO_IMAGE:
-            return RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE;
-        case ::runanywhere::v1::DIFFUSION_MODE_INPAINTING:
-            return RAC_DIFFUSION_MODE_INPAINTING;
-        default:
-            return RAC_DIFFUSION_MODE_TEXT_TO_IMAGE;
-    }
+// DiffusionMode enum was deleted: mode is now inferred from which of
+// image/mask_image are present (see idl/diffusion_options.proto), never
+// declared on the wire. Mirrors the proto's own inference rule: no image =
+// text-to-image, image = image-to-image, image + mask_image = inpainting.
+rac_diffusion_mode_t diffusion_mode_from_presence(bool has_image, bool has_mask) {
+    if (has_image && has_mask)
+        return RAC_DIFFUSION_MODE_INPAINTING;
+    if (has_image)
+        return RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE;
+    return RAC_DIFFUSION_MODE_TEXT_TO_IMAGE;
 }
 
 }  // namespace
@@ -691,20 +681,27 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
         out->steps = in.steps();
     if (in.guidance_scale() > 0.0f)
         out->guidance_scale = in.guidance_scale();
-    out->seed = in.seed();
+    // seed is now `optional int64`: absent means "pick a fresh random seed".
+    // The C struct has no presence bit of its own (-1 is its documented
+    // random sentinel); map absent -> -1, present -> the literal value
+    // including 0.
+    out->seed = in.has_seed() ? in.seed() : -1;
     out->scheduler = diffusion_scheduler_from_proto(in.scheduler());
-    out->mode = diffusion_mode_from_proto(in.mode());
-    if (!in.input_image().empty()) {
+    // image/mask_image (renamed from input_image/mask_image) are `optional
+    // bytes`; mode is inferred from presence, not read off a deleted
+    // DiffusionMode field.
+    out->mode = diffusion_mode_from_presence(in.has_image(), in.has_mask_image());
+    if (in.has_image() && !in.image().empty()) {
         // Shared across SDKs: reject non-PNG/JPEG payloads before engine dispatch
         // so Kotlin/Swift/Web inpaint helpers do not re-implement sniffing.
-        if (!encoded_image_media_type_matches(in.input_image(), in.input_image_media_type()))
+        if (!encoded_image_media_type_matches(in.image(), in.image_media_type()))
             return fail();
-        out->input_image_data = copy_bytes(in.input_image());
+        out->input_image_data = copy_bytes(in.image());
         if (!out->input_image_data)
             return fail();
-        out->input_image_size = in.input_image().size();
+        out->input_image_size = in.image().size();
     }
-    if (!in.mask_image().empty()) {
+    if (in.has_mask_image() && !in.mask_image().empty()) {
         if (!encoded_image_media_type_matches(in.mask_image(), in.mask_image_media_type()))
             return fail();
         out->mask_data = copy_bytes(in.mask_image());
@@ -723,13 +720,14 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
             return fail();
         }
     }
-    out->input_image_width = in.input_image_width();
-    out->input_image_height = in.input_image_height();
-    if (in.denoise_strength() > 0.0f)
-        out->denoise_strength = in.denoise_strength();
-    out->report_intermediate_images = in.report_intermediate_images() ? RAC_TRUE : RAC_FALSE;
-    if (in.progress_stride() > 0)
-        out->progress_stride = in.progress_stride();
+    // input_image_width/input_image_height were deleted from the proto
+    // outright (dead fields, never read by any backend); leave the C
+    // defaults (0). denoise_strength renamed to strength.
+    if (in.strength() > 0.0f)
+        out->denoise_strength = in.strength();
+    // report_intermediate_images / progress_stride were deleted from the
+    // proto outright; leave the C struct at RAC_DIFFUSION_OPTIONS_DEFAULT's
+    // values (no per-request override exists on the wire anymore).
     return true;
 }
 
@@ -738,11 +736,10 @@ bool rac_diffusion_progress_to_proto(const rac_diffusion_progress_t* in,
     if (!in || !out)
         return false;
     out->Clear();
-    out->set_progress_percent(in->progress);
+    // progress_percent and stage were deleted from DiffusionProgress outright
+    // (current_step/total_steps already carry the same information).
     out->set_current_step(in->current_step);
     out->set_total_steps(in->total_steps);
-    if (in->stage)
-        out->set_stage(in->stage);
     if (in->intermediate_image_data && in->intermediate_image_size > 0) {
         out->set_intermediate_image_data(
             ::std::string(reinterpret_cast<const char*>(in->intermediate_image_data),
@@ -756,22 +753,25 @@ bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
     if (!in || !out)
         return false;
     out->Clear();
+    // DiffusionResult is now `repeated DiffusionImage images` + total_time_ms.
+    // rac_diffusion_result_t is a single-image C struct, so commons emits
+    // exactly one DiffusionImage entry until the C ABI grows a list.
     if (in->image_data && in->image_size > 0) {
-        out->set_image_data(
+        auto* image = out->add_images();
+        image->set_data(
             ::std::string(reinterpret_cast<const char*>(in->image_data), in->image_size));
+        image->set_width(in->width);
+        image->set_height(in->height);
+        image->set_seed_used(in->seed_used);
+        image->set_safety_flag(in->safety_flagged == RAC_TRUE);
         // Every shipped C-ABI diffusion engine (rac_diffusion_coreml,
         // rac_diffusion_platform) emits raw RGBA bytes — surface the media
         // type so SDKs can route through CGContext/Canvas instead of
         // Image(data:). A future backend that returns a PNG container must
         // override this on a parallel C-side carrier.
-        out->set_image_media_type("image/raw-rgba");
+        image->set_media_type("image/raw-rgba");
     }
-    out->set_width(in->width);
-    out->set_height(in->height);
-    out->set_seed_used(in->seed_used);
     out->set_total_time_ms(in->generation_time_ms);
-    out->set_safety_flag(in->safety_flagged == RAC_TRUE);
-    // No used_scheduler available on rac_diffusion_result_t — leave UNSPECIFIED.
     return true;
 }
 
@@ -788,19 +788,19 @@ bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
         out->set_id(in->id);
     if (in->name)
         out->set_name(in->name);
-    if (in->description)
-        out->set_description(in->description);
-    if (in->download_url)
-        out->set_url(in->download_url);
-    if (in->filename)
-        out->set_filename(in->filename);
     for (size_t i = 0; i < in->compatible_model_count; ++i) {
         if (in->compatible_model_ids[i]) {
             out->add_compatible_models(in->compatible_model_ids[i]);
         }
     }
-    out->set_size_bytes(in->file_size);
     out->set_default_scale(in->default_scale > 0.0f ? in->default_scale : 1.0f);
+    // description/url/filename/size_bytes were deleted from
+    // LoraAdapterCatalogEntry outright (idl/lora_options.proto -- adapter
+    // files are now acquired through the models domain's download/import
+    // verbs, not tracked here). download_url/filename/file_size stay on the
+    // C struct for that layer but have no proto counterpart to write into.
+    // local_path (non-empty = downloaded) has no rac_lora_entry_t equivalent
+    // either; it is populated by the registry directly, not this adapter.
     return true;
 }
 
@@ -811,10 +811,6 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
     std::memset(out, 0, sizeof(*out));
     out->id = copy_string(in.id());
     out->name = copy_string(in.name());
-    out->description = copy_string(in.description());
-    out->download_url = copy_string(in.url());
-    out->filename = copy_string(in.filename());
-    out->file_size = in.size_bytes();
     out->default_scale = in.default_scale() > 0.0f ? in.default_scale() : 1.0f;
     if (in.compatible_models_size() > 0) {
         out->compatible_model_count = static_cast<size_t>(in.compatible_models_size());
@@ -926,12 +922,9 @@ bool rac_device_storage_to_proto(const rac_device_storage_t* in,
     out->set_total_bytes(in->total_space);
     out->set_free_bytes(in->free_space);
     out->set_used_bytes(in->used_space);
-    if (in->total_space > 0) {
-        out->set_used_percent(static_cast<float>(in->used_space) /
-                              static_cast<float>(in->total_space) * 100.0f);
-    } else {
-        out->set_used_percent(0.0f);
-    }
+    // used_percent deleted from DeviceStorageInfo: derivable from
+    // used_bytes/total_bytes, so callers compute it rather than reading a
+    // second copy off the wire.
     return true;
 }
 

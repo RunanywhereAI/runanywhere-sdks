@@ -21,10 +21,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   LLMGenerateRequest,
   LLMStreamEvent,
+  LLMStreamEventKind,
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
 import {
+  FinishReason,
   LLMGenerationResult,
   type LLMGenerationResult as ProtoLLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
@@ -263,38 +265,47 @@ function makeFakeLLMModule(handlers: StreamHandlers): FakeModule {
   return fakeModule as FakeModule;
 }
 
+// `LLMStreamEvent.isFinal` (boolean) was replaced by the `eventKind` enum,
+// and its `finishReason`/`errorCode`/`errorMessage` moved onto the FinishReason
+// enum + optional `error: SDKError` field (idl/llm_service.proto). Non-final
+// token events carry FINISH_REASON_UNSPECIFIED.
 function streamingTokenEvent(token: string, isFinal = false): ProtoLLMStreamEvent {
   return LLMStreamEvent.fromPartial({
     token,
-    isFinal,
-    finishReason: isFinal ? 'stop' : '',
-    errorCode: 0,
+    eventKind: isFinal
+      ? LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED
+      : LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+    finishReason: isFinal ? FinishReason.FINISH_REASON_STOP : FinishReason.FINISH_REASON_UNSPECIFIED,
   });
 }
 
+// `LLMStreamFinalResult` was deleted outright -- the stream terminates with
+// the same `LLMGenerationResult` shape the unary call returns, carried on
+// `LLMStreamEvent.result` when `eventKind == COMPLETED`.
 function terminalStreamEvent(text: string, tokenCount: number): ProtoLLMStreamEvent {
   return LLMStreamEvent.fromPartial({
-    isFinal: true,
-    finishReason: 'stop',
-    errorCode: 0,
-    // Field names match LLMStreamFinalResult in llm_service.proto, NOT
-    // LLMGenerationResult (a different proto used by the non-streaming
-    // path). `streamingResultFromEvents` reads these names directly.
+    eventKind: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+    finishReason: FinishReason.FINISH_REASON_STOP,
     result: {
       text,
-      promptTokens: 0,
-      completionTokens: tokenCount,
-      totalTokens: tokenCount,
-      totalTimeMs: 1,
-      timeToFirstTokenMs: 0,
-      tokensPerSecond: tokenCount,
-      finishReason: 'stop',
-      errorCode: 0,
-      errorMessage: '',
+      modelUsed: '',
+      generationTimeMs: 1,
+      finishReason: FinishReason.FINISH_REASON_STOP,
+      thinkingTokens: 0,
+      responseTokens: tokenCount,
+      cachedPromptTokens: 0,
       promptEvalTimeMs: 0,
       decodeTimeMs: 1,
       toolCalls: [],
       toolResults: [],
+      usage: {
+        inputTokens: 0,
+        outputTokens: tokenCount,
+        totalTokens: tokenCount,
+        decodeTokensPerSecond: tokenCount,
+        prefillMs: 0,
+        ttftMs: 0,
+      },
     },
   });
 }
@@ -347,13 +358,18 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
     const result = await handle.result;
     expect(result.text).toBe('Hello, world!');
     expect(result.responseTokens).toBe(3);
-    expect(result.finishReason).toBe('stop');
+    expect(result.finishReason).toBe(FinishReason.FINISH_REASON_STOP);
 
-    expect(capturedRequest?.prompt).toBe('Say hi');
+    // `LLMGenerateRequest.prompt` was deleted outright -- the prompt rides
+    // the last entry of `messages: ChatMessage[]` now.
+    expect(capturedRequest?.messages.at(-1)?.content).toBe('Say hi');
     expect(capturedRequest?.options?.maxOutputTokens).toBe(16);
     expect(capturedRequest?.options?.temperature).toBe(0);
     expect(capturedRequest?.options?.topP).toBe(1);
-    expect(capturedRequest?.options?.repetitionPenalty).toBe(1);
+    // repeat_penalty defaults to 1.1 (idl/llm_options.proto), matching
+    // llama.cpp/Ollama convention -- not the old repetition_penalty field's
+    // 1.0 default. toBeCloseTo tolerates the float32 round-trip precision.
+    expect(capturedRequest?.options?.repeatPenalty).toBeCloseTo(1.1);
     expect(module.streamCalls).toBe(1);
     expect(module.ccallCalls).toContainEqual({
       functionName: 'rac_llm_generate_stream_proto',
@@ -369,11 +385,12 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
     });
     const module = makeFakeLLMModule({
       async generate(request) {
-        expect(request.prompt).toBe('async prompt');
+        // `LLMGenerateRequest.prompt` was deleted outright -- the prompt
+        // rides the last entry of `messages: ChatMessage[]` now.
+        expect(request.messages.at(-1)?.content).toBe('async prompt');
         await generationGate;
         return LLMGenerationResult.fromPartial({
           text: 'async answer',
-          errorCode: 0,
         });
       },
       generateStream: () => 0,

@@ -28,6 +28,19 @@ private enum TTSStateProtoABI {
     static let state = NativeProtoABI.load(stateName, as: State.self)
 }
 
+/// `TTSServiceState.voices` (tag 3) was reserved off the wire outright
+/// (idl/tts_options.proto: "use the list-voices verb") — available voices
+/// are a dedicated lifecycle-driven call now, not a state-snapshot field.
+private enum TTSListVoicesProtoABI {
+    typealias ListVoices = @convention(c) (
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
+    static let listVoicesName = "rac_tts_list_voices_lifecycle_proto"
+
+    static let listVoices = NativeProtoABI.load(listVoicesName, as: ListVoices.self)
+}
+
 private enum TTSStreamSessionABI {
     typealias Callback = @convention(c) (
         UnsafePointer<UInt8>?,
@@ -178,7 +191,9 @@ private final class TTSStreamSessionContext: @unchecked Sendable {
             let message = event.hasError ? event.error.message : "TTS stream failed"
             let code = event.hasError ? rac_result_t(event.error.cAbiCode) : RAC_ERROR_STREAM_CANCELLED
             yieldFailure(message, code: code)
-        case .started, .progress, .phoneme, .unspecified, .UNRECOGNIZED:
+        case .started, .unspecified, .UNRECOGNIZED:
+            // .progress/.phoneme were deleted outright (idl/tts_options.proto):
+            // RATTSStreamEventKind is now started/audioChunk/completed/error only.
             break
         }
     }
@@ -258,6 +273,24 @@ extension CppBridge {
                 throw SDKException(code: .processingFailed, message: message, category: .internal)
             }
             return try NativeProtoABI.decode(RATTSServiceState.self, from: outBuffer)
+        }
+
+        /// Voices the currently-loaded (or default) TTS engine can speak
+        /// with. Replaces the deleted `RATTSServiceState.voices` field.
+        public func listVoicesProto() throws -> RATTSVoiceList {
+            let symbol = try NativeProtoABI.require(
+                TTSListVoicesProtoABI.listVoices,
+                named: TTSListVoicesProtoABI.listVoicesName
+            )
+            var outBuffer = rac_proto_buffer_t()
+            defer { NativeProtoABI.free(&outBuffer) }
+            let status = symbol(&outBuffer)
+            guard status == RAC_SUCCESS else {
+                let message = outBuffer.error_message.map { String(cString: $0) }
+                    ?? "Native proto request failed: \(TTSListVoicesProtoABI.listVoicesName) rc=\(status)"
+                throw SDKException(code: .processingFailed, message: message, category: .internal)
+            }
+            return try NativeProtoABI.decode(RATTSVoiceList.self, from: outBuffer)
         }
 
         // MARK: - Voice Lifecycle

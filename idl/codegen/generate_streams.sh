@@ -50,7 +50,7 @@ function render(vars) {
 const tuples = [
     // Only the wrappers RN and Web actually import. The other nine
     // server-streaming RPCs were generated and never consumed.
-    ['VoiceAgent',       'voice_agent',       'VoiceAgentRequest',          'VoiceEvent',                  'Stream',         '../voice_agent_service', '../voice_events'],
+    ['VoiceAgent',       'voice_agent',       'VoiceAgentTurnRequest',      'VoiceEvent',                  'Stream',         '../voice_agent_service', '../voice_events'],
     ['LLM',              'llm',               'LLMGenerateRequest',         'LLMStreamEvent',              'Generate',       '../llm_service',         '../llm_service'],
 ];
 // Derive source_proto from request_module: '../voice_agent_service' ->

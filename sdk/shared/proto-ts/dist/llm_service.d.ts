@@ -1,10 +1,8 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
 import { SDKError } from "./errors";
-import { LLMGenerationOptions } from "./llm_options";
-import { TokenUsage } from "./token_usage";
-import { ToolCall, ToolResult } from "./tool_calling";
-import { TokenKind } from "./voice_events";
+import { FinishReason, LLMGenerationOptions, LLMGenerationResult } from "./llm_options";
+import { ToolCall } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMStreamEventKind {
     LLM_STREAM_EVENT_KIND_UNSPECIFIED = 0,
@@ -21,61 +19,57 @@ export declare function lLMStreamEventKindFromJSON(object: any): LLMStreamEventK
 export declare function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string;
 /** The single request envelope for both unary and streaming generation. */
 export interface LLMGenerateRequest {
-    prompt: string;
+    /**
+     * Correlation id, echoed on every LLMStreamEvent for this call. Empty =
+     * commons generates one, which is the normal case and matches industry
+     * practice (provider-generated: OpenAI `id`, Anthropic `request-id`). A
+     * non-empty caller value is honoured verbatim.
+     */
     requestId: string;
     modelId: string;
     conversationId: string;
-    metadata: {
-        [key: string]: string;
-    };
     options?: LLMGenerationOptions | undefined;
     /**
-     * Prior turns, excluding `prompt` (the live user turn) and
-     * options.system_prompt.
+     * The whole conversation, oldest first, ending with the turn the model
+     * must answer. Never empty. System turns belong in
+     * options.system_prompt, not here.
      */
-    history: ChatMessage[];
+    messages: ChatMessage[];
 }
-export interface LLMGenerateRequest_MetadataEntry {
-    key: string;
-    value: string;
-}
-export interface LLMStreamFinalResult {
-    text: string;
-    thinkingContent?: string | undefined;
-    totalTimeMs: number;
-    timeToFirstTokenMs: number;
-    finishReason: string;
-    promptEvalTimeMs: number;
-    decodeTimeMs: number;
-    toolCalls: ToolCall[];
-    toolResults: ToolResult[];
-    usage?: TokenUsage | undefined;
-    error?: SDKError | undefined;
-}
-/** `result` is populated only on the terminal event. */
+/**
+ * LLMStreamFinalResult is deleted: the stream terminates with the same
+ * LLMGenerationResult type the unary call returns (see `result` below), so
+ * one mapper serves both paths instead of two near-identical ones.
+ *
+ * Exactly one terminal event per stream: event_kind == COMPLETED (with
+ * `result` set) or == ERROR (with `error` set). `event_kind` is the primary
+ * discriminator.
+ */
 export interface LLMStreamEvent {
     /** Monotonic sequence for tool-calling session streams (#607). */
     seq: number;
-    timestampUs: number;
+    /**
+     * The delta. Answer text when event_kind == TOKEN, reasoning text when
+     * event_kind == THINKING.
+     */
     token: string;
-    isFinal: boolean;
-    kind: TokenKind;
-    tokenId: number;
-    logprob: number;
-    finishReason: string;
-    result?: LLMStreamFinalResult | undefined;
     eventKind: LLMStreamEventKind;
+    /** Correlation id, echoed from the request on every event. */
     requestId: string;
-    conversationId: string;
-    promptTokensProcessed: number;
-    completionTokensGenerated: number;
-    elapsedMs: number;
+    finishReason: FinishReason;
+    /** Present exactly when event_kind == COMPLETED. */
+    result?: LLMGenerationResult | undefined;
+    /** Present exactly when event_kind == TOOL_CALL. */
     toolCall?: ToolCall | undefined;
+    /** Present exactly when event_kind == ERROR. */
     error?: SDKError | undefined;
+    /**
+     * Largest complete JSON value visible in the output so far, when
+     * LLMGenerationOptions.structured_output is set.
+     */
+    partialJson?: string | undefined;
 }
 export declare const LLMGenerateRequest: MessageFns<LLMGenerateRequest>;
-export declare const LLMGenerateRequest_MetadataEntry: MessageFns<LLMGenerateRequest_MetadataEntry>;
-export declare const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult>;
 export declare const LLMStreamEvent: MessageFns<LLMStreamEvent>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

@@ -11,7 +11,6 @@ package com.runanywhere.sdk.public.api
 import ai.runanywhere.proto.v1.SegmentationImage
 import ai.runanywhere.proto.v1.SegmentationPixelFormat
 import ai.runanywhere.proto.v1.VLMImage
-import ai.runanywhere.proto.v1.VLMImageFormat
 import com.runanywhere.sdk.foundation.errors.SDKException
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
@@ -20,24 +19,27 @@ import java.io.File
 private const val PNG_HEADER_BYTES = 8
 private const val JPEG_HEADER_BYTES = 3
 
+/**
+ * `VLMImageFormat` and `VLMImage.encoded` are deleted (idl/vlm_options.proto):
+ * `VLMImage` is now a plain oneof (`file_path` / `data` / `raw_rgb` / `base64`
+ * / `raw_rgba`) plus a `media_type` string required alongside `data`/`base64`
+ * — no format enum to select. `raw_rgb` and `raw_rgba` are two distinct oneof
+ * arms now (not one field disambiguated by a format flag).
+ */
 internal fun ImageInput.toVlmImage(): VLMImage =
     when {
-        filePath != null ->
-            VLMImage(file_path = filePath, format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH)
+        filePath != null -> VLMImage(file_path = filePath)
         encoded != null ->
-            VLMImage(encoded = encoded.toByteString(), format = encodedVlmFormat(encoded))
-        raw != null ->
             VLMImage(
-                raw_rgb = raw.toByteString(),
-                width = width,
-                height = height,
-                format =
-                    if (layout == ImagePixelLayout.RGBA8) {
-                        VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA
-                    } else {
-                        VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB
-                    },
+                data_ = encoded.toByteString(),
+                media_type = sniffMediaType(encoded) ?: "image/jpeg",
             )
+        raw != null ->
+            if (layout == ImagePixelLayout.RGBA8) {
+                VLMImage(raw_rgba = raw.toByteString(), width = width, height = height)
+            } else {
+                VLMImage(raw_rgb = raw.toByteString(), width = width, height = height)
+            }
         else -> throw SDKException.invalidArgument("ImageInput carries no pixels")
     }
 
@@ -72,13 +74,6 @@ internal fun ImageInput.encodedBytes(): ByteString? {
 
 internal fun ImageInput.encodedMediaType(): String? =
     encodedBytes()?.toByteArray()?.let(::sniffMediaType)
-
-private fun encodedVlmFormat(data: ByteArray): VLMImageFormat =
-    when (sniffMediaType(data)) {
-        "image/png" -> VLMImageFormat.VLM_IMAGE_FORMAT_PNG
-        "image/webp" -> VLMImageFormat.VLM_IMAGE_FORMAT_WEBP
-        else -> VLMImageFormat.VLM_IMAGE_FORMAT_JPEG
-    }
 
 private fun sniffMediaType(data: ByteArray): String? =
     when {

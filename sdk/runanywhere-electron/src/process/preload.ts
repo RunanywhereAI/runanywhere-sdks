@@ -20,8 +20,8 @@ import {
   RAGResult,
   RAGStatistics,
 } from '../proto/rag';
+import { SDKEnvironment } from '../proto/model_types';
 import {
-  SdkInitEnvironment,
   SdkInitPhase1Request,
   SdkInitPhase2Request,
 } from '../proto/sdk_init';
@@ -34,7 +34,7 @@ import { toAsyncIterable, streamWithMetrics } from '../stream';
 import type { LLMStreamEvent } from '../stream';
 import { bus } from '../events';
 import type { EventListener, Modality } from '../events';
-import { CATALOG } from '../catalog';
+import { catalogEntries } from '../catalog';
 import { SDKException, asSDKException } from '../errors';
 import type { RpcMessage } from './rpc';
 
@@ -176,8 +176,8 @@ async function runControlPlane(cp?: ControlPlaneOptions): Promise<void> {
     const version = (await send('version', [])) as string;
     const platform = osPlatform();
     const protoEnv = isProd
-      ? SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION
-      : SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+      ? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+      : SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     const phase1Bytes = SdkInitPhase1Request.encode({
       environment: protoEnv,
       apiKey,
@@ -188,10 +188,6 @@ async function runControlPlane(cp?: ControlPlaneOptions): Promise<void> {
     }).finish();
     const phase2Bytes = SdkInitPhase2Request.encode({
       buildToken: '',
-      forceRefreshAssignments: false,
-      flushTelemetry: true,
-      discoverDownloadedModels: true,
-      rescanLocalModels: true,
     }).finish();
     await send('v3.configureControlPlane', [
       {
@@ -248,7 +244,7 @@ contextBridge.exposeInMainWorld('runanywhere', {
   formatChat: (turns: ChatTurn[], template?: ChatTemplate, opts?: FormatOptions) => formatChat(turns, template, opts),
 
   // ---- model catalog + storage ----
-  catalog: () => CATALOG,
+  catalog: () => catalogEntries(),
   // modelStatus/exists run their fs work in the utility host (off the renderer
   // thread), so both are async RPCs.
   modelStatus: () => send('modelStatus', []),
@@ -394,8 +390,23 @@ contextBridge.exposeInMainWorld('runanywhere', {
     return RAGStatistics.decode((await send('ragIngest', [handle, bytes])) as Uint8Array) as RagStats;
   },
   ragQuery: async (handle: number, query: RagQuery): Promise<RagResult> => {
-    const bytes = RAGQueryOptions.encode(RAGQueryOptions.fromPartial(query)).finish();
-    return RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array) as RagResult;
+    const bytes = RAGQueryOptions.encode(
+      RAGQueryOptions.fromPartial({
+        query: query.query,
+        generation: query.generation,
+        retrieval: {
+          topK: query.retrievalTopK,
+          scoreThreshold: query.scoreThreshold,
+        },
+      })
+    ).finish();
+    const raw = RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array);
+    // RAGResult dropped total_time_ms (deleted from idl/rag.proto); derive it —
+    // retrieval + generation is the whole of what the pipeline measures per-call.
+    return {
+      ...raw,
+      totalTimeMs: raw.retrievalTimeMs + raw.generationTimeMs,
+    } as RagResult;
   },
   ragStats: async (handle: number): Promise<RagStats> =>
     RAGStatistics.decode((await send('ragStats', [handle])) as Uint8Array) as RagStats,

@@ -38,6 +38,10 @@ sdk/runanywhere-react-native/packages/core/src/Public/Extensions/Hybrid/CloudSTT
 sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts|web:ts-json-serialisation
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/CloudSttProvider.ts|web:ts-json-serialisation
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/Cloud.ts|web:ts-json-serialisation
+# ToolDefinition.parameters is a JSON-Schema string by proto design
+# (idl/tool_calling.proto) -- the structured ToolParameter list was deleted
+# outright. Mirrors the already-allowlisted Swift/Kotlin web-search tools.
+sdk/runanywhere-web/packages/core/src/Public/Helpers/registerDuckDuckGoSearchTool.ts|web:ts-json-serialisation
 sdk/runanywhere-web/packages/core/src/Adapters/ProtoAdapterTypes.ts|web:hand-written-types-ts
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts|web:hand-written-types-ts
 

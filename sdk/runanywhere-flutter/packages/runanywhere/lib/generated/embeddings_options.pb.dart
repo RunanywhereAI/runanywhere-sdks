@@ -17,150 +17,12 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'embeddings_options.pbenum.dart';
 import 'errors.pb.dart' as $0;
-import 'model_types.pbenum.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'embeddings_options.pbenum.dart';
 
-/// Applied at service creation.
-class EmbeddingsConfiguration extends $pb.GeneratedMessage {
-  factory EmbeddingsConfiguration({
-    $core.String? modelId,
-    $core.int? embeddingDimension,
-    $core.int? maxSequenceLength,
-    $1.InferenceFramework? preferredFramework,
-    $core.bool? normalize,
-    EmbeddingsPoolingStrategy? pooling,
-    $core.String? configJson,
-  }) {
-    final result = create();
-    if (modelId != null) result.modelId = modelId;
-    if (embeddingDimension != null)
-      result.embeddingDimension = embeddingDimension;
-    if (maxSequenceLength != null) result.maxSequenceLength = maxSequenceLength;
-    if (preferredFramework != null)
-      result.preferredFramework = preferredFramework;
-    if (normalize != null) result.normalize = normalize;
-    if (pooling != null) result.pooling = pooling;
-    if (configJson != null) result.configJson = configJson;
-    return result;
-  }
-
-  EmbeddingsConfiguration._();
-
-  factory EmbeddingsConfiguration.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory EmbeddingsConfiguration.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EmbeddingsConfiguration',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aI(2, _omitFieldNames ? '' : 'embeddingDimension')
-    ..aI(3, _omitFieldNames ? '' : 'maxSequenceLength')
-    ..aE<$1.InferenceFramework>(5, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $1.InferenceFramework.values)
-    ..aOB(7, _omitFieldNames ? '' : 'normalize')
-    ..aE<EmbeddingsPoolingStrategy>(8, _omitFieldNames ? '' : 'pooling',
-        enumValues: EmbeddingsPoolingStrategy.values)
-    ..aOS(9, _omitFieldNames ? '' : 'configJson')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EmbeddingsConfiguration clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EmbeddingsConfiguration copyWith(
-          void Function(EmbeddingsConfiguration) updates) =>
-      super.copyWith((message) => updates(message as EmbeddingsConfiguration))
-          as EmbeddingsConfiguration;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static EmbeddingsConfiguration create() => EmbeddingsConfiguration._();
-  @$core.override
-  EmbeddingsConfiguration createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static EmbeddingsConfiguration getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EmbeddingsConfiguration>(create);
-  static EmbeddingsConfiguration? _defaultInstance;
-
-  /// Registry id or local path.
-  @$pb.TagNumber(1)
-  $core.String get modelId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set modelId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasModelId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearModelId() => $_clearField(1);
-
-  /// Must match the loaded model's hidden size: 384 for all-MiniLM-L6-v2,
-  /// 768 for bge-base, 1024 for bge-large.
-  @$pb.TagNumber(2)
-  $core.int get embeddingDimension => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set embeddingDimension($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasEmbeddingDimension() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearEmbeddingDimension() => $_clearField(2);
-
-  /// Truncation or sliding window past this length is backend-decided.
-  @$pb.TagNumber(3)
-  $core.int get maxSequenceLength => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set maxSequenceLength($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasMaxSequenceLength() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearMaxSequenceLength() => $_clearField(3);
-
-  @$pb.TagNumber(5)
-  $1.InferenceFramework get preferredFramework => $_getN(3);
-  @$pb.TagNumber(5)
-  set preferredFramework($1.InferenceFramework value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasPreferredFramework() => $_has(3);
-  @$pb.TagNumber(5)
-  void clearPreferredFramework() => $_clearField(5);
-
-  @$pb.TagNumber(7)
-  $core.bool get normalize => $_getBF(4);
-  @$pb.TagNumber(7)
-  set normalize($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(7)
-  $core.bool hasNormalize() => $_has(4);
-  @$pb.TagNumber(7)
-  void clearNormalize() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  EmbeddingsPoolingStrategy get pooling => $_getN(5);
-  @$pb.TagNumber(8)
-  set pooling(EmbeddingsPoolingStrategy value) => $_setField(8, value);
-  @$pb.TagNumber(8)
-  $core.bool hasPooling() => $_has(5);
-  @$pb.TagNumber(8)
-  void clearPooling() => $_clearField(8);
-
-  /// Backend-specific config such as tokenizer or vocab companion paths.
-  @$pb.TagNumber(9)
-  $core.String get configJson => $_getSZ(6);
-  @$pb.TagNumber(9)
-  set configJson($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(9)
-  $core.bool hasConfigJson() => $_has(6);
-  @$pb.TagNumber(9)
-  void clearConfigJson() => $_clearField(9);
-}
-
-/// Per-call overrides. Unset fields fall back to the component configuration.
+/// Per-call overrides. Unset fields fall back to the loaded bundle's defaults.
 class EmbeddingsOptions extends $pb.GeneratedMessage {
   factory EmbeddingsOptions({
     $core.bool? truncate,
@@ -168,6 +30,8 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
     $core.bool? normalize,
     EmbeddingsPoolingStrategy? pooling,
     $core.int? nThreads,
+    EmbeddingsInputType? inputType,
+    $core.int? dimensions,
   }) {
     final result = create();
     if (truncate != null) result.truncate = truncate;
@@ -175,6 +39,8 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
     if (normalize != null) result.normalize = normalize;
     if (pooling != null) result.pooling = pooling;
     if (nThreads != null) result.nThreads = nThreads;
+    if (inputType != null) result.inputType = inputType;
+    if (dimensions != null) result.dimensions = dimensions;
     return result;
   }
 
@@ -197,6 +63,9 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
     ..aE<EmbeddingsPoolingStrategy>(5, _omitFieldNames ? '' : 'pooling',
         enumValues: EmbeddingsPoolingStrategy.values)
     ..aI(6, _omitFieldNames ? '' : 'nThreads')
+    ..aE<EmbeddingsInputType>(7, _omitFieldNames ? '' : 'inputType',
+        enumValues: EmbeddingsInputType.values)
+    ..aI(8, _omitFieldNames ? '' : 'dimensions')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -218,8 +87,10 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<EmbeddingsOptions>(create);
   static EmbeddingsOptions? _defaultInstance;
 
-  /// Truncate over-long inputs instead of erroring. Unset = backend default,
-  /// currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
+  /// true  = clip an over-long input to the model's context and embed it.
+  /// false = fail the call.
+  /// Unset = true. A backend may instead aggregate over a sliding window,
+  /// which embeds the whole document rather than discarding its tail.
   @$pb.TagNumber(2)
   $core.bool get truncate => $_getBF(0);
   @$pb.TagNumber(2)
@@ -239,6 +110,8 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearBatchSize() => $_clearField(3);
 
+  /// L2-normalize every vector to unit length (what cosine search expects).
+  /// Unset = true. false returns the raw pooled vector.
   @$pb.TagNumber(4)
   $core.bool get normalize => $_getBF(2);
   @$pb.TagNumber(4)
@@ -265,24 +138,45 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
   $core.bool hasNThreads() => $_has(4);
   @$pb.TagNumber(6)
   void clearNThreads() => $_clearField(6);
+
+  /// What the vector will be used for. Asymmetric embedders (bge, e5,
+  /// nomic-embed, gte, EmbeddingGemma) prepend a different prompt for a query
+  /// than for a document. The prefix table must be added to the model manifest
+  /// as part of honouring this field; it does not exist today. A bundle that
+  /// declares no prompts ignores input_type and returns the identical vector
+  /// for QUERY and DOCUMENT — it never errors.
+  @$pb.TagNumber(7)
+  EmbeddingsInputType get inputType => $_getN(5);
+  @$pb.TagNumber(7)
+  set inputType(EmbeddingsInputType value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasInputType() => $_has(5);
+  @$pb.TagNumber(7)
+  void clearInputType() => $_clearField(7);
+
+  /// Matryoshka (MRL) output width: truncate each vector to this many floats
+  /// and re-normalize. Unset = the model's native width. Accepts any width in
+  /// [1, the native width]; a width the model was not MRL-trained at is
+  /// silently worse. This is the request-side width — EmbeddingsResult.dimension
+  /// reports the width actually produced.
+  @$pb.TagNumber(8)
+  $core.int get dimensions => $_getIZ(6);
+  @$pb.TagNumber(8)
+  set dimensions($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(8)
+  $core.bool hasDimensions() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearDimensions() => $_clearField(8);
 }
 
 class EmbeddingVector extends $pb.GeneratedMessage {
   factory EmbeddingVector({
     $core.Iterable<$core.double>? values,
-    $core.double? norm,
-    $core.String? text,
-    $core.int? dimension,
     $core.int? inputIndex,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
   }) {
     final result = create();
     if (values != null) result.values.addAll(values);
-    if (norm != null) result.norm = norm;
-    if (text != null) result.text = text;
-    if (dimension != null) result.dimension = dimension;
     if (inputIndex != null) result.inputIndex = inputIndex;
-    if (metadata != null) result.metadata.addEntries(metadata);
     return result;
   }
 
@@ -300,15 +194,7 @@ class EmbeddingVector extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KF)
-    ..aD(2, _omitFieldNames ? '' : 'norm', fieldType: $pb.PbFieldType.OF)
-    ..aOS(3, _omitFieldNames ? '' : 'text')
-    ..aI(4, _omitFieldNames ? '' : 'dimension')
-    ..aI(5, _omitFieldNames ? '' : 'inputIndex')
-    ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'EmbeddingVector.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
+    ..aI(2, _omitFieldNames ? '' : 'inputIndex')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -334,47 +220,16 @@ class EmbeddingVector extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $pb.PbList<$core.double> get values => $_getList(0);
 
-  /// Populated when the backend computes it, letting consumers score
-  /// similarity without recomputing.
+  /// Zero-based position in the request batch. ALWAYS set, on every entry
+  /// point, including index 0.
   @$pb.TagNumber(2)
-  $core.double get norm => $_getN(1);
+  $core.int get inputIndex => $_getIZ(1);
   @$pb.TagNumber(2)
-  set norm($core.double value) => $_setFloat(1, value);
+  set inputIndex($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasNorm() => $_has(1);
+  $core.bool hasInputIndex() => $_has(1);
   @$pb.TagNumber(2)
-  void clearNorm() => $_clearField(2);
-
-  /// Lets batch callers correlate vectors with inputs without tracking order.
-  @$pb.TagNumber(3)
-  $core.String get text => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set text($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasText() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearText() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get dimension => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set dimension($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasDimension() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearDimension() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get inputIndex => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set inputIndex($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasInputIndex() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearInputIndex() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(5);
+  void clearInputIndex() => $_clearField(2);
 }
 
 /// One text = embed, multiple texts = embed_batch.
@@ -384,14 +239,12 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
     EmbeddingsOptions? options,
     $core.String? requestId,
     $core.String? modelId,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
   }) {
     final result = create();
     if (texts != null) result.texts.addAll(texts);
     if (options != null) result.options = options;
     if (requestId != null) result.requestId = requestId;
     if (modelId != null) result.modelId = modelId;
-    if (metadata != null) result.metadata.addEntries(metadata);
     return result;
   }
 
@@ -413,11 +266,6 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
         subBuilder: EmbeddingsOptions.create)
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
     ..aOS(4, _omitFieldNames ? '' : 'modelId')
-    ..m<$core.String, $core.String>(5, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'EmbeddingsRequest.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -470,9 +318,6 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
   $core.bool hasModelId() => $_has(3);
   @$pb.TagNumber(4)
   void clearModelId() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 }
 
 class EmbeddingsResult extends $pb.GeneratedMessage {
@@ -483,7 +328,6 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     $core.int? tokensUsed,
     $core.String? modelId,
     $core.String? requestId,
-    $0.SDKError? error,
   }) {
     final result = create();
     if (vectors != null) result.vectors.addAll(vectors);
@@ -492,7 +336,6 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     if (tokensUsed != null) result.tokensUsed = tokensUsed;
     if (modelId != null) result.modelId = modelId;
     if (requestId != null) result.requestId = requestId;
-    if (error != null) result.error = error;
     return result;
   }
 
@@ -515,9 +358,7 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     ..aInt64(3, _omitFieldNames ? '' : 'processingTimeMs')
     ..aI(4, _omitFieldNames ? '' : 'tokensUsed')
     ..aOS(5, _omitFieldNames ? '' : 'modelId')
-    ..aOS(8, _omitFieldNames ? '' : 'requestId')
-    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
-        subBuilder: $0.SDKError.create)
+    ..aOS(6, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -543,7 +384,7 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $pb.PbList<EmbeddingVector> get vectors => $_getList(0);
 
-  /// Duplicated from each vector so consumers can size buffers in O(1).
+  /// The width of every vector above, so consumers can size buffers in O(1).
   @$pb.TagNumber(2)
   $core.int get dimension => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -581,36 +422,23 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearModelId() => $_clearField(5);
 
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(6)
   $core.String get requestId => $_getSZ(5);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(6)
   set requestId($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(8)
+  @$pb.TagNumber(6)
   $core.bool hasRequestId() => $_has(5);
-  @$pb.TagNumber(8)
-  void clearRequestId() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $0.SDKError get error => $_getN(6);
-  @$pb.TagNumber(9)
-  set error($0.SDKError value) => $_setField(9, value);
-  @$pb.TagNumber(9)
-  $core.bool hasError() => $_has(6);
-  @$pb.TagNumber(9)
-  void clearError() => $_clearField(9);
-  @$pb.TagNumber(9)
-  $0.SDKError ensureError() => $_ensure(6);
+  @$pb.TagNumber(6)
+  void clearRequestId() => $_clearField(6);
 }
 
 class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
   factory EmbeddingsCreateRequest({
     $core.String? modelId,
-    EmbeddingsConfiguration? configuration,
     $core.String? configJson,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
-    if (configuration != null) result.configuration = configuration;
     if (configJson != null) result.configJson = configJson;
     return result;
   }
@@ -629,9 +457,7 @@ class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOM<EmbeddingsConfiguration>(2, _omitFieldNames ? '' : 'configuration',
-        subBuilder: EmbeddingsConfiguration.create)
-    ..aOS(3, _omitFieldNames ? '' : 'configJson')
+    ..aOS(2, _omitFieldNames ? '' : 'configJson')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -664,27 +490,15 @@ class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearModelId() => $_clearField(1);
 
-  /// Unset = commons defaults; set fields override per-component defaults.
-  @$pb.TagNumber(2)
-  EmbeddingsConfiguration get configuration => $_getN(1);
-  @$pb.TagNumber(2)
-  set configuration(EmbeddingsConfiguration value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasConfiguration() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearConfiguration() => $_clearField(2);
-  @$pb.TagNumber(2)
-  EmbeddingsConfiguration ensureConfiguration() => $_ensure(1);
-
   /// For backends needing companion file paths, e.g. {"vocab_path":"..."}.
-  @$pb.TagNumber(3)
-  $core.String get configJson => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set configJson($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasConfigJson() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearConfigJson() => $_clearField(3);
+  @$pb.TagNumber(2)
+  $core.String get configJson => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set configJson($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasConfigJson() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearConfigJson() => $_clearField(2);
 }
 
 class EmbeddingsCreateResult extends $pb.GeneratedMessage {

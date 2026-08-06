@@ -10,14 +10,18 @@ import Foundation
 // MARK: - RASTTOptions: C-bridge + convenience
 
 public extension RASTTOptions {
+    // enableDiarization -> diarize, maxSpeakers -> speakersExpected (now
+    // optional presence-tracked), vocabularyList deleted outright (no
+    // replacement) — all idl/stt_options.proto renames/removals. No live
+    // caller of this initializer exists; kept only so callers that
+    // construct via named args at the old spelling still compile.
     init(
         language: String = "en",
         detectLanguage: Bool = false,
         enablePunctuation: Bool = true,
-        enableDiarization: Bool = false,
-        maxSpeakers: Int = 0,
-        enableTimestamps: Bool = true,
-        vocabularyFilter: [String] = []
+        diarize: Bool = false,
+        speakersExpected: Int? = nil,
+        enableTimestamps: Bool = true
     ) {
         var options = RASTTOptions()
         // `language` is an optional BCP-47 string; leaving it unset asks the
@@ -26,10 +30,9 @@ public extension RASTTOptions {
             options.language = language
         }
         options.enablePunctuation = enablePunctuation
-        options.enableDiarization = enableDiarization
-        options.maxSpeakers = Int32(maxSpeakers)
+        options.diarize = diarize
+        if let speakersExpected { options.speakersExpected = Int32(speakersExpected) }
         options.enableWordTimestamps = enableTimestamps
-        options.vocabularyList = vocabularyFilter
         self = options
     }
 }

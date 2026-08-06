@@ -296,15 +296,10 @@ bool validate_vad_stream_event(const runanywhere::v1::VADStreamEvent& event) {
     }
 
     switch (event.kind()) {
-        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STARTED:
-        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STOPPED:
-            return true;
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME:
             return event.has_result();
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
             return event.has_activity();
-        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STATISTICS:
-            return event.has_statistics();
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR:
             return event.has_error();
         default:
@@ -328,7 +323,9 @@ void emit_vad_stream_event(const runanywhere::v1::VADStreamEvent& event,
 void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, int32_t duration_ms,
                                 rac_result_t error_code = RAC_SUCCESS) {
     runanywhere::v1::VoiceEvent voice_event;
-    voice_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+    // VoiceEvent.timestamp_us was renamed to timestamp_ms (the producer clock
+    // is millisecond-granular; no *1000 conversion needed anymore).
+    voice_event.set_timestamp_ms(rac_get_current_time_ms());
     voice_event.set_category(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_CATEGORY_VAD
                                                        : runanywhere::v1::EVENT_CATEGORY_ERROR);
     voice_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
@@ -339,17 +336,22 @@ void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, 
         // VADEvent.type uses VADStreamEventKind; the speech/silence
         // direction is carried in the companion is_speech field below.
         vad->set_type(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
-        vad->set_confidence(confidence);
+        vad->set_probability(confidence);
         vad->set_is_speech(is_speech);
         vad->set_speech_duration_ms(is_speech ? duration_ms : 0);
         vad->set_silence_duration_ms(is_speech ? 0 : duration_ms);
         vad->set_noise_floor_db(energy > 0.0f ? 20.0 * std::log10(energy) : -120.0);
     } else {
-        auto* error = voice_event.mutable_error();
-        error->set_code(static_cast<int32_t>(error_code));
+        // VoiceEvent.error was deleted; the one error payload in this domain
+        // is now the session_error oneof arm (VoiceSessionError).
+        auto* error = voice_event.mutable_session_error();
+        const int32_t signed_code = static_cast<int32_t>(error_code);
+        const int32_t abs_code = signed_code < 0 ? -signed_code : signed_code;
+        error->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
         error->set_message(rac_error_message(error_code));
-        error->set_component("vad");
-        error->set_is_recoverable(true);
+        error->set_failed_component("vad");
+        error->set_c_abi_code(signed_code);
+        error->set_recoverable(true);
     }
 
     runanywhere::v1::SDKEvent sdk_event;
@@ -1323,7 +1325,7 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
 
     runanywhere::v1::VADResult result;
     result.set_is_speech(is_speech == RAC_TRUE);
-    result.set_confidence(confidence);
+    result.set_probability(confidence);
     result.set_energy(energy);
     result.set_duration_ms(duration_ms);
     publish_vad_pipeline_event(is_speech == RAC_TRUE, confidence, energy, duration_ms);
@@ -1436,11 +1438,6 @@ rac_result_t parse_vad_request(const uint8_t* request_proto_bytes, size_t reques
                                      static_cast<int>(request_proto_size))) {
         return parse_error(out_error, "failed to parse VADProcessRequest");
     }
-    if (out_request->has_audio() && !out_request->audio().adapter_handle().empty()) {
-        return rac_proto_buffer_set_error(
-            out_error, RAC_ERROR_NOT_SUPPORTED,
-            "VADProcessRequest audio adapter_handle requires a platform adapter");
-    }
     if (!out_request->has_audio() || out_request->audio().audio_data().empty()) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                           "VADProcessRequest.audio.audio_data is required");
@@ -1501,7 +1498,7 @@ rac_result_t emit_vad_service_state(const rac::lifecycle::LifecycleVadRef& ref, 
     const bool active = (ref.ops != nullptr && ref.ops->is_speech_active != nullptr &&
                          ref.ops->is_speech_active(ref.impl) == RAC_TRUE);
     state.set_is_speech_active(active);
-    state.set_energy_threshold(threshold);
+    state.set_activation_threshold(threshold);
     state.set_sample_rate(sample_rate);
     state.set_frame_length_ms(frame_length_ms);
     if (ref.model_id) {
@@ -1585,8 +1582,8 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     runanywhere::v1::VADResult result;
     result.set_is_speech(is_speech == RAC_TRUE);
     result.set_energy(energy);
-    result.set_confidence(threshold > 0.0f ? std::min(1.0f, energy / threshold)
-                                           : (is_speech == RAC_TRUE ? 1.0f : 0.0f));
+    result.set_probability(threshold > 0.0f ? std::min(1.0f, energy / threshold)
+                                            : (is_speech == RAC_TRUE ? 1.0f : 0.0f));
     int32_t duration_ms = static_cast<int32_t>(
         (static_cast<double>(samples.size()) / static_cast<double>(sample_rate)) * 1000.0);
     if (!samples.empty() && duration_ms == 0) {
@@ -1599,7 +1596,7 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     // event for the in-app event stream + edge-detected speech-activity rows
     // (started/ended with speech/silence duration + segment count). Without
     // this, standalone VAD via processLifecycle never reached telemetry.
-    emit_lifecycle_vad_telemetry(is_speech == RAC_TRUE, sample_rate, result.confidence(), energy,
+    emit_lifecycle_vad_telemetry(is_speech == RAC_TRUE, sample_rate, result.probability(), energy,
                                  duration_ms, ref.model_id);
 
     rc = copy_proto(result, out_result);

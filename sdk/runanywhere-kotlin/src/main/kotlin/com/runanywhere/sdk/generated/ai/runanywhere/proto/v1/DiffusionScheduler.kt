@@ -17,7 +17,8 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * DDPM and LCM are forward-looking; no SDK exposes them.
+ * Only values with a C carrier are listed. UNSPECIFIED = the model's
+ * configured scheduler, which is what every engine does.
  */
 public enum class DiffusionScheduler(
   override val `value`: Int,
@@ -29,16 +30,14 @@ public enum class DiffusionScheduler(
    */
   DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS(2),
   DIFFUSION_SCHEDULER_DDIM(3),
-  DIFFUSION_SCHEDULER_DDPM(4),
-  DIFFUSION_SCHEDULER_EULER(5),
+  DIFFUSION_SCHEDULER_EULER(4),
   /**
    * Euler Ancestral
    */
-  DIFFUSION_SCHEDULER_EULER_A(6),
-  DIFFUSION_SCHEDULER_PNDM(7),
-  DIFFUSION_SCHEDULER_LMS(8),
-  DIFFUSION_SCHEDULER_LCM(9),
-  DIFFUSION_SCHEDULER_DPMPP_2M_SDE(10),
+  DIFFUSION_SCHEDULER_EULER_A(5),
+  DIFFUSION_SCHEDULER_PNDM(6),
+  DIFFUSION_SCHEDULER_LMS(7),
+  DIFFUSION_SCHEDULER_DPMPP_2M_SDE(8),
   ;
 
   public companion object {
@@ -57,13 +56,11 @@ public enum class DiffusionScheduler(
       1 -> DIFFUSION_SCHEDULER_DPMPP_2M
       2 -> DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS
       3 -> DIFFUSION_SCHEDULER_DDIM
-      4 -> DIFFUSION_SCHEDULER_DDPM
-      5 -> DIFFUSION_SCHEDULER_EULER
-      6 -> DIFFUSION_SCHEDULER_EULER_A
-      7 -> DIFFUSION_SCHEDULER_PNDM
-      8 -> DIFFUSION_SCHEDULER_LMS
-      9 -> DIFFUSION_SCHEDULER_LCM
-      10 -> DIFFUSION_SCHEDULER_DPMPP_2M_SDE
+      4 -> DIFFUSION_SCHEDULER_EULER
+      5 -> DIFFUSION_SCHEDULER_EULER_A
+      6 -> DIFFUSION_SCHEDULER_PNDM
+      7 -> DIFFUSION_SCHEDULER_LMS
+      8 -> DIFFUSION_SCHEDULER_DPMPP_2M_SDE
       else -> null
     }
   }

@@ -67,22 +67,22 @@ constexpr CuaAction::ParseTableT_ CuaAction::InternalGenerateParseTable_(const :
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(CuaAction, _impl_.type_), 2>(),
        {8, 2, 0,
         PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.type_)}},
-      // bool coordinate_valid = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(CuaAction, _impl_.coordinate_valid_), 7>(),
-       {16, 7, 0,
-        PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.coordinate_valid_)}},
-      // int32 x = 3;
+      // optional int32 x = 2;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(CuaAction, _impl_.x_), 3>(),
-       {24, 3, 0,
+       {16, 3, 0,
         PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.x_)}},
-      // int32 y = 4;
+      // optional int32 y = 3;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(CuaAction, _impl_.y_), 4>(),
-       {32, 4, 0,
+       {24, 4, 0,
         PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.y_)}},
-      // int32 scroll_pixels = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(CuaAction, _impl_.scroll_pixels_), 5>(),
-       {40, 5, 0,
-        PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.scroll_pixels_)}},
+      // int32 scroll_x = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(CuaAction, _impl_.scroll_x_), 5>(),
+       {32, 5, 0,
+        PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.scroll_x_)}},
+      // int32 scroll_y = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(CuaAction, _impl_.scroll_y_), 7>(),
+       {40, 7, 0,
+        PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.scroll_y_)}},
       // double wait_seconds = 6;
       {::_pbi::TcParser::FastF64S1,
        {49, 6, 0,
@@ -95,10 +95,10 @@ constexpr CuaAction::ParseTableT_ CuaAction::InternalGenerateParseTable_(const :
       {::_pbi::TcParser::FastUS1,
        {66, 1, 0,
         PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.reasoning_)}},
-      // bool parse_ok = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(CuaAction, _impl_.parse_ok_), 8>(),
+      // bool is_valid = 9;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(CuaAction, _impl_.is_valid_), 8>(),
        {72, 8, 0,
-        PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.parse_ok_)}},
+        PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.is_valid_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -110,22 +110,22 @@ constexpr CuaAction::ParseTableT_ CuaAction::InternalGenerateParseTable_(const :
     }}, {{
       // .runanywhere.v1.CuaActionType type = 1;
       {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.type_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // bool coordinate_valid = 2;
-      {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.coordinate_valid_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int32 x = 3;
+      // optional int32 x = 2;
       {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.x_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 y = 4;
+      // optional int32 y = 3;
       {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.y_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 scroll_pixels = 5;
-      {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.scroll_pixels_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 scroll_x = 4;
+      {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.scroll_x_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 scroll_y = 5;
+      {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.scroll_y_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // double wait_seconds = 6;
       {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.wait_seconds_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
       // string text = 7;
       {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string reasoning = 8;
       {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.reasoning_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool parse_ok = 9;
-      {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.parse_ok_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool is_valid = 9;
+      {PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.is_valid_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     // no aux_entries
     {{
@@ -151,10 +151,10 @@ inline constexpr CuaAction::Impl_::Impl_(
         type_{static_cast< ::runanywhere::v1::CuaActionType >(0)},
         x_{0},
         y_{0},
-        scroll_pixels_{0},
+        scroll_x_{0},
         wait_seconds_{0},
-        coordinate_valid_{false},
-        parse_ok_{false} {}
+        scroll_y_{0},
+        is_valid_{false} {}
 
 template <typename>
 constexpr CuaAction::CuaAction(::_pbi::ConstantInitialized,
@@ -261,19 +261,19 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_._has_bits_),
         12, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.type_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.coordinate_valid_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.x_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.y_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.scroll_pixels_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.scroll_x_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.scroll_y_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.wait_seconds_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.reasoning_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.parse_ok_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CuaAction, _impl_.is_valid_),
         2,
-        7,
         3,
         4,
         5,
+        7,
         6,
         0,
         1,
@@ -290,37 +290,37 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_cua_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\tcua.proto\022\016runanywhere.v1\"\310\001\n\tCuaActio"
+    "\n\tcua.proto\022\016runanywhere.v1\"\321\001\n\tCuaActio"
     "n\022+\n\004type\030\001 \001(\0162\035.runanywhere.v1.CuaActi"
-    "onType\022\030\n\020coordinate_valid\030\002 \001(\010\022\t\n\001x\030\003 "
-    "\001(\005\022\t\n\001y\030\004 \001(\005\022\025\n\rscroll_pixels\030\005 \001(\005\022\024\n"
-    "\014wait_seconds\030\006 \001(\001\022\014\n\004text\030\007 \001(\t\022\021\n\trea"
-    "soning\030\010 \001(\t\022\020\n\010parse_ok\030\t \001(\010*\350\004\n\rCuaAc"
-    "tionType\022\037\n\033CUA_ACTION_TYPE_UNSPECIFIED\020"
-    "\000\022\036\n\032CUA_ACTION_TYPE_LEFT_CLICK\020\001\022\037\n\033CUA"
-    "_ACTION_TYPE_RIGHT_CLICK\020\002\022 \n\034CUA_ACTION"
-    "_TYPE_DOUBLE_CLICK\020\003\022 \n\034CUA_ACTION_TYPE_"
-    "TRIPLE_CLICK\020\004\022\036\n\032CUA_ACTION_TYPE_MOUSE_"
-    "MOVE\020\005\022#\n\037CUA_ACTION_TYPE_LEFT_CLICK_DRA"
-    "G\020\006\022\030\n\024CUA_ACTION_TYPE_TYPE\020\007\022\027\n\023CUA_ACT"
-    "ION_TYPE_KEY\020\010\022\032\n\026CUA_ACTION_TYPE_SCROLL"
-    "\020\t\022\033\n\027CUA_ACTION_TYPE_HSCROLL\020\n\022\035\n\031CUA_A"
-    "CTION_TYPE_VISIT_URL\020\013\022 \n\034CUA_ACTION_TYP"
-    "E_HISTORY_BACK\020\014\022\036\n\032CUA_ACTION_TYPE_WEB_"
-    "SEARCH\020\r\022$\n CUA_ACTION_TYPE_READ_PAGE_AN"
-    "SWER\020\016\022\"\n\036CUA_ACTION_TYPE_PAUSE_MEMORIZE"
-    "\020\017\022\034\n\030CUA_ACTION_TYPE_ASK_USER\020\020\022\030\n\024CUA_"
-    "ACTION_TYPE_WAIT\020\021\022\035\n\031CUA_ACTION_TYPE_TE"
-    "RMINATE\020\022B\203\001\n\027ai.runanywhere.proto.v1B\010C"
-    "uaProtoP\001Z<github.com/runanywhere/runany"
-    "where-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV"
-    "1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "onType\022\016\n\001x\030\002 \001(\005H\000\210\001\001\022\016\n\001y\030\003 \001(\005H\001\210\001\001\022\020"
+    "\n\010scroll_x\030\004 \001(\005\022\020\n\010scroll_y\030\005 \001(\005\022\024\n\014wa"
+    "it_seconds\030\006 \001(\001\022\014\n\004text\030\007 \001(\t\022\021\n\treason"
+    "ing\030\010 \001(\t\022\020\n\010is_valid\030\t \001(\010B\004\n\002_xB\004\n\002_y*"
+    "\350\004\n\rCuaActionType\022\037\n\033CUA_ACTION_TYPE_UNS"
+    "PECIFIED\020\000\022\036\n\032CUA_ACTION_TYPE_LEFT_CLICK"
+    "\020\001\022\037\n\033CUA_ACTION_TYPE_RIGHT_CLICK\020\002\022 \n\034C"
+    "UA_ACTION_TYPE_DOUBLE_CLICK\020\003\022 \n\034CUA_ACT"
+    "ION_TYPE_TRIPLE_CLICK\020\004\022\036\n\032CUA_ACTION_TY"
+    "PE_MOUSE_MOVE\020\005\022#\n\037CUA_ACTION_TYPE_LEFT_"
+    "CLICK_DRAG\020\006\022\030\n\024CUA_ACTION_TYPE_TYPE\020\007\022\027"
+    "\n\023CUA_ACTION_TYPE_KEY\020\010\022\032\n\026CUA_ACTION_TY"
+    "PE_SCROLL\020\t\022\033\n\027CUA_ACTION_TYPE_HSCROLL\020\n"
+    "\022\035\n\031CUA_ACTION_TYPE_VISIT_URL\020\013\022 \n\034CUA_A"
+    "CTION_TYPE_HISTORY_BACK\020\014\022\036\n\032CUA_ACTION_"
+    "TYPE_WEB_SEARCH\020\r\022$\n CUA_ACTION_TYPE_REA"
+    "D_PAGE_ANSWER\020\016\022\"\n\036CUA_ACTION_TYPE_PAUSE"
+    "_MEMORIZE\020\017\022\034\n\030CUA_ACTION_TYPE_ASK_USER\020"
+    "\020\022\030\n\024CUA_ACTION_TYPE_WAIT\020\021\022\035\n\031CUA_ACTIO"
+    "N_TYPE_TERMINATE\020\022B\203\001\n\027ai.runanywhere.pr"
+    "oto.v1B\010CuaProtoP\001Z<github.com/runanywhe"
+    "re/runanywhere-sdks/idl/v1;runanywherev1"
+    "\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_cua_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_cua_2eproto = {
     false,
     false,
-    991,
+    1000,
     descriptor_table_protodef_cua_2eproto,
     "cua.proto",
     &descriptor_table_cua_2eproto_once,
@@ -380,9 +380,9 @@ CuaAction::CuaAction(
                offsetof(Impl_, type_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, type_),
-           offsetof(Impl_, parse_ok_) -
+           offsetof(Impl_, is_valid_) -
                offsetof(Impl_, type_) +
-               sizeof(Impl_::parse_ok_));
+               sizeof(Impl_::is_valid_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.CuaAction)
 }
@@ -398,9 +398,9 @@ inline void CuaAction::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, type_),
            0,
-           offsetof(Impl_, parse_ok_) -
+           offsetof(Impl_, is_valid_) -
                offsetof(Impl_, type_) +
-               sizeof(Impl_::parse_ok_));
+               sizeof(Impl_::is_valid_));
 }
 CuaAction::~CuaAction() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.CuaAction)
@@ -462,10 +462,10 @@ PROTOBUF_NOINLINE void CuaAction::Clear() {
   }
   if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
     ::memset(&_impl_.type_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.coordinate_valid_) -
-        reinterpret_cast<char*>(&_impl_.type_)) + sizeof(_impl_.coordinate_valid_));
+        reinterpret_cast<char*>(&_impl_.scroll_y_) -
+        reinterpret_cast<char*>(&_impl_.type_)) + sizeof(_impl_.scroll_y_));
   }
-  _impl_.parse_ok_ = false;
+  _impl_.is_valid_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -498,39 +498,35 @@ PROTOBUF_NOINLINE void CuaAction::Clear() {
     }
   }
 
-  // bool coordinate_valid = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (this_._internal_coordinate_valid() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          2, this_._internal_coordinate_valid(), target);
-    }
-  }
-
-  // int32 x = 3;
+  // optional int32 x = 2;
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_x() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_x(), target);
-    }
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
+            stream, this_._internal_x(), target);
   }
 
-  // int32 y = 4;
+  // optional int32 y = 3;
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_y() != 0) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
+            stream, this_._internal_y(), target);
+  }
+
+  // int32 scroll_x = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_scroll_x() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
-              stream, this_._internal_y(), target);
+              stream, this_._internal_scroll_x(), target);
     }
   }
 
-  // int32 scroll_pixels = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_scroll_pixels() != 0) {
+  // int32 scroll_y = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_scroll_y() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
-              stream, this_._internal_scroll_pixels(), target);
+              stream, this_._internal_scroll_y(), target);
     }
   }
 
@@ -563,12 +559,12 @@ PROTOBUF_NOINLINE void CuaAction::Clear() {
     }
   }
 
-  // bool parse_ok = 9;
+  // bool is_valid = 9;
   if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_parse_ok() != 0) {
+    if (this_._internal_is_valid() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          9, this_._internal_parse_ok(), target);
+          9, this_._internal_is_valid(), target);
     }
   }
 
@@ -619,25 +615,21 @@ PROTOBUF_NOINLINE void CuaAction::Clear() {
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_type());
       }
     }
-    // int32 x = 3;
+    // optional int32 x = 2;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_x() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_x());
-      }
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_x());
     }
-    // int32 y = 4;
+    // optional int32 y = 3;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_y() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_y());
-      }
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_y());
     }
-    // int32 scroll_pixels = 5;
+    // int32 scroll_x = 4;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_scroll_pixels() != 0) {
+      if (this_._internal_scroll_x() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_scroll_pixels());
+            this_._internal_scroll_x());
       }
     }
     // double wait_seconds = 6;
@@ -646,17 +638,18 @@ PROTOBUF_NOINLINE void CuaAction::Clear() {
         total_size += 9;
       }
     }
-    // bool coordinate_valid = 2;
+    // int32 scroll_y = 5;
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (this_._internal_coordinate_valid() != 0) {
-        total_size += 2;
+      if (this_._internal_scroll_y() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_scroll_y());
       }
     }
   }
    {
-    // bool parse_ok = 9;
+    // bool is_valid = 9;
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_parse_ok() != 0) {
+      if (this_._internal_is_valid() != 0) {
         total_size += 2;
       }
     }
@@ -703,18 +696,14 @@ void CuaAction::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_x() != 0) {
-        _this->_impl_.x_ = from._impl_.x_;
-      }
+      _this->_impl_.x_ = from._impl_.x_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_y() != 0) {
-        _this->_impl_.y_ = from._impl_.y_;
-      }
+      _this->_impl_.y_ = from._impl_.y_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_scroll_pixels() != 0) {
-        _this->_impl_.scroll_pixels_ = from._impl_.scroll_pixels_;
+      if (from._internal_scroll_x() != 0) {
+        _this->_impl_.scroll_x_ = from._impl_.scroll_x_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
@@ -723,14 +712,14 @@ void CuaAction::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_coordinate_valid() != 0) {
-        _this->_impl_.coordinate_valid_ = from._impl_.coordinate_valid_;
+      if (from._internal_scroll_y() != 0) {
+        _this->_impl_.scroll_y_ = from._impl_.scroll_y_;
       }
     }
   }
   if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_parse_ok() != 0) {
-      _this->_impl_.parse_ok_ = from._impl_.parse_ok_;
+    if (from._internal_is_valid() != 0) {
+      _this->_impl_.is_valid_ = from._impl_.is_valid_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -755,8 +744,8 @@ void CuaAction::InternalSwap(CuaAction* PROTOBUF_RESTRICT PROTOBUF_NONNULL other
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.reasoning_, &other->_impl_.reasoning_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.parse_ok_)
-      + sizeof(CuaAction::_impl_.parse_ok_)
+      PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.is_valid_)
+      + sizeof(CuaAction::_impl_.is_valid_)
       - PROTOBUF_FIELD_OFFSET(CuaAction, _impl_.type_)>(
           reinterpret_cast<char*>(&_impl_.type_),
           reinterpret_cast<char*>(&other->_impl_.type_));

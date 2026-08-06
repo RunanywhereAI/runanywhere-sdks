@@ -217,9 +217,18 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                 ModelInfo snapshot;
                 std::error_code fs_ec;
                 if (get_model_snapshot_by_id(handle, model_id, &snapshot) &&
-                    (snapshot.has_expected_files() || snapshot.has_multi_file()) &&
                     std::filesystem::exists(model_path, fs_ec)) {
-                    if (!model_folder_is_complete(snapshot, model_path)) {
+                    // ModelInfo.expected_files (top-level) was deleted; the
+                    // per-artifact completeness check now applies whenever
+                    // the single_file/archive artifact declares its own
+                    // expected_files, or the artifact is multi_file.
+                    const bool has_expected_files_manifest =
+                        (snapshot.artifact_case() == ModelInfo::kSingleFile &&
+                         snapshot.single_file().has_expected_files()) ||
+                        (snapshot.artifact_case() == ModelInfo::kArchive &&
+                         snapshot.archive().has_expected_files());
+                    if ((has_expected_files_manifest || snapshot.has_multi_file()) &&
+                        !model_folder_is_complete(snapshot, model_path)) {
                         RAC_LOG_WARNING(
                             "ModelRegistry",
                             "Refresh rescan: '%s' folder is incomplete — leaving unlinked",
@@ -314,6 +323,12 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
             manifest_restored = restore_models_from_folder_manifests(handle);
             adapter_rescan_linked = rescan_local_via_platform_adapter(handle);
             adapter_rescan_ran = true;
+            // discovered_count/updated_count (derivations of these two
+            // figures) were reserved off ModelRegistryRefreshResult; log
+            // them instead of silently dropping the diagnostic.
+            RAC_LOG_INFO("ModelRegistry",
+                        "Refresh rescan: manifest_restored=%d adapter_rescan_linked=%d",
+                        manifest_restored, adapter_rescan_linked);
         }
     }
 
@@ -332,17 +347,13 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
         sort_query_results(request.query(), &filtered);
         models = std::move(filtered);
     }
-    const ModelCounts counts = count_models(models);
-
+    // registered_count/updated_count/discovered_count/pruned_count/
+    // downloaded_count/available_count/error_count were all reserved off
+    // ModelRegistryRefreshResult: pure derivations over `models` with no
+    // remaining consumer. `models`/refreshed_at_unix_ms/warnings/error are
+    // the only fields that survive.
     ModelRegistryRefreshResult result;
-    result.set_registered_count(counts.total);
-    result.set_updated_count(adapter_rescan_linked);
-    result.set_discovered_count(adapter_rescan_linked + manifest_restored);
-    result.set_pruned_count(0);
     result.set_refreshed_at_unix_ms(rac_get_current_time_ms());
-    result.set_downloaded_count(counts.downloaded);
-    result.set_available_count(counts.available);
-    result.set_error_count(counts.errors);
     if (refresh_rc != RAC_SUCCESS) {
         rac::foundation::populate_sdk_error(result.mutable_error(), refresh_rc);
     }
