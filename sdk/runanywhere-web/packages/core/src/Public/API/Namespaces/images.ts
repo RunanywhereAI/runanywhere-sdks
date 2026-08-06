@@ -35,7 +35,6 @@ export const images = {
     await ensureImageModel();
     const protoOptions = toProtoImageOptions(prompt, options);
     const result = await generateImage(protoOptions);
-    if (result.error) throw new SDKException(result.error);
     return toImageResult(result, protoOptions.steps ?? 0);
   },
 

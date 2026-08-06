@@ -139,7 +139,7 @@ export type { VoiceSession, VoiceSessionOptions } from './Public/API/Namespaces/
 
 // Errors — one typed exception carrying the generated proto error taxonomy.
 export { SDKException, isSDKException } from './Foundation/SDKException.js';
-export type { ProtoErrorContext, ProtoSDKError } from './Foundation/SDKException.js';
+export type { ProtoSDKError } from './Foundation/SDKException.js';
 export {
   ProtoErrorCategory,
   ProtoErrorCode,

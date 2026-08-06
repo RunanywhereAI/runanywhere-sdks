@@ -207,7 +207,6 @@ function callOptions(
     minSilenceDurationMs: options?.minSilenceDurationMs ?? defaults.minSilenceDurationMs,
     maxSpeechDurationMs: options?.maxSpeechDurationMs ?? defaults.maxSpeechDurationMs,
     prefixPaddingMs: options?.prefixPaddingMs ?? defaults.prefixPaddingMs,
-    includeStatistics: options?.includeStatistics ?? defaults.includeStatistics,
   };
 }
 

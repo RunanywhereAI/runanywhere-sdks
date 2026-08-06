@@ -124,7 +124,6 @@ async function embed(
     options,
     requestId: '',
     modelId: modelID,
-    metadata: {},
   };
   return embedBatch(request, modelID);
 }
@@ -160,10 +159,6 @@ async function embedBatch(
       'Embeddings.embedBatch',
       'embedBatch returned no result from the native WASM.',
     );
-  }
-
-  if (result.error) {
-    throw new SDKException(result.error);
   }
 
   return result;
@@ -223,9 +218,9 @@ function l2Norm(values: number[]): number {
 }
 
 /**
- * Cosine similarity between two embedding vectors. Uses the precomputed
- * `norm` field when present, recomputing the L2 norm otherwise. Returns 0
- * for mismatched/empty vectors or zero norms.
+ * Cosine similarity between two embedding vectors. `EmbeddingVector` carries
+ * no precomputed norm on the wire, so both L2 norms are always recomputed.
+ * Returns 0 for mismatched/empty vectors or zero norms.
  * Swift parity: `RAEmbeddingVector.cosineSimilarity(with:)`
  * (EmbeddingsProto+Helpers.swift:18).
  */
@@ -233,8 +228,8 @@ export function embeddingCosineSimilarity(a: EmbeddingVector, b: EmbeddingVector
   if (a.values.length !== b.values.length || a.values.length === 0) return 0;
   let dot = 0;
   for (let i = 0; i < a.values.length; i += 1) dot += a.values[i]! * b.values[i]!;
-  const aNorm = a.norm !== undefined ? a.norm : l2Norm(a.values);
-  const bNorm = b.norm !== undefined ? b.norm : l2Norm(b.values);
+  const aNorm = l2Norm(a.values);
+  const bNorm = l2Norm(b.values);
   if (aNorm <= 0 || bNorm <= 0) return 0;
   return dot / (aNorm * bNorm);
 }

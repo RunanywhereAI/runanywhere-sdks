@@ -83,11 +83,11 @@ function toVoiceEvents(event: ProtoVoiceEvent): VoiceEvent[] {
       out.push(event.vad.isSpeech ? { type: 'speechStarted' } : { type: 'speechEnded' });
     }
   }
-  if (event.error) {
+  if (event.sessionError) {
     out.push({
       type: 'error',
-      message: event.error.message,
-      recoverable: event.error.isRecoverable,
+      message: event.sessionError.message,
+      recoverable: event.sessionError.recoverable,
     });
   }
   return out;

@@ -113,7 +113,6 @@ export class VADProtoAdapter {
     sampleRate = audioCaptureDefaults.micSampleRateHz,
   ): Promise<ProtoVADResult | null> {
     const request = VADProcessRequest.create({
-      requestId: lifecycleRequestId(),
       audio: {
         audioData: float32ToLittleEndianBytes(samples),
         encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
@@ -122,7 +121,6 @@ export class VADProtoAdapter {
         frameOffsetMs: 0,
       },
       options,
-      metadata: {},
     });
     const host = requireLiveOnnxWorkerOrMain('vad.processLifecycle');
     if (host) {
@@ -197,7 +195,6 @@ export class VADProtoAdapter {
       return null;
     }
     const request = VADProcessRequest.create({
-      requestId: lifecycleRequestId(),
       audio: {
         audioData: float32ToLittleEndianBytes(samples),
         encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
@@ -206,7 +203,6 @@ export class VADProtoAdapter {
         frameOffsetMs: 0,
       },
       options,
-      metadata: {},
     });
     return this.bridge().withEncodedRequest(
       request,
@@ -495,11 +491,4 @@ function float32ToLittleEndianBytes(samples: Float32Array): Uint8Array {
     view.setFloat32(index * Float32Array.BYTES_PER_ELEMENT, samples[index] ?? 0, true);
   }
   return new Uint8Array(buffer);
-}
-
-function lifecycleRequestId(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID();
-  }
-  return `vad-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

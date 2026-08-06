@@ -6,13 +6,10 @@ import {
   LoraAdapterCatalogListRequest,
   LoraAdapterCatalogListResult,
   LoraAdapterCatalogQuery,
-  LoraAdapterDownloadCompletedRequest,
-  LoraAdapterDownloadCompletedResult,
   type LoraAdapterCatalogEntry as ProtoLoraAdapterCatalogEntry,
   type LoraAdapterCatalogGetRequest as ProtoLoraAdapterCatalogGetRequest,
   type LoraAdapterCatalogListRequest as ProtoLoraAdapterCatalogListRequest,
   type LoraAdapterCatalogQuery as ProtoLoraAdapterCatalogQuery,
-  type LoraAdapterDownloadCompletedRequest as ProtoLoraAdapterDownloadCompletedRequest,
 } from '@runanywhere/proto-ts/lora_options';
 import { ProtoErrorCode } from '../../../../src/Foundation/SDKException';
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
@@ -43,10 +40,6 @@ interface CapturedCatalogCalls {
     registry: number;
     request: ProtoLoraAdapterCatalogGetRequest;
   };
-  markDownloadCompleted?: {
-    registry: number;
-    request: ProtoLoraAdapterDownloadCompletedRequest;
-  };
 }
 
 describe('LoRA catalog proto facade', () => {
@@ -55,7 +48,14 @@ describe('LoRA catalog proto facade', () => {
     ModalityProtoAdapter.clearDefaultModule();
   });
 
-  it('routes catalog list/query/get/download-completion through generated proto bytes', async () => {
+  // `LoraAdapterCatalogListRequest.includeCounts`,
+  // `LoraAdapterCatalogListResult.filteredCount`, and the
+  // `rac_lora_catalog_mark_download_completed_proto` verb were all deleted
+  // outright (idl/lora_options.proto's lora-delete-download-import-
+  // bookkeeping pass): adapter files are acquired through the models
+  // domain's generic download verb now, and a non-empty
+  // `LoraAdapterCatalogEntry.localPath` is the only "downloaded" signal.
+  it('routes catalog list/query/get through generated proto bytes', async () => {
     const captured: CapturedCatalogCalls = {};
     ModalityProtoAdapter.registerModuleCapabilities(
       ['lora'],
@@ -70,10 +70,8 @@ describe('LoRA catalog proto facade', () => {
 
     await expect(LoRA.catalog.list({
       query: { modelId: 'base-model', tags: [] },
-      includeCounts: true,
     })).resolves.toMatchObject({
       totalCount: 1,
-      filteredCount: 1,
       downloadedCount: 0,
       entries: [expect.objectContaining({ id: 'style' })],
     });
@@ -91,24 +89,13 @@ describe('LoRA catalog proto facade', () => {
       entry: expect.objectContaining({ id: 'style' }),
     });
 
-    await expect(LoRA.catalog.markDownloadCompleted({
-      adapterId: 'style',
-      localPath: 'opfs://runanywhere/lora/style.gguf',
-      sizeBytes: 12,
-      imported: false,
-      statusMessage: 'download completed',
-    })).resolves.toMatchObject({
-      persisted: true,
-      entry: expect.objectContaining({ id: 'style' }),
-    });
-
     expect(captured.register).toMatchObject({
       registry: LORA_REGISTRY_HANDLE,
       entry: { id: 'style' },
     });
     expect(captured.list).toMatchObject({
       registry: LORA_REGISTRY_HANDLE,
-      request: { includeCounts: true, query: { modelId: 'base-model' } },
+      request: { query: { modelId: 'base-model' } },
     });
     expect(captured.query).toMatchObject({
       registry: LORA_REGISTRY_HANDLE,
@@ -117,13 +104,6 @@ describe('LoRA catalog proto facade', () => {
     expect(captured.get).toMatchObject({
       registry: LORA_REGISTRY_HANDLE,
       request: { adapterId: 'style' },
-    });
-    expect(captured.markDownloadCompleted).toMatchObject({
-      registry: LORA_REGISTRY_HANDLE,
-      request: {
-        adapterId: 'style',
-        localPath: 'opfs://runanywhere/lora/style.gguf',
-      },
     });
   });
 
@@ -137,7 +117,6 @@ describe('LoRA catalog proto facade', () => {
       '_rac_lora_catalog_list_proto',
       '_rac_lora_catalog_query_proto',
       '_rac_lora_catalog_get_proto',
-      '_rac_lora_catalog_mark_download_completed_proto',
     ]));
 
     await expect(LoRA.catalog.list()).rejects.toMatchObject({
@@ -148,26 +127,21 @@ describe('LoRA catalog proto facade', () => {
   });
 });
 
+// `LoraAdapterCatalogEntry` was trimmed to 6 adapter-specific fields
+// (idl/lora_options.proto's lora-delete-download-import-bookkeeping pass):
+// every generic artifact fact (description/url/filename/sizeBytes/author/
+// checksumSha256/license) moved to the ModelInfo artifact record instead,
+// and a non-empty `localPath` is now the sole "downloaded" signal
+// (isDownloaded/downloadedAtUnixMs/isImported/statusMessage were deleted
+// outright, not just renamed).
 function catalogEntry(): ProtoLoraAdapterCatalogEntry {
   return {
     id: 'style',
     name: 'Style',
-    description: 'Style adapter',
-    url: 'https://example.test/style.gguf',
-    filename: 'style.gguf',
     compatibleModels: ['base-model'],
-    sizeBytes: 12,
-    author: undefined,
     defaultScale: 0.75,
-    checksumSha256: undefined,
-    license: undefined,
     tags: ['style'],
-    metadata: {},
     localPath: undefined,
-    isDownloaded: undefined,
-    downloadedAtUnixMs: undefined,
-    isImported: undefined,
-    statusMessage: undefined,
   };
 }
 
@@ -183,10 +157,7 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
   ) => {
     const entry = LoraAdapterCatalogEntry.decode(readBytes(module, entryPtr, entrySize));
     captured.register = { registry, entry };
-    writeResult(module, outEntry, LoraAdapterCatalogEntry.encode({
-      ...entry,
-      statusMessage: 'registered by wasm',
-    }).finish());
+    writeResult(module, outEntry, LoraAdapterCatalogEntry.encode(entry).finish());
     return 0;
   };
   module._rac_lora_catalog_list_proto = (
@@ -200,7 +171,6 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
     writeResult(module, outResult, LoraAdapterCatalogListResult.encode({
       entries: [catalogEntry()],
       totalCount: 1,
-      filteredCount: 1,
       downloadedCount: 0,
     }).finish());
     return 0;
@@ -216,7 +186,6 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
     writeResult(module, outResult, LoraAdapterCatalogListResult.encode({
       entries: [catalogEntry()],
       totalCount: 1,
-      filteredCount: 1,
       downloadedCount: 0,
     }).finish());
     return 0;
@@ -232,29 +201,6 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
     writeResult(module, outResult, LoraAdapterCatalogGetResult.encode({
       found: true,
       entry: catalogEntry(),
-    }).finish());
-    return 0;
-  };
-  module._rac_lora_catalog_mark_download_completed_proto = (
-    registry: number,
-    requestPtr: number,
-    requestSize: number,
-    outResult: number,
-  ) => {
-    const request = LoraAdapterDownloadCompletedRequest.decode(
-      readBytes(module, requestPtr, requestSize),
-    );
-    captured.markDownloadCompleted = { registry, request };
-    writeResult(module, outResult, LoraAdapterDownloadCompletedResult.encode({
-      entry: {
-        ...catalogEntry(),
-        localPath: request.localPath,
-        isDownloaded: true,
-        downloadedAtUnixMs: request.completedAtUnixMs ?? 1,
-        isImported: request.imported,
-        statusMessage: request.statusMessage,
-      },
-      persisted: true,
     }).finish());
     return 0;
   };

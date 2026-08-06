@@ -45,7 +45,6 @@ export const embeddings = {
         options: toProtoEmbedOptions(options),
         requestId: '',
         modelId,
-        metadata: {},
       },
       modelId,
     );

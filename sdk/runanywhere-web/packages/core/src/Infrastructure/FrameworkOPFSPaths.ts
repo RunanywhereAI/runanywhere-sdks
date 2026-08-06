@@ -18,7 +18,11 @@ import {
   type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import { artifactTypeRequiresExtraction } from '../types/ModelTypes+Artifacts.js';
+import {
+  artifactCaseType,
+  artifactTypeRequiresExtraction,
+  modelInfoArtifact,
+} from '../types/ModelTypes+Artifacts.js';
 import { tryRunanywhereModule } from '../runtime/EmscriptenModule.js';
 
 /**
@@ -79,7 +83,8 @@ export function primaryFilenameFromModel(model: ModelInfo): string | null {
  * archive filename from `downloadUrl` to still exist.
  */
 export function isExtractedDirectoryArtifact(model: ModelInfo): boolean {
-  const type = model.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED;
+  const artifact = modelInfoArtifact(model);
+  const type = artifact ? artifactCaseType(artifact) : ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED;
   if (artifactTypeRequiresExtraction(type)) return true;
   if (type === ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY) return true;
   const url = (model.downloadUrl ?? '').split('?')[0]?.toLowerCase() ?? '';

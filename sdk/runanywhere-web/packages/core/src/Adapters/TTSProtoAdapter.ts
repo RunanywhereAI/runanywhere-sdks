@@ -77,9 +77,8 @@ export class TTSProtoAdapter {
   async synthesizeLifecycle(
     text: string,
     options: ProtoTTSOptions,
-    ssml?: string,
   ): Promise<ProtoTTSOutput | null> {
-    const request = lifecycleRequest(text, options, ssml);
+    const request = lifecycleRequest(text, options);
     const host = requireLiveOnnxWorkerOrMain('tts.synthesizeLifecycle');
     if (host) {
       const response = await host.infer('tts.synthesize', {
@@ -116,10 +115,9 @@ export class TTSProtoAdapter {
   synthesizeLifecycleStreamEvents(
     text: string,
     options: ProtoTTSOptions,
-    ssml?: string,
   ): AsyncIterable<ProtoTTSStreamEvent> {
     const requestBytes = TTSSynthesisRequest.encode(
-      lifecycleRequest(text, options, ssml),
+      lifecycleRequest(text, options),
     ).finish();
     const host = requireLiveOnnxWorkerOrMain('tts.synthesizeLifecycleStream');
     if (host) {
@@ -156,9 +154,8 @@ export class TTSProtoAdapter {
   synthesizeLifecycleStream(
     text: string,
     options: ProtoTTSOptions,
-    ssml?: string,
   ): AsyncIterable<ProtoTTSOutput> {
-    const events = this.synthesizeLifecycleStreamEvents(text, options, ssml);
+    const events = this.synthesizeLifecycleStreamEvents(text, options);
     return outputsFromLifecycleEvents(events);
   }
 
@@ -300,13 +297,11 @@ export class TTSProtoAdapter {
 function lifecycleRequest(
   text: string,
   options: ProtoTTSOptions,
-  ssml?: string,
 ): ReturnType<typeof TTSSynthesisRequest.create> {
   return TTSSynthesisRequest.create({
+    requestId: '',
     text,
-    ssml,
     options,
-    metadata: {},
   });
 }
 

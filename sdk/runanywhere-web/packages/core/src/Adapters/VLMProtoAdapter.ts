@@ -2,11 +2,12 @@ import {
   VLMGenerationRequest,
   VLMResult,
   VLMStreamEvent,
-  type VLMGenerationOptions as ProtoVLMGenerationOptions,
   type VLMImage as ProtoVLMImage,
   type VLMResult as ProtoVLMResult,
   type VLMStreamEvent as ProtoVLMStreamEvent,
+  type VLMVisionOptions as ProtoVLMVisionOptions,
 } from '@runanywhere/proto-ts/vlm_options';
+import type { LLMGenerationOptions as ProtoLLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import {
@@ -44,10 +45,12 @@ export class VLMProtoAdapter {
 
   async process(
     image: ProtoVLMImage,
-    options: ProtoVLMGenerationOptions,
+    prompt: string,
+    options: ProtoLLMGenerationOptions,
+    vision?: ProtoVLMVisionOptions,
   ): Promise<ProtoVLMResult | null> {
     const requestBytes = VLMGenerationRequest.encode(
-      VLMGenerationRequest.fromPartial({ images: [image], options }),
+      VLMGenerationRequest.fromPartial({ images: [image], prompt, options, vision }),
     ).finish();
     if (mustUseLlamaBackendWorker()) {
       const host = requireLlamaWorkerHost(
@@ -72,9 +75,11 @@ export class VLMProtoAdapter {
 
   async processAsync(
     image: ProtoVLMImage,
-    options: ProtoVLMGenerationOptions,
+    prompt: string,
+    options: ProtoLLMGenerationOptions,
+    vision?: ProtoVLMVisionOptions,
   ): Promise<ProtoVLMResult | null> {
-    return this.process(image, options);
+    return this.process(image, prompt, options, vision);
   }
 
   /**
@@ -86,12 +91,16 @@ export class VLMProtoAdapter {
    */
   streamEvents(
     image: ProtoVLMImage,
-    options: ProtoVLMGenerationOptions,
+    prompt: string,
+    options: ProtoLLMGenerationOptions,
+    vision?: ProtoVLMVisionOptions,
   ): AsyncIterable<ProtoVLMStreamEvent> {
     const requestBytes = VLMGenerationRequest.encode(
       VLMGenerationRequest.fromPartial({
         images: [image],
+        prompt,
         options,
+        vision,
       }),
     ).finish();
     if (mustUseLlamaBackendWorker()) {

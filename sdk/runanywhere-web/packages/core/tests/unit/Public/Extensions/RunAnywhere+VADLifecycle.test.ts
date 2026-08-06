@@ -153,9 +153,10 @@ function fakeLifecycleModule(): { module: FakeModule; counters: LifecycleCounter
       counters.requests.push(request);
       return writeResult(
         outResult,
+        // `VADResult.confidence` was renamed `.probability` on the wire.
         VADResult.encode(VADResult.fromPartial({
           isSpeech: counters.lifecycleProcesses % 2 === 1,
-          confidence: 0.9,
+          probability: 0.9,
           durationMs: 32,
         })).finish(),
       );

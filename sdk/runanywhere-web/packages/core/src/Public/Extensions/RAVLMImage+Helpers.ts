@@ -11,21 +11,23 @@
  * AppKit / CoreVideo pixel sources that do not exist in a browser. Web
  * callers convert canvases/blobs to encoded bytes, base64, or raw
  * RGB(A) buffers and use the factories below.
+ *
+ * `VLMImage` is a plain oneof of `filePath`/`data`/`rawRgb`/`base64`/
+ * `rawRgba` plus a required `mediaType` (MIME type, required when `data` or
+ * `base64` is set) and `width`/`height` (required for the raw pixel forms).
+ * There is no `VLMImageFormat` enum on the wire any more.
  */
 
-import {
-  VLMImage,
-  VLMImageFormat,
-} from '@runanywhere/proto-ts/vlm_options';
+import { VLMImage } from '@runanywhere/proto-ts/vlm_options';
 
 /**
  * Create a proto VLM image from an encoded JPEG / PNG / WebP byte buffer.
- * Swift parity: `RAVLMImage.fromEncoded(_:format:)` (RAVLMImage+Helpers.swift:52).
+ * Swift parity: `RAVLMImage.fromEncoded(_:mediaType:)` (RAVLMImage+Helpers.swift:52).
  */
-export function vlmImageFromEncoded(data: Uint8Array, format: VLMImageFormat): VLMImage {
+export function vlmImageFromEncoded(data: Uint8Array, mediaType: string): VLMImage {
   return VLMImage.fromPartial({
-    encoded: data,
-    format,
+    data,
+    mediaType,
     width: 0,
     height: 0,
   });
@@ -38,27 +40,27 @@ export function vlmImageFromEncoded(data: Uint8Array, format: VLMImageFormat): V
 export function vlmImageFromFilePath(path: string): VLMImage {
   return VLMImage.fromPartial({
     filePath: path,
-    format: VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
     width: 0,
     height: 0,
+    mediaType: '',
   });
 }
 
 /**
  * Create a proto VLM image from a base64-encoded string.
- * Swift parity: `RAVLMImage.fromBase64(_:)` (RAVLMImage+Helpers.swift:68).
+ * Swift parity: `RAVLMImage.fromBase64(_:mediaType:)` (RAVLMImage+Helpers.swift:68).
  */
-export function vlmImageFromBase64(base64: string): VLMImage {
+export function vlmImageFromBase64(base64: string, mediaType: string): VLMImage {
   return VLMImage.fromPartial({
     base64,
-    format: VLMImageFormat.VLM_IMAGE_FORMAT_BASE64,
+    mediaType,
     width: 0,
     height: 0,
   });
 }
 
 /**
- * Create a proto VLM image from raw RGB bytes.
+ * Create a proto VLM image from raw 3-byte-per-pixel RGB bytes.
  * Swift parity: `RAVLMImage.fromRawRGB(_:width:height:)` (RAVLMImage+Helpers.swift:76).
  */
 export function vlmImageFromRawRGB(data: Uint8Array, width: number, height: number): VLMImage {
@@ -66,20 +68,21 @@ export function vlmImageFromRawRGB(data: Uint8Array, width: number, height: numb
     rawRgb: data,
     width,
     height,
-    format: VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
+    mediaType: '',
   });
 }
 
 /**
- * Create a proto VLM image from raw RGBA bytes.
- * (Stored in the same `rawRgb` oneof slot; format flag distinguishes it.)
+ * Create a proto VLM image from raw 4-byte-per-pixel RGBA bytes. `rawRgba`
+ * is now its own oneof arm (distinct from `rawRgb`), not a shared slot
+ * distinguished by a format flag.
  * Swift parity: `RAVLMImage.fromRawRGBA(_:width:height:)` (RAVLMImage+Helpers.swift:87).
  */
 export function vlmImageFromRawRGBA(data: Uint8Array, width: number, height: number): VLMImage {
   return VLMImage.fromPartial({
-    rawRgb: data,
+    rawRgba: data,
     width,
     height,
-    format: VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA,
+    mediaType: '',
   });
 }

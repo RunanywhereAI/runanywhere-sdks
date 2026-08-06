@@ -240,7 +240,7 @@ function lifecycleRequest(
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
       sampleRate,
       channels: 1,
-      bitsPerSample: 16,
+      durationMs: (audioData.byteLength / 2 / sampleRate) * 1000,
     },
     options,
   });

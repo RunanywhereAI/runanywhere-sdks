@@ -4,7 +4,7 @@
  */
 
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
-import { VLMImageFormat, type VLMImage } from '@runanywhere/proto-ts/vlm_options';
+import type { VLMImage } from '@runanywhere/proto-ts/vlm_options';
 import {
   vlmImageFromBase64,
   vlmImageFromEncoded,
@@ -163,10 +163,10 @@ export async function audioInputToPcm16(audio: AudioInput): Promise<Uint8Array> 
 /** Image payload accepted by the vision and segmentation verbs. */
 export type ImageInput = VLMImage;
 
-function encodedFormatFor(mimeType: string): VLMImageFormat {
-  if (mimeType.includes('png')) return VLMImageFormat.VLM_IMAGE_FORMAT_PNG;
-  if (mimeType.includes('webp')) return VLMImageFormat.VLM_IMAGE_FORMAT_WEBP;
-  return VLMImageFormat.VLM_IMAGE_FORMAT_JPEG;
+function normalizedMediaType(mimeType: string): string {
+  if (mimeType.includes('png')) return 'image/png';
+  if (mimeType.includes('webp')) return 'image/webp';
+  return 'image/jpeg';
 }
 
 async function encodeElement(
@@ -185,7 +185,7 @@ async function encodeElement(
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!blob) throw new Error('Canvas could not be encoded as PNG');
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  return vlmImageFromEncoded(bytes, VLMImageFormat.VLM_IMAGE_FORMAT_PNG);
+  return vlmImageFromEncoded(bytes, 'image/png');
 }
 
 /** Construct image payloads from the shapes a browser can produce. */
@@ -197,13 +197,16 @@ export const ImageInput = {
 
   /** Wrap encoded JPEG, PNG, or WebP bytes. */
   bytes(data: Uint8Array, mimeType = 'image/jpeg'): ImageInput {
-    return vlmImageFromEncoded(data, encodedFormatFor(mimeType));
+    return vlmImageFromEncoded(data, normalizedMediaType(mimeType));
   },
 
   /** Wrap a base64-encoded image, with or without a data-URL prefix. */
-  base64(value: string): ImageInput {
+  base64(value: string, mediaType = 'image/jpeg'): ImageInput {
     const comma = value.indexOf(',');
-    return vlmImageFromBase64(value.startsWith('data:') && comma >= 0 ? value.slice(comma + 1) : value);
+    return vlmImageFromBase64(
+      value.startsWith('data:') && comma >= 0 ? value.slice(comma + 1) : value,
+      mediaType,
+    );
   },
 
   /** Wrap packed 3-byte-per-pixel RGB samples. */
@@ -219,7 +222,7 @@ export const ImageInput = {
   /** Encode a `Blob` or `File` picked in the browser. */
   async blob(source: Blob): Promise<ImageInput> {
     const bytes = new Uint8Array(await source.arrayBuffer());
-    return vlmImageFromEncoded(bytes, encodedFormatFor(source.type));
+    return vlmImageFromEncoded(bytes, normalizedMediaType(source.type));
   },
 
   /** Encode a DOM image, canvas, or decoded bitmap through a scratch canvas. */

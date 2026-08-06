@@ -15,11 +15,12 @@ import {
 import type { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import type {
-  VLMGenerationOptions,
   VLMImage,
   VLMResult,
   VLMStreamEvent,
+  VLMVisionOptions,
 } from '@runanywhere/proto-ts/vlm_options';
+import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 
 function isVisionModelCategory(category: ModelCategory | undefined): boolean {
   return (
@@ -69,7 +70,9 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
 
   async processImage(
     image: VLMImage,
-    options: VLMGenerationOptions,
+    prompt: string,
+    options: Partial<LLMGenerationOptions>,
+    vision?: VLMVisionOptions,
   ): Promise<VLMResult> {
     if (!this._modelLoaded) {
       throw SDKException.notInitialized('No VLM model has been loaded through RunAnywhere.loadModel().');
@@ -83,7 +86,7 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
       );
     }
 
-    const result = await adapter.processAsync(image, options);
+    const result = await adapter.processAsync(image, prompt, options, vision);
     if (!result) {
       // Swift taxonomy: failed operations throw `.processingFailed`.
       throw SDKException.processingFailed('Native VLM proto path returned no result.');
@@ -93,7 +96,9 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
 
   async processImageStream(
     image: VLMImage,
-    options: VLMGenerationOptions,
+    prompt: string,
+    options: Partial<LLMGenerationOptions>,
+    vision?: VLMVisionOptions,
   ): Promise<AsyncIterable<VLMStreamEvent>> {
     if (!this._modelLoaded) {
       throw SDKException.notInitialized('No VLM model has been loaded through RunAnywhere.loadModel().');
@@ -107,7 +112,7 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
       );
     }
 
-    return adapter.streamEvents(image, options);
+    return adapter.streamEvents(image, prompt, options, vision);
   }
 
   cancelVLMGeneration(): void {

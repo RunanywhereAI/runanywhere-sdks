@@ -103,11 +103,20 @@ describe('CrossWasmVoiceAgentProvider', () => {
   it('keeps energy and model-backed VAD thresholds in their native units', async () => {
     mocks.vadLifecycleAvailable = true;
     const provider = __testing__.createCrossWasmVoiceAgentProvider();
+    // `VoiceAgentComposeConfig` has no `vadSampleRate`/`vadFrameLength`/
+    // `vadEnergyThreshold`/`sessionId` fields -- VAD tuning nests under
+    // `vadConfig: VADConfiguration` (sampleRate/frameLengthMs/
+    // activationThreshold), and `sessionId` was deleted outright (Web-only
+    // session bookkeeping lives in the provider, not the wire config).
     await provider.initializeVoiceAgent({
-      vadSampleRate: 16_000,
-      vadFrameLength: 0.1,
-      vadEnergyThreshold: 0.005,
-      sessionId: 'model-vad',
+      vadConfig: {
+        modelId: '',
+        sampleRate: 16_000,
+        frameLengthMs: 100,
+        activationThreshold: 0.005,
+        enableAutoCalibration: false,
+        calibrationMultiplier: 1,
+      },
     });
 
     await provider.processVoiceTurn(new Float32Array(16_000).fill(0.2));
@@ -127,10 +136,14 @@ describe('CrossWasmVoiceAgentProvider', () => {
   it('applies the spoken system prompt and bounded conversational history', async () => {
     const provider = __testing__.createCrossWasmVoiceAgentProvider();
     await provider.initializeVoiceAgent({
-      vadSampleRate: 16_000,
-      vadFrameLength: 0.1,
-      vadEnergyThreshold: 0.015,
-      sessionId: 'conversation',
+      vadConfig: {
+        modelId: '',
+        sampleRate: 16_000,
+        frameLengthMs: 100,
+        activationThreshold: 0.015,
+        enableAutoCalibration: false,
+        calibrationMultiplier: 1,
+      },
     });
     const audio = new Float32Array(16_000).fill(0.2);
 
@@ -155,17 +168,23 @@ describe('CrossWasmVoiceAgentProvider', () => {
     const pending = deferred<typeof transcript>();
     mocks.transcribe.mockReturnValueOnce(pending.promise);
     const provider = __testing__.createCrossWasmVoiceAgentProvider();
+    // `VoiceAgentComposeConfig` has no `sessionId` field -- session identity
+    // is Web-provider-internal bookkeeping now, not part of the wire config.
     const config = {
-      vadSampleRate: 16_000,
-      vadFrameLength: 0.1,
-      vadEnergyThreshold: 0.015,
-      sessionId: 'old',
+      vadConfig: {
+        modelId: '',
+        sampleRate: 16_000,
+        frameLengthMs: 100,
+        activationThreshold: 0.015,
+        enableAutoCalibration: false,
+        calibrationMultiplier: 1,
+      },
     };
     await provider.initializeVoiceAgent(config);
     const oldTurn = provider.processVoiceTurn(new Float32Array(16_000).fill(0.2));
 
     await Promise.resolve(provider.cleanupVoiceAgent());
-    await provider.initializeVoiceAgent({ ...config, sessionId: 'new' });
+    await provider.initializeVoiceAgent({ ...config });
     pending.resolve(transcript);
 
     await expect(oldTurn).rejects.toThrow(/session stopped or restarted/);

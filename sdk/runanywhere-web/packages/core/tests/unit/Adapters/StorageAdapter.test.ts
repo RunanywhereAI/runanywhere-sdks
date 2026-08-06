@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  ModelArtifactType,
   ModelCategory,
   ModelInfo as ModelInfoMessage,
+  ModelRegistryStatus,
 } from '@runanywhere/proto-ts/model_types';
 import {
   StorageDeleteRequest,
@@ -370,9 +370,12 @@ describe('BrowserStorageAnalyzerAdapter', () => {
           id: 'vad-delete',
           name: 'VAD delete',
           localPath: modelPath,
-          isDownloaded: true,
+          registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
           downloadSizeBytes: 18,
-          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+          // `ModelInfo.artifactType` was deleted outright -- the `multiFile`
+          // oneof arm (even empty) is what now marks a model as a
+          // directory-shaped artifact for isDirectoryModel()'s check.
+          multiFile: { files: [] },
         })],
       }),
     } as unknown as ModelRegistryAdapter);
@@ -381,7 +384,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
 
     await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
       modelIds: ['vad-delete'],
-      deleteFiles: true,
+      keepFilesOnDisk: false,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
       allowPlatformDelete: true,
@@ -407,9 +410,12 @@ describe('BrowserStorageAnalyzerAdapter', () => {
           id: 'vad-denied',
           name: 'VAD denied',
           localPath: modelPath,
-          isDownloaded: true,
+          registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
           downloadSizeBytes: 18,
-          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+          // `ModelInfo.artifactType` was deleted outright -- the `multiFile`
+          // oneof arm (even empty) is what now marks a model as a
+          // directory-shaped artifact for isDirectoryModel()'s check.
+          multiFile: { files: [] },
         })],
       }),
     } as unknown as ModelRegistryAdapter);
@@ -418,7 +424,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
 
     await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
       modelIds: ['vad-denied'],
-      deleteFiles: true,
+      keepFilesOnDisk: false,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
       allowPlatformDelete: true,
@@ -445,9 +451,12 @@ describe('BrowserStorageAnalyzerAdapter', () => {
           id: 'vad-shutdown',
           name: 'VAD shutdown',
           localPath: modelPath,
-          isDownloaded: true,
+          registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
           downloadSizeBytes: 18,
-          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+          // `ModelInfo.artifactType` was deleted outright -- the `multiFile`
+          // oneof arm (even empty) is what now marks a model as a
+          // directory-shaped artifact for isDirectoryModel()'s check.
+          multiFile: { files: [] },
         })],
       }),
       updateDownloadStatus: () => true,
@@ -458,7 +467,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
 
     const deletion = storage!.delete(StorageDeleteRequest.fromPartial({
       modelIds: ['vad-shutdown'],
-      deleteFiles: true,
+      keepFilesOnDisk: false,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
       allowPlatformDelete: true,
@@ -491,7 +500,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
     expect(staleInfo).not.toHaveBeenCalled();
     await expect(storage!.delete(StorageDeleteRequest.fromPartial({
       modelIds: ['vad-shutdown'],
-      deleteFiles: true,
+      keepFilesOnDisk: false,
       allowPlatformDelete: true,
     }))).rejects.toThrow('shutting down');
 
@@ -527,9 +536,12 @@ describe('BrowserStorageAnalyzerAdapter', () => {
           id: 'vad-reloaded',
           name: 'VAD reloaded',
           localPath: modelPath,
-          isDownloaded: true,
+          registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
           downloadSizeBytes: 18,
-          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+          // `ModelInfo.artifactType` was deleted outright -- the `multiFile`
+          // oneof arm (even empty) is what now marks a model as a
+          // directory-shaped artifact for isDirectoryModel()'s check.
+          multiFile: { files: [] },
         })],
       }),
     } as unknown as ModelRegistryAdapter);
@@ -539,7 +551,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
 
     const deletion = storage!.delete(StorageDeleteRequest.fromPartial({
       modelIds: ['vad-reloaded'],
-      deleteFiles: true,
+      keepFilesOnDisk: false,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
       allowPlatformDelete: true,
@@ -581,9 +593,12 @@ describe('BrowserStorageAnalyzerAdapter', () => {
           id: 'vad-stale-plan',
           name: 'VAD stale plan',
           localPath: modelPath,
-          isDownloaded: true,
+          registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
           downloadSizeBytes: 18,
-          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+          // `ModelInfo.artifactType` was deleted outright -- the `multiFile`
+          // oneof arm (even empty) is what now marks a model as a
+          // directory-shaped artifact for isDirectoryModel()'s check.
+          multiFile: { files: [] },
         })],
       }),
     } as unknown as ModelRegistryAdapter);
@@ -591,7 +606,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
 
     await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
       modelIds: ['vad-stale-plan'],
-      deleteFiles: true,
+      keepFilesOnDisk: false,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
       allowPlatformDelete: true,
@@ -631,9 +646,12 @@ describe('BrowserStorageAnalyzerAdapter', () => {
           id: 'vad-duplicate-plan',
           name: 'VAD duplicate plan',
           localPath: modelPath,
-          isDownloaded: true,
+          registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
           downloadSizeBytes: 18,
-          artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
+          // `ModelInfo.artifactType` was deleted outright -- the `multiFile`
+          // oneof arm (even empty) is what now marks a model as a
+          // directory-shaped artifact for isDirectoryModel()'s check.
+          multiFile: { files: [] },
         })],
       }),
     } as unknown as ModelRegistryAdapter);
@@ -641,7 +659,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
 
     await adapter.prepareDelete(StorageDeleteRequest.fromPartial({
       modelIds: ['vad-duplicate-plan'],
-      deleteFiles: true,
+      keepFilesOnDisk: false,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
       allowPlatformDelete: true,
@@ -669,9 +687,8 @@ describe('BrowserStorageAnalyzerAdapter', () => {
       id: 'cold-vad',
       name: 'Cold VAD',
       localPath,
-      isDownloaded: true,
+      registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
       downloadSizeBytes: 1_000,
-      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE,
       multiFile: {
         files: [
           { filename: 'model.onnx', relativePath: 'model.onnx', sizeBytes: 600 },

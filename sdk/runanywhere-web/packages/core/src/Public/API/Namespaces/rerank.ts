@@ -29,7 +29,7 @@ export const rerank = {
     await ensureReady();
     const result = await rerankImpl({
       query,
-      candidates: documents.map((text, index) => ({ id: String(index), text })),
+      documents: [...documents],
       options: { ...rerankOptionsDefaults(), topN: topN ?? rerankOptionsDefaults().topN },
     });
     return toRankedResults(result);

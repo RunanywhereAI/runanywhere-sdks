@@ -3,6 +3,17 @@
  *
  * Structured output namespace — mirrors Swift's `RunAnywhere+StructuredOutput.swift`.
  * Provides schema-driven JSON generation via `RunAnywhere.structuredOutput.*`.
+ *
+ * idl/structured_output.proto (API-realignment so-p2) deleted the dedicated
+ * `StructuredOutputRequest` / `StructuredOutputValidationRequest` messages
+ * outright. `StructuredOutputParseRequest` (requestId, text, options,
+ * metadata) is now the sole request envelope shared by parse/validate/
+ * prepare-prompt — `text` plays the role the old `prompt` field did (mirrors
+ * commons' `rac_structured_output_prepare_prompt_proto` /
+ * `..._validate_proto`, `structured_output.cpp`). There is likewise no more
+ * `JSONSchema`/`NamedEntity` message or `StructuredOutputStreamEvent`/
+ * `StructuredOutputStreamEventKind` type — `StructuredOutputOptions.schema`
+ * is a plain JSON-Schema string.
  */
 
 import type {
@@ -10,22 +21,15 @@ import type {
   LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import {
-  JSONSchema as JSONSchemaMessage,
-  StructuredOutputMode,
   StructuredOutputOptions as StructuredOutputOptionsMessage,
+  StructuredOutputParseRequest as StructuredOutputParseRequestMessage,
   StructuredOutputPromptResult as StructuredOutputPromptResultMessage,
-  StructuredOutputRequest as StructuredOutputRequestMessage,
-  StructuredOutputStreamEventKind,
   StructuredOutputValidation as StructuredOutputValidationMessage,
-  StructuredOutputValidationRequest as StructuredOutputValidationRequestMessage,
-  type JSONSchema,
-  type NamedEntity,
   type StructuredOutputOptions,
+  type StructuredOutputParseRequest,
   type StructuredOutputPromptResult,
-  type StructuredOutputRequest,
   type StructuredOutputResult,
   type StructuredOutputValidation,
-  type StructuredOutputValidationRequest,
 } from '@runanywhere/proto-ts/structured_output';
 import { SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
@@ -38,25 +42,22 @@ import {
   TextGeneration,
   generateStructuredStream,
   type JSONSchemaDescriptor,
+  type StructuredOutputStreamEvent,
 } from './RunAnywhere+TextGeneration.js';
 
 export type {
-  JSONSchema,
-  NamedEntity,
   StructuredOutputOptions,
+  StructuredOutputParseRequest,
   StructuredOutputPromptResult,
-  StructuredOutputRequest,
   StructuredOutputResult,
   StructuredOutputValidation,
-  StructuredOutputValidationRequest,
 };
 
 const logger = new SDKLogger('StructuredOutput');
 
 type StructuredOutputExport =
   | '_rac_structured_output_prepare_prompt_proto'
-  | '_rac_structured_output_validate_proto'
-  | '_rac_structured_output_schema_to_json_proto';
+  | '_rac_structured_output_validate_proto';
 
 // Schema accepted by the structured-output verbs. Composed from the canonical
 // `JSONSchemaDescriptor` (jsonSchema + parse) so there is a single source of
@@ -68,13 +69,9 @@ type StructuredOutputSchema<T = unknown> = Omit<JSONSchemaDescriptor, 'parse'> &
 } & Partial<Pick<
   StructuredOutputOptions,
   | 'includeSchemaInPrompt'
-  | 'strictMode'
-  | 'name'
-  | 'mode'
-  | 'regexPattern'
+  | 'schema'
   | 'grammar'
-  | 'repairJson'
-  | 'maxRetries'
+  | 'regex'
 >>;
 
 function missingStructuredOutputExports(
@@ -113,55 +110,40 @@ function requireStructuredOutputModule(
 function buildStructuredOutputOptions(
   options: Partial<StructuredOutputOptions> | StructuredOutputSchema,
 ): StructuredOutputOptions {
-  const { parse: _parse, ...serializableOptions } = (
+  const { parse: _parse, jsonSchema, ...serializableOptions } = (
     options as StructuredOutputSchema & Partial<StructuredOutputOptions>
   );
   return StructuredOutputOptionsMessage.fromPartial({
     ...serializableOptions,
+    schema: serializableOptions.schema ?? jsonSchema,
     includeSchemaInPrompt: options.includeSchemaInPrompt ?? true,
-    mode: options.mode ?? StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-    repairJson: options.repairJson ?? false,
-    maxRetries: options.maxRetries ?? 0,
   });
 }
 
-function normalizePreparePromptRequest(
-  requestOrPrompt: StructuredOutputRequest | string,
+function normalizeParseRequest(
+  requestOrText: StructuredOutputParseRequest | string,
   options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
-): StructuredOutputRequest {
-  if (typeof requestOrPrompt !== 'string') {
-    return StructuredOutputRequestMessage.fromPartial(requestOrPrompt);
+): StructuredOutputParseRequest {
+  if (typeof requestOrText !== 'string') {
+    return StructuredOutputParseRequestMessage.fromPartial(requestOrText);
   }
-  return StructuredOutputRequestMessage.fromPartial({
+  return StructuredOutputParseRequestMessage.fromPartial({
     requestId: '',
-    prompt: requestOrPrompt,
+    text: requestOrText,
     options: options ? buildStructuredOutputOptions(options) : undefined,
     metadata: {},
   });
 }
 
-function normalizeValidationRequest(
-  requestOrText: StructuredOutputValidationRequest | string,
-  options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
-): StructuredOutputValidationRequest {
-  if (typeof requestOrText !== 'string') {
-    return StructuredOutputValidationRequestMessage.fromPartial(requestOrText);
-  }
-  return StructuredOutputValidationRequestMessage.fromPartial({
-    text: requestOrText,
-    options: options ? buildStructuredOutputOptions(options) : undefined,
-  });
-}
-
 function readStructuredOutputPrompt(
-  request: StructuredOutputRequest,
+  request: StructuredOutputParseRequest,
 ): StructuredOutputPromptResult {
   const module = requireStructuredOutputModule('structuredOutput.preparePrompt', [
     '_rac_structured_output_prepare_prompt_proto',
   ]);
   const result = new ProtoWasmBridge(module, logger).withEncodedRequest(
-    StructuredOutputRequestMessage.fromPartial(request),
-    StructuredOutputRequestMessage,
+    request,
+    StructuredOutputParseRequestMessage,
     StructuredOutputPromptResultMessage,
     (requestPtr, requestSize, outResult) => (
       module._rac_structured_output_prepare_prompt_proto!(
@@ -182,14 +164,14 @@ function readStructuredOutputPrompt(
 }
 
 function readStructuredOutputValidation(
-  request: StructuredOutputValidationRequest,
+  request: StructuredOutputParseRequest,
 ): StructuredOutputValidation {
   const module = requireStructuredOutputModule('structuredOutput.validate', [
     '_rac_structured_output_validate_proto',
   ]);
   const result = new ProtoWasmBridge(module, logger).withEncodedRequest(
-    StructuredOutputValidationRequestMessage.fromPartial(request),
-    StructuredOutputValidationRequestMessage,
+    request,
+    StructuredOutputParseRequestMessage,
     StructuredOutputValidationMessage,
     (requestPtr, requestSize, outResult) => (
       module._rac_structured_output_validate_proto!(requestPtr, requestSize, outResult)
@@ -210,59 +192,6 @@ function readStructuredOutputValidation(
 // ---------------------------------------------------------------------------
 
 /**
- * JSON Schema text consumed by the commons structured-output C ABI.
- *
- * Delegates to `rac_structured_output_schema_to_json_proto` so every SDK
- * shares the same byte-exact, key-sorted, compact serializer. Returns `"{}"`
- * on any serialization or ABI failure to preserve the previous fallback
- * contract. Swift parity: `RAJSONSchema.jsonSchemaString`
- * (StructuredOutputProto+Helpers.swift:38).
- */
-export function jsonSchemaString(schema: JSONSchema): string {
-  const module = getModuleForCapability('structured-output');
-  if (!module || typeof module._rac_structured_output_schema_to_json_proto !== 'function') {
-    return '{}';
-  }
-  const bridge = new ProtoWasmBridge(module, logger);
-  if (!bridge.hasProtoBufferExports()) return '{}';
-  try {
-    const schemaBytes = JSONSchemaMessage.encode(JSONSchemaMessage.fromPartial(schema)).finish();
-    // The result buffer carries raw UTF-8 JSON text, not proto bytes, so the
-    // raw `readResultProto` byte path is decoded with TextDecoder.
-    const jsonBytes = bridge.withHeapBytes(schemaBytes, (ptr, size) => (
-      bridge.readResultProto(
-        (outResult) => module._rac_structured_output_schema_to_json_proto!(ptr, size, outResult),
-        'rac_structured_output_schema_to_json_proto',
-      )
-    ));
-    if (!jsonBytes || jsonBytes.length === 0) return '{}';
-    return new TextDecoder().decode(jsonBytes);
-  } catch {
-    return '{}';
-  }
-}
-
-/**
- * Canonical options factory for a typed schema: stamps the schema, the
- * commons-serialized `jsonSchema` text, and JSON-schema mode.
- * Swift parity: `RAStructuredOutputOptions.defaults(schema:includeSchemaInPrompt:strict:)`
- * (StructuredOutputProto+Helpers.swift:14).
- */
-export function structuredOutputOptionsWithSchema(
-  schema: JSONSchema,
-  includeSchemaInPrompt = true,
-  strict = false,
-): StructuredOutputOptions {
-  return StructuredOutputOptionsMessage.fromPartial({
-    schema,
-    includeSchemaInPrompt,
-    strictMode: strict,
-    jsonSchema: jsonSchemaString(schema),
-    mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-  });
-}
-
-/**
  * Whether the structured-output result validated successfully.
  * Swift parity: `RAStructuredOutputResult.success` (StructuredOutputProto+Helpers.swift:76).
  */
@@ -270,43 +199,35 @@ export function structuredOutputResultSuccess(result: StructuredOutputResult): b
   return result.validation?.isValid ?? false;
 }
 
-/**
- * Character length of a named entity span (never negative).
- * Swift parity: `RANamedEntity.length` (StructuredOutputProto+Helpers.swift:97).
- */
-export function namedEntityLength(entity: NamedEntity): number {
-  return Math.max(0, entity.endOffset - entity.startOffset);
-}
-
 function preparePrompt(
-  request: StructuredOutputRequest,
+  request: StructuredOutputParseRequest,
 ): StructuredOutputPromptResult;
 function preparePrompt(
-  prompt: string,
+  text: string,
   options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
 ): StructuredOutputPromptResult;
 function preparePrompt(
-  requestOrPrompt: StructuredOutputRequest | string,
+  requestOrText: StructuredOutputParseRequest | string,
   options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
 ): StructuredOutputPromptResult {
   return readStructuredOutputPrompt(
-    normalizePreparePromptRequest(requestOrPrompt, options),
+    normalizeParseRequest(requestOrText, options),
   );
 }
 
 function validate(
-  request: StructuredOutputValidationRequest,
+  request: StructuredOutputParseRequest,
 ): StructuredOutputValidation;
 function validate(
   text: string,
   options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
 ): StructuredOutputValidation;
 function validate(
-  requestOrText: StructuredOutputValidationRequest | string,
+  requestOrText: StructuredOutputParseRequest | string,
   options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
 ): StructuredOutputValidation {
   return readStructuredOutputValidation(
-    normalizeValidationRequest(requestOrText, options),
+    normalizeParseRequest(requestOrText, options),
   );
 }
 
@@ -328,10 +249,7 @@ export async function generateStructured(
 ): Promise<StructuredOutputResult> {
   let result: StructuredOutputResult | undefined;
   for await (const event of generateStructuredStream(prompt, schema, options)) {
-    if (
-      event.kind === StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED
-      && event.result
-    ) {
+    if (event.kind === 'completed' && event.result) {
       result = event.result;
     }
   }
@@ -351,8 +269,8 @@ export async function generateStructured(
  * (RunAnywhere+StructuredOutput.swift:139-156): when
  * `includeSchemaInPrompt` is set, the prompt is prepared through the commons
  * structured-output primitive and any system prompt it produces overrides the
- * caller's; the structured-output options ride the generate request (mapped
- * to jsonSchema / responseFormat / grammar by `buildLLMGenerateRequest`).
+ * caller's; the structured-output options ride the generate request
+ * (`LLMGenerationOptions.structuredOutput`).
  */
 export async function generateWithStructuredOutput(
   prompt: string,
@@ -378,6 +296,8 @@ export async function generateWithStructuredOutput(
     prompt,
   });
 }
+
+export type { StructuredOutputStreamEvent };
 
 /**
  * Public `RunAnywhere.structuredOutput.*` namespace — Web-only extensions

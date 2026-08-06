@@ -24,7 +24,6 @@ function toDetectOptions(options?: VadOptions) {
     minSpeechDurationMs: proto.minSpeechDurationMs,
     minSilenceDurationMs: proto.minSilenceDurationMs,
     prefixPaddingMs: proto.prefixPaddingMs,
-    includeStatistics: proto.includeStatistics,
   };
 }
 
@@ -62,7 +61,7 @@ function createVadStream(format: AudioFormatSpec, options?: VadOptions): VadStre
   void (async () => {
     try {
       for await (const result of streamVoiceActivity(inputQueue, toDetectOptions(options))) {
-        const timestampMs = result.timestampMs || result.startTimeMs || undefined;
+        const timestampMs = result.timestampMs || undefined;
         if (result.isSpeech && !speaking) {
           speaking = true;
           outputQueue.push({ type: 'speechStarted', timestampMs });
@@ -73,7 +72,7 @@ function createVadStream(format: AudioFormatSpec, options?: VadOptions): VadStre
         outputQueue.push({
           type: 'activity',
           isSpeech: result.isSpeech,
-          probability: result.confidence,
+          probability: result.probability,
           timestampMs,
         });
       }

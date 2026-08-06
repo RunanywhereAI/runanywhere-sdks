@@ -71,20 +71,15 @@ interface AttachedService {
   servicePtr: number;
 }
 
-/** Map a backend kind to the engine name `rac_plugin_find_for_engine` pins on. */
+/**
+ * `HybridBackendKind` IS the engine name `rac_plugin_find_for_engine` pins
+ * on now: `HybridModelDescriptor.backend` (a closed enum) + `.provider` were
+ * replaced outright by a single free-form `engine: string` field
+ * (idl/hybrid_router.proto), so there is no enum-to-string mapping left to
+ * do here.
+ */
 function pinnedEngineName(backend: HybridBackendKind): string {
-  switch (backend) {
-    case HybridBackendKind.HYBRID_BACKEND_SHERPA:
-      return 'sherpa';
-    case HybridBackendKind.HYBRID_BACKEND_CLOUD:
-      return 'cloud';
-    case HybridBackendKind.HYBRID_BACKEND_LLAMACPP:
-      return 'llamacpp';
-    case HybridBackendKind.HYBRID_BACKEND_OPENROUTER:
-      return 'openrouter';
-    default:
-      return '';
-  }
+  return backend;
 }
 
 /**
@@ -306,8 +301,9 @@ export class HybridSttRouter {
       const responseBytes = mod.HEAPU8.slice(responsePtr, responsePtr + responseSize);
       const decoded = decodeTranscribeResponse(responseBytes);
       if (decoded.rc !== 0) {
-        const message = decoded.errorMessage || `Hybrid STT transcribe failed (rc=${decoded.rc})`;
-        throw SDKException.serviceNotAvailable(message);
+        // `HybridSttTranscribeResponse.errorMsg` was deleted outright
+        // (idl/hybrid_router.proto): only the bare rc survives on failure.
+        throw SDKException.serviceNotAvailable(`Hybrid STT transcribe failed (rc=${decoded.rc})`);
       }
       return decoded.result;
     } finally {
@@ -373,12 +369,12 @@ export class HybridSttRouter {
     }
 
     // cloud config JSON (provider/api_key/model/...); sherpa = no config.
-    const configJSON = model.backend === HybridBackendKind.HYBRID_BACKEND_CLOUD
+    const configJSON = model.backend === HybridBackendKind.CLOUD
       ? Cloud.configJSON(model.id)
       : null;
     // cloud takes everything via config_json; no model path. sherpa resolves
     // its model from the registry by id.
-    const modelIdOrPath = model.backend === HybridBackendKind.HYBRID_BACKEND_CLOUD ? '' : model.id;
+    const modelIdOrPath = model.backend === HybridBackendKind.CLOUD ? '' : model.id;
 
     const enginePtr = allocCString(mod, engineName);
     const modelPtr = allocCString(mod, modelIdOrPath);

@@ -181,8 +181,6 @@ function fakeSTTModule(): FakeSTTHarness {
       heap32[pointer >>> 2] = value;
     },
     _rac_voice_agent_set_proto_callback: () => 0,
-    _rac_llm_set_stream_proto_callback: () => 0,
-    _rac_llm_unset_stream_proto_callback: () => 0,
     _rac_backend_onnx_register: () => 0,
     _rac_backend_sherpa_register: () => 0,
     _rac_wasm_sizeof_proto_buffer: () => 16,

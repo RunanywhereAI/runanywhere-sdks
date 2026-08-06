@@ -190,7 +190,7 @@ function event(seq: number, text: string): VoiceEvent {
 test('single subscriber receives every event', async () => {
   const fake = makeFakeModule();
   const transport = __testing__.fanOutTransportFor(42, fake as never);
-  const iter = streamVoiceAgent(transport, { eventFilter: '' });
+  const iter = streamVoiceAgent(transport, { requestId: '', sessionId: '', audioData: new Uint8Array(0), metadata: {} });
 
   const collector = startCollector(iter);
   // Kick off the first .next() so the fan-out trampoline is installed
@@ -222,8 +222,8 @@ test('two concurrent subscribers each receive every event (fan-out)', async () =
   const fake = makeFakeModule();
   const transport = __testing__.fanOutTransportFor(7, fake as never);
 
-  const iterA = streamVoiceAgent(transport, { eventFilter: '' });
-  const iterB = streamVoiceAgent(transport, { eventFilter: '' });
+  const iterA = streamVoiceAgent(transport, { requestId: '', sessionId: '', audioData: new Uint8Array(0), metadata: {} });
+  const iterB = streamVoiceAgent(transport, { requestId: '', sessionId: '', audioData: new Uint8Array(0), metadata: {} });
 
   const collA = startCollector(iterA);
   const collB = startCollector(iterB);
@@ -260,7 +260,7 @@ test('second wave after teardown installs a fresh trampoline', async () => {
   const transport = __testing__.fanOutTransportFor(99, fake as never);
 
   // First wave.
-  const iter1 = streamVoiceAgent(transport, { eventFilter: '' });
+  const iter1 = streamVoiceAgent(transport, { requestId: '', sessionId: '', audioData: new Uint8Array(0), metadata: {} });
   const coll1 = startCollector(iter1);
   const p1 = coll1.iterator.next();
   await flush();
@@ -272,7 +272,7 @@ test('second wave after teardown installs a fresh trampoline', async () => {
   expect(fake.removeFunctionCalls).toBe(1);
 
   // Second wave on the same handle reuses the same adapter transport.
-  const iter2 = streamVoiceAgent(transport, { eventFilter: '' });
+  const iter2 = streamVoiceAgent(transport, { requestId: '', sessionId: '', audioData: new Uint8Array(0), metadata: {} });
   const coll2 = startCollector(iter2);
   const p2 = coll2.iterator.next();
   await flush();
@@ -289,7 +289,7 @@ test('a failing _rac_voice_agent_set_proto_callback surfaces as onError', async 
   const fake = makeFakeModule({ setCallbackResult: () => -1 });
   const transport = __testing__.fanOutTransportFor(1, fake as never);
 
-  const iter = streamVoiceAgent(transport, { eventFilter: '' });
+  const iter = streamVoiceAgent(transport, { requestId: '', sessionId: '', audioData: new Uint8Array(0), metadata: {} });
   const it = iter[Symbol.asyncIterator]();
 
   let error: Error | null = null;

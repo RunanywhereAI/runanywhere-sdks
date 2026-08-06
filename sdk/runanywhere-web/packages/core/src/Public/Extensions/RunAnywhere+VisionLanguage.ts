@@ -4,35 +4,49 @@
  * Public VLM namespace matching Swift's RunAnywhere+VisionLanguage. The Web
  * implementation delegates to a backend-installed provider so app code never
  * imports backend worker bridges directly.
+ *
+ * `VLMGenerationOptions` was deleted outright from idl/vlm_options.proto:
+ * `VLMGenerationRequest.options` is now a plain `LLMGenerationOptions` (same
+ * names/defaults/validation as the text API) and `VLMGenerationRequest.vision`
+ * carries only the four genuinely vision-specific knobs
+ * (`VLMVisionOptions`: modelFamily, customChatTemplate, imageMarkerOverride,
+ * maxImageTokens). `prompt` lives directly on the request, not inside options.
  */
 
 import type {
-  VLMGenerationOptions,
   VLMImage,
   VLMResult,
   VLMStreamEvent,
+  VLMVisionOptions,
 } from '@runanywhere/proto-ts/vlm_options';
-import {
-  VLMGenerationOptions as VLMGenerationOptionsMessage,
-  VLMModelFamily,
-} from '@runanywhere/proto-ts/vlm_options';
+import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import {
   ModelCategory,
   type CurrentModelResult,
 } from '@runanywhere/proto-ts/model_types';
 import { SDKException } from '../../Foundation/SDKException.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
-import { vLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/vlm_options_convenience';
 
 export interface VisionLanguageProvider {
   readonly isInitialized: boolean;
   readonly isModelLoaded: boolean;
   loadCurrentModel?(currentModel: CurrentModelResult): Promise<void>;
   unloadModel?(): Promise<void>;
-  processImage(image: VLMImage, options: VLMGenerationOptions): Promise<VLMResult>;
+  processImage(
+    image: VLMImage,
+    prompt: string,
+    options: Partial<LLMGenerationOptions>,
+    vision?: VLMVisionOptions,
+  ): Promise<VLMResult>;
   /** Typed stream: STARTED → TOKEN* → exactly one terminal COMPLETED/ERROR
    *  (COMPLETED carries the full VLMResult). Canonical cross-SDK shape. */
-  processImageStream?(image: VLMImage, options: VLMGenerationOptions): Promise<AsyncIterable<VLMStreamEvent>>;
+  processImageStream?(
+    image: VLMImage,
+    prompt: string,
+    options: Partial<LLMGenerationOptions>,
+    vision?: VLMVisionOptions,
+  ): Promise<AsyncIterable<VLMStreamEvent>>;
   cancelVLMGeneration(): Promise<void> | void;
 }
 
@@ -50,39 +64,18 @@ function requireProvider(feature: string): VisionLanguageProvider {
   );
 }
 
-async function processImageStream(
-  image: VLMImage,
-  options: VLMGenerationOptions,
-): Promise<AsyncIterable<VLMStreamEvent>>;
 /**
- * Ergonomic overload mirroring Swift/React Native: the prompt is applied
- * onto `options.prompt` before streaming. When `options` is omitted, the
- * remaining knobs fall back to the canonical defaults
- * (`RAVLMGenerationOptions.defaults()` — applied by
- * `normalizeVLMGenerationOptions`). Swift parity:
- * `processImageStream(_:prompt:options:)` (RunAnywhere+VisionLanguage.swift:71-79).
+ * Fill gaps from the IDL text-generation defaults -- VLM options are the
+ * same `LLMGenerationOptions` shape and defaults as the text API now.
  */
-async function processImageStream(
-  image: VLMImage,
-  prompt: string,
-  options?: VLMGenerationOptions,
-): Promise<AsyncIterable<VLMStreamEvent>>;
-async function processImageStream(
-  image: VLMImage,
-  optionsOrPrompt: VLMGenerationOptions | string,
-  maybeOptions?: VLMGenerationOptions,
-): Promise<AsyncIterable<VLMStreamEvent>> {
-  const options = typeof optionsOrPrompt === 'string'
-    ? { ...(maybeOptions ?? VLMGenerationOptionsMessage.fromPartial({})), prompt: optionsOrPrompt }
-    : optionsOrPrompt;
-  const active = requireProvider('visionLanguage.processImageStream');
-  if (!active.processImageStream) {
-    throw SDKException.backendNotAvailable(
-      'visionLanguage.processImageStream',
-      'The active Web vision-language provider does not expose streaming.',
-    );
-  }
-  return active.processImageStream(image, normalizeVLMGenerationOptions(options));
+function normalizeVLMGenerationOptions(
+  options?: Partial<LLMGenerationOptions>,
+): LLMGenerationOptions {
+  const defaults = lLMGenerationOptionsDefaults();
+  return {
+    ...defaults,
+    ...options,
+  };
 }
 
 export const VisionLanguage = {
@@ -132,19 +125,41 @@ export const VisionLanguage = {
     await active.unloadModel();
   },
 
-  processImage(image: VLMImage, options: VLMGenerationOptions): Promise<VLMResult> {
+  processImage(
+    image: VLMImage,
+    prompt: string,
+    options?: Partial<LLMGenerationOptions>,
+    vision?: VLMVisionOptions,
+  ): Promise<VLMResult> {
     return requireProvider('visionLanguage.processImage').processImage(
       image,
+      prompt,
       normalizeVLMGenerationOptions(options),
+      vision,
     );
   },
 
-  /**
-   * Typed VLM event stream. Also accepts the `(image, prompt, options?)`
-   * convenience overload — Swift parity:
-   * `processImageStream(_:prompt:options:)` (RunAnywhere+VisionLanguage.swift:71-79).
-   */
-  processImageStream,
+  /** Typed VLM event stream. */
+  processImageStream(
+    image: VLMImage,
+    prompt: string,
+    options?: Partial<LLMGenerationOptions>,
+    vision?: VLMVisionOptions,
+  ): Promise<AsyncIterable<VLMStreamEvent>> {
+    const active = requireProvider('visionLanguage.processImageStream');
+    if (!active.processImageStream) {
+      throw SDKException.backendNotAvailable(
+        'visionLanguage.processImageStream',
+        'The active Web vision-language provider does not expose streaming.',
+      );
+    }
+    return active.processImageStream(
+      image,
+      prompt,
+      normalizeVLMGenerationOptions(options),
+      vision,
+    );
+  },
 
   async cancelVLMGeneration(): Promise<void> {
     await requireProvider('visionLanguage.cancelVLMGeneration').cancelVLMGeneration();
@@ -152,35 +167,3 @@ export const VisionLanguage = {
 };
 
 export type VisionLanguageCapability = typeof VisionLanguage;
-
-function normalizeVLMGenerationOptions(
-  options: VLMGenerationOptions,
-): VLMGenerationOptions {
-  // Defaults mirror Swift `RAVLMGenerationOptions.defaults()`
-  // Normalize only when unset/<=0. Defaults come from the rac_default
-  // annotations in idl/vlm_options.proto; the table this replaced capped
-  // maxTokens at 256 against the C layer's 2048 and set topK 40 where the C
-  // layer disables it.
-  const d = vLMGenerationOptionsDefaults();
-  return {
-    prompt: options.prompt ?? '',
-    maxOutputTokens: options.maxOutputTokens > 0 ? options.maxOutputTokens : d.maxOutputTokens,
-    temperature: options.temperature > 0 ? options.temperature : d.temperature,
-    topP: options.topP > 0 ? options.topP : d.topP,
-    topK: options.topK > 0 ? options.topK : d.topK,
-    stopSequences: options.stopSequences ?? [],
-    systemPrompt: options.systemPrompt,
-    maxImageSize: options.maxImageSize ?? 0,
-    nThreads: options.nThreads ?? 0,
-    useGpu: options.useGpu ?? true,
-    modelFamily: options.modelFamily || VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
-    customChatTemplate: options.customChatTemplate,
-    imageMarkerOverride: options.imageMarkerOverride,
-    seed: options.seed ?? 0,
-    repetitionPenalty:
-      options.repetitionPenalty > 0 ? options.repetitionPenalty : d.repetitionPenalty,
-    minP: options.minP ?? 0,
-    emitImageEmbeddings: options.emitImageEmbeddings ?? false,
-    reasoning: options.reasoning,
-  };
-}

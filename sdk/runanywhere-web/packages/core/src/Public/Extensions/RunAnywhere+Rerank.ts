@@ -15,7 +15,6 @@ import { RerankProtoAdapter } from '../../Adapters/RerankProtoAdapter.js';
 import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import {
-  type RerankCandidate,
   type RerankOptions,
   type RerankRequest,
   type RerankResult,
@@ -132,7 +131,6 @@ export async function rerank(request: RerankRequest): Promise<RerankResult> {
 }
 
 export type {
-  RerankCandidate,
   RerankOptions,
   RerankRequest,
   RerankResult,

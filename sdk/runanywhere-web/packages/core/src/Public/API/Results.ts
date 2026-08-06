@@ -175,7 +175,6 @@ export interface Voice {
   id: string;
   name: string;
   language: string;
-  isNeural: boolean;
 }
 
 /** What is resident and how much room is left. */

@@ -97,7 +97,7 @@ function createSttStream(format: AudioFormatSpec, options?: SttOptions): SttStre
           return;
         }
         if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL) {
-          const final = event.finalOutput ?? event.partial?.finalOutput;
+          const final = event.finalOutput;
           if (final) {
             queue.push({
               type: 'transcriptFinal',

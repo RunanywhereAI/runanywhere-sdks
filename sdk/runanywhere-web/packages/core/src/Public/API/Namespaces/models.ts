@@ -6,6 +6,7 @@ import {
   ModelArtifactType,
   ModelCategory,
   ModelFileRole,
+  ModelRegistryStatus,
   type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
@@ -56,11 +57,20 @@ const LOADED_CATEGORIES: readonly ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
 ];
 
+/**
+ * `ModelInfo.isDownloaded` was deleted outright; `registryStatus` is the sole
+ * downloaded-ness signal (DOWNLOADED and LOADED both mean "on disk").
+ */
+function isDownloaded(model: ModelInfo): boolean {
+  return model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+    || model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
+}
+
 function matchesFilter(model: ModelInfo, filter: ModelFilter): boolean {
   if (filter.category !== undefined && model.category !== filter.category) return false;
   if (filter.framework !== undefined && model.framework !== filter.framework) return false;
   if (filter.format !== undefined && model.format !== filter.format) return false;
-  if (filter.downloadedOnly && !model.isDownloaded) return false;
+  if (filter.downloadedOnly && !isDownloaded(model)) return false;
   if (filter.availableOnly && !model.isAvailable) return false;
   if (filter.maxSizeBytes !== undefined && Number(model.downloadSizeBytes ?? 0) > filter.maxSizeBytes) {
     return false;
@@ -213,7 +223,7 @@ export const models = {
         `Model '${id}' is currently loaded. Call models.unload('${id}') before unregister.`,
       );
     }
-    if (model.isDownloaded || model.localPath) {
+    if (isDownloaded(model) || model.localPath) {
       throw SDKException.invalidState(
         `Model '${id}' still has local artifacts. Call models.delete('${id}') before unregister.`,
       );
@@ -249,8 +259,7 @@ export const models = {
               severity: 0,
               component: 'storage',
               retryable: false,
-              remediationHint: '',
-              correlationId: '',
+              requestId: '',
             },
           };
           return;

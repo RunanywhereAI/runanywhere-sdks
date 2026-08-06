@@ -31,13 +31,15 @@ export const lora = {
     }
     const result = await applyLoraAdapters({
       requestId: '',
-      replaceExisting: false,
+      // LoraApplyRequest.replaceExisting -> keepExisting was inverted on the
+      // wire (SET semantics is now the zero value). The public
+      // `replaceExisting` name/default here are unchanged; only the
+      // proto-building step inverts: keepExisting = !replaceExisting.
+      keepExisting: true,
       adapters: [{
         adapterPath: artifact.localPath,
         adapterId,
         scale: scale ?? 1,
-        metadata: {},
-        targetModules: [],
       }],
     });
     if (result.error) {
@@ -57,9 +59,7 @@ export const lora = {
       return;
     }
     await removeLoraAdapters({
-      requestId: '',
       adapterIds: [adapterId],
-      adapterPaths: [],
       clearAll: false,
     });
   },
@@ -68,9 +68,7 @@ export const lora = {
   async removeAll(): Promise<void> {
     await ensureReady();
     await removeLoraAdapters({
-      requestId: '',
       adapterIds: [],
-      adapterPaths: [],
       clearAll: true,
     });
   },
