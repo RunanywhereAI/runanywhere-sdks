@@ -25,6 +25,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
+import { isModelDownloaded } from '../utils/modelDisplay';
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
@@ -237,7 +238,7 @@ export const VoiceAssistantScreen: React.FC = () => {
   const handleModelSelected = useCallback(
     async (model: SDKModelInfo) => {
       setShowModelSelection(false);
-      if (!model.isDownloaded && !model.localPath) {
+      if (!isModelDownloaded(model)) {
         Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }

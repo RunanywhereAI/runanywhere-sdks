@@ -31,7 +31,7 @@ import {
   getModelFrameworks,
   getPrimaryFramework,
 } from '../../utils/modelDisplay';
-import { formatFramework, RunAnywhere } from '@runanywhere/core';
+import { formatFramework, RunAnywhere, usagePercentage } from '@runanywhere/core';
 import {
   InferenceFramework,
   ModelCategory,
@@ -43,6 +43,7 @@ import {
 } from '../../services/NpuModelCatalog';
 import { RAG_EMBEDDING_FRAMEWORKS } from '../../services/EmbeddingCatalogPolicy';
 import { listVisibleCatalogModels } from '../../services/ModelRegistryQueries';
+import { isModelDownloaded } from '../../utils/modelDisplay';
 
 type StorageSnapshot = Awaited<ReturnType<typeof RunAnywhere.storage.info>>;
 
@@ -129,8 +130,7 @@ const isRAGContext = (context: ModelSelectionContext): boolean =>
   context === ModelSelectionContext.RagEmbedding ||
   context === ModelSelectionContext.RagLLM;
 
-const isOnDevice = (model: SDKModelInfo): boolean =>
-  Boolean(model.isDownloaded || model.localPath);
+const isOnDevice = (model: SDKModelInfo): boolean => isModelDownloaded(model);
 
 const formatBytes = (bytes: number): string => {
   if (!bytes || bytes <= 0) return '0 B';
@@ -197,7 +197,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       ]);
       setStorage(storageInfo);
 
-      if (loraCatalog?.success) {
+      if (loraCatalog && !loraCatalog.error) {
         const ids = new Set<string>();
         for (const entry of loraCatalog.entries) {
           entry.compatibleModels.forEach((id) => ids.add(id));
@@ -555,7 +555,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                     styles.usageFill,
                     {
                       backgroundColor: colors.primary,
-                      width: `${Math.min(100, Math.max(0, storage?.device?.usedPercent ?? 0))}%`,
+                      width: `${Math.min(100, Math.max(0, storage?.device ? usagePercentage(storage.device) : 0))}%`,
                     },
                   ]}
                 />

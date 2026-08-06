@@ -31,6 +31,7 @@ import {
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
+import { isModelDownloaded } from '../utils/modelDisplay';
 
 function pcmAudioInputs(
   chunks: AsyncIterable<Uint8Array>
@@ -144,7 +145,7 @@ export const VADScreen: React.FC = () => {
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      if (!model.isDownloaded && !model.localPath) {
+      if (!isModelDownloaded(model)) {
         Alert.alert('Model Required', 'Download the VAD model first.');
         return;
       }
@@ -165,8 +166,12 @@ export const VADScreen: React.FC = () => {
     try {
       let step = await iterator.next();
       while (!step.done && isListeningRef.current) {
-        if (step.value.type === 'frame') {
-          setLatestResult(step.value.result);
+        if (step.value.type === 'activity') {
+          setLatestResult({
+            isSpeech: step.value.isSpeech,
+            probability: step.value.probability,
+            segments: [],
+          });
           setFrameCount((count) => count + 1);
         }
         step = await iterator.next();

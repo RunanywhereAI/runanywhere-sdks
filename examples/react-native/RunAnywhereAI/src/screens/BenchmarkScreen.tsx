@@ -88,7 +88,7 @@ const LLM_PROMPT =
   'mechanisms, and training procedures. Be as thorough as possible.';
 
 async function unloadCategory(category: ModelCategory): Promise<void> {
-  await RunAnywhere.models.unload(category);
+  await RunAnywhere.models.unloadAll(category);
 }
 
 async function loadBenchmarkModel(model: SDKModelInfo): Promise<number> {

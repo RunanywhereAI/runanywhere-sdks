@@ -11,5 +11,5 @@ export async function isModelLoadedForCategory(
 export async function unloadModelsForCategory(
   category: ModelCategory
 ): Promise<void> {
-  await RunAnywhere.models.unload(category);
+  await RunAnywhere.models.unloadAll(category);
 }

@@ -138,10 +138,10 @@ const MessageAnalyticsRow: React.FC<MessageAnalyticsRowProps> = ({
             color={colors.primary}
           />
         )}
-        {analytics.performance.throughputTokensPerSec > 0 && (
+        {(analytics.performance.usage?.decodeTokensPerSecond ?? 0) > 0 && (
           <MetricView
             label="Speed"
-            value={`${Math.round(analytics.performance.throughputTokensPerSec)} tok/s`}
+            value={`${Math.round(analytics.performance.usage?.decodeTokensPerSecond ?? 0)} tok/s`}
             color={colors.tertiary}
           />
         )}
@@ -199,14 +199,14 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
     );
     const totalTPS = analyticsMessages.reduce(
       (sum, { analytics }) =>
-        sum + analytics.performance.throughputTokensPerSec,
+        sum + (analytics.performance.usage?.decodeTokensPerSecond ?? 0),
       0
     );
     const totalTokens = analyticsMessages.reduce(
       (sum, { analytics }) =>
         sum +
-        analytics.performance.inputTokens +
-        analytics.performance.outputTokens,
+        (analytics.performance.usage?.inputTokens ?? 0) +
+        (analytics.performance.usage?.outputTokens ?? 0),
       0
     );
     const completedCount = analyticsMessages.filter(
@@ -229,7 +229,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       const group = modelGroups.get(modelName);
       if (group) {
         group.times.push(analytics.performance.latencyMs);
-        group.speeds.push(analytics.performance.throughputTokensPerSec);
+        group.speeds.push(analytics.performance.usage?.decodeTokensPerSecond ?? 0);
       }
     });
 

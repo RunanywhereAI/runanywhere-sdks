@@ -30,6 +30,10 @@ import {
   type LoraAdapterCatalogEntry,
 } from '@runanywhere/proto-ts/lora_options';
 import {
+  downloadLoraArtifact,
+  getLoraArtifactInfo,
+} from '../../utils/loraArtifacts';
+import {
   typography,
   useTheme,
   useThemedStyles,
@@ -72,6 +76,13 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   const [scales, setScales] = useState<Record<string, number>>({});
   const [isLoadingLoRA, setIsLoadingLoRA] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // `LoraAdapterCatalogEntry` no longer carries description/sizeBytes/
+  // localPath (idl/lora_options.proto: those generic artifact facts moved to
+  // the ModelInfo record for the adapter) — fetched per-entry via
+  // `getLoraArtifactInfo` and kept keyed by catalog entry id.
+  const [artifactInfo, setArtifactInfo] = useState<
+    Record<string, { localPath: string | null; sizeBytes: number; description: string }>
+  >({});
 
   const updateLoaded = useCallback(
     (adapters: AppliedAdapter[]) => {
@@ -97,10 +108,23 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
       const result = await RunAnywhere.lora.catalog.query(
         LoraAdapterCatalogQuery.fromPartial({ modelId })
       );
-      if (!result.success) {
-        throw new Error(result.errorMessage || 'LoRA catalog query failed');
+      if (result.error) {
+        throw new Error(result.error.message || 'LoRA catalog query failed');
       }
       setAvailableAdapters(result.entries);
+      const infoEntries = await Promise.all(
+        result.entries.map(async (entry) => [
+          entry.id,
+          await getLoraArtifactInfo(entry.id),
+        ] as const)
+      );
+      setArtifactInfo(
+        Object.fromEntries(
+          infoEntries
+            .filter(([, info]) => info !== null)
+            .map(([id, info]) => [id, info!])
+        )
+      );
       const state = await RunAnywhere.lora.list();
       updateLoaded(state.applied);
     } catch (err) {
@@ -122,8 +146,8 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
       setError(null);
       try {
         const scale = scales[entry.id] ?? entry.defaultScale;
-        if (!entry.isDownloaded || !entry.localPath) {
-          await RunAnywhere.lora.catalog.download(entry);
+        if (!artifactInfo[entry.id]?.localPath) {
+          await downloadLoraArtifact(entry.id);
         }
         await RunAnywhere.lora.apply(entry.id, scale);
         await refresh();
@@ -133,7 +157,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
         setIsLoadingLoRA(false);
       }
     },
-    [scales, refresh]
+    [scales, artifactInfo, refresh]
   );
 
   /** Mirrors iOS removeLoraAdapter(path:). */
@@ -152,7 +176,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   /** Mirrors iOS clearLoraAdapters. */
   const handleClearAll = useCallback(async () => {
     try {
-      await RunAnywhere.lora.remove();
+      await RunAnywhere.lora.removeAll();
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -196,18 +220,19 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
             <Text style={styles.sectionHeader}>AVAILABLE FOR THIS MODEL</Text>
             {availableAdapters.map((entry) => {
               const applied = isApplied(entry);
-              const downloaded = Boolean(entry.isDownloaded && entry.localPath);
-              const scale = scales[entry.id] ?? entry.defaultScale;
+              const info = artifactInfo[entry.id];
+              const downloaded = Boolean(info?.localPath);
+              const scale = scales[entry.id] ?? entry.defaultScale ?? 1.0;
               return (
                 <View key={entry.id} style={styles.card}>
                   <View style={styles.cardHeader}>
                     <View style={styles.cardInfo}>
                       <Text style={styles.adapterName}>{entry.name}</Text>
                       <Text style={styles.adapterDescription}>
-                        {entry.description}
+                        {info?.description}
                       </Text>
                       <Text style={styles.adapterSize}>
-                        {formatBytes(entry.sizeBytes)}
+                        {formatBytes(info?.sizeBytes ?? 0)}
                       </Text>
                     </View>
                     {applied ? (

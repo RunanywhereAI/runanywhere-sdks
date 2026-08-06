@@ -7,11 +7,61 @@
  */
 
 import { RunAnywhere } from '@runanywhere/core';
-import {
-  ToolDefinition,
-  ToolParameterType,
-} from '@runanywhere/proto-ts/tool_calling';
+import { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 import { safeEvaluateExpression } from './mathParser';
+
+/**
+ * `ToolParameter`/`ToolParameterType` (the proto types) were deleted outright
+ * (idl/tool_calling.proto): `ToolDefinition.parameters` is now a single raw
+ * JSON Schema object STRING — the same OpenAI `parameters` / Anthropic
+ * `input_schema` / MCP `inputSchema` shape every tool-calling API publishes.
+ * Mirrors the Swift `ToolParameter.schemaProperty`/`jsonSchema(for:)` helpers
+ * (sdk/runanywhere-swift/.../ToolCallingTypes.swift) and Kotlin's equivalent,
+ * neither of which the React Native SDK currently exposes — build the schema
+ * string directly here.
+ */
+function jsonSchema(
+  parameters: ReadonlyArray<{
+    name: string;
+    type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object';
+    description: string;
+    required?: boolean;
+  }>
+): string {
+  if (parameters.length === 0) return '{}';
+  const properties: Record<string, { type: string; description: string }> =
+    {};
+  const required: string[] = [];
+  for (const param of parameters) {
+    properties[param.name] = {
+      type: param.type,
+      description: param.description,
+    };
+    if (param.required ?? true) required.push(param.name);
+  }
+  return JSON.stringify({
+    type: 'object',
+    properties,
+    ...(required.length > 0 ? { required } : {}),
+  });
+}
+
+/**
+ * Property names declared on a `ToolDefinition.parameters` JSON Schema
+ * string, for display (e.g. SettingsScreen's per-tool parameter chips).
+ * Tolerates "", "{}", or malformed JSON by returning no names.
+ */
+export function toolParameterNames(parametersSchema: string): string[] {
+  if (!parametersSchema) return [];
+  try {
+    const parsed = JSON.parse(parametersSchema) as {
+      properties?: Record<string, unknown>;
+    };
+    return Object.keys(parsed.properties ?? {});
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Register the three demo tools (weather, time, calculator).
@@ -26,16 +76,15 @@ export const registerDemoTools = async (): Promise<void> => {
     ToolDefinition.fromPartial({
       name: 'get_weather',
       description: 'Gets the current weather for a city or location',
-      parameters: [
+      parameters: jsonSchema([
         {
           name: 'location',
-          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+          type: 'string',
           description:
             'City name or location (e.g., "Tokyo", "New York", "London")',
           required: true,
-          enumValues: [],
         },
-      ],
+      ]),
     }),
     async (args) => {
       const location = String(args.location ?? 'San Francisco');
@@ -65,7 +114,7 @@ export const registerDemoTools = async (): Promise<void> => {
     ToolDefinition.fromPartial({
       name: 'get_current_time',
       description: 'Gets the current date, time, and timezone information',
-      parameters: [],
+      parameters: jsonSchema([]),
     }),
     async () => {
       const now = new Date();
@@ -84,15 +133,14 @@ export const registerDemoTools = async (): Promise<void> => {
       name: 'calculate',
       description:
         'Performs math calculations. Supports +, -, *, /, and parentheses',
-      parameters: [
+      parameters: jsonSchema([
         {
           name: 'expression',
-          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+          type: 'string',
           description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
           required: true,
-          enumValues: [],
         },
-      ],
+      ]),
     }),
     async (args) => {
       const expression = String(args.expression ?? '0');

@@ -4,11 +4,23 @@ import type { IconName } from '../theme/system/icons';
 import {
   InferenceFramework,
   ModelFormat,
+  ModelRegistryStatus,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 
 export const DEFAULT_INFERENCE_FRAMEWORK =
   InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED;
+
+/**
+ * `ModelInfo.isDownloaded` was deleted outright (idl/model_types.proto: "a
+ * bool cannot express DOWNLOADING") — `registryStatus` is the single
+ * downloaded-ness signal now, with a non-empty `localPath` as the simplest
+ * local proxy (matches the SDK's own read sites in `Public/Api/Models.ts`).
+ */
+export const isModelDownloaded = (model: ModelInfo): boolean =>
+  model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED ||
+  model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED ||
+  Boolean(model.localPath);
 
 export const getFrameworkColor = (
   framework?: InferenceFramework | null
