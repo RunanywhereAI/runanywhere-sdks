@@ -163,7 +163,7 @@ class PortableNvidiaE2ETest {
         val loadStarted = System.currentTimeMillis()
         val load = withTimeout(600_000) { RunAnywhere.loadModel(registered) }
         fields["loadMs"] = (System.currentTimeMillis() - loadStarted).toString()
-        check(load.success) { load.error_message.ifBlank { "load failed" } }
+        check(load.error == null) { load.error?.message?.ifBlank { "load failed" } ?: "load failed" }
         fields["loadedFramework"] = load.framework.name
         fields["memAvailKbAfterLoad"] = memAvailableKb().toString()
 
@@ -260,7 +260,7 @@ class PortableNvidiaE2ETest {
         val loadStarted = System.currentTimeMillis()
         val load = withTimeout(900_000) { RunAnywhere.loadModel(registered) }
         fields["loadMs"] = (System.currentTimeMillis() - loadStarted).toString()
-        check(load.success) { load.error_message.ifBlank { "load failed" } }
+        check(load.error == null) { load.error?.message?.ifBlank { "load failed" } ?: "load failed" }
         fields["loadedFramework"] = load.framework.name
         fields["memAvailKbAfterLoad"] = memAvailableKb().toString()
         try {
@@ -282,8 +282,8 @@ class PortableNvidiaE2ETest {
                     event.token?.let { if (it.isNotEmpty()) text.append(it) }
                     if (event.is_final) {
                         event.result?.let {
-                            promptTokens = it.input_tokens
-                            completionTokens = it.output_tokens
+                            promptTokens = it.usage?.input_tokens ?: 0
+                            completionTokens = it.usage?.output_tokens ?: 0
                         }
                     }
                 }

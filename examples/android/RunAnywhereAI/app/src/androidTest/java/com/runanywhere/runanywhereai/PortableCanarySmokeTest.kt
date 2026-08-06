@@ -89,7 +89,7 @@ class PortableCanarySmokeTest {
                 val loadStarted = System.currentTimeMillis()
                 val load = withTimeout(300_000) { RunAnywhere.loadModel(registered) }
                 val loadMs = System.currentTimeMillis() - loadStarted
-                assertTrue(load.error_message.ifBlank { "Canary load failed" }, load.success)
+                assertTrue(load.error?.message?.ifBlank { "Canary load failed" } ?: "Canary load failed", load.error == null)
                 assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_SHERPA, load.framework)
                 loaded = true
 
@@ -125,7 +125,7 @@ class PortableCanarySmokeTest {
                                 ),
                             )
                         }
-                    assertTrue(unload.error_message.ifBlank { "Canary unload failed" }, unload.success)
+                    assertTrue(unload.error?.message?.ifBlank { "Canary unload failed" } ?: "Canary unload failed", unload.error == null)
                     Log.i(tag, "UNLOAD model=$MODEL_ID ids=${unload.unloaded_model_ids}")
                 }
             }

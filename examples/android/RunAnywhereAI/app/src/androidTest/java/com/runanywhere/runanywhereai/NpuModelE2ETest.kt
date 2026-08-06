@@ -256,7 +256,7 @@ class NpuModelE2ETest {
                             ),
                         )
                     val importOk =
-                        imported.success && imported.registered &&
+                        imported.error == null && imported.registered &&
                             imported.local_path == localRoot.absolutePath
                     report.put("acquisition_ms", System.currentTimeMillis() - importStart)
                         .put("local_bundle_mb", round2(localBundle.files.sumOf { it.bytes } / 1e6))
@@ -264,16 +264,16 @@ class NpuModelE2ETest {
                         .put(
                             "local_import",
                             JSONObject()
-                                .put("success", imported.success)
+                                .put("success", imported.error == null)
                                 .put("registered", imported.registered)
                                 .put("copied_into_managed_storage", imported.copied_into_managed_storage)
                                 .put("imported_bytes", imported.imported_bytes)
                                 .put("warnings", JSONArray(imported.warnings))
-                                .put("error_message", imported.error_message),
+                                .put("error_message", imported.error?.message),
                         )
                         .gate("local_import_registered", importOk)
                     if (!importOk) {
-                        throw AssertionError(imported.error_message.ifBlank { "local model import failed" })
+                        throw AssertionError(imported.error?.message?.ifBlank { "local model import failed" } ?: "local model import failed")
                     }
                 } else {
                     // ---- download (unbounded on time; size drives it) + real transfer metrics ----
@@ -326,13 +326,13 @@ class NpuModelE2ETest {
                         JSONObject()
                             .put("cycle", cycle + 1)
                             .put("load_ms", loadMs)
-                            .put("load_success", candidate.success)
+                            .put("load_success", candidate.error == null)
                             .put("framework", candidate.framework.name)
                     lifecycleStable =
-                        lifecycleStable && candidate.success &&
+                        lifecycleStable && candidate.error == null &&
                             candidate.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
-                    if (!candidate.success) {
-                        throw AssertionError(candidate.error_message.ifBlank { "load cycle ${cycle + 1} failed" })
+                    if (candidate.error != null) {
+                        throw AssertionError(candidate.error?.message?.ifBlank { "load cycle ${cycle + 1} failed" } ?: "load cycle ${cycle + 1} failed")
                     }
                     load = candidate
                     if (cycle + 1 < lifecycleCycles) {
@@ -345,13 +345,13 @@ class NpuModelE2ETest {
                                     framework = model.framework,
                                 ),
                             )
-                        val unloadOk = unload.success && model.id in unload.unloaded_model_ids
-                        row.put("unload_success", unload.success)
+                        val unloadOk = unload.error == null && model.id in unload.unloaded_model_ids
+                        row.put("unload_success", unload.error == null)
                             .put("unloaded_model_ids", JSONArray(unload.unloaded_model_ids))
-                            .put("unload_error", unload.error_message)
+                            .put("unload_error", unload.error?.message)
                         lifecycleStable = lifecycleStable && unloadOk
                         require(unloadOk) {
-                            unload.error_message.ifBlank { "unload cycle ${cycle + 1} failed" }
+                            unload.error?.message?.ifBlank { "unload cycle ${cycle + 1} failed" } ?: "unload cycle ${cycle + 1} failed"
                         }
                     }
                     cycleReport.put(row)
@@ -439,13 +439,13 @@ class NpuModelE2ETest {
                     try {
                         val result = RunAnywhere.deleteModel(model.id)
                         val modelIdDeleted = model.id in result.deleted_model_ids
-                        val deleteOk = result.success && modelIdDeleted && result.failed_model_ids.isEmpty() &&
+                        val deleteOk = result.error == null && modelIdDeleted && result.failed_model_ids.isEmpty() &&
                             result.skipped_model_ids.isEmpty() && result.files_deleted &&
                             result.registry_updated && !result.dry_run
                         report.put("delete", JSONObject()
                             .put("applicable", true)
                             .put("requested", true)
-                            .put("success", result.success)
+                            .put("success", result.error == null)
                             .put("duration_ms", System.currentTimeMillis() - deleteStart)
                             .put("deleted_bytes", result.deleted_bytes)
                             .put("deleted_model_ids", JSONArray(result.deleted_model_ids))
@@ -455,15 +455,15 @@ class NpuModelE2ETest {
                             .put("files_deleted", result.files_deleted)
                             .put("registry_updated", result.registry_updated)
                             .put("dry_run", result.dry_run)
-                            .put("error_message", result.error_message))
+                            .put("error_message", result.error?.message))
                             .gate("delete_model", deleteOk)
                         if (!deleteOk) {
                             val deleteWasPrimaryFailure = finalStatus in setOf("PASS", "SMOKE_PASS")
                             finalStatus = "FAIL"
                             if (deleteWasPrimaryFailure) finalPhase = "delete"
-                            val reason = result.error_message.ifBlank {
+                            val reason = result.error?.message?.ifBlank {
                                 "delete result did not confirm files + registry cleanup for ${model.id}"
-                            }
+                            } ?: "delete result did not confirm files + registry cleanup for ${model.id}"
                             finalDetail = appendDetail(finalDetail, reason)
                         }
                     } catch (e: Exception) {
@@ -582,9 +582,9 @@ class NpuModelE2ETest {
                 sb.append(tk); ids.add(ev.token_id)
             }
             if (ev.is_final) ev.result?.let { r ->
-                ttft = r.time_to_first_token_ms.toDouble(); tps = r.tokens_per_second.toDouble()
+                ttft = r.time_to_first_token_ms.toDouble(); tps = r.usage?.tokens_per_second ?: 0.0
                 decMs = r.decode_time_ms.toDouble(); preMs = r.prompt_eval_time_ms.toDouble()
-                totMs = r.total_time_ms.toDouble(); outTok = r.output_tokens; inTok = r.input_tokens
+                totMs = r.total_time_ms.toDouble(); outTok = r.usage?.output_tokens ?: 0; inTok = r.usage?.input_tokens ?: 0
             }
         }
         val totalWall = (System.currentTimeMillis() - t0).toDouble()
@@ -632,13 +632,13 @@ class NpuModelE2ETest {
                 .put("output", text).put("expect_keywords", JSONArray(kws))
                 .put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
                 .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))
-                .put("tokens_per_s", round2(r.tokens_per_second.toDouble()))
+                .put("tokens_per_s", round2(r.usage?.tokens_per_second ?: 0.0))
                 .put("total_ms", round2(r.processing_time_ms.toDouble()))
-                .put("out_tok", r.output_tokens).put("img_tok", r.image_tokens)
+                .put("out_tok", r.usage?.output_tokens ?: 0).put("img_tok", r.image_tokens)
                 .put("metric", "keyword:${kws.firstOrNull() ?: ""}").put("max_new", budget).put("pass", pass))
             report.put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
                 .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))
-                .put("tokens_per_s", round2(r.tokens_per_second.toDouble()))
+                .put("tokens_per_s", round2(r.usage?.tokens_per_second ?: 0.0))
         }
         val passFraction = passed.toDouble() / imgCases.size
         report.put("suite_pass_frac", round6(passFraction))
@@ -952,7 +952,7 @@ class NpuModelE2ETest {
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.transcribe(pcm) }
             val wallMs = (System.currentTimeMillis() - start).toDouble()
             val procMs = r.metadata?.processing_time_ms?.takeIf { it > 0 }?.toDouble() ?: wallMs
-            val rtf = r.metadata?.real_time_factor?.takeIf { it > 0f }?.toDouble() ?: (procMs / 1000.0 / audioS)
+            val rtf = procMs / 1000.0 / audioS
             val text = r.text.trim()
             val wer = NpuMetrics.wer(ref, text)
             val artifacts = NpuMetrics.tokenizerArtifacts(text)

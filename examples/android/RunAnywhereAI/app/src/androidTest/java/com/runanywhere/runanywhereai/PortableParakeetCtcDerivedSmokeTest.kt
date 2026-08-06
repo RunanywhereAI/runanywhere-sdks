@@ -99,7 +99,7 @@ class PortableParakeetCtcDerivedSmokeTest {
                         validate_before_register = false,
                     ),
                 )
-            assertTrue(imported.error_message.ifBlank { "local import failed" }, imported.success)
+            assertTrue(imported.error?.message?.ifBlank { "local import failed" } ?: "local import failed", imported.error == null)
             assertTrue("local import was not registered", imported.registered)
             assertFalse("commons must not claim it copied the local bundle", imported.copied_into_managed_storage)
             assertEquals(bundleRoot.path, imported.local_path)
@@ -118,7 +118,7 @@ class PortableParakeetCtcDerivedSmokeTest {
                 val loadStarted = System.currentTimeMillis()
                 val load = withTimeout(300_000) { RunAnywhere.loadModel(importedModel) }
                 val loadMs = System.currentTimeMillis() - loadStarted
-                assertTrue(load.error_message.ifBlank { "derived Parakeet CTC load failed" }, load.success)
+                assertTrue(load.error?.message?.ifBlank { "derived Parakeet CTC load failed" } ?: "derived Parakeet CTC load failed", load.error == null)
                 assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_SHERPA, load.framework)
                 loaded = true
                 logMemory(targetContext, "after_load")
@@ -154,7 +154,7 @@ class PortableParakeetCtcDerivedSmokeTest {
                                 ),
                             )
                         }
-                    assertTrue(unload.error_message.ifBlank { "derived Parakeet CTC unload failed" }, unload.success)
+                    assertTrue(unload.error?.message?.ifBlank { "derived Parakeet CTC unload failed" } ?: "derived Parakeet CTC unload failed", unload.error == null)
                     Log.i(tag, "UNLOAD model=$MODEL_ID ids=${unload.unloaded_model_ids}")
                     logMemory(targetContext, "after_unload")
                 }

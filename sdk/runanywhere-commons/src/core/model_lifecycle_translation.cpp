@@ -100,7 +100,12 @@ runanywhere::v1::InferenceFramework framework_for_engine_name(const std::string&
     if (engine_name == RAC_ENGINE_ID_MLX) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
     }
-    if (engine_name == RAC_ENGINE_ID_COREML) {
+    // The engine is `neurt`, the FRAMEWORK is COREML: the engine is named for the implementing
+    // runtime, not for Apple's framework. This is the exact reverse of
+    // engine_name_for_framework()'s INFERENCE_FRAMEWORK_COREML -> RAC_ENGINE_ID_NEURT in
+    // model_lifecycle.cpp, and there is no RAC_ENGINE_ID_COREML to map from — the
+    // coreml -> neurt engine-id rename removed it.
+    if (engine_name == RAC_ENGINE_ID_NEURT) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
     }
     // RAC_ENGINE_ID_PLATFORM backs BOTH FOUNDATION_MODELS and SYSTEM_TTS

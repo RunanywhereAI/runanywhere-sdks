@@ -6,6 +6,10 @@
  * (`RunAnywhere.models.register(...)` / `RunAnywhere.lora.catalog.registerArtifact(...)`).
  * Safe to re-run on every cold
  * launch — commons merges runtime fields on re-registration.
+ *
+ * Layout convention (mirrors the iOS catalog): top-level sections are
+ * framework x modality, and inside a section rows are grouped by MODEL FAMILY,
+ * smallest to largest parameter count. ONE quantization per model.
  */
 
 import { Platform } from 'react-native';
@@ -46,10 +50,11 @@ export async function registerAll(
   const { llamaRegistered, onnxRegistered, mlxRegistered, qhexrtRegistered } =
     backendState;
   // =========================================================================
-  // LlamaCPP backend + LLM models
+  // LLM (llama.cpp) — grouped by model family, small → large inside a family
   // =========================================================================
   if (llamaRegistered) {
     await Promise.all([
+      // SmolLM (HuggingFace)
       registerModel({
         id: 'smollm2-360m-q8_0',
         name: 'SmolLM2 360M Q8_0',
@@ -57,21 +62,7 @@ export async function registerAll(
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         memoryRequirementBytes: 386_404_416,
       }),
-      registerModel({
-        id: 'llama-2-7b-chat-q4_k_m',
-        name: 'Llama 2 7B Chat Q4_K_M',
-        url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        // Exact artifact Content-Length for catalog display/storage planning.
-        memoryRequirementBytes: 4_081_004_224,
-      }),
-      registerModel({
-        id: 'mistral-7b-instruct-q4_k_m',
-        name: 'Mistral 7B Instruct Q4_K_M',
-        url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 4_368_438_944,
-      }),
+      // Qwen 2.5 (Alibaba)
       registerModel({
         id: 'qwen2.5-0.5b-instruct-q6_k',
         name: 'Qwen 2.5 0.5B Instruct Q6_K',
@@ -91,6 +82,7 @@ export async function registerAll(
         // real transfer size for UI/storage planning.
         memoryRequirementBytes: 1_117_320_736,
       }),
+      // Qwen3 (Alibaba) — thinking-capable
       registerModel({
         id: 'qwen3-0.6b-q4_k_m',
         name: 'Qwen3 0.6B Q4_K_M',
@@ -116,6 +108,76 @@ export async function registerAll(
         memoryRequirementBytes: 2_497_281_312,
         supportsThinking: true,
       }),
+      // LFM2 / LFM2.5 (Liquid AI)
+      // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
+      // (153 MB vs 149 MB): 4 MB buys K-quant mixed precision on the
+      // attention/embedding tensors, and Q4_K_M is the quantization every other
+      // GGUF row in this catalog uses.
+      registerModel({
+        id: 'lfm2.5-230m-q4_k_m',
+        name: 'LiquidAI LFM2.5 230M Q4_K_M',
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/main/LFM2.5-230M-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        // 153,406,304 B of weights (the exact artifact Content-Length) — KV
+        // cache and runtime overhead sit on top of this at load time. Every
+        // other llama.cpp row here states exact artifact bytes rather than the
+        // rounded weights+overhead estimate the iOS catalog uses, so this row
+        // follows the local convention.
+        memoryRequirementBytes: 153_406_304,
+      }),
+      // ONE quantization per model. The Q8_0 sibling of this row was removed
+      // deliberately: two quants of the same 350M model differ only in bytes
+      // (229 MB vs 379 MB), so the second row costs a catalog slot and a
+      // "which one do I pick?" decision without adding a capability.
+      registerModel({
+        id: 'lfm2-350m-q4_k_m',
+        name: 'LiquidAI LFM2 350M Q4_K_M',
+        url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 229_309_376,
+      }),
+      registerModel({
+        id: 'lfm2.5-1.2b-instruct-q4_k_m',
+        name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 730_895_168,
+      }),
+      // Same ONE-quantization-per-model rule as the 350M row above: the Q8_0
+      // sibling (1.25 GB against this row's 731 MB) was the same model at a
+      // different size, so it was dropped rather than kept as a second pick.
+      registerModel({
+        id: 'lfm2-1.2b-tool-q4_k_m',
+        name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
+        url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 730_894_048,
+      }),
+      // Llama (Meta)
+      registerModel({
+        id: 'llama-3.2-3b-instruct-q4_k_m',
+        name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
+        url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 2_019_377_696,
+      }),
+      registerModel({
+        id: 'llama-2-7b-chat-q4_k_m',
+        name: 'Llama 2 7B Chat Q4_K_M',
+        url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        // Exact artifact Content-Length for catalog display/storage planning.
+        memoryRequirementBytes: 4_081_004_224,
+      }),
+      // Mistral
+      registerModel({
+        id: 'mistral-7b-instruct-q4_k_m',
+        name: 'Mistral 7B Instruct Q4_K_M',
+        url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirementBytes: 4_368_438_944,
+      }),
+      // Bonsai (PrismML)
       // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
       // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
       // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
@@ -127,48 +189,10 @@ export async function registerAll(
         memoryRequirementBytes: 3_803_452_480,
         supportsThinking: true,
       }),
-      registerModel({
-        id: 'llama-3.2-3b-instruct-q4_k_m',
-        name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
-        url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 2_019_377_696,
-      }),
-      registerModel({
-        id: 'lfm2-350m-q4_k_m',
-        name: 'LiquidAI LFM2 350M Q4_K_M',
-        url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 229_309_376,
-      }),
-      registerModel({
-        id: 'lfm2-350m-q8_0',
-        name: 'LiquidAI LFM2 350M Q8_0',
-        url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 379_214_784,
-      }),
-      registerModel({
-        id: 'lfm2.5-1.2b-instruct-q4_k_m',
-        name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
-        url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 730_895_168,
-      }),
-      registerModel({
-        id: 'lfm2-1.2b-tool-q4_k_m',
-        name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
-        url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 730_894_048,
-      }),
-      registerModel({
-        id: 'lfm2-1.2b-tool-q8_0',
-        name: 'LiquidAI LFM2 1.2B Tool Q8_0',
-        url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirementBytes: 1_246_252_768,
-      }),
+      // Nemotron (NVIDIA) — portable llama.cpp GGUFs shared with the other
+      // example apps. These three rows are EMBEDDING-modality (see
+      // EmbeddingCatalogPolicy.ts); they stay with the llama.cpp rows to mirror
+      // the iOS catalog, which registers them in its llama.cpp section too.
       ...PORTABLE_NVIDIA_EMBEDDING_MODELS.map((model) => registerModel(model)),
     ]);
   } else {
@@ -176,119 +200,13 @@ export async function registerAll(
   }
 
   // =========================================================================
-  // VLM (Vision Language) models
-  // =========================================================================
-  if (llamaRegistered) {
-    await Promise.all([
-      // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
-      registerModel({
-        id: 'smolvlm-500m-instruct-q8_0',
-        name: 'SmolVLM 500M Instruct',
-        archiveUrl: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        memoryRequirementBytes: 600_000_000,
-      }),
-      // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
-      // Uses multi-file download: main model (986MB) + mmproj (710MB)
-      registerModel({
-        id: 'qwen2-vl-2b-instruct-q4_k_m',
-        name: 'Qwen2-VL 2B Instruct',
-        files: [
-          {
-            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
-            filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
-            required: true,
-          },
-          {
-            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
-            filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
-            required: true,
-          },
-        ],
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        // Sum of file Content-Lengths: main (986 MB) + mmproj (710 MB).
-        memoryRequirementBytes: 1_695_930_304,
-      }),
-      // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
-      registerModel({
-        id: 'lfm2-vl-450m-q8_0',
-        name: 'LFM2-VL 450M',
-        files: [
-          {
-            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
-            filename: 'LFM2-VL-450M-Q8_0.gguf',
-            required: true,
-          },
-          {
-            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
-            filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
-            required: true,
-          },
-        ],
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        // Sum of file Content-Lengths: main (379 MB) + mmproj (104 MB).
-        memoryRequirementBytes: 483_105_280,
-      }),
-      // Fara1.5-4B - Microsoft Qwen3.5-VL computer-use agent VLM (~3300MB total)
-      // Uses multi-file download: main model + mmproj vision projector.
-      registerModel({
-        id: 'fara1.5-4b-q4_k_m',
-        name: 'Fara1.5 4B Computer-Use Agent Q4_K_M',
-        files: [
-          {
-            url: 'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf',
-            filename: 'Fara1.5-4B-Q4_K_M.gguf',
-            required: true,
-          },
-          {
-            url: 'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf',
-            filename: 'mmproj-Fara1.5-4B-f16.gguf',
-            required: true,
-          },
-        ],
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        // Approximate total: primary Q4_K_M text model + f16 mmproj projector.
-        memoryRequirementBytes: 3_300_000_000,
-        // Declares the model drivable through `RunAnywhere.cua`.
-        cuaProfile: RunAnywhere.cua.faraProfile,
-      }),
-    ]);
-  }
-
-  // =========================================================================
-  // LoRA adapters — mirrors iOS registerLoraAdapters() / Android seedLora.
-  // =========================================================================
-  if (llamaRegistered) {
-    await registerLoraAdapters();
-  }
-
-  // =========================================================================
-  // MLX backend — representative Apple catalog aligned with the iOS example
+  // MLX (Apple Metal) — representative Apple catalog aligned with the iOS
+  // example, grouped by model family
   // =========================================================================
   if (mlxRegistered) {
     await Promise.all([
-      registerModel({
-        id: 'mlx-qwen3-0.6b-4bit',
-        name: 'MLX Qwen3 0.6B 4bit',
-        url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
-        memoryRequirementBytes: 650_000_000,
-        supportsThinking: true,
-      }),
-      // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
-      // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
-      registerModel({
-        id: 'mlx-bonsai-27b-1bit',
-        name: 'MLX Bonsai-27B 1-bit',
-        url: 'https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
-        memoryRequirementBytes: 5_129_115_752,
-        supportsThinking: true,
-      }),
+      // Qwen (Alibaba) — Qwen2-VL vision, then the Qwen3 0.6B trio
+      // (LLM / ASR / embedding)
       registerModel({
         id: 'mlx-qwen2-vl-2b-instruct-4bit',
         name: 'MLX Qwen2-VL 2B Instruct 4bit',
@@ -296,6 +214,14 @@ export async function registerAll(
         framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
         category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         memoryRequirementBytes: 2_200_000_000,
+      }),
+      registerModel({
+        id: 'mlx-qwen3-0.6b-4bit',
+        name: 'MLX Qwen3 0.6B 4bit',
+        url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        memoryRequirementBytes: 650_000_000,
+        supportsThinking: true,
       }),
       registerModel({
         id: 'mlx-qwen3-asr-0.6b-8bit',
@@ -352,14 +278,6 @@ export async function registerAll(
         memoryRequirementBytes: 1_010_773_761,
       }),
       registerModel({
-        id: 'mlx-kokoro-82m-6bit',
-        name: 'MLX Kokoro 82M 6bit',
-        url: 'https://huggingface.co/mlx-community/Kokoro-82M-6bit',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
-        category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirementBytes: 309_640_166,
-      }),
-      registerModel({
         id: 'mlx-qwen3-embedding-0.6b-4bit-dwq',
         name: 'MLX Qwen3 Embedding 0.6B 4bit DWQ',
         url: 'https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ',
@@ -367,16 +285,140 @@ export async function registerAll(
         category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
         memoryRequirementBytes: 350_000_000,
       }),
+      // LFM2.5 (Liquid AI)
+      // A PLAIN REPO ref, not a `/4bit` subfolder ref like
+      // `hf.co/LiquidAI/LFM2.5-2.6B-MLX/4bit`. LiquidAI publishes one precision
+      // per repo here — the 4-bit weights sit at the repo ROOT alongside
+      // config.json and tokenizer.json — so appending a precision segment would
+      // 404.
+      registerModel({
+        id: 'mlx-lfm2.5-230m-4bit',
+        name: 'MLX LFM2.5 230M 4bit',
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-230M-MLX-4bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        // 150,867,598 B for the whole repo (146 MB of that is
+        // model.safetensors) plus KV cache and Metal runtime overhead.
+        memoryRequirementBytes: 200_000_000,
+      }),
+      // Bonsai (PrismML)
+      // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
+      // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
+      registerModel({
+        id: 'mlx-bonsai-27b-1bit',
+        name: 'MLX Bonsai-27B 1-bit',
+        url: 'https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        memoryRequirementBytes: 5_129_115_752,
+        supportsThinking: true,
+      }),
+      // Kokoro (hexgrad) — TTS
+      registerModel({
+        id: 'mlx-kokoro-82m-6bit',
+        name: 'MLX Kokoro 82M 6bit',
+        url: 'https://huggingface.co/mlx-community/Kokoro-82M-6bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        memoryRequirementBytes: 309_640_166,
+      }),
     ]);
   } else {
     logDiagnostic('[App] Skipping MLX models - backend not available');
   }
 
   // =========================================================================
-  // ONNX backend + STT/TTS models
+  // VLM (multimodal, llama.cpp) — grouped by model family
+  // =========================================================================
+  if (llamaRegistered) {
+    await Promise.all([
+      // SmolVLM (HuggingFace)
+      // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+      registerModel({
+        id: 'smolvlm-500m-instruct-q8_0',
+        name: 'SmolVLM 500M Instruct',
+        archiveUrl: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        memoryRequirementBytes: 600_000_000,
+      }),
+      // Qwen (Alibaba)
+      // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
+      // Uses multi-file download: main model (986MB) + mmproj (710MB)
+      registerModel({
+        id: 'qwen2-vl-2b-instruct-q4_k_m',
+        name: 'Qwen2-VL 2B Instruct',
+        files: [
+          {
+            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+            filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+            filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+            required: true,
+          },
+        ],
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        // Sum of file Content-Lengths: main (986 MB) + mmproj (710 MB).
+        memoryRequirementBytes: 1_695_930_304,
+      }),
+      // LFM2-VL (Liquid AI)
+      // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
+      registerModel({
+        id: 'lfm2-vl-450m-q8_0',
+        name: 'LFM2-VL 450M',
+        files: [
+          {
+            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
+            filename: 'LFM2-VL-450M-Q8_0.gguf',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
+            filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
+            required: true,
+          },
+        ],
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        // Sum of file Content-Lengths: main (379 MB) + mmproj (104 MB).
+        memoryRequirementBytes: 483_105_280,
+      }),
+      // Fara (Microsoft)
+      // Fara1.5-4B - Microsoft Qwen3.5-VL computer-use agent VLM (~3300MB total)
+      // Uses multi-file download: main model + mmproj vision projector.
+      registerModel({
+        id: 'fara1.5-4b-q4_k_m',
+        name: 'Fara1.5 4B Computer-Use Agent Q4_K_M',
+        files: [
+          {
+            url: 'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf',
+            filename: 'Fara1.5-4B-Q4_K_M.gguf',
+            required: true,
+          },
+          {
+            url: 'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf',
+            filename: 'mmproj-Fara1.5-4B-f16.gguf',
+            required: true,
+          },
+        ],
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        // Approximate total: primary Q4_K_M text model + f16 mmproj projector.
+        memoryRequirementBytes: 3_300_000_000,
+        // Declares the model drivable through `RunAnywhere.cua`.
+        cuaProfile: RunAnywhere.cua.faraProfile,
+      }),
+    ]);
+  }
+
+  // =========================================================================
+  // STT (Sherpa-ONNX)
   // =========================================================================
   if (onnxRegistered) {
     await Promise.all([
+      // Whisper (OpenAI)
       // Sherpa-ONNX speech models — served by the Sherpa engine plugin
       registerModel({
         id: 'sherpa-onnx-whisper-tiny.en',
@@ -386,6 +428,15 @@ export async function registerAll(
         category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         memoryRequirementBytes: 75_000_000,
       }),
+    ]);
+  }
+
+  // =========================================================================
+  // TTS (Sherpa-ONNX Piper VITS)
+  // =========================================================================
+  if (onnxRegistered) {
+    await Promise.all([
+      // Piper VITS (rhasspy)
       registerModel({
         id: 'vits-piper-en_US-lessac-medium',
         name: 'Piper TTS (US English - Medium)',
@@ -402,41 +453,61 @@ export async function registerAll(
         category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirementBytes: 65_000_000,
       }),
-      // Silero VAD — one-per-modality minimum for voice-agent parity with
-      // iOS. Small .onnx file served directly from the upstream repo.
-      registerModel({
-        id: 'silero-vad',
-        name: 'Silero VAD',
-        url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-        category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-        // Actual silero_vad.onnx Content-Length for catalog display/storage
-        // planning; the SDK keeps downloadSizeBytes separate.
-        memoryRequirementBytes: 2_327_524,
-      }),
-      // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
-      // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
-      registerModel({
-        id: 'all-minilm-l6-v2',
-        name: 'All MiniLM L6 v2 (Embedding)',
-        files: [
-          {
-            url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
-            filename: 'model.onnx',
-            required: true,
-          },
-          {
-            url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
-            filename: 'vocab.txt',
-            required: true,
-          },
-        ],
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-        category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-        // Sum of file Content-Lengths: model.onnx (90 MB) + vocab.txt (232 KB).
-        memoryRequirementBytes: 90_619_114,
-      }),
     ]);
+  }
+
+  // =========================================================================
+  // VAD (Silero, ONNX)
+  // =========================================================================
+  if (onnxRegistered) {
+    // Silero VAD — one-per-modality minimum for voice-agent parity with
+    // iOS. Small .onnx file served directly from the upstream repo.
+    await registerModel({
+      id: 'silero-vad',
+      name: 'Silero VAD',
+      url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      // Actual silero_vad.onnx Content-Length for catalog display/storage
+      // planning; the SDK keeps downloadSizeBytes separate.
+      memoryRequirementBytes: 2_327_524,
+    });
+  }
+
+  // =========================================================================
+  // Embeddings (ONNX)
+  // =========================================================================
+  if (onnxRegistered) {
+    // MiniLM (sentence-transformers)
+    // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
+    // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
+    await registerModel({
+      id: 'all-minilm-l6-v2',
+      name: 'All MiniLM L6 v2 (Embedding)',
+      files: [
+        {
+          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+          filename: 'model.onnx',
+          required: true,
+        },
+        {
+          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+          filename: 'vocab.txt',
+          required: true,
+        },
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      // Sum of file Content-Lengths: model.onnx (90 MB) + vocab.txt (232 KB).
+      memoryRequirementBytes: 90_619_114,
+    });
+  }
+
+  // =========================================================================
+  // LoRA adapters — mirrors iOS registerLoraAdapters() / Android seedLora.
+  // =========================================================================
+  if (llamaRegistered) {
+    await registerLoraAdapters();
   }
 
   // =========================================================================

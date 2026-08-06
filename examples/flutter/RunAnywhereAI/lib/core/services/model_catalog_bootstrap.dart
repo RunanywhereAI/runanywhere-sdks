@@ -56,6 +56,9 @@ abstract final class ModelCatalogBootstrap {
     await _applyPersistedHfToken();
 
     // --- LLM models (LlamaCpp backend) ------------------------------------
+    // Grouped by model family; every family ordered small → large.
+
+    // SmolLM2 (HuggingFace)
     await _registerLLM(
       id: 'smollm2-360m-q8_0',
       name: 'SmolLM2 360M Q8_0',
@@ -64,22 +67,8 @@ abstract final class ModelCatalogBootstrap {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 386404416,
     );
-    await _registerLLM(
-      id: 'llama-2-7b-chat-q4_k_m',
-      name: 'Llama 2 7B Chat Q4_K_M',
-      url:
-          'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 4000000000,
-    );
-    await _registerLLM(
-      id: 'mistral-7b-instruct-q4_k_m',
-      name: 'Mistral 7B Instruct Q4_K_M',
-      url:
-          'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 4000000000,
-    );
+
+    // Qwen — 2.5 first, then 3, small → large inside each generation.
     await _registerLLM(
       id: 'qwen2.5-0.5b-instruct-q6_k',
       name: 'Qwen 2.5 0.5B Instruct Q6_K',
@@ -98,46 +87,6 @@ abstract final class ModelCatalogBootstrap {
           'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 2500000000,
-    );
-    await _registerLLM(
-      id: 'lfm2-350m-q4_k_m',
-      name: 'LiquidAI LFM2 350M Q4_K_M',
-      url:
-          'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 250000000,
-    );
-    await _registerLLM(
-      id: 'lfm2-350m-q8_0',
-      name: 'LiquidAI LFM2 350M Q8_0',
-      url:
-          'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 400000000,
-    );
-    await _registerLLM(
-      id: 'lfm2.5-1.2b-instruct-q4_k_m',
-      name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
-      url:
-          'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 900000000,
-    );
-    await _registerLLM(
-      id: 'lfm2-1.2b-tool-q4_k_m',
-      name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
-      url:
-          'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 800000000,
-    );
-    await _registerLLM(
-      id: 'lfm2-1.2b-tool-q8_0',
-      name: 'LiquidAI LFM2 1.2B Tool Q8_0',
-      url:
-          'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 1400000000,
     );
     await _registerLLM(
       id: 'qwen3-0.6b-q4_k_m',
@@ -166,6 +115,93 @@ abstract final class ModelCatalogBootstrap {
       memoryRequirement: 2800000000,
       supportsThinking: true,
     );
+
+    // LFM2 / LFM2.5 (Liquid AI)
+    // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
+    // (149 MB vs 153 MB): 4 MB buys K-quant mixed precision on the
+    // attention/embedding tensors, and Q4_K_M is the quantization every
+    // other GGUF row in this catalog uses.
+    await _registerLLM(
+      id: 'lfm2.5-230m-q4_k_m',
+      name: 'LiquidAI LFM2.5 230M Q4_K_M',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/main/LFM2.5-230M-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      // 153,406,304 B of weights plus KV cache and runtime overhead.
+      memoryRequirement: 190000000,
+    );
+    // ONE quantization per model. The Q8_0 sibling of this row was removed
+    // deliberately: two quants of the same 350M model differ only in bytes
+    // (229 MB vs 379 MB), so the second row costs a catalog slot and a
+    // "which one do I pick?" decision without adding a capability.
+    await _registerLLM(
+      id: 'lfm2-350m-q4_k_m',
+      name: 'LiquidAI LFM2 350M Q4_K_M',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 250000000,
+    );
+    await _registerLLM(
+      id: 'lfm2.5-1.2b-instruct-q4_k_m',
+      name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 900000000,
+    );
+    // Same one-quant-per-model rule: the Q8_0 sibling of this row was removed
+    // (1.4 GB vs 800 MB for identical capability).
+    await _registerLLM(
+      id: 'lfm2-1.2b-tool-q4_k_m',
+      name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 800000000,
+    );
+
+    // Llama (Meta)
+    await _registerLLM(
+      id: 'llama-3.2-3b-instruct-q4_k_m',
+      name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
+      url:
+          'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 2000000000,
+    );
+    await _registerLLM(
+      id: 'llama-2-7b-chat-q4_k_m',
+      name: 'Llama 2 7B Chat Q4_K_M',
+      url:
+          'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 4000000000,
+    );
+
+    // Mistral
+    await _registerLLM(
+      id: 'mistral-7b-instruct-q4_k_m',
+      name: 'Mistral 7B Instruct Q4_K_M',
+      url:
+          'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 4000000000,
+    );
+
+    // Nemotron (NVIDIA) — portable embedding GGUFs on the llama.cpp backend.
+    for (final model in portableNvidiaEmbeddingCatalog) {
+      await _registerLLM(
+        id: model.id,
+        name: model.name,
+        url: model.url,
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        memoryRequirement: model.memoryRequirement,
+      );
+    }
+
+    // Bonsai (PrismML)
     // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
     // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
     // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
@@ -178,24 +214,6 @@ abstract final class ModelCatalogBootstrap {
       memoryRequirement: 3803452480,
       supportsThinking: true,
     );
-    await _registerLLM(
-      id: 'llama-3.2-3b-instruct-q4_k_m',
-      name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
-      url:
-          'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 2000000000,
-    );
-    for (final model in portableNvidiaEmbeddingCatalog) {
-      await _registerLLM(
-        id: model.id,
-        name: model.name,
-        url: model.url,
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-        memoryRequirement: model.memoryRequirement,
-      );
-    }
     debugPrint('LLM models registered');
 
     if (mlxRegistered) {
@@ -205,6 +223,9 @@ abstract final class ModelCatalogBootstrap {
     }
 
     // --- VLM models (multi-modal, multi-file) -----------------------------
+    // Grouped by model family; every family ordered small → large.
+
+    // SmolVLM (HuggingFace)
     await _registerArchive(
       id: 'smolvlm-500m-instruct-q8_0',
       name: 'SmolVLM 500M Instruct',
@@ -216,6 +237,7 @@ abstract final class ModelCatalogBootstrap {
       structure: ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
       memoryRequirement: 600000000,
     );
+    // Qwen2-VL
     await _registerMultiFile(
       id: 'qwen2-vl-2b-instruct-q4_k_m',
       name: 'Qwen2-VL 2B Instruct',
@@ -235,6 +257,7 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
       memoryRequirement: 1800000000,
     );
+    // LFM2-VL (Liquid AI)
     await _registerMultiFile(
       id: 'lfm2-vl-450m-q8_0',
       name: 'LFM2-VL 450M',
@@ -254,6 +277,7 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
       memoryRequirement: 600000000,
     );
+    // Fara (Microsoft)
     // Fara1.5 — Computer-Use Agent profile model, mirrors the Android/iOS/RN
     // catalog rows so `RunAnywhere.cua` has a drivable model on every
     // platform. `cuaProfile` lands on `ModelInfo.cuaProfile`
@@ -281,6 +305,7 @@ abstract final class ModelCatalogBootstrap {
     debugPrint('VLM models registered');
 
     // --- STT models (Sherpa-ONNX) -----------------------------------------
+    // Whisper (OpenAI)
     await _registerArchive(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
@@ -294,6 +319,7 @@ abstract final class ModelCatalogBootstrap {
     );
 
     // --- TTS models (Sherpa-ONNX Piper VITS) ------------------------------
+    // Piper VITS
     await _registerArchive(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
@@ -318,6 +344,7 @@ abstract final class ModelCatalogBootstrap {
     );
 
     // --- VAD (Silero, ONNX) -------------------------------------------------
+    // Silero
     await _registerLLM(
       id: 'silero-vad',
       name: 'Silero VAD',
@@ -331,7 +358,8 @@ abstract final class ModelCatalogBootstrap {
     );
     debugPrint('Sherpa STT/TTS + Silero VAD models registered');
 
-    // --- ONNX Embedding (RAG) ---------------------------------------------
+    // --- Embeddings (ONNX, RAG) -------------------------------------------
+    // All MiniLM (sentence-transformers)
     // MiniLM needs model.onnx + vocab.txt in the same folder for the C++
     // RAG pipeline to find its vocab next to the model.
     await _registerMultiFile(
@@ -360,6 +388,7 @@ abstract final class ModelCatalogBootstrap {
     // There is no Android/CoreML diffusion backend, so the row is registered
     // only on Apple platforms and never appears on Android.
     if (Platform.isIOS || Platform.isMacOS) {
+      // Stable Diffusion (Stability AI, Apple CoreML conversion)
       await _registerDiffusion(
         id: 'stable-diffusion-v1-5-coreml',
         name: 'Stable Diffusion 1.5 (CoreML)',
@@ -388,6 +417,8 @@ abstract final class ModelCatalogBootstrap {
   /// One proven model per supported modality keeps the Flutter example useful
   /// without duplicating the full iOS catalog.
   static Future<void> _registerAppleMlxModels() async {
+    // --- MLX LLM (Apple Metal) --------------------------------------------
+    // Qwen
     await _registerLLM(
       id: 'mlx-qwen3-0.6b-4bit',
       name: 'MLX Qwen3 0.6B 4bit',
@@ -396,6 +427,19 @@ abstract final class ModelCatalogBootstrap {
       memoryRequirement: 650000000,
       supportsThinking: true,
     );
+    // LFM2.5 (Liquid AI)
+    // A PLAIN REPO ref, not a `/4bit` subfolder ref like LFM2.5-2.6B-MLX.
+    // LiquidAI publishes one precision per repo here — the 4-bit weights sit
+    // at the repo ROOT alongside config.json and tokenizer.json — so
+    // appending a precision segment would 404.
+    await _registerLLM(
+      id: 'mlx-lfm2.5-230m-4bit',
+      name: 'MLX LFM2.5 230M 4bit',
+      url: 'https://huggingface.co/LiquidAI/LFM2.5-230M-MLX-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      memoryRequirement: 200000000,
+    );
+    // Bonsai (PrismML)
     // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
     // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
     await _registerLLM(
@@ -406,6 +450,9 @@ abstract final class ModelCatalogBootstrap {
       memoryRequirement: 5129115752,
       supportsThinking: true,
     );
+
+    // --- MLX VLM (multimodal) ---------------------------------------------
+    // Qwen2-VL
     await _registerLLM(
       id: 'mlx-qwen2-vl-2b-instruct-4bit',
       name: 'MLX Qwen2-VL 2B Instruct 4bit',
@@ -414,6 +461,9 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
       memoryRequirement: 2200000000,
     );
+
+    // --- MLX STT ----------------------------------------------------------
+    // Qwen3-ASR
     await _registerMultiFile(
       id: 'mlx-qwen3-asr-0.6b-8bit',
       name: 'MLX Qwen3-ASR 0.6B 8bit',
@@ -468,6 +518,9 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       memoryRequirement: 1010773761,
     );
+
+    // --- MLX TTS ----------------------------------------------------------
+    // Kokoro
     await _registerLLM(
       id: 'mlx-kokoro-82m-6bit',
       name: 'MLX Kokoro 82M 6bit',
@@ -476,6 +529,9 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 309640166,
     );
+
+    // --- MLX Embeddings ---------------------------------------------------
+    // Qwen3 Embedding
     await _registerLLM(
       id: 'mlx-qwen3-embedding-0.6b-4bit-dwq',
       name: 'MLX Qwen3 Embedding 0.6B 4bit DWQ',

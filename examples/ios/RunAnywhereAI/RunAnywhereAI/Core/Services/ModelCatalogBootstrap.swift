@@ -70,6 +70,10 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             memoryRequirement: 2_500_000_000
         )
+        // ONE quantization per model. The Q8_0 sibling of this row was removed
+        // deliberately: two quants of the same 350M model differ only in bytes
+        // (229 MB vs 379 MB), so the second row costs a catalog slot and a
+        // "which one do I pick?" decision without adding a capability.
         await registerLLM(
             id: "lfm2-350m-q4_k_m",
             name: "LiquidAI LFM2 350M Q4_K_M",
@@ -77,12 +81,17 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             memoryRequirement: 250_000_000
         )
+        // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
+        // (149 MB vs 153 MB): 4 MB buys K-quant mixed precision on the
+        // attention/embedding tensors, and Q4_K_M is the quantization every
+        // other GGUF row in this catalog uses.
         await registerLLM(
-            id: "lfm2-350m-q8_0",
-            name: "LiquidAI LFM2 350M Q8_0",
-            url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+            id: "lfm2.5-230m-q4_k_m",
+            name: "LiquidAI LFM2.5 230M Q4_K_M",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/main/LFM2.5-230M-Q4_K_M.gguf",
             framework: .llamaCpp,
-            memoryRequirement: 400_000_000
+            // 153,406,304 B of weights plus KV cache and runtime overhead.
+            memoryRequirement: 190_000_000
         )
         await registerLLM(
             id: "lfm2.5-1.2b-instruct-q4_k_m",
@@ -444,6 +453,19 @@ enum ModelCatalogBootstrap {
             url: "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit",
             framework: .mlx,
             memoryRequirement: 900_000_000
+        )
+        // A PLAIN REPO ref, not a `/4bit` subfolder ref like LFM2.5-2.6B-MLX
+        // below. LiquidAI publishes one precision per repo here — the 4-bit
+        // weights sit at the repo ROOT alongside config.json and tokenizer.json
+        // — so appending a precision segment would 404.
+        await registerLLM(
+            id: "mlx-lfm2.5-230m-4bit",
+            name: "MLX LFM2.5 230M 4bit",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-230M-MLX-4bit",
+            framework: .mlx,
+            // 150,867,598 B for the whole repo (146 MB of that is
+            // model.safetensors) plus KV cache and Metal runtime overhead.
+            memoryRequirement: 200_000_000
         )
         await registerLLM(
             id: "mlx-lfm2-350m",
@@ -1275,6 +1297,54 @@ enum ModelCatalogBootstrap {
             // compares against the true total and cannot reject this bundle.
             memoryRequirement: 3_450_000_000,
             supportsThinking: true
+        )
+
+        // The two small siblings, same engine, same folder-ref rules as above.
+        //
+        // `int8/` is a PRECISION SIBLING DIR, not a variant probed at runtime.
+        // Unlike QHexRT (where v75/v79/v81 is arch-pinned and resolved on
+        // device), one Core ML bundle runs on every Apple device, so the
+        // precision is a quality/size choice the CATALOG makes — see
+        // engines/neurt/neurt_bundle_policy.h, `resolve_variant` is NULL on
+        // purpose. Point at `fp16/` instead to A/B the reference bundle.
+        //
+        // int8 is chosen over fp16 on measurement, not on size alone: linear
+        // per-channel int8 scored equal-or-better than fp16 on teacher-forced
+        // parity for both models AND had the LOWER on-ANE error floor, because
+        // narrowing the weight range narrows what flows into the ANE's fp16
+        // accumulation. It is also ~2x the decode rate at half the bytes.
+        //
+        // Each bundle is TWO graphs (`chunk0` + `lmhead`) and no more: both
+        // models are small enough that chunk planning returns a single body
+        // chunk, so there are no per-token host round-trips between chunks the
+        // way the 6-chunk 2.6B has. Every graph is far inside the size tier
+        // measured 100% reliable on an iPhone (Gate P PASS for both).
+        //
+        // supportsThinking is FALSE for both, deliberately. Their chat template
+        // has no `enable_thinking` switch — it only PRESERVES thinking already
+        // present in history — and the 230M card explicitly rules out
+        // reasoning-heavy use. Declaring it true would make the app offer a
+        // toggle that prepends /no_think to a model that never emits <think>.
+        await registerLLM(
+            id: "lfm2.5-230m-ane",
+            name: "LFM2.5 230M (NeuRT / Neural Engine)",
+            url: "hf.co/runanywhere/LFM2.5-230M_ANE/int8",
+            framework: .coreml,
+            modality: .language,
+            // Peak RSS with ~15% headroom, measured under `neurt_generate` on
+            // Apple silicon: 449 MB resident for a full prefill+decode. NOT a
+            // download claim — the live HF folder total (369 MB) is what the
+            // post-download size floor compares against for a folder ref.
+            memoryRequirement: 520_000_000
+        )
+        await registerLLM(
+            id: "lfm2.5-350m-ane",
+            name: "LFM2.5 350M (NeuRT / Neural Engine)",
+            url: "hf.co/runanywhere/LFM2.5-350M_ANE/int8",
+            framework: .coreml,
+            modality: .language,
+            // Measured 575 MB peak RSS + ~15%; HF folder total is 494 MB.
+            memoryRequirement: 660_000_000
         )
         logger.info("Apple Neural Engine models registered")
 
