@@ -40,8 +40,8 @@ import type {
 import { createLlmNamespace, createVlmNamespace } from './text';
 import type { LlmNamespace, VlmNamespace } from './text';
 import { AudioFormat, Environment, InferenceFramework, audio, image, ragDocument } from './types';
+import { SDKEnvironment } from '../proto/model_types';
 import {
-  SdkInitEnvironment,
   SdkInitPhase1Request,
   SdkInitPhase2Request,
 } from '../proto/sdk_init';
@@ -232,8 +232,8 @@ async function runControlPlane(
   const deviceId = await backend.devicePersistentId();
   const platform = osPlatform();
   const protoEnv = isProd
-    ? SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION
-    : SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+    ? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+    : SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
   const phase1 = SdkInitPhase1Request.encode({
     environment: protoEnv,
     apiKey,
@@ -244,10 +244,6 @@ async function runControlPlane(
   }).finish();
   const phase2 = SdkInitPhase2Request.encode({
     buildToken: '',
-    forceRefreshAssignments: false,
-    flushTelemetry: true,
-    discoverDownloadedModels: true,
-    rescanLocalModels: true,
   }).finish();
   await backend.configureControlPlane({
     environment: isProd ? 2 : 0,

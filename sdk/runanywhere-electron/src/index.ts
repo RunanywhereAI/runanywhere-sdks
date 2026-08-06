@@ -180,8 +180,8 @@ export type {
   VoiceTurnCallbacks,
 } from './VoiceAgent';
 export type { NativeAddon } from './bridge';
-export { CATALOG, isCatalogId } from './catalog';
-export type { CatalogEntry, ModelType } from './catalog';
+export { registerCatalog, clearCatalog, catalogEntries, catalogEntry, isCatalogId } from './catalog';
+export type { Catalog, CatalogEntry, ModelType } from './catalog';
 export { resolveModel, downloadFile, modelsRoot } from './download';
 export type { DownloadProgress, ResolvedModel } from './download';
 export {

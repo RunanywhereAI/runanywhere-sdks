@@ -11,7 +11,7 @@ import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
 
-import { CATALOG, isCatalogId, ModelType } from './catalog';
+import { catalogEntries, catalogEntry, isCatalogId, ModelType } from './catalog';
 import { ErrorCode, SDKException } from './errors';
 
 export interface DownloadProgress {
@@ -74,7 +74,7 @@ function dirSize(dir: string, depth = 0): number {
  */
 export function modelStatus(root: string = modelsRoot()): Record<string, { downloaded: boolean; sizeBytes: number }> {
   const out: Record<string, { downloaded: boolean; sizeBytes: number }> = {};
-  for (const [id, entry] of Object.entries(CATALOG)) {
+  for (const [id, entry] of Object.entries(catalogEntries())) {
     const dir = path.join(root, id);
     // Archives: the extracted primary is the completeness signal (the .tar.bz2 is
     // removed after extract). Everything else: EVERY file must be present — a VLM
@@ -585,7 +585,7 @@ export async function resolveModel(
     // Local path (existing or to-be-created).
     return { id: idOrPath, type: 'path', dir: path.dirname(idOrPath), primary: idOrPath };
   }
-  const entry = CATALOG[idOrPath];
+  const entry = catalogEntry(idOrPath)!;
   const dir = path.join(opts.dir ?? modelsRoot(), idOrPath);
   fs.mkdirSync(dir, { recursive: true });
   for (const f of entry.files) {

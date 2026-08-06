@@ -135,7 +135,7 @@ export class SDKException extends Error {
       category: error.category,
       cAbiCode: error.cAbiCode,
       nestedMessage: error.nestedMessage,
-      fieldPath: error.context?.fieldPath,
+      fieldPath: error.param,
     });
   }
 

@@ -6,6 +6,49 @@ const os = require('os');
 const fs = require('fs');
 
 const download = require('../../dist/download');
+const { registerCatalog } = require('../../dist/catalog');
+
+// catalog.ts is a process-registry, not a built-in catalog (the app supplies
+// its own table). This file's resolveModel()/modelStatus() tests pre-date
+// that split and were written against these ids' real-world shapes, so
+// register an equivalent fixture once for the whole suite rather than
+// rewriting every test body.
+registerCatalog({
+  'qwen3.5-0.8b': {
+    type: 'llm',
+    files: [{ url: 'https://example.com/qwen3.5-0.8b/model.gguf', as: 'model.gguf' }],
+    primary: 'model.gguf',
+  },
+  'qwen3.5-0.8b-vl': {
+    type: 'vlm',
+    files: [
+      { url: 'https://example.com/qwen3.5-0.8b-vl/model.gguf', as: 'model.gguf' },
+      { url: 'https://example.com/qwen3.5-0.8b-vl/mmproj.gguf', as: 'mmproj.gguf' },
+    ],
+    primary: 'model.gguf',
+    mmproj: 'mmproj.gguf',
+  },
+  minilm: {
+    type: 'embedder',
+    files: [
+      { url: 'https://example.com/minilm/model.onnx', as: 'model.onnx' },
+      { url: 'https://example.com/minilm/vocab.txt', as: 'vocab.txt' },
+    ],
+    primary: 'model.onnx',
+  },
+  'whisper-tiny': {
+    type: 'stt',
+    files: [{ url: 'https://example.com/whisper-tiny/whisper.tar.bz2', as: 'whisper.tar.bz2' }],
+    primary: 'sherpa-onnx-whisper-tiny.en',
+    archive: true,
+  },
+  'piper-lessac': {
+    type: 'tts',
+    files: [{ url: 'https://example.com/piper-lessac/piper.tar.bz2', as: 'piper.tar.bz2' }],
+    primary: 'vits-piper-en_US-lessac-medium',
+    archive: true,
+  },
+});
 
 // Small helper: a fresh, unique temp root per test (cleaned up by the caller).
 function freshTempRoot() {
@@ -179,9 +222,9 @@ test('pathExists reflects the filesystem', () => {
 });
 
 test('modelStatus returns a {downloaded,sizeBytes} entry for every catalog id', () => {
-  const { CATALOG } = require('../../dist/catalog');
+  const { catalogEntries } = require('../../dist/catalog');
   const status = download.modelStatus();
-  for (const id of Object.keys(CATALOG)) {
+  for (const id of Object.keys(catalogEntries())) {
     assert.ok(status[id], `status has ${id}`);
     assert.equal(typeof status[id].downloaded, 'boolean');
     assert.equal(typeof status[id].sizeBytes, 'number');
@@ -189,11 +232,12 @@ test('modelStatus returns a {downloaded,sizeBytes} entry for every catalog id', 
 });
 
 test('modelStatus reports a multi-file model as downloaded only when EVERY file is present', () => {
-  const { CATALOG } = require('../../dist/catalog');
+  const { catalogEntries } = require('../../dist/catalog');
+  const entries = catalogEntries();
   // A non-archive entry with >1 file (e.g. a VLM: model.gguf + mmproj.gguf).
-  const id = Object.keys(CATALOG).find((k) => !CATALOG[k].archive && CATALOG[k].files.length > 1);
+  const id = Object.keys(entries).find((k) => !entries[k].archive && entries[k].files.length > 1);
   assert.ok(id, 'catalog has a multi-file non-archive entry');
-  const entry = CATALOG[id];
+  const entry = entries[id];
   const root = freshTempRoot();
   const dir = path.join(root, id);
   fs.mkdirSync(dir, { recursive: true });
