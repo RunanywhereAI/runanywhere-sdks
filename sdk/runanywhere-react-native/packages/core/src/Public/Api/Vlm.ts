@@ -43,7 +43,8 @@ async function buildRequest(
   const request = VLMGenerationRequest.fromPartial({
     requestId,
     images: [toVlmImage(image)],
-    options: toVlmOptions(prompt, options),
+    prompt,
+    options: toVlmOptions(options),
   });
   return encode(request, VLMGenerationRequest);
 }
@@ -121,7 +122,6 @@ export const vlm = {
             }
             const isTerminal =
               event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED ||
-              event.isFinal ||
               event.result !== undefined;
             if (isTerminal) {
               controller.push({

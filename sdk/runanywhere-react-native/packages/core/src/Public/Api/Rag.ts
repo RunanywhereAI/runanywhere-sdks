@@ -82,19 +82,29 @@ async function toRagDocument(document: RagDocument): Promise<RAGDocument> {
   });
 }
 
+/**
+ * Build a `RAGQueryOptions`.
+ *
+ * `question`/flat `retrievalTopK`/`similarityThreshold` are deleted from
+ * `RAGQueryOptions` outright: the message now carries `query` plus a nested
+ * `retrieval: RAGRetrievalOptions` (`topK`/`scoreThreshold`) and
+ * `generation: LLMGenerationOptions`.
+ */
 function buildQueryOptions(
   question: string,
   options: RagQueryOptions | undefined,
   config: RagConfig | undefined
 ): RAGQueryOptions {
   const topK = options?.retrieval?.topK ?? config?.topK;
-  const similarityThreshold =
+  const scoreThreshold =
     options?.retrieval?.similarityThreshold ?? config?.similarityThreshold;
   return RAGQueryOptions.fromPartial({
-    question,
+    query: question,
     generation: toLlmOptions(options?.generation),
-    ...(topK !== undefined ? { retrievalTopK: topK } : {}),
-    ...(similarityThreshold !== undefined ? { similarityThreshold } : {}),
+    retrieval: {
+      ...(topK !== undefined ? { topK } : {}),
+      ...(scoreThreshold !== undefined ? { scoreThreshold } : {}),
+    },
   });
 }
 
@@ -124,8 +134,10 @@ function createSession(config: RagConfig | undefined): RagSession {
       requireOpen();
       const response = await ragSearch(
         RAGSearchRequest.fromPartial({
-          question: query,
-          retrievalTopK: topK ?? config?.topK ?? 0,
+          query,
+          retrieval: {
+            topK: topK ?? config?.topK ?? 0,
+          },
         })
       );
       if (response.error) {
@@ -143,7 +155,6 @@ function createSession(config: RagConfig | undefined): RagSession {
 
     queryStream(question: string, options?: RagQueryOptions): AsyncIterable<RagEvent> {
       requireOpen();
-      const retrieved: Match[] = [];
       let cancel: (() => Promise<void>) | null = null;
 
       return pushStream<RagEvent>(
@@ -160,12 +171,6 @@ function createSession(config: RagConfig | undefined): RagSession {
             .ragQueryStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
               const event = decodeEvent(eventBytes, RAGStreamEvent);
               switch (event.kind) {
-                case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED:
-                  if (event.chunk) retrieved.push(toMatch(event.chunk));
-                  break;
-                case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY:
-                  controller.push({ type: 'retrieved', matches: [...retrieved] });
-                  break;
                 case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN:
                   if (event.token.length > 0) {
                     controller.push({

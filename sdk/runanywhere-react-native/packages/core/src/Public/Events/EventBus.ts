@@ -8,14 +8,10 @@
 import type {
   SDKEvent as SDKEventMessage,
   ComponentLifecycleEvent,
-  ModelRegistryEvent,
-  DownloadEvent,
+  ModelEvent,
   SDKComponent,
 } from '@runanywhere/proto-ts/sdk_events';
-import {
-  GenerationEventKind,
-  ModelEventKind,
-} from '@runanywhere/proto-ts/sdk_events';
+import { ModelEventKind } from '@runanywhere/proto-ts/sdk_events';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import {
   ComponentLifecycleState,
@@ -196,19 +192,25 @@ export class EventBus {
     return this.payloadStream((event) => event.voicePipeline);
   }
 
-  /** `RADownloadEvent` payloads (model download progress / lifecycle). */
-  get downloadEventPayloads(): AsyncIterable<DownloadEvent> {
-    return this.payloadStream((event) => event.download);
+  /**
+   * `ModelEvent` payloads (model registry + download progress/lifecycle).
+   *
+   * `ModelRegistryEvent` and `DownloadEvent` are deleted outright — both are
+   * absorbed into the single `ModelEvent` message (`sdk_events.proto`:
+   * "Absorbed from ModelRegistryEvent" / "Absorbed from DownloadEventKind"),
+   * carried on the envelope's `model` arm (`SDKEvent.model`, comment:
+   * "+ model_registry, + download"). `downloadEventPayloads` and
+   * `modelRegistryEventPayloads` are merged into this one stream; callers
+   * that only care about downloads or only about registry activity narrow
+   * by `ModelEventKind` themselves.
+   */
+  get modelEventPayloads(): AsyncIterable<ModelEvent> {
+    return this.payloadStream((event) => event.model);
   }
 
   /** `RAComponentLifecycleEvent` payloads. */
   get componentLifecycleEventPayloads(): AsyncIterable<ComponentLifecycleEvent> {
     return this.payloadStream((event) => event.componentLifecycle);
-  }
-
-  /** `RAModelRegistryEvent` payloads. */
-  get modelRegistryEventPayloads(): AsyncIterable<ModelRegistryEvent> {
-    return this.payloadStream((event) => event.modelRegistry);
   }
 
   // ==========================================================================
@@ -380,21 +382,17 @@ export function modelLifecycleChange(
     }
   }
 
-  // Channels 2 + 3: model events and LLM generation events.
+  // Channel 2: model events. `GENERATION_EVENT_KIND_MODEL_LOADED`/
+  // `_MODEL_UNLOADED` are deleted from `GenerationEventKind` outright — the
+  // load/unload signal on the generation channel had no other reader in
+  // this file, and channel 1 (componentLifecycle) already covers the same
+  // transition canonically.
   const modelId = event.model?.modelId || event.generation?.modelId || '';
 
-  if (
-    event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED ||
-    event.generation?.kind ===
-      GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED
-  ) {
+  if (event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED) {
     return { kind: 'loaded', modelId, component: event.component, event };
   }
-  if (
-    event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED ||
-    event.generation?.kind ===
-      GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED
-  ) {
+  if (event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED) {
     return { kind: 'unloaded', modelId, component: event.component, event };
   }
   return undefined;

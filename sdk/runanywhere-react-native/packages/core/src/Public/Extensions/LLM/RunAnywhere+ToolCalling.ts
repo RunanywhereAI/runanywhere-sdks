@@ -12,22 +12,19 @@ import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
-  ToolParameterType,
   ToolCall,
   ToolResult,
   ToolCallingResult,
   ToolCallingOptions,
   ToolCallFormatName,
+  ToolCallingRole,
   type ToolDefinition,
-  type ToolParameter,
   type ToolValue,
   type ToolValueArray,
   type ToolValueObject,
 } from '@runanywhere/proto-ts/tool_calling';
 import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
-import { LLMGenerationOptions as LLMGenerationOptionsMessage } from '@runanywhere/proto-ts/llm_options';
-import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import { arrayBufferToBytes, bytesToBase64 } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
@@ -55,7 +52,6 @@ export interface RegisteredTool {
 
 export type {
   ToolDefinition,
-  ToolParameter,
   ToolCall,
   ToolResult,
   ToolCallingOptions,
@@ -65,7 +61,6 @@ export type {
   ToolValueArray,
   ToolValueObject,
 };
-export { ToolParameterType };
 
 // ---------------------------------------------------------------------------
 // ToolValue ↔ plain-JSON bridge (RN-layer mirror of commons'
@@ -172,6 +167,25 @@ export function toolValueMapFromJson(
   return out;
 }
 
+/**
+ * Convert a flat alternating `[user0, asst0, user1, asst1, ...]` history
+ * (excluding the current turn) into the wire `ToolCallingHistoryTurn[]`.
+ * Mirrors `chat.proto`'s role mapping (`MESSAGE_ROLE_USER` ->
+ * `TOOL_CALLING_ROLE_USER`, `MESSAGE_ROLE_ASSISTANT` ->
+ * `TOOL_CALLING_ROLE_ASSISTANT`).
+ */
+function toToolCallingHistory(
+  turns: string[]
+): { role: ToolCallingRole; content: string }[] {
+  return turns.map((content, index) => ({
+    role:
+      index % 2 === 0
+        ? ToolCallingRole.TOOL_CALLING_ROLE_USER
+        : ToolCallingRole.TOOL_CALLING_ROLE_ASSISTANT,
+    content,
+  }));
+}
+
 const registeredTools: Map<string, RegisteredTool> = new Map();
 
 /**
@@ -207,6 +221,11 @@ export function clearTools(): Promise<void> {
  * Execute a single parsed tool call against the registry. Used by
  * `generateWithTools` as the native-callback trampoline and exposed for
  * tests / hosts that want to drive tool execution manually.
+ *
+ * `ToolResult.success` is renamed `isError` with inverted polarity: the
+ * proto3 zero value (`false`) is now the "good result" default (Anthropic
+ * `is_error`, MCP `isError`), so every `success: false` below becomes
+ * `isError: true` and `success: true` becomes `isError: false`.
  */
 export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
   const tool = registeredTools.get(toolCall.name);
@@ -218,7 +237,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: `Unknown tool: ${toolCall.name}`,
-      success: false,
+      isError: true,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -237,7 +256,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: `Failed to parse tool arguments: ${errorMessage}`,
-      success: false,
+      isError: true,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -250,7 +269,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       toolCallId: toolCall.id,
       name: toolCall.name,
       resultJson: toolValueMapToJsonString(result),
-      success: true,
+      isError: false,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -262,7 +281,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: '',
       error: errorMessage,
-      success: false,
+      isError: true,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -279,16 +298,15 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 export interface GenerateWithToolsOptions {
   signal?: AbortSignal;
   /**
-   * LLM generation options channel — sampling, reasoning, and system prompt
-   * for the run loop. Merged over the canonical
-   * `lLMGenerationOptionsDefaults()` into the request's `generation` message.
+   * Sampling/system-prompt channel forwarded onto the request's
+   * `ToolCallingOptions`. `maxOutputTokens`/`temperature`/`reasoning` are
+   * deleted from `ToolCallingOptions` outright (idl: they duplicated the
+   * enclosing `LLMGenerationOptions` in the two embeddings that had one,
+   * and the standalone run-loop request has none) — only `topP` and
+   * `systemPrompt` still have a channel here; the run loop otherwise keeps
+   * commons' own greedy generation defaults.
    */
-  llmOptions?: Partial<
-    Pick<
-      LLMGenerationOptions,
-      'maxOutputTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'reasoning'
-    >
-  >;
+  llmOptions?: Partial<Pick<LLMGenerationOptions, 'topP' | 'systemPrompt'>>;
   /**
    * Swift parity: when omitted the proto field stays UNSET so commons applies
    * its documented default (true). Hosts that delegate validation to their
@@ -308,6 +326,14 @@ export interface GenerateWithToolsOptions {
  * Generate a response with tool calling. Commons owns the multi-iteration
  * run loop through `rac_tool_calling_run_loop_proto`; this
  * function only forwards the request and supplies the JS executor trampoline.
+ *
+ * `ToolCallingSessionCreateRequest` is collapsed to 3 fields — `prompt`,
+ * `history` (now typed `ToolCallingHistoryTurn[]`, not `string[]`), and
+ * `options: ToolCallingOptions` — deleting the 14 flat knobs that used to be
+ * re-published on the request; every one of them now lives on `options`
+ * alone (or, for `temperature`/`maxTokens`, nowhere: the run loop keeps
+ * commons' own greedy defaults, since this request has no enclosing
+ * `LLMGenerationOptions` to inherit them from).
  *
  * Pass an `AbortSignal` via `extra.signal` to cancel the in-flight loop —
  * Nitro publishes the native run-loop handle synchronously so we can fan an
@@ -344,51 +370,31 @@ export async function generateWithTools(
   const tools = options?.tools ?? (await getRegisteredTools());
   const format =
     options?.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
-  // Sampling/reasoning/system prompt travel in `generation`
-  // (lLMGenerationOptionsDefaults + the caller's llmOptions channel); pure
-  // tool configuration travels in `generation.toolCalling`.
-  const llm = extra?.llmOptions;
-  const generation = LLMGenerationOptionsMessage.fromPartial({
-    ...lLMGenerationOptionsDefaults(),
-    ...llm,
-    toolCalling: ToolCallingOptions.fromPartial({
-      tools,
-      format,
-      maxToolCalls: options?.maxToolCalls,
-      keepToolsAvailable: options?.keepToolsAvailable ?? false,
-      toolChoice: options?.toolChoice,
-      forcedToolName: options?.forcedToolName,
-      autoExecute: options?.autoExecute ?? true,
-      replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
-      requireJsonArguments: options?.requireJsonArguments ?? false,
-      disableThinking: options?.disableThinking ?? false,
-      parallelToolCalls: options?.parallelToolCalls ?? false,
-    }),
-  });
-  const toolCalling = generation.toolCalling;
-  const request = ToolCallingSessionCreateRequest.fromPartial({
-    prompt,
-    maxTokens: generation.maxOutputTokens,
-    temperature: generation.temperature,
-    topP: generation.topP,
-    systemPrompt: generation.systemPrompt ?? '',
-    tools: toolCalling?.tools ?? tools,
-    format: toolCalling?.format ?? format,
-    maxToolCalls: toolCalling?.maxToolCalls,
-    keepToolsAvailable: toolCalling?.keepToolsAvailable,
-    toolChoice: toolCalling?.toolChoice,
-    forcedToolName: toolCalling?.forcedToolName,
-    disableThinking: toolCalling?.disableThinking,
-    autoExecute: toolCalling?.autoExecute,
-    replaceSystemPrompt: toolCalling?.replaceSystemPrompt,
-    requireJsonArguments: toolCalling?.requireJsonArguments,
-    parallelToolCalls: toolCalling?.parallelToolCalls,
+  const toolCalling = ToolCallingOptions.fromPartial({
+    tools,
+    format,
+    maxToolCalls: options?.maxToolCalls,
+    keepToolsAvailable: options?.keepToolsAvailable ?? false,
+    toolChoice: options?.toolChoice,
+    forcedToolName: options?.forcedToolName,
+    autoExecute: options?.autoExecute ?? true,
+    replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
+    requireJsonArguments: options?.requireJsonArguments ?? false,
+    disableThinking: options?.disableThinking ?? false,
+    parallelToolCalls: options?.parallelToolCalls ?? false,
+    topP: extra?.llmOptions?.topP,
+    systemPrompt: extra?.llmOptions?.systemPrompt,
     // Leave unset unless the caller chose — commons defaults to true.
     validateCalls: extra?.validateCalls,
+  });
+  const request = ToolCallingSessionCreateRequest.fromPartial({
+    prompt,
     // Prior turns as a flat alternating [user0, asst0, ...] list of message
-    // contents (excluding the current turn, which is `prompt`); commons threads
-    // these into every generate in the loop so multi-turn tool use keeps context.
-    history: extra?.history ?? [],
+    // contents (excluding the current turn, which is `prompt`); commons
+    // flattens role-tagged history back to this same alternating shape, so
+    // round-tripping through USER/ASSISTANT roles here is lossless.
+    history: toToolCallingHistory(extra?.history ?? []),
+    options: toolCalling,
   });
 
   logger.debug(

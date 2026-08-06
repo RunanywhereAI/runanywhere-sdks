@@ -41,6 +41,7 @@ import {
   ModelListRequest,
   ModelListResult,
   ModelQuery,
+  ModelRegistryStatus,
   ModelSource,
   InferenceFramework,
   RegisterModelFromUrlRequest,
@@ -52,7 +53,6 @@ import {
   DownloadPlanRequest,
   DownloadFailureReason,
   DownloadPlanResult,
-  DownloadStage,
   DownloadState,
   type DownloadProgress,
   DownloadProgress as DownloadProgressCodec,
@@ -290,7 +290,8 @@ export async function registerArchiveModel(
     format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     downloadUrl: input.url,
     source: ModelSource.MODEL_SOURCE_REMOTE,
-    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE,
+    // `ModelInfo.artifactType` is deleted outright — the oneof arm
+    // (`archive` here) is itself the artifact-type signal now.
     archive,
     supportsThinking: input.supportsThinking ?? false,
     supportsLora: input.supportsLora ?? false,
@@ -346,13 +347,17 @@ export async function registerMultiFileModel(
         }
       : {}),
     ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
+    // ModelFileDescriptor.isRequired was renamed isOptional — NOT a bare
+    // rename, the boolean polarity inverts too (required=true means
+    // optional=false). This is a confirmed live bug when passed through
+    // unchanged.
     files: input.files.map((file) => ({
       role:
         file.role ??
         (native.inferModelFileRole(file.filename, category) as ModelFileRole),
       url: file.url,
       filename: file.filename,
-      isRequired: file.isRequired,
+      isOptional: !file.isRequired,
     })),
   });
   const saved = arrayBufferToBytes(
@@ -539,13 +544,17 @@ export async function importModel(
   return ModelImportResult.decode(bytes);
 }
 
+/**
+ * `ModelListResult.totalCount`/`downloadedCount`/`availableCount`/
+ * `filteredCount` are deleted outright — the message now carries only
+ * `models`/`error`. `ModelInfo.isDownloaded` is likewise deleted;
+ * `registryStatus` (`MODEL_REGISTRY_STATUS_DOWNLOADED`/`_LOADED`) is the
+ * single downloaded-ness signal now (see `model_types.proto`'s
+ * `ModelInfo.registry_status` comment).
+ */
 function modelListResult(models: ModelInfoList): ModelListResult {
   return ModelListResult.fromPartial({
     models,
-    totalCount: models.models.length,
-    downloadedCount: models.models.filter((model) => model.isDownloaded).length,
-    availableCount: models.models.filter((model) => model.isAvailable).length,
-    filteredCount: models.models.length,
   });
 }
 
@@ -636,12 +645,15 @@ async function unsubscribeFromDownloadProgress(
 // Download (canonical async iterable)
 // ---------------------------------------------------------------------------
 
+/**
+ * `DownloadStage` is deleted from `download_service.proto` outright —
+ * `DownloadProgress.state` (`DownloadState`) is the single phase signal now.
+ */
 function isTerminalProgress(progress: DownloadProgress): boolean {
   return (
     progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
     progress.state === DownloadState.DOWNLOAD_STATE_FAILED ||
-    progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED ||
-    progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
+    progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED
   );
 }
 
@@ -662,10 +674,7 @@ function isCompletedProgress(progress: DownloadProgress): boolean {
       { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
     );
   }
-  return (
-    progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
-    progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
-  );
+  return progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED;
 }
 
 /**
@@ -735,10 +744,12 @@ async function persistDownloadCompletion(
     );
   }
 
+  // ModelInfo.isDownloaded is deleted outright; registryStatus is the single
+  // downloaded-ness signal now.
   const importedModel = ModelInfoCodec.fromPartial({
     ...model,
     localPath,
-    isDownloaded: true,
+    registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
     isAvailable: true,
     updatedAtUnixMs: Date.now(),
   });
@@ -851,12 +862,15 @@ export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadPro
           const model = ModelInfoCodec.decode(modelBytes);
           modelForImport = model;
           // Plan fields mirror Swift RunAnywhere+Storage.swift:183-188.
+          // `resumeExisting`/`verifyChecksums` are deleted outright:
+          // `validateExistingBytes` covers resume validation, and checksums
+          // are "verified whenever the catalog has one" by default — there
+          // is no separate opt-in field, only `skipChecksumVerification` to
+          // opt OUT.
           const planRequest = DownloadPlanRequest.fromPartial({
             modelId,
             model,
-            resumeExisting: true,
             validateExistingBytes: true,
-            verifyChecksums: (model.checksumSha256?.length ?? 0) > 0,
           });
           const plan = await planDownload(native, planRequest);
           if (!plan.canStart) {
@@ -867,10 +881,19 @@ export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadPro
             finish();
             return;
           }
+          // `update_registry_on_completion` was renamed
+          // `skip_registry_update`, with INVERTED polarity: the old field's
+          // zero value (false) meant "don't auto-update" (registry updates
+          // were opt-in); the new field's zero value (false) means "do
+          // update" (registry updates are opt-OUT via skip=true). This
+          // call site wants commons to skip its own auto-update because
+          // `persistDownloadCompletion` below does the registry write
+          // itself via `importModel` — i.e. the same "I'll handle it"
+          // intent as the old `false`, expressed here as `skip: true`.
           const startRequest = DownloadStartRequest.fromPartial({
             modelId,
             plan,
-            updateRegistryOnCompletion: false,
+            skipRegistryUpdate: true,
           });
           const startBytes = await native.downloadStartProto(
             encodeProtoMessage(startRequest, DownloadStartRequest)

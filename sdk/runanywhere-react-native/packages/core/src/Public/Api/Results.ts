@@ -7,11 +7,10 @@
  * object.
  */
 
+import { FinishReason as ProtoFinishReason } from '@runanywhere/proto-ts/llm_options';
 import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
-import type { LLMStreamFinalResult } from '@runanywhere/proto-ts/llm_service';
 import type { STTOutput, STTServiceState } from '@runanywhere/proto-ts/stt_options';
 import type { TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
-import { TTSVoiceGender } from '@runanywhere/proto-ts/tts_options';
 import type { VADResult } from '@runanywhere/proto-ts/vad_options';
 import type { EmbeddingsResult } from '@runanywhere/proto-ts/embeddings_options';
 import type { RerankResult } from '@runanywhere/proto-ts/rerank';
@@ -23,7 +22,7 @@ import type {
   RAGSearchResult,
   RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
-import type { LoRAState } from '@runanywhere/proto-ts/lora_options';
+import type { LoraState as LoraStateProto } from '@runanywhere/proto-ts/lora_options';
 import type { StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
 import type { VLMResult } from '@runanywhere/proto-ts/vlm_options';
 import type { SDKError } from '@runanywhere/proto-ts/errors';
@@ -58,6 +57,12 @@ function throwIfFailed(result: { error?: SDKError }): void {
   throw new SDKException(result.error);
 }
 
+/**
+ * Map VLM's raw finish-reason string onto the public union.
+ *
+ * `VLMResult.finishReason` stays a plain string on the wire ("stop" |
+ * "length" | "stop_sequence"), unlike the LLM path's `FinishReason` enum.
+ */
 function toFinishReason(raw: string, toolCallCount: number): FinishReason {
   if (toolCallCount > 0) return 'toolCalls';
   switch (raw.toLowerCase()) {
@@ -72,6 +77,33 @@ function toFinishReason(raw: string, toolCallCount: number): FinishReason {
   }
 }
 
+/**
+ * Map the wire `FinishReason` enum onto the public union.
+ *
+ * `finish_reason` moved from a raw string to this typed enum on the wire
+ * (idl API-realignment); this replaces the old string-lowercasing
+ * `toFinishReason` for every LLM result path.
+ */
+function fromFinishReason(
+  raw: ProtoFinishReason,
+  toolCallCount: number
+): FinishReason {
+  if (toolCallCount > 0 || raw === ProtoFinishReason.FINISH_REASON_TOOL_CALLS) {
+    return 'toolCalls';
+  }
+  switch (raw) {
+    case ProtoFinishReason.FINISH_REASON_LENGTH:
+    case ProtoFinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
+      return 'length';
+    case ProtoFinishReason.FINISH_REASON_CANCELLED:
+      return 'cancelled';
+    case ProtoFinishReason.FINISH_REASON_ERROR:
+      return 'unknown';
+    default:
+      return 'stop';
+  }
+}
+
 /** Project a one-shot LLM result onto the public generation result. */
 export function toGenerationResult(
   result: LLMGenerationResult,
@@ -81,36 +113,31 @@ export function toGenerationResult(
   return {
     text: result.text,
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
-    toolCalls: [],
-    finishReason: toFinishReason(result.finishReason, 0),
+    toolCalls: result.toolCalls,
+    finishReason: fromFinishReason(result.finishReason, result.toolCalls.length),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: Math.round(result.ttftMs ?? 0),
-    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId,
     model: result.modelUsed,
   };
 }
 
-/** Project a terminal stream result onto the public generation result. */
+/**
+ * Project a terminal stream result onto the public generation result.
+ *
+ * `LLMStreamFinalResult` is deleted outright: the stream terminates with the
+ * same `LLMGenerationResult` the unary call returns, so this is
+ * `toGenerationResult` with a `model` fallback for when `modelUsed` is empty.
+ */
 export function toGenerationResultFromStream(
-  final: LLMStreamFinalResult,
+  final: LLMGenerationResult,
   requestId: string,
   model: string
 ): GenerationResult {
-  throwIfFailed(final);
-  return {
-    text: final.text,
-    ...(final.thinkingContent ? { thinkingText: final.thinkingContent } : {}),
-    toolCalls: final.toolCalls,
-    finishReason: toFinishReason(final.finishReason, final.toolCalls.length),
-    inputTokens: final.usage?.inputTokens ?? 0,
-    outputTokens: final.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: final.timeToFirstTokenMs,
-    tokensPerSecond: final.usage?.tokensPerSecond ?? 0,
-    requestId,
-    model,
-  };
+  const result = toGenerationResult(final, requestId);
+  return result.model ? result : { ...result, model };
 }
 
 /** Project a VLM result onto the public generation result. */
@@ -126,8 +153,8 @@ export function toGenerationResultFromVlm(
     finishReason: toFinishReason(result.finishReason, 0),
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
-    timeToFirstTokenMs: result.timeToFirstTokenMs,
-    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
+    timeToFirstTokenMs: Math.round(result.usage?.ttftMs ?? 0),
+    tokensPerSecond: result.usage?.decodeTokensPerSecond ?? 0,
     requestId,
     model,
   };
@@ -188,7 +215,12 @@ export function synthesizeStreamResult(
   };
 }
 
-/** Project a structured-output result onto the public structured result. */
+/**
+ * Project a structured-output result onto the public structured result.
+ *
+ * `StructuredOutputResult.parsedJson` (bytes) is renamed `json` (a plain UTF-8
+ * string) outright — no decode step is needed anymore.
+ */
 export function toStructuredResult<T>(
   result: StructuredOutputResult,
   metrics: GenerationResult,
@@ -196,7 +228,7 @@ export function toStructuredResult<T>(
 ): StructuredResult<T> {
   throwIfFailed(result);
   const raw = result.rawText ?? '';
-  const json = new TextDecoder('utf-8').decode(result.parsedJson);
+  const json = result.json;
   let value: T | null = null;
   let parsed = false;
   if (json.length > 0) {
@@ -266,40 +298,54 @@ export function toAudioChunk(output: TTSOutput): AudioChunk {
   };
 }
 
-/** Project a TTS voice descriptor onto the public voice. */
+/**
+ * Project a TTS voice descriptor onto the public voice.
+ *
+ * `TTSVoiceGender` and `TTSVoiceInfo.gender` are deleted from
+ * `tts_options.proto` outright — voice gender is no longer exposed.
+ */
 export function toVoice(info: TTSVoiceInfo): Voice {
-  const gender =
-    info.gender === TTSVoiceGender.TTS_VOICE_GENDER_MALE
-      ? 'male'
-      : info.gender === TTSVoiceGender.TTS_VOICE_GENDER_FEMALE
-        ? 'female'
-        : info.gender === TTSVoiceGender.TTS_VOICE_GENDER_NEUTRAL
-          ? 'neutral'
-          : undefined;
   return {
     id: info.id,
     name: info.displayName,
     language: info.languageCode,
-    ...(gender ? { gender } : {}),
   };
 }
 
-/** Project a VAD result onto the public verdict. */
+/**
+ * Project a VAD result onto the public verdict.
+ *
+ * `VADResult.confidence`/`startTimeMs`/`endTimeMs` are deleted outright
+ * (idl/vad_options.proto): confidence is renamed `probability`, and the
+ * start/end pair has no replacement — the result now only carries
+ * `timestampMs` (frame start) + `durationMs` (frame length). Derive the one
+ * segment this frame represents from that pair instead of a span, mirroring
+ * Swift's `VadResult.init(proto:)`.
+ */
 export function toVadResult(result: VADResult): VadResult {
   throwIfFailed(result);
   return {
     isSpeech: result.isSpeech,
-    probability: result.confidence,
+    probability: result.probability,
     segments:
-      result.isSpeech && result.endTimeMs > result.startTimeMs
-        ? [{ startMs: result.startTimeMs, endMs: result.endTimeMs }]
+      result.isSpeech && result.durationMs > 0
+        ? [
+            {
+              startMs: result.timestampMs,
+              endMs: result.timestampMs + result.durationMs,
+            },
+          ]
         : [],
   };
 }
 
-/** Project an embeddings result onto the public vectors, in input order. */
+/**
+ * Project an embeddings result onto the public vectors, in input order.
+ *
+ * `EmbeddingsResult.error` is deleted outright — the message carries no
+ * failure channel, so there is nothing left to `throwIfFailed` on here.
+ */
 export function toEmbeddings(result: EmbeddingsResult): Embedding[] {
-  throwIfFailed(result);
   return result.vectors
     .map((vector, position) => ({
       index: vector.inputIndex > 0 ? vector.inputIndex : position,
@@ -315,21 +361,23 @@ export function toRankedResults(result: RerankResult): RankedResult[] {
     .sort((left, right) => right.relevanceScore - left.relevanceScore);
 }
 
-/** Project a diffusion result onto the public image result. */
+/**
+ * Project a diffusion result onto the public image result.
+ *
+ * `DiffusionResult.imageData`/`batchImages`/`width`/`height`/
+ * `imageMediaType`/`seedUsed` are deleted outright: the result now carries a
+ * flat `images: DiffusionImage[]`, each with its own `data`/`width`/`height`/
+ * `mediaType`/`seedUsed`.
+ */
 export function toImageResult(result: DiffusionResult): ImageResult {
-  throwIfFailed(result);
-  const images = [
-    ...(result.imageData.byteLength > 0 ? [result.imageData] : []),
-    ...result.batchImages,
-  ];
   return {
-    images: images.map((data) => ({
-      data,
-      width: result.width,
-      height: result.height,
-      ...(result.imageMediaType ? { mediaType: result.imageMediaType } : {}),
+    images: result.images.map((image) => ({
+      data: image.data,
+      width: image.width,
+      height: image.height,
+      ...(image.mediaType ? { mediaType: image.mediaType } : {}),
     })),
-    seed: Number(result.seedUsed),
+    seed: Number(result.images[0]?.seedUsed ?? 0),
     steps: 0,
   };
 }
@@ -348,7 +396,12 @@ export function toDiarizationResult(
   };
 }
 
-/** Project a segmentation result onto the public mask. */
+/**
+ * Project a segmentation result onto the public mask.
+ *
+ * `SegmentationClassSummary.fraction` is deleted outright; derive it from
+ * `pixelCount / (width * height)` instead.
+ */
 export function toSegmentationResult(
   result: SegmentationResultProto
 ): SegmentationResult {
@@ -356,6 +409,7 @@ export function toSegmentationResult(
   const classMask = new Uint16Array(
     mask.buffer.slice(mask.byteOffset, mask.byteOffset + mask.byteLength)
   );
+  const totalPixels = result.width * result.height;
   return {
     classMask,
     width: result.width,
@@ -364,7 +418,7 @@ export function toSegmentationResult(
       id: summary.classId,
       label: summary.label,
       pixelCount: Number(summary.pixelCount),
-      fraction: summary.fraction,
+      fraction: totalPixels > 0 ? Number(summary.pixelCount) / totalPixels : 0,
     })),
     ...(result.diagnosticRgba && result.diagnosticRgba.byteLength > 0
       ? { diagnosticImage: result.diagnosticRgba }
@@ -376,7 +430,7 @@ export function toSegmentationResult(
 export function toMatch(chunk: RAGSearchResult): Match {
   return {
     text: chunk.text,
-    score: chunk.similarityScore,
+    score: chunk.score,
     metadata: chunk.metadata,
   };
 }
@@ -412,7 +466,7 @@ export function toRagStats(stats: RAGStatistics): RagStats {
 }
 
 /** Project the LoRA snapshot onto the public applied-adapter list. */
-export function toLoraState(state: LoRAState): LoraState {
+export function toLoraState(state: LoraStateProto): LoraState {
   return {
     applied: state.loadedAdapters
       .filter((adapter) => adapter.applied)

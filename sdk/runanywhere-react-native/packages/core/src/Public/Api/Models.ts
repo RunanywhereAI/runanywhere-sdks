@@ -10,13 +10,11 @@ import {
   ModelListRequest,
   ModelLoadRequest,
   ModelQuery,
+  ModelRegistryStatus,
   ModelUnloadRequest,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import {
-  DownloadStage,
-  DownloadState,
-} from '@runanywhere/proto-ts/download_service';
+import { DownloadState } from '@runanywhere/proto-ts/download_service';
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
@@ -83,15 +81,20 @@ function inferArtifactType(url: string): ModelArtifactType {
   return ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
 }
 
+/**
+ * `ModelQuery.availableOnly` is deleted outright — `registryStatus` (set on
+ * `ModelInfo`, not `ModelQuery`) is the only downloaded/available-ness axis
+ * left on the query message. `ModelFilter.availableOnly` has no wire
+ * counterpart to carry it in, so it is dropped here (the caller's request is
+ * silently a no-op rather than throwing, matching `downloadedOnly`'s
+ * best-effort filter semantics).
+ */
 function toModelQuery(filter: ModelFilter): ModelQuery {
   return ModelQuery.fromPartial({
     ...(filter.category !== undefined ? { category: filter.category } : {}),
     ...(filter.framework !== undefined ? { framework: filter.framework } : {}),
     ...(filter.downloadedOnly !== undefined
       ? { downloadedOnly: filter.downloadedOnly }
-      : {}),
-    ...(filter.availableOnly !== undefined
-      ? { availableOnly: filter.availableOnly }
       : {}),
     ...(filter.search ? { searchQuery: filter.search } : {}),
   });
@@ -106,9 +109,14 @@ function toDownloadEvent(
   return toDownloadEventInput(progress, model, operationId, sequence);
 }
 
+/**
+ * `DownloadStage` is deleted from `download_service.proto` outright —
+ * `DownloadProgress.state` (`DownloadState`) is the single phase signal now
+ * (matches the same simplification already applied in
+ * `RunAnywhere+ModelRegistry.ts`).
+ */
 function toDownloadEventInput(
   progress: {
-    stage: DownloadStage;
     state: DownloadState;
     bytesDownloaded: number;
     totalBytes: number;
@@ -129,16 +137,10 @@ function toDownloadEventInput(
         );
     return { type: 'failed', operationId, sequence: sequence(), error };
   }
-  if (
-    progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
-    progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
-  ) {
+  if (progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED) {
     return { type: 'completed', operationId, sequence: sequence(), model };
   }
-  if (
-    progress.stage === DownloadStage.DOWNLOAD_STAGE_EXTRACTING ||
-    progress.state === DownloadState.DOWNLOAD_STATE_EXTRACTING
-  ) {
+  if (progress.state === DownloadState.DOWNLOAD_STATE_EXTRACTING) {
     return { type: 'extracting', operationId, sequence: sequence() };
   }
   const bytesTotal = Number(progress.totalBytes);
@@ -398,7 +400,13 @@ export const models = {
         `Model '${id}' is currently loaded. Call models.unload('${id}') before unregister.`
       );
     }
-    if (model.isDownloaded || model.localPath) {
+    // `ModelInfo.isDownloaded` is deleted outright; `registryStatus` is the
+    // single downloaded-ness signal now.
+    if (
+      model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED ||
+      model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED ||
+      model.localPath
+    ) {
       throw SDKException.invalidState(
         `Model '${id}' still has local artifacts. Call models.delete('${id}') before unregister.`
       );
@@ -450,7 +458,10 @@ export async function ensureModelLoaded(
   if (current?.id === modelId) return;
 
   const model = await requireModel(modelId);
-  if (!model.isDownloaded) {
+  const isDownloaded =
+    model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED ||
+    model.registryStatus === ModelRegistryStatus.MODEL_REGISTRY_STATUS_LOADED;
+  if (!isDownloaded) {
     const iterator = models.download(modelId)[Symbol.asyncIterator]();
     try {
       for (;;) {

@@ -12,7 +12,7 @@ import {
   SegmentationImage,
   SegmentationPixelFormat,
 } from '@runanywhere/proto-ts/segmentation';
-import { VLMImage, VLMImageFormat } from '@runanywhere/proto-ts/vlm_options';
+import { VLMImage } from '@runanywhere/proto-ts/vlm_options';
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import type { AudioInput, ChatMessage, ImageInput } from './Types';
@@ -130,7 +130,6 @@ export function toSttAudioSource(audio: AudioInput): STTAudioSource {
     encoding,
     sampleRate: audio.sampleRate,
     channels: audio.channels,
-    bitsPerSample: audio.encoding === 'float32' ? 32 : 16,
   });
 }
 
@@ -164,35 +163,45 @@ export function toAudioBytes(
   return requireAudioBytes(audio, operation);
 }
 
-/** Build the VLM proto image for a public image input. */
+/** Default MIME type for encoded image bytes with no declared container. */
+const DEFAULT_IMAGE_MEDIA_TYPE = 'image/jpeg';
+
+/**
+ * Build the VLM proto image for a public image input.
+ *
+ * `VLMImageFormat` is deleted outright: `VLMImage` is now a plain oneof
+ * (`filePath`/`data`/`rawRgb`/`base64`/`rawRgba`) plus a required
+ * `mediaType` (MIME type, required when `data`/`base64` is set) and
+ * `width`/`height` (required for the raw pixel forms). `encoded` was
+ * renamed `data`.
+ */
 export function toVlmImage(image: ImageInput): VLMImage {
   if (image.filePath) {
     return VLMImage.fromPartial({
       filePath: image.filePath,
-      format: VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
     });
   }
   if (image.base64) {
     return VLMImage.fromPartial({
       base64: image.base64,
-      format: VLMImageFormat.VLM_IMAGE_FORMAT_BASE64,
+      mediaType: DEFAULT_IMAGE_MEDIA_TYPE,
     });
   }
   if (image.rawPixels) {
+    const width = image.width ?? 0;
+    const height = image.height ?? 0;
     return VLMImage.fromPartial({
-      rawRgb: image.rawPixels,
-      width: image.width ?? 0,
-      height: image.height ?? 0,
-      format:
-        image.pixelFormat === 'rgb8'
-          ? VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB
-          : VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA,
+      ...(image.pixelFormat === 'rgba8'
+        ? { rawRgba: image.rawPixels }
+        : { rawRgb: image.rawPixels }),
+      width,
+      height,
     });
   }
   if (image.bytes) {
     return VLMImage.fromPartial({
-      encoded: image.bytes,
-      format: VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED,
+      data: image.bytes,
+      mediaType: DEFAULT_IMAGE_MEDIA_TYPE,
     });
   }
   throw SDKException.invalidInput('ImageInput carries no image data');

@@ -18,7 +18,6 @@ import {
   isUsableCredential,
 } from '../services/Network/NetworkConfiguration';
 import {
-  SdkInitEnvironment,
   SdkInitPhase1Request,
   SdkInitPhase2Request,
   SdkInitResult,
@@ -111,6 +110,10 @@ async function awaitSettlement(promise: Promise<unknown> | null): Promise<void> 
 /**
  * Decode the serialized `RASdkInitResult` returned by the native phase-2 /
  * HTTP-retry bridge.
+ *
+ * `SdkInitResult.httpConfigured` is deleted outright — `hasCompletedHttpSetup`
+ * is the sole cross-phase latched bit now (idl comment: "SDKs read this to
+ * decide whether an authenticated call can proceed without a retryHTTP").
  */
 function decodeSdkInitResultPayload(payload: ArrayBuffer): {
   httpConfigured: boolean;
@@ -121,7 +124,7 @@ function decodeSdkInitResultPayload(payload: ArrayBuffer): {
   }
   const decoded = SdkInitResult.decode(new Uint8Array(payload));
   return {
-    httpConfigured: decoded.hasCompletedHttpSetup || decoded.httpConfigured,
+    httpConfigured: decoded.hasCompletedHttpSetup,
     httpApplicable: decoded.httpApplicable,
   };
 }
@@ -139,17 +142,6 @@ async function asNativeSDKException(error: unknown): Promise<SDKException> {
     }
   }
   return asSDKException(error);
-}
-
-function mapSdkInitEnvironment(environment: SDKEnvironment): SdkInitEnvironment {
-  switch (environment) {
-    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
-    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-    case SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED:
-    default:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
-  }
 }
 
 function environmentToConfigString(environment: SDKEnvironment): string {
@@ -283,32 +275,31 @@ async function initializeCore(options: InitializeOptions): Promise<void> {
 
       const phase1Request: SdkInitPhase1RequestMessage =
         SdkInitPhase1Request.create();
-      phase1Request.environment = mapSdkInitEnvironment(environment);
+      // `SdkInitEnvironment` (a separate enum) is deleted outright —
+      // `SdkInitPhase1Request.environment` now reuses model_types'
+      // `SDKEnvironment` directly, so no mapping is needed.
+      phase1Request.environment = environment;
       phase1Request.apiKey = effectiveApiKey;
       phase1Request.baseUrl = effectiveBaseURL;
       phase1Request.deviceId = '';
       phase1Request.platform = SDKConstants.platform;
       phase1Request.sdkVersion = SDKConstants.version;
 
+      // `SdkInitPhase2Request` collapsed to `buildToken` alone —
+      // `forceRefreshAssignments`/`flushTelemetry`/`discoverDownloadedModels`/
+      // `rescanLocalModels` are deleted outright (commons now decides these
+      // itself rather than taking per-call hints).
       const phase2Request: SdkInitPhase2RequestMessage =
         SdkInitPhase2Request.create();
       // The baked dev build token is gone; the backend is reached solely
       // through the effective base URL. Keep the proto field, always empty.
       phase2Request.buildToken = '';
-      phase2Request.forceRefreshAssignments = false;
-      phase2Request.flushTelemetry = true;
-      phase2Request.discoverDownloadedModels = true;
-      phase2Request.rescanLocalModels = true;
 
       const initParams: SDKInitOptions = {
         apiKey: phase1Request.apiKey,
         baseURL: phase1Request.baseUrl,
         environment,
         buildToken: phase2Request.buildToken,
-        forceRefreshAssignments: phase2Request.forceRefreshAssignments,
-        flushTelemetry: phase2Request.flushTelemetry,
-        discoverDownloadedModels: phase2Request.discoverDownloadedModels,
-        rescanLocalModels: phase2Request.rescanLocalModels,
       };
 
       logger.info('SDK initialization starting...');
@@ -335,6 +326,13 @@ async function initializeCore(options: InitializeOptions): Promise<void> {
         // RN still crosses an async native bridge for Phase 1. The generated
         // proto request objects are the call-site envelope; native fills the
         // platform-owned device id before invoking the commons proto ABI.
+        //
+        // `native.initialize()` takes a hand-rolled JSON blob, not a
+        // proto-encoded buffer — its key set is an independent TS/C++
+        // contract (see `HybridRunAnywhereCore.cpp`'s `extractBoolValue`
+        // calls), not the (now-collapsed) `SdkInitPhase2Request` proto.
+        // These four literals reproduce the previous defaults directly since
+        // `SdkInitPhase2Request` no longer carries them.
         const configJson = JSON.stringify({
           apiKey: phase1Request.apiKey,
           baseURL: phase1Request.baseUrl,
@@ -342,10 +340,10 @@ async function initializeCore(options: InitializeOptions): Promise<void> {
           platform: phase1Request.platform,
           sdkVersion: phase1Request.sdkVersion,
           buildToken: phase2Request.buildToken,
-          forceRefreshAssignments: phase2Request.forceRefreshAssignments,
-          flushTelemetry: phase2Request.flushTelemetry,
-          discoverDownloadedModels: phase2Request.discoverDownloadedModels,
-          rescanLocalModels: phase2Request.rescanLocalModels,
+          forceRefreshAssignments: false,
+          flushTelemetry: true,
+          discoverDownloadedModels: true,
+          rescanLocalModels: true,
         });
 
         const initialized = await native.initialize(configJson);

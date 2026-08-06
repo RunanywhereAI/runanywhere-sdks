@@ -175,13 +175,13 @@ export async function ragAddDocumentsBatch(
  * Query the RAG pipeline with a question.
  *
  * Matches Swift: `RunAnywhere.ragQuery(_:options:)` — the options message is
- * forwarded verbatim (including `retrievalTopK`, `similarityThreshold`,
- * `stream`, and `generation`). Unset numeric fields encode as proto3
+ * forwarded verbatim (including the nested `retrieval` (`topK`,
+ * `scoreThreshold`) and `generation`). Unset numeric fields encode as proto3
  * zeros, which commons maps to the canonical `rac_default` values.
  */
 export async function ragQuery(
   question: string,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): Promise<RAGResult>;
 /**
  * Query through the proto options message directly.
@@ -191,7 +191,7 @@ export async function ragQuery(
 export async function ragQuery(options: RAGQueryOptions): Promise<RAGResult>;
 export async function ragQuery(
   questionOrOptions: string | RAGQueryOptions,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): Promise<RAGResult> {
   // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:191-193).
   requireInitialized();
@@ -205,7 +205,7 @@ export async function ragQuery(
           // Answer-generation knobs travel in `options.generation`; RAG
           // defaults (max_output_tokens 512, temperature 0.7) are applied by
           // the pipeline when unset, not re-declared here.
-          question: questionOrOptions,
+          query: questionOrOptions,
         })
       : questionOrOptions;
   const resultBytes = await native.ragQueryProto(
@@ -259,14 +259,14 @@ export async function ragSearch(
  */
 export function ragQueryStream(
   question: string,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): AsyncIterable<RAGStreamEventType>;
 export function ragQueryStream(
   options: RAGQueryOptions
 ): AsyncIterable<RAGStreamEventType>;
 export function ragQueryStream(
   questionOrOptions: string | RAGQueryOptions,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): AsyncIterable<RAGStreamEventType> {
   requireInitialized();
   const native = ensureNative();
@@ -274,7 +274,7 @@ export function ragQueryStream(
     typeof questionOrOptions === 'string'
       ? RAGQueryOptionsMessage.fromPartial({
           ...options,
-          question: questionOrOptions,
+          query: questionOrOptions,
         })
       : questionOrOptions;
   const requestBytes = encodeProtoMessage(queryOptions, RAGQueryOptionsMessage);

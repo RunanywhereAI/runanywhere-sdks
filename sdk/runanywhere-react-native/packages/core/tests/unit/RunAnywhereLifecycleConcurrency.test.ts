@@ -30,6 +30,8 @@ import {
   completeServicesInitialization,
 } from '../../src/Public/RunAnywhere';
 
+// `SdkInitResult.httpConfigured` is deleted outright — `hasCompletedHttpSetup`
+// is the sole cross-phase latched bit now.
 function phase2Payload(
   httpConfigured: boolean = true,
   httpApplicable: boolean = true
@@ -37,7 +39,6 @@ function phase2Payload(
   const bytes = SdkInitResult.encode(
     SdkInitResult.create({
       hasCompletedHttpSetup: httpConfigured,
-      httpConfigured,
       httpApplicable,
     })
   ).finish();

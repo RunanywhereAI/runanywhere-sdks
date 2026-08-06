@@ -3,9 +3,9 @@
  */
 
 import {
-  LoRAAdapterConfig,
-  LoRAApplyRequest,
-  LoRARemoveRequest,
+  LoraAdapterConfig,
+  LoraApplyRequest,
+  LoraRemoveRequest,
 } from '@runanywhere/proto-ts/lora_options';
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
@@ -39,9 +39,9 @@ export const lora = {
   async apply(adapterId: string, scale?: number): Promise<void> {
     const path = await adapterPath(adapterId);
     const result = await loraCapability.apply(
-      LoRAApplyRequest.fromPartial({
+      LoraApplyRequest.fromPartial({
         adapters: [
-          LoRAAdapterConfig.fromPartial({
+          LoraAdapterConfig.fromPartial({
             adapterPath: path,
             adapterId,
             ...(scale !== undefined ? { scale } : {}),
@@ -57,13 +57,13 @@ export const lora = {
   /** Remove one applied adapter. */
   async remove(adapterId: string): Promise<void> {
     await loraCapability.remove(
-      LoRARemoveRequest.fromPartial({ adapterIds: [adapterId] })
+      LoraRemoveRequest.fromPartial({ adapterIds: [adapterId] })
     );
   },
 
   /** Remove every applied adapter. */
   async removeAll(): Promise<void> {
-    await loraCapability.remove(LoRARemoveRequest.fromPartial({ clearAll: true }));
+    await loraCapability.remove(LoraRemoveRequest.fromPartial({ clearAll: true }));
   },
 
   /** The adapters currently applied to the loaded model. */
@@ -72,25 +72,26 @@ export const lora = {
   },
 
   /**
-   * Adapter catalog: registration, download, import, and per-model lookup.
+   * Adapter catalog: registration and per-model lookup.
    *
    * Outside the v3 spec, which routes artifacts through `models.register`.
    * commons keeps LoRA adapters in their own catalog with compatibility
    * metadata the model registry has no field for, so the catalog verbs stay
-   * reachable until that merges.
+   * reachable until that merges. `registerArtifact`/`download`/
+   * `importAdapter`/`markDownloadCompleted`/`markImportCompleted` were
+   * removed outright: idl/lora_options.proto deleted
+   * LoraAdapterDownloadCompletedRequest/Result and
+   * LoraAdapterImportRequest/Result — adapter files are now acquired
+   * through `RunAnywhere.models` (register/download/import), not this
+   * catalog.
    */
   catalog: {
     register: loraCapability.register,
-    registerArtifact: loraCapability.registerArtifact,
     list: loraCapability.listCatalog,
     query: loraCapability.queryCatalog,
     get: loraCapability.getCatalogEntry,
     forModel: loraCapability.adaptersForModel,
     allRegistered: loraCapability.allRegistered,
-    download: loraCapability.download,
-    importAdapter: loraCapability.importAdapter,
-    markDownloadCompleted: loraCapability.markDownloadCompleted,
-    markImportCompleted: loraCapability.markImportCompleted,
     checkCompatibility: loraCapability.checkCompatibility,
   },
 };
