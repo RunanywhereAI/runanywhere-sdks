@@ -25,38 +25,49 @@ export interface STTConfiguration {
     audioFormat: AudioFormat;
     enablePunctuation: boolean;
     enableDiarization: boolean;
-    vocabularyList: string[];
-    /** 0 = backend default */
-    maxAlternatives: number;
     enableWordTimestamps: boolean;
     preferredFramework?: InferenceFramework | undefined;
 }
 /** Per-call overrides. */
 export interface STTOptions {
+    /**
+     * BCP-47 tag (bare ISO-639-1 accepted). Unset or "" means auto-detect;
+     * the code the engine settles on comes back on STTOutput.language.
+     */
     language?: string | undefined;
     enablePunctuation: boolean;
-    enableDiarization: boolean;
-    /** 0 = auto */
-    maxSpeakers: number;
-    vocabularyList: string[];
+    /**
+     * Attribute each word to a speaker. Labels come back on
+     * WordTimestamp.speaker_id and STTOutput.speaker_ids. Deepgram `diarize`,
+     * AssemblyAI `speaker_labels`.
+     */
+    diarize: boolean;
+    /**
+     * Hint for how many distinct speakers to expect. AssemblyAI
+     * `speakers_expected`. Unset = let the engine decide.
+     */
+    speakersExpected?: number | undefined;
     enableWordTimestamps: boolean;
-    /** 0 = backend default, for all four of these. */
-    beamSize: number;
-    maxAlternatives: number;
-    chunkDurationMs: number;
-    endpointSilenceMs: number;
-    suppressBlank: boolean;
-    translateToEnglish: boolean;
+    /**
+     * Trailing silence after which the utterance is finalized and an
+     * STT_STREAM_EVENT_KIND_ENDPOINT + FINAL pair is emitted. 0 = engine
+     * default.
+     */
+    silenceDurationMs: number;
 }
 export interface STTAudioSource {
+    /** Audio bytes, in-process. */
     audioData?: Uint8Array | undefined;
+    /** Local path or file:// URI, read and decoded by the platform adapter. */
     fileUri?: string | undefined;
-    adapterHandle?: string | undefined;
     encoding: AudioEncoding;
     audioFormat: AudioFormat;
     sampleRate: number;
+    /**
+     * Interleaved channel count; 0 or 1 = mono. Non-mono audio is downmixed
+     * before decoding and MUST be divided out of the duration estimate.
+     */
     channels: number;
-    bitsPerSample: number;
     durationMs: number;
 }
 export interface STTTranscriptionRequest {
@@ -76,6 +87,10 @@ export interface WordTimestamp {
     startMs: number;
     endMs: number;
     confidence: number;
+    /**
+     * Always empty today: no backend fills this. Kept live -- read by all
+     * five SDK facades as public API -- pending real diarization wiring.
+     */
     speakerId?: string | undefined;
 }
 /** One n-best hypothesis. Per-word breakdown only when the backend emits it. */
@@ -84,10 +99,10 @@ export interface TranscriptionAlternative {
     confidence: number;
     words: WordTimestamp[];
 }
+/** Which model ran, and how long it took. */
 export interface TranscriptionMetadata {
     modelId: string;
     processingTimeMs: number;
-    audioLengthMs: number;
 }
 export interface STTOutput {
     text: string;
@@ -99,27 +114,21 @@ export interface STTOutput {
     metadata?: TranscriptionMetadata | undefined;
     /** Milliseconds since epoch. */
     timestampMs: number;
-    /** Often duplicates metadata.audio_length_ms. */
     durationMs: number;
-    speakerIds: string[];
     /** For long-running or streaming transcription. */
     segmentIndex: number;
     error?: SDKError | undefined;
 }
+/**
+ * An in-progress hypothesis. `text` replaces the previous partial in full.
+ * The finished result arrives on STTStreamEvent.final_output and never here;
+ * correlation (request_id, seq) and failures live on the STTStreamEvent
+ * envelope.
+ */
 export interface STTPartialResult {
     text: string;
     isFinal: boolean;
-    /** Whisper-style hypothesis stability, 0.0-1.0. 0.0 when unsupported. */
-    stability: number;
-    confidence: number;
     language?: string | undefined;
-    timestampMs: number;
-    alternatives: TranscriptionAlternative[];
-    requestId: string;
-    segmentIndex: number;
-    audioStartMs: number;
-    audioEndMs: number;
-    finalOutput?: STTOutput | undefined;
 }
 export interface STTStreamEvent {
     seq: number;
@@ -135,7 +144,6 @@ export interface STTServiceState {
     currentModel?: string | undefined;
     supportsStreaming: boolean;
     supportedLanguageCodes: string[];
-    error?: SDKError | undefined;
 }
 export declare const STTConfiguration: MessageFns<STTConfiguration>;
 export declare const STTOptions: MessageFns<STTOptions>;

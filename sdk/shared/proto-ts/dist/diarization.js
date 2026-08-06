@@ -70,6 +70,7 @@ function createBaseDiarizationOptions() {
         threshold: undefined,
         minimumDurationMs: 0,
         mergeGapMs: 0,
+        maxSpeakers: undefined,
     };
 }
 exports.DiarizationOptions = {
@@ -91,6 +92,9 @@ exports.DiarizationOptions = {
         }
         if (message.mergeGapMs !== 0) {
             writer.uint32(48).int64(message.mergeGapMs);
+        }
+        if (message.maxSpeakers !== undefined) {
+            writer.uint32(64).int32(message.maxSpeakers);
         }
         return writer;
     },
@@ -143,6 +147,13 @@ exports.DiarizationOptions = {
                     message.mergeGapMs = longToNumber(reader.int64());
                     continue;
                 }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.maxSpeakers = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -171,6 +182,11 @@ exports.DiarizationOptions = {
                 : isSet(object.merge_gap_ms)
                     ? globalThis.Number(object.merge_gap_ms)
                     : 0,
+            maxSpeakers: isSet(object.maxSpeakers)
+                ? globalThis.Number(object.maxSpeakers)
+                : isSet(object.max_speakers)
+                    ? globalThis.Number(object.max_speakers)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -193,6 +209,9 @@ exports.DiarizationOptions = {
         if (message.mergeGapMs !== 0) {
             obj.mergeGapMs = Math.round(message.mergeGapMs);
         }
+        if (message.maxSpeakers !== undefined) {
+            obj.maxSpeakers = Math.round(message.maxSpeakers);
+        }
         return obj;
     },
     create(base) {
@@ -206,6 +225,7 @@ exports.DiarizationOptions = {
         message.threshold = object.threshold ?? undefined;
         message.minimumDurationMs = object.minimumDurationMs ?? 0;
         message.mergeGapMs = object.mergeGapMs ?? 0;
+        message.maxSpeakers = object.maxSpeakers ?? undefined;
         return message;
     },
 };

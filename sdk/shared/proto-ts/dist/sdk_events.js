@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: sdk_events.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SDKEvent_PropertiesEntry = exports.SDKEvent = exports.FailureEvent = exports.CancellationEvent = exports.TelemetryEvent_AttributesEntry = exports.TelemetryEvent = exports.PerformanceEvent = exports.HardwareRoutingEvent = exports.FrameworkEvent = exports.NetworkEvent = exports.DeviceEvent = exports.AuthEvent = exports.StorageLifecycleEvent = exports.StorageEvent = exports.DownloadEvent = exports.ModelRegistryEvent = exports.ModelEvent = exports.CapabilityOperationEvent = exports.VoiceLifecycleEvent = exports.GenerationEvent = exports.SessionEvent = exports.ComponentLifecycleEvent = exports.ComponentLifecycleSnapshotResult = exports.ComponentLifecycleSnapshot = exports.ComponentInitializationEvent = exports.ConfigurationEvent = exports.InitializationEvent = exports.CancellationEventKind = exports.TelemetryEventKind = exports.PerformanceEventKind = exports.HardwareRoutingEventKind = exports.FrameworkEventKind = exports.NetworkEventKind = exports.DeviceEventKind = exports.AuthEventKind = exports.StorageLifecycleEventKind = exports.StorageEventKind = exports.DownloadEventKind = exports.ModelRegistryEventKind = exports.ModelEventKind = exports.CapabilityOperationEventKind = exports.VoiceEventKind = exports.GenerationEventKind = exports.SessionEventKind = exports.ComponentInitializationEventKind = exports.ConfigurationEventKind = exports.InitializationStage = exports.EventDestination = exports.SDKComponent = exports.protobufPackage = void 0;
+exports.SDKEvent_PropertiesEntry = exports.SDKEvent = exports.CancellationEvent = exports.TelemetryEvent_AttributesEntry = exports.TelemetryEvent = exports.HardwareRoutingEvent = exports.FrameworkEvent = exports.NetworkEvent = exports.DeviceEvent = exports.AuthEvent = exports.StorageEvent = exports.ModelEvent = exports.CapabilityOperationEvent = exports.VoiceLifecycleEvent = exports.GenerationEvent = exports.SessionEvent = exports.ComponentLifecycleEvent = exports.ComponentLifecycleSnapshotResult = exports.ComponentLifecycleSnapshot = exports.ConfigurationEvent = exports.InitializationEvent = exports.CancellationEventKind = exports.TelemetryEventKind = exports.HardwareRoutingEventKind = exports.FrameworkEventKind = exports.NetworkEventKind = exports.DeviceEventKind = exports.AuthEventKind = exports.StorageEventKind = exports.ModelEventKind = exports.CapabilityOperationEventKind = exports.VoiceEventKind = exports.GenerationEventKind = exports.SessionEventKind = exports.ComponentLifecycleEventKind = exports.ConfigurationEventKind = exports.InitializationStage = exports.EventDestination = exports.SDKComponent = exports.protobufPackage = void 0;
 exports.sDKComponentFromJSON = sDKComponentFromJSON;
 exports.sDKComponentToJSON = sDKComponentToJSON;
 exports.eventDestinationFromJSON = eventDestinationFromJSON;
@@ -14,8 +14,8 @@ exports.initializationStageFromJSON = initializationStageFromJSON;
 exports.initializationStageToJSON = initializationStageToJSON;
 exports.configurationEventKindFromJSON = configurationEventKindFromJSON;
 exports.configurationEventKindToJSON = configurationEventKindToJSON;
-exports.componentInitializationEventKindFromJSON = componentInitializationEventKindFromJSON;
-exports.componentInitializationEventKindToJSON = componentInitializationEventKindToJSON;
+exports.componentLifecycleEventKindFromJSON = componentLifecycleEventKindFromJSON;
+exports.componentLifecycleEventKindToJSON = componentLifecycleEventKindToJSON;
 exports.sessionEventKindFromJSON = sessionEventKindFromJSON;
 exports.sessionEventKindToJSON = sessionEventKindToJSON;
 exports.generationEventKindFromJSON = generationEventKindFromJSON;
@@ -26,14 +26,8 @@ exports.capabilityOperationEventKindFromJSON = capabilityOperationEventKindFromJ
 exports.capabilityOperationEventKindToJSON = capabilityOperationEventKindToJSON;
 exports.modelEventKindFromJSON = modelEventKindFromJSON;
 exports.modelEventKindToJSON = modelEventKindToJSON;
-exports.modelRegistryEventKindFromJSON = modelRegistryEventKindFromJSON;
-exports.modelRegistryEventKindToJSON = modelRegistryEventKindToJSON;
-exports.downloadEventKindFromJSON = downloadEventKindFromJSON;
-exports.downloadEventKindToJSON = downloadEventKindToJSON;
 exports.storageEventKindFromJSON = storageEventKindFromJSON;
 exports.storageEventKindToJSON = storageEventKindToJSON;
-exports.storageLifecycleEventKindFromJSON = storageLifecycleEventKindFromJSON;
-exports.storageLifecycleEventKindToJSON = storageLifecycleEventKindToJSON;
 exports.authEventKindFromJSON = authEventKindFromJSON;
 exports.authEventKindToJSON = authEventKindToJSON;
 exports.deviceEventKindFromJSON = deviceEventKindFromJSON;
@@ -44,8 +38,6 @@ exports.frameworkEventKindFromJSON = frameworkEventKindFromJSON;
 exports.frameworkEventKindToJSON = frameworkEventKindToJSON;
 exports.hardwareRoutingEventKindFromJSON = hardwareRoutingEventKindFromJSON;
 exports.hardwareRoutingEventKindToJSON = hardwareRoutingEventKindToJSON;
-exports.performanceEventKindFromJSON = performanceEventKindFromJSON;
-exports.performanceEventKindToJSON = performanceEventKindToJSON;
 exports.telemetryEventKindFromJSON = telemetryEventKindFromJSON;
 exports.telemetryEventKindToJSON = telemetryEventKindToJSON;
 exports.cancellationEventKindFromJSON = cancellationEventKindFromJSON;
@@ -55,7 +47,6 @@ const wire_1 = require("@bufbuild/protobuf/wire");
 const component_types_1 = require("./component_types");
 const download_service_1 = require("./download_service");
 const errors_1 = require("./errors");
-const hardware_profile_1 = require("./hardware_profile");
 const model_types_1 = require("./model_types");
 const storage_types_1 = require("./storage_types");
 const voice_events_1 = require("./voice_events");
@@ -72,6 +63,8 @@ exports.protobufPackage = "runanywhere.v1";
  * RN's ComponentInitializationEvent.components: SDKComponent[] but not yet
  * in any SDK's enum).
  * ---------------------------------------------------------------------------
+ * The rac_wire_string values are the stable lowercase keys that SDKError.component
+ * carries; producers stringify through them, never through the constant name.
  */
 var SDKComponent;
 (function (SDKComponent) {
@@ -316,15 +309,6 @@ var ConfigurationEventKind;
     ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_SYNC_STARTED"] = 6] = "CONFIGURATION_EVENT_KIND_SYNC_STARTED";
     ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_SYNC_COMPLETED"] = 7] = "CONFIGURATION_EVENT_KIND_SYNC_COMPLETED";
     ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_SYNC_FAILED"] = 8] = "CONFIGURATION_EVENT_KIND_SYNC_FAILED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_SYNC_REQUESTED"] = 9] = "CONFIGURATION_EVENT_KIND_SYNC_REQUESTED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED"] = 10] = "CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED"] = 11] = "CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED"] = 12] = "CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED"] = 13] = "CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED"] = 14] = "CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED"] = 15] = "CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED"] = 16] = "CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED";
-    ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED"] = 17] = "CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED";
     /** CONFIGURATION_EVENT_KIND_CHANGED - generic config_changed (Kotlin/Dart) */
     ConfigurationEventKind[ConfigurationEventKind["CONFIGURATION_EVENT_KIND_CHANGED"] = 18] = "CONFIGURATION_EVENT_KIND_CHANGED";
     ConfigurationEventKind[ConfigurationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
@@ -358,33 +342,6 @@ function configurationEventKindFromJSON(object) {
         case 8:
         case "CONFIGURATION_EVENT_KIND_SYNC_FAILED":
             return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SYNC_FAILED;
-        case 9:
-        case "CONFIGURATION_EVENT_KIND_SYNC_REQUESTED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SYNC_REQUESTED;
-        case 10:
-        case "CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED;
-        case 11:
-        case "CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED;
-        case 12:
-        case "CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED;
-        case 13:
-        case "CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED;
-        case 14:
-        case "CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED;
-        case 15:
-        case "CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED;
-        case 16:
-        case "CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED;
-        case 17:
-        case "CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED":
-            return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED;
         case 18:
         case "CONFIGURATION_EVENT_KIND_CHANGED":
             return ConfigurationEventKind.CONFIGURATION_EVENT_KIND_CHANGED;
@@ -414,24 +371,6 @@ function configurationEventKindToJSON(object) {
             return "CONFIGURATION_EVENT_KIND_SYNC_COMPLETED";
         case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SYNC_FAILED:
             return "CONFIGURATION_EVENT_KIND_SYNC_FAILED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SYNC_REQUESTED:
-            return "CONFIGURATION_EVENT_KIND_SYNC_REQUESTED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED:
-            return "CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED:
-            return "CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED:
-            return "CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED:
-            return "CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED:
-            return "CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED:
-            return "CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED:
-            return "CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED";
-        case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED:
-            return "CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED";
         case ConfigurationEventKind.CONFIGURATION_EVENT_KIND_CHANGED:
             return "CONFIGURATION_EVENT_KIND_CHANGED";
         case ConfigurationEventKind.UNRECOGNIZED:
@@ -439,117 +378,155 @@ function configurationEventKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-var ComponentInitializationEventKind;
-(function (ComponentInitializationEventKind) {
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_UNSPECIFIED"] = 0] = "COMPONENT_INIT_EVENT_KIND_UNSPECIFIED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED"] = 1] = "COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED"] = 2] = "COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED"] = 3] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING"] = 4] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED"] = 5] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED"] = 6] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS"] = 7] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED"] = 8] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING"] = 9] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_READY"] = 10] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_READY";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED"] = 11] = "COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED"] = 12] = "COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED"] = 13] = "COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY"] = 14] = "COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY"] = 15] = "COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY";
-    ComponentInitializationEventKind[ComponentInitializationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(ComponentInitializationEventKind || (exports.ComponentInitializationEventKind = ComponentInitializationEventKind = {}));
-function componentInitializationEventKindFromJSON(object) {
+var ComponentLifecycleEventKind;
+(function (ComponentLifecycleEventKind) {
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED"] = 0] = "COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
+    /** COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED - previous_state -> current_state carries this */
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED"] = 1] = "COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED"] = 2] = "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED"] = 3] = "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED"] = 4] = "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS"] = 5] = "COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY"] = 6] = "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED"] = 7] = "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT"] = 8] = "COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT"] = 9] = "COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN"] = 10] = "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN";
+    /** COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED - Absorbed from ComponentInitializationEventKind. */
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED"] = 11] = "COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED"] = 12] = "COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING"] = 13] = "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED"] = 14] = "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING"] = 17] = "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY"] = 18] = "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED"] = 19] = "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED"] = 20] = "COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED"] = 21] = "COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY"] = 22] = "COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY"] = 23] = "COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY";
+    ComponentLifecycleEventKind[ComponentLifecycleEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ComponentLifecycleEventKind || (exports.ComponentLifecycleEventKind = ComponentLifecycleEventKind = {}));
+function componentLifecycleEventKindFromJSON(object) {
     switch (object) {
         case 0:
-        case "COMPONENT_INIT_EVENT_KIND_UNSPECIFIED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_UNSPECIFIED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED;
         case 1:
-        case "COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED;
         case 2:
-        case "COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED;
         case 3:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED;
         case 4:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED;
         case 5:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS;
         case 6:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY;
         case 7:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED;
         case 8:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT;
         case 9:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT;
         case 10:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_READY":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_READY;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN;
         case 11:
-        case "COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED;
         case 12:
-        case "COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED;
         case 13:
-        case "COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING;
         case 14:
-        case "COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY;
-        case 15:
-        case "COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY":
-            return ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY;
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED;
+        case 17:
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING;
+        case 18:
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY;
+        case 19:
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED;
+        case 20:
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED;
+        case 21:
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED;
+        case 22:
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY;
+        case 23:
+        case "COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY":
+            return ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY;
         case -1:
         case "UNRECOGNIZED":
         default:
-            return ComponentInitializationEventKind.UNRECOGNIZED;
+            return ComponentLifecycleEventKind.UNRECOGNIZED;
     }
 }
-function componentInitializationEventKindToJSON(object) {
+function componentLifecycleEventKindToJSON(object) {
     switch (object) {
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_UNSPECIFIED:
-            return "COMPONENT_INIT_EVENT_KIND_UNSPECIFIED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED:
-            return "COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED:
-            return "COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_READY:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_READY";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED:
-            return "COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED:
-            return "COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED:
-            return "COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY:
-            return "COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY";
-        case ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY:
-            return "COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY";
-        case ComponentInitializationEventKind.UNRECOGNIZED:
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY";
+        case ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY:
+            return "COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY";
+        case ComponentLifecycleEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -624,21 +601,14 @@ function sessionEventKindToJSON(object) {
 var GenerationEventKind;
 (function (GenerationEventKind) {
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_UNSPECIFIED"] = 0] = "GENERATION_EVENT_KIND_UNSPECIFIED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_SESSION_STARTED"] = 1] = "GENERATION_EVENT_KIND_SESSION_STARTED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_SESSION_ENDED"] = 2] = "GENERATION_EVENT_KIND_SESSION_ENDED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STARTED"] = 3] = "GENERATION_EVENT_KIND_STARTED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED"] = 4] = "GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOKEN_GENERATED"] = 5] = "GENERATION_EVENT_KIND_TOKEN_GENERATED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STREAMING_UPDATE"] = 6] = "GENERATION_EVENT_KIND_STREAMING_UPDATE";
+    /** GENERATION_EVENT_KIND_COMPLETED - Exactly one success terminal, one failure terminal, one cancel terminal. */
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_COMPLETED"] = 7] = "GENERATION_EVENT_KIND_COMPLETED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_FAILED"] = 8] = "GENERATION_EVENT_KIND_FAILED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_MODEL_LOADED"] = 9] = "GENERATION_EVENT_KIND_MODEL_LOADED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_MODEL_UNLOADED"] = 10] = "GENERATION_EVENT_KIND_MODEL_UNLOADED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_COST_CALCULATED"] = 11] = "GENERATION_EVENT_KIND_COST_CALCULATED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_ROUTING_DECISION"] = 12] = "GENERATION_EVENT_KIND_ROUTING_DECISION";
-    /** GENERATION_EVENT_KIND_STREAM_COMPLETED - Kotlin LLMEvent.STREAM_COMPLETED */
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STREAM_COMPLETED"] = 13] = "GENERATION_EVENT_KIND_STREAM_COMPLETED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCEL_REQUESTED"] = 14] = "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCELLED"] = 15] = "GENERATION_EVENT_KIND_CANCELLED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_STARTED"] = 16] = "GENERATION_EVENT_KIND_TOOL_CALL_STARTED";
     GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED"] = 17] = "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED";
@@ -656,12 +626,6 @@ function generationEventKindFromJSON(object) {
         case 0:
         case "GENERATION_EVENT_KIND_UNSPECIFIED":
             return GenerationEventKind.GENERATION_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "GENERATION_EVENT_KIND_SESSION_STARTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_SESSION_STARTED;
-        case 2:
-        case "GENERATION_EVENT_KIND_SESSION_ENDED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_SESSION_ENDED;
         case 3:
         case "GENERATION_EVENT_KIND_STARTED":
             return GenerationEventKind.GENERATION_EVENT_KIND_STARTED;
@@ -680,24 +644,9 @@ function generationEventKindFromJSON(object) {
         case 8:
         case "GENERATION_EVENT_KIND_FAILED":
             return GenerationEventKind.GENERATION_EVENT_KIND_FAILED;
-        case 9:
-        case "GENERATION_EVENT_KIND_MODEL_LOADED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED;
-        case 10:
-        case "GENERATION_EVENT_KIND_MODEL_UNLOADED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED;
-        case 11:
-        case "GENERATION_EVENT_KIND_COST_CALCULATED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_COST_CALCULATED;
         case 12:
         case "GENERATION_EVENT_KIND_ROUTING_DECISION":
             return GenerationEventKind.GENERATION_EVENT_KIND_ROUTING_DECISION;
-        case 13:
-        case "GENERATION_EVENT_KIND_STREAM_COMPLETED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED;
-        case 14:
-        case "GENERATION_EVENT_KIND_CANCEL_REQUESTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED;
         case 15:
         case "GENERATION_EVENT_KIND_CANCELLED":
             return GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED;
@@ -738,10 +687,6 @@ function generationEventKindToJSON(object) {
     switch (object) {
         case GenerationEventKind.GENERATION_EVENT_KIND_UNSPECIFIED:
             return "GENERATION_EVENT_KIND_UNSPECIFIED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_SESSION_STARTED:
-            return "GENERATION_EVENT_KIND_SESSION_STARTED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_SESSION_ENDED:
-            return "GENERATION_EVENT_KIND_SESSION_ENDED";
         case GenerationEventKind.GENERATION_EVENT_KIND_STARTED:
             return "GENERATION_EVENT_KIND_STARTED";
         case GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED:
@@ -754,18 +699,8 @@ function generationEventKindToJSON(object) {
             return "GENERATION_EVENT_KIND_COMPLETED";
         case GenerationEventKind.GENERATION_EVENT_KIND_FAILED:
             return "GENERATION_EVENT_KIND_FAILED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED:
-            return "GENERATION_EVENT_KIND_MODEL_LOADED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED:
-            return "GENERATION_EVENT_KIND_MODEL_UNLOADED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_COST_CALCULATED:
-            return "GENERATION_EVENT_KIND_COST_CALCULATED";
         case GenerationEventKind.GENERATION_EVENT_KIND_ROUTING_DECISION:
             return "GENERATION_EVENT_KIND_ROUTING_DECISION";
-        case GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED:
-            return "GENERATION_EVENT_KIND_STREAM_COMPLETED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED:
-            return "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
         case GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED:
             return "GENERATION_EVENT_KIND_CANCELLED";
         case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_STARTED:
@@ -797,7 +732,6 @@ var VoiceEventKind;
     /** VOICE_EVENT_KIND_LISTENING_STARTED - Listening / detection. */
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LISTENING_STARTED"] = 1] = "VOICE_EVENT_KIND_LISTENING_STARTED";
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LISTENING_ENDED"] = 2] = "VOICE_EVENT_KIND_LISTENING_ENDED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SPEECH_DETECTED"] = 3] = "VOICE_EVENT_KIND_SPEECH_DETECTED";
     /** VOICE_EVENT_KIND_TRANSCRIPTION_STARTED - Transcription. */
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_STARTED"] = 4] = "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED";
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL"] = 5] = "VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL";
@@ -839,18 +773,6 @@ var VoiceEventKind;
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_PAUSED"] = 34] = "VOICE_EVENT_KIND_PLAYBACK_PAUSED";
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_RESUMED"] = 35] = "VOICE_EVENT_KIND_PLAYBACK_RESUMED";
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_FAILED"] = 36] = "VOICE_EVENT_KIND_PLAYBACK_FAILED";
-    /** VOICE_EVENT_KIND_VOICE_SESSION_STARTED - Voice session orchestration (RN events.ts:177-187). */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_STARTED"] = 37] = "VOICE_EVENT_KIND_VOICE_SESSION_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_LISTENING"] = 38] = "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED"] = 39] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED"] = 40] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING"] = 41] = "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED"] = 42] = "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED"] = 43] = "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING"] = 44] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED"] = 45] = "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_STOPPED"] = 46] = "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_ERROR"] = 47] = "VOICE_EVENT_KIND_VOICE_SESSION_ERROR";
     /** VOICE_EVENT_KIND_VAD_PAUSED - VAD pause/resume (telemetry-only metrics). */
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_PAUSED"] = 48] = "VOICE_EVENT_KIND_VAD_PAUSED";
     VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_RESUMED"] = 49] = "VOICE_EVENT_KIND_VAD_RESUMED";
@@ -867,9 +789,6 @@ function voiceEventKindFromJSON(object) {
         case 2:
         case "VOICE_EVENT_KIND_LISTENING_ENDED":
             return VoiceEventKind.VOICE_EVENT_KIND_LISTENING_ENDED;
-        case 3:
-        case "VOICE_EVENT_KIND_SPEECH_DETECTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_SPEECH_DETECTED;
         case 4:
         case "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED":
             return VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_STARTED;
@@ -969,39 +888,6 @@ function voiceEventKindFromJSON(object) {
         case 36:
         case "VOICE_EVENT_KIND_PLAYBACK_FAILED":
             return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_FAILED;
-        case 37:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STARTED;
-        case 38:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_LISTENING;
-        case 39:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED;
-        case 40:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED;
-        case 41:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING;
-        case 42:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED;
-        case 43:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED;
-        case 44:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING;
-        case 45:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED;
-        case 46:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STOPPED;
-        case 47:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_ERROR":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_ERROR;
         case 48:
         case "VOICE_EVENT_KIND_VAD_PAUSED":
             return VoiceEventKind.VOICE_EVENT_KIND_VAD_PAUSED;
@@ -1022,8 +908,6 @@ function voiceEventKindToJSON(object) {
             return "VOICE_EVENT_KIND_LISTENING_STARTED";
         case VoiceEventKind.VOICE_EVENT_KIND_LISTENING_ENDED:
             return "VOICE_EVENT_KIND_LISTENING_ENDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_SPEECH_DETECTED:
-            return "VOICE_EVENT_KIND_SPEECH_DETECTED";
         case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_STARTED:
             return "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED";
         case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL:
@@ -1090,28 +974,6 @@ function voiceEventKindToJSON(object) {
             return "VOICE_EVENT_KIND_PLAYBACK_RESUMED";
         case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_FAILED:
             return "VOICE_EVENT_KIND_PLAYBACK_FAILED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STARTED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_LISTENING:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STOPPED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_ERROR:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_ERROR";
         case VoiceEventKind.VOICE_EVENT_KIND_VAD_PAUSED:
             return "VOICE_EVENT_KIND_VAD_PAUSED";
         case VoiceEventKind.VOICE_EVENT_KIND_VAD_RESUMED:
@@ -1269,7 +1131,6 @@ var ModelEventKind;
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_COMPLETED"] = 10] = "MODEL_EVENT_KIND_DOWNLOAD_COMPLETED";
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_FAILED"] = 11] = "MODEL_EVENT_KIND_DOWNLOAD_FAILED";
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_CANCELLED"] = 12] = "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_REQUESTED"] = 13] = "MODEL_EVENT_KIND_LIST_REQUESTED";
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_COMPLETED"] = 14] = "MODEL_EVENT_KIND_LIST_COMPLETED";
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_FAILED"] = 15] = "MODEL_EVENT_KIND_LIST_FAILED";
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_CATALOG_LOADED"] = 16] = "MODEL_EVENT_KIND_CATALOG_LOADED";
@@ -1282,6 +1143,33 @@ var ModelEventKind;
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_EXTRACTION_PROGRESS"] = 23] = "MODEL_EVENT_KIND_EXTRACTION_PROGRESS";
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_EXTRACTION_COMPLETED"] = 24] = "MODEL_EVENT_KIND_EXTRACTION_COMPLETED";
     ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_EXTRACTION_FAILED"] = 25] = "MODEL_EVENT_KIND_EXTRACTION_FAILED";
+    /** MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED - Absorbed from ModelRegistryEventKind. */
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED"] = 26] = "MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED"] = 27] = "MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED"] = 28] = "MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_ASSIGNMENT_STARTED"] = 29] = "MODEL_EVENT_KIND_ASSIGNMENT_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED"] = 30] = "MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_ASSIGNMENT_FAILED"] = 31] = "MODEL_EVENT_KIND_ASSIGNMENT_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_IMPORT_STARTED"] = 32] = "MODEL_EVENT_KIND_IMPORT_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_IMPORT_COMPLETED"] = 33] = "MODEL_EVENT_KIND_IMPORT_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_IMPORT_FAILED"] = 34] = "MODEL_EVENT_KIND_IMPORT_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DISCOVERY_STARTED"] = 35] = "MODEL_EVENT_KIND_DISCOVERY_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DISCOVERY_COMPLETED"] = 36] = "MODEL_EVENT_KIND_DISCOVERY_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DISCOVERY_FAILED"] = 37] = "MODEL_EVENT_KIND_DISCOVERY_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED"] = 38] = "MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED"] = 40] = "MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_REGISTRY_GET_FAILED"] = 41] = "MODEL_EVENT_KIND_REGISTRY_GET_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED"] = 43] = "MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_REGISTRY_LIST_FAILED"] = 44] = "MODEL_EVENT_KIND_REGISTRY_LIST_FAILED";
+    /** MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED - Absorbed from DownloadEventKind. */
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED"] = 45] = "MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED"] = 46] = "MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED"] = 47] = "MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED"] = 48] = "MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED"] = 49] = "MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_RESUMED"] = 50] = "MODEL_EVENT_KIND_DOWNLOAD_RESUMED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_PAUSED"] = 51] = "MODEL_EVENT_KIND_DOWNLOAD_PAUSED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED"] = 52] = "MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED";
     ModelEventKind[ModelEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ModelEventKind || (exports.ModelEventKind = ModelEventKind = {}));
 function modelEventKindFromJSON(object) {
@@ -1325,9 +1213,6 @@ function modelEventKindFromJSON(object) {
         case 12:
         case "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED":
             return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCELLED;
-        case 13:
-        case "MODEL_EVENT_KIND_LIST_REQUESTED":
-            return ModelEventKind.MODEL_EVENT_KIND_LIST_REQUESTED;
         case 14:
         case "MODEL_EVENT_KIND_LIST_COMPLETED":
             return ModelEventKind.MODEL_EVENT_KIND_LIST_COMPLETED;
@@ -1364,6 +1249,81 @@ function modelEventKindFromJSON(object) {
         case 25:
         case "MODEL_EVENT_KIND_EXTRACTION_FAILED":
             return ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_FAILED;
+        case 26:
+        case "MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED;
+        case 27:
+        case "MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED;
+        case 28:
+        case "MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED;
+        case 29:
+        case "MODEL_EVENT_KIND_ASSIGNMENT_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_STARTED;
+        case 30:
+        case "MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED;
+        case 31:
+        case "MODEL_EVENT_KIND_ASSIGNMENT_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_FAILED;
+        case 32:
+        case "MODEL_EVENT_KIND_IMPORT_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_IMPORT_STARTED;
+        case 33:
+        case "MODEL_EVENT_KIND_IMPORT_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_IMPORT_COMPLETED;
+        case 34:
+        case "MODEL_EVENT_KIND_IMPORT_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_IMPORT_FAILED;
+        case 35:
+        case "MODEL_EVENT_KIND_DISCOVERY_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_DISCOVERY_STARTED;
+        case 36:
+        case "MODEL_EVENT_KIND_DISCOVERY_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_DISCOVERY_COMPLETED;
+        case 37:
+        case "MODEL_EVENT_KIND_DISCOVERY_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_DISCOVERY_FAILED;
+        case 38:
+        case "MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED":
+            return ModelEventKind.MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED;
+        case 40:
+        case "MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED;
+        case 41:
+        case "MODEL_EVENT_KIND_REGISTRY_GET_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_REGISTRY_GET_FAILED;
+        case 43:
+        case "MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED;
+        case 44:
+        case "MODEL_EVENT_KIND_REGISTRY_LIST_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_REGISTRY_LIST_FAILED;
+        case 45:
+        case "MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED;
+        case 46:
+        case "MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED;
+        case 47:
+        case "MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED;
+        case 48:
+        case "MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED;
+        case 49:
+        case "MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED;
+        case 50:
+        case "MODEL_EVENT_KIND_DOWNLOAD_RESUMED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_RESUMED;
+        case 51:
+        case "MODEL_EVENT_KIND_DOWNLOAD_PAUSED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PAUSED;
+        case 52:
+        case "MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -1398,8 +1358,6 @@ function modelEventKindToJSON(object) {
             return "MODEL_EVENT_KIND_DOWNLOAD_FAILED";
         case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCELLED:
             return "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED";
-        case ModelEventKind.MODEL_EVENT_KIND_LIST_REQUESTED:
-            return "MODEL_EVENT_KIND_LIST_REQUESTED";
         case ModelEventKind.MODEL_EVENT_KIND_LIST_COMPLETED:
             return "MODEL_EVENT_KIND_LIST_COMPLETED";
         case ModelEventKind.MODEL_EVENT_KIND_LIST_FAILED:
@@ -1424,249 +1382,57 @@ function modelEventKindToJSON(object) {
             return "MODEL_EVENT_KIND_EXTRACTION_COMPLETED";
         case ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_FAILED:
             return "MODEL_EVENT_KIND_EXTRACTION_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED:
+            return "MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED:
+            return "MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED:
+            return "MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_STARTED:
+            return "MODEL_EVENT_KIND_ASSIGNMENT_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED:
+            return "MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_FAILED:
+            return "MODEL_EVENT_KIND_ASSIGNMENT_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_IMPORT_STARTED:
+            return "MODEL_EVENT_KIND_IMPORT_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_IMPORT_COMPLETED:
+            return "MODEL_EVENT_KIND_IMPORT_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_IMPORT_FAILED:
+            return "MODEL_EVENT_KIND_IMPORT_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_DISCOVERY_STARTED:
+            return "MODEL_EVENT_KIND_DISCOVERY_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_DISCOVERY_COMPLETED:
+            return "MODEL_EVENT_KIND_DISCOVERY_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_DISCOVERY_FAILED:
+            return "MODEL_EVENT_KIND_DISCOVERY_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED:
+            return "MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED";
+        case ModelEventKind.MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED:
+            return "MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_REGISTRY_GET_FAILED:
+            return "MODEL_EVENT_KIND_REGISTRY_GET_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED:
+            return "MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_REGISTRY_LIST_FAILED:
+            return "MODEL_EVENT_KIND_REGISTRY_LIST_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_RESUMED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_RESUMED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PAUSED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_PAUSED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED";
         case ModelEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var ModelRegistryEventKind;
-(function (ModelRegistryEventKind) {
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED"] = 0] = "MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED"] = 1] = "MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED"] = 2] = "MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED"] = 3] = "MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED"] = 4] = "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED"] = 5] = "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED"] = 6] = "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED"] = 7] = "MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED"] = 8] = "MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED"] = 9] = "MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED"] = 10] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED"] = 11] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED"] = 12] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED"] = 13] = "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_LIST_STARTED"] = 14] = "MODEL_REGISTRY_EVENT_KIND_LIST_STARTED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED"] = 15] = "MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_LIST_FAILED"] = 16] = "MODEL_REGISTRY_EVENT_KIND_LIST_FAILED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_GET_STARTED"] = 17] = "MODEL_REGISTRY_EVENT_KIND_GET_STARTED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED"] = 18] = "MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED";
-    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_GET_FAILED"] = 19] = "MODEL_REGISTRY_EVENT_KIND_GET_FAILED";
-    ModelRegistryEventKind[ModelRegistryEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(ModelRegistryEventKind || (exports.ModelRegistryEventKind = ModelRegistryEventKind = {}));
-function modelRegistryEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED;
-        case 2:
-        case "MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED;
-        case 3:
-        case "MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED;
-        case 4:
-        case "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED;
-        case 5:
-        case "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED;
-        case 6:
-        case "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED;
-        case 7:
-        case "MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED;
-        case 8:
-        case "MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED;
-        case 9:
-        case "MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED;
-        case 10:
-        case "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED;
-        case 11:
-        case "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED;
-        case 12:
-        case "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED;
-        case 13:
-        case "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED;
-        case 14:
-        case "MODEL_REGISTRY_EVENT_KIND_LIST_STARTED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_STARTED;
-        case 15:
-        case "MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED;
-        case 16:
-        case "MODEL_REGISTRY_EVENT_KIND_LIST_FAILED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_FAILED;
-        case 17:
-        case "MODEL_REGISTRY_EVENT_KIND_GET_STARTED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_STARTED;
-        case 18:
-        case "MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED;
-        case 19:
-        case "MODEL_REGISTRY_EVENT_KIND_GET_FAILED":
-            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_FAILED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return ModelRegistryEventKind.UNRECOGNIZED;
-    }
-}
-function modelRegistryEventKindToJSON(object) {
-    switch (object) {
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED:
-            return "MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED:
-            return "MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED:
-            return "MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED:
-            return "MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED:
-            return "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED:
-            return "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED:
-            return "MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED:
-            return "MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED:
-            return "MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED:
-            return "MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED:
-            return "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED:
-            return "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED:
-            return "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED:
-            return "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_STARTED:
-            return "MODEL_REGISTRY_EVENT_KIND_LIST_STARTED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED:
-            return "MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_FAILED:
-            return "MODEL_REGISTRY_EVENT_KIND_LIST_FAILED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_STARTED:
-            return "MODEL_REGISTRY_EVENT_KIND_GET_STARTED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED:
-            return "MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED";
-        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_FAILED:
-            return "MODEL_REGISTRY_EVENT_KIND_GET_FAILED";
-        case ModelRegistryEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var DownloadEventKind;
-(function (DownloadEventKind) {
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_UNSPECIFIED"] = 0] = "DOWNLOAD_EVENT_KIND_UNSPECIFIED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PLAN_STARTED"] = 1] = "DOWNLOAD_EVENT_KIND_PLAN_STARTED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PLAN_COMPLETED"] = 2] = "DOWNLOAD_EVENT_KIND_PLAN_COMPLETED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PLAN_FAILED"] = 3] = "DOWNLOAD_EVENT_KIND_PLAN_FAILED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_STARTED"] = 4] = "DOWNLOAD_EVENT_KIND_STARTED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PROGRESS"] = 5] = "DOWNLOAD_EVENT_KIND_PROGRESS";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED"] = 6] = "DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_CANCELLED"] = 7] = "DOWNLOAD_EVENT_KIND_CANCELLED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_RESUME_REQUESTED"] = 8] = "DOWNLOAD_EVENT_KIND_RESUME_REQUESTED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_RESUMED"] = 9] = "DOWNLOAD_EVENT_KIND_RESUMED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_COMPLETED"] = 10] = "DOWNLOAD_EVENT_KIND_COMPLETED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_FAILED"] = 11] = "DOWNLOAD_EVENT_KIND_FAILED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PAUSED"] = 12] = "DOWNLOAD_EVENT_KIND_PAUSED";
-    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED"] = 13] = "DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED";
-    DownloadEventKind[DownloadEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(DownloadEventKind || (exports.DownloadEventKind = DownloadEventKind = {}));
-function downloadEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "DOWNLOAD_EVENT_KIND_UNSPECIFIED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "DOWNLOAD_EVENT_KIND_PLAN_STARTED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_STARTED;
-        case 2:
-        case "DOWNLOAD_EVENT_KIND_PLAN_COMPLETED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_COMPLETED;
-        case 3:
-        case "DOWNLOAD_EVENT_KIND_PLAN_FAILED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_FAILED;
-        case 4:
-        case "DOWNLOAD_EVENT_KIND_STARTED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_STARTED;
-        case 5:
-        case "DOWNLOAD_EVENT_KIND_PROGRESS":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PROGRESS;
-        case 6:
-        case "DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED;
-        case 7:
-        case "DOWNLOAD_EVENT_KIND_CANCELLED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCELLED;
-        case 8:
-        case "DOWNLOAD_EVENT_KIND_RESUME_REQUESTED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUME_REQUESTED;
-        case 9:
-        case "DOWNLOAD_EVENT_KIND_RESUMED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUMED;
-        case 10:
-        case "DOWNLOAD_EVENT_KIND_COMPLETED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_COMPLETED;
-        case 11:
-        case "DOWNLOAD_EVENT_KIND_FAILED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_FAILED;
-        case 12:
-        case "DOWNLOAD_EVENT_KIND_PAUSED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PAUSED;
-        case 13:
-        case "DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED":
-            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return DownloadEventKind.UNRECOGNIZED;
-    }
-}
-function downloadEventKindToJSON(object) {
-    switch (object) {
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_UNSPECIFIED:
-            return "DOWNLOAD_EVENT_KIND_UNSPECIFIED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_STARTED:
-            return "DOWNLOAD_EVENT_KIND_PLAN_STARTED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_COMPLETED:
-            return "DOWNLOAD_EVENT_KIND_PLAN_COMPLETED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PLAN_FAILED:
-            return "DOWNLOAD_EVENT_KIND_PLAN_FAILED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_STARTED:
-            return "DOWNLOAD_EVENT_KIND_STARTED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PROGRESS:
-            return "DOWNLOAD_EVENT_KIND_PROGRESS";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED:
-            return "DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_CANCELLED:
-            return "DOWNLOAD_EVENT_KIND_CANCELLED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUME_REQUESTED:
-            return "DOWNLOAD_EVENT_KIND_RESUME_REQUESTED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_RESUMED:
-            return "DOWNLOAD_EVENT_KIND_RESUMED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_COMPLETED:
-            return "DOWNLOAD_EVENT_KIND_COMPLETED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_FAILED:
-            return "DOWNLOAD_EVENT_KIND_FAILED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PAUSED:
-            return "DOWNLOAD_EVENT_KIND_PAUSED";
-        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED:
-            return "DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED";
-        case DownloadEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1674,9 +1440,7 @@ function downloadEventKindToJSON(object) {
 var StorageEventKind;
 (function (StorageEventKind) {
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_UNSPECIFIED"] = 0] = "STORAGE_EVENT_KIND_UNSPECIFIED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_INFO_REQUESTED"] = 1] = "STORAGE_EVENT_KIND_INFO_REQUESTED";
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_INFO_RETRIEVED"] = 2] = "STORAGE_EVENT_KIND_INFO_RETRIEVED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_MODELS_REQUESTED"] = 3] = "STORAGE_EVENT_KIND_MODELS_REQUESTED";
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_MODELS_RETRIEVED"] = 4] = "STORAGE_EVENT_KIND_MODELS_RETRIEVED";
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED"] = 5] = "STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED";
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED"] = 6] = "STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED";
@@ -1691,6 +1455,15 @@ var StorageEventKind;
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_MISS"] = 15] = "STORAGE_EVENT_KIND_CACHE_MISS";
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_EVICTION"] = 16] = "STORAGE_EVENT_KIND_EVICTION";
     StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DISK_FULL"] = 17] = "STORAGE_EVENT_KIND_DISK_FULL";
+    /** STORAGE_EVENT_KIND_AVAILABILITY_CHECKED - Absorbed from StorageLifecycleEventKind. */
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_AVAILABILITY_CHECKED"] = 18] = "STORAGE_EVENT_KIND_AVAILABILITY_CHECKED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_AVAILABILITY_FAILED"] = 19] = "STORAGE_EVENT_KIND_AVAILABILITY_FAILED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_PLAN_CREATED"] = 20] = "STORAGE_EVENT_KIND_DELETE_PLAN_CREATED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_PLAN_FAILED"] = 21] = "STORAGE_EVENT_KIND_DELETE_PLAN_FAILED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED"] = 22] = "STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED"] = 23] = "STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED"] = 24] = "STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED"] = 25] = "STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED";
     StorageEventKind[StorageEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(StorageEventKind || (exports.StorageEventKind = StorageEventKind = {}));
 function storageEventKindFromJSON(object) {
@@ -1698,15 +1471,9 @@ function storageEventKindFromJSON(object) {
         case 0:
         case "STORAGE_EVENT_KIND_UNSPECIFIED":
             return StorageEventKind.STORAGE_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "STORAGE_EVENT_KIND_INFO_REQUESTED":
-            return StorageEventKind.STORAGE_EVENT_KIND_INFO_REQUESTED;
         case 2:
         case "STORAGE_EVENT_KIND_INFO_RETRIEVED":
             return StorageEventKind.STORAGE_EVENT_KIND_INFO_RETRIEVED;
-        case 3:
-        case "STORAGE_EVENT_KIND_MODELS_REQUESTED":
-            return StorageEventKind.STORAGE_EVENT_KIND_MODELS_REQUESTED;
         case 4:
         case "STORAGE_EVENT_KIND_MODELS_RETRIEVED":
             return StorageEventKind.STORAGE_EVENT_KIND_MODELS_RETRIEVED;
@@ -1749,6 +1516,30 @@ function storageEventKindFromJSON(object) {
         case 17:
         case "STORAGE_EVENT_KIND_DISK_FULL":
             return StorageEventKind.STORAGE_EVENT_KIND_DISK_FULL;
+        case 18:
+        case "STORAGE_EVENT_KIND_AVAILABILITY_CHECKED":
+            return StorageEventKind.STORAGE_EVENT_KIND_AVAILABILITY_CHECKED;
+        case 19:
+        case "STORAGE_EVENT_KIND_AVAILABILITY_FAILED":
+            return StorageEventKind.STORAGE_EVENT_KIND_AVAILABILITY_FAILED;
+        case 20:
+        case "STORAGE_EVENT_KIND_DELETE_PLAN_CREATED":
+            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_PLAN_CREATED;
+        case 21:
+        case "STORAGE_EVENT_KIND_DELETE_PLAN_FAILED":
+            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_PLAN_FAILED;
+        case 22:
+        case "STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED":
+            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED;
+        case 23:
+        case "STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED;
+        case 24:
+        case "STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED;
+        case 25:
+        case "STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -1759,12 +1550,8 @@ function storageEventKindToJSON(object) {
     switch (object) {
         case StorageEventKind.STORAGE_EVENT_KIND_UNSPECIFIED:
             return "STORAGE_EVENT_KIND_UNSPECIFIED";
-        case StorageEventKind.STORAGE_EVENT_KIND_INFO_REQUESTED:
-            return "STORAGE_EVENT_KIND_INFO_REQUESTED";
         case StorageEventKind.STORAGE_EVENT_KIND_INFO_RETRIEVED:
             return "STORAGE_EVENT_KIND_INFO_RETRIEVED";
-        case StorageEventKind.STORAGE_EVENT_KIND_MODELS_REQUESTED:
-            return "STORAGE_EVENT_KIND_MODELS_REQUESTED";
         case StorageEventKind.STORAGE_EVENT_KIND_MODELS_RETRIEVED:
             return "STORAGE_EVENT_KIND_MODELS_RETRIEVED";
         case StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED:
@@ -1793,110 +1580,23 @@ function storageEventKindToJSON(object) {
             return "STORAGE_EVENT_KIND_EVICTION";
         case StorageEventKind.STORAGE_EVENT_KIND_DISK_FULL:
             return "STORAGE_EVENT_KIND_DISK_FULL";
+        case StorageEventKind.STORAGE_EVENT_KIND_AVAILABILITY_CHECKED:
+            return "STORAGE_EVENT_KIND_AVAILABILITY_CHECKED";
+        case StorageEventKind.STORAGE_EVENT_KIND_AVAILABILITY_FAILED:
+            return "STORAGE_EVENT_KIND_AVAILABILITY_FAILED";
+        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_PLAN_CREATED:
+            return "STORAGE_EVENT_KIND_DELETE_PLAN_CREATED";
+        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_PLAN_FAILED:
+            return "STORAGE_EVENT_KIND_DELETE_PLAN_FAILED";
+        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED:
+            return "STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED:
+            return "STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED:
+            return "STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED:
+            return "STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED";
         case StorageEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var StorageLifecycleEventKind;
-(function (StorageLifecycleEventKind) {
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED"] = 0] = "STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED"] = 1] = "STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED"] = 2] = "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED"] = 3] = "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED"] = 4] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED"] = 5] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED"] = 6] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED"] = 7] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED"] = 8] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED"] = 9] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED"] = 10] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED"] = 11] = "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED"] = 12] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED"] = 13] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED";
-    StorageLifecycleEventKind[StorageLifecycleEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(StorageLifecycleEventKind || (exports.StorageLifecycleEventKind = StorageLifecycleEventKind = {}));
-function storageLifecycleEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED;
-        case 2:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED;
-        case 3:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED;
-        case 4:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED;
-        case 5:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED;
-        case 6:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED;
-        case 7:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED;
-        case 8:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED;
-        case 9:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED;
-        case 10:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED;
-        case 11:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED;
-        case 12:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED;
-        case 13:
-        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED":
-            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return StorageLifecycleEventKind.UNRECOGNIZED;
-    }
-}
-function storageLifecycleEventKindToJSON(object) {
-    switch (object) {
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED";
-        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED:
-            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED";
-        case StorageLifecycleEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -2127,16 +1827,6 @@ var FrameworkEventKind;
     FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_UNSPECIFIED"] = 0] = "FRAMEWORK_EVENT_KIND_UNSPECIFIED";
     FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED"] = 1] = "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED";
     FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED"] = 2] = "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED"] = 3] = "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED"] = 4] = "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED"] = 5] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED"] = 6] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED"] = 7] = "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED"] = 8] = "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED"] = 9] = "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED"] = 10] = "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED"] = 11] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED"] = 12] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED";
     FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ERROR"] = 13] = "FRAMEWORK_EVENT_KIND_ERROR";
     FrameworkEventKind[FrameworkEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(FrameworkEventKind || (exports.FrameworkEventKind = FrameworkEventKind = {}));
@@ -2151,36 +1841,6 @@ function frameworkEventKindFromJSON(object) {
         case 2:
         case "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED":
             return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED;
-        case 3:
-        case "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED;
-        case 4:
-        case "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED;
-        case 5:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED;
-        case 6:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED;
-        case 7:
-        case "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED;
-        case 8:
-        case "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED;
-        case 9:
-        case "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED;
-        case 10:
-        case "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED;
-        case 11:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED;
-        case 12:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED;
         case 13:
         case "FRAMEWORK_EVENT_KIND_ERROR":
             return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ERROR;
@@ -2198,26 +1858,6 @@ function frameworkEventKindToJSON(object) {
             return "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED";
         case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED:
             return "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED";
         case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ERROR:
             return "FRAMEWORK_EVENT_KIND_ERROR";
         case FrameworkEventKind.UNRECOGNIZED:
@@ -2288,55 +1928,6 @@ function hardwareRoutingEventKindToJSON(object) {
         case HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING:
             return "HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING";
         case HardwareRoutingEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var PerformanceEventKind;
-(function (PerformanceEventKind) {
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_UNSPECIFIED"] = 0] = "PERFORMANCE_EVENT_KIND_UNSPECIFIED";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_MEMORY_WARNING"] = 1] = "PERFORMANCE_EVENT_KIND_MEMORY_WARNING";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED"] = 2] = "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_LATENCY_MEASURED"] = 3] = "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED"] = 4] = "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED";
-    PerformanceEventKind[PerformanceEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(PerformanceEventKind || (exports.PerformanceEventKind = PerformanceEventKind = {}));
-function performanceEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "PERFORMANCE_EVENT_KIND_UNSPECIFIED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "PERFORMANCE_EVENT_KIND_MEMORY_WARNING":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_MEMORY_WARNING;
-        case 2:
-        case "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED;
-        case 3:
-        case "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_LATENCY_MEASURED;
-        case 4:
-        case "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return PerformanceEventKind.UNRECOGNIZED;
-    }
-}
-function performanceEventKindToJSON(object) {
-    switch (object) {
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_UNSPECIFIED:
-            return "PERFORMANCE_EVENT_KIND_UNSPECIFIED";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_MEMORY_WARNING:
-            return "PERFORMANCE_EVENT_KIND_MEMORY_WARNING";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED:
-            return "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_LATENCY_MEASURED:
-            return "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED:
-            return "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED";
-        case PerformanceEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -2764,356 +2355,6 @@ exports.ConfigurationEvent = {
         return message;
     },
 };
-function createBaseComponentInitializationEvent() {
-    return {
-        kind: 0,
-        component: 0,
-        modelId: "",
-        sizeBytes: 0,
-        progress: 0,
-        oldState: "",
-        newState: "",
-        components: [],
-        readyComponents: [],
-        pendingComponents: [],
-        readyCount: 0,
-        failedCount: 0,
-        previousLifecycleState: 0,
-        currentLifecycleState: 0,
-        error: undefined,
-    };
-}
-exports.ComponentInitializationEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.component !== 0) {
-            writer.uint32(16).int32(message.component);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(26).string(message.modelId);
-        }
-        if (message.sizeBytes !== 0) {
-            writer.uint32(32).int64(message.sizeBytes);
-        }
-        if (message.progress !== 0) {
-            writer.uint32(45).float(message.progress);
-        }
-        if (message.oldState !== "") {
-            writer.uint32(58).string(message.oldState);
-        }
-        if (message.newState !== "") {
-            writer.uint32(66).string(message.newState);
-        }
-        writer.uint32(74).fork();
-        for (const v of message.components) {
-            writer.int32(v);
-        }
-        writer.join();
-        writer.uint32(82).fork();
-        for (const v of message.readyComponents) {
-            writer.int32(v);
-        }
-        writer.join();
-        writer.uint32(90).fork();
-        for (const v of message.pendingComponents) {
-            writer.int32(v);
-        }
-        writer.join();
-        if (message.readyCount !== 0) {
-            writer.uint32(104).int32(message.readyCount);
-        }
-        if (message.failedCount !== 0) {
-            writer.uint32(112).int32(message.failedCount);
-        }
-        if (message.previousLifecycleState !== 0) {
-            writer.uint32(120).int32(message.previousLifecycleState);
-        }
-        if (message.currentLifecycleState !== 0) {
-            writer.uint32(128).int32(message.currentLifecycleState);
-        }
-        if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(138).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseComponentInitializationEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.component = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.sizeBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 45) {
-                        break;
-                    }
-                    message.progress = reader.float();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.oldState = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.newState = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag === 72) {
-                        message.components.push(reader.int32());
-                        continue;
-                    }
-                    if (tag === 74) {
-                        const end2 = reader.uint32() + reader.pos;
-                        while (reader.pos < end2) {
-                            message.components.push(reader.int32());
-                        }
-                        continue;
-                    }
-                    break;
-                }
-                case 10: {
-                    if (tag === 80) {
-                        message.readyComponents.push(reader.int32());
-                        continue;
-                    }
-                    if (tag === 82) {
-                        const end2 = reader.uint32() + reader.pos;
-                        while (reader.pos < end2) {
-                            message.readyComponents.push(reader.int32());
-                        }
-                        continue;
-                    }
-                    break;
-                }
-                case 11: {
-                    if (tag === 88) {
-                        message.pendingComponents.push(reader.int32());
-                        continue;
-                    }
-                    if (tag === 90) {
-                        const end2 = reader.uint32() + reader.pos;
-                        while (reader.pos < end2) {
-                            message.pendingComponents.push(reader.int32());
-                        }
-                        continue;
-                    }
-                    break;
-                }
-                case 13: {
-                    if (tag !== 104) {
-                        break;
-                    }
-                    message.readyCount = reader.int32();
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 112) {
-                        break;
-                    }
-                    message.failedCount = reader.int32();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 120) {
-                        break;
-                    }
-                    message.previousLifecycleState = reader.int32();
-                    continue;
-                }
-                case 16: {
-                    if (tag !== 128) {
-                        break;
-                    }
-                    message.currentLifecycleState = reader.int32();
-                    continue;
-                }
-                case 17: {
-                    if (tag !== 138) {
-                        break;
-                    }
-                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? componentInitializationEventKindFromJSON(object.kind) : 0,
-            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            sizeBytes: isSet(object.sizeBytes)
-                ? globalThis.Number(object.sizeBytes)
-                : isSet(object.size_bytes)
-                    ? globalThis.Number(object.size_bytes)
-                    : 0,
-            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-            oldState: isSet(object.oldState)
-                ? globalThis.String(object.oldState)
-                : isSet(object.old_state)
-                    ? globalThis.String(object.old_state)
-                    : "",
-            newState: isSet(object.newState)
-                ? globalThis.String(object.newState)
-                : isSet(object.new_state)
-                    ? globalThis.String(object.new_state)
-                    : "",
-            components: globalThis.Array.isArray(object?.components)
-                ? object.components.map((e) => sDKComponentFromJSON(e))
-                : [],
-            readyComponents: globalThis.Array.isArray(object?.readyComponents)
-                ? object.readyComponents.map((e) => sDKComponentFromJSON(e))
-                : globalThis.Array.isArray(object?.ready_components)
-                    ? object.ready_components.map((e) => sDKComponentFromJSON(e))
-                    : [],
-            pendingComponents: globalThis.Array.isArray(object?.pendingComponents)
-                ? object.pendingComponents.map((e) => sDKComponentFromJSON(e))
-                : globalThis.Array.isArray(object?.pending_components)
-                    ? object.pending_components.map((e) => sDKComponentFromJSON(e))
-                    : [],
-            readyCount: isSet(object.readyCount)
-                ? globalThis.Number(object.readyCount)
-                : isSet(object.ready_count)
-                    ? globalThis.Number(object.ready_count)
-                    : 0,
-            failedCount: isSet(object.failedCount)
-                ? globalThis.Number(object.failedCount)
-                : isSet(object.failed_count)
-                    ? globalThis.Number(object.failed_count)
-                    : 0,
-            previousLifecycleState: isSet(object.previousLifecycleState)
-                ? (0, component_types_1.componentLifecycleStateFromJSON)(object.previousLifecycleState)
-                : isSet(object.previous_lifecycle_state)
-                    ? (0, component_types_1.componentLifecycleStateFromJSON)(object.previous_lifecycle_state)
-                    : 0,
-            currentLifecycleState: isSet(object.currentLifecycleState)
-                ? (0, component_types_1.componentLifecycleStateFromJSON)(object.currentLifecycleState)
-                : isSet(object.current_lifecycle_state)
-                    ? (0, component_types_1.componentLifecycleStateFromJSON)(object.current_lifecycle_state)
-                    : 0,
-            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = componentInitializationEventKindToJSON(message.kind);
-        }
-        if (message.component !== 0) {
-            obj.component = sDKComponentToJSON(message.component);
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.sizeBytes !== 0) {
-            obj.sizeBytes = Math.round(message.sizeBytes);
-        }
-        if (message.progress !== 0) {
-            obj.progress = message.progress;
-        }
-        if (message.oldState !== "") {
-            obj.oldState = message.oldState;
-        }
-        if (message.newState !== "") {
-            obj.newState = message.newState;
-        }
-        if (message.components?.length) {
-            obj.components = message.components.map((e) => sDKComponentToJSON(e));
-        }
-        if (message.readyComponents?.length) {
-            obj.readyComponents = message.readyComponents.map((e) => sDKComponentToJSON(e));
-        }
-        if (message.pendingComponents?.length) {
-            obj.pendingComponents = message.pendingComponents.map((e) => sDKComponentToJSON(e));
-        }
-        if (message.readyCount !== 0) {
-            obj.readyCount = Math.round(message.readyCount);
-        }
-        if (message.failedCount !== 0) {
-            obj.failedCount = Math.round(message.failedCount);
-        }
-        if (message.previousLifecycleState !== 0) {
-            obj.previousLifecycleState = (0, component_types_1.componentLifecycleStateToJSON)(message.previousLifecycleState);
-        }
-        if (message.currentLifecycleState !== 0) {
-            obj.currentLifecycleState = (0, component_types_1.componentLifecycleStateToJSON)(message.currentLifecycleState);
-        }
-        if (message.error !== undefined) {
-            obj.error = errors_1.SDKError.toJSON(message.error);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ComponentInitializationEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseComponentInitializationEvent();
-        message.kind = object.kind ?? 0;
-        message.component = object.component ?? 0;
-        message.modelId = object.modelId ?? "";
-        message.sizeBytes = object.sizeBytes ?? 0;
-        message.progress = object.progress ?? 0;
-        message.oldState = object.oldState ?? "";
-        message.newState = object.newState ?? "";
-        message.components = object.components?.map((e) => e) || [];
-        message.readyComponents = object.readyComponents?.map((e) => e) || [];
-        message.pendingComponents = object.pendingComponents?.map((e) => e) || [];
-        message.readyCount = object.readyCount ?? 0;
-        message.failedCount = object.failedCount ?? 0;
-        message.previousLifecycleState = object.previousLifecycleState ?? 0;
-        message.currentLifecycleState = object.currentLifecycleState ?? 0;
-        message.error = (object.error !== undefined && object.error !== null)
-            ? errors_1.SDKError.fromPartial(object.error)
-            : undefined;
-        return message;
-    },
-};
 function createBaseComponentLifecycleSnapshot() {
     return {
         component: 0,
@@ -3407,11 +2648,20 @@ exports.ComponentLifecycleSnapshotResult = {
 };
 function createBaseComponentLifecycleEvent() {
     return {
+        kind: 0,
         component: 0,
         previousState: 0,
         currentState: 0,
         modelId: "",
         timestampMs: 0,
+        sizeBytes: 0,
+        progress: 0,
+        components: [],
+        readyComponents: [],
+        pendingComponents: [],
+        readyCount: 0,
+        failedCount: 0,
+        error: undefined,
         modelLoadResult: undefined,
         modelUnloadResult: undefined,
         modelDeleteResult: undefined,
@@ -3425,6 +2675,9 @@ function createBaseComponentLifecycleEvent() {
 }
 exports.ComponentLifecycleEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(152).int32(message.kind);
+        }
         if (message.component !== 0) {
             writer.uint32(8).int32(message.component);
         }
@@ -3439,6 +2692,36 @@ exports.ComponentLifecycleEvent = {
         }
         if (message.timestampMs !== 0) {
             writer.uint32(40).int64(message.timestampMs);
+        }
+        if (message.sizeBytes !== 0) {
+            writer.uint32(160).int64(message.sizeBytes);
+        }
+        if (message.progress !== 0) {
+            writer.uint32(173).float(message.progress);
+        }
+        writer.uint32(178).fork();
+        for (const v of message.components) {
+            writer.int32(v);
+        }
+        writer.join();
+        writer.uint32(186).fork();
+        for (const v of message.readyComponents) {
+            writer.int32(v);
+        }
+        writer.join();
+        writer.uint32(194).fork();
+        for (const v of message.pendingComponents) {
+            writer.int32(v);
+        }
+        writer.join();
+        if (message.readyCount !== 0) {
+            writer.uint32(200).int32(message.readyCount);
+        }
+        if (message.failedCount !== 0) {
+            writer.uint32(208).int32(message.failedCount);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(218).fork()).join();
         }
         if (message.modelLoadResult !== undefined) {
             model_types_1.ModelLoadResult.encode(message.modelLoadResult, writer.uint32(82).fork()).join();
@@ -3476,6 +2759,13 @@ exports.ComponentLifecycleEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 19: {
+                    if (tag !== 152) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
                 case 1: {
                     if (tag !== 8) {
                         break;
@@ -3509,6 +2799,83 @@ exports.ComponentLifecycleEvent = {
                         break;
                     }
                     message.timestampMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 20: {
+                    if (tag !== 160) {
+                        break;
+                    }
+                    message.sizeBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 21: {
+                    if (tag !== 173) {
+                        break;
+                    }
+                    message.progress = reader.float();
+                    continue;
+                }
+                case 22: {
+                    if (tag === 176) {
+                        message.components.push(reader.int32());
+                        continue;
+                    }
+                    if (tag === 178) {
+                        const end2 = reader.uint32() + reader.pos;
+                        while (reader.pos < end2) {
+                            message.components.push(reader.int32());
+                        }
+                        continue;
+                    }
+                    break;
+                }
+                case 23: {
+                    if (tag === 184) {
+                        message.readyComponents.push(reader.int32());
+                        continue;
+                    }
+                    if (tag === 186) {
+                        const end2 = reader.uint32() + reader.pos;
+                        while (reader.pos < end2) {
+                            message.readyComponents.push(reader.int32());
+                        }
+                        continue;
+                    }
+                    break;
+                }
+                case 24: {
+                    if (tag === 192) {
+                        message.pendingComponents.push(reader.int32());
+                        continue;
+                    }
+                    if (tag === 194) {
+                        const end2 = reader.uint32() + reader.pos;
+                        while (reader.pos < end2) {
+                            message.pendingComponents.push(reader.int32());
+                        }
+                        continue;
+                    }
+                    break;
+                }
+                case 25: {
+                    if (tag !== 200) {
+                        break;
+                    }
+                    message.readyCount = reader.int32();
+                    continue;
+                }
+                case 26: {
+                    if (tag !== 208) {
+                        break;
+                    }
+                    message.failedCount = reader.int32();
+                    continue;
+                }
+                case 27: {
+                    if (tag !== 218) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
                 case 10: {
@@ -3584,6 +2951,7 @@ exports.ComponentLifecycleEvent = {
     },
     fromJSON(object) {
         return {
+            kind: isSet(object.kind) ? componentLifecycleEventKindFromJSON(object.kind) : 0,
             component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
             previousState: isSet(object.previousState)
                 ? (0, component_types_1.componentLifecycleStateFromJSON)(object.previousState)
@@ -3605,6 +2973,36 @@ exports.ComponentLifecycleEvent = {
                 : isSet(object.timestamp_ms)
                     ? globalThis.Number(object.timestamp_ms)
                     : 0,
+            sizeBytes: isSet(object.sizeBytes)
+                ? globalThis.Number(object.sizeBytes)
+                : isSet(object.size_bytes)
+                    ? globalThis.Number(object.size_bytes)
+                    : 0,
+            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
+            components: globalThis.Array.isArray(object?.components)
+                ? object.components.map((e) => sDKComponentFromJSON(e))
+                : [],
+            readyComponents: globalThis.Array.isArray(object?.readyComponents)
+                ? object.readyComponents.map((e) => sDKComponentFromJSON(e))
+                : globalThis.Array.isArray(object?.ready_components)
+                    ? object.ready_components.map((e) => sDKComponentFromJSON(e))
+                    : [],
+            pendingComponents: globalThis.Array.isArray(object?.pendingComponents)
+                ? object.pendingComponents.map((e) => sDKComponentFromJSON(e))
+                : globalThis.Array.isArray(object?.pending_components)
+                    ? object.pending_components.map((e) => sDKComponentFromJSON(e))
+                    : [],
+            readyCount: isSet(object.readyCount)
+                ? globalThis.Number(object.readyCount)
+                : isSet(object.ready_count)
+                    ? globalThis.Number(object.ready_count)
+                    : 0,
+            failedCount: isSet(object.failedCount)
+                ? globalThis.Number(object.failedCount)
+                : isSet(object.failed_count)
+                    ? globalThis.Number(object.failed_count)
+                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
             modelLoadResult: isSet(object.modelLoadResult)
                 ? model_types_1.ModelLoadResult.fromJSON(object.modelLoadResult)
                 : isSet(object.model_load_result)
@@ -3650,6 +3048,9 @@ exports.ComponentLifecycleEvent = {
     },
     toJSON(message) {
         const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = componentLifecycleEventKindToJSON(message.kind);
+        }
         if (message.component !== 0) {
             obj.component = sDKComponentToJSON(message.component);
         }
@@ -3664,6 +3065,30 @@ exports.ComponentLifecycleEvent = {
         }
         if (message.timestampMs !== 0) {
             obj.timestampMs = Math.round(message.timestampMs);
+        }
+        if (message.sizeBytes !== 0) {
+            obj.sizeBytes = Math.round(message.sizeBytes);
+        }
+        if (message.progress !== 0) {
+            obj.progress = message.progress;
+        }
+        if (message.components?.length) {
+            obj.components = message.components.map((e) => sDKComponentToJSON(e));
+        }
+        if (message.readyComponents?.length) {
+            obj.readyComponents = message.readyComponents.map((e) => sDKComponentToJSON(e));
+        }
+        if (message.pendingComponents?.length) {
+            obj.pendingComponents = message.pendingComponents.map((e) => sDKComponentToJSON(e));
+        }
+        if (message.readyCount !== 0) {
+            obj.readyCount = Math.round(message.readyCount);
+        }
+        if (message.failedCount !== 0) {
+            obj.failedCount = Math.round(message.failedCount);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         if (message.modelLoadResult !== undefined) {
             obj.modelLoadResult = model_types_1.ModelLoadResult.toJSON(message.modelLoadResult);
@@ -3699,11 +3124,22 @@ exports.ComponentLifecycleEvent = {
     },
     fromPartial(object) {
         const message = createBaseComponentLifecycleEvent();
+        message.kind = object.kind ?? 0;
         message.component = object.component ?? 0;
         message.previousState = object.previousState ?? 0;
         message.currentState = object.currentState ?? 0;
         message.modelId = object.modelId ?? "";
         message.timestampMs = object.timestampMs ?? 0;
+        message.sizeBytes = object.sizeBytes ?? 0;
+        message.progress = object.progress ?? 0;
+        message.components = object.components?.map((e) => e) || [];
+        message.readyComponents = object.readyComponents?.map((e) => e) || [];
+        message.pendingComponents = object.pendingComponents?.map((e) => e) || [];
+        message.readyCount = object.readyCount ?? 0;
+        message.failedCount = object.failedCount ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         message.modelLoadResult = (object.modelLoadResult !== undefined && object.modelLoadResult !== null)
             ? model_types_1.ModelLoadResult.fromPartial(object.modelLoadResult)
             : undefined;
@@ -3900,11 +3336,8 @@ function createBaseGenerationEvent() {
         prompt: "",
         token: "",
         streamingText: "",
-        tokensCount: 0,
+        outputTokens: 0,
         response: "",
-        tokensUsed: 0,
-        latencyMs: 0,
-        firstTokenLatencyMs: 0,
         error: "",
         modelId: "",
         costAmount: 0,
@@ -3926,9 +3359,9 @@ function createBaseGenerationEvent() {
         maxTokens: 0,
         contextLength: 0,
         modelName: "",
-        durationMs: 0,
+        totalDurationMs: 0,
         framework: 0,
-        promptEvalTimeMs: 0,
+        prefillDurationMs: 0,
     };
 }
 exports.GenerationEvent = {
@@ -3948,92 +3381,83 @@ exports.GenerationEvent = {
         if (message.streamingText !== "") {
             writer.uint32(42).string(message.streamingText);
         }
-        if (message.tokensCount !== 0) {
-            writer.uint32(48).int32(message.tokensCount);
+        if (message.outputTokens !== 0) {
+            writer.uint32(48).int32(message.outputTokens);
         }
         if (message.response !== "") {
             writer.uint32(58).string(message.response);
         }
-        if (message.tokensUsed !== 0) {
-            writer.uint32(64).int32(message.tokensUsed);
-        }
-        if (message.latencyMs !== 0) {
-            writer.uint32(72).int64(message.latencyMs);
-        }
-        if (message.firstTokenLatencyMs !== 0) {
-            writer.uint32(80).int64(message.firstTokenLatencyMs);
-        }
         if (message.error !== "") {
-            writer.uint32(90).string(message.error);
+            writer.uint32(66).string(message.error);
         }
         if (message.modelId !== "") {
-            writer.uint32(98).string(message.modelId);
+            writer.uint32(74).string(message.modelId);
         }
         if (message.costAmount !== 0) {
-            writer.uint32(105).double(message.costAmount);
+            writer.uint32(81).double(message.costAmount);
         }
         if (message.costSavedAmount !== 0) {
-            writer.uint32(113).double(message.costSavedAmount);
+            writer.uint32(89).double(message.costSavedAmount);
         }
         if (message.routingTarget !== "") {
-            writer.uint32(122).string(message.routingTarget);
+            writer.uint32(98).string(message.routingTarget);
         }
         if (message.routingReason !== "") {
-            writer.uint32(130).string(message.routingReason);
+            writer.uint32(106).string(message.routingReason);
         }
         if (message.cancelReason !== "") {
-            writer.uint32(138).string(message.cancelReason);
+            writer.uint32(114).string(message.cancelReason);
         }
         if (message.toolCallId !== "") {
-            writer.uint32(146).string(message.toolCallId);
+            writer.uint32(122).string(message.toolCallId);
         }
         if (message.toolName !== "") {
-            writer.uint32(154).string(message.toolName);
+            writer.uint32(130).string(message.toolName);
         }
         if (message.toolPayloadJson !== "") {
-            writer.uint32(162).string(message.toolPayloadJson);
+            writer.uint32(138).string(message.toolPayloadJson);
         }
         if (message.structuredSchemaJson !== "") {
-            writer.uint32(170).string(message.structuredSchemaJson);
+            writer.uint32(146).string(message.structuredSchemaJson);
         }
         if (message.structuredOutputJson !== "") {
-            writer.uint32(178).string(message.structuredOutputJson);
+            writer.uint32(154).string(message.structuredOutputJson);
         }
         if (message.thinkingText !== "") {
-            writer.uint32(186).string(message.thinkingText);
+            writer.uint32(162).string(message.thinkingText);
         }
         if (message.inputTokens !== 0) {
-            writer.uint32(192).int32(message.inputTokens);
+            writer.uint32(168).int32(message.inputTokens);
         }
         if (message.tokensPerSecond !== 0) {
-            writer.uint32(201).double(message.tokensPerSecond);
+            writer.uint32(177).double(message.tokensPerSecond);
         }
         if (message.timeToFirstTokenMs !== 0) {
-            writer.uint32(208).int64(message.timeToFirstTokenMs);
+            writer.uint32(184).int64(message.timeToFirstTokenMs);
         }
         if (message.isStreaming !== false) {
-            writer.uint32(216).bool(message.isStreaming);
+            writer.uint32(192).bool(message.isStreaming);
         }
         if (message.temperature !== 0) {
-            writer.uint32(229).float(message.temperature);
+            writer.uint32(205).float(message.temperature);
         }
         if (message.maxTokens !== 0) {
-            writer.uint32(232).int32(message.maxTokens);
+            writer.uint32(208).int32(message.maxTokens);
         }
         if (message.contextLength !== 0) {
-            writer.uint32(240).int32(message.contextLength);
+            writer.uint32(216).int32(message.contextLength);
         }
         if (message.modelName !== "") {
-            writer.uint32(250).string(message.modelName);
+            writer.uint32(226).string(message.modelName);
         }
-        if (message.durationMs !== 0) {
-            writer.uint32(257).double(message.durationMs);
+        if (message.totalDurationMs !== 0) {
+            writer.uint32(232).int64(message.totalDurationMs);
         }
         if (message.framework !== 0) {
-            writer.uint32(264).int32(message.framework);
+            writer.uint32(240).int32(message.framework);
         }
-        if (message.promptEvalTimeMs !== 0) {
-            writer.uint32(272).int64(message.promptEvalTimeMs);
+        if (message.prefillDurationMs !== 0) {
+            writer.uint32(248).int64(message.prefillDurationMs);
         }
         return writer;
     },
@@ -4083,7 +3507,7 @@ exports.GenerationEvent = {
                     if (tag !== 48) {
                         break;
                     }
-                    message.tokensCount = reader.int32();
+                    message.outputTokens = reader.int32();
                     continue;
                 }
                 case 7: {
@@ -4094,192 +3518,171 @@ exports.GenerationEvent = {
                     continue;
                 }
                 case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.tokensUsed = reader.int32();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.latencyMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.firstTokenLatencyMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
+                    if (tag !== 66) {
                         break;
                     }
                     message.error = reader.string();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 81) {
+                        break;
+                    }
+                    message.costAmount = reader.double();
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 89) {
+                        break;
+                    }
+                    message.costSavedAmount = reader.double();
                     continue;
                 }
                 case 12: {
                     if (tag !== 98) {
                         break;
                     }
-                    message.modelId = reader.string();
+                    message.routingTarget = reader.string();
                     continue;
                 }
                 case 13: {
-                    if (tag !== 105) {
+                    if (tag !== 106) {
                         break;
                     }
-                    message.costAmount = reader.double();
+                    message.routingReason = reader.string();
                     continue;
                 }
                 case 14: {
-                    if (tag !== 113) {
+                    if (tag !== 114) {
                         break;
                     }
-                    message.costSavedAmount = reader.double();
+                    message.cancelReason = reader.string();
                     continue;
                 }
                 case 15: {
                     if (tag !== 122) {
                         break;
                     }
-                    message.routingTarget = reader.string();
+                    message.toolCallId = reader.string();
                     continue;
                 }
                 case 16: {
                     if (tag !== 130) {
                         break;
                     }
-                    message.routingReason = reader.string();
+                    message.toolName = reader.string();
                     continue;
                 }
                 case 17: {
                     if (tag !== 138) {
                         break;
                     }
-                    message.cancelReason = reader.string();
+                    message.toolPayloadJson = reader.string();
                     continue;
                 }
                 case 18: {
                     if (tag !== 146) {
                         break;
                     }
-                    message.toolCallId = reader.string();
+                    message.structuredSchemaJson = reader.string();
                     continue;
                 }
                 case 19: {
                     if (tag !== 154) {
                         break;
                     }
-                    message.toolName = reader.string();
+                    message.structuredOutputJson = reader.string();
                     continue;
                 }
                 case 20: {
                     if (tag !== 162) {
                         break;
                     }
-                    message.toolPayloadJson = reader.string();
+                    message.thinkingText = reader.string();
                     continue;
                 }
                 case 21: {
-                    if (tag !== 170) {
+                    if (tag !== 168) {
                         break;
                     }
-                    message.structuredSchemaJson = reader.string();
+                    message.inputTokens = reader.int32();
                     continue;
                 }
                 case 22: {
-                    if (tag !== 178) {
+                    if (tag !== 177) {
                         break;
                     }
-                    message.structuredOutputJson = reader.string();
+                    message.tokensPerSecond = reader.double();
                     continue;
                 }
                 case 23: {
-                    if (tag !== 186) {
+                    if (tag !== 184) {
                         break;
                     }
-                    message.thinkingText = reader.string();
+                    message.timeToFirstTokenMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 24: {
                     if (tag !== 192) {
                         break;
                     }
-                    message.inputTokens = reader.int32();
+                    message.isStreaming = reader.bool();
                     continue;
                 }
                 case 25: {
-                    if (tag !== 201) {
+                    if (tag !== 205) {
                         break;
                     }
-                    message.tokensPerSecond = reader.double();
+                    message.temperature = reader.float();
                     continue;
                 }
                 case 26: {
                     if (tag !== 208) {
                         break;
                     }
-                    message.timeToFirstTokenMs = longToNumber(reader.int64());
+                    message.maxTokens = reader.int32();
                     continue;
                 }
                 case 27: {
                     if (tag !== 216) {
                         break;
                     }
-                    message.isStreaming = reader.bool();
+                    message.contextLength = reader.int32();
                     continue;
                 }
                 case 28: {
-                    if (tag !== 229) {
+                    if (tag !== 226) {
                         break;
                     }
-                    message.temperature = reader.float();
+                    message.modelName = reader.string();
                     continue;
                 }
                 case 29: {
                     if (tag !== 232) {
                         break;
                     }
-                    message.maxTokens = reader.int32();
+                    message.totalDurationMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 30: {
                     if (tag !== 240) {
                         break;
                     }
-                    message.contextLength = reader.int32();
-                    continue;
-                }
-                case 31: {
-                    if (tag !== 250) {
-                        break;
-                    }
-                    message.modelName = reader.string();
-                    continue;
-                }
-                case 32: {
-                    if (tag !== 257) {
-                        break;
-                    }
-                    message.durationMs = reader.double();
-                    continue;
-                }
-                case 33: {
-                    if (tag !== 264) {
-                        break;
-                    }
                     message.framework = reader.int32();
                     continue;
                 }
-                case 34: {
-                    if (tag !== 272) {
+                case 31: {
+                    if (tag !== 248) {
                         break;
                     }
-                    message.promptEvalTimeMs = longToNumber(reader.int64());
+                    message.prefillDurationMs = longToNumber(reader.int64());
                     continue;
                 }
             }
@@ -4305,27 +3708,12 @@ exports.GenerationEvent = {
                 : isSet(object.streaming_text)
                     ? globalThis.String(object.streaming_text)
                     : "",
-            tokensCount: isSet(object.tokensCount)
-                ? globalThis.Number(object.tokensCount)
-                : isSet(object.tokens_count)
-                    ? globalThis.Number(object.tokens_count)
+            outputTokens: isSet(object.outputTokens)
+                ? globalThis.Number(object.outputTokens)
+                : isSet(object.output_tokens)
+                    ? globalThis.Number(object.output_tokens)
                     : 0,
             response: isSet(object.response) ? globalThis.String(object.response) : "",
-            tokensUsed: isSet(object.tokensUsed)
-                ? globalThis.Number(object.tokensUsed)
-                : isSet(object.tokens_used)
-                    ? globalThis.Number(object.tokens_used)
-                    : 0,
-            latencyMs: isSet(object.latencyMs)
-                ? globalThis.Number(object.latencyMs)
-                : isSet(object.latency_ms)
-                    ? globalThis.Number(object.latency_ms)
-                    : 0,
-            firstTokenLatencyMs: isSet(object.firstTokenLatencyMs)
-                ? globalThis.Number(object.firstTokenLatencyMs)
-                : isSet(object.first_token_latency_ms)
-                    ? globalThis.Number(object.first_token_latency_ms)
-                    : 0,
             error: isSet(object.error) ? globalThis.String(object.error) : "",
             modelId: isSet(object.modelId)
                 ? globalThis.String(object.modelId)
@@ -4423,16 +3811,16 @@ exports.GenerationEvent = {
                 : isSet(object.model_name)
                     ? globalThis.String(object.model_name)
                     : "",
-            durationMs: isSet(object.durationMs)
-                ? globalThis.Number(object.durationMs)
-                : isSet(object.duration_ms)
-                    ? globalThis.Number(object.duration_ms)
+            totalDurationMs: isSet(object.totalDurationMs)
+                ? globalThis.Number(object.totalDurationMs)
+                : isSet(object.total_duration_ms)
+                    ? globalThis.Number(object.total_duration_ms)
                     : 0,
-            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
-            promptEvalTimeMs: isSet(object.promptEvalTimeMs)
-                ? globalThis.Number(object.promptEvalTimeMs)
-                : isSet(object.prompt_eval_time_ms)
-                    ? globalThis.Number(object.prompt_eval_time_ms)
+            framework: isSet(object.framework) ? (0, model_types_1.inferenceFrameworkFromJSON)(object.framework) : 0,
+            prefillDurationMs: isSet(object.prefillDurationMs)
+                ? globalThis.Number(object.prefillDurationMs)
+                : isSet(object.prefill_duration_ms)
+                    ? globalThis.Number(object.prefill_duration_ms)
                     : 0,
         };
     },
@@ -4453,20 +3841,11 @@ exports.GenerationEvent = {
         if (message.streamingText !== "") {
             obj.streamingText = message.streamingText;
         }
-        if (message.tokensCount !== 0) {
-            obj.tokensCount = Math.round(message.tokensCount);
+        if (message.outputTokens !== 0) {
+            obj.outputTokens = Math.round(message.outputTokens);
         }
         if (message.response !== "") {
             obj.response = message.response;
-        }
-        if (message.tokensUsed !== 0) {
-            obj.tokensUsed = Math.round(message.tokensUsed);
-        }
-        if (message.latencyMs !== 0) {
-            obj.latencyMs = Math.round(message.latencyMs);
-        }
-        if (message.firstTokenLatencyMs !== 0) {
-            obj.firstTokenLatencyMs = Math.round(message.firstTokenLatencyMs);
         }
         if (message.error !== "") {
             obj.error = message.error;
@@ -4531,14 +3910,14 @@ exports.GenerationEvent = {
         if (message.modelName !== "") {
             obj.modelName = message.modelName;
         }
-        if (message.durationMs !== 0) {
-            obj.durationMs = message.durationMs;
+        if (message.totalDurationMs !== 0) {
+            obj.totalDurationMs = Math.round(message.totalDurationMs);
         }
         if (message.framework !== 0) {
-            obj.framework = Math.round(message.framework);
+            obj.framework = (0, model_types_1.inferenceFrameworkToJSON)(message.framework);
         }
-        if (message.promptEvalTimeMs !== 0) {
-            obj.promptEvalTimeMs = Math.round(message.promptEvalTimeMs);
+        if (message.prefillDurationMs !== 0) {
+            obj.prefillDurationMs = Math.round(message.prefillDurationMs);
         }
         return obj;
     },
@@ -4552,11 +3931,8 @@ exports.GenerationEvent = {
         message.prompt = object.prompt ?? "";
         message.token = object.token ?? "";
         message.streamingText = object.streamingText ?? "";
-        message.tokensCount = object.tokensCount ?? 0;
+        message.outputTokens = object.outputTokens ?? 0;
         message.response = object.response ?? "";
-        message.tokensUsed = object.tokensUsed ?? 0;
-        message.latencyMs = object.latencyMs ?? 0;
-        message.firstTokenLatencyMs = object.firstTokenLatencyMs ?? 0;
         message.error = object.error ?? "";
         message.modelId = object.modelId ?? "";
         message.costAmount = object.costAmount ?? 0;
@@ -4578,9 +3954,9 @@ exports.GenerationEvent = {
         message.maxTokens = object.maxTokens ?? 0;
         message.contextLength = object.contextLength ?? 0;
         message.modelName = object.modelName ?? "";
-        message.durationMs = object.durationMs ?? 0;
+        message.totalDurationMs = object.totalDurationMs ?? 0;
         message.framework = object.framework ?? 0;
-        message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
+        message.prefillDurationMs = object.prefillDurationMs ?? 0;
         return message;
     },
 };
@@ -4594,14 +3970,11 @@ function createBaseVoiceLifecycleEvent() {
         audioBase64: "",
         durationMs: 0,
         audioLevel: 0,
-        transcription: "",
-        turnResponse: "",
-        turnAudioBase64: "",
         error: "",
         modelId: "",
         modelName: "",
-        audioLengthMs: 0,
-        audioSizeBytes: 0,
+        inputAudioDurationMs: 0,
+        inputAudioBytes: 0,
         wordCount: 0,
         realTimeFactor: 0,
         language: "",
@@ -4609,8 +3982,8 @@ function createBaseVoiceLifecycleEvent() {
         isStreaming: false,
         framework: 0,
         characterCount: 0,
-        audioDurationMs: 0,
-        audioSizeBytesTts: 0,
+        outputAudioDurationMs: 0,
+        outputAudioBytes: 0,
         processingDurationMs: 0,
     };
 }
@@ -4640,15 +4013,6 @@ exports.VoiceLifecycleEvent = {
         if (message.audioLevel !== 0) {
             writer.uint32(69).float(message.audioLevel);
         }
-        if (message.transcription !== "") {
-            writer.uint32(74).string(message.transcription);
-        }
-        if (message.turnResponse !== "") {
-            writer.uint32(82).string(message.turnResponse);
-        }
-        if (message.turnAudioBase64 !== "") {
-            writer.uint32(90).string(message.turnAudioBase64);
-        }
         if (message.error !== "") {
             writer.uint32(98).string(message.error);
         }
@@ -4658,11 +4022,11 @@ exports.VoiceLifecycleEvent = {
         if (message.modelName !== "") {
             writer.uint32(114).string(message.modelName);
         }
-        if (message.audioLengthMs !== 0) {
-            writer.uint32(120).int64(message.audioLengthMs);
+        if (message.inputAudioDurationMs !== 0) {
+            writer.uint32(120).int64(message.inputAudioDurationMs);
         }
-        if (message.audioSizeBytes !== 0) {
-            writer.uint32(128).int32(message.audioSizeBytes);
+        if (message.inputAudioBytes !== 0) {
+            writer.uint32(128).int64(message.inputAudioBytes);
         }
         if (message.wordCount !== 0) {
             writer.uint32(136).int32(message.wordCount);
@@ -4685,11 +4049,11 @@ exports.VoiceLifecycleEvent = {
         if (message.characterCount !== 0) {
             writer.uint32(184).int32(message.characterCount);
         }
-        if (message.audioDurationMs !== 0) {
-            writer.uint32(192).int64(message.audioDurationMs);
+        if (message.outputAudioDurationMs !== 0) {
+            writer.uint32(192).int64(message.outputAudioDurationMs);
         }
-        if (message.audioSizeBytesTts !== 0) {
-            writer.uint32(200).int32(message.audioSizeBytesTts);
+        if (message.outputAudioBytes !== 0) {
+            writer.uint32(200).int64(message.outputAudioBytes);
         }
         if (message.processingDurationMs !== 0) {
             writer.uint32(208).int64(message.processingDurationMs);
@@ -4759,27 +4123,6 @@ exports.VoiceLifecycleEvent = {
                     message.audioLevel = reader.float();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.transcription = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.turnResponse = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.turnAudioBase64 = reader.string();
-                    continue;
-                }
                 case 12: {
                     if (tag !== 98) {
                         break;
@@ -4805,14 +4148,14 @@ exports.VoiceLifecycleEvent = {
                     if (tag !== 120) {
                         break;
                     }
-                    message.audioLengthMs = longToNumber(reader.int64());
+                    message.inputAudioDurationMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 16: {
                     if (tag !== 128) {
                         break;
                     }
-                    message.audioSizeBytes = reader.int32();
+                    message.inputAudioBytes = longToNumber(reader.int64());
                     continue;
                 }
                 case 17: {
@@ -4868,14 +4211,14 @@ exports.VoiceLifecycleEvent = {
                     if (tag !== 192) {
                         break;
                     }
-                    message.audioDurationMs = longToNumber(reader.int64());
+                    message.outputAudioDurationMs = longToNumber(reader.int64());
                     continue;
                 }
                 case 25: {
                     if (tag !== 200) {
                         break;
                     }
-                    message.audioSizeBytesTts = reader.int32();
+                    message.outputAudioBytes = longToNumber(reader.int64());
                     continue;
                 }
                 case 26: {
@@ -4923,17 +4266,6 @@ exports.VoiceLifecycleEvent = {
                 : isSet(object.audio_level)
                     ? globalThis.Number(object.audio_level)
                     : 0,
-            transcription: isSet(object.transcription) ? globalThis.String(object.transcription) : "",
-            turnResponse: isSet(object.turnResponse)
-                ? globalThis.String(object.turnResponse)
-                : isSet(object.turn_response)
-                    ? globalThis.String(object.turn_response)
-                    : "",
-            turnAudioBase64: isSet(object.turnAudioBase64)
-                ? globalThis.String(object.turnAudioBase64)
-                : isSet(object.turn_audio_base64)
-                    ? globalThis.String(object.turn_audio_base64)
-                    : "",
             error: isSet(object.error) ? globalThis.String(object.error) : "",
             modelId: isSet(object.modelId)
                 ? globalThis.String(object.modelId)
@@ -4945,15 +4277,15 @@ exports.VoiceLifecycleEvent = {
                 : isSet(object.model_name)
                     ? globalThis.String(object.model_name)
                     : "",
-            audioLengthMs: isSet(object.audioLengthMs)
-                ? globalThis.Number(object.audioLengthMs)
-                : isSet(object.audio_length_ms)
-                    ? globalThis.Number(object.audio_length_ms)
+            inputAudioDurationMs: isSet(object.inputAudioDurationMs)
+                ? globalThis.Number(object.inputAudioDurationMs)
+                : isSet(object.input_audio_duration_ms)
+                    ? globalThis.Number(object.input_audio_duration_ms)
                     : 0,
-            audioSizeBytes: isSet(object.audioSizeBytes)
-                ? globalThis.Number(object.audioSizeBytes)
-                : isSet(object.audio_size_bytes)
-                    ? globalThis.Number(object.audio_size_bytes)
+            inputAudioBytes: isSet(object.inputAudioBytes)
+                ? globalThis.Number(object.inputAudioBytes)
+                : isSet(object.input_audio_bytes)
+                    ? globalThis.Number(object.input_audio_bytes)
                     : 0,
             wordCount: isSet(object.wordCount)
                 ? globalThis.Number(object.wordCount)
@@ -4976,21 +4308,21 @@ exports.VoiceLifecycleEvent = {
                 : isSet(object.is_streaming)
                     ? globalThis.Boolean(object.is_streaming)
                     : false,
-            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+            framework: isSet(object.framework) ? (0, model_types_1.inferenceFrameworkFromJSON)(object.framework) : 0,
             characterCount: isSet(object.characterCount)
                 ? globalThis.Number(object.characterCount)
                 : isSet(object.character_count)
                     ? globalThis.Number(object.character_count)
                     : 0,
-            audioDurationMs: isSet(object.audioDurationMs)
-                ? globalThis.Number(object.audioDurationMs)
-                : isSet(object.audio_duration_ms)
-                    ? globalThis.Number(object.audio_duration_ms)
+            outputAudioDurationMs: isSet(object.outputAudioDurationMs)
+                ? globalThis.Number(object.outputAudioDurationMs)
+                : isSet(object.output_audio_duration_ms)
+                    ? globalThis.Number(object.output_audio_duration_ms)
                     : 0,
-            audioSizeBytesTts: isSet(object.audioSizeBytesTts)
-                ? globalThis.Number(object.audioSizeBytesTts)
-                : isSet(object.audio_size_bytes_tts)
-                    ? globalThis.Number(object.audio_size_bytes_tts)
+            outputAudioBytes: isSet(object.outputAudioBytes)
+                ? globalThis.Number(object.outputAudioBytes)
+                : isSet(object.output_audio_bytes)
+                    ? globalThis.Number(object.output_audio_bytes)
                     : 0,
             processingDurationMs: isSet(object.processingDurationMs)
                 ? globalThis.Number(object.processingDurationMs)
@@ -5025,15 +4357,6 @@ exports.VoiceLifecycleEvent = {
         if (message.audioLevel !== 0) {
             obj.audioLevel = message.audioLevel;
         }
-        if (message.transcription !== "") {
-            obj.transcription = message.transcription;
-        }
-        if (message.turnResponse !== "") {
-            obj.turnResponse = message.turnResponse;
-        }
-        if (message.turnAudioBase64 !== "") {
-            obj.turnAudioBase64 = message.turnAudioBase64;
-        }
         if (message.error !== "") {
             obj.error = message.error;
         }
@@ -5043,11 +4366,11 @@ exports.VoiceLifecycleEvent = {
         if (message.modelName !== "") {
             obj.modelName = message.modelName;
         }
-        if (message.audioLengthMs !== 0) {
-            obj.audioLengthMs = Math.round(message.audioLengthMs);
+        if (message.inputAudioDurationMs !== 0) {
+            obj.inputAudioDurationMs = Math.round(message.inputAudioDurationMs);
         }
-        if (message.audioSizeBytes !== 0) {
-            obj.audioSizeBytes = Math.round(message.audioSizeBytes);
+        if (message.inputAudioBytes !== 0) {
+            obj.inputAudioBytes = Math.round(message.inputAudioBytes);
         }
         if (message.wordCount !== 0) {
             obj.wordCount = Math.round(message.wordCount);
@@ -5065,16 +4388,16 @@ exports.VoiceLifecycleEvent = {
             obj.isStreaming = message.isStreaming;
         }
         if (message.framework !== 0) {
-            obj.framework = Math.round(message.framework);
+            obj.framework = (0, model_types_1.inferenceFrameworkToJSON)(message.framework);
         }
         if (message.characterCount !== 0) {
             obj.characterCount = Math.round(message.characterCount);
         }
-        if (message.audioDurationMs !== 0) {
-            obj.audioDurationMs = Math.round(message.audioDurationMs);
+        if (message.outputAudioDurationMs !== 0) {
+            obj.outputAudioDurationMs = Math.round(message.outputAudioDurationMs);
         }
-        if (message.audioSizeBytesTts !== 0) {
-            obj.audioSizeBytesTts = Math.round(message.audioSizeBytesTts);
+        if (message.outputAudioBytes !== 0) {
+            obj.outputAudioBytes = Math.round(message.outputAudioBytes);
         }
         if (message.processingDurationMs !== 0) {
             obj.processingDurationMs = Math.round(message.processingDurationMs);
@@ -5094,14 +4417,11 @@ exports.VoiceLifecycleEvent = {
         message.audioBase64 = object.audioBase64 ?? "";
         message.durationMs = object.durationMs ?? 0;
         message.audioLevel = object.audioLevel ?? 0;
-        message.transcription = object.transcription ?? "";
-        message.turnResponse = object.turnResponse ?? "";
-        message.turnAudioBase64 = object.turnAudioBase64 ?? "";
         message.error = object.error ?? "";
         message.modelId = object.modelId ?? "";
         message.modelName = object.modelName ?? "";
-        message.audioLengthMs = object.audioLengthMs ?? 0;
-        message.audioSizeBytes = object.audioSizeBytes ?? 0;
+        message.inputAudioDurationMs = object.inputAudioDurationMs ?? 0;
+        message.inputAudioBytes = object.inputAudioBytes ?? 0;
         message.wordCount = object.wordCount ?? 0;
         message.realTimeFactor = object.realTimeFactor ?? 0;
         message.language = object.language ?? "";
@@ -5109,8 +4429,8 @@ exports.VoiceLifecycleEvent = {
         message.isStreaming = object.isStreaming ?? false;
         message.framework = object.framework ?? 0;
         message.characterCount = object.characterCount ?? 0;
-        message.audioDurationMs = object.audioDurationMs ?? 0;
-        message.audioSizeBytesTts = object.audioSizeBytesTts ?? 0;
+        message.outputAudioDurationMs = object.outputAudioDurationMs ?? 0;
+        message.outputAudioBytes = object.outputAudioBytes ?? 0;
         message.processingDurationMs = object.processingDurationMs ?? 0;
         return message;
     },
@@ -5352,6 +4672,20 @@ function createBaseModelEvent() {
         modelSizeBytes: 0,
         durationMs: 0,
         framework: 0,
+        assignmentId: "",
+        assignedComponent: 0,
+        sourcePath: "",
+        refreshResult: undefined,
+        listResult: undefined,
+        getResult: undefined,
+        importResult: undefined,
+        discoveryResult: undefined,
+        compatibilityResult: undefined,
+        currentModelResult: undefined,
+        planResult: undefined,
+        startResult: undefined,
+        downloadProgress: undefined,
+        cancelResult: undefined,
     };
 }
 exports.ModelEvent = {
@@ -5403,6 +4737,48 @@ exports.ModelEvent = {
         }
         if (message.framework !== 0) {
             writer.uint32(128).int32(message.framework);
+        }
+        if (message.assignmentId !== "") {
+            writer.uint32(138).string(message.assignmentId);
+        }
+        if (message.assignedComponent !== 0) {
+            writer.uint32(144).int32(message.assignedComponent);
+        }
+        if (message.sourcePath !== "") {
+            writer.uint32(154).string(message.sourcePath);
+        }
+        if (message.refreshResult !== undefined) {
+            model_types_1.ModelRegistryRefreshResult.encode(message.refreshResult, writer.uint32(162).fork()).join();
+        }
+        if (message.listResult !== undefined) {
+            model_types_1.ModelListResult.encode(message.listResult, writer.uint32(170).fork()).join();
+        }
+        if (message.getResult !== undefined) {
+            model_types_1.ModelGetResult.encode(message.getResult, writer.uint32(178).fork()).join();
+        }
+        if (message.importResult !== undefined) {
+            model_types_1.ModelImportResult.encode(message.importResult, writer.uint32(186).fork()).join();
+        }
+        if (message.discoveryResult !== undefined) {
+            model_types_1.ModelDiscoveryResult.encode(message.discoveryResult, writer.uint32(194).fork()).join();
+        }
+        if (message.compatibilityResult !== undefined) {
+            model_types_1.ModelCompatibilityResult.encode(message.compatibilityResult, writer.uint32(202).fork()).join();
+        }
+        if (message.currentModelResult !== undefined) {
+            model_types_1.CurrentModelResult.encode(message.currentModelResult, writer.uint32(210).fork()).join();
+        }
+        if (message.planResult !== undefined) {
+            download_service_1.DownloadPlanResult.encode(message.planResult, writer.uint32(218).fork()).join();
+        }
+        if (message.startResult !== undefined) {
+            download_service_1.DownloadStartResult.encode(message.startResult, writer.uint32(226).fork()).join();
+        }
+        if (message.downloadProgress !== undefined) {
+            download_service_1.DownloadProgress.encode(message.downloadProgress, writer.uint32(234).fork()).join();
+        }
+        if (message.cancelResult !== undefined) {
+            download_service_1.DownloadCancelResult.encode(message.cancelResult, writer.uint32(242).fork()).join();
         }
         return writer;
     },
@@ -5525,6 +4901,104 @@ exports.ModelEvent = {
                     message.framework = reader.int32();
                     continue;
                 }
+                case 17: {
+                    if (tag !== 138) {
+                        break;
+                    }
+                    message.assignmentId = reader.string();
+                    continue;
+                }
+                case 18: {
+                    if (tag !== 144) {
+                        break;
+                    }
+                    message.assignedComponent = reader.int32();
+                    continue;
+                }
+                case 19: {
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.sourcePath = reader.string();
+                    continue;
+                }
+                case 20: {
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.refreshResult = model_types_1.ModelRegistryRefreshResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 21: {
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.listResult = model_types_1.ModelListResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 22: {
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.getResult = model_types_1.ModelGetResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 23: {
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.importResult = model_types_1.ModelImportResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 24: {
+                    if (tag !== 194) {
+                        break;
+                    }
+                    message.discoveryResult = model_types_1.ModelDiscoveryResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 25: {
+                    if (tag !== 202) {
+                        break;
+                    }
+                    message.compatibilityResult = model_types_1.ModelCompatibilityResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 26: {
+                    if (tag !== 210) {
+                        break;
+                    }
+                    message.currentModelResult = model_types_1.CurrentModelResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 27: {
+                    if (tag !== 218) {
+                        break;
+                    }
+                    message.planResult = download_service_1.DownloadPlanResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 28: {
+                    if (tag !== 226) {
+                        break;
+                    }
+                    message.startResult = download_service_1.DownloadStartResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 29: {
+                    if (tag !== 234) {
+                        break;
+                    }
+                    message.downloadProgress = download_service_1.DownloadProgress.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 30: {
+                    if (tag !== 242) {
+                        break;
+                    }
+                    message.cancelResult = download_service_1.DownloadCancelResult.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -5598,7 +5072,77 @@ exports.ModelEvent = {
                 : isSet(object.duration_ms)
                     ? globalThis.Number(object.duration_ms)
                     : 0,
-            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+            framework: isSet(object.framework) ? (0, model_types_1.inferenceFrameworkFromJSON)(object.framework) : 0,
+            assignmentId: isSet(object.assignmentId)
+                ? globalThis.String(object.assignmentId)
+                : isSet(object.assignment_id)
+                    ? globalThis.String(object.assignment_id)
+                    : "",
+            assignedComponent: isSet(object.assignedComponent)
+                ? sDKComponentFromJSON(object.assignedComponent)
+                : isSet(object.assigned_component)
+                    ? sDKComponentFromJSON(object.assigned_component)
+                    : 0,
+            sourcePath: isSet(object.sourcePath)
+                ? globalThis.String(object.sourcePath)
+                : isSet(object.source_path)
+                    ? globalThis.String(object.source_path)
+                    : "",
+            refreshResult: isSet(object.refreshResult)
+                ? model_types_1.ModelRegistryRefreshResult.fromJSON(object.refreshResult)
+                : isSet(object.refresh_result)
+                    ? model_types_1.ModelRegistryRefreshResult.fromJSON(object.refresh_result)
+                    : undefined,
+            listResult: isSet(object.listResult)
+                ? model_types_1.ModelListResult.fromJSON(object.listResult)
+                : isSet(object.list_result)
+                    ? model_types_1.ModelListResult.fromJSON(object.list_result)
+                    : undefined,
+            getResult: isSet(object.getResult)
+                ? model_types_1.ModelGetResult.fromJSON(object.getResult)
+                : isSet(object.get_result)
+                    ? model_types_1.ModelGetResult.fromJSON(object.get_result)
+                    : undefined,
+            importResult: isSet(object.importResult)
+                ? model_types_1.ModelImportResult.fromJSON(object.importResult)
+                : isSet(object.import_result)
+                    ? model_types_1.ModelImportResult.fromJSON(object.import_result)
+                    : undefined,
+            discoveryResult: isSet(object.discoveryResult)
+                ? model_types_1.ModelDiscoveryResult.fromJSON(object.discoveryResult)
+                : isSet(object.discovery_result)
+                    ? model_types_1.ModelDiscoveryResult.fromJSON(object.discovery_result)
+                    : undefined,
+            compatibilityResult: isSet(object.compatibilityResult)
+                ? model_types_1.ModelCompatibilityResult.fromJSON(object.compatibilityResult)
+                : isSet(object.compatibility_result)
+                    ? model_types_1.ModelCompatibilityResult.fromJSON(object.compatibility_result)
+                    : undefined,
+            currentModelResult: isSet(object.currentModelResult)
+                ? model_types_1.CurrentModelResult.fromJSON(object.currentModelResult)
+                : isSet(object.current_model_result)
+                    ? model_types_1.CurrentModelResult.fromJSON(object.current_model_result)
+                    : undefined,
+            planResult: isSet(object.planResult)
+                ? download_service_1.DownloadPlanResult.fromJSON(object.planResult)
+                : isSet(object.plan_result)
+                    ? download_service_1.DownloadPlanResult.fromJSON(object.plan_result)
+                    : undefined,
+            startResult: isSet(object.startResult)
+                ? download_service_1.DownloadStartResult.fromJSON(object.startResult)
+                : isSet(object.start_result)
+                    ? download_service_1.DownloadStartResult.fromJSON(object.start_result)
+                    : undefined,
+            downloadProgress: isSet(object.downloadProgress)
+                ? download_service_1.DownloadProgress.fromJSON(object.downloadProgress)
+                : isSet(object.download_progress)
+                    ? download_service_1.DownloadProgress.fromJSON(object.download_progress)
+                    : undefined,
+            cancelResult: isSet(object.cancelResult)
+                ? download_service_1.DownloadCancelResult.fromJSON(object.cancelResult)
+                : isSet(object.cancel_result)
+                    ? download_service_1.DownloadCancelResult.fromJSON(object.cancel_result)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -5649,7 +5193,49 @@ exports.ModelEvent = {
             obj.durationMs = Math.round(message.durationMs);
         }
         if (message.framework !== 0) {
-            obj.framework = Math.round(message.framework);
+            obj.framework = (0, model_types_1.inferenceFrameworkToJSON)(message.framework);
+        }
+        if (message.assignmentId !== "") {
+            obj.assignmentId = message.assignmentId;
+        }
+        if (message.assignedComponent !== 0) {
+            obj.assignedComponent = sDKComponentToJSON(message.assignedComponent);
+        }
+        if (message.sourcePath !== "") {
+            obj.sourcePath = message.sourcePath;
+        }
+        if (message.refreshResult !== undefined) {
+            obj.refreshResult = model_types_1.ModelRegistryRefreshResult.toJSON(message.refreshResult);
+        }
+        if (message.listResult !== undefined) {
+            obj.listResult = model_types_1.ModelListResult.toJSON(message.listResult);
+        }
+        if (message.getResult !== undefined) {
+            obj.getResult = model_types_1.ModelGetResult.toJSON(message.getResult);
+        }
+        if (message.importResult !== undefined) {
+            obj.importResult = model_types_1.ModelImportResult.toJSON(message.importResult);
+        }
+        if (message.discoveryResult !== undefined) {
+            obj.discoveryResult = model_types_1.ModelDiscoveryResult.toJSON(message.discoveryResult);
+        }
+        if (message.compatibilityResult !== undefined) {
+            obj.compatibilityResult = model_types_1.ModelCompatibilityResult.toJSON(message.compatibilityResult);
+        }
+        if (message.currentModelResult !== undefined) {
+            obj.currentModelResult = model_types_1.CurrentModelResult.toJSON(message.currentModelResult);
+        }
+        if (message.planResult !== undefined) {
+            obj.planResult = download_service_1.DownloadPlanResult.toJSON(message.planResult);
+        }
+        if (message.startResult !== undefined) {
+            obj.startResult = download_service_1.DownloadStartResult.toJSON(message.startResult);
+        }
+        if (message.downloadProgress !== undefined) {
+            obj.downloadProgress = download_service_1.DownloadProgress.toJSON(message.downloadProgress);
+        }
+        if (message.cancelResult !== undefined) {
+            obj.cancelResult = download_service_1.DownloadCancelResult.toJSON(message.cancelResult);
         }
         return obj;
     },
@@ -5674,306 +5260,9 @@ exports.ModelEvent = {
         message.modelSizeBytes = object.modelSizeBytes ?? 0;
         message.durationMs = object.durationMs ?? 0;
         message.framework = object.framework ?? 0;
-        return message;
-    },
-};
-function createBaseModelRegistryEvent() {
-    return {
-        kind: 0,
-        modelId: "",
-        assignmentId: "",
-        assignedComponent: 0,
-        framework: 0,
-        sourcePath: "",
-        error: "",
-        refreshResult: undefined,
-        listResult: undefined,
-        getResult: undefined,
-        importResult: undefined,
-        discoveryResult: undefined,
-        compatibilityResult: undefined,
-        currentModelResult: undefined,
-    };
-}
-exports.ModelRegistryEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(18).string(message.modelId);
-        }
-        if (message.assignmentId !== "") {
-            writer.uint32(26).string(message.assignmentId);
-        }
-        if (message.assignedComponent !== 0) {
-            writer.uint32(32).int32(message.assignedComponent);
-        }
-        if (message.framework !== 0) {
-            writer.uint32(40).int32(message.framework);
-        }
-        if (message.sourcePath !== "") {
-            writer.uint32(50).string(message.sourcePath);
-        }
-        if (message.error !== "") {
-            writer.uint32(58).string(message.error);
-        }
-        if (message.refreshResult !== undefined) {
-            model_types_1.ModelRegistryRefreshResult.encode(message.refreshResult, writer.uint32(162).fork()).join();
-        }
-        if (message.listResult !== undefined) {
-            model_types_1.ModelListResult.encode(message.listResult, writer.uint32(170).fork()).join();
-        }
-        if (message.getResult !== undefined) {
-            model_types_1.ModelGetResult.encode(message.getResult, writer.uint32(178).fork()).join();
-        }
-        if (message.importResult !== undefined) {
-            model_types_1.ModelImportResult.encode(message.importResult, writer.uint32(186).fork()).join();
-        }
-        if (message.discoveryResult !== undefined) {
-            model_types_1.ModelDiscoveryResult.encode(message.discoveryResult, writer.uint32(194).fork()).join();
-        }
-        if (message.compatibilityResult !== undefined) {
-            model_types_1.ModelCompatibilityResult.encode(message.compatibilityResult, writer.uint32(202).fork()).join();
-        }
-        if (message.currentModelResult !== undefined) {
-            model_types_1.CurrentModelResult.encode(message.currentModelResult, writer.uint32(210).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseModelRegistryEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.assignmentId = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.assignedComponent = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.framework = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.sourcePath = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 20: {
-                    if (tag !== 162) {
-                        break;
-                    }
-                    message.refreshResult = model_types_1.ModelRegistryRefreshResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 21: {
-                    if (tag !== 170) {
-                        break;
-                    }
-                    message.listResult = model_types_1.ModelListResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 22: {
-                    if (tag !== 178) {
-                        break;
-                    }
-                    message.getResult = model_types_1.ModelGetResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 23: {
-                    if (tag !== 186) {
-                        break;
-                    }
-                    message.importResult = model_types_1.ModelImportResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 24: {
-                    if (tag !== 194) {
-                        break;
-                    }
-                    message.discoveryResult = model_types_1.ModelDiscoveryResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 25: {
-                    if (tag !== 202) {
-                        break;
-                    }
-                    message.compatibilityResult = model_types_1.ModelCompatibilityResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 26: {
-                    if (tag !== 210) {
-                        break;
-                    }
-                    message.currentModelResult = model_types_1.CurrentModelResult.decode(reader, reader.uint32());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? modelRegistryEventKindFromJSON(object.kind) : 0,
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            assignmentId: isSet(object.assignmentId)
-                ? globalThis.String(object.assignmentId)
-                : isSet(object.assignment_id)
-                    ? globalThis.String(object.assignment_id)
-                    : "",
-            assignedComponent: isSet(object.assignedComponent)
-                ? sDKComponentFromJSON(object.assignedComponent)
-                : isSet(object.assigned_component)
-                    ? sDKComponentFromJSON(object.assigned_component)
-                    : 0,
-            framework: isSet(object.framework) ? (0, model_types_1.inferenceFrameworkFromJSON)(object.framework) : 0,
-            sourcePath: isSet(object.sourcePath)
-                ? globalThis.String(object.sourcePath)
-                : isSet(object.source_path)
-                    ? globalThis.String(object.source_path)
-                    : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            refreshResult: isSet(object.refreshResult)
-                ? model_types_1.ModelRegistryRefreshResult.fromJSON(object.refreshResult)
-                : isSet(object.refresh_result)
-                    ? model_types_1.ModelRegistryRefreshResult.fromJSON(object.refresh_result)
-                    : undefined,
-            listResult: isSet(object.listResult)
-                ? model_types_1.ModelListResult.fromJSON(object.listResult)
-                : isSet(object.list_result)
-                    ? model_types_1.ModelListResult.fromJSON(object.list_result)
-                    : undefined,
-            getResult: isSet(object.getResult)
-                ? model_types_1.ModelGetResult.fromJSON(object.getResult)
-                : isSet(object.get_result)
-                    ? model_types_1.ModelGetResult.fromJSON(object.get_result)
-                    : undefined,
-            importResult: isSet(object.importResult)
-                ? model_types_1.ModelImportResult.fromJSON(object.importResult)
-                : isSet(object.import_result)
-                    ? model_types_1.ModelImportResult.fromJSON(object.import_result)
-                    : undefined,
-            discoveryResult: isSet(object.discoveryResult)
-                ? model_types_1.ModelDiscoveryResult.fromJSON(object.discoveryResult)
-                : isSet(object.discovery_result)
-                    ? model_types_1.ModelDiscoveryResult.fromJSON(object.discovery_result)
-                    : undefined,
-            compatibilityResult: isSet(object.compatibilityResult)
-                ? model_types_1.ModelCompatibilityResult.fromJSON(object.compatibilityResult)
-                : isSet(object.compatibility_result)
-                    ? model_types_1.ModelCompatibilityResult.fromJSON(object.compatibility_result)
-                    : undefined,
-            currentModelResult: isSet(object.currentModelResult)
-                ? model_types_1.CurrentModelResult.fromJSON(object.currentModelResult)
-                : isSet(object.current_model_result)
-                    ? model_types_1.CurrentModelResult.fromJSON(object.current_model_result)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = modelRegistryEventKindToJSON(message.kind);
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.assignmentId !== "") {
-            obj.assignmentId = message.assignmentId;
-        }
-        if (message.assignedComponent !== 0) {
-            obj.assignedComponent = sDKComponentToJSON(message.assignedComponent);
-        }
-        if (message.framework !== 0) {
-            obj.framework = (0, model_types_1.inferenceFrameworkToJSON)(message.framework);
-        }
-        if (message.sourcePath !== "") {
-            obj.sourcePath = message.sourcePath;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.refreshResult !== undefined) {
-            obj.refreshResult = model_types_1.ModelRegistryRefreshResult.toJSON(message.refreshResult);
-        }
-        if (message.listResult !== undefined) {
-            obj.listResult = model_types_1.ModelListResult.toJSON(message.listResult);
-        }
-        if (message.getResult !== undefined) {
-            obj.getResult = model_types_1.ModelGetResult.toJSON(message.getResult);
-        }
-        if (message.importResult !== undefined) {
-            obj.importResult = model_types_1.ModelImportResult.toJSON(message.importResult);
-        }
-        if (message.discoveryResult !== undefined) {
-            obj.discoveryResult = model_types_1.ModelDiscoveryResult.toJSON(message.discoveryResult);
-        }
-        if (message.compatibilityResult !== undefined) {
-            obj.compatibilityResult = model_types_1.ModelCompatibilityResult.toJSON(message.compatibilityResult);
-        }
-        if (message.currentModelResult !== undefined) {
-            obj.currentModelResult = model_types_1.CurrentModelResult.toJSON(message.currentModelResult);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ModelRegistryEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseModelRegistryEvent();
-        message.kind = object.kind ?? 0;
-        message.modelId = object.modelId ?? "";
         message.assignmentId = object.assignmentId ?? "";
         message.assignedComponent = object.assignedComponent ?? 0;
-        message.framework = object.framework ?? 0;
         message.sourcePath = object.sourcePath ?? "";
-        message.error = object.error ?? "";
         message.refreshResult = (object.refreshResult !== undefined && object.refreshResult !== null)
             ? model_types_1.ModelRegistryRefreshResult.fromPartial(object.refreshResult)
             : undefined;
@@ -5995,222 +5284,17 @@ exports.ModelRegistryEvent = {
         message.currentModelResult = (object.currentModelResult !== undefined && object.currentModelResult !== null)
             ? model_types_1.CurrentModelResult.fromPartial(object.currentModelResult)
             : undefined;
-        return message;
-    },
-};
-function createBaseDownloadEvent() {
-    return {
-        kind: 0,
-        modelId: "",
-        taskId: "",
-        error: "",
-        planResult: undefined,
-        startResult: undefined,
-        progress: undefined,
-        cancelResult: undefined,
-        resumeResult: undefined,
-    };
-}
-exports.DownloadEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(18).string(message.modelId);
-        }
-        if (message.taskId !== "") {
-            writer.uint32(26).string(message.taskId);
-        }
-        if (message.error !== "") {
-            writer.uint32(34).string(message.error);
-        }
-        if (message.planResult !== undefined) {
-            download_service_1.DownloadPlanResult.encode(message.planResult, writer.uint32(162).fork()).join();
-        }
-        if (message.startResult !== undefined) {
-            download_service_1.DownloadStartResult.encode(message.startResult, writer.uint32(170).fork()).join();
-        }
-        if (message.progress !== undefined) {
-            download_service_1.DownloadProgress.encode(message.progress, writer.uint32(178).fork()).join();
-        }
-        if (message.cancelResult !== undefined) {
-            download_service_1.DownloadCancelResult.encode(message.cancelResult, writer.uint32(186).fork()).join();
-        }
-        if (message.resumeResult !== undefined) {
-            download_service_1.DownloadResumeResult.encode(message.resumeResult, writer.uint32(194).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseDownloadEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.taskId = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 20: {
-                    if (tag !== 162) {
-                        break;
-                    }
-                    message.planResult = download_service_1.DownloadPlanResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 21: {
-                    if (tag !== 170) {
-                        break;
-                    }
-                    message.startResult = download_service_1.DownloadStartResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 22: {
-                    if (tag !== 178) {
-                        break;
-                    }
-                    message.progress = download_service_1.DownloadProgress.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 23: {
-                    if (tag !== 186) {
-                        break;
-                    }
-                    message.cancelResult = download_service_1.DownloadCancelResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 24: {
-                    if (tag !== 194) {
-                        break;
-                    }
-                    message.resumeResult = download_service_1.DownloadResumeResult.decode(reader, reader.uint32());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? downloadEventKindFromJSON(object.kind) : 0,
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            taskId: isSet(object.taskId)
-                ? globalThis.String(object.taskId)
-                : isSet(object.task_id)
-                    ? globalThis.String(object.task_id)
-                    : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            planResult: isSet(object.planResult)
-                ? download_service_1.DownloadPlanResult.fromJSON(object.planResult)
-                : isSet(object.plan_result)
-                    ? download_service_1.DownloadPlanResult.fromJSON(object.plan_result)
-                    : undefined,
-            startResult: isSet(object.startResult)
-                ? download_service_1.DownloadStartResult.fromJSON(object.startResult)
-                : isSet(object.start_result)
-                    ? download_service_1.DownloadStartResult.fromJSON(object.start_result)
-                    : undefined,
-            progress: isSet(object.progress) ? download_service_1.DownloadProgress.fromJSON(object.progress) : undefined,
-            cancelResult: isSet(object.cancelResult)
-                ? download_service_1.DownloadCancelResult.fromJSON(object.cancelResult)
-                : isSet(object.cancel_result)
-                    ? download_service_1.DownloadCancelResult.fromJSON(object.cancel_result)
-                    : undefined,
-            resumeResult: isSet(object.resumeResult)
-                ? download_service_1.DownloadResumeResult.fromJSON(object.resumeResult)
-                : isSet(object.resume_result)
-                    ? download_service_1.DownloadResumeResult.fromJSON(object.resume_result)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = downloadEventKindToJSON(message.kind);
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.taskId !== "") {
-            obj.taskId = message.taskId;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.planResult !== undefined) {
-            obj.planResult = download_service_1.DownloadPlanResult.toJSON(message.planResult);
-        }
-        if (message.startResult !== undefined) {
-            obj.startResult = download_service_1.DownloadStartResult.toJSON(message.startResult);
-        }
-        if (message.progress !== undefined) {
-            obj.progress = download_service_1.DownloadProgress.toJSON(message.progress);
-        }
-        if (message.cancelResult !== undefined) {
-            obj.cancelResult = download_service_1.DownloadCancelResult.toJSON(message.cancelResult);
-        }
-        if (message.resumeResult !== undefined) {
-            obj.resumeResult = download_service_1.DownloadResumeResult.toJSON(message.resumeResult);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.DownloadEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseDownloadEvent();
-        message.kind = object.kind ?? 0;
-        message.modelId = object.modelId ?? "";
-        message.taskId = object.taskId ?? "";
-        message.error = object.error ?? "";
         message.planResult = (object.planResult !== undefined && object.planResult !== null)
             ? download_service_1.DownloadPlanResult.fromPartial(object.planResult)
             : undefined;
         message.startResult = (object.startResult !== undefined && object.startResult !== null)
             ? download_service_1.DownloadStartResult.fromPartial(object.startResult)
             : undefined;
-        message.progress = (object.progress !== undefined && object.progress !== null)
-            ? download_service_1.DownloadProgress.fromPartial(object.progress)
+        message.downloadProgress = (object.downloadProgress !== undefined && object.downloadProgress !== null)
+            ? download_service_1.DownloadProgress.fromPartial(object.downloadProgress)
             : undefined;
         message.cancelResult = (object.cancelResult !== undefined && object.cancelResult !== null)
             ? download_service_1.DownloadCancelResult.fromPartial(object.cancelResult)
-            : undefined;
-        message.resumeResult = (object.resumeResult !== undefined && object.resumeResult !== null)
-            ? download_service_1.DownloadResumeResult.fromPartial(object.resumeResult)
             : undefined;
         return message;
     },
@@ -6227,6 +5311,11 @@ function createBaseStorageEvent() {
         cacheKey: "",
         evictedBytes: 0,
         freedBytes: 0,
+        bytes: 0,
+        infoResult: undefined,
+        availabilityResult: undefined,
+        deletePlan: undefined,
+        deleteResult: undefined,
     };
 }
 exports.StorageEvent = {
@@ -6260,6 +5349,21 @@ exports.StorageEvent = {
         }
         if (message.freedBytes !== 0) {
             writer.uint32(80).int64(message.freedBytes);
+        }
+        if (message.bytes !== 0) {
+            writer.uint32(88).int64(message.bytes);
+        }
+        if (message.infoResult !== undefined) {
+            storage_types_1.StorageInfoResult.encode(message.infoResult, writer.uint32(162).fork()).join();
+        }
+        if (message.availabilityResult !== undefined) {
+            storage_types_1.StorageAvailabilityResult.encode(message.availabilityResult, writer.uint32(170).fork()).join();
+        }
+        if (message.deletePlan !== undefined) {
+            storage_types_1.StorageDeletePlan.encode(message.deletePlan, writer.uint32(178).fork()).join();
+        }
+        if (message.deleteResult !== undefined) {
+            storage_types_1.StorageDeleteResult.encode(message.deleteResult, writer.uint32(186).fork()).join();
         }
         return writer;
     },
@@ -6340,6 +5444,41 @@ exports.StorageEvent = {
                     message.freedBytes = longToNumber(reader.int64());
                     continue;
                 }
+                case 11: {
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.bytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 20: {
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.infoResult = storage_types_1.StorageInfoResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 21: {
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.availabilityResult = storage_types_1.StorageAvailabilityResult.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 22: {
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.deletePlan = storage_types_1.StorageDeletePlan.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 23: {
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.deleteResult = storage_types_1.StorageDeleteResult.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -6392,6 +5531,27 @@ exports.StorageEvent = {
                 : isSet(object.freed_bytes)
                     ? globalThis.Number(object.freed_bytes)
                     : 0,
+            bytes: isSet(object.bytes) ? globalThis.Number(object.bytes) : 0,
+            infoResult: isSet(object.infoResult)
+                ? storage_types_1.StorageInfoResult.fromJSON(object.infoResult)
+                : isSet(object.info_result)
+                    ? storage_types_1.StorageInfoResult.fromJSON(object.info_result)
+                    : undefined,
+            availabilityResult: isSet(object.availabilityResult)
+                ? storage_types_1.StorageAvailabilityResult.fromJSON(object.availabilityResult)
+                : isSet(object.availability_result)
+                    ? storage_types_1.StorageAvailabilityResult.fromJSON(object.availability_result)
+                    : undefined,
+            deletePlan: isSet(object.deletePlan)
+                ? storage_types_1.StorageDeletePlan.fromJSON(object.deletePlan)
+                : isSet(object.delete_plan)
+                    ? storage_types_1.StorageDeletePlan.fromJSON(object.delete_plan)
+                    : undefined,
+            deleteResult: isSet(object.deleteResult)
+                ? storage_types_1.StorageDeleteResult.fromJSON(object.deleteResult)
+                : isSet(object.delete_result)
+                    ? storage_types_1.StorageDeleteResult.fromJSON(object.delete_result)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -6426,6 +5586,21 @@ exports.StorageEvent = {
         if (message.freedBytes !== 0) {
             obj.freedBytes = Math.round(message.freedBytes);
         }
+        if (message.bytes !== 0) {
+            obj.bytes = Math.round(message.bytes);
+        }
+        if (message.infoResult !== undefined) {
+            obj.infoResult = storage_types_1.StorageInfoResult.toJSON(message.infoResult);
+        }
+        if (message.availabilityResult !== undefined) {
+            obj.availabilityResult = storage_types_1.StorageAvailabilityResult.toJSON(message.availabilityResult);
+        }
+        if (message.deletePlan !== undefined) {
+            obj.deletePlan = storage_types_1.StorageDeletePlan.toJSON(message.deletePlan);
+        }
+        if (message.deleteResult !== undefined) {
+            obj.deleteResult = storage_types_1.StorageDeleteResult.toJSON(message.deleteResult);
+        }
         return obj;
     },
     create(base) {
@@ -6443,209 +5618,7 @@ exports.StorageEvent = {
         message.cacheKey = object.cacheKey ?? "";
         message.evictedBytes = object.evictedBytes ?? 0;
         message.freedBytes = object.freedBytes ?? 0;
-        return message;
-    },
-};
-function createBaseStorageLifecycleEvent() {
-    return {
-        kind: 0,
-        modelId: "",
-        cacheKey: "",
-        bytes: 0,
-        error: "",
-        infoResult: undefined,
-        availabilityResult: undefined,
-        deletePlan: undefined,
-        deleteResult: undefined,
-    };
-}
-exports.StorageLifecycleEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(18).string(message.modelId);
-        }
-        if (message.cacheKey !== "") {
-            writer.uint32(26).string(message.cacheKey);
-        }
-        if (message.bytes !== 0) {
-            writer.uint32(32).int64(message.bytes);
-        }
-        if (message.error !== "") {
-            writer.uint32(42).string(message.error);
-        }
-        if (message.infoResult !== undefined) {
-            storage_types_1.StorageInfoResult.encode(message.infoResult, writer.uint32(162).fork()).join();
-        }
-        if (message.availabilityResult !== undefined) {
-            storage_types_1.StorageAvailabilityResult.encode(message.availabilityResult, writer.uint32(170).fork()).join();
-        }
-        if (message.deletePlan !== undefined) {
-            storage_types_1.StorageDeletePlan.encode(message.deletePlan, writer.uint32(178).fork()).join();
-        }
-        if (message.deleteResult !== undefined) {
-            storage_types_1.StorageDeleteResult.encode(message.deleteResult, writer.uint32(186).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseStorageLifecycleEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.cacheKey = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.bytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 20: {
-                    if (tag !== 162) {
-                        break;
-                    }
-                    message.infoResult = storage_types_1.StorageInfoResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 21: {
-                    if (tag !== 170) {
-                        break;
-                    }
-                    message.availabilityResult = storage_types_1.StorageAvailabilityResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 22: {
-                    if (tag !== 178) {
-                        break;
-                    }
-                    message.deletePlan = storage_types_1.StorageDeletePlan.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 23: {
-                    if (tag !== 186) {
-                        break;
-                    }
-                    message.deleteResult = storage_types_1.StorageDeleteResult.decode(reader, reader.uint32());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? storageLifecycleEventKindFromJSON(object.kind) : 0,
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            cacheKey: isSet(object.cacheKey)
-                ? globalThis.String(object.cacheKey)
-                : isSet(object.cache_key)
-                    ? globalThis.String(object.cache_key)
-                    : "",
-            bytes: isSet(object.bytes) ? globalThis.Number(object.bytes) : 0,
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            infoResult: isSet(object.infoResult)
-                ? storage_types_1.StorageInfoResult.fromJSON(object.infoResult)
-                : isSet(object.info_result)
-                    ? storage_types_1.StorageInfoResult.fromJSON(object.info_result)
-                    : undefined,
-            availabilityResult: isSet(object.availabilityResult)
-                ? storage_types_1.StorageAvailabilityResult.fromJSON(object.availabilityResult)
-                : isSet(object.availability_result)
-                    ? storage_types_1.StorageAvailabilityResult.fromJSON(object.availability_result)
-                    : undefined,
-            deletePlan: isSet(object.deletePlan)
-                ? storage_types_1.StorageDeletePlan.fromJSON(object.deletePlan)
-                : isSet(object.delete_plan)
-                    ? storage_types_1.StorageDeletePlan.fromJSON(object.delete_plan)
-                    : undefined,
-            deleteResult: isSet(object.deleteResult)
-                ? storage_types_1.StorageDeleteResult.fromJSON(object.deleteResult)
-                : isSet(object.delete_result)
-                    ? storage_types_1.StorageDeleteResult.fromJSON(object.delete_result)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = storageLifecycleEventKindToJSON(message.kind);
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.cacheKey !== "") {
-            obj.cacheKey = message.cacheKey;
-        }
-        if (message.bytes !== 0) {
-            obj.bytes = Math.round(message.bytes);
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.infoResult !== undefined) {
-            obj.infoResult = storage_types_1.StorageInfoResult.toJSON(message.infoResult);
-        }
-        if (message.availabilityResult !== undefined) {
-            obj.availabilityResult = storage_types_1.StorageAvailabilityResult.toJSON(message.availabilityResult);
-        }
-        if (message.deletePlan !== undefined) {
-            obj.deletePlan = storage_types_1.StorageDeletePlan.toJSON(message.deletePlan);
-        }
-        if (message.deleteResult !== undefined) {
-            obj.deleteResult = storage_types_1.StorageDeleteResult.toJSON(message.deleteResult);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.StorageLifecycleEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseStorageLifecycleEvent();
-        message.kind = object.kind ?? 0;
-        message.modelId = object.modelId ?? "";
-        message.cacheKey = object.cacheKey ?? "";
         message.bytes = object.bytes ?? 0;
-        message.error = object.error ?? "";
         message.infoResult = (object.infoResult !== undefined && object.infoResult !== null)
             ? storage_types_1.StorageInfoResult.fromPartial(object.infoResult)
             : undefined;
@@ -7335,7 +6308,7 @@ exports.FrameworkEvent = {
     fromJSON(object) {
         return {
             kind: isSet(object.kind) ? frameworkEventKindFromJSON(object.kind) : 0,
-            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+            framework: isSet(object.framework) ? (0, model_types_1.inferenceFrameworkFromJSON)(object.framework) : 0,
             adapterName: isSet(object.adapterName)
                 ? globalThis.String(object.adapterName)
                 : isSet(object.adapter_name)
@@ -7366,7 +6339,7 @@ exports.FrameworkEvent = {
             obj.kind = frameworkEventKindToJSON(message.kind);
         }
         if (message.framework !== 0) {
-            obj.framework = Math.round(message.framework);
+            obj.framework = (0, model_types_1.inferenceFrameworkToJSON)(message.framework);
         }
         if (message.adapterName !== "") {
             obj.adapterName = message.adapterName;
@@ -7405,16 +6378,7 @@ exports.FrameworkEvent = {
     },
 };
 function createBaseHardwareRoutingEvent() {
-    return {
-        kind: 0,
-        component: 0,
-        framework: 0,
-        capability: "",
-        route: "",
-        reason: "",
-        error: "",
-        hardwareProfile: undefined,
-    };
+    return { kind: 0, component: 0, framework: 0, capability: "", route: "", reason: "", error: "" };
 }
 exports.HardwareRoutingEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -7438,9 +6402,6 @@ exports.HardwareRoutingEvent = {
         }
         if (message.error !== "") {
             writer.uint32(58).string(message.error);
-        }
-        if (message.hardwareProfile !== undefined) {
-            hardware_profile_1.HardwareProfileResult.encode(message.hardwareProfile, writer.uint32(162).fork()).join();
         }
         return writer;
     },
@@ -7500,13 +6461,6 @@ exports.HardwareRoutingEvent = {
                     message.error = reader.string();
                     continue;
                 }
-                case 20: {
-                    if (tag !== 162) {
-                        break;
-                    }
-                    message.hardwareProfile = hardware_profile_1.HardwareProfileResult.decode(reader, reader.uint32());
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -7524,11 +6478,6 @@ exports.HardwareRoutingEvent = {
             route: isSet(object.route) ? globalThis.String(object.route) : "",
             reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
             error: isSet(object.error) ? globalThis.String(object.error) : "",
-            hardwareProfile: isSet(object.hardwareProfile)
-                ? hardware_profile_1.HardwareProfileResult.fromJSON(object.hardwareProfile)
-                : isSet(object.hardware_profile)
-                    ? hardware_profile_1.HardwareProfileResult.fromJSON(object.hardware_profile)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -7554,9 +6503,6 @@ exports.HardwareRoutingEvent = {
         if (message.error !== "") {
             obj.error = message.error;
         }
-        if (message.hardwareProfile !== undefined) {
-            obj.hardwareProfile = hardware_profile_1.HardwareProfileResult.toJSON(message.hardwareProfile);
-        }
         return obj;
     },
     create(base) {
@@ -7571,149 +6517,6 @@ exports.HardwareRoutingEvent = {
         message.route = object.route ?? "";
         message.reason = object.reason ?? "";
         message.error = object.error ?? "";
-        message.hardwareProfile = (object.hardwareProfile !== undefined && object.hardwareProfile !== null)
-            ? hardware_profile_1.HardwareProfileResult.fromPartial(object.hardwareProfile)
-            : undefined;
-        return message;
-    },
-};
-function createBasePerformanceEvent() {
-    return { kind: 0, memoryBytes: 0, thermalState: "", operation: "", milliseconds: 0, tokensPerSecond: 0 };
-}
-exports.PerformanceEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.memoryBytes !== 0) {
-            writer.uint32(16).int64(message.memoryBytes);
-        }
-        if (message.thermalState !== "") {
-            writer.uint32(26).string(message.thermalState);
-        }
-        if (message.operation !== "") {
-            writer.uint32(34).string(message.operation);
-        }
-        if (message.milliseconds !== 0) {
-            writer.uint32(40).int64(message.milliseconds);
-        }
-        if (message.tokensPerSecond !== 0) {
-            writer.uint32(49).double(message.tokensPerSecond);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBasePerformanceEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.memoryBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.thermalState = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.operation = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.milliseconds = longToNumber(reader.int64());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 49) {
-                        break;
-                    }
-                    message.tokensPerSecond = reader.double();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? performanceEventKindFromJSON(object.kind) : 0,
-            memoryBytes: isSet(object.memoryBytes)
-                ? globalThis.Number(object.memoryBytes)
-                : isSet(object.memory_bytes)
-                    ? globalThis.Number(object.memory_bytes)
-                    : 0,
-            thermalState: isSet(object.thermalState)
-                ? globalThis.String(object.thermalState)
-                : isSet(object.thermal_state)
-                    ? globalThis.String(object.thermal_state)
-                    : "",
-            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
-            milliseconds: isSet(object.milliseconds) ? globalThis.Number(object.milliseconds) : 0,
-            tokensPerSecond: isSet(object.tokensPerSecond)
-                ? globalThis.Number(object.tokensPerSecond)
-                : isSet(object.tokens_per_second)
-                    ? globalThis.Number(object.tokens_per_second)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = performanceEventKindToJSON(message.kind);
-        }
-        if (message.memoryBytes !== 0) {
-            obj.memoryBytes = Math.round(message.memoryBytes);
-        }
-        if (message.thermalState !== "") {
-            obj.thermalState = message.thermalState;
-        }
-        if (message.operation !== "") {
-            obj.operation = message.operation;
-        }
-        if (message.milliseconds !== 0) {
-            obj.milliseconds = Math.round(message.milliseconds);
-        }
-        if (message.tokensPerSecond !== 0) {
-            obj.tokensPerSecond = message.tokensPerSecond;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.PerformanceEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBasePerformanceEvent();
-        message.kind = object.kind ?? 0;
-        message.memoryBytes = object.memoryBytes ?? 0;
-        message.thermalState = object.thermalState ?? "";
-        message.operation = object.operation ?? "";
-        message.milliseconds = object.milliseconds ?? 0;
-        message.tokensPerSecond = object.tokensPerSecond ?? 0;
         return message;
     },
 };
@@ -8038,106 +6841,6 @@ exports.CancellationEvent = {
         return message;
     },
 };
-function createBaseFailureEvent() {
-    return { component: 0, operation: "", error: undefined, recoverable: false };
-}
-exports.FailureEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.component !== 0) {
-            writer.uint32(8).int32(message.component);
-        }
-        if (message.operation !== "") {
-            writer.uint32(18).string(message.operation);
-        }
-        if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(26).fork()).join();
-        }
-        if (message.recoverable !== false) {
-            writer.uint32(32).bool(message.recoverable);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseFailureEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.component = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.operation = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.recoverable = reader.bool();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
-            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
-            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
-            recoverable: isSet(object.recoverable) ? globalThis.Boolean(object.recoverable) : false,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.component !== 0) {
-            obj.component = sDKComponentToJSON(message.component);
-        }
-        if (message.operation !== "") {
-            obj.operation = message.operation;
-        }
-        if (message.error !== undefined) {
-            obj.error = errors_1.SDKError.toJSON(message.error);
-        }
-        if (message.recoverable !== false) {
-            obj.recoverable = message.recoverable;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.FailureEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseFailureEvent();
-        message.component = object.component ?? 0;
-        message.operation = object.operation ?? "";
-        message.error = (object.error !== undefined && object.error !== null)
-            ? errors_1.SDKError.fromPartial(object.error)
-            : undefined;
-        message.recoverable = object.recoverable ?? false;
-        return message;
-    },
-};
 function createBaseSDKEvent() {
     return {
         timestampMs: 0,
@@ -8150,32 +6853,25 @@ function createBaseSDKEvent() {
         destination: 0,
         properties: {},
         operationId: "",
-        correlationId: "",
         source: "",
-        traceId: "",
+        seq: 0,
         initialization: undefined,
         configuration: undefined,
         generation: undefined,
         model: undefined,
-        performance: undefined,
         network: undefined,
         storage: undefined,
         framework: undefined,
         device: undefined,
-        componentInit: undefined,
         voice: undefined,
         voicePipeline: undefined,
         componentLifecycle: undefined,
         session: undefined,
         auth: undefined,
-        modelRegistry: undefined,
-        download: undefined,
-        storageLifecycle: undefined,
         hardwareRouting: undefined,
         capability: undefined,
         telemetry: undefined,
         cancellation: undefined,
-        failure: undefined,
     };
 }
 exports.SDKEvent = {
@@ -8210,14 +6906,11 @@ exports.SDKEvent = {
         if (message.operationId !== "") {
             writer.uint32(266).string(message.operationId);
         }
-        if (message.correlationId !== "") {
-            writer.uint32(274).string(message.correlationId);
-        }
         if (message.source !== "") {
             writer.uint32(282).string(message.source);
         }
-        if (message.traceId !== "") {
-            writer.uint32(290).string(message.traceId);
+        if (message.seq !== 0) {
+            writer.uint32(296).uint64(message.seq);
         }
         if (message.initialization !== undefined) {
             exports.InitializationEvent.encode(message.initialization, writer.uint32(26).fork()).join();
@@ -8231,9 +6924,6 @@ exports.SDKEvent = {
         if (message.model !== undefined) {
             exports.ModelEvent.encode(message.model, writer.uint32(50).fork()).join();
         }
-        if (message.performance !== undefined) {
-            exports.PerformanceEvent.encode(message.performance, writer.uint32(58).fork()).join();
-        }
         if (message.network !== undefined) {
             exports.NetworkEvent.encode(message.network, writer.uint32(66).fork()).join();
         }
@@ -8245,9 +6935,6 @@ exports.SDKEvent = {
         }
         if (message.device !== undefined) {
             exports.DeviceEvent.encode(message.device, writer.uint32(90).fork()).join();
-        }
-        if (message.componentInit !== undefined) {
-            exports.ComponentInitializationEvent.encode(message.componentInit, writer.uint32(98).fork()).join();
         }
         if (message.voice !== undefined) {
             exports.VoiceLifecycleEvent.encode(message.voice, writer.uint32(138).fork()).join();
@@ -8264,15 +6951,6 @@ exports.SDKEvent = {
         if (message.auth !== undefined) {
             exports.AuthEvent.encode(message.auth, writer.uint32(194).fork()).join();
         }
-        if (message.modelRegistry !== undefined) {
-            exports.ModelRegistryEvent.encode(message.modelRegistry, writer.uint32(202).fork()).join();
-        }
-        if (message.download !== undefined) {
-            exports.DownloadEvent.encode(message.download, writer.uint32(210).fork()).join();
-        }
-        if (message.storageLifecycle !== undefined) {
-            exports.StorageLifecycleEvent.encode(message.storageLifecycle, writer.uint32(218).fork()).join();
-        }
         if (message.hardwareRouting !== undefined) {
             exports.HardwareRoutingEvent.encode(message.hardwareRouting, writer.uint32(226).fork()).join();
         }
@@ -8284,9 +6962,6 @@ exports.SDKEvent = {
         }
         if (message.cancellation !== undefined) {
             exports.CancellationEvent.encode(message.cancellation, writer.uint32(250).fork()).join();
-        }
-        if (message.failure !== undefined) {
-            exports.FailureEvent.encode(message.failure, writer.uint32(258).fork()).join();
         }
         return writer;
     },
@@ -8370,13 +7045,6 @@ exports.SDKEvent = {
                     message.operationId = reader.string();
                     continue;
                 }
-                case 34: {
-                    if (tag !== 274) {
-                        break;
-                    }
-                    message.correlationId = reader.string();
-                    continue;
-                }
                 case 35: {
                     if (tag !== 282) {
                         break;
@@ -8384,11 +7052,11 @@ exports.SDKEvent = {
                     message.source = reader.string();
                     continue;
                 }
-                case 36: {
-                    if (tag !== 290) {
+                case 37: {
+                    if (tag !== 296) {
                         break;
                     }
-                    message.traceId = reader.string();
+                    message.seq = longToNumber(reader.uint64());
                     continue;
                 }
                 case 3: {
@@ -8419,13 +7087,6 @@ exports.SDKEvent = {
                     message.model = exports.ModelEvent.decode(reader, reader.uint32());
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.performance = exports.PerformanceEvent.decode(reader, reader.uint32());
-                    continue;
-                }
                 case 8: {
                     if (tag !== 66) {
                         break;
@@ -8452,13 +7113,6 @@ exports.SDKEvent = {
                         break;
                     }
                     message.device = exports.DeviceEvent.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.componentInit = exports.ComponentInitializationEvent.decode(reader, reader.uint32());
                     continue;
                 }
                 case 17: {
@@ -8496,27 +7150,6 @@ exports.SDKEvent = {
                     message.auth = exports.AuthEvent.decode(reader, reader.uint32());
                     continue;
                 }
-                case 25: {
-                    if (tag !== 202) {
-                        break;
-                    }
-                    message.modelRegistry = exports.ModelRegistryEvent.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 26: {
-                    if (tag !== 210) {
-                        break;
-                    }
-                    message.download = exports.DownloadEvent.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 27: {
-                    if (tag !== 218) {
-                        break;
-                    }
-                    message.storageLifecycle = exports.StorageLifecycleEvent.decode(reader, reader.uint32());
-                    continue;
-                }
                 case 28: {
                     if (tag !== 226) {
                         break;
@@ -8543,13 +7176,6 @@ exports.SDKEvent = {
                         break;
                     }
                     message.cancellation = exports.CancellationEvent.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 32: {
-                    if (tag !== 258) {
-                        break;
-                    }
-                    message.failure = exports.FailureEvent.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -8589,31 +7215,16 @@ exports.SDKEvent = {
                 : isSet(object.operation_id)
                     ? globalThis.String(object.operation_id)
                     : "",
-            correlationId: isSet(object.correlationId)
-                ? globalThis.String(object.correlationId)
-                : isSet(object.correlation_id)
-                    ? globalThis.String(object.correlation_id)
-                    : "",
             source: isSet(object.source) ? globalThis.String(object.source) : "",
-            traceId: isSet(object.traceId)
-                ? globalThis.String(object.traceId)
-                : isSet(object.trace_id)
-                    ? globalThis.String(object.trace_id)
-                    : "",
+            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
             initialization: isSet(object.initialization) ? exports.InitializationEvent.fromJSON(object.initialization) : undefined,
             configuration: isSet(object.configuration) ? exports.ConfigurationEvent.fromJSON(object.configuration) : undefined,
             generation: isSet(object.generation) ? exports.GenerationEvent.fromJSON(object.generation) : undefined,
             model: isSet(object.model) ? exports.ModelEvent.fromJSON(object.model) : undefined,
-            performance: isSet(object.performance) ? exports.PerformanceEvent.fromJSON(object.performance) : undefined,
             network: isSet(object.network) ? exports.NetworkEvent.fromJSON(object.network) : undefined,
             storage: isSet(object.storage) ? exports.StorageEvent.fromJSON(object.storage) : undefined,
             framework: isSet(object.framework) ? exports.FrameworkEvent.fromJSON(object.framework) : undefined,
             device: isSet(object.device) ? exports.DeviceEvent.fromJSON(object.device) : undefined,
-            componentInit: isSet(object.componentInit)
-                ? exports.ComponentInitializationEvent.fromJSON(object.componentInit)
-                : isSet(object.component_init)
-                    ? exports.ComponentInitializationEvent.fromJSON(object.component_init)
-                    : undefined,
             voice: isSet(object.voice) ? exports.VoiceLifecycleEvent.fromJSON(object.voice) : undefined,
             voicePipeline: isSet(object.voicePipeline)
                 ? voice_events_1.VoiceEvent.fromJSON(object.voicePipeline)
@@ -8627,17 +7238,6 @@ exports.SDKEvent = {
                     : undefined,
             session: isSet(object.session) ? exports.SessionEvent.fromJSON(object.session) : undefined,
             auth: isSet(object.auth) ? exports.AuthEvent.fromJSON(object.auth) : undefined,
-            modelRegistry: isSet(object.modelRegistry)
-                ? exports.ModelRegistryEvent.fromJSON(object.modelRegistry)
-                : isSet(object.model_registry)
-                    ? exports.ModelRegistryEvent.fromJSON(object.model_registry)
-                    : undefined,
-            download: isSet(object.download) ? exports.DownloadEvent.fromJSON(object.download) : undefined,
-            storageLifecycle: isSet(object.storageLifecycle)
-                ? exports.StorageLifecycleEvent.fromJSON(object.storageLifecycle)
-                : isSet(object.storage_lifecycle)
-                    ? exports.StorageLifecycleEvent.fromJSON(object.storage_lifecycle)
-                    : undefined,
             hardwareRouting: isSet(object.hardwareRouting)
                 ? exports.HardwareRoutingEvent.fromJSON(object.hardwareRouting)
                 : isSet(object.hardware_routing)
@@ -8646,7 +7246,6 @@ exports.SDKEvent = {
             capability: isSet(object.capability) ? exports.CapabilityOperationEvent.fromJSON(object.capability) : undefined,
             telemetry: isSet(object.telemetry) ? exports.TelemetryEvent.fromJSON(object.telemetry) : undefined,
             cancellation: isSet(object.cancellation) ? exports.CancellationEvent.fromJSON(object.cancellation) : undefined,
-            failure: isSet(object.failure) ? exports.FailureEvent.fromJSON(object.failure) : undefined,
         };
     },
     toJSON(message) {
@@ -8687,14 +7286,11 @@ exports.SDKEvent = {
         if (message.operationId !== "") {
             obj.operationId = message.operationId;
         }
-        if (message.correlationId !== "") {
-            obj.correlationId = message.correlationId;
-        }
         if (message.source !== "") {
             obj.source = message.source;
         }
-        if (message.traceId !== "") {
-            obj.traceId = message.traceId;
+        if (message.seq !== 0) {
+            obj.seq = Math.round(message.seq);
         }
         if (message.initialization !== undefined) {
             obj.initialization = exports.InitializationEvent.toJSON(message.initialization);
@@ -8708,9 +7304,6 @@ exports.SDKEvent = {
         if (message.model !== undefined) {
             obj.model = exports.ModelEvent.toJSON(message.model);
         }
-        if (message.performance !== undefined) {
-            obj.performance = exports.PerformanceEvent.toJSON(message.performance);
-        }
         if (message.network !== undefined) {
             obj.network = exports.NetworkEvent.toJSON(message.network);
         }
@@ -8722,9 +7315,6 @@ exports.SDKEvent = {
         }
         if (message.device !== undefined) {
             obj.device = exports.DeviceEvent.toJSON(message.device);
-        }
-        if (message.componentInit !== undefined) {
-            obj.componentInit = exports.ComponentInitializationEvent.toJSON(message.componentInit);
         }
         if (message.voice !== undefined) {
             obj.voice = exports.VoiceLifecycleEvent.toJSON(message.voice);
@@ -8741,15 +7331,6 @@ exports.SDKEvent = {
         if (message.auth !== undefined) {
             obj.auth = exports.AuthEvent.toJSON(message.auth);
         }
-        if (message.modelRegistry !== undefined) {
-            obj.modelRegistry = exports.ModelRegistryEvent.toJSON(message.modelRegistry);
-        }
-        if (message.download !== undefined) {
-            obj.download = exports.DownloadEvent.toJSON(message.download);
-        }
-        if (message.storageLifecycle !== undefined) {
-            obj.storageLifecycle = exports.StorageLifecycleEvent.toJSON(message.storageLifecycle);
-        }
         if (message.hardwareRouting !== undefined) {
             obj.hardwareRouting = exports.HardwareRoutingEvent.toJSON(message.hardwareRouting);
         }
@@ -8761,9 +7342,6 @@ exports.SDKEvent = {
         }
         if (message.cancellation !== undefined) {
             obj.cancellation = exports.CancellationEvent.toJSON(message.cancellation);
-        }
-        if (message.failure !== undefined) {
-            obj.failure = exports.FailureEvent.toJSON(message.failure);
         }
         return obj;
     },
@@ -8789,9 +7367,8 @@ exports.SDKEvent = {
             return acc;
         }, {});
         message.operationId = object.operationId ?? "";
-        message.correlationId = object.correlationId ?? "";
         message.source = object.source ?? "";
-        message.traceId = object.traceId ?? "";
+        message.seq = object.seq ?? 0;
         message.initialization = (object.initialization !== undefined && object.initialization !== null)
             ? exports.InitializationEvent.fromPartial(object.initialization)
             : undefined;
@@ -8804,9 +7381,6 @@ exports.SDKEvent = {
         message.model = (object.model !== undefined && object.model !== null)
             ? exports.ModelEvent.fromPartial(object.model)
             : undefined;
-        message.performance = (object.performance !== undefined && object.performance !== null)
-            ? exports.PerformanceEvent.fromPartial(object.performance)
-            : undefined;
         message.network = (object.network !== undefined && object.network !== null)
             ? exports.NetworkEvent.fromPartial(object.network)
             : undefined;
@@ -8818,9 +7392,6 @@ exports.SDKEvent = {
             : undefined;
         message.device = (object.device !== undefined && object.device !== null)
             ? exports.DeviceEvent.fromPartial(object.device)
-            : undefined;
-        message.componentInit = (object.componentInit !== undefined && object.componentInit !== null)
-            ? exports.ComponentInitializationEvent.fromPartial(object.componentInit)
             : undefined;
         message.voice = (object.voice !== undefined && object.voice !== null)
             ? exports.VoiceLifecycleEvent.fromPartial(object.voice)
@@ -8835,15 +7406,6 @@ exports.SDKEvent = {
             ? exports.SessionEvent.fromPartial(object.session)
             : undefined;
         message.auth = (object.auth !== undefined && object.auth !== null) ? exports.AuthEvent.fromPartial(object.auth) : undefined;
-        message.modelRegistry = (object.modelRegistry !== undefined && object.modelRegistry !== null)
-            ? exports.ModelRegistryEvent.fromPartial(object.modelRegistry)
-            : undefined;
-        message.download = (object.download !== undefined && object.download !== null)
-            ? exports.DownloadEvent.fromPartial(object.download)
-            : undefined;
-        message.storageLifecycle = (object.storageLifecycle !== undefined && object.storageLifecycle !== null)
-            ? exports.StorageLifecycleEvent.fromPartial(object.storageLifecycle)
-            : undefined;
         message.hardwareRouting = (object.hardwareRouting !== undefined && object.hardwareRouting !== null)
             ? exports.HardwareRoutingEvent.fromPartial(object.hardwareRouting)
             : undefined;
@@ -8855,9 +7417,6 @@ exports.SDKEvent = {
             : undefined;
         message.cancellation = (object.cancellation !== undefined && object.cancellation !== null)
             ? exports.CancellationEvent.fromPartial(object.cancellation)
-            : undefined;
-        message.failure = (object.failure !== undefined && object.failure !== null)
-            ? exports.FailureEvent.fromPartial(object.failure)
             : undefined;
         return message;
     },

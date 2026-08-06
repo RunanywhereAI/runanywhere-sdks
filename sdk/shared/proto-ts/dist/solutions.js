@@ -16,14 +16,21 @@ exports.vectorStoreToJSON = vectorStoreToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 const llm_options_1 = require("./llm_options");
 exports.protobufPackage = "runanywhere.v1";
-/** Lets frontends switch on one enum instead of inspecting the oneof. */
+/**
+ * Frontends switch on the SolutionConfig oneof case. This enum exists only
+ * for logs and handles, and its numbers now match the oneof tags.
+ */
 var SolutionType;
 (function (SolutionType) {
     SolutionType[SolutionType["SOLUTION_TYPE_UNSPECIFIED"] = 0] = "SOLUTION_TYPE_UNSPECIFIED";
+    /** SOLUTION_TYPE_VOICE_AGENT - SolutionConfig.voice_agent = 1 */
     SolutionType[SolutionType["SOLUTION_TYPE_VOICE_AGENT"] = 1] = "SOLUTION_TYPE_VOICE_AGENT";
+    /** SOLUTION_TYPE_RAG - SolutionConfig.rag         = 2 */
     SolutionType[SolutionType["SOLUTION_TYPE_RAG"] = 2] = "SOLUTION_TYPE_RAG";
-    SolutionType[SolutionType["SOLUTION_TYPE_TIME_SERIES"] = 4] = "SOLUTION_TYPE_TIME_SERIES";
-    SolutionType[SolutionType["SOLUTION_TYPE_AGENT_LOOP"] = 5] = "SOLUTION_TYPE_AGENT_LOOP";
+    /** SOLUTION_TYPE_AGENT_LOOP - SolutionConfig.agent_loop  = 4 */
+    SolutionType[SolutionType["SOLUTION_TYPE_AGENT_LOOP"] = 4] = "SOLUTION_TYPE_AGENT_LOOP";
+    /** SOLUTION_TYPE_TIME_SERIES - SolutionConfig.time_series = 5 */
+    SolutionType[SolutionType["SOLUTION_TYPE_TIME_SERIES"] = 5] = "SOLUTION_TYPE_TIME_SERIES";
     SolutionType[SolutionType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(SolutionType || (exports.SolutionType = SolutionType = {}));
 function solutionTypeFromJSON(object) {
@@ -38,11 +45,11 @@ function solutionTypeFromJSON(object) {
         case "SOLUTION_TYPE_RAG":
             return SolutionType.SOLUTION_TYPE_RAG;
         case 4:
-        case "SOLUTION_TYPE_TIME_SERIES":
-            return SolutionType.SOLUTION_TYPE_TIME_SERIES;
-        case 5:
         case "SOLUTION_TYPE_AGENT_LOOP":
             return SolutionType.SOLUTION_TYPE_AGENT_LOOP;
+        case 5:
+        case "SOLUTION_TYPE_TIME_SERIES":
+            return SolutionType.SOLUTION_TYPE_TIME_SERIES;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -57,10 +64,10 @@ function solutionTypeToJSON(object) {
             return "SOLUTION_TYPE_VOICE_AGENT";
         case SolutionType.SOLUTION_TYPE_RAG:
             return "SOLUTION_TYPE_RAG";
-        case SolutionType.SOLUTION_TYPE_TIME_SERIES:
-            return "SOLUTION_TYPE_TIME_SERIES";
         case SolutionType.SOLUTION_TYPE_AGENT_LOOP:
             return "SOLUTION_TYPE_AGENT_LOOP";
+        case SolutionType.SOLUTION_TYPE_TIME_SERIES:
+            return "SOLUTION_TYPE_TIME_SERIES";
         case SolutionType.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -391,7 +398,6 @@ function createBaseVoiceAgentConfig() {
         generation: undefined,
         maxContextTokens: 0,
         emitPartials: false,
-        typeKind: undefined,
     };
 }
 exports.VoiceAgentConfig = {
@@ -409,37 +415,34 @@ exports.VoiceAgentConfig = {
             writer.uint32(34).string(message.vadModelId);
         }
         if (message.ttsVoiceId !== "") {
-            writer.uint32(138).string(message.ttsVoiceId);
+            writer.uint32(42).string(message.ttsVoiceId);
         }
         if (message.sampleRateHz !== 0) {
-            writer.uint32(40).int32(message.sampleRateHz);
+            writer.uint32(48).int32(message.sampleRateHz);
         }
         if (message.chunkMs !== 0) {
-            writer.uint32(48).int32(message.chunkMs);
+            writer.uint32(56).int32(message.chunkMs);
         }
         if (message.audioSource !== 0) {
-            writer.uint32(56).int32(message.audioSource);
+            writer.uint32(64).int32(message.audioSource);
         }
         if (message.audioFilePath !== "") {
-            writer.uint32(122).string(message.audioFilePath);
+            writer.uint32(74).string(message.audioFilePath);
         }
         if (message.enableBargeIn !== undefined) {
-            writer.uint32(64).bool(message.enableBargeIn);
+            writer.uint32(80).bool(message.enableBargeIn);
         }
         if (message.bargeInThresholdMs !== 0) {
-            writer.uint32(72).int32(message.bargeInThresholdMs);
+            writer.uint32(88).int32(message.bargeInThresholdMs);
         }
         if (message.generation !== undefined) {
-            llm_options_1.LLMGenerationOptions.encode(message.generation, writer.uint32(146).fork()).join();
+            llm_options_1.LLMGenerationOptions.encode(message.generation, writer.uint32(98).fork()).join();
         }
         if (message.maxContextTokens !== 0) {
-            writer.uint32(88).int32(message.maxContextTokens);
+            writer.uint32(104).int32(message.maxContextTokens);
         }
         if (message.emitPartials !== false) {
-            writer.uint32(104).bool(message.emitPartials);
-        }
-        if (message.typeKind !== undefined) {
-            writer.uint32(128).int32(message.typeKind);
+            writer.uint32(112).bool(message.emitPartials);
         }
         return writer;
     },
@@ -478,81 +481,74 @@ exports.VoiceAgentConfig = {
                     message.vadModelId = reader.string();
                     continue;
                 }
-                case 17: {
-                    if (tag !== 138) {
+                case 5: {
+                    if (tag !== 42) {
                         break;
                     }
                     message.ttsVoiceId = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.sampleRateHz = reader.int32();
                     continue;
                 }
                 case 6: {
                     if (tag !== 48) {
                         break;
                     }
-                    message.chunkMs = reader.int32();
+                    message.sampleRateHz = reader.int32();
                     continue;
                 }
                 case 7: {
                     if (tag !== 56) {
                         break;
                     }
-                    message.audioSource = reader.int32();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 122) {
-                        break;
-                    }
-                    message.audioFilePath = reader.string();
+                    message.chunkMs = reader.int32();
                     continue;
                 }
                 case 8: {
                     if (tag !== 64) {
                         break;
                     }
-                    message.enableBargeIn = reader.bool();
+                    message.audioSource = reader.int32();
                     continue;
                 }
                 case 9: {
-                    if (tag !== 72) {
+                    if (tag !== 74) {
                         break;
                     }
-                    message.bargeInThresholdMs = reader.int32();
+                    message.audioFilePath = reader.string();
                     continue;
                 }
-                case 18: {
-                    if (tag !== 146) {
+                case 10: {
+                    if (tag !== 80) {
                         break;
                     }
-                    message.generation = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
+                    message.enableBargeIn = reader.bool();
                     continue;
                 }
                 case 11: {
                     if (tag !== 88) {
                         break;
                     }
-                    message.maxContextTokens = reader.int32();
+                    message.bargeInThresholdMs = reader.int32();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.generation = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
                     continue;
                 }
                 case 13: {
                     if (tag !== 104) {
                         break;
                     }
-                    message.emitPartials = reader.bool();
+                    message.maxContextTokens = reader.int32();
                     continue;
                 }
-                case 16: {
-                    if (tag !== 128) {
+                case 14: {
+                    if (tag !== 112) {
                         break;
                     }
-                    message.typeKind = reader.int32();
+                    message.emitPartials = reader.bool();
                     continue;
                 }
             }
@@ -631,11 +627,6 @@ exports.VoiceAgentConfig = {
                 : isSet(object.emit_partials)
                     ? globalThis.Boolean(object.emit_partials)
                     : false,
-            typeKind: isSet(object.typeKind)
-                ? solutionTypeFromJSON(object.typeKind)
-                : isSet(object.type_kind)
-                    ? solutionTypeFromJSON(object.type_kind)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -682,9 +673,6 @@ exports.VoiceAgentConfig = {
         if (message.emitPartials !== false) {
             obj.emitPartials = message.emitPartials;
         }
-        if (message.typeKind !== undefined) {
-            obj.typeKind = solutionTypeToJSON(message.typeKind);
-        }
         return obj;
     },
     create(base) {
@@ -708,7 +696,6 @@ exports.VoiceAgentConfig = {
             : undefined;
         message.maxContextTokens = object.maxContextTokens ?? 0;
         message.emitPartials = object.emitPartials ?? false;
-        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
@@ -725,7 +712,6 @@ function createBaseRAGConfig() {
         bm25B: 0,
         rrfK: 0,
         promptTemplate: "",
-        typeKind: undefined,
     };
 }
 exports.RAGConfig = {
@@ -762,9 +748,6 @@ exports.RAGConfig = {
         }
         if (message.promptTemplate !== "") {
             writer.uint32(90).string(message.promptTemplate);
-        }
-        if (message.typeKind !== undefined) {
-            writer.uint32(96).int32(message.typeKind);
         }
         return writer;
     },
@@ -852,13 +835,6 @@ exports.RAGConfig = {
                     message.promptTemplate = reader.string();
                     continue;
                 }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.typeKind = reader.int32();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -924,11 +900,6 @@ exports.RAGConfig = {
                 : isSet(object.prompt_template)
                     ? globalThis.String(object.prompt_template)
                     : "",
-            typeKind: isSet(object.typeKind)
-                ? solutionTypeFromJSON(object.typeKind)
-                : isSet(object.type_kind)
-                    ? solutionTypeFromJSON(object.type_kind)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -966,9 +937,6 @@ exports.RAGConfig = {
         if (message.promptTemplate !== "") {
             obj.promptTemplate = message.promptTemplate;
         }
-        if (message.typeKind !== undefined) {
-            obj.typeKind = solutionTypeToJSON(message.typeKind);
-        }
         return obj;
     },
     create(base) {
@@ -987,12 +955,11 @@ exports.RAGConfig = {
         message.bm25B = object.bm25B ?? 0;
         message.rrfK = object.rrfK ?? 0;
         message.promptTemplate = object.promptTemplate ?? "";
-        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
 function createBaseAgentLoopConfig() {
-    return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0, typeKind: undefined };
+    return { llmModelId: "", systemPrompt: "", tools: [], maxIterations: 0, maxContextTokens: 0 };
 }
 exports.AgentLoopConfig = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1010,9 +977,6 @@ exports.AgentLoopConfig = {
         }
         if (message.maxContextTokens !== 0) {
             writer.uint32(40).int32(message.maxContextTokens);
-        }
-        if (message.typeKind !== undefined) {
-            writer.uint32(48).int32(message.typeKind);
         }
         return writer;
     },
@@ -1058,13 +1022,6 @@ exports.AgentLoopConfig = {
                     message.maxContextTokens = reader.int32();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.typeKind = reader.int32();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1096,11 +1053,6 @@ exports.AgentLoopConfig = {
                 : isSet(object.max_context_tokens)
                     ? globalThis.Number(object.max_context_tokens)
                     : 0,
-            typeKind: isSet(object.typeKind)
-                ? solutionTypeFromJSON(object.typeKind)
-                : isSet(object.type_kind)
-                    ? solutionTypeFromJSON(object.type_kind)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -1120,9 +1072,6 @@ exports.AgentLoopConfig = {
         if (message.maxContextTokens !== 0) {
             obj.maxContextTokens = Math.round(message.maxContextTokens);
         }
-        if (message.typeKind !== undefined) {
-            obj.typeKind = solutionTypeToJSON(message.typeKind);
-        }
         return obj;
     },
     create(base) {
@@ -1135,7 +1084,6 @@ exports.AgentLoopConfig = {
         message.tools = object.tools?.map((e) => exports.ToolSpec.fromPartial(e)) || [];
         message.maxIterations = object.maxIterations ?? 0;
         message.maxContextTokens = object.maxContextTokens ?? 0;
-        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };
@@ -1227,7 +1175,7 @@ exports.ToolSpec = {
     },
 };
 function createBaseTimeSeriesConfig() {
-    return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0, typeKind: undefined };
+    return { anomalyModelId: "", llmModelId: "", windowSize: 0, stride: 0, anomalyThreshold: 0 };
 }
 exports.TimeSeriesConfig = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1245,9 +1193,6 @@ exports.TimeSeriesConfig = {
         }
         if (message.anomalyThreshold !== 0) {
             writer.uint32(45).float(message.anomalyThreshold);
-        }
-        if (message.typeKind !== undefined) {
-            writer.uint32(48).int32(message.typeKind);
         }
         return writer;
     },
@@ -1293,13 +1238,6 @@ exports.TimeSeriesConfig = {
                     message.anomalyThreshold = reader.float();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.typeKind = reader.int32();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1331,11 +1269,6 @@ exports.TimeSeriesConfig = {
                 : isSet(object.anomaly_threshold)
                     ? globalThis.Number(object.anomaly_threshold)
                     : 0,
-            typeKind: isSet(object.typeKind)
-                ? solutionTypeFromJSON(object.typeKind)
-                : isSet(object.type_kind)
-                    ? solutionTypeFromJSON(object.type_kind)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -1355,9 +1288,6 @@ exports.TimeSeriesConfig = {
         if (message.anomalyThreshold !== 0) {
             obj.anomalyThreshold = message.anomalyThreshold;
         }
-        if (message.typeKind !== undefined) {
-            obj.typeKind = solutionTypeToJSON(message.typeKind);
-        }
         return obj;
     },
     create(base) {
@@ -1370,7 +1300,6 @@ exports.TimeSeriesConfig = {
         message.windowSize = object.windowSize ?? 0;
         message.stride = object.stride ?? 0;
         message.anomalyThreshold = object.anomalyThreshold ?? 0;
-        message.typeKind = object.typeKind ?? undefined;
         return message;
     },
 };

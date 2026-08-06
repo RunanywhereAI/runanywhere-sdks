@@ -1,61 +1,43 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
-import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
-export declare enum DiffusionMode {
-    DIFFUSION_MODE_UNSPECIFIED = 0,
-    DIFFUSION_MODE_TEXT_TO_IMAGE = 1,
-    DIFFUSION_MODE_IMAGE_TO_IMAGE = 2,
-    DIFFUSION_MODE_INPAINTING = 3,
-    UNRECOGNIZED = -1
-}
-export declare function diffusionModeFromJSON(object: any): DiffusionMode;
-export declare function diffusionModeToJSON(object: DiffusionMode): string;
-/** DDPM and LCM are forward-looking; no SDK exposes them. */
+/**
+ * Only values with a C carrier are listed. UNSPECIFIED = the model's
+ * configured scheduler, which is what every engine does.
+ */
 export declare enum DiffusionScheduler {
     DIFFUSION_SCHEDULER_UNSPECIFIED = 0,
     DIFFUSION_SCHEDULER_DPMPP_2M = 1,
     /** DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS - recommended default */
     DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS = 2,
     DIFFUSION_SCHEDULER_DDIM = 3,
-    DIFFUSION_SCHEDULER_DDPM = 4,
-    DIFFUSION_SCHEDULER_EULER = 5,
+    DIFFUSION_SCHEDULER_EULER = 4,
     /** DIFFUSION_SCHEDULER_EULER_A - Euler Ancestral */
-    DIFFUSION_SCHEDULER_EULER_A = 6,
-    DIFFUSION_SCHEDULER_PNDM = 7,
-    DIFFUSION_SCHEDULER_LMS = 8,
-    DIFFUSION_SCHEDULER_LCM = 9,
-    DIFFUSION_SCHEDULER_DPMPP_2M_SDE = 10,
+    DIFFUSION_SCHEDULER_EULER_A = 5,
+    DIFFUSION_SCHEDULER_PNDM = 6,
+    DIFFUSION_SCHEDULER_LMS = 7,
+    DIFFUSION_SCHEDULER_DPMPP_2M_SDE = 8,
     UNRECOGNIZED = -1
 }
 export declare function diffusionSchedulerFromJSON(object: any): DiffusionScheduler;
 export declare function diffusionSchedulerToJSON(object: DiffusionScheduler): string;
-export declare enum DiffusionModelVariant {
-    DIFFUSION_MODEL_VARIANT_UNSPECIFIED = 0,
-    DIFFUSION_MODEL_VARIANT_SD_1_5 = 1,
-    DIFFUSION_MODEL_VARIANT_SD_2_1 = 2,
-    DIFFUSION_MODEL_VARIANT_SDXL = 3,
-    DIFFUSION_MODEL_VARIANT_SDXL_TURBO = 4,
-    DIFFUSION_MODEL_VARIANT_SDXS = 5,
-    /** DIFFUSION_MODEL_VARIANT_LCM - Latent Consistency Model */
-    DIFFUSION_MODEL_VARIANT_LCM = 6,
+/** Encoding of the returned image bytes. */
+export declare enum DiffusionOutputFormat {
+    /** DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED - = PNG */
+    DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED = 0,
+    DIFFUSION_OUTPUT_FORMAT_PNG = 1,
+    /**
+     * DIFFUSION_OUTPUT_FORMAT_JPEG - No JPEG or WEBP encoder exists in this tree yet. Requesting one is
+     * rejected outright; it is never silently answered with PNG.
+     */
+    DIFFUSION_OUTPUT_FORMAT_JPEG = 2,
+    DIFFUSION_OUTPUT_FORMAT_WEBP = 3,
+    /** DIFFUSION_OUTPUT_FORMAT_RAW_RGBA - Escape hatch: no encode, 4 bytes per pixel, "image/raw-rgba". */
+    DIFFUSION_OUTPUT_FORMAT_RAW_RGBA = 4,
     UNRECOGNIZED = -1
 }
-export declare function diffusionModelVariantFromJSON(object: any): DiffusionModelVariant;
-export declare function diffusionModelVariantToJSON(object: DiffusionModelVariant): string;
-export declare enum DiffusionTokenizerSourceKind {
-    DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED = 0,
-    /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15 - CLIP ViT-L/14 */
-    DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15 = 1,
-    /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2 - OpenCLIP ViT-H/14 */
-    DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2 = 2,
-    /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL - dual tokenizers */
-    DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL = 3,
-    DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM = 4,
-    UNRECOGNIZED = -1
-}
-export declare function diffusionTokenizerSourceKindFromJSON(object: any): DiffusionTokenizerSourceKind;
-export declare function diffusionTokenizerSourceKindToJSON(object: DiffusionTokenizerSourceKind): string;
+export declare function diffusionOutputFormatFromJSON(object: any): DiffusionOutputFormat;
+export declare function diffusionOutputFormatToJSON(object: DiffusionOutputFormat): string;
 export declare enum DiffusionStreamEventKind {
     DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
     DIFFUSION_STREAM_EVENT_KIND_STARTED = 1,
@@ -67,19 +49,6 @@ export declare enum DiffusionStreamEventKind {
 }
 export declare function diffusionStreamEventKindFromJSON(object: any): DiffusionStreamEventKind;
 export declare function diffusionStreamEventKindToJSON(object: DiffusionStreamEventKind): string;
-export interface DiffusionTokenizerSource {
-    kind: DiffusionTokenizerSourceKind;
-    customPath?: string | undefined;
-    autoDownload: boolean;
-}
-export interface DiffusionConfiguration {
-    modelVariant: DiffusionModelVariant;
-    tokenizerSource?: DiffusionTokenizerSource | undefined;
-    enableSafetyChecker: boolean;
-    maxMemoryMb: number;
-    modelId?: string | undefined;
-    preferredFramework?: InferenceFramework | undefined;
-}
 export interface DiffusionGenerationOptions {
     prompt: string;
     negativePrompt: string;
@@ -88,76 +57,85 @@ export interface DiffusionGenerationOptions {
     height: number;
     steps: number;
     guidanceScale: number;
-    /** -1 = random. */
-    seed: number;
+    /**
+     * Absent = pick a fresh random seed. Any present value is literal,
+     * including 0. The seed actually used comes back on each result image.
+     */
+    seed?: number | undefined;
     scheduler: DiffusionScheduler;
-    mode: DiffusionMode;
-    /** For IMAGE_TO_IMAGE and INPAINTING. */
-    inputImage?: Uint8Array | undefined;
+    /**
+     * Source picture. Its presence promotes the request to image-to-image;
+     * adding `mask_image` promotes it to inpainting. Must be an encoded
+     * PNG or JPEG container.
+     */
+    image?: Uint8Array | undefined;
+    /** White = repaint. Same dimensions as `image`. */
     maskImage?: Uint8Array | undefined;
-    denoiseStrength: number;
-    reportIntermediateImages: boolean;
-    progressStride: number;
-    inputImageWidth: number;
-    inputImageHeight: number;
-    inputImageMediaType?: string | undefined;
+    /**
+     * How far from the source image to travel. Only meaningful with `image`.
+     * Effective steps = ceil(steps * strength), so a low value is
+     * proportionally cheaper -- on device that is battery.
+     */
+    strength: number;
+    /**
+     * Container of the bytes above, as supplied by the caller. Request-side;
+     * the result carries its own media type per image.
+     */
+    imageMediaType?: string | undefined;
     maskImageMediaType?: string | undefined;
-    /** 0 = one image. */
-    batchSize: number;
-    returnLatents: boolean;
+    /** How many images to generate for this prompt. Absent = 1. */
+    n?: number | undefined;
+    /** Encoding of the returned image bytes. */
+    outputFormat: DiffusionOutputFormat;
 }
 export interface DiffusionGenerationRequest {
-    requestId: string;
     options?: DiffusionGenerationOptions | undefined;
     modelId?: string | undefined;
-    metadata: {
-        [key: string]: string;
-    };
-}
-export interface DiffusionGenerationRequest_MetadataEntry {
-    key: string;
-    value: string;
 }
 export interface DiffusionProgress {
-    progressPercent: number;
     currentStep: number;
+    /** as resolved by the backend */
     totalSteps: number;
-    stage: string;
     intermediateImageData?: Uint8Array | undefined;
-    intermediateImageWidth: number;
-    intermediateImageHeight: number;
-    timestampMs: number;
-    etaMs: number;
-    intermediateImageMediaType?: string | undefined;
 }
-export interface DiffusionResult {
-    imageData: Uint8Array;
+/**
+ * One generated image. Per-image, because with n > 1 each image has its
+ * own seed and its own safety verdict (Stability `seeds`/`finish_reasons`,
+ * Diffusers `nsfw_content_detected`).
+ */
+export interface DiffusionImage {
+    data: Uint8Array;
+    /** resolved, echoed back */
     width: number;
     height: number;
-    /** The resolved seed, so a run can be reproduced when seed was -1. */
+    /** so "make more like that one" works */
     seedUsed: number;
-    totalTimeMs: number;
+    /** advisory, in-band, never an error */
     safetyFlag: boolean;
-    usedScheduler: DiffusionScheduler;
-    imageMediaType?: string | undefined;
-    batchImages: Uint8Array[];
-    imagesGenerated: number;
-    error?: SDKError | undefined;
+    /** resolved output_format, e.g. "image/png" */
+    mediaType: string;
+}
+export interface DiffusionResult {
+    /**
+     * One entry per requested image, in request order. commons emits exactly
+     * one entry until the C ABI grows a list: rac_diffusion_result_t is a
+     * single-image struct with one image_data/image_size pair.
+     */
+    images: DiffusionImage[];
+    totalTimeMs: number;
 }
 export interface DiffusionStreamEvent {
+    /** Generation is single-flight, so the stream itself is the correlation. */
     timestampUs: number;
-    requestId: string;
     kind: DiffusionStreamEventKind;
     progress?: DiffusionProgress | undefined;
     result?: DiffusionResult | undefined;
     error?: SDKError | undefined;
 }
-export declare const DiffusionTokenizerSource: MessageFns<DiffusionTokenizerSource>;
-export declare const DiffusionConfiguration: MessageFns<DiffusionConfiguration>;
 export declare const DiffusionGenerationOptions: MessageFns<DiffusionGenerationOptions>;
 export declare const DiffusionGenerationRequest: MessageFns<DiffusionGenerationRequest>;
-export declare const DiffusionGenerationRequest_MetadataEntry: MessageFns<DiffusionGenerationRequest_MetadataEntry>;
 export declare const DiffusionProgress: MessageFns<DiffusionProgress>;
+export declare const DiffusionImage: MessageFns<DiffusionImage>;
 export declare const DiffusionResult: MessageFns<DiffusionResult>;
 export declare const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

@@ -1,8 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ComponentLifecycleState, EventCategory } from "./component_types";
-import { DownloadCancelResult, DownloadPlanResult, DownloadProgress, DownloadResumeResult, DownloadStartResult } from "./download_service";
+import { DownloadCancelResult, DownloadPlanResult, DownloadProgress, DownloadStartResult } from "./download_service";
 import { ErrorSeverity, SDKError } from "./errors";
-import { HardwareProfileResult } from "./hardware_profile";
 import { CurrentModelResult, InferenceFramework, ModelCategory, ModelCompatibilityResult, ModelDeleteResult, ModelDiscoveryResult, ModelGetResult, ModelImportResult, ModelInfo, ModelListResult, ModelLoadResult, ModelRegistryRefreshResult, ModelUnloadResult } from "./model_types";
 import { StorageAvailabilityResult, StorageDeletePlan, StorageDeleteResult, StorageInfoResult } from "./storage_types";
 import { VoiceEvent } from "./voice_events";
@@ -19,6 +18,8 @@ export declare const protobufPackage = "runanywhere.v1";
  * RN's ComponentInitializationEvent.components: SDKComponent[] but not yet
  * in any SDK's enum).
  * ---------------------------------------------------------------------------
+ * The rac_wire_string values are the stable lowercase keys that SDKError.component
+ * carries; producers stringify through them, never through the constant name.
  */
 export declare enum SDKComponent {
     SDK_COMPONENT_UNSPECIFIED = 0,
@@ -90,42 +91,41 @@ export declare enum ConfigurationEventKind {
     CONFIGURATION_EVENT_KIND_SYNC_STARTED = 6,
     CONFIGURATION_EVENT_KIND_SYNC_COMPLETED = 7,
     CONFIGURATION_EVENT_KIND_SYNC_FAILED = 8,
-    CONFIGURATION_EVENT_KIND_SYNC_REQUESTED = 9,
-    CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED = 10,
-    CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED = 11,
-    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED = 12,
-    CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED = 13,
-    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED = 14,
-    CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED = 15,
-    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED = 16,
-    CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED = 17,
     /** CONFIGURATION_EVENT_KIND_CHANGED - generic config_changed (Kotlin/Dart) */
     CONFIGURATION_EVENT_KIND_CHANGED = 18,
     UNRECOGNIZED = -1
 }
 export declare function configurationEventKindFromJSON(object: any): ConfigurationEventKind;
 export declare function configurationEventKindToJSON(object: ConfigurationEventKind): string;
-export declare enum ComponentInitializationEventKind {
-    COMPONENT_INIT_EVENT_KIND_UNSPECIFIED = 0,
-    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED = 1,
-    COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED = 2,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED = 3,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING = 4,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED = 5,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED = 6,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS = 7,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED = 8,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING = 9,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_READY = 10,
-    COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED = 11,
-    COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED = 12,
-    COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED = 13,
-    COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY = 14,
-    COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY = 15,
+export declare enum ComponentLifecycleEventKind {
+    COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0,
+    /** COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED - previous_state -> current_state carries this */
+    COMPONENT_LIFECYCLE_EVENT_KIND_STATE_CHANGED = 1,
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_LOAD_COMPLETED = 2,
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_UNLOAD_COMPLETED = 3,
+    COMPONENT_LIFECYCLE_EVENT_KIND_MODEL_DELETE_COMPLETED = 4,
+    COMPONENT_LIFECYCLE_EVENT_KIND_DOWNLOAD_PROGRESS = 5,
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_AVAILABILITY = 6,
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_COMPLETED = 7,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT = 8,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SNAPSHOT_RESULT = 9,
+    COMPONENT_LIFECYCLE_EVENT_KIND_STORAGE_DELETE_PLAN = 10,
+    /** COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED - Absorbed from ComponentInitializationEventKind. */
+    COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_STARTED = 11,
+    COMPONENT_LIFECYCLE_EVENT_KIND_INITIALIZATION_COMPLETED = 12,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_CHECKING = 13,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED = 14,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_INITIALIZING = 17,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_READY = 18,
+    COMPONENT_LIFECYCLE_EVENT_KIND_COMPONENT_FAILED = 19,
+    COMPONENT_LIFECYCLE_EVENT_KIND_PARALLEL_INIT_STARTED = 20,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SEQUENTIAL_INIT_STARTED = 21,
+    COMPONENT_LIFECYCLE_EVENT_KIND_ALL_COMPONENTS_READY = 22,
+    COMPONENT_LIFECYCLE_EVENT_KIND_SOME_COMPONENTS_READY = 23,
     UNRECOGNIZED = -1
 }
-export declare function componentInitializationEventKindFromJSON(object: any): ComponentInitializationEventKind;
-export declare function componentInitializationEventKindToJSON(object: ComponentInitializationEventKind): string;
+export declare function componentLifecycleEventKindFromJSON(object: any): ComponentLifecycleEventKind;
+export declare function componentLifecycleEventKindToJSON(object: ComponentLifecycleEventKind): string;
 export declare enum SessionEventKind {
     SESSION_EVENT_KIND_UNSPECIFIED = 0,
     SESSION_EVENT_KIND_CREATED = 1,
@@ -141,21 +141,14 @@ export declare function sessionEventKindFromJSON(object: any): SessionEventKind;
 export declare function sessionEventKindToJSON(object: SessionEventKind): string;
 export declare enum GenerationEventKind {
     GENERATION_EVENT_KIND_UNSPECIFIED = 0,
-    GENERATION_EVENT_KIND_SESSION_STARTED = 1,
-    GENERATION_EVENT_KIND_SESSION_ENDED = 2,
     GENERATION_EVENT_KIND_STARTED = 3,
     GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED = 4,
     GENERATION_EVENT_KIND_TOKEN_GENERATED = 5,
     GENERATION_EVENT_KIND_STREAMING_UPDATE = 6,
+    /** GENERATION_EVENT_KIND_COMPLETED - Exactly one success terminal, one failure terminal, one cancel terminal. */
     GENERATION_EVENT_KIND_COMPLETED = 7,
     GENERATION_EVENT_KIND_FAILED = 8,
-    GENERATION_EVENT_KIND_MODEL_LOADED = 9,
-    GENERATION_EVENT_KIND_MODEL_UNLOADED = 10,
-    GENERATION_EVENT_KIND_COST_CALCULATED = 11,
     GENERATION_EVENT_KIND_ROUTING_DECISION = 12,
-    /** GENERATION_EVENT_KIND_STREAM_COMPLETED - Kotlin LLMEvent.STREAM_COMPLETED */
-    GENERATION_EVENT_KIND_STREAM_COMPLETED = 13,
-    GENERATION_EVENT_KIND_CANCEL_REQUESTED = 14,
     GENERATION_EVENT_KIND_CANCELLED = 15,
     GENERATION_EVENT_KIND_TOOL_CALL_STARTED = 16,
     GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED = 17,
@@ -175,7 +168,6 @@ export declare enum VoiceEventKind {
     /** VOICE_EVENT_KIND_LISTENING_STARTED - Listening / detection. */
     VOICE_EVENT_KIND_LISTENING_STARTED = 1,
     VOICE_EVENT_KIND_LISTENING_ENDED = 2,
-    VOICE_EVENT_KIND_SPEECH_DETECTED = 3,
     /** VOICE_EVENT_KIND_TRANSCRIPTION_STARTED - Transcription. */
     VOICE_EVENT_KIND_TRANSCRIPTION_STARTED = 4,
     VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL = 5,
@@ -217,18 +209,6 @@ export declare enum VoiceEventKind {
     VOICE_EVENT_KIND_PLAYBACK_PAUSED = 34,
     VOICE_EVENT_KIND_PLAYBACK_RESUMED = 35,
     VOICE_EVENT_KIND_PLAYBACK_FAILED = 36,
-    /** VOICE_EVENT_KIND_VOICE_SESSION_STARTED - Voice session orchestration (RN events.ts:177-187). */
-    VOICE_EVENT_KIND_VOICE_SESSION_STARTED = 37,
-    VOICE_EVENT_KIND_VOICE_SESSION_LISTENING = 38,
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED = 39,
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED = 40,
-    VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING = 41,
-    VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED = 42,
-    VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED = 43,
-    VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING = 44,
-    VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED = 45,
-    VOICE_EVENT_KIND_VOICE_SESSION_STOPPED = 46,
-    VOICE_EVENT_KIND_VOICE_SESSION_ERROR = 47,
     /** VOICE_EVENT_KIND_VAD_PAUSED - VAD pause/resume (telemetry-only metrics). */
     VOICE_EVENT_KIND_VAD_PAUSED = 48,
     VOICE_EVENT_KIND_VAD_RESUMED = 49,
@@ -274,7 +254,6 @@ export declare enum ModelEventKind {
     MODEL_EVENT_KIND_DOWNLOAD_COMPLETED = 10,
     MODEL_EVENT_KIND_DOWNLOAD_FAILED = 11,
     MODEL_EVENT_KIND_DOWNLOAD_CANCELLED = 12,
-    MODEL_EVENT_KIND_LIST_REQUESTED = 13,
     MODEL_EVENT_KIND_LIST_COMPLETED = 14,
     MODEL_EVENT_KIND_LIST_FAILED = 15,
     MODEL_EVENT_KIND_CATALOG_LOADED = 16,
@@ -287,59 +266,40 @@ export declare enum ModelEventKind {
     MODEL_EVENT_KIND_EXTRACTION_PROGRESS = 23,
     MODEL_EVENT_KIND_EXTRACTION_COMPLETED = 24,
     MODEL_EVENT_KIND_EXTRACTION_FAILED = 25,
+    /** MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED - Absorbed from ModelRegistryEventKind. */
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED = 26,
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED = 27,
+    MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED = 28,
+    MODEL_EVENT_KIND_ASSIGNMENT_STARTED = 29,
+    MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED = 30,
+    MODEL_EVENT_KIND_ASSIGNMENT_FAILED = 31,
+    MODEL_EVENT_KIND_IMPORT_STARTED = 32,
+    MODEL_EVENT_KIND_IMPORT_COMPLETED = 33,
+    MODEL_EVENT_KIND_IMPORT_FAILED = 34,
+    MODEL_EVENT_KIND_DISCOVERY_STARTED = 35,
+    MODEL_EVENT_KIND_DISCOVERY_COMPLETED = 36,
+    MODEL_EVENT_KIND_DISCOVERY_FAILED = 37,
+    MODEL_EVENT_KIND_CURRENT_MODEL_CHANGED = 38,
+    MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED = 40,
+    MODEL_EVENT_KIND_REGISTRY_GET_FAILED = 41,
+    MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED = 43,
+    MODEL_EVENT_KIND_REGISTRY_LIST_FAILED = 44,
+    /** MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED - Absorbed from DownloadEventKind. */
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED = 45,
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED = 46,
+    MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED = 47,
+    MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED = 48,
+    MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED = 49,
+    MODEL_EVENT_KIND_DOWNLOAD_RESUMED = 50,
+    MODEL_EVENT_KIND_DOWNLOAD_PAUSED = 51,
+    MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED = 52,
     UNRECOGNIZED = -1
 }
 export declare function modelEventKindFromJSON(object: any): ModelEventKind;
 export declare function modelEventKindToJSON(object: ModelEventKind): string;
-export declare enum ModelRegistryEventKind {
-    MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED = 0,
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED = 1,
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED = 2,
-    MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED = 3,
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED = 4,
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED = 5,
-    MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED = 6,
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED = 7,
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED = 8,
-    MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED = 9,
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED = 10,
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED = 11,
-    MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED = 12,
-    MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED = 13,
-    MODEL_REGISTRY_EVENT_KIND_LIST_STARTED = 14,
-    MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED = 15,
-    MODEL_REGISTRY_EVENT_KIND_LIST_FAILED = 16,
-    MODEL_REGISTRY_EVENT_KIND_GET_STARTED = 17,
-    MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED = 18,
-    MODEL_REGISTRY_EVENT_KIND_GET_FAILED = 19,
-    UNRECOGNIZED = -1
-}
-export declare function modelRegistryEventKindFromJSON(object: any): ModelRegistryEventKind;
-export declare function modelRegistryEventKindToJSON(object: ModelRegistryEventKind): string;
-export declare enum DownloadEventKind {
-    DOWNLOAD_EVENT_KIND_UNSPECIFIED = 0,
-    DOWNLOAD_EVENT_KIND_PLAN_STARTED = 1,
-    DOWNLOAD_EVENT_KIND_PLAN_COMPLETED = 2,
-    DOWNLOAD_EVENT_KIND_PLAN_FAILED = 3,
-    DOWNLOAD_EVENT_KIND_STARTED = 4,
-    DOWNLOAD_EVENT_KIND_PROGRESS = 5,
-    DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED = 6,
-    DOWNLOAD_EVENT_KIND_CANCELLED = 7,
-    DOWNLOAD_EVENT_KIND_RESUME_REQUESTED = 8,
-    DOWNLOAD_EVENT_KIND_RESUMED = 9,
-    DOWNLOAD_EVENT_KIND_COMPLETED = 10,
-    DOWNLOAD_EVENT_KIND_FAILED = 11,
-    DOWNLOAD_EVENT_KIND_PAUSED = 12,
-    DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED = 13,
-    UNRECOGNIZED = -1
-}
-export declare function downloadEventKindFromJSON(object: any): DownloadEventKind;
-export declare function downloadEventKindToJSON(object: DownloadEventKind): string;
 export declare enum StorageEventKind {
     STORAGE_EVENT_KIND_UNSPECIFIED = 0,
-    STORAGE_EVENT_KIND_INFO_REQUESTED = 1,
     STORAGE_EVENT_KIND_INFO_RETRIEVED = 2,
-    STORAGE_EVENT_KIND_MODELS_REQUESTED = 3,
     STORAGE_EVENT_KIND_MODELS_RETRIEVED = 4,
     STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED = 5,
     STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED = 6,
@@ -354,29 +314,19 @@ export declare enum StorageEventKind {
     STORAGE_EVENT_KIND_CACHE_MISS = 15,
     STORAGE_EVENT_KIND_EVICTION = 16,
     STORAGE_EVENT_KIND_DISK_FULL = 17,
+    /** STORAGE_EVENT_KIND_AVAILABILITY_CHECKED - Absorbed from StorageLifecycleEventKind. */
+    STORAGE_EVENT_KIND_AVAILABILITY_CHECKED = 18,
+    STORAGE_EVENT_KIND_AVAILABILITY_FAILED = 19,
+    STORAGE_EVENT_KIND_DELETE_PLAN_CREATED = 20,
+    STORAGE_EVENT_KIND_DELETE_PLAN_FAILED = 21,
+    STORAGE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED = 22,
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_STARTED = 23,
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_COMPLETED = 24,
+    STORAGE_EVENT_KIND_CACHE_CLEANUP_FAILED = 25,
     UNRECOGNIZED = -1
 }
 export declare function storageEventKindFromJSON(object: any): StorageEventKind;
 export declare function storageEventKindToJSON(object: StorageEventKind): string;
-export declare enum StorageLifecycleEventKind {
-    STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0,
-    STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED = 1,
-    STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED = 2,
-    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED = 3,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED = 4,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED = 5,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED = 6,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED = 7,
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED = 8,
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED = 9,
-    STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED = 10,
-    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED = 11,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED = 12,
-    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED = 13,
-    UNRECOGNIZED = -1
-}
-export declare function storageLifecycleEventKindFromJSON(object: any): StorageLifecycleEventKind;
-export declare function storageLifecycleEventKindToJSON(object: StorageLifecycleEventKind): string;
 export declare enum AuthEventKind {
     AUTH_EVENT_KIND_UNSPECIFIED = 0,
     AUTH_EVENT_KIND_REQUESTED = 1,
@@ -425,16 +375,6 @@ export declare enum FrameworkEventKind {
     FRAMEWORK_EVENT_KIND_UNSPECIFIED = 0,
     FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED = 1,
     FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED = 2,
-    FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED = 3,
-    FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED = 4,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED = 5,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED = 6,
-    FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED = 7,
-    FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED = 8,
-    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED = 9,
-    FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED = 10,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED = 11,
-    FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED = 12,
     FRAMEWORK_EVENT_KIND_ERROR = 13,
     UNRECOGNIZED = -1
 }
@@ -453,16 +393,6 @@ export declare enum HardwareRoutingEventKind {
 }
 export declare function hardwareRoutingEventKindFromJSON(object: any): HardwareRoutingEventKind;
 export declare function hardwareRoutingEventKindToJSON(object: HardwareRoutingEventKind): string;
-export declare enum PerformanceEventKind {
-    PERFORMANCE_EVENT_KIND_UNSPECIFIED = 0,
-    PERFORMANCE_EVENT_KIND_MEMORY_WARNING = 1,
-    PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED = 2,
-    PERFORMANCE_EVENT_KIND_LATENCY_MEASURED = 3,
-    PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED = 4,
-    UNRECOGNIZED = -1
-}
-export declare function performanceEventKindFromJSON(object: any): PerformanceEventKind;
-export declare function performanceEventKindToJSON(object: PerformanceEventKind): string;
 export declare enum TelemetryEventKind {
     TELEMETRY_EVENT_KIND_UNSPECIFIED = 0,
     TELEMETRY_EVENT_KIND_COUNTER = 1,
@@ -539,51 +469,6 @@ export interface ConfigurationEvent {
     oldValueJson: string;
     newValueJson: string;
 }
-/**
- * ---------------------------------------------------------------------------
- * Per-component initialization lifecycle. Mirrors RN
- *   events.ts:270-312 (ComponentInitializationEvent: 16 variants).
- * Distinct from `InitializationEvent` (overall SDK lifecycle).
- * ---------------------------------------------------------------------------
- */
-export interface ComponentInitializationEvent {
-    kind: ComponentInitializationEventKind;
-    /** Single-component events (componentChecking / componentReady / …). */
-    component: SDKComponent;
-    /**
-     * For COMPONENT_CHECKING / COMPONENT_INITIALIZING / COMPONENT_READY /
-     * download events.
-     */
-    modelId: string;
-    /** For COMPONENT_DOWNLOAD_REQUIRED — RN events.ts:285. */
-    sizeBytes: number;
-    /** For COMPONENT_DOWNLOAD_PROGRESS — 0.0..1.0. */
-    progress: number;
-    /** For COMPONENT_STATE_CHANGED — RN events.ts:274-278. */
-    oldState: string;
-    newState: string;
-    /**
-     * For multi-component events (initializationStarted / parallel/sequential /
-     * someComponentsReady).
-     */
-    components: SDKComponent[];
-    readyComponents: SDKComponent[];
-    pendingComponents: SDKComponent[];
-    /**
-     * For INITIALIZATION_COMPLETED — InitializationResult summary count.
-     * Full result travels via dedicated RPC.
-     */
-    readyCount: number;
-    failedCount: number;
-    /**
-     * Typed equivalents of old_state/new_state for SDKs that want generated
-     * enum-backed component lifecycle state instead of parsing strings.
-     */
-    previousLifecycleState: ComponentLifecycleState;
-    currentLifecycleState: ComponentLifecycleState;
-    /** Set on COMPONENT_FAILED / *_FAILED and failed completions. */
-    error?: SDKError | undefined;
-}
 /** Snapshot of a component's current model-backed lifecycle state. */
 export interface ComponentLifecycleSnapshot {
     component: SDKComponent;
@@ -604,14 +489,28 @@ export interface ComponentLifecycleSnapshotResult {
 /**
  * Operation-aware lifecycle event. The oneof arms intentionally reference the
  * operation result/progress protos from this contract slice instead of adding
- * another broad event taxonomy.
+ * another broad event taxonomy. Covers both component bring-up (absorbed from
+ * ComponentInitializationEvent) and steady-state model lifecycle.
  */
 export interface ComponentLifecycleEvent {
+    kind: ComponentLifecycleEventKind;
     component: SDKComponent;
     previousState: ComponentLifecycleState;
     currentState: ComponentLifecycleState;
     modelId: string;
     timestampMs: number;
+    /** Absorbed from ComponentInitializationEvent. */
+    sizeBytes: number;
+    /** COMPONENT_DOWNLOAD_PROGRESS */
+    progress: number;
+    /** multi-component events */
+    components: SDKComponent[];
+    readyComponents: SDKComponent[];
+    pendingComponents: SDKComponent[];
+    /** INITIALIZATION_COMPLETED summary */
+    readyCount: number;
+    failedCount: number;
+    error?: SDKError | undefined;
     modelLoadResult?: ModelLoadResult | undefined;
     modelUnloadResult?: ModelUnloadResult | undefined;
     modelDeleteResult?: ModelDeleteResult | undefined;
@@ -647,23 +546,20 @@ export interface GenerationEvent {
     prompt: string;
     /** For TOKEN_GENERATED / FIRST_TOKEN_GENERATED — single token text. */
     token: string;
-    /** For STREAMING_UPDATE — the running response text and token count. */
+    /** For STREAMING_UPDATE — the running response text. */
     streamingText: string;
-    tokensCount: number;
-    /** For COMPLETED — full response, usage stats, latency. */
+    /** Output tokens so far on STREAMING_UPDATE; the final count on COMPLETED. */
+    outputTokens: number;
+    /** For COMPLETED — full response. */
     response: string;
-    tokensUsed: number;
-    latencyMs: number;
-    /** For FIRST_TOKEN_GENERATED — TTFT in ms (RN events.ts:76). */
-    firstTokenLatencyMs: number;
     /** For FAILED. */
     error: string;
     /** For MODEL_LOADED / MODEL_UNLOADED — bound model. */
     modelId: string;
-    /** For COST_CALCULATED — RN events.ts:88, Dart SDKGenerationCostCalculated. */
+    /** For COST_CALCULATED — Dart SDKGenerationCostCalculated. */
     costAmount: number;
     costSavedAmount: number;
-    /** For ROUTING_DECISION — RN events.ts:89. */
+    /** For ROUTING_DECISION. */
     routingTarget: string;
     routingReason: string;
     /** For cancellation / tool / structured-output / thinking events. */
@@ -674,32 +570,26 @@ export interface GenerationEvent {
     structuredSchemaJson: string;
     structuredOutputJson: string;
     thinkingText: string;
-    /**
-     * For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-     * Enables totalTokens = input_tokens + tokens_used analytics
-     * from the event stream alone.
-     */
+    /** Prompt-token count on COMPLETED. Total = input_tokens + output_tokens. */
     inputTokens: number;
     /**
      * Telemetry metrics carried on the canonical event stream so the C++
      * destination router can derive the full telemetry payload from the
-     * proto SDKEvent alone (no parallel struct path). `framework` is the
-     * InferenceFramework enum stored as int32 (matches FrameworkEvent.framework).
+     * proto SDKEvent alone (no parallel struct path).
      */
     tokensPerSecond: number;
-    /** completion TTFT (FIRST_TOKEN uses first_token_latency_ms) */
+    /** Time to first token, whichever kind reports it. */
     timeToFirstTokenMs: number;
     isStreaming: boolean;
     temperature: number;
     maxTokens: number;
     contextLength: number;
     modelName: string;
-    /** wall-clock generation duration */
-    durationMs: number;
-    /** InferenceFramework enum int */
-    framework: number;
-    /** prompt eval (prefill) duration */
-    promptEvalTimeMs: number;
+    /** Whole-generation wall clock. */
+    totalDurationMs: number;
+    framework: InferenceFramework;
+    /** Prefill (prompt eval) wall clock. */
+    prefillDurationMs: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -736,13 +626,6 @@ export interface VoiceLifecycleEvent {
     durationMs: number;
     /** For VOICE_SESSION_LISTENING — current audio level (RN events.ts:178). */
     audioLevel: number;
-    /**
-     * For VOICE_SESSION_TRANSCRIBED / VOICE_SESSION_RESPONDED /
-     * VOICE_SESSION_TURN_COMPLETED — RN events.ts:182-185.
-     */
-    transcription: string;
-    turnResponse: string;
-    turnAudioBase64: string;
     /** For *_ERROR / *_FAILED. */
     error: string;
     /**
@@ -750,15 +633,14 @@ export interface VoiceLifecycleEvent {
      * Telemetry metrics (STT transcription + TTS synthesis + model load) so
      * the C++ destination router derives the full telemetry payload from the
      * proto SDKEvent alone. Populated per-component (component on the SDKEvent
-     * envelope selects which subset applies). `framework` is the
-     * InferenceFramework enum stored as int32.
+     * envelope selects which subset applies).
      * -----------------------------------------------------------------------
      */
     modelId: string;
     modelName: string;
-    /** STT input audio length */
-    audioLengthMs: number;
-    audioSizeBytes: number;
+    /** STT input audio */
+    inputAudioDurationMs: number;
+    inputAudioBytes: number;
     /** STT */
     wordCount: number;
     /** STT */
@@ -769,13 +651,12 @@ export interface VoiceLifecycleEvent {
     sampleRate: number;
     /** STT */
     isStreaming: boolean;
-    /** InferenceFramework enum int */
-    framework: number;
+    framework: InferenceFramework;
     /** TTS synthesis metrics. */
     characterCount: number;
-    /** distinct from duration_ms(7); telemetry output_duration_ms */
-    audioDurationMs: number;
-    audioSizeBytesTts: number;
+    /** TTS output audio */
+    outputAudioDurationMs: number;
+    outputAudioBytes: number;
     /** telemetry processing_time_ms */
     processingDurationMs: number;
 }
@@ -839,24 +720,17 @@ export interface ModelEvent {
     /**
      * Model-load + download/extraction telemetry metrics so the C++
      * destination router derives the telemetry payload from the proto
-     * SDKEvent alone. `framework` is the InferenceFramework enum stored as
-     * int32 (matches FrameworkEvent.framework).
+     * SDKEvent alone.
      */
     modelName: string;
     modelSizeBytes: number;
     /** load / download / extraction duration */
     durationMs: number;
-    /** InferenceFramework enum int */
-    framework: number;
-}
-export interface ModelRegistryEvent {
-    kind: ModelRegistryEventKind;
-    modelId: string;
+    framework: InferenceFramework;
+    /** Absorbed from ModelRegistryEvent: registry-specific identity + results. */
     assignmentId: string;
     assignedComponent: SDKComponent;
-    framework: InferenceFramework;
     sourcePath: string;
-    error: string;
     refreshResult?: ModelRegistryRefreshResult | undefined;
     listResult?: ModelListResult | undefined;
     getResult?: ModelGetResult | undefined;
@@ -864,17 +738,10 @@ export interface ModelRegistryEvent {
     discoveryResult?: ModelDiscoveryResult | undefined;
     compatibilityResult?: ModelCompatibilityResult | undefined;
     currentModelResult?: CurrentModelResult | undefined;
-}
-export interface DownloadEvent {
-    kind: DownloadEventKind;
-    modelId: string;
-    taskId: string;
-    error: string;
     planResult?: DownloadPlanResult | undefined;
     startResult?: DownloadStartResult | undefined;
-    progress?: DownloadProgress | undefined;
+    downloadProgress?: DownloadProgress | undefined;
     cancelResult?: DownloadCancelResult | undefined;
-    resumeResult?: DownloadResumeResult | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -903,13 +770,8 @@ export interface StorageEvent {
     evictedBytes: number;
     /** For CLEAR_CACHE_COMPLETED / CLEAN_TEMP_COMPLETED — bytes reclaimed. */
     freedBytes: number;
-}
-export interface StorageLifecycleEvent {
-    kind: StorageLifecycleEventKind;
-    modelId: string;
-    cacheKey: string;
+    /** Absorbed from StorageLifecycleEvent. */
     bytes: number;
-    error: string;
     infoResult?: StorageInfoResult | undefined;
     availabilityResult?: StorageAvailabilityResult | undefined;
     deletePlan?: StorageDeletePlan | undefined;
@@ -985,13 +847,8 @@ export interface NetworkEvent {
  */
 export interface FrameworkEvent {
     kind: FrameworkEventKind;
-    /**
-     * For ADAPTER_REGISTERED / *_RETRIEVED — bound framework. Uses
-     * canonical InferenceFramework from model_types.proto, but stored as
-     * its enum int32 here to avoid cross-file message dependency just for
-     * a single field. Frontends decode via the shared codegen.
-     */
-    framework: number;
+    /** For ADAPTER_REGISTERED / *_RETRIEVED — bound framework. */
+    framework: InferenceFramework;
     /** For ADAPTER_REGISTERED — adapter display name. */
     adapterName: string;
     /** For ADAPTERS_RETRIEVED / *_RETRIEVED — counts. */
@@ -1019,30 +876,15 @@ export interface HardwareRoutingEvent {
     route: string;
     reason: string;
     error: string;
-    hardwareProfile?: HardwareProfileResult | undefined;
 }
 /**
- * ---------------------------------------------------------------------------
- * Performance metrics events. Mirrors RN
- *   events.ts:193-197 (SDKPerformanceEvent: 4 variants).
- * ---------------------------------------------------------------------------
+ * PerformanceEvent was deleted (had zero producers and zero readers, per
+ * review): a memory/thermal/latency/throughput reading is a named number with
+ * a unit, which TelemetryEvent already models. `name` carries what
+ * PerformanceEventKind used to (e.g. "memory_warning", "thermal_state"),
+ * `value` + `unit` carry the number (bytes / celsius-state / ms /
+ * tokens_per_second), and `attributes` carries operation/thermal_state text.
  */
-export interface PerformanceEvent {
-    kind: PerformanceEventKind;
-    /** For MEMORY_WARNING — usage in bytes (RN typed as number). */
-    memoryBytes: number;
-    /**
-     * For THERMAL_STATE_CHANGED — engine-defined state string
-     * (e.g. "nominal", "fair", "serious", "critical"; Apple-specific
-     * names preserved as strings to avoid platform-coupled enums).
-     */
-    thermalState: string;
-    /** For LATENCY_MEASURED. */
-    operation: string;
-    milliseconds: number;
-    /** For THROUGHPUT_MEASURED — RN events.ts:197. */
-    tokensPerSecond: number;
-}
 export interface TelemetryEvent {
     kind: TelemetryEventKind;
     name: string;
@@ -1062,12 +904,6 @@ export interface CancellationEvent {
     operationId: string;
     reason: string;
     userInitiated: boolean;
-}
-export interface FailureEvent {
-    component: SDKComponent;
-    operation: string;
-    error?: SDKError | undefined;
-    recoverable: boolean;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -1121,46 +957,41 @@ export interface SDKEvent {
      */
     operationId: string;
     /**
-     * Cross-service correlation key supplied by the SDK/app or generated by
-     * the portable layer. Native/Web adapters may propagate it through HTTP
-     * headers or OS task metadata, but C++ owns the canonical event field.
-     */
-    correlationId: string;
-    /**
      * Source that emitted the event: "cpp", "swift", "kotlin", "flutter",
      * "react_native", "web", or a backend/plugin key. This disambiguates
      * platform adapter facts from portable orchestration events.
      */
     source: string;
     /**
-     * Optional tracing identifier for diagnostics. Empty when tracing is not
-     * enabled; do not use it as a business key.
+     * Monotonic, whole-stream ordering key, stamped by a single choke point in
+     * commons at emission time. Detects drops and reordering; the only
+     * correlation primitive a consumer needs beyond id / session_id /
+     * operation_id above. (correlation_id and trace_id were deleted: neither
+     * had a writer or a reader anywhere in the tree.)
      */
-    traceId: string;
+    seq: number;
     initialization?: InitializationEvent | undefined;
     configuration?: ConfigurationEvent | undefined;
     generation?: GenerationEvent | undefined;
+    /** + model_registry, + download */
     model?: ModelEvent | undefined;
-    performance?: PerformanceEvent | undefined;
     network?: NetworkEvent | undefined;
+    /** + storage_lifecycle */
     storage?: StorageEvent | undefined;
     framework?: FrameworkEvent | undefined;
     device?: DeviceEvent | undefined;
-    componentInit?: ComponentInitializationEvent | undefined;
     voice?: VoiceLifecycleEvent | undefined;
     /** from voice_events.proto */
     voicePipeline?: VoiceEvent | undefined;
+    /** + component_init */
     componentLifecycle?: ComponentLifecycleEvent | undefined;
     session?: SessionEvent | undefined;
     auth?: AuthEvent | undefined;
-    modelRegistry?: ModelRegistryEvent | undefined;
-    download?: DownloadEvent | undefined;
-    storageLifecycle?: StorageLifecycleEvent | undefined;
     hardwareRouting?: HardwareRoutingEvent | undefined;
     capability?: CapabilityOperationEvent | undefined;
+    /** + performance */
     telemetry?: TelemetryEvent | undefined;
     cancellation?: CancellationEvent | undefined;
-    failure?: FailureEvent | undefined;
 }
 export interface SDKEvent_PropertiesEntry {
     key: string;
@@ -1168,7 +999,6 @@ export interface SDKEvent_PropertiesEntry {
 }
 export declare const InitializationEvent: MessageFns<InitializationEvent>;
 export declare const ConfigurationEvent: MessageFns<ConfigurationEvent>;
-export declare const ComponentInitializationEvent: MessageFns<ComponentInitializationEvent>;
 export declare const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot>;
 export declare const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnapshotResult>;
 export declare const ComponentLifecycleEvent: MessageFns<ComponentLifecycleEvent>;
@@ -1177,20 +1007,15 @@ export declare const GenerationEvent: MessageFns<GenerationEvent>;
 export declare const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent>;
 export declare const CapabilityOperationEvent: MessageFns<CapabilityOperationEvent>;
 export declare const ModelEvent: MessageFns<ModelEvent>;
-export declare const ModelRegistryEvent: MessageFns<ModelRegistryEvent>;
-export declare const DownloadEvent: MessageFns<DownloadEvent>;
 export declare const StorageEvent: MessageFns<StorageEvent>;
-export declare const StorageLifecycleEvent: MessageFns<StorageLifecycleEvent>;
 export declare const AuthEvent: MessageFns<AuthEvent>;
 export declare const DeviceEvent: MessageFns<DeviceEvent>;
 export declare const NetworkEvent: MessageFns<NetworkEvent>;
 export declare const FrameworkEvent: MessageFns<FrameworkEvent>;
 export declare const HardwareRoutingEvent: MessageFns<HardwareRoutingEvent>;
-export declare const PerformanceEvent: MessageFns<PerformanceEvent>;
 export declare const TelemetryEvent: MessageFns<TelemetryEvent>;
 export declare const TelemetryEvent_AttributesEntry: MessageFns<TelemetryEvent_AttributesEntry>;
 export declare const CancellationEvent: MessageFns<CancellationEvent>;
-export declare const FailureEvent: MessageFns<FailureEvent>;
 export declare const SDKEvent: MessageFns<SDKEvent>;
 export declare const SDKEvent_PropertiesEntry: MessageFns<SDKEvent_PropertiesEntry>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

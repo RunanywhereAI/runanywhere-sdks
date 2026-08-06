@@ -1,4 +1,4 @@
-import { ArchiveStructure, AudioFormat, ModelCategory, ModelSource, SDKEnvironment } from '../model_types';
+import { AcceleratorPolicy, ArchiveStructure, AudioFormat, ModelCategory, ModelSource, SDKEnvironment } from '../model_types';
 export declare const audioFormatWireString: (e: AudioFormat) => string;
 export declare const audioFormatFromWireString: (s: string) => AudioFormat | undefined;
 export declare const modelCategoryWireString: (e: ModelCategory) => string;
@@ -9,3 +9,5 @@ export declare const modelSourceWireString: (e: ModelSource) => string;
 export declare const modelSourceFromWireString: (s: string) => ModelSource | undefined;
 export declare const archiveStructureWireString: (e: ArchiveStructure) => string;
 export declare const archiveStructureFromWireString: (s: string) => ArchiveStructure | undefined;
+export declare const acceleratorPolicyWireString: (e: AcceleratorPolicy) => string;
+export declare const acceleratorPolicyFromWireString: (s: string) => AcceleratorPolicy | undefined;

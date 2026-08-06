@@ -17,7 +17,6 @@ export declare const audioCaptureDefaults: Readonly<{
     micSampleRateHz: number;
     micChannels: number;
     micChannelCapacity: number;
-    micTapBufferFrames: number;
     ttsSampleRateHz: number;
 }>;
 export declare const voiceAgentDefaults: Readonly<{
@@ -26,9 +25,6 @@ export declare const voiceAgentDefaults: Readonly<{
     defaultVadModelId: string;
     speechRmsThreshold: number;
     speechFloorMultiplier: number;
-}>;
-export declare const hybridDefaults: Readonly<{
-    sttConfidenceThreshold: number;
 }>;
 export declare const workerDefaults: Readonly<{
     handshakeTimeoutMs: number;

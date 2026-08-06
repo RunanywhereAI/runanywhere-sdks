@@ -77,8 +77,6 @@ function createBaseSTTConfiguration() {
         audioFormat: 0,
         enablePunctuation: false,
         enableDiarization: false,
-        vocabularyList: [],
-        maxAlternatives: 0,
         enableWordTimestamps: false,
         preferredFramework: undefined,
     };
@@ -105,12 +103,6 @@ exports.STTConfiguration = {
         }
         if (message.enableDiarization !== false) {
             writer.uint32(56).bool(message.enableDiarization);
-        }
-        for (const v of message.vocabularyList) {
-            writer.uint32(66).string(v);
-        }
-        if (message.maxAlternatives !== 0) {
-            writer.uint32(72).int32(message.maxAlternatives);
         }
         if (message.enableWordTimestamps !== false) {
             writer.uint32(80).bool(message.enableWordTimestamps);
@@ -176,20 +168,6 @@ exports.STTConfiguration = {
                     message.enableDiarization = reader.bool();
                     continue;
                 }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.vocabularyList.push(reader.string());
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.maxAlternatives = reader.int32();
-                    continue;
-                }
                 case 10: {
                     if (tag !== 80) {
                         break;
@@ -245,16 +223,6 @@ exports.STTConfiguration = {
                 : isSet(object.enable_diarization)
                     ? globalThis.Boolean(object.enable_diarization)
                     : false,
-            vocabularyList: globalThis.Array.isArray(object?.vocabularyList)
-                ? object.vocabularyList.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.vocabulary_list)
-                    ? object.vocabulary_list.map((e) => globalThis.String(e))
-                    : [],
-            maxAlternatives: isSet(object.maxAlternatives)
-                ? globalThis.Number(object.maxAlternatives)
-                : isSet(object.max_alternatives)
-                    ? globalThis.Number(object.max_alternatives)
-                    : 0,
             enableWordTimestamps: isSet(object.enableWordTimestamps)
                 ? globalThis.Boolean(object.enableWordTimestamps)
                 : isSet(object.enable_word_timestamps)
@@ -290,12 +258,6 @@ exports.STTConfiguration = {
         if (message.enableDiarization !== false) {
             obj.enableDiarization = message.enableDiarization;
         }
-        if (message.vocabularyList?.length) {
-            obj.vocabularyList = message.vocabularyList;
-        }
-        if (message.maxAlternatives !== 0) {
-            obj.maxAlternatives = Math.round(message.maxAlternatives);
-        }
         if (message.enableWordTimestamps !== false) {
             obj.enableWordTimestamps = message.enableWordTimestamps;
         }
@@ -316,8 +278,6 @@ exports.STTConfiguration = {
         message.audioFormat = object.audioFormat ?? 0;
         message.enablePunctuation = object.enablePunctuation ?? false;
         message.enableDiarization = object.enableDiarization ?? false;
-        message.vocabularyList = object.vocabularyList?.map((e) => e) || [];
-        message.maxAlternatives = object.maxAlternatives ?? 0;
         message.enableWordTimestamps = object.enableWordTimestamps ?? false;
         message.preferredFramework = object.preferredFramework ?? undefined;
         return message;
@@ -327,16 +287,10 @@ function createBaseSTTOptions() {
     return {
         language: undefined,
         enablePunctuation: false,
-        enableDiarization: false,
-        maxSpeakers: 0,
-        vocabularyList: [],
+        diarize: false,
+        speakersExpected: undefined,
         enableWordTimestamps: false,
-        beamSize: 0,
-        maxAlternatives: 0,
-        chunkDurationMs: 0,
-        endpointSilenceMs: 0,
-        suppressBlank: false,
-        translateToEnglish: false,
+        silenceDurationMs: 0,
     };
 }
 exports.STTOptions = {
@@ -347,35 +301,17 @@ exports.STTOptions = {
         if (message.enablePunctuation !== false) {
             writer.uint32(16).bool(message.enablePunctuation);
         }
-        if (message.enableDiarization !== false) {
-            writer.uint32(24).bool(message.enableDiarization);
+        if (message.diarize !== false) {
+            writer.uint32(24).bool(message.diarize);
         }
-        if (message.maxSpeakers !== 0) {
-            writer.uint32(32).int32(message.maxSpeakers);
-        }
-        for (const v of message.vocabularyList) {
-            writer.uint32(42).string(v);
+        if (message.speakersExpected !== undefined) {
+            writer.uint32(32).int32(message.speakersExpected);
         }
         if (message.enableWordTimestamps !== false) {
             writer.uint32(48).bool(message.enableWordTimestamps);
         }
-        if (message.beamSize !== 0) {
-            writer.uint32(56).int32(message.beamSize);
-        }
-        if (message.maxAlternatives !== 0) {
-            writer.uint32(96).int32(message.maxAlternatives);
-        }
-        if (message.chunkDurationMs !== 0) {
-            writer.uint32(104).int32(message.chunkDurationMs);
-        }
-        if (message.endpointSilenceMs !== 0) {
-            writer.uint32(112).int32(message.endpointSilenceMs);
-        }
-        if (message.suppressBlank !== false) {
-            writer.uint32(120).bool(message.suppressBlank);
-        }
-        if (message.translateToEnglish !== false) {
-            writer.uint32(128).bool(message.translateToEnglish);
+        if (message.silenceDurationMs !== 0) {
+            writer.uint32(112).int32(message.silenceDurationMs);
         }
         return writer;
     },
@@ -404,21 +340,14 @@ exports.STTOptions = {
                     if (tag !== 24) {
                         break;
                     }
-                    message.enableDiarization = reader.bool();
+                    message.diarize = reader.bool();
                     continue;
                 }
                 case 4: {
                     if (tag !== 32) {
                         break;
                     }
-                    message.maxSpeakers = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.vocabularyList.push(reader.string());
+                    message.speakersExpected = reader.int32();
                     continue;
                 }
                 case 6: {
@@ -428,46 +357,11 @@ exports.STTOptions = {
                     message.enableWordTimestamps = reader.bool();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.beamSize = reader.int32();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.maxAlternatives = reader.int32();
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 104) {
-                        break;
-                    }
-                    message.chunkDurationMs = reader.int32();
-                    continue;
-                }
                 case 14: {
                     if (tag !== 112) {
                         break;
                     }
-                    message.endpointSilenceMs = reader.int32();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 120) {
-                        break;
-                    }
-                    message.suppressBlank = reader.bool();
-                    continue;
-                }
-                case 16: {
-                    if (tag !== 128) {
-                        break;
-                    }
-                    message.translateToEnglish = reader.bool();
+                    message.silenceDurationMs = reader.int32();
                     continue;
                 }
             }
@@ -486,56 +380,22 @@ exports.STTOptions = {
                 : isSet(object.enable_punctuation)
                     ? globalThis.Boolean(object.enable_punctuation)
                     : false,
-            enableDiarization: isSet(object.enableDiarization)
-                ? globalThis.Boolean(object.enableDiarization)
-                : isSet(object.enable_diarization)
-                    ? globalThis.Boolean(object.enable_diarization)
-                    : false,
-            maxSpeakers: isSet(object.maxSpeakers)
-                ? globalThis.Number(object.maxSpeakers)
-                : isSet(object.max_speakers)
-                    ? globalThis.Number(object.max_speakers)
-                    : 0,
-            vocabularyList: globalThis.Array.isArray(object?.vocabularyList)
-                ? object.vocabularyList.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.vocabulary_list)
-                    ? object.vocabulary_list.map((e) => globalThis.String(e))
-                    : [],
+            diarize: isSet(object.diarize) ? globalThis.Boolean(object.diarize) : false,
+            speakersExpected: isSet(object.speakersExpected)
+                ? globalThis.Number(object.speakersExpected)
+                : isSet(object.speakers_expected)
+                    ? globalThis.Number(object.speakers_expected)
+                    : undefined,
             enableWordTimestamps: isSet(object.enableWordTimestamps)
                 ? globalThis.Boolean(object.enableWordTimestamps)
                 : isSet(object.enable_word_timestamps)
                     ? globalThis.Boolean(object.enable_word_timestamps)
                     : false,
-            beamSize: isSet(object.beamSize)
-                ? globalThis.Number(object.beamSize)
-                : isSet(object.beam_size)
-                    ? globalThis.Number(object.beam_size)
+            silenceDurationMs: isSet(object.silenceDurationMs)
+                ? globalThis.Number(object.silenceDurationMs)
+                : isSet(object.silence_duration_ms)
+                    ? globalThis.Number(object.silence_duration_ms)
                     : 0,
-            maxAlternatives: isSet(object.maxAlternatives)
-                ? globalThis.Number(object.maxAlternatives)
-                : isSet(object.max_alternatives)
-                    ? globalThis.Number(object.max_alternatives)
-                    : 0,
-            chunkDurationMs: isSet(object.chunkDurationMs)
-                ? globalThis.Number(object.chunkDurationMs)
-                : isSet(object.chunk_duration_ms)
-                    ? globalThis.Number(object.chunk_duration_ms)
-                    : 0,
-            endpointSilenceMs: isSet(object.endpointSilenceMs)
-                ? globalThis.Number(object.endpointSilenceMs)
-                : isSet(object.endpoint_silence_ms)
-                    ? globalThis.Number(object.endpoint_silence_ms)
-                    : 0,
-            suppressBlank: isSet(object.suppressBlank)
-                ? globalThis.Boolean(object.suppressBlank)
-                : isSet(object.suppress_blank)
-                    ? globalThis.Boolean(object.suppress_blank)
-                    : false,
-            translateToEnglish: isSet(object.translateToEnglish)
-                ? globalThis.Boolean(object.translateToEnglish)
-                : isSet(object.translate_to_english)
-                    ? globalThis.Boolean(object.translate_to_english)
-                    : false,
         };
     },
     toJSON(message) {
@@ -546,35 +406,17 @@ exports.STTOptions = {
         if (message.enablePunctuation !== false) {
             obj.enablePunctuation = message.enablePunctuation;
         }
-        if (message.enableDiarization !== false) {
-            obj.enableDiarization = message.enableDiarization;
+        if (message.diarize !== false) {
+            obj.diarize = message.diarize;
         }
-        if (message.maxSpeakers !== 0) {
-            obj.maxSpeakers = Math.round(message.maxSpeakers);
-        }
-        if (message.vocabularyList?.length) {
-            obj.vocabularyList = message.vocabularyList;
+        if (message.speakersExpected !== undefined) {
+            obj.speakersExpected = Math.round(message.speakersExpected);
         }
         if (message.enableWordTimestamps !== false) {
             obj.enableWordTimestamps = message.enableWordTimestamps;
         }
-        if (message.beamSize !== 0) {
-            obj.beamSize = Math.round(message.beamSize);
-        }
-        if (message.maxAlternatives !== 0) {
-            obj.maxAlternatives = Math.round(message.maxAlternatives);
-        }
-        if (message.chunkDurationMs !== 0) {
-            obj.chunkDurationMs = Math.round(message.chunkDurationMs);
-        }
-        if (message.endpointSilenceMs !== 0) {
-            obj.endpointSilenceMs = Math.round(message.endpointSilenceMs);
-        }
-        if (message.suppressBlank !== false) {
-            obj.suppressBlank = message.suppressBlank;
-        }
-        if (message.translateToEnglish !== false) {
-            obj.translateToEnglish = message.translateToEnglish;
+        if (message.silenceDurationMs !== 0) {
+            obj.silenceDurationMs = Math.round(message.silenceDurationMs);
         }
         return obj;
     },
@@ -585,16 +427,10 @@ exports.STTOptions = {
         const message = createBaseSTTOptions();
         message.language = object.language ?? undefined;
         message.enablePunctuation = object.enablePunctuation ?? false;
-        message.enableDiarization = object.enableDiarization ?? false;
-        message.maxSpeakers = object.maxSpeakers ?? 0;
-        message.vocabularyList = object.vocabularyList?.map((e) => e) || [];
+        message.diarize = object.diarize ?? false;
+        message.speakersExpected = object.speakersExpected ?? undefined;
         message.enableWordTimestamps = object.enableWordTimestamps ?? false;
-        message.beamSize = object.beamSize ?? 0;
-        message.maxAlternatives = object.maxAlternatives ?? 0;
-        message.chunkDurationMs = object.chunkDurationMs ?? 0;
-        message.endpointSilenceMs = object.endpointSilenceMs ?? 0;
-        message.suppressBlank = object.suppressBlank ?? false;
-        message.translateToEnglish = object.translateToEnglish ?? false;
+        message.silenceDurationMs = object.silenceDurationMs ?? 0;
         return message;
     },
 };
@@ -602,12 +438,10 @@ function createBaseSTTAudioSource() {
     return {
         audioData: undefined,
         fileUri: undefined,
-        adapterHandle: undefined,
         encoding: 0,
         audioFormat: 0,
         sampleRate: 0,
         channels: 0,
-        bitsPerSample: 0,
         durationMs: 0,
     };
 }
@@ -618,9 +452,6 @@ exports.STTAudioSource = {
         }
         if (message.fileUri !== undefined) {
             writer.uint32(18).string(message.fileUri);
-        }
-        if (message.adapterHandle !== undefined) {
-            writer.uint32(26).string(message.adapterHandle);
         }
         if (message.encoding !== 0) {
             writer.uint32(32).int32(message.encoding);
@@ -633,9 +464,6 @@ exports.STTAudioSource = {
         }
         if (message.channels !== 0) {
             writer.uint32(56).int32(message.channels);
-        }
-        if (message.bitsPerSample !== 0) {
-            writer.uint32(64).int32(message.bitsPerSample);
         }
         if (message.durationMs !== 0) {
             writer.uint32(72).int64(message.durationMs);
@@ -661,13 +489,6 @@ exports.STTAudioSource = {
                         break;
                     }
                     message.fileUri = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.adapterHandle = reader.string();
                     continue;
                 }
                 case 4: {
@@ -698,13 +519,6 @@ exports.STTAudioSource = {
                     message.channels = reader.int32();
                     continue;
                 }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.bitsPerSample = reader.int32();
-                    continue;
-                }
                 case 9: {
                     if (tag !== 72) {
                         break;
@@ -732,11 +546,6 @@ exports.STTAudioSource = {
                 : isSet(object.file_uri)
                     ? globalThis.String(object.file_uri)
                     : undefined,
-            adapterHandle: isSet(object.adapterHandle)
-                ? globalThis.String(object.adapterHandle)
-                : isSet(object.adapter_handle)
-                    ? globalThis.String(object.adapter_handle)
-                    : undefined,
             encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             audioFormat: isSet(object.audioFormat)
                 ? (0, model_types_1.audioFormatFromJSON)(object.audioFormat)
@@ -749,11 +558,6 @@ exports.STTAudioSource = {
                     ? globalThis.Number(object.sample_rate)
                     : 0,
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            bitsPerSample: isSet(object.bitsPerSample)
-                ? globalThis.Number(object.bitsPerSample)
-                : isSet(object.bits_per_sample)
-                    ? globalThis.Number(object.bits_per_sample)
-                    : 0,
             durationMs: isSet(object.durationMs)
                 ? globalThis.Number(object.durationMs)
                 : isSet(object.duration_ms)
@@ -769,9 +573,6 @@ exports.STTAudioSource = {
         if (message.fileUri !== undefined) {
             obj.fileUri = message.fileUri;
         }
-        if (message.adapterHandle !== undefined) {
-            obj.adapterHandle = message.adapterHandle;
-        }
         if (message.encoding !== 0) {
             obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
@@ -783,9 +584,6 @@ exports.STTAudioSource = {
         }
         if (message.channels !== 0) {
             obj.channels = Math.round(message.channels);
-        }
-        if (message.bitsPerSample !== 0) {
-            obj.bitsPerSample = Math.round(message.bitsPerSample);
         }
         if (message.durationMs !== 0) {
             obj.durationMs = Math.round(message.durationMs);
@@ -799,12 +597,10 @@ exports.STTAudioSource = {
         const message = createBaseSTTAudioSource();
         message.audioData = object.audioData ?? undefined;
         message.fileUri = object.fileUri ?? undefined;
-        message.adapterHandle = object.adapterHandle ?? undefined;
         message.encoding = object.encoding ?? 0;
         message.audioFormat = object.audioFormat ?? 0;
         message.sampleRate = object.sampleRate ?? 0;
         message.channels = object.channels ?? 0;
-        message.bitsPerSample = object.bitsPerSample ?? 0;
         message.durationMs = object.durationMs ?? 0;
         return message;
     },
@@ -1211,7 +1007,7 @@ exports.TranscriptionAlternative = {
     },
 };
 function createBaseTranscriptionMetadata() {
-    return { modelId: "", processingTimeMs: 0, audioLengthMs: 0 };
+    return { modelId: "", processingTimeMs: 0 };
 }
 exports.TranscriptionMetadata = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1220,9 +1016,6 @@ exports.TranscriptionMetadata = {
         }
         if (message.processingTimeMs !== 0) {
             writer.uint32(16).int64(message.processingTimeMs);
-        }
-        if (message.audioLengthMs !== 0) {
-            writer.uint32(24).int64(message.audioLengthMs);
         }
         return writer;
     },
@@ -1247,13 +1040,6 @@ exports.TranscriptionMetadata = {
                     message.processingTimeMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.audioLengthMs = longToNumber(reader.int64());
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1274,11 +1060,6 @@ exports.TranscriptionMetadata = {
                 : isSet(object.processing_time_ms)
                     ? globalThis.Number(object.processing_time_ms)
                     : 0,
-            audioLengthMs: isSet(object.audioLengthMs)
-                ? globalThis.Number(object.audioLengthMs)
-                : isSet(object.audio_length_ms)
-                    ? globalThis.Number(object.audio_length_ms)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -1289,9 +1070,6 @@ exports.TranscriptionMetadata = {
         if (message.processingTimeMs !== 0) {
             obj.processingTimeMs = Math.round(message.processingTimeMs);
         }
-        if (message.audioLengthMs !== 0) {
-            obj.audioLengthMs = Math.round(message.audioLengthMs);
-        }
         return obj;
     },
     create(base) {
@@ -1301,7 +1079,6 @@ exports.TranscriptionMetadata = {
         const message = createBaseTranscriptionMetadata();
         message.modelId = object.modelId ?? "";
         message.processingTimeMs = object.processingTimeMs ?? 0;
-        message.audioLengthMs = object.audioLengthMs ?? 0;
         return message;
     },
 };
@@ -1315,7 +1092,6 @@ function createBaseSTTOutput() {
         metadata: undefined,
         timestampMs: 0,
         durationMs: 0,
-        speakerIds: [],
         segmentIndex: 0,
         error: undefined,
     };
@@ -1345,9 +1121,6 @@ exports.STTOutput = {
         }
         if (message.durationMs !== 0) {
             writer.uint32(72).int64(message.durationMs);
-        }
-        for (const v of message.speakerIds) {
-            writer.uint32(82).string(v);
         }
         if (message.segmentIndex !== 0) {
             writer.uint32(104).int32(message.segmentIndex);
@@ -1420,13 +1193,6 @@ exports.STTOutput = {
                     message.durationMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.speakerIds.push(reader.string());
-                    continue;
-                }
                 case 13: {
                     if (tag !== 104) {
                         break;
@@ -1469,11 +1235,6 @@ exports.STTOutput = {
                 : isSet(object.duration_ms)
                     ? globalThis.Number(object.duration_ms)
                     : 0,
-            speakerIds: globalThis.Array.isArray(object?.speakerIds)
-                ? object.speakerIds.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.speaker_ids)
-                    ? object.speaker_ids.map((e) => globalThis.String(e))
-                    : [],
             segmentIndex: isSet(object.segmentIndex)
                 ? globalThis.Number(object.segmentIndex)
                 : isSet(object.segment_index)
@@ -1508,9 +1269,6 @@ exports.STTOutput = {
         if (message.durationMs !== 0) {
             obj.durationMs = Math.round(message.durationMs);
         }
-        if (message.speakerIds?.length) {
-            obj.speakerIds = message.speakerIds;
-        }
         if (message.segmentIndex !== 0) {
             obj.segmentIndex = Math.round(message.segmentIndex);
         }
@@ -1534,7 +1292,6 @@ exports.STTOutput = {
             : undefined;
         message.timestampMs = object.timestampMs ?? 0;
         message.durationMs = object.durationMs ?? 0;
-        message.speakerIds = object.speakerIds?.map((e) => e) || [];
         message.segmentIndex = object.segmentIndex ?? 0;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
@@ -1543,20 +1300,7 @@ exports.STTOutput = {
     },
 };
 function createBaseSTTPartialResult() {
-    return {
-        text: "",
-        isFinal: false,
-        stability: 0,
-        confidence: 0,
-        language: undefined,
-        timestampMs: 0,
-        alternatives: [],
-        requestId: "",
-        segmentIndex: 0,
-        audioStartMs: 0,
-        audioEndMs: 0,
-        finalOutput: undefined,
-    };
+    return { text: "", isFinal: false, language: undefined };
 }
 exports.STTPartialResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1566,35 +1310,8 @@ exports.STTPartialResult = {
         if (message.isFinal !== false) {
             writer.uint32(16).bool(message.isFinal);
         }
-        if (message.stability !== 0) {
-            writer.uint32(29).float(message.stability);
-        }
-        if (message.confidence !== 0) {
-            writer.uint32(37).float(message.confidence);
-        }
         if (message.language !== undefined) {
             writer.uint32(114).string(message.language);
-        }
-        if (message.timestampMs !== 0) {
-            writer.uint32(48).int64(message.timestampMs);
-        }
-        for (const v of message.alternatives) {
-            exports.TranscriptionAlternative.encode(v, writer.uint32(58).fork()).join();
-        }
-        if (message.requestId !== "") {
-            writer.uint32(74).string(message.requestId);
-        }
-        if (message.segmentIndex !== 0) {
-            writer.uint32(80).int32(message.segmentIndex);
-        }
-        if (message.audioStartMs !== 0) {
-            writer.uint32(88).int64(message.audioStartMs);
-        }
-        if (message.audioEndMs !== 0) {
-            writer.uint32(96).int64(message.audioEndMs);
-        }
-        if (message.finalOutput !== undefined) {
-            exports.STTOutput.encode(message.finalOutput, writer.uint32(106).fork()).join();
         }
         return writer;
     },
@@ -1619,74 +1336,11 @@ exports.STTPartialResult = {
                     message.isFinal = reader.bool();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 29) {
-                        break;
-                    }
-                    message.stability = reader.float();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.confidence = reader.float();
-                    continue;
-                }
                 case 14: {
                     if (tag !== 114) {
                         break;
                     }
                     message.language = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.timestampMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.alternatives.push(exports.TranscriptionAlternative.decode(reader, reader.uint32()));
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.requestId = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.segmentIndex = reader.int32();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.audioStartMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.audioEndMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 106) {
-                        break;
-                    }
-                    message.finalOutput = exports.STTOutput.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1705,42 +1359,7 @@ exports.STTPartialResult = {
                 : isSet(object.is_final)
                     ? globalThis.Boolean(object.is_final)
                     : false,
-            stability: isSet(object.stability) ? globalThis.Number(object.stability) : 0,
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
             language: isSet(object.language) ? globalThis.String(object.language) : undefined,
-            timestampMs: isSet(object.timestampMs)
-                ? globalThis.Number(object.timestampMs)
-                : isSet(object.timestamp_ms)
-                    ? globalThis.Number(object.timestamp_ms)
-                    : 0,
-            alternatives: globalThis.Array.isArray(object?.alternatives)
-                ? object.alternatives.map((e) => exports.TranscriptionAlternative.fromJSON(e))
-                : [],
-            requestId: isSet(object.requestId)
-                ? globalThis.String(object.requestId)
-                : isSet(object.request_id)
-                    ? globalThis.String(object.request_id)
-                    : "",
-            segmentIndex: isSet(object.segmentIndex)
-                ? globalThis.Number(object.segmentIndex)
-                : isSet(object.segment_index)
-                    ? globalThis.Number(object.segment_index)
-                    : 0,
-            audioStartMs: isSet(object.audioStartMs)
-                ? globalThis.Number(object.audioStartMs)
-                : isSet(object.audio_start_ms)
-                    ? globalThis.Number(object.audio_start_ms)
-                    : 0,
-            audioEndMs: isSet(object.audioEndMs)
-                ? globalThis.Number(object.audioEndMs)
-                : isSet(object.audio_end_ms)
-                    ? globalThis.Number(object.audio_end_ms)
-                    : 0,
-            finalOutput: isSet(object.finalOutput)
-                ? exports.STTOutput.fromJSON(object.finalOutput)
-                : isSet(object.final_output)
-                    ? exports.STTOutput.fromJSON(object.final_output)
-                    : undefined,
         };
     },
     toJSON(message) {
@@ -1751,35 +1370,8 @@ exports.STTPartialResult = {
         if (message.isFinal !== false) {
             obj.isFinal = message.isFinal;
         }
-        if (message.stability !== 0) {
-            obj.stability = message.stability;
-        }
-        if (message.confidence !== 0) {
-            obj.confidence = message.confidence;
-        }
         if (message.language !== undefined) {
             obj.language = message.language;
-        }
-        if (message.timestampMs !== 0) {
-            obj.timestampMs = Math.round(message.timestampMs);
-        }
-        if (message.alternatives?.length) {
-            obj.alternatives = message.alternatives.map((e) => exports.TranscriptionAlternative.toJSON(e));
-        }
-        if (message.requestId !== "") {
-            obj.requestId = message.requestId;
-        }
-        if (message.segmentIndex !== 0) {
-            obj.segmentIndex = Math.round(message.segmentIndex);
-        }
-        if (message.audioStartMs !== 0) {
-            obj.audioStartMs = Math.round(message.audioStartMs);
-        }
-        if (message.audioEndMs !== 0) {
-            obj.audioEndMs = Math.round(message.audioEndMs);
-        }
-        if (message.finalOutput !== undefined) {
-            obj.finalOutput = exports.STTOutput.toJSON(message.finalOutput);
         }
         return obj;
     },
@@ -1790,18 +1382,7 @@ exports.STTPartialResult = {
         const message = createBaseSTTPartialResult();
         message.text = object.text ?? "";
         message.isFinal = object.isFinal ?? false;
-        message.stability = object.stability ?? 0;
-        message.confidence = object.confidence ?? 0;
         message.language = object.language ?? undefined;
-        message.timestampMs = object.timestampMs ?? 0;
-        message.alternatives = object.alternatives?.map((e) => exports.TranscriptionAlternative.fromPartial(e)) || [];
-        message.requestId = object.requestId ?? "";
-        message.segmentIndex = object.segmentIndex ?? 0;
-        message.audioStartMs = object.audioStartMs ?? 0;
-        message.audioEndMs = object.audioEndMs ?? 0;
-        message.finalOutput = (object.finalOutput !== undefined && object.finalOutput !== null)
-            ? exports.STTOutput.fromPartial(object.finalOutput)
-            : undefined;
         return message;
     },
 };
@@ -1975,13 +1556,7 @@ exports.STTStreamEvent = {
     },
 };
 function createBaseSTTServiceState() {
-    return {
-        isReady: false,
-        currentModel: undefined,
-        supportsStreaming: false,
-        supportedLanguageCodes: [],
-        error: undefined,
-    };
+    return { isReady: false, currentModel: undefined, supportsStreaming: false, supportedLanguageCodes: [] };
 }
 exports.STTServiceState = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1996,9 +1571,6 @@ exports.STTServiceState = {
         }
         for (const v of message.supportedLanguageCodes) {
             writer.uint32(34).string(v);
-        }
-        if (message.error !== undefined) {
-            errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
         }
         return writer;
     },
@@ -2037,13 +1609,6 @@ exports.STTServiceState = {
                     message.supportedLanguageCodes.push(reader.string());
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2074,7 +1639,6 @@ exports.STTServiceState = {
                 : globalThis.Array.isArray(object?.supported_language_codes)
                     ? object.supported_language_codes.map((e) => globalThis.String(e))
                     : [],
-            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2091,9 +1655,6 @@ exports.STTServiceState = {
         if (message.supportedLanguageCodes?.length) {
             obj.supportedLanguageCodes = message.supportedLanguageCodes;
         }
-        if (message.error !== undefined) {
-            obj.error = errors_1.SDKError.toJSON(message.error);
-        }
         return obj;
     },
     create(base) {
@@ -2105,9 +1666,6 @@ exports.STTServiceState = {
         message.currentModel = object.currentModel ?? undefined;
         message.supportsStreaming = object.supportsStreaming ?? false;
         message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
-        message.error = (object.error !== undefined && object.error !== null)
-            ? errors_1.SDKError.fromPartial(object.error)
-            : undefined;
         return message;
     },
 };

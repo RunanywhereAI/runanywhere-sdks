@@ -1,36 +1,19 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
+import { SDKEnvironment } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
-export declare enum SdkInitPhase {
-    SDK_INIT_PHASE_UNSPECIFIED = 0,
-    /** SDK_INIT_PHASE_ONE - Synchronous core init, no network */
-    SDK_INIT_PHASE_ONE = 1,
-    /** SDK_INIT_PHASE_TWO - Async services init, network */
-    SDK_INIT_PHASE_TWO = 2,
-    /** SDK_INIT_PHASE_RETRY_HTTP - HTTP/auth retry after an offline init */
-    SDK_INIT_PHASE_RETRY_HTTP = 3,
-    UNRECOGNIZED = -1
-}
-export declare function sdkInitPhaseFromJSON(object: any): SdkInitPhase;
-export declare function sdkInitPhaseToJSON(object: SdkInitPhase): string;
-/**
- * PRODUCTION is 2 because 1 was a staging value in shipped commons and
- * xcframework builds. Do not renumber.
- */
-export declare enum SdkInitEnvironment {
-    SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0,
-    SDK_INIT_ENVIRONMENT_PRODUCTION = 2,
-    UNRECOGNIZED = -1
-}
-export declare function sdkInitEnvironmentFromJSON(object: any): SdkInitEnvironment;
-export declare function sdkInitEnvironmentToJSON(object: SdkInitEnvironment): string;
 /**
  * The only platform-supplied values commons cannot derive itself. Platform
  * adapter callbacks are registered separately through rac_platform_adapter_t
  * before this call; this message is purely the data envelope.
  */
 export interface SdkInitPhase1Request {
-    environment: SdkInitEnvironment;
+    /**
+     * model_types.proto's SDKEnvironment is the single environment vocabulary.
+     * Its zero is UNSPECIFIED, so an omitted field means unset, not
+     * "development": commons must fail closed rather than pick an environment.
+     */
+    environment: SDKEnvironment;
     /** May be empty in development mode. */
     apiKey: string;
     /** May be empty in development mode. */
@@ -39,43 +22,41 @@ export interface SdkInitPhase1Request {
     deviceId: string;
     platform: string;
     sdkVersion: string;
+    /**
+     * Caller override for NetworkDefaults.request_timeout_ms. Unset = the pool
+     * default (60000). openai-python / anthropic-python `timeout`.
+     */
+    requestTimeoutMs?: number | undefined;
+    /**
+     * Caller override for NetworkDefaults.max_retries. Unset = the pool
+     * default (3). openai-python / anthropic-python `max_retries`; 0 disables
+     * retries.
+     */
+    maxRetries?: number | undefined;
 }
 /**
- * Most state is already resident in commons after Phase 1; these are the
- * per-call hints that stay SDK-owned.
+ * The one value that legitimately varies between a dev build and a release.
+ * Telemetry flushing and registry/local-file reconciliation are commons
+ * behaviour, not per-call hints.
  */
 export interface SdkInitPhase2Request {
     /** Dev-mode device registration token. */
     buildToken: string;
-    forceRefreshAssignments: boolean;
-    flushTelemetry: boolean;
-    /** Reconcile registry rows with local files. */
-    discoverDownloadedModels: boolean;
-    rescanLocalModels: boolean;
 }
 /**
  * Returned by Phase 1, Phase 2, and retryHTTP.
  *
  * A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
- * to fail in offline mode, in which case error is unset, http_configured=false,
- * and warning holds the offline notice while the SDK continues on cached
- * models.
+ * to fail in offline mode, in which case error is unset and warning holds the
+ * offline notice while the SDK continues on cached models.
  */
 export interface SdkInitResult {
-    phase: SdkInitPhase;
     error?: SDKError | undefined;
-    /** HTTP transport wired at this call site. */
-    httpConfigured: boolean;
-    deviceRegistered: boolean;
     /** Registry rows that linked to local files. */
     linkedModelsCount: number;
-    /** On-disk folders with no registry row. */
-    discoveredOrphans: number;
     warning: string;
-    durationMs: number;
     /**
-     * The cross-phase latched bit that survives between calls, as opposed to
-     * http_configured, which describes only the calling phase. SDKs read this
+     * The cross-phase latched bit that survives between calls. SDKs read this
      * to decide whether an authenticated call can proceed without a retryHTTP.
      */
     hasCompletedHttpSetup: boolean;

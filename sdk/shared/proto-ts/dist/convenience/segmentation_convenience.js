@@ -13,16 +13,8 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateSegmentationImage = exports.segmentationImageDefaults = void 0;
+exports.validateSegmentationImage = void 0;
 const _errors_1 = require("./_errors");
-const segmentationImageDefaults = () => ({
-    data: new Uint8Array(0),
-    width: 0,
-    height: 0,
-    pixelFormat: 0,
-    strideBytes: 0,
-});
-exports.segmentationImageDefaults = segmentationImageDefaults;
 const validateSegmentationImage = (m) => {
     if (m.width === 0) {
         throw new _errors_1.ValidationError({
@@ -30,10 +22,22 @@ const validateSegmentationImage = (m) => {
             message: 'width is required',
         });
     }
+    if (m.width < 1 || m.width > 4096) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'SegmentationImage.width',
+            message: `width must be in 1...4096 (got ${m.width})`,
+        });
+    }
     if (m.height === 0) {
         throw new _errors_1.ValidationError({
             fieldPath: 'SegmentationImage.height',
             message: 'height is required',
+        });
+    }
+    if (m.height < 1 || m.height > 4096) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'SegmentationImage.height',
+            message: `height must be in 1...4096 (got ${m.height})`,
         });
     }
 };

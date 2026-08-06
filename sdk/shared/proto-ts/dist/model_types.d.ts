@@ -1,6 +1,6 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
-import { AccelerationPreference, HardwareProfile } from "./hardware_profile";
+import { AccelerationPreference } from "./hardware_profile";
 import { ThinkingTagPattern } from "./thinking_tag_pattern";
 export declare const protobufPackage = "runanywhere.v1";
 /** Container format of an audio payload. */
@@ -105,10 +105,7 @@ export declare enum InferenceFramework {
 }
 export declare function inferenceFrameworkFromJSON(object: any): InferenceFramework;
 export declare function inferenceFrameworkToJSON(object: InferenceFramework): string;
-/**
- * What a model does. There is no RERANK member, which is why the rerank
- * primitive cannot auto-load a model.
- */
+/** What a model does. */
 export declare enum ModelCategory {
     MODEL_CATEGORY_UNSPECIFIED = 0,
     MODEL_CATEGORY_LANGUAGE = 1,
@@ -123,6 +120,7 @@ export declare enum ModelCategory {
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
     MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
+    MODEL_CATEGORY_RERANK = 12,
     UNRECOGNIZED = -1
 }
 export declare function modelCategoryFromJSON(object: any): ModelCategory;
@@ -213,18 +211,6 @@ export declare enum ModelRegistryStatus {
 }
 export declare function modelRegistryStatusFromJSON(object: any): ModelRegistryStatus;
 export declare function modelRegistryStatusToJSON(object: ModelRegistryStatus): string;
-export declare enum ModelQuerySortField {
-    MODEL_QUERY_SORT_FIELD_UNSPECIFIED = 0,
-    MODEL_QUERY_SORT_FIELD_NAME = 1,
-    MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS = 2,
-    MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS = 3,
-    MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4,
-    MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5,
-    MODEL_QUERY_SORT_FIELD_USAGE_COUNT = 6,
-    UNRECOGNIZED = -1
-}
-export declare function modelQuerySortFieldFromJSON(object: any): ModelQuerySortField;
-export declare function modelQuerySortFieldToJSON(object: ModelQuerySortField): string;
 /**
  * Role of a file inside a single/multi-file artifact. The generic COMPANION
  * role covers arbitrary sidecars; specific roles document common public
@@ -264,6 +250,17 @@ export declare enum RoutingPolicy {
 }
 export declare function routingPolicyFromJSON(object: any): RoutingPolicy;
 export declare function routingPolicyToJSON(object: RoutingPolicy): string;
+/** Requested execution placement for a load. LiteRT/ExecuTorch-aligned. */
+export declare enum AcceleratorPolicy {
+    ACCELERATOR_POLICY_UNSPECIFIED = 0,
+    ACCELERATOR_POLICY_AUTO = 1,
+    ACCELERATOR_POLICY_CPU = 2,
+    ACCELERATOR_POLICY_GPU = 3,
+    ACCELERATOR_POLICY_NPU = 4,
+    UNRECOGNIZED = -1
+}
+export declare function acceleratorPolicyFromJSON(object: any): AcceleratorPolicy;
+export declare function acceleratorPolicyToJSON(object: AcceleratorPolicy): string;
 export interface ModelInfoMetadata {
     description: string;
     author: string;
@@ -326,16 +323,7 @@ export interface ModelInfo {
     singleFile?: SingleFileArtifact | undefined;
     archive?: ArchiveArtifact | undefined;
     multiFile?: MultiFileArtifact | undefined;
-    customStrategyId?: string | undefined;
     builtIn?: boolean | undefined;
-    /**
-     * High-level artifact classification, complementary to the `artifact`
-     * oneof above. Allows catalog entries to carry a coarse type tag without
-     * resolving the full strategy variant.
-     */
-    artifactType?: ModelArtifactType | undefined;
-    /** Manifest of files that are expected on disk after fetch/extraction. */
-    expectedFiles?: ExpectedModelFiles | undefined;
     /** Preferred hardware acceleration backend for this model. */
     accelerationPreference?: AccelerationPreference | undefined;
     /** Hybrid (on-device vs cloud) routing policy for this entry. */
@@ -347,16 +335,14 @@ export interface ModelInfo {
     compatibility?: ModelRuntimeCompatibility | undefined;
     preferredFramework?: InferenceFramework | undefined;
     /**
-     * Durable registry state. Live byte progress belongs to
-     * download_service.DownloadProgress, not ModelInfo.
+     * The single durable state of this entry, and the only downloaded-ness
+     * signal. A non-empty local_path (7) is location data, NOT state: it
+     * stays populated for an entry whose files were deleted. Live byte
+     * progress belongs to download_service.DownloadProgress, not ModelInfo.
      */
     registryStatus?: ModelRegistryStatus | undefined;
-    isDownloaded?: boolean | undefined;
     isAvailable?: boolean | undefined;
     lastUsedAtUnixMs?: number | undefined;
-    usageCount?: number | undefined;
-    syncPending?: boolean | undefined;
-    statusMessage?: string | undefined;
     /**
      * Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
      * this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
@@ -373,20 +359,11 @@ export interface ModelInfoList {
     models: ModelInfo[];
 }
 export interface SingleFileArtifact {
-    requiredPatterns: string[];
-    optionalPatterns: string[];
-    /**
-     * Full manifest form for SDK-local wrappers that attach expected files to
-     * a single-file artifact. The pattern fields above remain for existing
-     * generated consumers.
-     */
     expectedFiles?: ExpectedModelFiles | undefined;
 }
 export interface ArchiveArtifact {
     type: ArchiveType;
     structure: ArchiveStructure;
-    requiredPatterns: string[];
-    optionalPatterns: string[];
     /**
      * Full manifest form for archive artifacts after extraction. Archive
      * extraction policy is portable; native filesystem permissions and handles
@@ -397,14 +374,8 @@ export interface ArchiveArtifact {
 export interface ModelFileDescriptor {
     url: string;
     filename: string;
-    isRequired: boolean;
-    /**
-     * Extended descriptor fields (Flutter model_types.dart:~350,
-     * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
-     * canonical "required" flag — the documented `required` boolean from
-     * newer SDK sources maps onto it (default true, mirrored in Swift).
-     * Exact on-disk artifact size, verified after download.
-     */
+    isOptional: boolean;
+    /** Exact on-disk artifact size, verified after download. */
     sizeBytes?: number | undefined;
     /**
      * Path fields used by SDK-local wrappers/catalogs. `filename` is the
@@ -436,18 +407,16 @@ export interface ExpectedModelFiles {
  * Registry/query filters shared by SDK model-management APIs. UI-only
  * presentation state and platform filesystem handles are intentionally not
  * represented here.
+ * Filters only. Ordering is the client's -- a local catalog is tens of rows.
  */
 export interface ModelQuery {
     framework?: InferenceFramework | undefined;
     category?: ModelCategory | undefined;
     format?: ModelFormat | undefined;
     downloadedOnly?: boolean | undefined;
-    availableOnly?: boolean | undefined;
     maxSizeBytes?: number | undefined;
-    searchQuery: string;
-    source?: ModelSource | undefined;
-    sortField?: ModelQuerySortField | undefined;
-    descending?: boolean | undefined;
+    /** Optional so "no search" is expressible; empty string is not a filter. */
+    searchQuery?: string | undefined;
     registryStatus?: ModelRegistryStatus | undefined;
 }
 export interface ModelRegistryRefreshRequest {
@@ -471,29 +440,16 @@ export interface ModelRegistryRefreshRequest {
 }
 export interface ModelRegistryRefreshResult {
     models?: ModelInfoList | undefined;
-    registeredCount: number;
-    updatedCount: number;
-    discoveredCount: number;
-    prunedCount: number;
     refreshedAtUnixMs: number;
     warnings: string[];
-    downloadedCount: number;
-    availableCount: number;
-    errorCount: number;
     error?: SDKError | undefined;
 }
 export interface ModelListRequest {
     /** Set query.downloaded_only for downloaded-only lists. */
     query?: ModelQuery | undefined;
-    /** Include denormalized counts in ModelListResult. */
-    includeCounts: boolean;
 }
 export interface ModelListResult {
     models?: ModelInfoList | undefined;
-    totalCount: number;
-    downloadedCount: number;
-    availableCount: number;
-    filteredCount: number;
     error?: SDKError | undefined;
 }
 export interface ModelGetRequest {
@@ -554,11 +510,7 @@ export interface DiscoveredModel {
 }
 export interface ModelDiscoveryResult {
     discoveredModels: DiscoveredModel[];
-    linkedCount: number;
-    purgedCount: number;
     warnings: string[];
-    scannedCount: number;
-    importedCount: number;
     error?: SDKError | undefined;
 }
 export interface ModelLoadRequest {
@@ -571,17 +523,16 @@ export interface ModelLoadRequest {
     framework?: InferenceFramework | undefined;
     forceReload: boolean;
     validateAvailability: boolean;
-    /** v4 placement knobs (honored end-to-end; never silently dropped). */
+    /**
+     * The one load knob every on-device runtime exposes. Unset or 0 means
+     * "take it from the model" (llama.cpp --ctx-size semantics) -- never a
+     * hardcoded small default. Carried by the native load ABI.
+     */
     contextLength?: number | undefined;
-    threads?: number | undefined;
-    /** deprecated adapter; maps to accelerator */
+    /** a hard runtime guarantee */
     useGpu?: boolean | undefined;
     backendPreferences: InferenceFramework[];
-    /**
-     * AcceleratorPolicy values live in public_api_v4.proto; stored as int32
-     * here to avoid a circular import with LoadedModelInfo helpers.
-     */
-    acceleratorPolicy?: number | undefined;
+    acceleratorPolicy?: AcceleratorPolicy | undefined;
 }
 export interface ModelLoadResult {
     modelId: string;
@@ -608,6 +559,11 @@ export interface ModelLoadResult {
     runtimeVersion?: string | undefined;
     abiVersion?: string | undefined;
     fallbackReason?: string | undefined;
+    /**
+     * What context length the runtime actually allocated -- a request is
+     * not a promise.
+     */
+    allocatedContextLength?: number | undefined;
 }
 export interface ModelUnloadRequest {
     modelId: string;
@@ -637,13 +593,15 @@ export interface CurrentModelResult {
     resolvedArtifacts: ModelFileDescriptor[];
     error?: SDKError | undefined;
 }
+/**
+ * delete(model_id) frees DISK. It always unloads the model first if it is
+ * resident -- there is no flag, and no failure mode for "still loaded".
+ * Entries whose source is MODEL_SOURCE_BUILT_IN are never deletable and fail
+ * with an SDKError. Success is the absence of `error`.
+ */
 export interface ModelDeleteResult {
     modelId: string;
     deletedBytes: number;
-    filesDeleted: boolean;
-    registryUpdated: boolean;
-    wasLoaded: boolean;
-    warnings: string[];
     error?: SDKError | undefined;
 }
 /**
@@ -659,12 +617,6 @@ export interface ModelDeleteResult {
 export interface ModelCompatibilityRequest {
     /** Required. Model identifier to evaluate. */
     modelId: string;
-    /**
-     * Optional cached hardware profile from the platform adapter. If
-     * unset, commons will read whatever it has cached internally; the
-     * RAM/storage values below remain authoritative for the verdict.
-     */
-    hardwareProfile?: HardwareProfile | undefined;
     /**
      * Available RAM in bytes (from device probe). 0 = unknown — commons
      * will treat the requirement as satisfied.

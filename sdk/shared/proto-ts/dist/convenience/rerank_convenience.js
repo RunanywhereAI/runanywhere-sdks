@@ -17,6 +17,7 @@ exports.validateRerankRequest = exports.rerankOptionsDefaults = void 0;
 const _errors_1 = require("./_errors");
 const rerankOptionsDefaults = () => ({
     topN: 0,
+    maxTokensPerDoc: 0,
 });
 exports.rerankOptionsDefaults = rerankOptionsDefaults;
 const validateRerankRequest = (m) => {

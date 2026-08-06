@@ -1,7 +1,7 @@
-import { RAGConfiguration, RAGQueryOptions, RAGSearchRequest } from '../rag';
+import { RAGConfiguration, RAGQueryOptions, RAGRetrievalOptions, RAGSearchRequest } from '../rag';
 export declare const rAGConfigurationDefaults: () => RAGConfiguration;
 export declare const validateRAGConfiguration: (m: RAGConfiguration) => void;
-export declare const rAGQueryOptionsDefaults: () => RAGQueryOptions;
+export declare const rAGRetrievalOptionsDefaults: () => RAGRetrievalOptions;
+export declare const validateRAGRetrievalOptions: (m: RAGRetrievalOptions) => void;
 export declare const validateRAGQueryOptions: (m: RAGQueryOptions) => void;
-export declare const rAGSearchRequestDefaults: () => RAGSearchRequest;
 export declare const validateRAGSearchRequest: (m: RAGSearchRequest) => void;

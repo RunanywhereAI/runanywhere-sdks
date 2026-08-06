@@ -5,85 +5,20 @@
 //   protoc               v7.35.1
 // source: rerank.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RerankResult = exports.RerankScoredItem = exports.RerankRequest = exports.RerankOptions = exports.RerankCandidate = exports.protobufPackage = void 0;
+exports.RerankResult = exports.RerankScoredItem = exports.RerankRequest = exports.RerankOptions = exports.protobufPackage = void 0;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
-function createBaseRerankCandidate() {
-    return { id: "", text: "" };
-}
-exports.RerankCandidate = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.id !== "") {
-            writer.uint32(10).string(message.id);
-        }
-        if (message.text !== "") {
-            writer.uint32(18).string(message.text);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseRerankCandidate();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.id = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.text = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            id: isSet(object.id) ? globalThis.String(object.id) : "",
-            text: isSet(object.text) ? globalThis.String(object.text) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.id !== "") {
-            obj.id = message.id;
-        }
-        if (message.text !== "") {
-            obj.text = message.text;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.RerankCandidate.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseRerankCandidate();
-        message.id = object.id ?? "";
-        message.text = object.text ?? "";
-        return message;
-    },
-};
 function createBaseRerankOptions() {
-    return { topN: 0 };
+    return { topN: 0, maxTokensPerDoc: 0 };
 }
 exports.RerankOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.topN !== 0) {
             writer.uint32(8).uint32(message.topN);
+        }
+        if (message.maxTokensPerDoc !== 0) {
+            writer.uint32(16).uint32(message.maxTokensPerDoc);
         }
         return writer;
     },
@@ -101,6 +36,13 @@ exports.RerankOptions = {
                     message.topN = reader.uint32();
                     continue;
                 }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.maxTokensPerDoc = reader.uint32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -116,12 +58,20 @@ exports.RerankOptions = {
                 : isSet(object.top_n)
                     ? globalThis.Number(object.top_n)
                     : 0,
+            maxTokensPerDoc: isSet(object.maxTokensPerDoc)
+                ? globalThis.Number(object.maxTokensPerDoc)
+                : isSet(object.max_tokens_per_doc)
+                    ? globalThis.Number(object.max_tokens_per_doc)
+                    : 0,
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.topN !== 0) {
             obj.topN = Math.round(message.topN);
+        }
+        if (message.maxTokensPerDoc !== 0) {
+            obj.maxTokensPerDoc = Math.round(message.maxTokensPerDoc);
         }
         return obj;
     },
@@ -131,22 +81,26 @@ exports.RerankOptions = {
     fromPartial(object) {
         const message = createBaseRerankOptions();
         message.topN = object.topN ?? 0;
+        message.maxTokensPerDoc = object.maxTokensPerDoc ?? 0;
         return message;
     },
 };
 function createBaseRerankRequest() {
-    return { query: "", candidates: [], options: undefined };
+    return { query: "", options: undefined, documents: [], modelId: undefined };
 }
 exports.RerankRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.query !== "") {
             writer.uint32(10).string(message.query);
         }
-        for (const v of message.candidates) {
-            exports.RerankCandidate.encode(v, writer.uint32(18).fork()).join();
-        }
         if (message.options !== undefined) {
             exports.RerankOptions.encode(message.options, writer.uint32(26).fork()).join();
+        }
+        for (const v of message.documents) {
+            writer.uint32(34).string(v);
+        }
+        if (message.modelId !== undefined) {
+            writer.uint32(42).string(message.modelId);
         }
         return writer;
     },
@@ -164,18 +118,25 @@ exports.RerankRequest = {
                     message.query = reader.string();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.candidates.push(exports.RerankCandidate.decode(reader, reader.uint32()));
-                    continue;
-                }
                 case 3: {
                     if (tag !== 26) {
                         break;
                     }
                     message.options = exports.RerankOptions.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.documents.push(reader.string());
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.modelId = reader.string();
                     continue;
                 }
             }
@@ -189,10 +150,15 @@ exports.RerankRequest = {
     fromJSON(object) {
         return {
             query: isSet(object.query) ? globalThis.String(object.query) : "",
-            candidates: globalThis.Array.isArray(object?.candidates)
-                ? object.candidates.map((e) => exports.RerankCandidate.fromJSON(e))
-                : [],
             options: isSet(object.options) ? exports.RerankOptions.fromJSON(object.options) : undefined,
+            documents: globalThis.Array.isArray(object?.documents)
+                ? object.documents.map((e) => globalThis.String(e))
+                : [],
+            modelId: isSet(object.modelId)
+                ? globalThis.String(object.modelId)
+                : isSet(object.model_id)
+                    ? globalThis.String(object.model_id)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -200,11 +166,14 @@ exports.RerankRequest = {
         if (message.query !== "") {
             obj.query = message.query;
         }
-        if (message.candidates?.length) {
-            obj.candidates = message.candidates.map((e) => exports.RerankCandidate.toJSON(e));
-        }
         if (message.options !== undefined) {
             obj.options = exports.RerankOptions.toJSON(message.options);
+        }
+        if (message.documents?.length) {
+            obj.documents = message.documents;
+        }
+        if (message.modelId !== undefined) {
+            obj.modelId = message.modelId;
         }
         return obj;
     },
@@ -214,29 +183,24 @@ exports.RerankRequest = {
     fromPartial(object) {
         const message = createBaseRerankRequest();
         message.query = object.query ?? "";
-        message.candidates = object.candidates?.map((e) => exports.RerankCandidate.fromPartial(e)) || [];
         message.options = (object.options !== undefined && object.options !== null)
             ? exports.RerankOptions.fromPartial(object.options)
             : undefined;
+        message.documents = object.documents?.map((e) => e) || [];
+        message.modelId = object.modelId ?? undefined;
         return message;
     },
 };
 function createBaseRerankScoredItem() {
-    return { id: "", relevanceScore: 0, index: 0, rank: 0 };
+    return { relevanceScore: 0, index: 0 };
 }
 exports.RerankScoredItem = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.id !== "") {
-            writer.uint32(10).string(message.id);
-        }
         if (message.relevanceScore !== 0) {
             writer.uint32(21).float(message.relevanceScore);
         }
         if (message.index !== 0) {
             writer.uint32(24).uint32(message.index);
-        }
-        if (message.rank !== 0) {
-            writer.uint32(32).uint32(message.rank);
         }
         return writer;
     },
@@ -247,13 +211,6 @@ exports.RerankScoredItem = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.id = reader.string();
-                    continue;
-                }
                 case 2: {
                     if (tag !== 21) {
                         break;
@@ -268,13 +225,6 @@ exports.RerankScoredItem = {
                     message.index = reader.uint32();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.rank = reader.uint32();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -285,29 +235,21 @@ exports.RerankScoredItem = {
     },
     fromJSON(object) {
         return {
-            id: isSet(object.id) ? globalThis.String(object.id) : "",
             relevanceScore: isSet(object.relevanceScore)
                 ? globalThis.Number(object.relevanceScore)
                 : isSet(object.relevance_score)
                     ? globalThis.Number(object.relevance_score)
                     : 0,
             index: isSet(object.index) ? globalThis.Number(object.index) : 0,
-            rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.id !== "") {
-            obj.id = message.id;
-        }
         if (message.relevanceScore !== 0) {
             obj.relevanceScore = message.relevanceScore;
         }
         if (message.index !== 0) {
             obj.index = Math.round(message.index);
-        }
-        if (message.rank !== 0) {
-            obj.rank = Math.round(message.rank);
         }
         return obj;
     },
@@ -316,10 +258,8 @@ exports.RerankScoredItem = {
     },
     fromPartial(object) {
         const message = createBaseRerankScoredItem();
-        message.id = object.id ?? "";
         message.relevanceScore = object.relevanceScore ?? 0;
         message.index = object.index ?? 0;
-        message.rank = object.rank ?? 0;
         return message;
     },
 };
