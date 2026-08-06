@@ -394,8 +394,23 @@ contextBridge.exposeInMainWorld('runanywhere', {
     return RAGStatistics.decode((await send('ragIngest', [handle, bytes])) as Uint8Array) as RagStats;
   },
   ragQuery: async (handle: number, query: RagQuery): Promise<RagResult> => {
-    const bytes = RAGQueryOptions.encode(RAGQueryOptions.fromPartial(query)).finish();
-    return RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array) as RagResult;
+    const bytes = RAGQueryOptions.encode(
+      RAGQueryOptions.fromPartial({
+        query: query.query,
+        generation: query.generation,
+        retrieval: {
+          topK: query.retrievalTopK,
+          scoreThreshold: query.scoreThreshold,
+        },
+      })
+    ).finish();
+    const raw = RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array);
+    // RAGResult dropped total_time_ms (deleted from idl/rag.proto); derive it —
+    // retrieval + generation is the whole of what the pipeline measures per-call.
+    return {
+      ...raw,
+      totalTimeMs: raw.retrievalTimeMs + raw.generationTimeMs,
+    } as RagResult;
   },
   ragStats: async (handle: number): Promise<RagStats> =>
     RAGStatistics.decode((await send('ragStats', [handle])) as Uint8Array) as RagStats,

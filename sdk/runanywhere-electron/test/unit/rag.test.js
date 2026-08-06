@@ -71,7 +71,7 @@ test('RagSession threads the native handle through ingest/query/close', async ()
   await s.close();
   assert.deepEqual(b.calls[0], ['create', { embeddingModelId: 'minilm', llmModelId: 'qwen' }]);
   assert.deepEqual(b.calls[1], ['ingest', 7, { text: 'hello world' }]);
-  assert.deepEqual(b.calls[2], ['query', 7, { question: 'what is the capital?' }]);
+  assert.deepEqual(b.calls[2], ['query', 7, { query: 'what is the capital?' }]);
   assert.deepEqual(b.calls[3], ['destroy', 7]);
 });
 
@@ -106,45 +106,45 @@ test('ingestMany ingests in order and returns the final stats', async () => {
 // The vendored proto codec must round-trip the fields the bridge encodes/decodes.
 test('vendored proto codec round-trips RAGConfiguration', () => {
   const bytes = RAGConfiguration.encode(
-    RAGConfiguration.fromPartial({ embeddingModelId: 'minilm', llmModelId: 'qwen', topK: 5, similarityThreshold: 0.35 })
+    RAGConfiguration.fromPartial({ embeddingModelId: 'minilm', llmModelId: 'qwen', topK: 5, scoreThreshold: 0.35 })
   ).finish();
   const back = RAGConfiguration.decode(bytes);
   assert.equal(back.embeddingModelId, 'minilm');
   assert.equal(back.llmModelId, 'qwen');
   assert.equal(back.topK, 5);
-  assert.ok(Math.abs(back.similarityThreshold - 0.35) < 1e-6);
+  assert.ok(Math.abs(back.scoreThreshold - 0.35) < 1e-6);
 });
 
 test('vendored proto codec round-trips RAGQueryOptions + RAGResult', () => {
   const q = RAGQueryOptions.decode(
     RAGQueryOptions.encode(
-      RAGQueryOptions.fromPartial({ question: 'capital of France?', generation: { maxOutputTokens: 64 } })
+      RAGQueryOptions.fromPartial({ query: 'capital of France?', generation: { maxOutputTokens: 64 } })
     ).finish()
   );
-  assert.equal(q.question, 'capital of France?');
+  assert.equal(q.query, 'capital of France?');
   assert.equal(q.generation.maxOutputTokens, 64);
 
   const r = RAGResult.decode(
-    RAGResult.encode(RAGResult.fromPartial({ answer: 'Paris.', retrievedChunks: [{ chunkId: 'c1', text: 'France…', similarityScore: 0.9 }] })).finish()
+    RAGResult.encode(RAGResult.fromPartial({ answer: 'Paris.', retrievedChunks: [{ chunkId: 'c1', text: 'France…', score: 0.9 }] })).finish()
   );
   assert.equal(r.answer, 'Paris.');
   assert.equal(r.retrievedChunks[0].chunkId, 'c1');
-  assert.ok(Math.abs(r.retrievedChunks[0].similarityScore - 0.9) < 1e-6);
+  assert.ok(Math.abs(r.retrievedChunks[0].score - 0.9) < 1e-6);
 });
 
 test('vendored proto codec round-trips RAGSearchRequest + RAGSearchResponse', () => {
   const req = RAGSearchRequest.decode(
     RAGSearchRequest.encode(
-      RAGSearchRequest.fromPartial({ question: 'capital?', retrievalTopK: 3 })
+      RAGSearchRequest.fromPartial({ query: 'capital?', retrieval: { topK: 3 } })
     ).finish()
   );
-  assert.equal(req.question, 'capital?');
-  assert.equal(req.retrievalTopK, 3);
+  assert.equal(req.query, 'capital?');
+  assert.equal(req.retrieval.topK, 3);
 
   const res = RAGSearchResponse.decode(
     RAGSearchResponse.encode(
       RAGSearchResponse.fromPartial({
-        chunks: [{ chunkId: 'c1', text: 'France…', similarityScore: 0.9 }],
+        chunks: [{ chunkId: 'c1', text: 'France…', score: 0.9 }],
         retrievalTimeMs: 4,
       })
     ).finish()
@@ -167,7 +167,7 @@ test('v3 RagSession.search uses ragSearch, not the query workaround', async () =
       calls.push(['search', session, RAGSearchRequest.decode(bytes)]);
       return RAGSearchResponse.encode(
         RAGSearchResponse.fromPartial({
-          chunks: [{ text: 'Paris is the capital of France.', similarityScore: 0.91, metadata: {} }],
+          chunks: [{ text: 'Paris is the capital of France.', score: 0.91, metadata: {} }],
         })
       ).finish();
     },
@@ -186,8 +186,8 @@ test('v3 RagSession.search uses ragSearch, not the query workaround', async () =
   assert.equal(matches.length, 1);
   assert.equal(matches[0].text, 'Paris is the capital of France.');
   assert.equal(calls[0][0], 'search');
-  assert.equal(calls[0][2].question, 'capital');
-  assert.equal(calls[0][2].retrievalTopK, 2);
+  assert.equal(calls[0][2].query, 'capital');
+  assert.equal(calls[0][2].retrieval.topK, 2);
 });
 
 test('RAGStatistics round-trips through the codec', () => {

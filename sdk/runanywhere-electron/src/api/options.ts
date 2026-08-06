@@ -148,9 +148,7 @@ export interface RagConfig {
   topK?: number;
   chunkSize?: number;
   chunkOverlap?: number;
-  similarityThreshold?: number;
-  /** Persist the index at this path; absent keeps it in memory. */
-  persistPath?: string;
+  scoreThreshold?: number;
 }
 
 /** Placement controls applied when a model loads. */
