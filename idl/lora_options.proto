@@ -1,7 +1,9 @@
 // RunAnywhere IDL — LoRA adapter catalog, application, and state.
 //
 // Adapter file acquisition, sandbox handles, and backend load/unload stay
-// adapter and backend owned.
+// adapter and backend owned. Adapter files are acquired through the models
+// domain's download and import verbs; this domain carries no download state
+// of its own, and an adapter that is on disk has a non-empty local_path.
 
 syntax = "proto3";
 
@@ -19,22 +21,24 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-message LoRAAdapterConfig {
-    // On-disk path to the GGUF file.
-    string          adapter_path = 1 [(runanywhere.v1.rac_required) = true];
+message LoraAdapterConfig {
+    // The handle. apply, remove, list and per-request selection all key on
+    // this. Matches PEFT adapter_name / vLLM lora_name / Genie
+    // loraAdapterName.
+    string          adapter_id   = 3 [(runanywhere.v1.rac_required) = true];
 
-    float           scale        = 2 [(runanywhere.v1.rac_default) = "1.0"];
+    // Escape hatch for a loose GGUF that was never registered. Commons still
+    // loads strictly from this path: there is no catalog id -> path resolver
+    // on the apply path yet.
+    optional string adapter_path = 1;
 
-    // Links back to a catalog entry when the adapter came from one.
-    optional string adapter_id   = 3;
-
-    map<string, string> metadata = 4;
-
-    // Not read by commons.
-    repeated string target_modules = 5;
+    // 1.0 = as trained, 0.0 = applied but contributing nothing, negatives
+    // subtract. Unbounded and signed. Unset falls back to the catalog entry's
+    // default_scale, then to 1.0.
+    optional float  scale        = 2 [(runanywhere.v1.rac_default) = "1.0"];
 }
 
-message LoRAAdapterInfo {
+message LoraAdapterInfo {
     // Catalog id when known, else empty.
     string          adapter_id    = 1;
 
@@ -44,66 +48,67 @@ message LoRAAdapterInfo {
     // Whether it is currently applied to the context.
     bool            applied       = 4;
 
-    int64           loaded_at_ms  = 7;
+    // Read from the adapter artifact at load time. Never settable.
+    // rank is PEFT's `r`, alpha is lora_alpha; effective strength is
+    // scale * (alpha / rank), which is why 1.0 is not portable between
+    // adapters trained with different alpha/rank.
+    optional int32  rank          = 5;
+    optional float  alpha         = 6;
+
+    // Measured resident size of this adapter's weights. Absent when the
+    // backend does not report it.
+    optional int64  size_bytes    = 7;
+
+    int64           loaded_at_ms  = 8;
 
     // Populated when applied is false.
-    optional SDKError error       = 8;
+    optional SDKError error       = 9;
 }
 
+// The adapter-specific facts only. Everything generic about the artifact —
+// where it is fetched from, how large it is, how to verify it, who published
+// it, and whether it has been fetched — lives on the ModelInfo record for
+// this adapter.
 message LoraAdapterCatalogEntry {
     string          id                = 1;
     string          name              = 2;
-    string          description       = 3;
-
-    // Direct .gguf download URL, and the filename to save it as.
-    string          url               = 4;
-    string          filename          = 5;
 
     // Explicit base model ids this adapter works with.
-    repeated string compatible_models = 6;
+    repeated string compatible_models = 3;
 
-    // 0 if unknown.
-    int64           size_bytes        = 7;
+    // Publisher-recommended strength. Unset means 1.0.
+    optional float  default_scale     = 4 [(runanywhere.v1.rac_default) = "1.0"];
 
-    optional string author            = 8;
-    float           default_scale     = 9 [(runanywhere.v1.rac_default) = "1.0"];
+    repeated string tags              = 5;
 
-    // Lowercase hex.
-    optional string checksum_sha256   = 10;
-
-    optional string license           = 11;
-    repeated string tags              = 12;
-    map<string, string> metadata      = 13;
-
-    // Local artifact state, persisted only after the platform reports success.
-    optional string local_path        = 14;
-    optional bool   is_downloaded     = 15;
-    optional int64  downloaded_at_unix_ms = 16;
-    optional bool   is_imported       = 17;
-    optional string status_message    = 18;
+    // Non-empty means the adapter file is on disk. This is the single
+    // definition of "downloaded".
+    optional string local_path        = 6;
 }
 
 message LoraAdapterCatalogQuery {
     optional string adapter_id      = 1;
     optional string model_id        = 2;
     optional bool   downloaded_only = 3;
+
+    // Substring match against name.
     optional string search_query    = 4;
+
     repeated string tags            = 5;
 }
 
 message LoraAdapterCatalogListRequest {
     optional LoraAdapterCatalogQuery query = 1;
-    bool include_counts = 2;
 }
 
 message LoraAdapterCatalogListResult {
-    repeated LoraAdapterCatalogEntry entries = 2;
+    repeated LoraAdapterCatalogEntry entries = 1;
 
-    // total_count is unfiltered; filtered_count reflects the query.
-    int32 total_count = 4;
-    int32 filtered_count = 5;
-    int32 downloaded_count = 6;
-    optional SDKError error = 7;
+    // total_count is unfiltered. Callers that want a filtered count read
+    // entries.size(); a downloaded count is entries with a local_path.
+    int32 total_count = 2;
+    int32 downloaded_count = 3;
+    optional SDKError error = 4;
 }
 
 message LoraAdapterCatalogGetRequest {
@@ -116,78 +121,43 @@ message LoraAdapterCatalogGetResult {
     optional SDKError error = 4;
 }
 
-message LoraAdapterDownloadCompletedRequest {
-    string adapter_id = 1;
-    string local_path = 2;
-    optional int64 size_bytes = 3;
-    optional string checksum_sha256 = 4;
-    optional int64 completed_at_unix_ms = 5;
-    bool imported = 6;
-    string status_message = 7;
-}
-
-message LoraAdapterDownloadCompletedResult {
-    LoraAdapterCatalogEntry entry = 2;
-    bool persisted = 4;
-    optional SDKError error = 5;
-}
-
-message LoraAdapterImportRequest {
-    // Platform-readable path of the picked file.
-    string source_path = 1;
-
-    // Defaults to basename(source_path).
-    optional string filename = 2;
-}
-
-message LoraAdapterImportResult {
-    // Stable SDK-owned path of the imported file.
-    string local_path = 3;
-
-    // Whether a catalog entry matched and was completed.
-    bool matched = 4;
-    LoraAdapterCatalogEntry entry = 5;
-    optional SDKError error = 6;
-}
-
 message LoraCompatibilityResult {
     bool            is_compatible       = 1;
 
-    optional string base_model_required = 3;
-    repeated string warnings           = 4;
+    optional string base_model_required = 2;
 
     // Populated when is_compatible is false.
-    optional SDKError error             = 6;
+    optional SDKError error             = 3;
 }
 
-message LoRAApplyRequest {
+message LoraApplyRequest {
     string request_id = 1;
-    repeated LoRAAdapterConfig adapters = 2;
 
-    // Drop currently-applied adapters instead of stacking.
-    bool replace_existing = 3;
+    // SET semantics, matching Diffusers set_adapters and
+    // llama_set_adapters_lora: `adapters` becomes the complete active set and
+    // anything not listed is detached.
+    repeated LoraAdapterConfig adapters = 2;
+
+    // Stack on top of the currently-applied set instead of replacing it.
+    bool keep_existing = 3;
 }
 
-message LoRAApplyResult {
+message LoraApplyResult {
     string request_id = 1;
-    repeated LoRAAdapterInfo adapters = 2;
+    repeated LoraAdapterInfo adapters = 2;
     optional SDKError error = 6;
 }
 
-message LoRARemoveRequest {
-    string request_id = 1;
-
-    // Remove by id or by path; clear_all ignores both lists.
-    repeated string adapter_ids = 2;
-    repeated string adapter_paths = 3;
-    bool clear_all = 4;
+message LoraRemoveRequest {
+    // Remove the named adapters; clear_all ignores the list.
+    repeated string adapter_ids = 1;
+    bool clear_all = 2;
 }
 
-// Also serves as the request for List and State, carrying optional
-// base_model_id filtering without a separate empty request type.
-message LoRAState {
-    repeated LoRAAdapterInfo loaded_adapters = 1;
-    bool has_active_adapters = 2;
-    optional string base_model_id = 3;
-    optional SDKError error = 6;
+// Response only. The state read takes no arguments; base_model_id is
+// reported, never a filter.
+message LoraState {
+    repeated LoraAdapterInfo loaded_adapters = 1;
+    optional string base_model_id = 2;
+    optional SDKError error = 3;
 }

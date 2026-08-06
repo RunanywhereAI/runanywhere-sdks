@@ -33,10 +33,11 @@ enum NPUChip {
 message DeviceStorageInfo {
     int64 total_bytes  = 1;
     int64 free_bytes   = 2;
-    int64 used_bytes   = 3;
 
-    // 0.0 to 100.0, and 0.0 when total_bytes is 0.
-    float used_percent = 4;
+    // Distinct from total-minus-free: this is the adapter's own reading of
+    // occupied space, not a derivation. Kept live.
+    int64 used_bytes   = 3;
+    reserved 4;  // used_percent: derivable from used_bytes/total_bytes
 }
 
 message AppStorageInfo {
@@ -49,16 +50,16 @@ message AppStorageInfo {
 message ModelStorageMetrics {
     string         model_id            = 1;
     int64          size_on_disk_bytes  = 2;
-
-    // Epoch ms of the last load.
-    optional int64 last_used_ms        = 3;
+    reserved 3;  // last_used_ms -> ModelInfo.last_used_at_unix_ms
 }
 
 message StorageInfo {
     AppStorageInfo               app                 = 1;
     DeviceStorageInfo            device              = 2;
     repeated ModelStorageMetrics models              = 3;
-    int32                        total_models        = 4;
+    reserved 4;  // total_models: count over `models`
+    // total_models_bytes (5) is NOT a pure derivation -- kept live; see
+    // storage_event_publisher.cpp and two facade readers.
     int64                        total_models_bytes  = 5;
 }
 
@@ -68,8 +69,7 @@ message StorageAvailability {
     int64           available_bytes  = 3;
     optional string warning_message  = 4;
     optional string recommendation   = 5;
-    int64           shortfall_bytes  = 6;
-    float           required_to_available_ratio = 7;
+    reserved 6, 7;  // shortfall = required - available; ratio from the same two
 }
 
 message StorageInfoRequest {
@@ -88,9 +88,11 @@ message StorageInfoResult {
 message StorageAvailabilityRequest {
     string model_id                  = 1;
     int64  required_bytes            = 2;
+    reserved 3;  // was double safety_margin; 0.0 nullified the requirement
 
-    // Headroom multiplier applied on top of required_bytes.
-    double safety_margin             = 3;
+    // Absolute headroom the device must still have after the write. Same
+    // unit and same name as DownloadPlanRequest.required_free_bytes_after_download.
+    int64  required_free_bytes_after_download = 7;
 
     // Count bytes already occupied by this model as reclaimable.
     bool   include_existing_model_bytes = 4;
@@ -121,7 +123,7 @@ message StorageDeletePlanRequest {
 message StorageDeleteCandidate {
     string         model_id          = 1;
     int64          reclaimable_bytes = 2;
-    optional int64 last_used_ms      = 3;
+    reserved 3;  // last_used_ms -> ModelInfo.last_used_at_unix_ms
     bool           is_loaded         = 4;
     string         local_path        = 5;
 
@@ -141,13 +143,14 @@ message StorageDeletePlan {
     repeated string                 warnings                   = 5;
     bool                            requires_unload            = 7;
     bool                            requires_platform_delete   = 8;
-    int32                           candidate_count            = 9;
     optional SDKError               error                      = 10;
+    reserved 9;  // candidate_count == candidates.size()
 }
 
 message StorageDeleteRequest {
     repeated string model_ids            = 1;
-    bool            delete_files         = 2;
+    // Files are deleted; set this only to opt OUT (catalog-only bookkeeping).
+    bool            keep_files_on_disk   = 2;
     bool            clear_registry_paths = 3;
     bool            unload_if_loaded     = 4;
     bool            dry_run              = 5;

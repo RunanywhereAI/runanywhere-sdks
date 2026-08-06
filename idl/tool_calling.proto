@@ -22,6 +22,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "rac_options.proto";
 import "token_usage.proto";
 
 option cc_enable_arenas      = true;
@@ -36,9 +37,8 @@ option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;r
 // ---------------------------------------------------------------------------
 // JSON-typed scalar / composite carrier for tool arguments and results.
 // Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
-// TypeScript discriminated union. Used inside ToolParameter.enum_values
-// (string-only) and as the canonical wire shape when consumers want
-// strongly-typed arguments rather than raw JSON.
+// TypeScript discriminated union. Used as the canonical wire shape when
+// consumers want strongly-typed arguments rather than raw JSON.
 // ---------------------------------------------------------------------------
 message ToolValue {
     oneof kind {
@@ -71,18 +71,6 @@ message ToolValueJSON {
 }
 
 // ---------------------------------------------------------------------------
-// Supported parameter types.
-// ---------------------------------------------------------------------------
-enum ToolParameterType {
-    TOOL_PARAMETER_TYPE_UNSPECIFIED = 0;
-    TOOL_PARAMETER_TYPE_STRING      = 1;
-    TOOL_PARAMETER_TYPE_NUMBER      = 2;
-    TOOL_PARAMETER_TYPE_BOOLEAN     = 3;
-    TOOL_PARAMETER_TYPE_OBJECT      = 4;
-    TOOL_PARAMETER_TYPE_ARRAY       = 5;
-}
-
-// ---------------------------------------------------------------------------
 // Tool-call wire formats various LLM families emit. This enum is the single
 // portable format selector across commons and every generated SDK binding.
 // ---------------------------------------------------------------------------
@@ -102,30 +90,21 @@ enum ToolChoiceMode {
 }
 
 // ---------------------------------------------------------------------------
-// A single parameter definition for a tool.
-// ---------------------------------------------------------------------------
-message ToolParameter {
-    string name                      = 1;
-    ToolParameterType type           = 2;
-    string description               = 3;
-    bool   required                  = 4;
-    // Allowed values for enum-like parameters. Empty = unconstrained.
-    repeated string enum_values      = 5;
-    optional string json_schema      = 6;
-    optional ToolValue default_value  = 7;
-}
-
-// ---------------------------------------------------------------------------
 // Definition of a tool that the LLM can call.
 // ---------------------------------------------------------------------------
 message ToolDefinition {
-    string name                      = 1;
-    string description               = 2;
-    repeated ToolParameter parameters = 3;
+    string name        = 1;
+    string description = 2;
+
+    // OpenAI-compatible parameters schema: ONE JSON Schema object describing
+    // this tool's arguments — the same shape solutions.proto's ToolSpec
+    // already carries. One schema per tool is what OpenAI (`parameters`),
+    // Anthropic (`input_schema`) and MCP (`inputSchema`) each publish.
+    // "" or "{}" advertises a zero-argument tool.
+    string parameters  = 3;
+
     // Optional category for grouping tools in catalogs / UIs.
-    optional string category         = 4;
-    optional string json_schema      = 5;
-    map<string, string> metadata     = 6;
+    optional string category = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +112,9 @@ message ToolDefinition {
 // matching the parameter shape declared in the corresponding ToolDefinition.
 // ---------------------------------------------------------------------------
 message ToolCall {
-    // Unique ID (caller-supplied or generated). Empty = unset.
+    // Correlation id, echoed back on ToolResult.tool_call_id. Caller-supplied
+    // or generated; carried through parse AND validate unchanged. Never
+    // derived from created_at_ms. Empty = unset.
     string id                        = 1;
     // Tool name (matches ToolDefinition.name).
     string name                      = 2;
@@ -144,14 +125,16 @@ message ToolCall {
     // `arguments_json` directly when building LLM prompts. It is the
     // canonical wire shape for the prompt-formatting path.
     string arguments_json            = 3;
-    // Discriminator for OpenAI-compatible flows ("function" is the only
-    // value at the moment). Empty = unset.
-    string type                      = 4;
 
-    reserved 5, 6;
+    // Wall-clock parse time, ms since epoch (second resolution today).
+    // Diagnostic ONLY — never an identity, never used to correlate a call
+    // with its result.
+    int64 created_at_ms              = 4;
 
-    int64 created_at_ms              = 7;
-    optional string raw_text         = 8;
+    // The exact model text this call was extracted FROM, including the tool
+    // envelope. Diagnostic. Not the envelope-stripped text — that is
+    // ToolParseResult.remaining_text.
+    optional string raw_text         = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,14 +153,15 @@ message ToolResult {
     string result_json               = 3;
     optional string error            = 4;
 
-    // Whether execution succeeded. If unset/false and error is empty,
-    // consumers should fall back to result_json/error semantics.
-    bool success                     = 5;
+    // True when the tool failed, so commons tells the model the call errored
+    // instead of feeding result_json back as data and the model can
+    // self-correct. The proto3 zero value (false) is the correct default: a
+    // ToolResult nobody touched reads as a good result, not a failed one.
+    // Industry: Anthropic `is_error`, MCP `isError`.
+    bool is_error                    = 5;
 
-    reserved 6, 7;
-
-    int64 started_at_ms              = 8;
-    int64 completed_at_ms            = 9;
+    int64 started_at_ms              = 6;
+    int64 completed_at_ms            = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,16 +174,26 @@ message ToolCallingOptions {
 
     reserved 2, 9, 11;
 
-    // Whether to auto-execute tools or hand them back to the caller.
-    bool   auto_execute              = 3;
+    // Unset = true: the SDK runs your registered executor and closes the
+    // loop. Explicit false returns the parsed ToolCall without invoking it.
+    // Presence-tracked so "unset" is never confused with "explicitly false".
+    optional bool auto_execute       = 3;
 
-    // Sampling temperature override (Swift: optional Float).
-    optional float temperature       = 4;
+    // Sampling temperature and per-turn output-token cap are NOT duplicated
+    // here: the enclosing LLMGenerationOptions.temperature / max_output_tokens
+    // are the one value for both, for the two embeddings that have one
+    // (llm_options.proto's tool_calling field, chat.proto's
+    // ChatGenerationRequest.tool_calling). The three standalone verbs
+    // (ToolParseRequest, ToolPromptFormatRequest, ToolCallValidationRequest)
+    // do not sample at all, so neither field made sense there either.
+    reserved 4, 5;
+    reserved "temperature", "max_output_tokens";
 
-    // Maximum tokens override.
-    optional int32 max_tokens        = 5;
-
-    // System prompt to use during tool-enabled generation.
+    // System prompt for tool-enabled generation. This is the ONLY channel
+    // ToolPromptFormatRequest (a standalone verb with no enclosing
+    // LLMGenerationOptions) has for a system prompt; when ToolCallingOptions
+    // is embedded in LLMGenerationOptions, the child value wins when present
+    // and options.system_prompt is the fallback.
     optional string system_prompt    = 6;
 
     // If true, replaces the system prompt entirely (no auto-injected
@@ -225,9 +219,12 @@ message ToolCallingOptions {
     // field.
     bool parallel_tool_calls = 15;
 
-    // Maximum tool calls in one conversation turn. Unset/0 = SDK default
-    // (typically 5).
-    optional int32 max_tool_calls = 12;
+    // Maximum tool calls in one conversation turn. Unset/0 = the annotated
+    // default applies.
+    optional int32 max_tool_calls = 12 [
+        (runanywhere.v1.rac_default) = "5",
+        (runanywhere.v1.rac_min)     = 1
+    ];
 
     ToolChoiceMode tool_choice = 13;
     optional string forced_tool_name = 14;
@@ -238,6 +235,15 @@ message ToolCallingOptions {
     // at the prompt level — same contract as
     // LLMGenerationOptions.disable_thinking). Default false.
     optional bool disable_thinking = 17;
+
+    // Moved here from ToolCallingSessionCreateRequest so one message carries
+    // the whole tool-generation policy.
+    optional float top_p = 18;
+
+    // Unset = true: unknown tool calls short-circuit before host execution.
+    // Callers that delegate validation/authorization to their executor or
+    // use dynamic tool registries must explicitly set validate_calls=false.
+    optional bool validate_calls = 19;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,20 +258,17 @@ message ToolCallingResult {
     repeated ToolResult tool_results = 3;
     // Whether the response is complete or waiting for more tool results.
     bool   is_complete               = 4;
-    // Conversation ID for continuing with tool results.
-    optional string conversation_id  = 5;
     // Number of LLM generation turns used, including the final synthesis turn.
-    int32  iterations_used           = 6;
+    int32  iterations_used           = 5;
 
-    optional string error_message    = 7;
-    int32 error_code                 = 8;
-    string raw_text                  = 9;
+    optional string error_message    = 6;
+    int32 error_code                 = 7;
     // Optional thinking/reasoning content extracted from the final response.
-    optional string thinking_content = 10;
+    optional string thinking_content = 8;
     // Token usage aggregated across every LLM generation turn in the loop
     // (including the final synthesis turn). Lets a plain generate() that routed
     // through the tool loop report the same usage a non-tool generate would.
-    TokenUsage usage                 = 11;
+    TokenUsage usage                 = 9;
 }
 
 message ToolParseRequest {
@@ -292,9 +295,6 @@ message ToolPromptFormatRequest {
     // Tool results to include when formatting a follow-up prompt after host
     // execution. Empty means an initial tool-enabled prompt.
     repeated ToolResult tool_results = 3;
-
-    // Assistant text emitted before tool execution, when available.
-    optional string assistant_text = 4;
 }
 
 message ToolPromptFormatResult {
@@ -322,34 +322,6 @@ message ToolCallValidationResult {
     int32 error_code = 6;
 }
 
-enum ToolCallingStreamEventKind {
-    TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = 0;
-    TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = 1;
-    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED = 2;
-    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED = 3;
-    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED = 4;
-    TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = 5;
-    TOOL_CALLING_STREAM_EVENT_KIND_ERROR = 6;
-}
-
-message ToolCallingStreamEvent {
-    uint64 seq = 1;
-    int64 timestamp_us = 2;
-    string conversation_id = 3;
-    ToolCallingStreamEventKind kind = 4;
-    string token = 5;
-    optional ToolCall tool_call = 6;
-    optional ToolResult tool_result = 7;
-    optional ToolCallingResult result = 8;
-    optional string error_message = 9;
-    int32 error_code = 10;
-}
-
-message ToolRegistrySnapshot {
-    repeated ToolDefinition tools = 1;
-    int64 updated_at_ms = 2;
-}
-
 // Logical tool-calling service contract. Host tool registration, permission
 // checks, execution, callbacks, browser/native APIs, and side effects remain
 // adapter-owned; this service describes only portable parsing, prompt
@@ -365,67 +337,47 @@ service ToolCalling {
 // Tool-calling session state machine.
 // ---------------------------------------------------------------------------
 
-message ToolCallingSessionCreateRequest {
-    // Prompt + LLM generation options inline (avoids cross-proto import cycle).
-    string prompt = 1;
-    int32 max_tokens = 11;
-    float temperature = 12;
-    float top_p = 13;
-    string system_prompt = 14;
-    repeated ToolDefinition tools = 2;
-    ToolCallFormatName format = 3;
-    uint32 max_tool_calls = 4;
-    bool keep_tools_available = 5;
-    // proto3 `optional` enables presence detection (has_validate_calls()).
-    // When unset, commons defaults to validate_calls=true so unknown tool
-    // calls short-circuit before host execution.
-    // Callers that delegate validation/authorization to their executor or
-    // use dynamic tool registries must explicitly set validate_calls=false.
-    optional bool validate_calls = 6;
-
-    // OpenAI-style tool_choice override surfaced through the high-level
-    // run-loop / session APIs. The same fields exist on ToolCallingOptions
-    // (fields 13/14); we re-publish them here so the canonical request
-    // envelope can carry the policy without forcing callers to pass an
-    // inline ToolCallingOptions. commons honors these on every
-    // format/validate primitive via build_options_snapshot.
-    optional ToolChoiceMode tool_choice = 7;
-    optional string forced_tool_name = 8;
-
-    // 9-10 reserved: remaining gap between session-control fields and
-    // inline LLM generation params (11-14). Explicitly reserving prevents
-    // two concurrent patches from racing to claim a number here with
-    // conflicting semantics — a wire-compat hazard that would silently
-    // mis-decode data once both patches land.
-    reserved 9 to 10;
-
-    // When true, suppress the model's thinking phase for every generate in
-    // the loop/session (maps from ToolCallingOptions.disable_thinking; same
-    // contract as LLMGenerationOptions.disable_thinking). Default false.
-    bool disable_thinking = 15;
-
-    // Default true when absent. False returns the parsed ToolCall without
-    // invoking the host executor.
-    optional bool auto_execute = 16;
-    bool replace_system_prompt = 17;
-    bool require_json_arguments = 18;
-
-    // Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
-    // EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
-    // in the loop so multi-turn tool use keeps context. Same contract as the standard path's
-    // ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
-    // cross-proto import cycle.
-    repeated string history = 19;
-
-    // Mirrors ToolCallingOptions.parallel_tool_calls for the run-loop /
-    // session envelope: when true, one model turn may emit multiple
-    // tool-call envelopes and commons executes all of them before one
-    // follow-up prompt. Default false = historical single-call behavior.
-    bool parallel_tool_calls = 20;
+// Conversational role of one prior turn in `history`.
+enum ToolCallingRole {
+    TOOL_CALLING_ROLE_UNSPECIFIED = 0;
+    TOOL_CALLING_ROLE_USER        = 1;
+    TOOL_CALLING_ROLE_ASSISTANT   = 2;
+    TOOL_CALLING_ROLE_SYSTEM      = 3;
 }
 
-message ToolCallingSessionCreateResult {
-    uint64 session_handle = 1;
+// One prior conversation turn, with its speaker stated rather than inferred
+// from list position.
+//
+// Declared here rather than importing chat.proto's ChatMessage/MessageRole:
+// chat.proto already imports tool_calling.proto, so that import would cycle.
+// Extracting ChatMessage + MessageRole into a leaf proto was considered and
+// rejected as a larger change than this surface warrants.
+//
+// Mapping from chat.proto: MESSAGE_ROLE_USER -> TOOL_CALLING_ROLE_USER,
+// MESSAGE_ROLE_ASSISTANT -> TOOL_CALLING_ROLE_ASSISTANT,
+// MESSAGE_ROLE_SYSTEM -> TOOL_CALLING_ROLE_SYSTEM. Tool calls and tool
+// results do NOT round-trip through history — only role + content do.
+message ToolCallingHistoryTurn {
+    ToolCallingRole role = 1;
+    string content       = 2;
+}
+
+message ToolCallingSessionCreateRequest {
+    // The current turn's user prompt.
+    string prompt = 1;
+
+    // Prior turns, EXCLUDING the current turn (which is `prompt`). commons
+    // threads these into every generate in the loop so multi-turn tool use
+    // keeps context.
+    repeated ToolCallingHistoryTurn history = 2;
+
+    // THE single home for tool policy + sampling. No re-published copies:
+    // every knob that used to be duplicated on this message (tools, format,
+    // max_tool_calls, keep_tools_available, validate_calls, tool_choice,
+    // forced_tool_name, max_output_tokens, temperature, top_p, system_prompt,
+    // disable_thinking, auto_execute, replace_system_prompt,
+    // require_json_arguments, parallel_tool_calls) lives on ToolCallingOptions.
+    ToolCallingOptions options = 3;
 }
 
 message ToolCallingSessionEvent {
@@ -443,8 +395,4 @@ message ToolCallingSessionStepWithResultRequest {
     string tool_call_id = 2;
     string result_json = 3;
     optional string error = 4;
-}
-
-message ToolCallingSessionDestroyRequest {
-    uint64 session_handle = 1;
 }

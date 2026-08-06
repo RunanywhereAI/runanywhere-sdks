@@ -1,15 +1,14 @@
 // RunAnywhere IDL — diffusion (image generation) types.
 //
 // No diffusion engine ships under engines/ yet, so nothing produces these
-// messages at runtime. report_intermediate_images and the DiffusionProgress
-// intermediate-image fields reach the C struct and stop there.
+// messages at runtime. DiffusionProgress.intermediate_image_data reaches the
+// C struct and stops there — no engine emits previews.
 
 syntax = "proto3";
 
 package runanywhere.v1;
 
 import "errors.proto";
-import "model_types.proto";
 import "rac_options.proto";
 
 option cc_enable_arenas          = true;
@@ -21,59 +20,30 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-enum DiffusionMode {
-    DIFFUSION_MODE_UNSPECIFIED    = 0;
-    DIFFUSION_MODE_TEXT_TO_IMAGE  = 1;
-    DIFFUSION_MODE_IMAGE_TO_IMAGE = 2;
-    DIFFUSION_MODE_INPAINTING     = 3;
-}
-
-// DDPM and LCM are forward-looking; no SDK exposes them.
+// Only values with a C carrier are listed. UNSPECIFIED = the model's
+// configured scheduler, which is what every engine does.
 enum DiffusionScheduler {
     DIFFUSION_SCHEDULER_UNSPECIFIED      = 0;
     DIFFUSION_SCHEDULER_DPMPP_2M         = 1;
     DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS  = 2;   // recommended default
     DIFFUSION_SCHEDULER_DDIM             = 3;
-    DIFFUSION_SCHEDULER_DDPM             = 4;
-    DIFFUSION_SCHEDULER_EULER            = 5;
-    DIFFUSION_SCHEDULER_EULER_A          = 6;   // Euler Ancestral
-    DIFFUSION_SCHEDULER_PNDM             = 7;
-    DIFFUSION_SCHEDULER_LMS              = 8;
-    DIFFUSION_SCHEDULER_LCM              = 9;
-    DIFFUSION_SCHEDULER_DPMPP_2M_SDE     = 10;
+    DIFFUSION_SCHEDULER_EULER            = 4;
+    DIFFUSION_SCHEDULER_EULER_A          = 5;   // Euler Ancestral
+    DIFFUSION_SCHEDULER_PNDM             = 6;
+    DIFFUSION_SCHEDULER_LMS              = 7;
+    DIFFUSION_SCHEDULER_DPMPP_2M_SDE     = 8;
 }
 
-enum DiffusionModelVariant {
-    DIFFUSION_MODEL_VARIANT_UNSPECIFIED = 0;
-    DIFFUSION_MODEL_VARIANT_SD_1_5      = 1;
-    DIFFUSION_MODEL_VARIANT_SD_2_1      = 2;
-    DIFFUSION_MODEL_VARIANT_SDXL        = 3;
-    DIFFUSION_MODEL_VARIANT_SDXL_TURBO  = 4;
-    DIFFUSION_MODEL_VARIANT_SDXS        = 5;
-    DIFFUSION_MODEL_VARIANT_LCM         = 6;   // Latent Consistency Model
-}
-
-enum DiffusionTokenizerSourceKind {
-    DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED   = 0;
-    DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15  = 1;   // CLIP ViT-L/14
-    DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2   = 2;   // OpenCLIP ViT-H/14
-    DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL  = 3;   // dual tokenizers
-    DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM        = 4;
-}
-
-message DiffusionTokenizerSource {
-    DiffusionTokenizerSourceKind kind        = 1;
-    optional string              custom_path = 2;
-    bool                         auto_download = 3;
-}
-
-message DiffusionConfiguration {
-    DiffusionModelVariant    model_variant         = 1;
-    DiffusionTokenizerSource tokenizer_source      = 2;
-    bool                     enable_safety_checker = 3;
-    int32                    max_memory_mb         = 4;
-    optional string          model_id              = 5;
-    optional InferenceFramework preferred_framework = 6;
+// Encoding of the returned image bytes.
+enum DiffusionOutputFormat {
+    DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED = 0;   // = PNG
+    DIFFUSION_OUTPUT_FORMAT_PNG         = 1;
+    // No JPEG or WEBP encoder exists in this tree yet. Requesting one is
+    // rejected outright; it is never silently answered with PNG.
+    DIFFUSION_OUTPUT_FORMAT_JPEG        = 2;
+    DIFFUSION_OUTPUT_FORMAT_WEBP        = 3;
+    // Escape hatch: no encode, 4 bytes per pixel, "image/raw-rgba".
+    DIFFUSION_OUTPUT_FORMAT_RAW_RGBA    = 4;
 }
 
 message DiffusionGenerationOptions {
@@ -94,69 +64,82 @@ message DiffusionGenerationOptions {
         (runanywhere.v1.rac_max_float) = 20.0
     ];
 
-    // -1 = random.
-    int64              seed                = 7 [(runanywhere.v1.rac_default) = "-1"];
+    // Absent = pick a fresh random seed. Any present value is literal,
+    // including 0. The seed actually used comes back on each result image.
+    optional int64     seed                = 7;
 
     DiffusionScheduler scheduler           = 8;
-    DiffusionMode      mode                = 9;
 
-    // For IMAGE_TO_IMAGE and INPAINTING.
-    optional bytes     input_image         = 10;
-    optional bytes     mask_image          = 11;
-    float              denoise_strength    = 12 [
+    // Mode is inferred, never declared: no image = text-to-image, image =
+    // image-to-image, image + mask_image = inpainting. The only invalid
+    // combination is a mask with no image.
+
+    // Source picture. Its presence promotes the request to image-to-image;
+    // adding `mask_image` promotes it to inpainting. Must be an encoded
+    // PNG or JPEG container.
+    optional bytes     image               = 9;
+    // White = repaint. Same dimensions as `image`.
+    optional bytes     mask_image          = 10;
+    // How far from the source image to travel. Only meaningful with `image`.
+    // Effective steps = ceil(steps * strength), so a low value is
+    // proportionally cheaper -- on device that is battery.
+    float              strength            = 11 [
         (runanywhere.v1.rac_default) = "0.75",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
 
-    bool               report_intermediate_images = 13;
-    int32              progress_stride     = 14;
-    int32              input_image_width   = 15;
-    int32              input_image_height  = 16;
-    optional string     input_image_media_type = 17;
-    optional string     mask_image_media_type  = 18;
+    // Container of the bytes above, as supplied by the caller. Request-side;
+    // the result carries its own media type per image.
+    optional string    image_media_type      = 12;
+    optional string    mask_image_media_type = 13;
 
-    // 0 = one image.
-    int32               batch_size             = 19;
+    // How many images to generate for this prompt. Absent = 1.
+    optional int32     n                   = 14 [
+        (runanywhere.v1.rac_default) = "1",
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 8
+    ];
 
-    bool                return_latents         = 20;
+    // Encoding of the returned image bytes.
+    DiffusionOutputFormat output_format    = 15 [
+        (runanywhere.v1.rac_default) = "DIFFUSION_OUTPUT_FORMAT_PNG"
+    ];
 }
 
 message DiffusionGenerationRequest {
-    string request_id = 1;
-    optional DiffusionGenerationOptions options = 2;
-    optional string model_id = 3;
-    map<string, string> metadata = 4;
+    optional DiffusionGenerationOptions options = 1;
+    optional string model_id = 2;
 }
 
 message DiffusionProgress {
-    float  progress_percent         = 1;
-    int32  current_step             = 2;
-    int32  total_steps              = 3;
-    string stage                    = 4;
-    optional bytes intermediate_image_data = 5;
-    int32  intermediate_image_width        = 6;
-    int32  intermediate_image_height       = 7;
-    int64  timestamp_ms                    = 8;
-    int64  eta_ms                          = 9;
-    optional string intermediate_image_media_type = 10;
+    int32  current_step            = 1;
+    int32  total_steps             = 2;   // as resolved by the backend
+    optional bytes intermediate_image_data = 3;
+}
+
+// One generated image. Per-image, because with n > 1 each image has its
+// own seed and its own safety verdict (Stability `seeds`/`finish_reasons`,
+// Diffusers `nsfw_content_detected`).
+message DiffusionImage {
+    bytes  data        = 1;
+    int32  width       = 2;   // resolved, echoed back
+    int32  height      = 3;
+    int64  seed_used   = 4;   // so "make more like that one" works
+    bool   safety_flag = 5;   // advisory, in-band, never an error
+    string media_type  = 6;   // resolved output_format, e.g. "image/png"
 }
 
 message DiffusionResult {
-    bytes              image_data      = 1;
-    int32              width           = 2;
-    int32              height          = 3;
+    // One entry per requested image, in request order. commons emits exactly
+    // one entry until the C ABI grows a list: rac_diffusion_result_t is a
+    // single-image struct with one image_data/image_size pair.
+    repeated DiffusionImage images        = 1;
 
-    // The resolved seed, so a run can be reproduced when seed was -1.
-    int64              seed_used       = 4;
+    int64                   total_time_ms = 2;
 
-    int64              total_time_ms   = 5;
-    bool               safety_flag     = 6;
-    DiffusionScheduler used_scheduler  = 7;
-    optional string     image_media_type = 10;
-    repeated bytes      batch_images     = 11;
-    int32               images_generated = 12;
-    optional SDKError   error            = 13;
+    // Failures travel out-of-band on the unary path (rac_proto_buffer_t
+    // status/error_message) and in DiffusionStreamEvent.error when streaming.
 }
 
 enum DiffusionStreamEventKind {
@@ -169,10 +152,10 @@ enum DiffusionStreamEventKind {
 }
 
 message DiffusionStreamEvent {
-    int64 timestamp_us = 2;
-    string request_id = 3;
-    DiffusionStreamEventKind kind = 4;
-    optional DiffusionProgress progress = 5;
-    optional DiffusionResult result = 6;
-    optional SDKError error = 9;
+    // Generation is single-flight, so the stream itself is the correlation.
+    int64 timestamp_us = 1;
+    DiffusionStreamEventKind kind = 2;
+    optional DiffusionProgress progress = 3;
+    optional DiffusionResult result = 4;
+    optional SDKError error = 5;
 }

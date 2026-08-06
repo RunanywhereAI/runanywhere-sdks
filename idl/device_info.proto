@@ -2,20 +2,22 @@
 //
 // Every SDK emits an identical device-telemetry record for analytics/routing:
 // Swift `Infrastructure/Device/Models/Domain/DeviceInfo.swift` and Kotlin
-// `CppBridgeDevice` produce the same 19-field snake_case JSON (the header on
-// the Swift struct notes it "matches backend schemas/device.py DeviceInfo");
-// RN exposes the same field universe via getters; Web carries a subset
+// `CppBridgeDevice` produce the same snake_case JSON (the header on the Swift
+// struct notes it "matches backend schemas/device.py DeviceInfo"); RN exposes
+// the same field universe via getters; Web carries a subset
 // (`DeviceInfoData`). This is the single source of truth for that schema.
 //
-// Distinct from hardware_profile.proto's `HardwareProfile` — that is the
-// static silicon-capability subset consumed by the `Hardware` service for
-// accelerator routing. DeviceInfo is identity + runtime telemetry. The
-// platform-only fields (Web hasWebGPU/hasSharedArrayBuffer, Android extras)
-// go in `platform_extras` rather than the typed core.
+// DeviceInfo is the ONLY device description in this IDL: identity + runtime
+// telemetry. NPU capability detail lives in exactly one other place,
+// hardware_profile.proto's `NpuCapability`. The platform-only fields (Web
+// has_webgpu/has_shared_array_buffer, Android extras) go in `platform_extras`
+// rather than the typed core.
 
 syntax = "proto3";
 
 package runanywhere.v1;
+
+import "rac_options.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -26,32 +28,106 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
+// Host OS family. Closed set — a producer that cannot classify itself sends
+// PLATFORM_UNSPECIFIED rather than inventing a spelling.
+enum Platform {
+    PLATFORM_UNSPECIFIED = 0;
+    PLATFORM_IOS         = 1;
+    PLATFORM_ANDROID     = 2;
+    PLATFORM_MACOS       = 3;
+    PLATFORM_WEB         = 4;
+    PLATFORM_LINUX       = 5;
+    PLATFORM_WINDOWS     = 6;
+    PLATFORM_TVOS        = 7;
+    PLATFORM_WATCHOS     = 8;
+    PLATFORM_VISIONOS    = 9;
+}
+
+// Physical device class.
+enum FormFactor {
+    FORM_FACTOR_UNSPECIFIED = 0;  // replaces the hand-written "unknown" token
+    FORM_FACTOR_PHONE       = 1;
+    FORM_FACTOR_TABLET      = 2;
+    FORM_FACTOR_DESKTOP     = 3;
+    FORM_FACTOR_LAPTOP      = 4;
+    FORM_FACTOR_TV          = 5;
+    FORM_FACTOR_WATCH       = 6;
+    FORM_FACTOR_HEADSET     = 7;
+}
+
+// Charging state of the main battery.
+enum BatteryState {
+    BATTERY_STATE_UNSPECIFIED = 0;  // unreadable (desktop, tvOS, browser)
+    BATTERY_STATE_CHARGING    = 1;
+    BATTERY_STATE_UNPLUGGED   = 2;
+    BATTERY_STATE_FULL        = 3;
+}
+
 message DeviceInfo {
-    string device_model        = 1;   // e.g. "iPhone16,2", "Pixel 8 Pro".
-    string device_name         = 2;   // User-facing device name.
-    string platform            = 3;   // "ios" | "android" | "macos" | "web" | ...
-    string os_version          = 4;
-    string form_factor         = 5;   // "phone" | "tablet" | "desktop" | ...
-    string architecture        = 6;   // "arm64" | "x86_64" | "wasm32" | ...
-    string chip_name           = 7;   // e.g. "Apple A17 Pro".
-    int64  total_memory        = 8;   // Bytes.
-    int64  available_memory    = 9;   // Bytes.
-    bool   has_neural_engine   = 10;
-    int32  neural_engine_cores = 11;
-    string gpu_family          = 12;
+    string     device_model    = 1;   // e.g. "iPhone16,2", "Pixel 8 Pro".
+    Platform   platform        = 2;
+    string     os_version      = 3;
+    FormFactor form_factor     = 4;
 
-    optional float  battery_level = 13;  // 0.0–1.0; unset when unavailable.
-    optional string battery_state = 14;  // "charging" | "unplugged" | "full" | ...
-    bool   is_low_power_mode   = 15;
+    // ABI name as the OS reports it: Android sends Build.SUPPORTED_ABIS[0]
+    // ("arm64-v8a"), Apple "arm64", Web "wasm32". Kept a string because no
+    // industry API enumerates ABIs — but the spelling is the OS's, not ours.
+    string     architecture    = 5;
 
-    int32  core_count          = 16;
-    int32  performance_cores   = 17;
-    int32  efficiency_cores    = 18;
+    string     chip_name       = 6;   // e.g. "Apple A17 Pro".
 
-    optional string device_fingerprint = 19;
+    // Physical RAM installed, in BYTES. Never the JVM heap cap — Android must
+    // read ActivityManager.MemoryInfo.totalMem, not Runtime.maxMemory().
+    int64 total_memory_bytes     = 7;
 
-    // Platform-specific fields that are not part of the cross-SDK core
-    // (e.g. web: "has_webgpu", "has_shared_array_buffer"; android: "manufacturer",
-    // "android_api_level", "os_build_id", ...).
-    map<string, string> platform_extras = 20;
+    // Free + reclaimable system RAM at snapshot time, in BYTES.
+    // 0 = UNKNOWN (the Web producer cannot read it). A consumer MUST NOT read
+    // 0 as "no memory left" and refuse to load.
+    int64 available_memory_bytes = 8;
+
+    // Dedicated neural accelerator present (ANE, Hexagon, APU, ...).
+    bool   has_npu             = 9;
+    // 0 = none OR present-but-unreported.
+    int32  npu_cores           = 10;
+    string gpu_family          = 11;
+
+    // Remaining charge as a fraction of full. ABSENT is the ONLY encoding of
+    // "unknown" — 0.0 means a flat battery, not an unreadable one. Producers
+    // bridging through rac_device_registration_info_t (which uses a negative
+    // sentinel) MUST map negative -> absent, never negative -> 0.
+    optional float battery_level = 12 [
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
+
+    // ABSENT when the platform reports no battery at all; UNSPECIFIED when a
+    // battery exists but its state could not be read. The C ABI member is
+    // documented NULL-if-unavailable, which is why this stays `optional`.
+    optional BatteryState battery_state = 13;
+
+    bool  is_low_power_mode    = 14;
+
+    int32 core_count           = 15;
+    int32 performance_cores    = 16;
+
+    optional string device_fingerprint = 17;
+
+    // Vendor escape hatch, CLOSED key set:
+    //   android: "manufacturer", "device_id", "os_build_id", "sdk_version",
+    //            "android_api_level", "locale", "timezone"
+    //   web:     "has_webgpu", "has_shared_array_buffer"
+    //
+    // "manufacturer" and "device_id" are the only two the native parser reads
+    // ("device_id" arrives as a promoted top-level JSON key). Keys not listed
+    // here are NOT dropped: the Kotlin serializer flattens them into the
+    // outbound registration body verbatim, where no client code reads them.
+    //
+    // A key that restates a typed field above MUST NOT be sent — "device_type",
+    // "os_name", "processor_count" and "is_simulator" were removed for exactly
+    // that reason, and "device_id" duplicates device_fingerprint and should
+    // follow once the native parser reads the typed field instead.
+    //
+    // Values are always strings. This map does not cross the C ABI on Apple
+    // platforms, so nothing load-bearing may live here.
+    map<string, string> platform_extras = 18;
 }

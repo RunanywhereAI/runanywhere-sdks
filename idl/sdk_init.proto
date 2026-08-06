@@ -10,6 +10,8 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "errors.proto";
+import "model_types.proto";
+import "rac_options.proto";
 
 option cc_enable_arenas         = true;
 option java_multiple_files      = true;
@@ -20,65 +22,56 @@ option csharp_namespace         = "Runanywhere.V1";
 option swift_prefix             = "RA";
 option go_package               = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-enum SdkInitPhase {
-    SDK_INIT_PHASE_UNSPECIFIED = 0;
-    SDK_INIT_PHASE_ONE         = 1;  // Synchronous core init, no network
-    SDK_INIT_PHASE_TWO         = 2;  // Async services init, network
-    SDK_INIT_PHASE_RETRY_HTTP  = 3;  // HTTP/auth retry after an offline init
-}
-
-// PRODUCTION is 2 because 1 was a staging value in shipped commons and
-// xcframework builds. Do not renumber.
-enum SdkInitEnvironment {
-    SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0;
-    SDK_INIT_ENVIRONMENT_PRODUCTION  = 2;
-}
-
 // The only platform-supplied values commons cannot derive itself. Platform
 // adapter callbacks are registered separately through rac_platform_adapter_t
 // before this call; this message is purely the data envelope.
 message SdkInitPhase1Request {
-    SdkInitEnvironment environment = 1;
+    // model_types.proto's SDKEnvironment is the single environment vocabulary.
+    // Its zero is UNSPECIFIED, so an omitted field means unset, not
+    // "development": commons must fail closed rather than pick an environment.
+    SDKEnvironment     environment = 1;
     string             api_key     = 2;  // May be empty in development mode.
     string             base_url    = 3;  // May be empty in development mode.
     string             device_id   = 4;  // Platform-resolved, e.g. a Keychain UUID.
     string             platform    = 5;
     string             sdk_version = 6;
+
+    // Caller override for NetworkDefaults.request_timeout_ms. Unset = the pool
+    // default (60000). openai-python / anthropic-python `timeout`.
+    optional int32     request_timeout_ms = 7 [(runanywhere.v1.rac_min) = 1000];
+
+    // Caller override for NetworkDefaults.max_retries. Unset = the pool
+    // default (3). openai-python / anthropic-python `max_retries`; 0 disables
+    // retries.
+    optional int32     max_retries        = 8 [
+        (runanywhere.v1.rac_min) = 0,
+        (runanywhere.v1.rac_max) = 10
+    ];
 }
 
-// Most state is already resident in commons after Phase 1; these are the
-// per-call hints that stay SDK-owned.
+// The one value that legitimately varies between a dev build and a release.
+// Telemetry flushing and registry/local-file reconciliation are commons
+// behaviour, not per-call hints.
 message SdkInitPhase2Request {
-    string build_token                = 1;  // Dev-mode device registration token.
-    bool   force_refresh_assignments  = 2;
-    bool   flush_telemetry            = 3;
-    bool   discover_downloaded_models = 4;  // Reconcile registry rows with local files.
-    bool   rescan_local_models        = 5;
+    string build_token = 1;  // Dev-mode device registration token.
 }
 
 // Returned by Phase 1, Phase 2, and retryHTTP.
 //
 // A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
-// to fail in offline mode, in which case error is unset, http_configured=false,
-// and warning holds the offline notice while the SDK continues on cached
-// models.
+// to fail in offline mode, in which case error is unset and warning holds the
+// offline notice while the SDK continues on cached models.
 message SdkInitResult {
-    SdkInitPhase phase                  = 1;
-    SDKError     error                  = 3;
-    bool         http_configured        = 4;  // HTTP transport wired at this call site.
-    bool         device_registered      = 5;
-    uint32       linked_models_count    = 6;  // Registry rows that linked to local files.
-    uint32       discovered_orphans     = 7;  // On-disk folders with no registry row.
-    string       warning                = 8;
-    int64        duration_ms            = 9;
+    SDKError     error                  = 1;
+    uint32       linked_models_count    = 2;  // Registry rows that linked to local files.
+    string       warning                = 3;
 
-    // The cross-phase latched bit that survives between calls, as opposed to
-    // http_configured, which describes only the calling phase. SDKs read this
+    // The cross-phase latched bit that survives between calls. SDKs read this
     // to decide whether an authenticated call can proceed without a retryHTTP.
-    bool         has_completed_http_setup = 10;
+    bool         has_completed_http_setup = 4;
 
     // Whether this configuration has a usable credential and URL pair at all.
     // Local-only development builds set it false so platform SDKs stop
     // retrying HTTP on every guarded call.
-    bool         http_applicable           = 11;
+    bool         http_applicable          = 5;
 }

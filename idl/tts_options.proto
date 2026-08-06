@@ -21,30 +21,14 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-enum TTSVoiceGender {
-    TTS_VOICE_GENDER_UNSPECIFIED = 0;
-    TTS_VOICE_GENDER_MALE        = 1;
-    TTS_VOICE_GENDER_FEMALE      = 2;
-    TTS_VOICE_GENDER_NEUTRAL     = 3;
-}
-
-message TTSConfiguration {
-    // Voice model file id, e.g. a piper voice. Empty for platform TTS engines
-    // (Apple System TTS, Android TextToSpeech), which need no model file.
-    string             model_id            = 1;
-
-    // Use the neural or premium voice when available.
-    bool               enable_neural_voice = 9 [(runanywhere.v1.rac_default) = "true"];
-
-    optional InferenceFramework preferred_framework = 11;
-
-    // Applied when a per-call TTSOptions is absent or leaves a field unset.
-    optional TTSOptions default_options    = 12;
-}
-
 message TTSOptions {
     // Empty = use the component's configured voice.
     string             voice               = 1;
+
+    // Voice/model id to synthesize with. Unset = use whatever is already
+    // loaded for MODEL_CATEGORY_SPEECH_SYNTHESIS; set = load it first,
+    // downloading if needed.
+    optional string    model               = 13;
 
     // BCP-47. Empty = use the component default.
     string             language_code       = 2 [(runanywhere.v1.rac_default) = "en-US"];
@@ -56,43 +40,52 @@ message TTSOptions {
         (runanywhere.v1.rac_max_float) = 2.0
     ];
 
-    // 0.5 - 2.0.
-    float              pitch               = 4 [(runanywhere.v1.rac_default) = "1.0"];
+    // Fundamental-frequency multiplier, 1.0 = the voice's own pitch. Honoured
+    // only by the platform backend (Apple System TTS / Android TextToSpeech);
+    // neural voices (sherpa/Piper/Kokoro, qhexrt) ignore it, because for them
+    // pitch is voice identity rather than a dial.
+    float              pitch               = 4 [
+        (runanywhere.v1.rac_default) = "1.0",
+        (runanywhere.v1.rac_min_float) = 0.5,
+        (runanywhere.v1.rac_max_float) = 2.0
+    ];
 
     // 0.0 - 1.0.
     float              volume              = 5 [(runanywhere.v1.rac_default) = "1.0"];
 
-    // Whether the input carries SSML markup.
-    bool               enable_ssml         = 6;
+    reserved 6;                  // was enable_ssml -- no backend parses SSML
+    reserved "enable_ssml";
 
+    // TTS honours exactly AUDIO_FORMAT_PCM (float32) and AUDIO_FORMAT_WAV.
+    // Other values, including AUDIO_FORMAT_PCM_S16LE, fall through to PCM
+    // silently today; do not rely on them until that is fixed.
     runanywhere.v1.AudioFormat audio_format = 7 [(runanywhere.v1.rac_default) = "AUDIO_FORMAT_PCM"];
 
-    // 0 = component default.
-    int32              sample_rate         = 8 [(runanywhere.v1.rac_default) = "22050"];
+    // 0 (the default) = render at the voice's native rate. Naming any other
+    // rate forces a resample and costs quality. TTSOutput.sample_rate always
+    // reports the rate actually used.
+    int32              sample_rate         = 8 [(runanywhere.v1.rac_default) = "0"];
 
-    // For multi-speaker voices. -1 or 0 = backend default, per model convention.
-    int32              speaker_id          = 9;
-
-    // Style or emotion hint for voices supporting style transfer.
-    optional string    style               = 11;
+    reserved 9, 10, 11;          // was speaker_id, style; 10 never used
+    reserved "speaker_id", "style";
 }
+
+// TTSConfiguration deleted. It was write-only: engine pinning already
+// resolves off ModelLoadRequest, and "which voice" is TTSOptions.model.
 
 message TTSSynthesisRequest {
     string request_id = 1;
     string text = 2;
-    optional string ssml = 3;
+    reserved 3;                  // was ssml -- engines spoke the markup aloud
+    reserved "ssml";
     optional TTSOptions options = 4;
-    map<string, string> metadata = 5;
+    reserved 5;                  // was metadata -- no code ever read it
+    reserved "metadata";
 }
 
-message TTSPhonemeTimestamp {
-    // IPA or engine-specific symbol.
-    string phoneme  = 1;
-
-    // Offsets within the synthesized audio.
-    int64  start_ms = 2;
-    int64  end_ms   = 3;
-}
+// TTSPhonemeTimestamp deleted -- never produced, and the wrong granularity.
+// If timings are wanted later, add a request-side `timestamps` enum
+// {none, word, character} plus repeated TTSTimestamp {text, start_ms, end_ms}.
 
 message TTSSynthesisMetadata {
     string voice_id            = 1;
@@ -101,8 +94,12 @@ message TTSSynthesisMetadata {
     string language_code       = 2;
 
     int64  processing_time_ms  = 3;
-    int32  character_count     = 4;
-    int64  audio_duration_ms   = 5;
+
+    // UTF-8 byte length of the spoken input, not a codepoint count.
+    int32  input_bytes         = 4;
+
+    reserved 5;                  // was audio_duration_ms -- == parent duration_ms
+    reserved "audio_duration_ms";
 }
 
 message TTSOutput {
@@ -116,8 +113,8 @@ message TTSOutput {
 
     int64                          duration_ms         = 4;
 
-    // Empty unless the engine produced them.
-    repeated TTSPhonemeTimestamp   phoneme_timestamps  = 5;
+    reserved 5;                  // was phoneme_timestamps -- never produced
+    reserved "phoneme_timestamps";
 
     TTSSynthesisMetadata           metadata            = 6;
 
@@ -127,7 +124,9 @@ message TTSOutput {
     // For one-shot synthesis, chunk_index=0 and is_final=true.
     int32                          chunk_index         = 8;
     bool                           is_final            = 9;
-    int64                          audio_size_bytes    = 10;
+
+    reserved 10;                 // was audio_size_bytes -- == audio_data.size()
+    reserved "audio_size_bytes";
 
     optional SDKError              error               = 13;
 }
@@ -154,22 +153,22 @@ message TTSVoiceInfo {
     // Passed back as TTSOptions.voice.
     string         id            = 1;
 
-    // e.g. "Samantha".
+    // e.g. "Samantha". MUST NOT be a copy of `id` -- fall back to the model
+    // id only when the engine reports no display name.
     string         display_name  = 2;
 
     // BCP-47.
     string         language_code = 3;
 
-    TTSVoiceGender gender        = 4;
-
-    // Locale, age, or style notes.
-    string         description   = 5;
-
-    bool           is_neural     = 6;
-    bool           is_system     = 7;
+    // The voice's native rate in Hz -- tells the caller whether naming a
+    // different TTSOptions.sample_rate buys anything.
     int32          sample_rate   = 8;
-    repeated string supported_styles = 9;
+
+    reserved 4, 5, 6, 7, 9;
+    reserved "gender", "description", "is_neural", "is_system",
+             "supported_styles";
 }
+// enum TTSVoiceGender deleted -- its only field is gone.
 
 message TTSVoiceList {
     repeated TTSVoiceInfo voices = 1;
@@ -179,10 +178,10 @@ enum TTSStreamEventKind {
     TTS_STREAM_EVENT_KIND_UNSPECIFIED = 0;
     TTS_STREAM_EVENT_KIND_STARTED = 1;
     TTS_STREAM_EVENT_KIND_AUDIO_CHUNK = 2;
-    TTS_STREAM_EVENT_KIND_PHONEME = 3;
     TTS_STREAM_EVENT_KIND_COMPLETED = 4;
     TTS_STREAM_EVENT_KIND_ERROR = 5;
-    TTS_STREAM_EVENT_KIND_PROGRESS = 6;
+    reserved 3, 6;               // was PHONEME, PROGRESS -- nothing emitted either
+    reserved "TTS_STREAM_EVENT_KIND_PHONEME", "TTS_STREAM_EVENT_KIND_PROGRESS";
 }
 
 message TTSStreamEvent {
@@ -190,22 +189,19 @@ message TTSStreamEvent {
     string request_id = 3;
     TTSStreamEventKind kind = 4;
     optional TTSOutput output = 5;
-    optional TTSPhonemeTimestamp phoneme = 6;
-    optional TTSSpeakResult speak_result = 7;
-
-    // progress is 0.0-1.0 when known; total_chunks 0 = unknown.
-    float progress = 10;
-    int32 chunk_index = 11;
-    int32 total_chunks = 12;
-    int64 elapsed_ms = 13;
-    string status_message = 14;
     optional SDKError error = 15;
+
+    // Chunk ordering lives on TTSOutput.chunk_index, which is populated.
+    reserved 1, 6, 7, 10, 11, 12, 13, 14;
+    reserved "phoneme", "speak_result", "progress", "chunk_index",
+             "total_chunks", "elapsed_ms", "status_message";
 }
 
 message TTSServiceState {
     bool is_ready = 1;
     optional string current_voice = 2;
-    repeated TTSVoiceInfo voices = 3;
+    reserved 3;                  // was voices -- use the list-voices verb
+    reserved "voices";
     repeated string supported_language_codes = 4;
     optional SDKError error = 7;
 }

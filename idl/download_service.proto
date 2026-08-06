@@ -28,12 +28,19 @@ message DownloadSubscribeRequest {
 
 message DownloadProgress {
     string         model_id          = 1;
-    DownloadStage  stage             = 2;
+    reserved 2;  // was DownloadStage stage: duplicated `state` (8)
+    reserved "stage";
     int64          bytes_downloaded  = 3;
     int64          total_bytes       = 4;   // 0 if unknown
     float          stage_progress    = 5;   // 0.0..1.0 within current stage
-    float          overall_speed_bps = 6;
-    int64          eta_seconds       = 7;   // -1 if unknown
+
+    // Bytes per second. Absent means unknown -- no sentinel that collides
+    // with a real value.
+    float          bytes_per_second  = 6;
+    optional int64 eta_seconds       = 7;
+
+    // The single phase of this transfer. `error` (21) is populated exactly
+    // when state == DOWNLOAD_STATE_FAILED and is meaningless otherwise.
     DownloadState  state             = 8;
     int32          retry_attempt     = 9;   // 0 on first try
     string         task_id           = 11;
@@ -45,16 +52,12 @@ message DownloadProgress {
     int64          started_at_unix_ms = 17;
     int64          updated_at_unix_ms = 18;
     string         current_file_name  = 19;
-    string         resume_token       = 20;  // logical resume marker, not a native handle
-    optional SDKError error           = 21;  // populated when state == FAILED
-}
 
-enum DownloadStage {
-    DOWNLOAD_STAGE_UNSPECIFIED = 0;
-    DOWNLOAD_STAGE_DOWNLOADING = 1;
-    DOWNLOAD_STAGE_EXTRACTING  = 2;
-    DOWNLOAD_STAGE_VALIDATING  = 3;
-    DOWNLOAD_STAGE_COMPLETED   = 4;
+    // Starting a download IS resuming it; there is no separate resume verb
+    // or token to echo. The resume marker stays a C++-internal concept.
+    reserved 20;
+    reserved "resume_token";
+    optional SDKError error           = 21;
 }
 
 enum DownloadState {
@@ -68,7 +71,11 @@ enum DownloadState {
     DOWNLOAD_STATE_CANCELLED   = 7;
     DOWNLOAD_STATE_PAUSED      = 8;
     DOWNLOAD_STATE_RESUMING    = 9;
+    DOWNLOAD_STATE_VALIDATING  = 10;  // checksum / expected-files verification
 }
+
+// enum DownloadStage: deleted. It duplicated DownloadState (both had
+// DOWNLOADING/EXTRACTING/COMPLETED) with no defined FAILED moment.
 
 // Structured reason for a download plan/start/resume rejection. Lets every SDK
 // branch on a stable enum instead of substring-matching the human-readable
@@ -124,12 +131,19 @@ enum HttpDownloadStatus {
 message DownloadPlanRequest {
     string             model_id              = 1;
     optional ModelInfo model                 = 2;
-    bool               resume_existing       = 3;
+
+    // Starting a download IS resuming it: DownloadStartRequest{model_id}
+    // continues from any valid partial on disk automatically.
+    reserved 3;
+    reserved "resume_existing";
     int64              available_storage_bytes = 4;
     bool               allow_metered_network = 5;
     string             storage_namespace     = 6;
     bool               validate_existing_bytes = 7;
-    bool               verify_checksums      = 8;
+
+    // Checksums are verified whenever the catalog has one; set this only to
+    // opt OUT.
+    bool               skip_checksum_verification = 8;
     int64              required_free_bytes_after_download = 9;
 }
 
@@ -153,7 +167,8 @@ message DownloadPlanResult {
     int64                 resume_from_bytes  = 7;
     repeated string       warnings           = 8;
     string                storage_namespace  = 10;
-    string                resume_token       = 11;
+    reserved 11;
+    reserved "resume_token";
     int64                 required_free_bytes_after_download = 12;
     DownloadFailureReason failure_reason     = 13;  // structured companion to error
     optional SDKError     error              = 14;
@@ -161,10 +176,18 @@ message DownloadPlanResult {
 
 message DownloadStartRequest {
     string              model_id = 1;
-    DownloadPlanResult  plan     = 2;
-    bool                resume   = 3;
-    string              resume_token = 4;
-    bool                update_registry_on_completion = 5;
+
+    // Optional. ABSENT (the common path) = plan internally and start, one
+    // call. PRESENT = execute this exact previously-approved plan, for the
+    // flow that showed the user a size and a metered-network warning first.
+    optional DownloadPlanResult plan = 2;
+
+    reserved 3, 4;
+    reserved "resume", "resume_token";
+
+    // The registry is updated on completion; set this only to opt OUT
+    // (staging flows).
+    bool                skip_registry_update = 5;
 }
 
 message DownloadStartResult {
@@ -172,9 +195,14 @@ message DownloadStartResult {
     string           task_id          = 2;
     string           model_id         = 3;
     DownloadProgress initial_progress = 4;
-    string           resume_token     = 6;
+    reserved 6;
+    reserved "resume_token";
     DownloadFailureReason failure_reason = 7;  // structured companion to error
     optional SDKError error           = 8;
+
+    // The plan that was executed, supplied or computed, so a one-call caller
+    // still gets the byte numbers.
+    optional DownloadPlanResult plan = 9;
 }
 
 message DownloadCancelRequest {
@@ -189,24 +217,14 @@ message DownloadCancelResult {
     int64  partial_bytes_deleted = 4;
     bool   was_running           = 6;
     bool   partial_bytes_preserved = 7;
-    string resume_token          = 8;
+    reserved 8;
+    reserved "resume_token";
     optional SDKError error      = 9;
 }
 
-message DownloadResumeRequest {
-    string task_id           = 1;
-    string model_id          = 2;
-    int64  resume_from_bytes = 3;
-    string resume_token      = 4;
-    bool   validate_partial_bytes = 5;
-}
-
-message DownloadResumeResult {
-    bool             accepted         = 1;
-    string           task_id          = 2;
-    string           model_id         = 3;
-    DownloadProgress initial_progress = 4;
-    string           resume_token     = 6;
-    DownloadFailureReason failure_reason = 7;  // structured companion to error
-    optional SDKError error           = 8;
-}
+// DownloadResumeRequest / DownloadResumeResult: deleted.
+//
+// Starting a download IS resuming it. DownloadStartRequest{model_id}
+// continues from any valid partial on disk, and a second call for the same
+// model_id coalesces onto the transfer already in flight rather than
+// starting a new one.

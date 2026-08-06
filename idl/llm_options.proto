@@ -22,33 +22,41 @@ option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
 message LLMGenerationOptions {
-    // 0 = unset, so the annotated default applies.
-    int32  max_output_tokens   = 1 [
+    // Every knob below has explicit presence: ABSENT means the annotated
+    // default applies, and any value the caller sets -- including 0 -- is
+    // honoured verbatim. Nothing treats 0 as unset.
+    //
+    // Sampler chain order is fixed: repeat_penalty -> top_k -> top_p ->
+    // min_p -> temperature (llama.cpp order, minus the samplers we do not
+    // expose). top_k/min_p/repeat_penalty default ON to match llama.cpp and
+    // Ollama, which both ship these on because small quantized models loop
+    // without them.
+    optional int32 max_output_tokens = 1 [
         (runanywhere.v1.rac_default) = "512",
         (runanywhere.v1.rac_min) = 0
     ];
 
-    // 0.0 = greedy decoding.
-    float  temperature         = 2 [
+    // 0.0 = greedy decoding, and is honoured as an explicit request.
+    optional float temperature = 2 [
         (runanywhere.v1.rac_default) = "0.7",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 2.0
     ];
 
-    float  top_p               = 3 [
+    optional float top_p = 3 [
         (runanywhere.v1.rac_default) = "1.0",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
 
-    // Commons treats 0 as unset for every sampling knob below.
-    int32  top_k               = 4 [
-        (runanywhere.v1.rac_default) = "0",
+    optional int32 top_k = 4 [
+        (runanywhere.v1.rac_default) = "40",
         (runanywhere.v1.rac_min) = 0
     ];
 
-    float  repetition_penalty  = 5 [
-        (runanywhere.v1.rac_default) = "1.0",
+    // Industry name: llama.cpp and Ollama both spell this repeat_penalty.
+    optional float repeat_penalty = 5 [
+        (runanywhere.v1.rac_default) = "1.1",
         (runanywhere.v1.rac_min_float) = 0.0
     ];
 
@@ -61,17 +69,43 @@ message LLMGenerationOptions {
     optional ExecutionTarget execution_target = 12;
 
     optional StructuredOutputOptions structured_output = 13;
-    int64 seed = 15 [(runanywhere.v1.rac_default) = "0"];
-    float frequency_penalty = 16 [(runanywhere.v1.rac_default) = "0.0"];
-    float presence_penalty = 17 [(runanywhere.v1.rac_default) = "0.0"];
+    optional int64 seed = 15 [(runanywhere.v1.rac_default) = "0"];
+    optional float frequency_penalty = 16 [(runanywhere.v1.rac_default) = "0.0"];
+    optional float presence_penalty = 17 [(runanywhere.v1.rac_default) = "0.0"];
 
     // No engine reads repeat_last_n or echo_prompt.
     int32 repeat_last_n = 18 [(runanywhere.v1.rac_default) = "0"];
-    float min_p = 19 [(runanywhere.v1.rac_default) = "0.0"];
+    optional float min_p = 19 [(runanywhere.v1.rac_default) = "0.05"];
     bool echo_prompt = 22;
 
-    int32 n_threads = 23 [(runanywhere.v1.rac_default) = "0"];
+    // Deleted: thread count is a load-time decision (the engine builds its
+    // thread pool at model load and cannot honour a per-request change).
+    // Only preferred_framework stays here, because backend routing genuinely
+    // is a per-call decision.
+    reserved 23;
+    reserved "n_threads";
+
     optional ToolCallingOptions tool_calling = 24;
+}
+
+// One declared vocabulary, used in every place a finish reason is reported
+// on the LLM generation path (LLMGenerationResult, LLMStreamEvent).
+enum FinishReason {
+    FINISH_REASON_UNSPECIFIED = 0;
+    // End-of-turn token. OpenAI "stop" / Anthropic "end_turn".
+    FINISH_REASON_STOP = 1;
+    // Hit max_output_tokens. OpenAI "length" / Anthropic "max_tokens".
+    FINISH_REASON_LENGTH = 2;
+    // One of options.stop_sequences fired; see `stop_sequence`.
+    FINISH_REASON_STOP_SEQUENCE = 3;
+    // Model wants a tool run before it can continue.
+    FINISH_REASON_TOOL_CALLS = 4;
+    // Caller cancelled. No cloud analogue.
+    FINISH_REASON_CANCELLED = 5;
+    // Conversation exceeded the allocated context window.
+    FINISH_REASON_CONTEXT_OVERFLOW = 6;
+    // Generation failed; see `error`.
+    FINISH_REASON_ERROR = 7;
 }
 
 message LLMGenerationResult {
@@ -79,12 +113,16 @@ message LLMGenerationResult {
     optional string thinking_content = 2;
     string model_used          = 5;
     double generation_time_ms  = 6;
-    optional double ttft_ms    = 7;
     optional string framework  = 9;
-    string finish_reason       = 10;
+    reserved 10;  // was string finish_reason -- wire-type flip to enum, fresh tag below
     int32  thinking_tokens     = 11;
     int32  response_tokens     = 12;
     optional string json_output = 13;
+    FinishReason finish_reason = 27;
+    // Which of options.stop_sequences fired. Set only when finish_reason ==
+    // FINISH_REASON_STOP_SEQUENCE. Industry: Anthropic `stop_sequence`,
+    // llama.cpp `stopping_word`.
+    optional string stop_sequence = 28;
 
     // Nothing reads performance or executed_on.
     optional PerformanceMetrics performance = 14;

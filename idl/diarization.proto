@@ -23,18 +23,23 @@ option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
 message DiarizationOptions {
+    // Only 16 kHz is accepted: the engine does not resample, and any other
+    // rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
     optional int32 sample_rate = 1 [
         (runanywhere.v1.rac_default) = "16000",
-        (runanywhere.v1.rac_min) = 8000,
-        (runanywhere.v1.rac_max) = 48000
+        (runanywhere.v1.rac_min) = 16000,
+        (runanywhere.v1.rac_max) = 16000
     ];
     optional int32 channels = 2 [
         (runanywhere.v1.rac_default) = "1",
         (runanywhere.v1.rac_min) = 1,
         (runanywhere.v1.rac_max) = 1
     ];
-    // Commons normalizes either PCM representation to float samples before
-    // dispatching to an engine.
+    // Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+    // AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+    // float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+    // and AUDIO_ENCODING_UNSPECIFIED are rejected with
+    // RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
     optional AudioEncoding encoding = 3 [
         (runanywhere.v1.rac_default) = "AUDIO_ENCODING_PCM_F32_LE"
     ];
@@ -45,6 +50,15 @@ message DiarizationOptions {
     ];
     int64 minimum_duration_ms = 5 [(runanywhere.v1.rac_min) = 0];
     int64 merge_gap_ms = 6 [(runanywhere.v1.rac_min) = 0];
+
+    // 7 reserved for num_speakers once the ONNX provider gains a slot-merge step.
+
+    // Speaker-count hint: an upper bound, not an exact count. Unset =
+    // auto-detect. An engine that detects more than max_speakers speakers
+    // ranks them by total active duration, drops the weakest, and re-densifies
+    // the speaker indices. Values above the loaded model's speaker capacity
+    // are clamped.
+    optional int32 max_speakers = 8 [(runanywhere.v1.rac_min) = 1];
 }
 
 message DiarizationRequest {

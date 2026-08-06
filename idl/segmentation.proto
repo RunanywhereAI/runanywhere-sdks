@@ -26,32 +26,48 @@ enum SegmentationPixelFormat {
 
 message SegmentationImage {
     bytes data = 1 [(runanywhere.v1.rac_required) = true];
-    uint32 width = 2 [(runanywhere.v1.rac_required) = true];
-    uint32 height = 3 [(runanywhere.v1.rac_required) = true];
+    uint32 width = 2 [
+        (runanywhere.v1.rac_required) = true,
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 4096
+    ];
+    uint32 height = 3 [
+        (runanywhere.v1.rac_required) = true,
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 4096
+    ];
     SegmentationPixelFormat pixel_format = 4 [(runanywhere.v1.rac_required) = true];
-
-    // Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
-    // C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
-    // wire counterpart.
-    uint32 stride_bytes = 5 [(runanywhere.v1.rac_default) = "0"];
 }
 
 message SegmentationOptions {
     // When true, also return a deterministic class-colour RGBA image. The
     // canonical class_mask_u16_le remains the machine-readable result.
     bool include_diagnostic_rgba = 1;
+
+    // When true, also return confidence_mask_u8: the model's probability for
+    // the class it chose, per pixel. Costs width * height extra bytes.
+    bool include_confidence = 2;
 }
 
 message SegmentationRequest {
     SegmentationImage image = 1;
     optional SegmentationOptions options = 2;
+
+    // Registry id, catalog id, or absolute path. Unset = use the resident
+    // semantic-segmentation model. Mirrors EmbeddingsRequest.model_id and
+    // VLMGenerationRequest.model_id.
+    optional string model_id = 3;
 }
 
+// Coverage share of a class is pixel_count / (SegmentationResult.width *
+// SegmentationResult.height). Commons rejects any result whose pixel_counts
+// do not sum to that product before encoding it into a SegmentationResult, so
+// within this message the summaries partition the image and the division is
+// exact.
 message SegmentationClassSummary {
     uint32 class_id = 1;
     uint64 pixel_count = 2;
-    float fraction = 3;
-    string label = 4;
+    string label = 3;
 }
 
 message SegmentationResult {
@@ -64,4 +80,10 @@ message SegmentationResult {
     repeated SegmentationClassSummary class_summaries = 5;
     int64 processing_time_ms = 6;
     string model_id = 7;
+
+    // Confidence of the class in class_mask_u16_le, one byte per pixel,
+    // 0..255 == probability 0.0..1.0. Same row-major order and dimensions as
+    // the class mask. Present iff SegmentationOptions.include_confidence was
+    // set, and then exactly width * height bytes.
+    optional bytes confidence_mask_u8 = 8;
 }
