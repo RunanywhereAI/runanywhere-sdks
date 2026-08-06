@@ -127,9 +127,10 @@ describe('CrossWasmRAGProvider', () => {
     expect(embedBatch).toHaveBeenCalledTimes(2);
     expect(result.answer).toContain('ORBIT-7');
     expect(result.retrievedChunks).toHaveLength(1);
+    // RAGSearchResult.rank was deleted outright (idl/rag.proto) -- callers
+    // reconstruct rank from array position, there is no wire-carried field.
     expect(result.retrievedChunks[0]).toMatchObject({
       sourceDocument: 'Zephyr Notes',
-      rank: 1,
     });
     expect(result.contextUsed).toContain('ORBIT-7');
     expect(generate).toHaveBeenCalledWith(expect.objectContaining({
@@ -167,10 +168,11 @@ describe('CrossWasmRAGProvider', () => {
     await provider.ragIngest('A short document.', JSON.stringify({ docId: 'doc-1', docName: 'One' }));
 
     await expect(provider.ragGetDocumentCount()).resolves.toBe(1);
+    // RAGStatistics (idl/rag.proto) has no isPersistent field -- persistence
+    // is reported by RAGProviderCapabilities.persistent, asserted below.
     await expect(provider.ragGetStatistics?.()).resolves.toMatchObject({
       indexedDocuments: 1,
       indexedChunks: 1,
-      isPersistent: false,
     });
     expect(provider.ragGetCapabilities?.()).toEqual({
       native: false,

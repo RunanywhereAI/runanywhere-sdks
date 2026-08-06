@@ -366,7 +366,10 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
     expect(capturedRequest?.options?.maxOutputTokens).toBe(16);
     expect(capturedRequest?.options?.temperature).toBe(0);
     expect(capturedRequest?.options?.topP).toBe(1);
-    expect(capturedRequest?.options?.repeatPenalty).toBe(1);
+    // repeat_penalty defaults to 1.1 (idl/llm_options.proto), matching
+    // llama.cpp/Ollama convention -- not the old repetition_penalty field's
+    // 1.0 default. toBeCloseTo tolerates the float32 round-trip precision.
+    expect(capturedRequest?.options?.repeatPenalty).toBeCloseTo(1.1);
     expect(module.streamCalls).toBe(1);
     expect(module.ccallCalls).toContainEqual({
       functionName: 'rac_llm_generate_stream_proto',

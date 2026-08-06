@@ -440,7 +440,10 @@ describe('generateStructuredStream', () => {
     expect(capturedGenerate?.options?.maxOutputTokens).toBe(64);
     expect(capturedGenerate?.options?.temperature).toBeCloseTo(0.7);
     expect(capturedGenerate?.options?.topP).toBeCloseTo(1.0);
-    expect(capturedGenerate?.options?.repeatPenalty).toBeCloseTo(1.0);
+    // repeat_penalty defaults to 1.1 (idl/llm_options.proto), matching
+    // llama.cpp/Ollama convention -- not the old repetition_penalty field's
+    // 1.0 default.
+    expect(capturedGenerate?.options?.repeatPenalty).toBeCloseTo(1.1);
 
     // Three token events stream through before the terminal completed event.
     expect(events).toHaveLength(4);
