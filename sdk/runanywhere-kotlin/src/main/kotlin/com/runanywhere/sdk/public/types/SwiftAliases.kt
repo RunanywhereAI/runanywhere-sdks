@@ -23,6 +23,7 @@ public typealias RAExecutionTarget = ai.runanywhere.proto.v1.ExecutionTarget
 public typealias RAToolDefinition = ai.runanywhere.proto.v1.ToolDefinition
 public typealias RAToolCall = ai.runanywhere.proto.v1.ToolCall
 public typealias RAToolResult = ai.runanywhere.proto.v1.ToolResult
+
 // RAJSONSchema is deleted: runanywhere.v1.JSONSchema no longer exists.
 // StructuredOutputOptions.schema is now a plain JSON Schema string.
 public typealias RAStructuredOutputResult = ai.runanywhere.proto.v1.StructuredOutputResult
@@ -48,6 +49,7 @@ public typealias RAVoiceAgentComponentStates = ai.runanywhere.proto.v1.VoiceAgen
 
 public typealias RAVLMImage = ai.runanywhere.proto.v1.VLMImage
 public typealias RAVLMResult = ai.runanywhere.proto.v1.VLMResult
+
 // RAVLMGenerationOptions is deleted: runanywhere.v1.VLMGenerationOptions was
 // removed outright. VLM generation now composes LLMGenerationOptions
 // (sampling/system-prompt/structured-output) with VLMVisionOptions
@@ -109,6 +111,7 @@ public typealias RAInferenceFramework = ai.runanywhere.proto.v1.InferenceFramewo
 public typealias RAArchiveType = ai.runanywhere.proto.v1.ArchiveType
 public typealias RAArchiveStructure = ai.runanywhere.proto.v1.ArchiveStructure
 public typealias RAStorageInfo = ai.runanywhere.proto.v1.StorageInfo
+
 // RAHardwareProfile / RAAcceleratorInfo are deleted: both messages were
 // removed outright. Device + NPU capability now live on DeviceInfo /
 // NpuCapability (device_registration.proto).

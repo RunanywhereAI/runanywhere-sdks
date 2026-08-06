@@ -72,7 +72,11 @@ internal fun RALLMGenerationOptions?.toGenerateRequest(prompt: String): RALLMGen
         )
     return RALLMGenerateRequest(
         options = requestOptions,
-        messages = listOf(ai.runanywhere.proto.v1.ChatMessage(role = ai.runanywhere.proto.v1.MessageRole.MESSAGE_ROLE_USER, content = prompt)),
+        messages =
+            listOf(
+                ai.runanywhere.proto.v1
+                    .ChatMessage(role = ai.runanywhere.proto.v1.MessageRole.MESSAGE_ROLE_USER, content = prompt),
+            ),
     )
 }
 

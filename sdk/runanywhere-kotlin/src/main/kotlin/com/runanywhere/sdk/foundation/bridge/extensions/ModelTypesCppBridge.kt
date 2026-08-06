@@ -68,8 +68,10 @@ internal object ModelTypesCppBridge {
     fun applyInferredArtifact(modelInfo: RAModelInfo, url: String): RAModelInfo {
         val result = artifactInferFromUrlProto(url, modelInfo.id)
         val hasExistingArtifact =
-            modelInfo.single_file != null || modelInfo.archive != null ||
-                modelInfo.multi_file != null || modelInfo.built_in != null
+            modelInfo.single_file != null ||
+                modelInfo.archive != null ||
+                modelInfo.multi_file != null ||
+                modelInfo.built_in != null
         if (result == null) {
             // Native ABI unavailable — preserve existing info, fall back to
             // a single-file artifact when nothing is set so the

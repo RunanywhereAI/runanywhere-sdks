@@ -17,7 +17,9 @@ package com.runanywhere.sdk.public.api
  * directly, matching commons' new contract (verbatim JSON Schema text,
  * unsupported keywords rejected).
  */
-public data class JsonSchema(val rawJson: String)
+public data class JsonSchema(
+    val rawJson: String,
+)
 
 /** Declaration of a tool the model may call. */
 public typealias ToolDefinition = ai.runanywhere.proto.v1.ToolDefinition

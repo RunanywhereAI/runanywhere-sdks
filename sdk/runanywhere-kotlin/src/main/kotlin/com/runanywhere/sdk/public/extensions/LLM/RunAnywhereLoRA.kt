@@ -306,7 +306,11 @@ internal object AndroidLoRA : LoRA {
 
         var localPath = finalProgress.local_path
         if (localPath.isBlank()) {
-            val lookup = RunAnywhere.getModel(ai.runanywhere.proto.v1.ModelGetRequest(model_id = registered.id))
+            val lookup =
+                RunAnywhere.getModel(
+                    ai.runanywhere.proto.v1
+                        .ModelGetRequest(model_id = registered.id),
+                )
             if (lookup.found) {
                 localPath = lookup.model?.local_path.orEmpty()
             }

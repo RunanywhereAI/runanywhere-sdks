@@ -41,9 +41,13 @@ class GeneratedConfigurationDefaultsTest {
         assertEquals(true, embeddings.normalize)
         assertNull(embeddings.dimensions)
 
+        // VADConfiguration.threshold (energy-detector-specific, default 0.015)
+        // was renamed activation_threshold: a normalized [0,1] sensitivity
+        // (industry default 0.5, matching OpenAI/Silero/LiveKit), which each
+        // backend maps onto its own units (idl/vad_options.proto).
         val vad = VADConfiguration.defaults()
         assertEquals(16_000, vad.sample_rate)
-        assertEquals(0.015f, vad.activation_threshold)
+        assertEquals(0.5f, vad.activation_threshold)
 
         val sttConfiguration = STTConfiguration.defaults()
         assertEquals(16_000, sttConfiguration.sample_rate)
@@ -55,6 +59,9 @@ class GeneratedConfigurationDefaultsTest {
         assertEquals(true, sttOptions.enable_word_timestamps)
 
         // TTS synthesis knobs left TTSConfiguration in the v2 contract; TTSOptions owns them.
-        assertEquals(22_050, TTSOptions.defaults().sample_rate)
+        // sample_rate now defaults to 0 (idl/tts_options.proto): render at
+        // the voice's native rate rather than forcing a resample to a fixed
+        // 22050 Hz, which cost quality.
+        assertEquals(0, TTSOptions.defaults().sample_rate)
     }
 }

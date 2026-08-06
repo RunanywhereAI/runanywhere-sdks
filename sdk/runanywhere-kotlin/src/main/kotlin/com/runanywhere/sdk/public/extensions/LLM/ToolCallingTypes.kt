@@ -32,6 +32,7 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 typealias ToolValue = ai.runanywhere.proto.v1.ToolValue
 typealias ToolValueArray = ai.runanywhere.proto.v1.ToolValueArray
 typealias ToolValueObject = ai.runanywhere.proto.v1.ToolValueObject
+
 // ToolParameterType / ToolParameter are deleted: ToolDefinition.parameters is
 // now a single JSON-Schema string (OpenAI `parameters` / Anthropic
 // `input_schema` / MCP `inputSchema` shape) instead of a typed parameter list.
@@ -221,7 +222,9 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.jsonString(
 // MARK: Tool Definition Helpers --------------------------------------------
 
 /** JSON Schema primitive types (`"string"`, `"number"`, `"integer"`, `"boolean"`, `"array"`, `"object"`). */
-enum class ToolParameterType(internal val wireValue: String) {
+enum class ToolParameterType(
+    internal val wireValue: String,
+) {
     STRING("string"),
     NUMBER("number"),
     INTEGER("integer"),

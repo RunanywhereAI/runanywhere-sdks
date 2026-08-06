@@ -7,10 +7,10 @@
 
 package com.runanywhere.sdk.public.api
 
+import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
 import ai.runanywhere.proto.v1.LoraAdapterConfig
 import ai.runanywhere.proto.v1.LoraApplyRequest
 import ai.runanywhere.proto.v1.LoraRemoveRequest
-import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.extensions.AndroidLoRA
 
