@@ -322,12 +322,13 @@ class STTViewModel extends VoiceComponentViewModelBase {
         onlineModelId: onlineModelId,
       );
       // Buffered recordings are WAV-encoded at 16 kHz (AudioCaptureManager).
-      // audio_format wire values match rac_audio_format_enum_t (1 = WAV).
+      // `audioFormat` is now the typed `AudioFormat` enum, not a raw
+      // rac_audio_format_enum_t int.
       final response = router.transcribe(
         audioBytes,
         options: sdk.HybridSttTranscribeOptions(
           sampleRate: 16000,
-          audioFormat: 1,
+          audioFormat: sdk.AudioFormat.AUDIO_FORMAT_WAV,
         ),
       );
       transcription = response.text;

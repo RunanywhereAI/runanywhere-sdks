@@ -12,6 +12,101 @@ import 'package:shared_preferences/shared_preferences.dart';
 // weather-tool demo calls. SDK auth/download/model traffic stays on
 // RACommons-backed adapters.
 
+// --- Tool-parameter -> JSON-Schema convenience -------------------------------
+//
+// `ToolParameter`/`ToolParameterType` (the proto types) were deleted outright
+// (idl/tool_calling.proto): `ToolDefinition.parameters` is now a single raw
+// JSON-Schema object STRING -- the same OpenAI `parameters` / Anthropic
+// `input_schema` / MCP `inputSchema` shape every tool-calling API publishes.
+// The Flutter SDK has no equivalent convenience type (unlike Swift's
+// `ToolParameter` in `ToolCallingTypes.swift` and Kotlin's `ToolParameter` in
+// `ToolCallingTypes.kt`, which are app-facing helpers layered on top of the
+// wire type, not part of the proto itself), so this app builds its own
+// app-local helper mirroring the exact same shape rather than hand-rolling
+// JSON at each call site.
+
+/// JSON Schema primitive types (`"string"`, `"number"`, `"integer"`,
+/// `"boolean"`, `"array"`, `"object"`).
+enum ToolParameterType {
+  string('string'),
+  number('number'),
+  integer('integer'),
+  boolean('boolean'),
+  array('array'),
+  object('object');
+
+  const ToolParameterType(this.wireValue);
+
+  final String wireValue;
+}
+
+/// One parameter on a [ToolDefinition], expressed as a JSON Schema property.
+/// Mirrors Swift's `ToolParameter` / Kotlin's `ToolParameter`. Never crosses
+/// the wire on its own — [buildToolDefinition] serializes a list of these
+/// into the single JSON-Schema string `ToolDefinition.parameters` carries.
+class ToolParameter {
+  const ToolParameter({
+    required this.name,
+    required this.type,
+    required this.description,
+    this.required = true,
+    this.enumValues = const [],
+  });
+
+  final String name;
+  final ToolParameterType type;
+  final String description;
+  final bool required;
+  final List<String> enumValues;
+
+  /// This parameter's contribution to the enclosing JSON Schema `properties`
+  /// object: `{"type": ..., "description": ...}`, plus `"enum"` when set.
+  Map<String, dynamic> get _schemaProperty => {
+    'type': type.wireValue,
+    'description': description,
+    if (enumValues.isNotEmpty) 'enum': enumValues,
+  };
+}
+
+/// Serialize [parameters] into the JSON Schema object `ToolDefinition.
+/// parameters` now carries: `{"type": "object", "properties": {...},
+/// "required": [...]}`.
+String _jsonSchema(List<ToolParameter> parameters) {
+  if (parameters.isEmpty) return '{}';
+  final properties = {
+    for (final parameter in parameters) parameter.name: parameter._schemaProperty,
+  };
+  final required = parameters
+      .where((parameter) => parameter.required)
+      .map((parameter) => parameter.name)
+      .toList();
+  final schema = <String, dynamic>{
+    'type': 'object',
+    'properties': properties,
+    if (required.isNotEmpty) 'required': required,
+  };
+  return jsonEncode(schema);
+}
+
+/// Build a [ToolDefinition] from app-side [ToolParameter]s, serializing them
+/// into the single JSON-Schema string `parameters` now carries. Mirrors
+/// Swift's `RAToolDefinition.init(name:description:parameters:category:)` /
+/// Kotlin's `ToolDefinition(name:, description:, parameters:, category:)`.
+ToolDefinition buildToolDefinition({
+  required String name,
+  required String description,
+  List<ToolParameter> parameters = const [],
+  String? category,
+}) {
+  final definition = ToolDefinition(
+    name: name,
+    description: description,
+    parameters: _jsonSchema(parameters),
+  );
+  if (category != null) definition.category = category;
+  return definition;
+}
+
 /// Tool Settings ViewModel (mirroring iOS ToolSettingsViewModel)
 ///
 /// Manages tool calling state and registered tools.
@@ -74,14 +169,14 @@ class ToolSettingsViewModel extends ChangeNotifier {
   Future<void> registerDemoTools() async {
     // 1. Weather Tool - Uses Open-Meteo API (free, no API key required)
     RunAnywhere.llm.tools.register(
-      ToolDefinition(
+      buildToolDefinition(
         name: 'get_weather',
         description:
             'Gets the current weather for a given location using Open-Meteo API',
         parameters: [
-          ToolParameter(
+          const ToolParameter(
             name: 'location',
-            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+            type: ToolParameterType.string,
             description: "City name (e.g., 'San Francisco', 'London', 'Tokyo')",
           ),
         ],
@@ -91,24 +186,23 @@ class ToolSettingsViewModel extends ChangeNotifier {
 
     // 2. Time Tool - Real system time with timezone
     RunAnywhere.llm.tools.register(
-      ToolDefinition(
+      buildToolDefinition(
         name: 'get_current_time',
         description: 'Gets the current date, time, and timezone information',
-        parameters: [],
       ),
       _getCurrentTime,
     );
 
     // 3. Calculator Tool - Real math evaluation
     RunAnywhere.llm.tools.register(
-      ToolDefinition(
+      buildToolDefinition(
         name: 'calculate',
         description:
             'Performs math calculations. Supports +, -, *, /, and parentheses',
         parameters: [
-          ToolParameter(
+          const ToolParameter(
             name: 'expression',
-            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+            type: ToolParameterType.string,
             description: "Math expression (e.g., '2 + 2 * 3', '(10 + 5) / 3')",
           ),
         ],

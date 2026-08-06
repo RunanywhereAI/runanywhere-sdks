@@ -129,24 +129,25 @@ abstract final class ToolCallingExecutionPolicy {
       // Commons recognizes an unambiguous explicit tool name in the prompt and
       // narrows the native decision there, so every SDK gets the same behavior
       // without app-side routing heuristics.
-      toolOptions: _toolOptions(registeredTools, generation.maxOutputTokens),
+      toolOptions: _toolOptions(registeredTools),
     );
   }
 
-  static ToolCallingOptions _toolOptions(
-    List<ToolDefinition> tools,
-    int finalResponseMaxTokens,
-  ) => ToolCallingOptions(
-    tools: tools,
-    maxToolCalls: maxToolCalls,
-    maxTokens: finalResponseMaxTokens,
-    temperature: 0,
-    autoExecute: true,
-    keepToolsAvailable: false,
-    disableThinking: true,
-    // Match the iOS/Android examples: one model turn may request multiple tools
-    // (e.g. weather + time) and get them all executed before a single follow-up
-    // reply.
-    parallelToolCalls: true,
-  );
+  // `ToolCallingOptions.maxTokens`/`.temperature` were deleted as redundant
+  // with the parent `LLMGenerationOptions` (idl/tool_calling.proto) — the
+  // native tool loop reads the final-response budget and temperature from
+  // `generationOptions()` above (which already pins both), so there is
+  // nothing left to set here.
+  static ToolCallingOptions _toolOptions(List<ToolDefinition> tools) =>
+      ToolCallingOptions(
+        tools: tools,
+        maxToolCalls: maxToolCalls,
+        autoExecute: true,
+        keepToolsAvailable: false,
+        disableThinking: true,
+        // Match the iOS/Android examples: one model turn may request
+        // multiple tools (e.g. weather + time) and get them all executed
+        // before a single follow-up reply.
+        parallelToolCalls: true,
+      );
 }

@@ -31,8 +31,9 @@ class QHexRT {
   static const _platformChannel = MethodChannel('runanywhere_qhexrt');
 
   /// The unknown/unsupported fallback returned when the probe is unavailable.
-  static NpuCapability _unknownCapability() =>
-      NpuCapability(socId: -1, archName: 'unknown');
+  /// `socId` stays absent (never a -1 sentinel) -- a default-constructed
+  /// message is already "unavailable" per the proto's own contract.
+  static NpuCapability _unknownCapability() => NpuCapability();
 
   /// Whether the native backend library can be loaded on this device.
   static bool get isAvailable => QhexrtBindings.checkAvailability();
@@ -40,9 +41,10 @@ class QHexRT {
   /// Probe the Hexagon NPU without loading QNN. Safe on any device.
   ///
   /// Returns the generated `runanywhere.v1.NpuCapability` proto message
-  /// (socModel, socId, hexagonArch, qhexrtSupported, archName) decoded from
-  /// QHexRT's `rac_qhexrt_probe_proto()`. On unsupported devices or probe
-  /// failure it returns the unknown fallback (socId -1, archName "unknown").
+  /// (socModel, socId, hexagonArch, supported, npu) decoded from QHexRT's
+  /// `rac_qhexrt_probe_proto()`. On unsupported devices or probe failure it
+  /// returns the unknown fallback (a default-constructed message: absent
+  /// socId, HEXAGON_ARCH_UNKNOWN, supported=false).
   static NpuCapability probeNpu() {
     if (!isAvailable) return _unknownCapability();
     try {

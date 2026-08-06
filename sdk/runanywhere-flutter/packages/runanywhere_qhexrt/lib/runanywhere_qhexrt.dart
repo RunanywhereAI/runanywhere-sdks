@@ -10,7 +10,7 @@
 /// import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 ///
 /// final npu = QHexRT.probeNpu();
-/// if (npu.qhexrtSupported) await QHexRT.register();
+/// if (npu.supported) await QHexRT.register();
 /// ```
 library;
 
