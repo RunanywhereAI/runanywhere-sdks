@@ -12,9 +12,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.FinishReason
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.TokenKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.generated.convenience.defaults
@@ -138,6 +139,10 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
  * only mean that the collector closed or cancelled the flow; returning `false`
  * immediately tells native generation to stop instead of silently discarding
  * the remainder of the stream.
+ *
+ * `RALLMStreamEvent.is_final` is deleted outright (idl/llm_service.proto):
+ * `event_kind` (COMPLETED/ERROR) is the sole terminal discriminator now,
+ * matching Swift's `event.eventKind == .completed || event.eventKind == .error`.
  */
 internal fun losslessLLMStreamFlow(
     prepare: suspend () -> Unit,
@@ -152,7 +157,7 @@ internal fun losslessLLMStreamFlow(
                 try {
                     generate { event ->
                         val delivered = trySend(event).isSuccess
-                        delivered && !event.is_final
+                        delivered && !event.isTerminal()
                     }
                     completedNormally.set(true)
                 } finally {
@@ -167,6 +172,10 @@ internal fun losslessLLMStreamFlow(
         }
     }.buffer(Channel.UNLIMITED)
         .flowOn(Dispatchers.IO)
+
+private fun RALLMStreamEvent.isTerminal(): Boolean =
+    event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+        event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR
 
 @Deprecated("Cancel the Flow returned by RunAnywhere.llm.generateStream instead.")
 suspend fun RunAnywhere.cancelGeneration() {
@@ -197,7 +206,7 @@ internal data class LLMStreamModelIdentity(
  * @param prompt Prompt text used to estimate [RALLMGenerationResult.input_tokens]
  *   when the backend does not surface it directly.
  * @param events Flow of stream events from [generateStream]. Consumed until
- *   [RALLMStreamEvent.is_final] is true or the flow completes.
+ *   [RALLMStreamEvent.event_kind] reaches COMPLETED/ERROR or the flow completes.
  * @param onThinking Optional callback invoked for each typed thought token with
  *   the accumulated model-emitted reasoning text so far.
  * @param onToken Optional callback invoked for each typed answer token with the
@@ -235,7 +244,22 @@ suspend fun RunAnywhere.aggregateStream(
         },
     )
 
-/** Internal, injectable aggregation core used by the public API and unit tests. */
+/**
+ * Internal, injectable aggregation core used by the public API and unit tests.
+ *
+ * `RALLMStreamEvent.is_final`/`.kind` (a per-token `TokenKind`) are deleted
+ * outright (idl/llm_service.proto): `event_kind` (`LLMStreamEventKind`) is
+ * now the sole discriminator, both for terminality (COMPLETED/ERROR) and for
+ * routing a token to the thinking vs. answer transcript
+ * (THINKING/TOOL_CALL/else), matching Swift's
+ * `event.eventKind == .thinking` / `.completed || .error` checks.
+ * `LLMGenerationResult.total_time_ms`/`.time_to_first_token_ms`/top-level
+ * `ttft_ms` are likewise deleted: `generation_time_ms` (already a `Double`)
+ * is the sole wall-clock field left on the result, and TTFT now lives on
+ * the shared `TokenUsage.ttft_ms` (`Int64` milliseconds) instead of a
+ * top-level `Double`. `TokenUsage.tokens_per_second` was renamed
+ * `decode_tokens_per_second`.
+ */
 internal suspend fun aggregateLLMStream(
     prompt: String,
     events: Flow<RALLMStreamEvent>,
@@ -249,31 +273,31 @@ internal suspend fun aggregateLLMStream(
     var tokenCount = 0
     var firstTokenTimeMs: Long? = null
     val startTimeMs = nowMillis()
-    var finishReason = ""
+    var finishReason = FinishReason.FINISH_REASON_UNSPECIFIED
     var terminalError: ai.runanywhere.proto.v1.SDKError? = null
     var finalEvent: RALLMStreamEvent? = null
 
     events
         .transformWhile { event ->
             emit(event)
-            !event.is_final
+            !event.isTerminal()
         }.collect { event ->
             if (event.token.isNotEmpty()) {
                 if (firstTokenTimeMs == null) firstTokenTimeMs = nowMillis()
                 tokenCount += 1
-                when (event.kind) {
-                    TokenKind.TOKEN_KIND_THOUGHT -> {
+                when (event.event_kind) {
+                    LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING -> {
                         thinkingResponse.append(event.token)
                         onThinking?.invoke(thinkingResponse.toString())
                     }
-                    TokenKind.TOKEN_KIND_TOOL_CALL -> Unit
+                    LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOOL_CALL -> Unit
                     else -> {
                         answerResponse.append(event.token)
                         onToken?.invoke(answerResponse.toString())
                     }
                 }
             }
-            if (event.is_final) {
+            if (event.isTerminal()) {
                 finalEvent = event
                 finishReason = event.finish_reason
                 terminalError = event.error
@@ -281,7 +305,7 @@ internal suspend fun aggregateLLMStream(
         }
 
     val totalLatencyMs = (nowMillis() - startTimeMs).toDouble()
-    val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs).toDouble() }
+    val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs) }
     val modelIdentity = resolveModelIdentity()
 
     // Prefer the backend's terminal aggregate result (text + metrics) when the
@@ -290,19 +314,19 @@ internal suspend fun aggregateLLMStream(
     val final = finalEvent?.result
     val inputTokens = final?.usage?.input_tokens ?: maxOf(1, prompt.length / 4)
     val tokensGenerated = final?.usage?.output_tokens ?: tokenCount
-    val tokensPerSecond =
-        final?.usage?.tokens_per_second
+    val decodeTokensPerSecond =
+        final?.usage?.decode_tokens_per_second
             ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0
+    val ttftFromFinal = final?.usage?.ttft_ms?.takeIf { it > 0L }
     return RALLMGenerationResult(
         text = final?.text ?: answerResponse.toString(),
         thinking_content = final?.thinking_content ?: thinkingResponse.toString().takeIf { it.isNotEmpty() },
         response_tokens = tokensGenerated,
         model_used = modelIdentity.modelID,
-        generation_time_ms = final?.total_time_ms?.toDouble() ?: totalLatencyMs,
+        generation_time_ms = final?.generation_time_ms ?: totalLatencyMs,
         framework = modelIdentity.framework,
         prompt_eval_time_ms = final?.prompt_eval_time_ms ?: 0L,
         decode_time_ms = final?.decode_time_ms ?: 0L,
-        ttft_ms = final?.time_to_first_token_ms?.toDouble() ?: ttftMs,
         finish_reason = finishReason,
         error = terminalError,
         usage =
@@ -310,7 +334,8 @@ internal suspend fun aggregateLLMStream(
                 input_tokens = inputTokens,
                 output_tokens = tokensGenerated,
                 total_tokens = final?.usage?.total_tokens ?: (inputTokens + tokensGenerated),
-                tokens_per_second = tokensPerSecond,
+                decode_tokens_per_second = decodeTokensPerSecond,
+                ttft_ms = ttftFromFinal ?: (ttftMs ?: 0L),
             ),
     )
 }

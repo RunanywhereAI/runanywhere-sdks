@@ -35,7 +35,7 @@ public class VlmNamespace internal constructor() {
         val opts = options.orDefault()
         val model = prepareVlm(opts)
         val requestId = UUID.randomUUID().toString()
-        return legacyProcessImage(image.toVlmImage(), opts.toVlmProto(prompt))
+        return legacyProcessImage(opts.toVlmProto(prompt, listOf(image.toVlmImage())))
             .toGenerationResult(requestId, model)
     }
 
@@ -66,7 +66,7 @@ public class VlmNamespace internal constructor() {
                 }
             }
 
-            legacyProcessImageStream(image.toVlmImage(), opts.toVlmProto(prompt)).collect { event ->
+            legacyProcessImageStream(opts.toVlmProto(prompt, listOf(image.toVlmImage()))).collect { event ->
                 when (event.kind) {
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_STARTED -> announceStarted()
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN -> {

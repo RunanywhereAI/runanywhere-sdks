@@ -13,7 +13,6 @@ import ai.runanywhere.proto.v1.DownloadCancelRequest
 import ai.runanywhere.proto.v1.DownloadPlanRequest
 import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
-import ai.runanywhere.proto.v1.DownloadStage
 import ai.runanywhere.proto.v1.DownloadStartRequest
 import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.DownloadSubscribeRequest
@@ -75,13 +74,18 @@ private suspend fun RunAnywhere.downloadCompatibleModel(
 ): DownloadProgress {
     downloadLogger.info("Planning download for ${resolvedModel.id}")
 
+    // resume_existing was deleted outright (idl/download_service.proto):
+    // resume is now planner-driven, not a caller opt-in flag.
+    // verify_checksums -> skip_checksum_verification, inverted to opt-OUT.
+    // The proto3 zero value (false, left unset here) already means "verify
+    // whenever the catalog has one" -- the exact old intent of
+    // `verify_checksums = !resolvedModel.checksum_sha256.isNullOrBlank()` --
+    // so there is nothing to opt out of.
     val planRequest =
         DownloadPlanRequest(
             model_id = resolvedModel.id,
             model = resolvedModel,
-            resume_existing = true,
             validate_existing_bytes = true,
-            verify_checksums = !resolvedModel.checksum_sha256.isNullOrBlank(),
         )
 
     val plan = planDownload(planRequest)
@@ -101,17 +105,20 @@ private suspend fun RunAnywhere.downloadCompatibleModel(
         )
     }
 
+    // resume/resume_token were deleted outright (idl/download_service.proto)
+    // -- resume is now planner-driven from `plan` alone.
+    //
+    // Commons owns the completion registry mutation: the orchestrator's
+    // self-heal calls rac_model_registry_update_download_status, which
+    // also persists the durable .rac-manifest.binpb sidecar restored on
+    // the next cold launch. update_registry_on_completion=true was
+    // renamed+inverted to skip_registry_update, whose zero-value default
+    // (false) already means "update the registry", so leaving it unset
+    // preserves the old behavior with no line needed.
     val startRequest =
         DownloadStartRequest(
             model_id = resolvedModel.id,
             plan = plan,
-            resume = plan.can_resume,
-            resume_token = plan.resume_token,
-            // Commons owns the completion registry mutation: the orchestrator's
-            // self-heal calls rac_model_registry_update_download_status, which
-            // also persists the durable .rac-manifest.binpb sidecar restored on
-            // the next cold launch.
-            update_registry_on_completion = true,
         )
 
     val startResult = CppBridgeDownload.start(startRequest)
@@ -260,6 +267,8 @@ private suspend fun reportDownloadProgress(
                 message = "Download cancelled",
                 category = ErrorCategory.ERROR_CATEGORY_NETWORK,
             )
-        else -> progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED
+        // DownloadStage was folded into DownloadState -- COMPLETED is
+        // already handled above, so no other state means "done".
+        else -> false
     }
 }

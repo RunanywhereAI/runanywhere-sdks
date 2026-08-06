@@ -8,7 +8,6 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.EmbeddingsRequest
-import ai.runanywhere.proto.v1.RerankCandidate
 import ai.runanywhere.proto.v1.RerankRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEmbeddings
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -64,13 +63,15 @@ public class RerankNamespace internal constructor() {
         topN: Int? = null,
     ): List<RankedResult> {
         if (documents.isEmpty()) return emptyList()
+        // `RerankCandidate` is deleted outright (idl/rerank.proto): every
+        // facade already built it with `id` set to the stringified array
+        // index, so the wrapper carried no information the flat `documents`
+        // list does not. `RerankRequest.documents` is now a plain
+        // `repeated string`, and `RerankScoredItem.index` points back into it.
         return legacyRerank(
             RerankRequest(
                 query = query,
-                candidates =
-                    documents.mapIndexed { index, text ->
-                        RerankCandidate(id = index.toString(), text = text)
-                    },
+                documents = documents,
                 options = rerankOptions(topN),
             ),
         ).toRankedResults()

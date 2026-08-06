@@ -11,14 +11,15 @@ import kotlin.test.assertEquals
 class VADGeneratedStreamSurfaceTest {
     @Test
     fun `streamVAD surfaces per-chunk RAVADResult to match Swift`() {
+        // `confidence` renamed `probability` (idl/vad_options.proto).
         val result =
             RAVADResult(
                 is_speech = true,
-                confidence = 0.95f,
+                probability = 0.95f,
             )
 
         assertEquals(true, result.is_speech)
-        assertEquals(0.95f, result.confidence)
+        assertEquals(0.95f, result.probability)
     }
 }
 

@@ -11,8 +11,6 @@ package com.runanywhere.sdk.public.api
 import ai.runanywhere.proto.v1.DiffusionResult
 import ai.runanywhere.proto.v1.EmbeddingsResult
 import ai.runanywhere.proto.v1.LLMGenerationResult
-import ai.runanywhere.proto.v1.LLMStreamFinalResult
-import ai.runanywhere.proto.v1.LoRAState
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGSearchResult
 import ai.runanywhere.proto.v1.RAGStatistics
@@ -23,17 +21,23 @@ import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.DiarizationResult as ProtoDiarizationResult
+import ai.runanywhere.proto.v1.LoraState as ProtoLoraState
 import ai.runanywhere.proto.v1.SegmentationResult as ProtoSegmentationResult
 
 private const val MILLIS_PER_SECOND = 1_000.0
 
-internal fun finishReasonOf(raw: String): FinishReason =
-    when (raw.lowercase()) {
-        "", "stop" -> FinishReason.STOP
-        "length", "max_tokens" -> FinishReason.LENGTH
-        "tool_calls", "tool_call", "tool" -> FinishReason.TOOL_CALLS
-        "cancelled", "canceled" -> FinishReason.CANCELLED
-        "content_filter", "content_filtered" -> FinishReason.CONTENT_FILTER
+/** Maps a generated [ai.runanywhere.proto.v1.FinishReason] onto the v3 [FinishReason]. */
+internal fun finishReasonOf(raw: ai.runanywhere.proto.v1.FinishReason): FinishReason =
+    when (raw) {
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_STOP,
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_STOP_SEQUENCE,
+        -> FinishReason.STOP
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_LENGTH -> FinishReason.LENGTH
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_TOOL_CALLS -> FinishReason.TOOL_CALLS
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_CANCELLED -> FinishReason.CANCELLED
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_CONTEXT_OVERFLOW,
+        ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_ERROR,
+        -> FinishReason.UNKNOWN
         else -> FinishReason.UNKNOWN
     }
 
@@ -44,45 +48,38 @@ internal fun LLMGenerationResult.toGenerationResult(requestId: String): Generati
         toolCalls = tool_calls,
         toolResults = tool_results,
         finishReason = finishReasonOf(finish_reason),
-        rawFinishReason = finish_reason.takeIf { it.isNotEmpty() },
+        rawFinishReason = finish_reason.name,
         inputTokens = usage?.input_tokens ?: 0,
         outputTokens = usage?.output_tokens ?: 0,
-        timeToFirstTokenMs = ttft_ms?.toLong() ?: 0L,
-        tokensPerSecond = (usage?.tokens_per_second ?: 0.0).toFloat(),
+        timeToFirstTokenMs = usage?.ttft_ms ?: 0L,
+        tokensPerSecond = (usage?.decode_tokens_per_second ?: 0.0).toFloat(),
         requestId = requestId,
         model = model_used,
     )
 
-internal fun LLMStreamFinalResult.toGenerationResult(
-    requestId: String,
-    model: String,
-    fallbackText: String,
-    fallbackThinking: String?,
-): GenerationResult =
-    GenerationResult(
-        text = text.ifEmpty { fallbackText },
-        thinkingText = thinking_content?.takeIf { it.isNotEmpty() } ?: fallbackThinking,
-        toolCalls = tool_calls,
-        toolResults = tool_results,
-        finishReason = finishReasonOf(finish_reason),
-        rawFinishReason = finish_reason.takeIf { it.isNotEmpty() },
-        inputTokens = usage?.input_tokens ?: 0,
-        outputTokens = usage?.output_tokens ?: 0,
-        timeToFirstTokenMs = time_to_first_token_ms,
-        tokensPerSecond = (usage?.tokens_per_second ?: 0.0).toFloat(),
-        requestId = requestId,
-        model = model,
-    )
+// LLMStreamFinalResult is deleted: the stream terminates with the same
+// LLMGenerationResult type the unary call returns (LLMStreamEvent.result),
+// so LLMGenerationResult.toGenerationResult(requestId) above serves both
+// paths instead of two near-identical mappers.
 
 internal fun VLMResult.toGenerationResult(requestId: String, model: String): GenerationResult =
     GenerationResult(
         text = text,
-        finishReason = finishReasonOf(finish_reason),
+        // VLMResult.finish_reason is a free-form string ("stop" | "length" |
+        // "stop_sequence"), not the FinishReason enum -- reuse the same
+        // wire-vocabulary parser LLMNamespace's stream mapper uses.
+        finishReason =
+            when (finish_reason) {
+                "length" -> FinishReason.LENGTH
+                "tool_calls" -> FinishReason.TOOL_CALLS
+                "cancelled", "canceled" -> FinishReason.CANCELLED
+                else -> FinishReason.STOP
+            },
         rawFinishReason = finish_reason.takeIf { it.isNotEmpty() },
         inputTokens = usage?.input_tokens ?: 0,
         outputTokens = usage?.output_tokens ?: 0,
-        timeToFirstTokenMs = time_to_first_token_ms,
-        tokensPerSecond = (usage?.tokens_per_second ?: 0.0).toFloat(),
+        timeToFirstTokenMs = usage?.ttft_ms ?: 0L,
+        tokensPerSecond = (usage?.decode_tokens_per_second ?: 0.0).toFloat(),
         requestId = requestId,
         model = model,
     )
@@ -128,13 +125,20 @@ internal fun TTSOutput.toAudioChunk(): AudioChunk =
         isFinal = is_final,
     )
 
+/**
+ * `VADResult.confidence`/`.start_time_ms`/`.end_time_ms` were deleted outright
+ * (idl/vad_options.proto): `confidence` is renamed `probability`, and the
+ * start/end pair has no replacement -- the result now only carries
+ * `timestamp_ms` (frame start) + `duration_ms` (frame length). Derive the
+ * one segment this frame represents from that pair instead of a span.
+ */
 internal fun VADResult.toVadResult(): VadResult =
     VadResult(
         isSpeech = is_speech,
-        probability = confidence,
+        probability = probability,
         segments =
-            if (is_speech && end_time_ms > start_time_ms) {
-                listOf(Segment(startMs = start_time_ms, endMs = end_time_ms))
+            if (is_speech && duration_ms > 0) {
+                listOf(Segment(startMs = timestamp_ms, endMs = timestamp_ms + duration_ms))
             } else {
                 emptyList()
             },
@@ -153,18 +157,26 @@ internal fun RerankResult.toRankedResults(): List<RankedResult> =
         .map { RankedResult(index = it.index.toInt(), relevanceScore = it.relevance_score) }
         .sortedByDescending { it.relevanceScore }
 
+/**
+ * `DiffusionResult` was reshaped from a flat width/height/imageData/
+ * batchImages/seedUsed quintuple into `repeated DiffusionImage images` (each
+ * carrying its own data/width/height/seedUsed/mediaType) + `total_time_ms`.
+ * `seed` surfaces the first image's seed for backward-compatible
+ * single-image callers.
+ */
 internal fun DiffusionResult.toImageResult(requestedSteps: Int): ImageResult {
-    val mediaType = image_media_type?.takeIf { it.isNotEmpty() } ?: "image/png"
-    val primary =
-        if (image_data.size > 0) {
-            listOf(ImageData(image_data.toByteArray(), width, height, mediaType))
-        } else {
-            emptyList()
+    val mapped =
+        images.map { image ->
+            ImageData(
+                bytes = image.data_.toByteArray(),
+                width = image.width,
+                height = image.height,
+                mediaType = image.media_type.takeIf { it.isNotEmpty() } ?: "image/png",
+            )
         }
-    val batch = batch_images.map { ImageData(it.toByteArray(), width, height, mediaType) }
     return ImageResult(
-        images = primary + batch,
-        seed = seed_used,
+        images = mapped,
+        seed = images.firstOrNull()?.seed_used ?: 0L,
         steps = requestedSteps,
     )
 }
@@ -190,10 +202,10 @@ internal fun ProtoSegmentationResult.toSegmentationResult(): SegmentationResult 
         classes =
             class_summaries.map { summary ->
                 ClassInfo(
-                    classId = summary.class_id.toInt(),
+                    classId = summary.class_id,
                     label = summary.label,
                     pixelCount = summary.pixel_count,
-                    fraction = summary.fraction,
+                    fraction = 0f,
                 )
             },
         diagnosticImage = diagnostic_rgba?.toByteArray(),
@@ -202,7 +214,7 @@ internal fun ProtoSegmentationResult.toSegmentationResult(): SegmentationResult 
 internal fun RAGSearchResult.toMatch(): Match =
     Match(
         text = text,
-        score = similarity_score,
+        score = score,
         metadata = metadata,
     )
 
@@ -232,7 +244,7 @@ internal fun RAGStatistics.toRagStats(): RagStats =
         indexSizeBytes = vector_store_size_bytes,
     )
 
-internal fun LoRAState.toLoraState(): LoraState =
+internal fun ProtoLoraState.toLoraState(): LoraState =
     LoraState(
         applied =
             loaded_adapters

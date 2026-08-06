@@ -38,7 +38,13 @@ class ToolCallingProtoAdaptersTest {
     }
 
     @Test
-    fun `run loop request inlines sampling and tool routing onto the request`() {
+    fun `run loop request inlines sampling and tool routing onto the options`() {
+        // idl/tool_calling.proto (tools-collapse-options-and-session-request)
+        // collapsed `ToolCallingSessionCreateRequest` to `prompt`/`history`/
+        // `options`: max_tokens/temperature/max_tool_calls/format/
+        // auto_execute/tool_choice/forced_tool_name/tools/validate_calls all
+        // moved exclusively onto the nested `options` (ToolCallingOptions);
+        // commons has no top-level sampling knob for the tool loop at all.
         val search = ToolDefinition(name = "search_web", description = "Search current information")
         val request =
             makeToolCallingRunLoopRequest(
@@ -62,17 +68,16 @@ class ToolCallingProtoAdaptersTest {
                 validateCalls = null,
             )
 
-        assertEquals(96, request.max_tokens)
-        assertEquals(0f, request.temperature)
-        assertEquals(1f, request.top_p)
+        val options = assertNotNull(request.options)
+        assertEquals(1f, options.top_p)
 
-        assertEquals(2, request.max_tool_calls)
-        assertEquals(ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2, request.format)
-        assertFalse(assertNotNull(request.auto_execute))
-        assertEquals(ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC, request.tool_choice)
-        assertEquals("search_web", request.forced_tool_name)
-        assertEquals(listOf("search_web"), request.tools.map { it.name })
-        assertEquals(null, request.validate_calls)
+        assertEquals(2, options.max_tool_calls)
+        assertEquals(ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2, options.format)
+        assertFalse(assertNotNull(options.auto_execute))
+        assertEquals(ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC, options.tool_choice)
+        assertEquals("search_web", options.forced_tool_name)
+        assertEquals(listOf("search_web"), options.tools.map { it.name })
+        assertEquals(null, options.validate_calls)
     }
 
     @Test
@@ -88,7 +93,7 @@ class ToolCallingProtoAdaptersTest {
                 history = priorTurns,
             )
 
-        assertEquals(priorTurns, request.history)
+        assertEquals(priorTurns, request.history.map { it.content })
         assertEquals("and in London?", request.prompt)
     }
 

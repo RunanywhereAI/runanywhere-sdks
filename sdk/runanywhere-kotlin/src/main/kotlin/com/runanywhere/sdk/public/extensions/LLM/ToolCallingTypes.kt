@@ -32,8 +32,9 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 typealias ToolValue = ai.runanywhere.proto.v1.ToolValue
 typealias ToolValueArray = ai.runanywhere.proto.v1.ToolValueArray
 typealias ToolValueObject = ai.runanywhere.proto.v1.ToolValueObject
-typealias ToolParameterType = ai.runanywhere.proto.v1.ToolParameterType
-typealias ToolParameter = ai.runanywhere.proto.v1.ToolParameter
+// ToolParameterType / ToolParameter are deleted: ToolDefinition.parameters is
+// now a single JSON-Schema string (OpenAI `parameters` / Anthropic
+// `input_schema` / MCP `inputSchema` shape) instead of a typed parameter list.
 typealias ToolDefinition = ai.runanywhere.proto.v1.ToolDefinition
 typealias ToolCall = ai.runanywhere.proto.v1.ToolCall
 typealias ToolResult = ai.runanywhere.proto.v1.ToolResult
@@ -216,3 +217,85 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
 fun ai.runanywhere.proto.v1.ToolValue.Companion.jsonString(
     from: Map<String, RAToolValue>,
 ): String = RAToolValue.`object`(from).toJSONString() ?: "{}"
+
+// MARK: Tool Definition Helpers --------------------------------------------
+
+/** JSON Schema primitive types (`"string"`, `"number"`, `"integer"`, `"boolean"`, `"array"`, `"object"`). */
+enum class ToolParameterType(internal val wireValue: String) {
+    STRING("string"),
+    NUMBER("number"),
+    INTEGER("integer"),
+    BOOLEAN("boolean"),
+    ARRAY("array"),
+    OBJECT("object"),
+}
+
+/**
+ * One parameter on a [ToolDefinition], expressed as a JSON Schema property.
+ *
+ * `ToolParameter`/`ToolParameterType` (the proto types) are deleted outright
+ * (idl/tool_calling.proto): `ToolDefinition.parameters` is now a single raw
+ * JSON Schema object STRING -- the same OpenAI `parameters` / Anthropic
+ * `input_schema` / MCP `inputSchema` shape every tool-calling API publishes.
+ * This class is a Kotlin-side convenience for building that schema; it never
+ * crosses the wire on its own. Mirrors Swift's `ToolParameter`.
+ */
+data class ToolParameter(
+    val name: String,
+    val type: ToolParameterType,
+    val description: String,
+    val required: Boolean = true,
+    val enumValues: List<String> = emptyList(),
+) {
+    /**
+     * This parameter's contribution to the enclosing JSON Schema `properties`
+     * object: `{"type": ..., "description": ...}`, plus `"enum"` when set.
+     */
+    internal fun schemaProperty(): RAToolValue {
+        val fields =
+            linkedMapOf(
+                "type" to RAToolValue.string(type.wireValue),
+                "description" to RAToolValue.string(description),
+            )
+        if (enumValues.isNotEmpty()) {
+            fields["enum"] = RAToolValue.array(enumValues.map(RAToolValue::string))
+        }
+        return RAToolValue.`object`(fields)
+    }
+}
+
+/**
+ * Build a [ToolDefinition] from Kotlin-side [ToolParameter]s, serializing
+ * them into the single JSON Schema object `parameters` now carries
+ * (idl/tool_calling.proto). Mirrors the OpenAI/Anthropic/MCP tool-schema
+ * shape: `{"type": "object", "properties": {...}, "required": [...]}`.
+ * Mirrors Swift's `RAToolDefinition.init(name:description:parameters:category:)`.
+ */
+fun ToolDefinition(
+    name: String,
+    description: String,
+    parameters: List<ToolParameter>,
+    category: String? = null,
+): ToolDefinition =
+    ai.runanywhere.proto.v1.ToolDefinition(
+        name = name,
+        description = description,
+        parameters = jsonSchema(parameters),
+        category = category,
+    )
+
+private fun jsonSchema(parameters: List<ToolParameter>): String {
+    if (parameters.isEmpty()) return "{}"
+    val properties =
+        parameters.associate { parameter -> parameter.name to parameter.schemaProperty() }
+    val required = parameters.filter { it.required }.map { it.name }
+    val schema =
+        linkedMapOf(
+            "type" to RAToolValue.string("object"),
+            "properties" to RAToolValue.`object`(properties),
+        )
+    if (required.isNotEmpty()) {
+        schema["required"] = RAToolValue.array(required.map(RAToolValue::string))
+    }
+    return RAToolValue.jsonString(from = schema)
+}

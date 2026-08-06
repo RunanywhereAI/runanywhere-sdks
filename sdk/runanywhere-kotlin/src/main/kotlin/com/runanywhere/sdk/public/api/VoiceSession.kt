@@ -9,7 +9,6 @@ package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.PipelineState
-import ai.runanywhere.proto.v1.SpeechTurnDetectionEventKind
 import ai.runanywhere.proto.v1.TurnLifecycleEventKind
 import ai.runanywhere.proto.v1.VADStreamEventKind
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
@@ -188,6 +187,15 @@ public class VoiceNamespace internal constructor() {
     }
 }
 
+/**
+ * `SpeechTurnDetectionEventKind` and `VoiceEvent.speech_turn_detection` are
+ * deleted outright (idl/voice_events.proto): agent-response start/complete
+ * and user-speech start/end are now `TurnLifecycleEventKind` values on
+ * `turn_lifecycle`, not a separate oneof arm. `VoiceEvent.error` (a bare
+ * `SDKError`) never existed on the wire either -- `session_error`
+ * (`VoiceSessionError`, field `recoverable`, no `is_` prefix) is the one
+ * error payload in this domain.
+ */
 private fun ProtoVoiceEvent.toVoiceEvent(): VoiceEvent? {
     user_said?.let { return VoiceEvent.UserTranscribed(it.text, it.is_final) }
     assistant_token?.let { token ->
@@ -207,16 +215,10 @@ private fun ProtoVoiceEvent.toVoiceEvent(): VoiceEvent? {
             TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED ->
                 return VoiceEvent.AgentResponse(turn.response)
             TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_FAILED ->
-                return VoiceEvent.Error(turn.error.ifBlank { "Turn failed" }, recoverable = true)
-            else -> Unit
-        }
-    }
-    speech_turn_detection?.let { detection ->
-        when (detection.kind) {
-            SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED ->
-                return VoiceEvent.SpeechStarted()
-            SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED ->
-                return VoiceEvent.SpeechEnded()
+                return VoiceEvent.Error(
+                    turn.error?.message?.takeIf { it.isNotBlank() } ?: "Turn failed",
+                    recoverable = turn.error?.recoverable ?: true,
+                )
             else -> Unit
         }
     }
@@ -228,9 +230,6 @@ private fun ProtoVoiceEvent.toVoiceEvent(): VoiceEvent? {
     state?.current?.toAgentState()?.let { return VoiceEvent.AgentStateChanged(it) }
     session_error?.let {
         return VoiceEvent.Error(it.message.ifBlank { "Voice session failed" }, it.recoverable)
-    }
-    this.error?.let {
-        return VoiceEvent.Error(it.message.ifBlank { "Voice pipeline failed" }, it.is_recoverable)
     }
     return null
 }

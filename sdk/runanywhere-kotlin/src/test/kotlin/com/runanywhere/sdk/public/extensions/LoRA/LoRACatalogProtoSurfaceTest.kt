@@ -1,15 +1,29 @@
 package com.runanywhere.sdk.public.extensions.LoRA
 
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
+import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
+import ai.runanywhere.proto.v1.LoraAdapterCatalogGetResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListRequest
+import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
-import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
-import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Focused tests for generated Lora* catalog surface.
+ *
+ * idl/lora_options.proto's "lora-delete-download-import-bookkeeping" edit
+ * deleted `LoraAdapterDownloadCompletedRequest`/`Result` and
+ * `LoraAdapterImportRequest`/`Result` outright (no replacement -- adapter
+ * files are acquired exclusively through the models domain's download/import
+ * verbs now, see `RunAnywhereLoRA.kt`), and shrunk `LoraAdapterCatalogEntry`
+ * to `{id, name, compatible_models, default_scale, tags, local_path}` --
+ * `url`/`filename`/`is_downloaded`/`is_imported` all deleted ("everything
+ * generic about the artifact ... lives on the ModelInfo record for this
+ * adapter" now). `LoraAdapterCatalogListRequest.include_counts` is likewise
+ * deleted with no replacement. Mirrors Swift's `LoRAProtoSurfaceTests.swift`.
+ */
 class LoRACatalogProtoSurfaceTest {
     @Test
     fun `catalog list request carries generated query fields`() {
@@ -22,7 +36,6 @@ class LoRACatalogProtoSurfaceTest {
                         search_query = "style",
                         tags = listOf("chat"),
                     ),
-                include_counts = true,
             )
 
         val decoded =
@@ -34,42 +47,36 @@ class LoRACatalogProtoSurfaceTest {
         assertEquals(true, decoded.query?.downloaded_only)
         assertEquals("style", decoded.query?.search_query)
         assertEquals(listOf("chat"), decoded.query?.tags)
-        assertTrue(decoded.include_counts)
     }
 
     @Test
-    fun `download completion result carries persisted catalog state`() {
-        val request =
-            LoraAdapterDownloadCompletedRequest(
-                adapter_id = "adapter-1",
-                local_path = "/models/lora/adapter-1.gguf",
-                size_bytes = 42L,
-                checksum_sha256 = "abc123",
-                completed_at_unix_ms = 1234L,
-                status_message = "download completed",
-            )
-        val result =
-            LoraAdapterDownloadCompletedResult(
-                persisted = true,
-                entry =
-                    LoraAdapterCatalogEntry(
-                        id = request.adapter_id,
-                        local_path = request.local_path,
-                        is_downloaded = true,
-                        downloaded_at_unix_ms = request.completed_at_unix_ms,
-                        status_message = request.status_message,
-                    ),
+    fun `catalog entries carry canonical fields, local_path is the sole downloaded signal`() {
+        val entry =
+            LoraAdapterCatalogEntry(
+                id = "adapter-a",
+                name = "Adapter A",
+                compatible_models = listOf("base-model"),
+                default_scale = 1.0f,
+                tags = listOf("chat"),
+                local_path = "/models/adapter-a.gguf",
             )
 
-        val decoded =
-            LoraAdapterDownloadCompletedResult.ADAPTER.decode(
-                LoraAdapterDownloadCompletedResult.ADAPTER.encode(result),
+        val listResult =
+            LoraAdapterCatalogListResult(
+                entries = listOf(entry),
+                total_count = 1,
+                downloaded_count = 1,
             )
 
-        assertNull(decoded.error)
-        assertTrue(decoded.persisted)
-        assertEquals("/models/lora/adapter-1.gguf", decoded.entry?.local_path)
-        assertEquals(true, decoded.entry?.is_downloaded)
-        assertEquals(1234L, decoded.entry?.downloaded_at_unix_ms)
+        val getRequest = LoraAdapterCatalogGetRequest(adapter_id = "adapter-a")
+        val getResult = LoraAdapterCatalogGetResult(found = true, entry = entry)
+
+        assertEquals("/models/adapter-a.gguf", listResult.entries.first().local_path)
+        assertEquals(1, listResult.downloaded_count)
+        assertEquals("adapter-a", getRequest.adapter_id)
+        assertTrue(getResult.found)
+        // Non-empty local_path is the single definition of "downloaded" now
+        // (is_downloaded/is_imported were deleted outright).
+        assertTrue(!(getResult.entry?.local_path.isNullOrEmpty()))
     }
 }

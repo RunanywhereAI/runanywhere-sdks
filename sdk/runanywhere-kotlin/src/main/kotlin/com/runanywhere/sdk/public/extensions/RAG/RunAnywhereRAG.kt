@@ -201,7 +201,7 @@ suspend fun RunAnywhere.ragQuery(
     ensureServicesReady()
     val queryOptions =
         (options ?: RAGQueryOptions.defaults(question)).let {
-            if (it.question.isEmpty()) it.copy(question = question) else it
+            if (it.query.isEmpty()) it.copy(query = question) else it
         }
     val nativeRequest = CppBridgeRAG.prepareQuery(queryOptions)
     return runCancellableNativeRagQuery(
@@ -212,7 +212,7 @@ suspend fun RunAnywhere.ragQuery(
 
 @Deprecated("Use RagSession.query(question, options).")
 suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
-    ragQuery(options.question, options)
+    ragQuery(options.query, options)
 
 /**
  * Streaming RAG query. Emits a [RAGStreamEvent] per generated token
@@ -234,7 +234,7 @@ fun RunAnywhere.ragQueryStream(
         ensureServicesReady()
         val queryOptions =
             (options ?: RAGQueryOptions.defaults(question)).let {
-                if (it.question.isEmpty()) it.copy(question = question) else it
+                if (it.query.isEmpty()) it.copy(query = question) else it
             }
         val nativeRequest = CppBridgeRAG.prepareQuery(queryOptions)
         // Run the blocking native stream through the RAG request coordinator so
@@ -263,7 +263,7 @@ fun RunAnywhere.ragQueryStream(
 
 @Deprecated("Use RagSession.queryStream(question, options).")
 fun RunAnywhere.ragQueryStream(options: RAGQueryOptions): Flow<RAGStreamEvent> =
-    ragQueryStream(options.question, options)
+    ragQueryStream(options.query, options)
 
 /** Immediately request cancellation of the active native RAG query. */
 @Deprecated("Cancel the Flow returned by RagSession.queryStream instead.")

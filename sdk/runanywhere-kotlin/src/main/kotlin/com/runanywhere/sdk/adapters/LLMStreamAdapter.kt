@@ -35,6 +35,7 @@
 package com.runanywhere.sdk.adapters
 
 import ai.runanywhere.proto.v1.LLMStreamEvent
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import com.runanywhere.sdk.public.types.RALLMStreamEvent
 import kotlinx.coroutines.flow.Flow
 
@@ -72,9 +73,15 @@ class LLMStreamAdapter internal constructor(
             unregister = { h, id -> bridge.unregisterCallback(h, id) },
             quiesce = { bridge.quiesce() },
             decodeEvent = { bytes -> LLMStreamEvent.ADAPTER.decode(bytes) },
-            // LLM streams terminate on is_final. Mirrors Swift's
-            // LLMStreamAdapter convenience init `isTerminalEvent: { $0.isFinal }`.
-            isTerminalEvent = { it.is_final },
+            // `is_final` was deleted outright (idl/llm_service.proto):
+            // `event_kind` is now the sole discriminator -- COMPLETED/ERROR
+            // are the two terminal kinds. Mirrors Swift's LLMStreamAdapter
+            // convenience init `isTerminalEvent: { $0.eventKind == .completed
+            // || $0.eventKind == .error }`.
+            isTerminalEvent = {
+                it.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+                    it.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR
+            },
         )
 
     /**

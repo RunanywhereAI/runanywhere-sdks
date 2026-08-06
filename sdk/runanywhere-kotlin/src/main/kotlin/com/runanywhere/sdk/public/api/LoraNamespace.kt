@@ -7,9 +7,9 @@
 
 package com.runanywhere.sdk.public.api
 
-import ai.runanywhere.proto.v1.LoRAAdapterConfig
-import ai.runanywhere.proto.v1.LoRAApplyRequest
-import ai.runanywhere.proto.v1.LoRARemoveRequest
+import ai.runanywhere.proto.v1.LoraAdapterConfig
+import ai.runanywhere.proto.v1.LoraApplyRequest
+import ai.runanywhere.proto.v1.LoraRemoveRequest
 import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.extensions.AndroidLoRA
@@ -24,10 +24,19 @@ import com.runanywhere.sdk.public.extensions.AndroidLoRA
  */
 public class LoraNamespace internal constructor() {
     /**
-     * Layer the registered adapter [adapterId] onto the loaded base model,
-     * downloading its weights first when they are absent.
+     * Layer the registered adapter [adapterId] onto the loaded base model.
      *
-     * @throws SDKException when the adapter is unknown or incompatible.
+     * `LoraAdapterCatalogEntry` carries no URL/artifact metadata any more
+     * (idl/lora_options.proto: "everything generic about the artifact ...
+     * lives on the ModelInfo record for this adapter") and the LoRA-domain
+     * download bookkeeping ABI was retired outright, so this no longer
+     * auto-downloads on a cache miss -- callers download through
+     * [com.runanywhere.sdk.public.extensions.LoRA.download] (or the models
+     * domain directly) first, which stamps the catalog entry's `local_path`.
+     * Mirrors Swift's simplified `LoraNamespace.apply(adapterId:scale:)`.
+     *
+     * @throws SDKException when the adapter is unknown, not yet downloaded,
+     *   or incompatible.
      */
     public suspend fun apply(adapterId: String, scale: Float? = null) {
         val legacy = AndroidLoRA
@@ -36,16 +45,18 @@ public class LoraNamespace internal constructor() {
                 ?: throw SDKException.modelNotFound(adapterId)
         val path =
             entry.local_path?.takeIf { it.isNotBlank() }
-                ?: legacy.download(entry)
+                ?: throw SDKException.invalidArgument(
+                    "LoRA adapter '$adapterId' has no local path; download it first",
+                )
         val result =
             legacy.apply(
-                LoRAApplyRequest(
+                LoraApplyRequest(
                     adapters =
                         listOf(
-                            LoRAAdapterConfig(
+                            LoraAdapterConfig(
                                 adapter_path = path,
                                 adapter_id = adapterId,
-                                scale = scale ?: entry.default_scale.takeIf { it > 0f } ?: 1f,
+                                scale = scale ?: entry.default_scale?.takeIf { it > 0f } ?: 1f,
                             ),
                         ),
                 ),
@@ -63,7 +74,7 @@ public class LoraNamespace internal constructor() {
      * @throws SDKException when the removal fails.
      */
     public suspend fun remove(adapterId: String) {
-        AndroidLoRA.remove(LoRARemoveRequest(adapter_ids = listOf(adapterId)))
+        AndroidLoRA.remove(LoraRemoveRequest(adapter_ids = listOf(adapterId)))
     }
 
     /**
@@ -72,7 +83,7 @@ public class LoraNamespace internal constructor() {
      * @throws SDKException when the removal fails.
      */
     public suspend fun removeAll() {
-        AndroidLoRA.remove(LoRARemoveRequest(clear_all = true))
+        AndroidLoRA.remove(LoraRemoveRequest(clear_all = true))
     }
 
     /**

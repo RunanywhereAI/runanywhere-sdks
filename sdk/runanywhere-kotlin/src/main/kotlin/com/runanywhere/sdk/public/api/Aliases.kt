@@ -8,8 +8,16 @@
 
 package com.runanywhere.sdk.public.api
 
-/** JSON Schema used to constrain structured generation. */
-public typealias JsonSchema = ai.runanywhere.proto.v1.JSONSchema
+/**
+ * JSON Schema used to constrain structured generation.
+ *
+ * `runanywhere.v1.JSONSchema` was deleted outright (idl/structured_output.proto):
+ * `StructuredOutputOptions.schema` is now a single JSON Schema STRING, so
+ * there is no typed proto tree to alias here. This wraps the raw text
+ * directly, matching commons' new contract (verbatim JSON Schema text,
+ * unsupported keywords rejected).
+ */
+public data class JsonSchema(val rawJson: String)
 
 /** Declaration of a tool the model may call. */
 public typealias ToolDefinition = ai.runanywhere.proto.v1.ToolDefinition

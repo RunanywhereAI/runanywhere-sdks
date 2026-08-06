@@ -191,9 +191,14 @@ object CppBridgeModelRegistry {
 
         return try {
             val result = ProtoModelDiscoveryResult.ADAPTER.decode(bytes)
+            // `linked_count`/`scanned_count` are deleted outright
+            // (idl/model_types.proto): the result now only carries
+            // `discovered_models`/`warnings`/`error`, so the discovered
+            // count is read from the list directly. Mirrors Swift's
+            // `CppBridge+ModelRegistry.swift`.
             log(
                 CppBridgePlatformAdapter.LogLevel.INFO,
-                "Discovery complete via proto: ${result.linked_count} models linked, ${result.scanned_count} scanned",
+                "Discovery complete via proto: ${result.discovered_models.size} models discovered",
             )
             result
         } catch (e: Exception) {
@@ -311,9 +316,13 @@ object CppBridgeModelRegistry {
     }
 
     /**
-     * Update last-used timestamp and increment the usage counter for a model.
+     * Update last-used timestamp for a model.
      *
-     * Mirrors Swift `CppBridge.ModelRegistry.updateLastUsed(modelId:)`.
+     * `usage_count` (tag 35) is reserved off the wire outright
+     * (idl/model_types.proto: "a 'use' was never defined") -- there is no
+     * proto source to read from or write to any more, so
+     * `last_used_at_unix_ms` alone now records "last used". Mirrors Swift
+     * `CppBridge.ModelRegistry.updateLastUsed(modelId:)`.
      *
      * @param modelId The model ID whose usage metadata should be touched.
      * @throws SDKException if the model is not found in the registry.
@@ -326,7 +335,6 @@ object CppBridgeModelRegistry {
         val updated =
             current.copy(
                 last_used_at_unix_ms = System.currentTimeMillis(),
-                usage_count = (current.usage_count ?: 0) + 1,
             )
         update(updated)
     }

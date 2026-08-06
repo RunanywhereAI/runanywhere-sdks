@@ -250,7 +250,7 @@ object CppBridgeSTT {
                 if (chunk.isEmpty()) return@collect
                 val feedRc = RunAnywhereBridge.racSttStreamFeedAudioProto(sessionId, chunk)
                 if (feedRc != RunAnywhereBridge.RAC_SUCCESS) {
-                    onPartial(errorPartial("STT stream feed failed: $feedRc", feedRc))
+                    onPartial(errorPartial("STT stream feed failed: $feedRc"))
                     shouldCancel = true
                     throw SDKException.operation("racSttStreamFeedAudioProto failed with rc=$feedRc")
                 }
@@ -258,7 +258,7 @@ object CppBridgeSTT {
 
             val stopRc = RunAnywhereBridge.racSttStreamStopProto(sessionId)
             if (stopRc != RunAnywhereBridge.RAC_SUCCESS) {
-                onPartial(errorPartial("STT stream stop failed: $stopRc", stopRc))
+                onPartial(errorPartial("STT stream stop failed: $stopRc"))
             }
         } catch (e: CancellationException) {
             shouldCancel = true
@@ -304,6 +304,15 @@ object CppBridgeSTT {
         return getHandle()
     }
 
+    /**
+     * `STTPartialResult` collapsed to `text`/`is_final`/`language`
+     * (idl/stt_options.proto): `final_output`/`confidence`/`audio_start_ms`/
+     * `audio_end_ms` no longer exist on it, so a FINAL event now only
+     * back-fills `text` from `STTStreamEvent.final_output` (a distinct,
+     * still-live field) when the partial's own text is empty, and a
+     * synthetic failure carries its message on `text` alone. Mirrors
+     * Swift's `CppBridge+STT.swift` `yield(_:)`/`yieldFailure`.
+     */
     private fun partialFromEvent(event: STTStreamEvent): STTPartialResult? =
         when (event.kind) {
             STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL,
@@ -313,35 +322,22 @@ object CppBridgeSTT {
                 val basis = event.partial ?: STTPartialResult()
                 basis.copy(
                     is_final = true,
-                    final_output = event.final_output ?: basis.final_output,
                     text = basis.text.ifEmpty { event.final_output?.text.orEmpty() },
                 )
             }
             STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR ->
                 errorPartial(
                     event.error?.message?.takeIf { it.isNotBlank() } ?: "STT stream failed",
-                    event.error?.code?.value ?: 0,
                 )
             STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED,
             STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED,
             -> null
         }
 
-    private fun errorPartial(message: String, code: Int): STTPartialResult =
+    private fun errorPartial(message: String): STTPartialResult =
         STTPartialResult(
             text = message,
             is_final = true,
-            final_output =
-                STTOutput(
-                    text = message,
-                    error =
-                        ai.runanywhere.proto.v1.SDKError(
-                            code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
-                            category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
-                            message = message,
-                            c_abi_code = code,
-                        ),
-                ),
         )
 
     private fun InferenceFramework.toCFramework(): Int =

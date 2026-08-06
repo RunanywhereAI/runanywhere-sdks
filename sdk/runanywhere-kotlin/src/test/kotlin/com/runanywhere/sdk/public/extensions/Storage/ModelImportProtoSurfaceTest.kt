@@ -22,6 +22,8 @@ import kotlin.test.assertTrue
 class ModelImportProtoSurfaceTest {
     @Test
     fun testModelImportRequestCarriesCanonicalFields() {
+        // `is_downloaded` is deleted outright (idl/model_types.proto);
+        // `registry_status`/non-empty `local_path` carry that signal now.
         val model =
             ModelInfo(
                 id = "demo-model",
@@ -29,7 +31,6 @@ class ModelImportProtoSurfaceTest {
                 local_path = "/models/demo.gguf",
                 format = ModelFormat.MODEL_FORMAT_GGUF,
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-                is_downloaded = true,
             )
 
         val request =

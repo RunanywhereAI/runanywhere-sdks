@@ -16,7 +16,6 @@ import ai.runanywhere.proto.v1.ArchiveArtifact
 import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.ArtifactInferFromUrlRequest
 import ai.runanywhere.proto.v1.ArtifactInferFromUrlResult
-import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelFormatFromUrlRequest
 import ai.runanywhere.proto.v1.ModelFormatFromUrlResult
@@ -51,10 +50,14 @@ internal object ModelTypesCppBridge {
     }
 
     /**
-     * Update the artifact-classification fields on [modelInfo] based on
-     * a URL/file-path. Preserves any caller-supplied `artifact_type` on
-     * the existing info when the caller has explicitly set it; otherwise
-     * uses the inferred artifact type.
+     * Update the artifact-classification `oneof` on [modelInfo] based on a
+     * URL/file-path. `ModelInfo.artifact_type` was deleted outright
+     * (idl/model_types.proto: "restates the oneof") — the `single_file` /
+     * `archive` / `multi_file` / `built_in` oneof arm is now the sole
+     * classification signal, so this reads/writes that oneof directly
+     * instead of a parallel enum field. Preserves the existing oneof arm
+     * when the caller has already set one; otherwise applies the inferred
+     * artifact.
      *
      * For archive URLs, sets `archive = ArchiveArtifact(...)` and clears
      * `single_file`; for single-file URLs, sets `single_file =
@@ -64,31 +67,22 @@ internal object ModelTypesCppBridge {
      */
     fun applyInferredArtifact(modelInfo: RAModelInfo, url: String): RAModelInfo {
         val result = artifactInferFromUrlProto(url, modelInfo.id)
-        val existingType = modelInfo.artifact_type ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
+        val hasExistingArtifact =
+            modelInfo.single_file != null || modelInfo.archive != null ||
+                modelInfo.multi_file != null || modelInfo.built_in != null
         if (result == null) {
             // Native ABI unavailable — preserve existing info, fall back to
             // a single-file artifact when nothing is set so the
             // registerModel path still produces a valid ModelInfo.
-            if (existingType == ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED &&
-                modelInfo.single_file == null &&
-                modelInfo.archive == null &&
-                modelInfo.multi_file == null
-            ) {
-                return modelInfo.copy(
-                    single_file = SingleFileArtifact(),
-                    artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
-                )
+            if (!hasExistingArtifact) {
+                return modelInfo.copy(single_file = SingleFileArtifact())
             }
             return modelInfo
         }
 
-        val inferredType = result.artifact_type
-        val effectiveType =
-            if (existingType != ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED) {
-                existingType
-            } else {
-                inferredType
-            }
+        if (hasExistingArtifact) {
+            return modelInfo
+        }
 
         return if (result.archive_type != ArchiveType.ARCHIVE_TYPE_UNSPECIFIED) {
             modelInfo.copy(
@@ -98,18 +92,11 @@ internal object ModelTypesCppBridge {
                         type = result.archive_type,
                         structure = result.archive_structure,
                     ),
-                artifact_type = effectiveType,
             )
         } else {
             modelInfo.copy(
                 single_file = SingleFileArtifact(),
                 archive = null,
-                artifact_type =
-                    if (effectiveType == ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED) {
-                        ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
-                    } else {
-                        effectiveType
-                    },
             )
         }
     }

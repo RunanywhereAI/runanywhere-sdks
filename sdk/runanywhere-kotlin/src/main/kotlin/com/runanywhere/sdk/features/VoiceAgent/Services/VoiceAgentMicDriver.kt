@@ -78,7 +78,7 @@ internal class VoiceAgentMicDriver(
                         VoiceAgentAudioFrame.ADAPTER.encode(
                             VoiceAgentAudioFrame(
                                 audio_data = chunk.toByteString(),
-                                sample_rate = SAMPLE_RATE_HZ,
+                                sample_rate_hz = SAMPLE_RATE_HZ,
                                 channels = 1,
                                 encoding = AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
                                 is_final = false,

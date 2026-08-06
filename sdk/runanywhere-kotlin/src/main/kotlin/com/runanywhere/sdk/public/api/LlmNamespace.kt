@@ -9,6 +9,7 @@ package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.LLMGenerateRequest
 import ai.runanywhere.proto.v1.LLMStreamEvent
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutput
@@ -25,7 +26,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.UUID
-import ai.runanywhere.proto.v1.TokenKind as ProtoTokenKind
 
 /** Registry of tools the model may call during generation. */
 public class ToolsNamespace internal constructor() {
@@ -157,7 +157,7 @@ public class LlmNamespace internal constructor() {
         }
 
         return StructuredResult(
-            value = parsed.parsed_json.utf8(),
+            value = parsed.json,
             raw = parsed.raw_text ?: generation.text,
             valid = parsed.validation?.is_valid == true,
             mode = mode,
@@ -238,6 +238,10 @@ public class LlmNamespace internal constructor() {
                 history = history.toAlternatingTurns(),
             )
         result.error_message?.let { throw SDKException.operation(it) }
+        // ToolCallingResult carries no correlation id at all (idl/tool_calling.proto
+        // deleted its conversation-id-bearing predecessor outright) -- mint one
+        // locally purely for GenerationResult.requestId (mirrors Swift's
+        // generateWithToolsCancellable).
         return GenerationResult(
             text = result.text,
             thinkingText = result.thinking_content?.takeIf { it.isNotEmpty() },
@@ -245,14 +249,14 @@ public class LlmNamespace internal constructor() {
             toolResults = result.tool_results,
             inputTokens = result.usage?.input_tokens ?: 0,
             outputTokens = result.usage?.output_tokens ?: 0,
-            tokensPerSecond = result.usage?.tokens_per_second?.toFloat() ?: 0f,
+            tokensPerSecond = result.usage?.decode_tokens_per_second?.toFloat() ?: 0f,
             finishReason =
                 if (result.tool_calls.isNotEmpty() && !result.is_complete) {
                     FinishReason.TOOL_CALLS
                 } else {
                     FinishReason.STOP
                 },
-            requestId = result.conversation_id.orEmpty(),
+            requestId = newRequestId(),
             model = model,
         )
     }
@@ -267,7 +271,7 @@ private fun structuredRepairPrompt(original: String, invalidOutput: String, sche
 
     Your previous answer did not match the required JSON schema. Reply again with ONLY JSON that satisfies this schema.
 
-    Schema: ${schema.raw_json.orEmpty()}
+    Schema: ${schema.rawJson}
     Previous invalid answer: $invalidOutput
     """.trimIndent()
 
@@ -281,6 +285,11 @@ private fun LlmOptions.usesTools(): Boolean = toolChoice != ToolChoice.None
 private suspend fun LlmOptions.activeTools(): List<ToolDefinition> =
     tools.ifEmpty { ToolCallingOrchestrator.getRegisteredTools() }
 
+/**
+ * `LLMGenerateRequest.prompt`/`.history` were deleted outright
+ * (idl/llm_service.proto): the request now carries only `messages`
+ * (oldest first, ending with the turn the model must answer).
+ */
 private fun LlmOptions.toRequest(
     prompt: String,
     requestId: String,
@@ -288,11 +297,16 @@ private fun LlmOptions.toRequest(
     structuredOutput: StructuredOutput? = null,
 ): LLMGenerateRequest =
     LLMGenerateRequest(
-        prompt = prompt,
         request_id = requestId,
         model_id = model.orEmpty(),
         options = toProto(structuredOutput),
-        history = history.map { it.toProto() },
+        messages = history.map { it.toProto() } + prompt.toUserMessageProto(),
+    )
+
+private fun String.toUserMessageProto(): ai.runanywhere.proto.v1.ChatMessage =
+    ai.runanywhere.proto.v1.ChatMessage(
+        role = ai.runanywhere.proto.v1.MessageRole.MESSAGE_ROLE_USER,
+        content = this,
     )
 
 /** Not `private` so tests can pin the `autoExecute` forwarding contract. */
@@ -352,11 +366,16 @@ private class StreamTerminalReached : RuntimeException()
  * tied to [CppBridgeLLM], so unit tests can characterize the native-boundary
  * contract without a JNI bridge.
  *
- * Never fabricates a successful `completed`: a stream that ends after
- * producing at least one event but without a terminal `is_final` emits
- * `failed` instead (mirrors Swift's `RunAnywhere.mapGenerationStream`). A
- * stream that produced zero events throws, since there is no partial
- * `requestId` to report a terminal event against.
+ * `LLMStreamEvent.is_final`/`.kind` (a per-token `TokenKind`) were both
+ * deleted outright (idl/llm_service.proto): `event_kind`
+ * (`LLMStreamEventKind`: STARTED/TOKEN/THINKING/TOOL_CALL/PROGRESS/
+ * COMPLETED/ERROR) is now the sole event-level discriminator, replacing
+ * both. Never fabricates a successful `completed`: a stream that ends
+ * after producing at least one event but without a terminal COMPLETED/
+ * ERROR emits `failed` instead (mirrors Swift's
+ * `RunAnywhere.mapGenerationStream`). A stream that produced zero events
+ * throws, since there is no partial `requestId` to report a terminal
+ * event against.
  */
 internal fun mapLLMStreamEvents(
     requestId: String,
@@ -383,9 +402,16 @@ internal fun mapLLMStreamEvents(
                     startedEmitted = true
                     emit(GenerationEvent.Started(requestId))
                 }
-                raw.error?.let {
+                if (raw.error != null || raw.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR) {
                     sawTerminal = true
-                    emit(GenerationEvent.Failed(requestId, partialOrNull(), SDKException(it)))
+                    emit(
+                        GenerationEvent.Failed(
+                            requestId,
+                            partialOrNull(),
+                            raw.error?.let { SDKException(it) }
+                                ?: SDKException.operation("Generation stream failed"),
+                        ),
+                    )
                     throw StreamTerminalReached()
                 }
                 raw.tokenEventOrNull(requestId, answer, thinking, textItemId, reasoningItemId, sequence)?.let {
@@ -398,24 +424,20 @@ internal fun mapLLMStreamEvents(
                     emit(GenerationEvent.ToolArgumentsDone(requestId, sequence++, itemId, call.arguments_json))
                     toolCallIndex += 1
                 }
-                if (raw.is_final) {
+                if (raw.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
                     sawTerminal = true
                     emit(
                         GenerationEvent.Completed(
                             requestId,
-                            raw.result?.toGenerationResult(
-                                requestId = requestId,
-                                model = model,
-                                fallbackText = answer.toString(),
-                                fallbackThinking = thinking.toString().takeIf { it.isNotEmpty() },
-                            ) ?: GenerationResult(
-                                text = answer.toString(),
-                                thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
-                                finishReason = finishReasonOf(raw.finish_reason),
-                                rawFinishReason = raw.finish_reason.takeIf { it.isNotEmpty() },
-                                requestId = requestId,
-                                model = model,
-                            ),
+                            raw.result?.toGenerationResult(requestId)
+                                ?: GenerationResult(
+                                    text = answer.toString(),
+                                    thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
+                                    finishReason = finishReasonOf(raw.finish_reason),
+                                    rawFinishReason = raw.finish_reason.name,
+                                    requestId = requestId,
+                                    model = model,
+                                ),
                         ),
                     )
                     throw StreamTerminalReached()
@@ -448,12 +470,12 @@ private fun LLMStreamEvent.tokenEventOrNull(
     sequence: Long,
 ): GenerationEvent? {
     if (token.isEmpty()) return null
-    return when (kind) {
-        ProtoTokenKind.TOKEN_KIND_THOUGHT -> {
+    return when (event_kind) {
+        LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING -> {
             thinking.append(token)
             GenerationEvent.ReasoningDelta(requestId, sequence, reasoningItemId, 0, token)
         }
-        ProtoTokenKind.TOKEN_KIND_TOOL_CALL -> null
+        LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOOL_CALL -> null
         else -> {
             answer.append(token)
             GenerationEvent.TextDelta(requestId, sequence, textItemId, 0, token)

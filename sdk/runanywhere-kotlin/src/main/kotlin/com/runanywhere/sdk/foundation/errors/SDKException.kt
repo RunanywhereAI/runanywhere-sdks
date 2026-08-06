@@ -15,7 +15,6 @@ import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
-import ai.runanywhere.proto.v1.ErrorContext as ProtoErrorContext
 import ai.runanywhere.proto.v1.SDKError as ProtoSDKError
 
 /**
@@ -100,10 +99,11 @@ class SDKException(
      * so callers can programmatically identify the failing field without
      * parsing the human-readable message.
      *
-     * Backed by the typed `error.context.field_path` proto field.
+     * `ErrorContext`/`SDKError.context` are deleted outright
+     * (idl/errors.proto); the flat `param` string field (OpenAI's `param`)
+     * is the wire-canonical carrier now, shared with Swift / Dart / TS.
      */
-    val fieldPath: String? get() =
-        error.context?.field_path?.takeIf { it.isNotEmpty() }
+    val fieldPath: String? get() = error.param_?.takeIf { it.isNotEmpty() }
 
     override fun toString(): String =
         "SDKException[$category] ${code.name}: ${error.message}"
@@ -233,10 +233,10 @@ class SDKException(
                             code = code,
                             category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
                             message = message,
-                            context =
-                                ProtoErrorContext(
-                                    field_path = fieldPath,
-                                ),
+                            // `ErrorContext`/`SDKError.context` are deleted
+                            // outright (idl/errors.proto); `param` (OpenAI's
+                            // `param`) is the wire-canonical carrier now.
+                            param_ = fieldPath,
                             c_abi_code = roundTripCAbiCode(code),
                             nested_message = cause?.message,
                         ),

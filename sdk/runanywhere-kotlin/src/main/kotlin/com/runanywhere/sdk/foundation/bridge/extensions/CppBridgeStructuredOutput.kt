@@ -9,31 +9,38 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
 import ai.runanywhere.proto.v1.StructuredOutputPromptResult
-import ai.runanywhere.proto.v1.StructuredOutputRequest
 import ai.runanywhere.proto.v1.StructuredOutputResult
 import ai.runanywhere.proto.v1.StructuredOutputValidation
-import ai.runanywhere.proto.v1.StructuredOutputValidationRequest
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAStructuredOutputResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
+/**
+ * idl/structured_output.proto (API-realignment so-p2) deleted the dedicated
+ * `StructuredOutputRequest` / `StructuredOutputValidationRequest` messages.
+ * `StructuredOutputParseRequest` (request_id, text, options, metadata) is
+ * now the sole request envelope shared by parse/validate/prepare-prompt —
+ * `text` plays the role the old `prompt` field did (mirrors commons'
+ * `rac_structured_output_prepare_prompt_proto` / `..._validate_proto`,
+ * `structured_output.cpp`).
+ */
 object CppBridgeStructuredOutput {
-    fun preparePrompt(request: StructuredOutputRequest): StructuredOutputPromptResult =
+    fun preparePrompt(request: StructuredOutputParseRequest): StructuredOutputPromptResult =
         decodeOrThrow(
             StructuredOutputPromptResult.ADAPTER,
             RunAnywhereBridge.racStructuredOutputPreparePromptProto(
-                StructuredOutputRequest.ADAPTER.encode(request),
+                StructuredOutputParseRequest.ADAPTER.encode(request),
             ),
             "racStructuredOutputPreparePromptProto",
         )
 
-    fun validate(request: StructuredOutputValidationRequest): StructuredOutputValidation =
+    fun validate(request: StructuredOutputParseRequest): StructuredOutputValidation =
         decodeOrThrow(
             StructuredOutputValidation.ADAPTER,
             RunAnywhereBridge.racStructuredOutputValidateProto(
-                StructuredOutputValidationRequest.ADAPTER.encode(request),
+                StructuredOutputParseRequest.ADAPTER.encode(request),
             ),
             "racStructuredOutputValidateProto",
         )

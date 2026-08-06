@@ -12,7 +12,6 @@
 package com.runanywhere.sdk.public.extensions.VoiceAgent
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
-import kotlin.math.roundToInt
 
 // VoiceAgentComponentStates now uses the richer canonical
 // `ComponentLifecycleState` (shared with SDKEvent). The former
@@ -22,8 +21,15 @@ typealias ComponentLoadState = ai.runanywhere.proto.v1.ComponentLifecycleState
 typealias VoiceAgentComponentStates = ai.runanywhere.proto.v1.VoiceAgentComponentStates
 typealias VoiceAgentConfiguration = ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 typealias VoiceAgentResult = ai.runanywhere.proto.v1.VoiceAgentResult
-typealias VoiceSessionConfig = ai.runanywhere.proto.v1.VoiceSessionConfig
 typealias VoiceSessionError = ai.runanywhere.proto.v1.VoiceSessionError
+
+// VoiceSessionConfig is deleted: runanywhere.v1.VoiceSessionConfig no
+// longer exists. Silence-duration configuration now lives on
+// `TurnDetection.silence_duration_ms` (idl/voice_agent_service.proto);
+// `auto_play_tts` has no surviving wire field anywhere in the proto tree
+// and had zero live callers in this module, so the helpers built on it
+// (`silenceDuration`/`withSilenceDuration`/`autoPlayTTS`/`withAutoPlayTTS`)
+// are dropped rather than rehomed onto a type that cannot express them.
 
 val ComponentLoadState.isLoaded: Boolean
     get() = this == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY
@@ -31,22 +37,8 @@ val ComponentLoadState.isLoaded: Boolean
 val ComponentLoadState.isLoading: Boolean
     get() = this == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_LOADING
 
-val VoiceSessionConfig.silenceDuration: Double
-    get() = silence_duration_ms.toDouble() / MILLIS_PER_SECOND
-
-fun VoiceSessionConfig.withSilenceDuration(seconds: Double): VoiceSessionConfig =
-    copy(silence_duration_ms = (seconds.coerceAtLeast(0.0) * MILLIS_PER_SECOND).roundToInt())
-
-val VoiceSessionConfig.autoPlayTTS: Boolean
-    get() = auto_play_tts
-
-fun VoiceSessionConfig.withAutoPlayTTS(enabled: Boolean): VoiceSessionConfig =
-    copy(auto_play_tts = enabled)
-
 val VoiceSessionError.errorDescription: String?
     get() = message.ifBlank { null }
 
 val VoiceSessionError.localizedMessage: String?
     get() = errorDescription
-
-private const val MILLIS_PER_SECOND = 1_000.0

@@ -34,9 +34,16 @@ val RAVADResult.duration: Double
 val SpeechActivityEvent.timestampEpochMs: Long
     get() = timestamp_ms
 
-/** Event-carried duration in seconds (set on SPEECH_ENDED). */
+/**
+ * Event-carried duration in seconds.
+ *
+ * `duration_ms` is deleted outright (idl/vad_options.proto); derive it from
+ * `audio_start_ms`/`audio_end_ms` instead (0 on a STARTED event, whose
+ * `audio_end_ms` is always 0). Mirrors Swift's
+ * `RASpeechActivityEvent.duration`.
+ */
 val SpeechActivityEvent.duration: Double
-    get() = duration_ms.toDouble() / 1000.0
+    get() = maxOf(0L, audio_end_ms - audio_start_ms).toDouble() / 1000.0
 
 // MARK: - SpeechActivityKind
 

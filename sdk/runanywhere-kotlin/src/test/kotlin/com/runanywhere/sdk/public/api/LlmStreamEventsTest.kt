@@ -5,18 +5,23 @@
  * Characterizes the native-stream-completion contract for
  * `RunAnywhere.llm.generateStream` under the v4 public API spec: a stream
  * never fabricates a successful `completed`. A native call that resolves
- * without ever sending an `is_final` proto event emits `failed` instead
- * (mirrors Swift's `RunAnywhere.mapGenerationStream` in
+ * without ever sending a COMPLETED/ERROR terminal `event_kind` emits
+ * `failed` instead (mirrors Swift's `RunAnywhere.mapGenerationStream` in
  * `runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LLMNamespace.swift`).
  * [mapLLMStreamEvents] is the injectable core [LlmNamespace.streamEvents]
  * delegates to, so these tests exercise the real fold logic without a JNI bridge.
+ *
+ * `RALLMStreamEvent.is_final` is deleted outright (idl/llm_service.proto):
+ * `event_kind` (COMPLETED/ERROR) is the sole terminal discriminator now, and
+ * `finish_reason` was retyped from a plain string to the `FinishReason` enum.
  */
 
 package com.runanywhere.sdk.public.api
 
+import ai.runanywhere.proto.v1.FinishReason
 import ai.runanywhere.proto.v1.LLMStreamEvent
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.SDKError
-import ai.runanywhere.proto.v1.TokenKind
 import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -28,13 +33,13 @@ import org.junit.Test
 
 class LlmStreamEventsTest {
     @Test
-    fun `native stream ending without is_final emits failed instead of fabricating a completion`() =
+    fun `native stream ending without a terminal event_kind emits failed instead of fabricating a completion`() =
         runBlocking {
             val raw =
                 flowOf(
-                    LLMStreamEvent(token = "Hel", is_final = false),
-                    LLMStreamEvent(token = "lo", is_final = false),
-                    // Native call resolves here without ever sending is_final = true.
+                    LLMStreamEvent(token = "Hel", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN),
+                    LLMStreamEvent(token = "lo", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN),
+                    // Native call resolves here without ever sending event_kind = COMPLETED.
                 )
 
             val events = mapLLMStreamEvents("req-1", "model-a", raw).toList()
@@ -58,15 +63,15 @@ class LlmStreamEventsTest {
         }
 
     @Test
-    fun `a terminal is_final event still wins and is not double-emitted`() =
+    fun `a terminal COMPLETED event still wins and is not double-emitted`() =
         runBlocking {
             val raw =
                 flowOf(
-                    LLMStreamEvent(token = "Hi", is_final = false),
+                    LLMStreamEvent(token = "Hi", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN),
                     LLMStreamEvent(
                         token = "",
-                        is_final = true,
-                        finish_reason = "stop",
+                        event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+                        finish_reason = FinishReason.FINISH_REASON_STOP,
                     ),
                 )
 
@@ -104,10 +109,13 @@ class LlmStreamEventsTest {
                 flowOf(
                     LLMStreamEvent(
                         token = "thinking...",
-                        is_final = false,
-                        kind = TokenKind.TOKEN_KIND_THOUGHT,
+                        event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING,
                     ),
-                    LLMStreamEvent(token = "answer", is_final = true, finish_reason = "stop"),
+                    LLMStreamEvent(
+                        token = "answer",
+                        event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+                        finish_reason = FinishReason.FINISH_REASON_STOP,
+                    ),
                 )
 
             val events = mapLLMStreamEvents("req-4", "model-a", raw).toList()
@@ -120,10 +128,10 @@ class LlmStreamEventsTest {
         runBlocking {
             val raw =
                 flowOf(
-                    LLMStreamEvent(token = "partial", is_final = false),
+                    LLMStreamEvent(token = "partial", event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN),
                     LLMStreamEvent(
                         token = "",
-                        is_final = false,
+                        event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR,
                         error = SDKError(message = "backend crashed"),
                     ),
                 )

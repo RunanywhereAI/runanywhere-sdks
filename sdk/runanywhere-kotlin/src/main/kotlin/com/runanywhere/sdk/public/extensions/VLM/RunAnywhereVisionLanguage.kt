@@ -18,7 +18,8 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMGenerationRequest
 import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.sdk.public.types.RAVLMResult
 import com.runanywhere.sdk.public.types.RAVLMStreamEvent
@@ -57,11 +58,15 @@ private suspend fun RunAnywhere.isVLMModelLoaded(): Boolean {
 
 // MARK: - Inference
 
+/**
+ * `RAVLMGenerationOptions` was deleted outright (idl/vlm_options.proto);
+ * this forwarder's parameter necessarily changes from the deleted options
+ * type to the full [RAVLMGenerationRequest] envelope
+ * (images/messages/prompt/options/vision) that replaced it. Mirrors
+ * Swift's `RunAnywhere.processImage(_ request: RAVLMGenerationRequest)`.
+ */
 @Deprecated("Use RunAnywhere.vlm.generate(image, prompt, options).")
-suspend fun RunAnywhere.processImage(
-    image: RAVLMImage,
-    options: RAVLMGenerationOptions,
-): RAVLMResult {
+suspend fun RunAnywhere.processImage(request: RAVLMGenerationRequest): RAVLMResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
@@ -73,10 +78,10 @@ suspend fun RunAnywhere.processImage(
     }
 
     vlmLogger.debug(
-        "Processing image with prompt: ${options.prompt.take(50)}${if (options.prompt.length > 50) "..." else ""}",
+        "Processing image with prompt: ${request.prompt.take(50)}${if (request.prompt.length > 50) "..." else ""}",
     )
 
-    val nativeRequest = CppBridgeVLM.prepareProcessRequest(image, options)
+    val nativeRequest = CppBridgeVLM.prepareProcessRequest(request)
     val result =
         runCancellableNativeUnaryRequest(
             coordinator = vlmNativeRequests,
@@ -85,27 +90,24 @@ suspend fun RunAnywhere.processImage(
         )
 
     vlmLogger.info(
-        "VLM processing complete: ${result.usage?.output_tokens ?: 0} tokens in ${result.processing_time_ms}ms " +
-            "(${String.format(java.util.Locale.ROOT, "%.1f", result.usage?.tokens_per_second ?: 0.0)} tok/s)",
+        "VLM processing complete: ${result.usage?.output_tokens ?: 0} tokens in ${result.total_time_ms}ms " +
+            "(${String.format(java.util.Locale.ROOT, "%.1f", result.usage?.decode_tokens_per_second ?: 0.0)} tok/s)",
     )
 
     return result
 }
 
 /**
- * Stream typed [RAVLMStreamEvent]s for an image + options request.
+ * Stream typed [RAVLMStreamEvent]s for a full [RAVLMGenerationRequest].
  *
  * Canonical cross-SDK shape (mirrors Swift
- * `RunAnywhere.processImageStream(_:options:)` returning
+ * `RunAnywhere.processImageStream(_ request:)` returning
  * `AsyncStream<RAVLMStreamEvent>`): STARTED → TOKEN* → exactly one terminal
  * COMPLETED/ERROR. COMPLETED carries the full `VLMResult` with metrics; an
  * ERROR event closes the flow with [SDKException].
  */
 @Deprecated("Use RunAnywhere.vlm.generateStream(image, prompt, options).")
-fun RunAnywhere.processImageStream(
-    image: RAVLMImage,
-    options: RAVLMGenerationOptions,
-): Flow<RAVLMStreamEvent> =
+fun RunAnywhere.processImageStream(request: RAVLMGenerationRequest): Flow<RAVLMStreamEvent> =
     callbackFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
@@ -118,7 +120,7 @@ fun RunAnywhere.processImageStream(
         // Unary and streaming VLM share one lifecycle-global native cancel
         // domain, so both must take the same request-scoped lease.
         val nativeRequest =
-            CppBridgeVLM.prepareStreamRequest(image, options) { event ->
+            CppBridgeVLM.prepareStreamRequest(request) { event ->
                 trySend(event)
                 when (event.kind) {
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR -> {
@@ -130,9 +132,10 @@ fun RunAnywhere.processImageStream(
                     }
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
                         val result = event.result
+                        val tokPerSec = result?.usage?.decode_tokens_per_second ?: 0.0
                         vlmLogger.info(
                             "VLM processing complete: ${result?.usage?.output_tokens ?: 0} tokens " +
-                                "(${String.format(java.util.Locale.ROOT, "%.1f", result?.usage?.tokens_per_second ?: 0.0)} tok/s)",
+                                "(${String.format(java.util.Locale.ROOT, "%.1f", tokPerSec)} tok/s)",
                         )
                         true
                     }
@@ -162,15 +165,18 @@ fun RunAnywhere.processImageStream(
 
 /**
  * Ergonomic overload mirroring Swift `processImageStream(_:prompt:options:)`
- * and React Native: the prompt is applied onto `options.prompt` before
- * streaming.
+ * and React Native: builds the [RAVLMGenerationRequest] envelope from one
+ * image + prompt, using default sampling.
  */
 @Deprecated("Use RunAnywhere.vlm.generateStream(image, prompt, options).")
 fun RunAnywhere.processImageStream(
     image: RAVLMImage,
     prompt: String,
-    options: RAVLMGenerationOptions = RAVLMGenerationOptions.defaults(),
-): Flow<RAVLMStreamEvent> = processImageStream(image, options.copy(prompt = prompt))
+    options: RALLMGenerationOptions = RALLMGenerationOptions.defaults(),
+): Flow<RAVLMStreamEvent> =
+    processImageStream(
+        RAVLMGenerationRequest(images = listOf(image), prompt = prompt, options = options),
+    )
 
 // MARK: - Generation Control
 

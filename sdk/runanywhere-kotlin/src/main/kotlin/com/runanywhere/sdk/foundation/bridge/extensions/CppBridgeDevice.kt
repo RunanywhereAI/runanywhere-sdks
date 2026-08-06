@@ -31,7 +31,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.DeviceInfo
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -227,17 +226,21 @@ object CppBridgeDevice {
 
     /**
      * Device-info JSON callback. The C++ side parses the returned
-     * string into `rac_device_registration_info_t`. Mirrors Swift's
-     * direct pointer fill in `register()` — JSON is the JNI-friendly
-     * equivalent of populating the C struct fields.
+     * string into `rac_device_registration_info_t` (`jni_device_get_info`
+     * in `runanywhere_commons_jni.cpp`). Mirrors Swift's direct pointer
+     * fill in `register()` — JSON is the JNI-friendly equivalent of
+     * populating the C struct fields.
      *
-     * The canonical schema is the generated [DeviceInfo] proto: we build
-     * the proto from the device data (19 core fields + `platform_extras`
-     * carrying the Android-only extras), then serialize it to the
-     * snake_case JSON the C++ parser expects. Wire's JSON encoder emits
-     * camelCase keys, so we serialize by hand: the core proto fields as
-     * snake_case keys and each `platform_extras` entry as a top-level
-     * snake_case key.
+     * This JSON contract is hand-rolled and independent of the generated
+     * [DeviceInfo] proto message: `jni_device_get_info` parses it with a
+     * bespoke nlohmann::json reader keyed on these exact snake_case string
+     * keys, not `DeviceInfo.ADAPTER`/Wire's JSON codec. `DeviceInfo` itself
+     * was reshaped by idl/device_info.proto (typed `Platform`/`FormFactor`/
+     * `BatteryState` enums replacing the old free-form strings, `_bytes`
+     * suffixes on the two memory fields, `device_name` dropped entirely) --
+     * none of that affects this callback's wire shape, so the JSON is built
+     * directly from the raw device values below instead of round-tripping
+     * through the proto type.
      */
     @JvmStatic
     fun getDeviceInfoCallback(): String {
@@ -273,86 +276,108 @@ object CppBridgeDevice {
         val efficiencyCores = provider?.getEfficiencyCores() ?: defaultCoreSplit.second
         val deviceIdValue = deviceId ?: ""
 
-        val deviceInfo =
-            DeviceInfo(
-                device_model = deviceModel,
-                device_name = deviceName,
-                platform = "android",
-                os_version = osVersion,
-                form_factor = formFactor,
-                architecture = architecture,
-                chip_name = chipName,
-                total_memory = totalMemory,
-                available_memory = availableMemory,
-                has_neural_engine = hasNeuralEngine,
-                neural_engine_cores = neuralEngineCores,
-                gpu_family = gpuFamily,
-                battery_level = batteryLevel.toFloat(),
-                battery_state = batteryState,
-                is_low_power_mode = isLowPowerMode,
-                core_count = coreCount,
-                performance_cores = performanceCores,
-                efficiency_cores = efficiencyCores,
-                device_fingerprint = deviceIdValue,
-                // Android-only extras consumed by the C++ parser (`manufacturer`)
-                // plus historical inert fields kept for payload stability.
-                platform_extras =
-                    linkedMapOf(
-                        "device_id" to deviceIdValue,
-                        "device_type" to "mobile",
-                        "os_name" to "Android",
-                        "processor_count" to coreCount.toString(),
-                        "is_simulator" to isEmulator.toString(),
-                        "manufacturer" to manufacturer,
-                        "os_build_id" to osBuildId,
-                        "sdk_version" to sdkVersionString,
-                        "android_api_level" to androidApiLevel.toString(),
-                        "locale" to locale,
-                        "timezone" to timezone,
-                    ),
+        val extras =
+            linkedMapOf(
+                "device_type" to "mobile",
+                "os_name" to "Android",
+                "processor_count" to coreCount.toString(),
+                "is_simulator" to isEmulator.toString(),
+                "manufacturer" to manufacturer,
+                "os_build_id" to osBuildId,
+                "sdk_version" to sdkVersionString,
+                "android_api_level" to androidApiLevel.toString(),
+                "locale" to locale,
+                "timezone" to timezone,
             )
 
-        return serializeDeviceInfoJson(deviceInfo)
+        return serializeDeviceInfoJson(
+            deviceId = deviceIdValue,
+            deviceModel = deviceModel,
+            deviceName = deviceName,
+            platform = "android",
+            osVersion = osVersion,
+            formFactor = formFactor,
+            architecture = architecture,
+            chipName = chipName,
+            totalMemory = totalMemory,
+            availableMemory = availableMemory,
+            hasNeuralEngine = hasNeuralEngine,
+            neuralEngineCores = neuralEngineCores,
+            gpuFamily = gpuFamily,
+            batteryLevel = batteryLevel.toFloat(),
+            batteryState = batteryState,
+            isLowPowerMode = isLowPowerMode,
+            coreCount = coreCount,
+            performanceCores = performanceCores,
+            efficiencyCores = efficiencyCores,
+            deviceFingerprint = deviceIdValue,
+            // Android-only extras consumed by the C++ parser (`manufacturer`)
+            // plus historical inert fields kept for payload stability.
+            extras = extras,
+        )
     }
 
     /**
-     * Serialize a [DeviceInfo] proto to the snake_case JSON contract the
-     * C++ device parser (`jni_device_get_info`) consumes. Core proto fields
-     * are emitted under their snake_case names; each `platform_extras` entry
-     * is emitted as a top-level key. Extras whose historical wire value was a
-     * JSON number or boolean (`processor_count`, `android_api_level`,
-     * `is_simulator`) are emitted unquoted; all others are quoted strings.
+     * Build the snake_case JSON contract the C++ device parser
+     * (`jni_device_get_info`) consumes directly from raw device values.
+     * [extras] entries are emitted as top-level keys. Extras whose
+     * historical wire value was a JSON number or boolean
+     * (`processor_count`, `android_api_level`, `is_simulator`) are emitted
+     * unquoted; all others are quoted strings.
      */
-    private fun serializeDeviceInfoJson(info: DeviceInfo): String {
+    @Suppress("LongParameterList")
+    private fun serializeDeviceInfoJson(
+        deviceId: String,
+        deviceModel: String,
+        deviceName: String,
+        platform: String,
+        osVersion: String,
+        formFactor: String,
+        architecture: String,
+        chipName: String,
+        totalMemory: Long,
+        availableMemory: Long,
+        hasNeuralEngine: Boolean,
+        neuralEngineCores: Int,
+        gpuFamily: String,
+        batteryLevel: Float,
+        batteryState: String?,
+        isLowPowerMode: Boolean,
+        coreCount: Int,
+        performanceCores: Int,
+        efficiencyCores: Int,
+        deviceFingerprint: String,
+        extras: Map<String, String>,
+    ): String {
         val literalExtras = setOf("processor_count", "android_api_level", "is_simulator")
         return buildString {
             append("{")
-            append("\"device_id\":\"${escapeJson(info.platform_extras["device_id"] ?: "")}\",")
-            append("\"device_model\":\"${escapeJson(info.device_model)}\",")
-            append("\"device_name\":\"${escapeJson(info.device_name)}\",")
-            append("\"platform\":\"${escapeJson(info.platform)}\",")
-            append("\"os_version\":\"${escapeJson(info.os_version)}\",")
-            append("\"form_factor\":\"${escapeJson(info.form_factor)}\",")
-            append("\"architecture\":\"${escapeJson(info.architecture)}\",")
-            append("\"chip_name\":\"${escapeJson(info.chip_name)}\",")
-            append("\"total_memory\":${info.total_memory},")
-            append("\"available_memory\":${info.available_memory},")
-            append("\"has_neural_engine\":${info.has_neural_engine},")
-            append("\"neural_engine_cores\":${info.neural_engine_cores},")
-            append("\"gpu_family\":\"${escapeJson(info.gpu_family)}\",")
-            append("\"battery_level\":${info.battery_level},")
-            if (info.battery_state != null) {
-                append("\"battery_state\":\"${escapeJson(info.battery_state)}\",")
+            append("\"device_id\":\"${escapeJson(deviceId)}\",")
+            append("\"device_model\":\"${escapeJson(deviceModel)}\",")
+            append("\"device_name\":\"${escapeJson(deviceName)}\",")
+            append("\"platform\":\"${escapeJson(platform)}\",")
+            append("\"os_version\":\"${escapeJson(osVersion)}\",")
+            append("\"form_factor\":\"${escapeJson(formFactor)}\",")
+            append("\"architecture\":\"${escapeJson(architecture)}\",")
+            append("\"chip_name\":\"${escapeJson(chipName)}\",")
+            append("\"total_memory\":$totalMemory,")
+            append("\"available_memory\":$availableMemory,")
+            append("\"has_neural_engine\":$hasNeuralEngine,")
+            append("\"neural_engine_cores\":$neuralEngineCores,")
+            append("\"gpu_family\":\"${escapeJson(gpuFamily)}\",")
+            append("\"battery_level\":$batteryLevel,")
+            if (batteryState != null) {
+                append("\"battery_state\":\"${escapeJson(batteryState)}\",")
             } else {
                 append("\"battery_state\":null,")
             }
-            append("\"is_low_power_mode\":${info.is_low_power_mode},")
-            append("\"core_count\":${info.core_count},")
-            append("\"performance_cores\":${info.performance_cores},")
-            append("\"efficiency_cores\":${info.efficiency_cores},")
-            append("\"device_fingerprint\":\"${escapeJson(info.device_fingerprint ?: "")}\"")
+            append("\"is_low_power_mode\":$isLowPowerMode,")
+            append("\"core_count\":$coreCount,")
+            append("\"performance_cores\":$performanceCores,")
+            append("\"efficiency_cores\":$efficiencyCores,")
+            append("\"device_fingerprint\":\"${escapeJson(deviceFingerprint)}\"")
             // Top-level snake_case extras (skip device_id; already emitted above).
-            for ((key, value) in info.platform_extras) {
+            for ((key, value) in extras) {
                 if (key == "device_id") continue
                 append(",")
                 append("\"${escapeJson(key)}\":")

@@ -14,29 +14,17 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.ErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode
-import ai.runanywhere.proto.v1.ExpectedModelFiles
-import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.LoRAApplyResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
 import ai.runanywhere.proto.v1.LoraAdapterCatalogGetResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListRequest
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
-import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
-import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
-import ai.runanywhere.proto.v1.LoraAdapterImportRequest
-import ai.runanywhere.proto.v1.LoraAdapterImportResult
+import ai.runanywhere.proto.v1.LoraApplyResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
-import ai.runanywhere.proto.v1.ModelArtifactType
-import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelFileDescriptor
-import ai.runanywhere.proto.v1.ModelFileRole
-import ai.runanywhere.proto.v1.ModelFormat
-import ai.runanywhere.proto.v1.ModelGetRequest
+import ai.runanywhere.proto.v1.ModelImportRequest
+import ai.runanywhere.proto.v1.ModelImportResult
 import ai.runanywhere.proto.v1.ModelInfoMetadata
-import ai.runanywhere.proto.v1.ModelSource
-import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLoraRegistry
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -45,22 +33,31 @@ import com.runanywhere.sdk.public.types.RALoRAApplyRequest
 import com.runanywhere.sdk.public.types.RALoRARemoveRequest
 import com.runanywhere.sdk.public.types.RALoRAState
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
  * Stateless capability namespace for LoRA adapter management.
  *
- * Mirrors Swift's `RunAnywhere.lora` (`RunAnywhere+LoRA.swift`) surface 1:1.
- * Runtime operations (apply / remove / list / state / checkCompatibility) and
- * catalog operations (register / listCatalog / queryCatalog / getCatalogEntry /
- * markDownloadCompleted / markImportCompleted) all flow through generated
- * request / result types from `lora_options.proto`.
+ * Mirrors Swift's `RunAnywhere.lora` (`RunAnywhere+LoRA.swift` +
+ * `RunAnywhere+LoRADownload.swift`) surface 1:1. Runtime operations
+ * (apply / remove / list / state / checkCompatibility) and catalog
+ * operations (register / listCatalog / queryCatalog / getCatalogEntry) flow
+ * through generated request / result types from `lora_options.proto`.
+ *
+ * `LoraAdapterDownloadCompletedRequest`/`Result` and
+ * `LoraAdapterImportRequest`/`Result` were deleted outright from
+ * idl/lora_options.proto (the "lora-delete-download-import-bookkeeping"
+ * API-simplification edit): adapter files are now acquired exclusively
+ * through the models domain's download/import verbs; this LoRA domain
+ * carries no download/import state of its own -- a non-empty
+ * `LoraAdapterCatalogEntry.local_path` is the only "downloaded" signal
+ * that survives. `markDownloadCompleted`/`markImportCompleted` are gone
+ * with no replacement.
  */
 interface LoRA {
     /** Apply one or more LoRA adapters to the currently loaded model. */
-    suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult
+    suspend fun apply(request: RALoRAApplyRequest): LoraApplyResult
 
     /**
      * Apply one registered catalog adapter to the currently loaded model.
@@ -73,7 +70,7 @@ interface LoRA {
         localPath: String? = null,
         scale: Float? = null,
         replaceExisting: Boolean = false,
-    ): LoRAApplyResult {
+    ): LoraApplyResult {
         val adapterPath = localPath ?: entry.local_path?.takeIf { it.isNotBlank() }
         if (adapterPath.isNullOrBlank()) {
             throw SDKException.invalidArgument("LoRA catalog adapter '${entry.id}' has no local path")
@@ -84,11 +81,14 @@ interface LoRA {
                     listOf(
                         RALoRAAdapterConfig(
                             adapter_path = adapterPath,
-                            adapter_id = entry.id.takeIf { it.isNotBlank() },
-                            scale = scale ?: entry.default_scale.takeIf { it > 0f } ?: 1f,
+                            adapter_id = entry.id,
+                            scale = scale ?: entry.default_scale?.takeIf { it > 0f } ?: 1f,
                         ),
                     ),
-                replace_existing = replaceExisting,
+                // Wire polarity was inverted (LoraApplyRequest.replace_existing ->
+                // keep_existing): the public replaceExisting parameter name/default
+                // are unchanged, only the proto-building code inverts.
+                keep_existing = !replaceExisting,
             ),
         )
     }
@@ -102,7 +102,7 @@ interface LoRA {
         localPath: String? = null,
         scale: Float? = null,
         replaceExisting: Boolean = false,
-    ): LoRAApplyResult = apply(entry, localPath, scale, replaceExisting)
+    ): LoraApplyResult = apply(entry, localPath, scale, replaceExisting)
 
     /** Remove adapters by generated request semantics, including `clear_all`. */
     suspend fun remove(request: RALoRARemoveRequest): RALoRAState
@@ -123,20 +123,30 @@ interface LoRA {
     suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry
 
     /**
-     * Register both the generated LoRA catalog entry and its generated download
-     * artifact record. This does not fetch bytes.
+     * Register both the LoRA catalog entry and its caller-supplied
+     * downloadable artifact record. Does not fetch bytes.
+     *
+     * `LoraAdapterCatalogEntry` no longer carries url/filename/size/checksum
+     * metadata (idl/lora_options.proto: "everything generic about the
+     * artifact ... lives on the ModelInfo record for this adapter"), so the
+     * artifact can no longer be derived from the entry alone -- callers
+     * supply the [artifact] `ModelInfo` describing where/how to fetch the
+     * adapter bytes (e.g. built via `ModelInfo.Companion.make(...)`).
      */
-    suspend fun registerArtifact(entry: LoraAdapterCatalogEntry): RAModelInfo
+    suspend fun registerArtifact(entry: LoraAdapterCatalogEntry, artifact: RAModelInfo): RAModelInfo
 
     /**
      * Download a LoRA adapter through the canonical model-download pipeline.
      *
      * One call registers the catalog entry + artifact, downloads with
-     * resume/checksum/progress through commons, records completion in the LoRA
-     * catalog, and returns the stable local adapter path.
+     * resume/checksum/progress through commons, and returns the stable
+     * local adapter path. There is nothing left to "mark completed" in the
+     * LoRA domain: the model-registry artifact record (keyed by
+     * [artifact]'s id) is the sole source of truth for the downloaded path.
      */
     suspend fun download(
         entry: LoraAdapterCatalogEntry,
+        artifact: RAModelInfo,
         onProgress: (suspend (DownloadProgress) -> Unit)? = null,
     ): String
 
@@ -151,39 +161,21 @@ interface LoRA {
     /** Fetch one catalog entry by generated request semantics. */
     suspend fun getCatalogEntry(request: LoraAdapterCatalogGetRequest): LoraAdapterCatalogGetResult
 
-    /** Persist native-reported completion state after the platform has fetched bytes. */
-    suspend fun markDownloadCompleted(
-        request: LoraAdapterDownloadCompletedRequest,
-    ): LoraAdapterDownloadCompletedResult
-
     /**
      * Import a user-picked local adapter file into SDK-owned storage.
      *
-     * Kotlin only resolves platform access (e.g. content URI to a readable
-     * path) before calling; commons owns everything past the source path:
-     * deterministic catalog matching, canonical placement, artifact registry
-     * record + manifest persistence, and catalog completion for matched
-     * entries. Apps apply the returned `local_path`; they never construct
-     * on-disk paths themselves.
+     * The LoRA-domain import verb (deterministic catalog matching, canonical
+     * `{Models}/{framework}/lora-adapter:{id}/` placement, catalog
+     * `imported=true` completion) has no replacement. Adapter files are now
+     * acquired exclusively through the models domain's generic import verb
+     * (`RunAnywhere.importModel`), so this imports [sourcePath] as a plain
+     * model artifact tagged `lora-adapter`. Unlike the retired ABI, this
+     * does NOT automatically match the import against an existing LoRA
+     * catalog entry -- callers that need the catalog association call
+     * [register]/[registerArtifact] with the matching entry themselves once
+     * they know which adapter this file corresponds to.
      */
-    suspend fun importAdapter(sourcePath: String): LoraAdapterImportResult
-
-    /**
-     * Persist native-reported import completion state. Sets `imported = true`
-     * and a default status message when not already populated, matching the
-     * IDL contract for platform file-picker / import completion.
-     */
-    suspend fun markImportCompleted(
-        request: LoraAdapterDownloadCompletedRequest,
-    ): LoraAdapterDownloadCompletedResult {
-        val patched =
-            request.copy(
-                imported = true,
-                status_message =
-                    request.status_message.ifBlank { "import completed" },
-            )
-        return markDownloadCompleted(patched)
-    }
+    suspend fun importAdapter(sourcePath: String): ModelImportResult
 
     /**
      * Get all LoRA adapters compatible with a specific model
@@ -220,7 +212,6 @@ interface LoRA {
     }
 }
 
-private const val LORA_ARTIFACT_MODEL_ID_PREFIX = "lora-adapter:"
 private const val LORA_ARTIFACT_TAG = "lora-adapter"
 
 private suspend fun ensureLoraReady() {
@@ -231,88 +222,11 @@ private suspend fun ensureLoraReady() {
 }
 
 /**
- * Stable model-registry id used for a LoRA adapter artifact.
- *
- * The adapter remains a LoRA catalog entry for apply/remove semantics, while
- * its bytes are represented as a generated model artifact so download/storage
- * policy stays on the generated registry/download path.
- */
-val LoraAdapterCatalogEntry.loraArtifactModelID: String
-    get() =
-        if (id.startsWith(LORA_ARTIFACT_MODEL_ID_PREFIX)) {
-            id
-        } else {
-            "$LORA_ARTIFACT_MODEL_ID_PREFIX$id"
-        }
-
-/**
- * Convert a generated LoRA catalog entry into generated model-registry
- * metadata used by the generic generated download path. Catalog filtering and
- * completion state remain owned by the generated LoRA catalog ABI.
- */
-fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
-    timestampUnixMs: Long = getCurrentTimeMillis(),
-): RAModelInfo {
-    val artifactFilename = filename.ifBlank { url.substringAfterLast('/').substringBefore('?') }
-    val descriptor =
-        ModelFileDescriptor(
-            url = url,
-            filename = artifactFilename,
-            is_required = true,
-            size_bytes = size_bytes.takeIf { it > 0 },
-            role = ModelFileRole.MODEL_FILE_ROLE_COMPANION,
-            checksum_sha256 = checksum_sha256,
-        )
-    val expectedFiles =
-        ExpectedModelFiles(
-            files = listOf(descriptor),
-            required_patterns = listOf(artifactFilename),
-            description = "LoRA adapter artifact",
-        )
-    val metadataTags =
-        buildList {
-            add(LORA_ARTIFACT_TAG)
-            compatible_models.forEach { add("base-model:$it") }
-            addAll(tags)
-        }.distinct()
-
-    return RAModelInfo(
-        id = loraArtifactModelID,
-        name = name,
-        category = ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
-        format = ModelFormat.MODEL_FORMAT_GGUF,
-        framework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-        download_url = url,
-        download_size_bytes = size_bytes,
-        supports_lora = false,
-        source = ModelSource.MODEL_SOURCE_REMOTE,
-        created_at_unix_ms = timestampUnixMs,
-        updated_at_unix_ms = timestampUnixMs,
-        checksum_sha256 = checksum_sha256,
-        metadata =
-            ModelInfoMetadata(
-                description = description,
-                author = author.orEmpty(),
-                license = license.orEmpty(),
-                tags = metadataTags,
-            ),
-        single_file =
-            SingleFileArtifact(
-                required_patterns = listOf(artifactFilename),
-                expected_files = expectedFiles,
-            ),
-        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
-        expected_files = expectedFiles,
-        is_available = true,
-    )
-}
-
-/**
  * JVM/Android backing object for [LoRA]. Stateless; all calls
  * delegate to [CppBridgeLoraRegistry] on `Dispatchers.IO`.
  */
 internal object AndroidLoRA : LoRA {
-    override suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult {
+    override suspend fun apply(request: RALoRAApplyRequest): LoraApplyResult {
         ensureLoraReady()
         return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.apply(request)
@@ -365,24 +279,34 @@ internal object AndroidLoRA : LoRA {
         }
     }
 
-    override suspend fun registerArtifact(entry: LoraAdapterCatalogEntry): RAModelInfo {
-        val registeredEntry = register(entry)
-        val artifact = registeredEntry.toLoraArtifactModelInfo()
-        registerModelInternal(artifact)
-        return artifact
+    override suspend fun registerArtifact(
+        entry: LoraAdapterCatalogEntry,
+        artifact: RAModelInfo,
+    ): RAModelInfo {
+        register(entry)
+        val tagged =
+            artifact.copy(
+                metadata =
+                    (artifact.metadata ?: ModelInfoMetadata()).copy(
+                        tags = (artifact.metadata?.tags.orEmpty() + LORA_ARTIFACT_TAG).distinct(),
+                    ),
+            )
+        registerModelInternal(tagged)
+        return tagged
     }
 
     override suspend fun download(
         entry: LoraAdapterCatalogEntry,
+        artifact: RAModelInfo,
         onProgress: (suspend (DownloadProgress) -> Unit)?,
     ): String {
         ensureLoraReady()
-        val artifact = registerArtifact(entry)
-        val finalProgress = RunAnywhere.downloadModel(artifact, onProgress = onProgress)
+        val registered = registerArtifact(entry, artifact)
+        val finalProgress = RunAnywhere.downloadModel(registered, onProgress = onProgress)
 
         var localPath = finalProgress.local_path
         if (localPath.isBlank()) {
-            val lookup = RunAnywhere.getModel(ModelGetRequest(model_id = artifact.id))
+            val lookup = RunAnywhere.getModel(ai.runanywhere.proto.v1.ModelGetRequest(model_id = registered.id))
             if (lookup.found) {
                 localPath = lookup.model?.local_path.orEmpty()
             }
@@ -392,13 +316,6 @@ internal object AndroidLoRA : LoRA {
                 "LoRA adapter '${entry.id}' downloaded but no local path was recorded",
             )
         }
-
-        markDownloadCompleted(
-            LoraAdapterDownloadCompletedRequest(
-                adapter_id = entry.id,
-                local_path = localPath,
-            ),
-        )
         return localPath
     }
 
@@ -427,20 +344,20 @@ internal object AndroidLoRA : LoRA {
         }
     }
 
-    override suspend fun markDownloadCompleted(
-        request: LoraAdapterDownloadCompletedRequest,
-    ): LoraAdapterDownloadCompletedResult {
+    override suspend fun importAdapter(sourcePath: String): ModelImportResult {
         ensureLoraReady()
-        return withContext(Dispatchers.IO) {
-            CppBridgeLoraRegistry.markDownloadCompleted(request)
-        }
-    }
-
-    override suspend fun importAdapter(sourcePath: String): LoraAdapterImportResult {
-        ensureLoraReady()
-        return withContext(Dispatchers.IO) {
-            CppBridgeLoraRegistry.importAdapter(LoraAdapterImportRequest(source_path = sourcePath))
-        }
+        val model =
+            RAModelInfo(
+                metadata = ModelInfoMetadata(tags = listOf(LORA_ARTIFACT_TAG)),
+            )
+        return RunAnywhere.importModel(
+            ModelImportRequest(
+                model = model,
+                source_path = sourcePath,
+                copy_into_managed_storage = true,
+                validate_before_register = true,
+            ),
+        )
     }
 }
 

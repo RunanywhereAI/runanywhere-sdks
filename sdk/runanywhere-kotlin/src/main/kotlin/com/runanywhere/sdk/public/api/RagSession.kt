@@ -8,6 +8,7 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.RAGDocument
+import ai.runanywhere.proto.v1.RAGRetrievalOptions
 import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGStreamEventKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRAG
@@ -88,8 +89,8 @@ public class RagSession internal constructor(
         val request =
             CppBridgeRAG.prepareSearch(
                 RAGSearchRequest(
-                    question = query,
-                    retrieval_top_k = topK ?: config.topK,
+                    query = query,
+                    retrieval = RAGRetrievalOptions(top_k = topK ?: config.topK),
                 ),
             )
         val response =
@@ -111,7 +112,7 @@ public class RagSession internal constructor(
         val live = requireHandle()
         requireGenerationModel()
         val request =
-            CppBridgeRAG.prepareQuery(ragQueryProto(question, config, options, stream = false))
+            CppBridgeRAG.prepareQuery(ragQueryProto(question, config, options))
         val result =
             runCancellableNativeUnaryRequest(
                 coordinator = requests,
@@ -132,8 +133,7 @@ public class RagSession internal constructor(
             val live = requireHandle()
             requireGenerationModel()
             val request =
-                CppBridgeRAG.prepareQuery(ragQueryProto(question, config, options, stream = true))
-            val retrieved = mutableListOf<Match>()
+                CppBridgeRAG.prepareQuery(ragQueryProto(question, config, options))
             val worker =
                 launch {
                     try {
@@ -141,7 +141,7 @@ public class RagSession internal constructor(
                             coordinator = requests,
                             request = { requestId ->
                                 CppBridgeRAG.queryStreamOn(live, requestId, request) { event ->
-                                    dispatchRagEvent(event, retrieved) { trySend(it).isSuccess }
+                                    dispatchRagEvent(event) { trySend(it).isSuccess }
                                 }
                             },
                             cancel = { requestId -> CppBridgeRAG.cancelRequestOn(live, requestId) },
@@ -193,23 +193,33 @@ public class RagSession internal constructor(
         }
     }
 
+    /**
+     * `RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED`/`_CONTEXT_READY` are deleted
+     * outright (idl/rag.proto): the enum collapsed to
+     * TOKEN/COMPLETED/ERROR, and `RAGStreamEvent.chunk` is gone --
+     * retrieved chunks now only arrive attached to the COMPLETED event's
+     * `result.retrieved_chunks`, matching commons' just-in-time in-memory
+     * retrieval (no earlier separate signal is emitted by
+     * rac_rag_proto_abi.cpp). There is no longer a way to surface grounding
+     * chunks before the answer starts streaming, so [RagEvent.Retrieved] is
+     * synthesized from the completed result's sources immediately before
+     * [RagEvent.Completed] rather than dropped -- callers that only cared
+     * about "the chunks that grounded the answer" still get them, just no
+     * longer ahead of the first token.
+     */
     private fun dispatchRagEvent(
         event: ai.runanywhere.proto.v1.RAGStreamEvent,
-        retrieved: MutableList<Match>,
         emit: (RagEvent) -> Boolean,
     ): Boolean =
         when (event.kind) {
-            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED -> {
-                event.chunk?.let { retrieved += it.toMatch() }
-                true
-            }
-            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY ->
-                emit(RagEvent.Retrieved(retrieved.toList()))
             RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN ->
                 if (event.token.isEmpty()) true else emit(RagEvent.TextDelta(event.token, TokenKind.TEXT))
             RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED -> {
                 val result = event.result
-                if (result != null) emit(RagEvent.Completed(result.toRagResult(llmModelId.orEmpty())))
+                if (result != null) {
+                    val ragResult = result.toRagResult(llmModelId.orEmpty())
+                    emit(RagEvent.Retrieved(ragResult.sources)) && emit(RagEvent.Completed(ragResult))
+                }
                 false
             }
             RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR -> {
