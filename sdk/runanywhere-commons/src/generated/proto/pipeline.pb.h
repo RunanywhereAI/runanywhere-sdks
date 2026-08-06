@@ -124,7 +124,7 @@ enum DeviceAffinity : int {
   DEVICE_AFFINITY_ANY = 1,
   DEVICE_AFFINITY_CPU = 2,
   DEVICE_AFFINITY_GPU = 3,
-  DEVICE_AFFINITY_ANE = 4,
+  DEVICE_AFFINITY_NPU = 4,
   DeviceAffinity_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   DeviceAffinity_INT_MAX_SENTINEL_DO_NOT_USE_ =

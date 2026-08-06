@@ -244,35 +244,33 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     $core.String? sttModelId,
     $core.String? ttsModelId,
     $core.String? vadModelId,
+    $core.String? ttsVoiceId,
     $core.int? sampleRateHz,
     $core.int? chunkMs,
     AudioSource? audioSource,
+    $core.String? audioFilePath,
     $core.bool? enableBargeIn,
     $core.int? bargeInThresholdMs,
+    $0.LLMGenerationOptions? generation,
     $core.int? maxContextTokens,
     $core.bool? emitPartials,
-    $core.String? audioFilePath,
-    SolutionType? typeKind,
-    $core.String? ttsVoiceId,
-    $0.LLMGenerationOptions? generation,
   }) {
     final result = create();
     if (llmModelId != null) result.llmModelId = llmModelId;
     if (sttModelId != null) result.sttModelId = sttModelId;
     if (ttsModelId != null) result.ttsModelId = ttsModelId;
     if (vadModelId != null) result.vadModelId = vadModelId;
+    if (ttsVoiceId != null) result.ttsVoiceId = ttsVoiceId;
     if (sampleRateHz != null) result.sampleRateHz = sampleRateHz;
     if (chunkMs != null) result.chunkMs = chunkMs;
     if (audioSource != null) result.audioSource = audioSource;
+    if (audioFilePath != null) result.audioFilePath = audioFilePath;
     if (enableBargeIn != null) result.enableBargeIn = enableBargeIn;
     if (bargeInThresholdMs != null)
       result.bargeInThresholdMs = bargeInThresholdMs;
+    if (generation != null) result.generation = generation;
     if (maxContextTokens != null) result.maxContextTokens = maxContextTokens;
     if (emitPartials != null) result.emitPartials = emitPartials;
-    if (audioFilePath != null) result.audioFilePath = audioFilePath;
-    if (typeKind != null) result.typeKind = typeKind;
-    if (ttsVoiceId != null) result.ttsVoiceId = ttsVoiceId;
-    if (generation != null) result.generation = generation;
     return result;
   }
 
@@ -293,20 +291,18 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'sttModelId')
     ..aOS(3, _omitFieldNames ? '' : 'ttsModelId')
     ..aOS(4, _omitFieldNames ? '' : 'vadModelId')
-    ..aI(5, _omitFieldNames ? '' : 'sampleRateHz')
-    ..aI(6, _omitFieldNames ? '' : 'chunkMs')
-    ..aE<AudioSource>(7, _omitFieldNames ? '' : 'audioSource',
+    ..aOS(5, _omitFieldNames ? '' : 'ttsVoiceId')
+    ..aI(6, _omitFieldNames ? '' : 'sampleRateHz')
+    ..aI(7, _omitFieldNames ? '' : 'chunkMs')
+    ..aE<AudioSource>(8, _omitFieldNames ? '' : 'audioSource',
         enumValues: AudioSource.values)
-    ..aOB(8, _omitFieldNames ? '' : 'enableBargeIn')
-    ..aI(9, _omitFieldNames ? '' : 'bargeInThresholdMs')
-    ..aI(11, _omitFieldNames ? '' : 'maxContextTokens')
-    ..aOB(13, _omitFieldNames ? '' : 'emitPartials')
-    ..aOS(15, _omitFieldNames ? '' : 'audioFilePath')
-    ..aE<SolutionType>(16, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
-    ..aOS(17, _omitFieldNames ? '' : 'ttsVoiceId')
-    ..aOM<$0.LLMGenerationOptions>(18, _omitFieldNames ? '' : 'generation',
+    ..aOS(9, _omitFieldNames ? '' : 'audioFilePath')
+    ..aOB(10, _omitFieldNames ? '' : 'enableBargeIn')
+    ..aI(11, _omitFieldNames ? '' : 'bargeInThresholdMs')
+    ..aOM<$0.LLMGenerationOptions>(12, _omitFieldNames ? '' : 'generation',
         subBuilder: $0.LLMGenerationOptions.create)
+    ..aI(13, _omitFieldNames ? '' : 'maxContextTokens')
+    ..aOB(14, _omitFieldNames ? '' : 'emitPartials')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -365,108 +361,99 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   void clearVadModelId() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get sampleRateHz => $_getIZ(4);
+  $core.String get ttsVoiceId => $_getSZ(4);
   @$pb.TagNumber(5)
-  set sampleRateHz($core.int value) => $_setSignedInt32(4, value);
+  set ttsVoiceId($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasSampleRateHz() => $_has(4);
+  $core.bool hasTtsVoiceId() => $_has(4);
   @$pb.TagNumber(5)
-  void clearSampleRateHz() => $_clearField(5);
+  void clearTtsVoiceId() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get chunkMs => $_getIZ(5);
+  $core.int get sampleRateHz => $_getIZ(5);
   @$pb.TagNumber(6)
-  set chunkMs($core.int value) => $_setSignedInt32(5, value);
+  set sampleRateHz($core.int value) => $_setSignedInt32(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasChunkMs() => $_has(5);
+  $core.bool hasSampleRateHz() => $_has(5);
   @$pb.TagNumber(6)
-  void clearChunkMs() => $_clearField(6);
+  void clearSampleRateHz() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get chunkMs => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set chunkMs($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasChunkMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearChunkMs() => $_clearField(7);
 
   /// audio_file_path applies when audio_source is FILE.
-  @$pb.TagNumber(7)
-  AudioSource get audioSource => $_getN(6);
-  @$pb.TagNumber(7)
-  set audioSource(AudioSource value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasAudioSource() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearAudioSource() => $_clearField(7);
+  @$pb.TagNumber(8)
+  AudioSource get audioSource => $_getN(7);
+  @$pb.TagNumber(8)
+  set audioSource(AudioSource value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasAudioSource() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearAudioSource() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get audioFilePath => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set audioFilePath($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasAudioFilePath() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearAudioFilePath() => $_clearField(9);
 
   /// Unset means enabled.
-  @$pb.TagNumber(8)
-  $core.bool get enableBargeIn => $_getBF(7);
-  @$pb.TagNumber(8)
-  set enableBargeIn($core.bool value) => $_setBool(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasEnableBargeIn() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearEnableBargeIn() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get bargeInThresholdMs => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set bargeInThresholdMs($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasBargeInThresholdMs() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearBargeInThresholdMs() => $_clearField(9);
+  @$pb.TagNumber(10)
+  $core.bool get enableBargeIn => $_getBF(9);
+  @$pb.TagNumber(10)
+  set enableBargeIn($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasEnableBargeIn() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearEnableBargeIn() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.int get maxContextTokens => $_getIZ(9);
+  $core.int get bargeInThresholdMs => $_getIZ(10);
   @$pb.TagNumber(11)
-  set maxContextTokens($core.int value) => $_setSignedInt32(9, value);
+  set bargeInThresholdMs($core.int value) => $_setSignedInt32(10, value);
   @$pb.TagNumber(11)
-  $core.bool hasMaxContextTokens() => $_has(9);
+  $core.bool hasBargeInThresholdMs() => $_has(10);
   @$pb.TagNumber(11)
-  void clearMaxContextTokens() => $_clearField(11);
+  void clearBargeInThresholdMs() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $0.LLMGenerationOptions get generation => $_getN(11);
+  @$pb.TagNumber(12)
+  set generation($0.LLMGenerationOptions value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasGeneration() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearGeneration() => $_clearField(12);
+  @$pb.TagNumber(12)
+  $0.LLMGenerationOptions ensureGeneration() => $_ensure(11);
+
+  @$pb.TagNumber(13)
+  $core.int get maxContextTokens => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set maxContextTokens($core.int value) => $_setSignedInt32(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasMaxContextTokens() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearMaxContextTokens() => $_clearField(13);
 
   /// Emit partial transcripts as non-final user-said events.
-  @$pb.TagNumber(13)
-  $core.bool get emitPartials => $_getBF(10);
-  @$pb.TagNumber(13)
-  set emitPartials($core.bool value) => $_setBool(10, value);
-  @$pb.TagNumber(13)
-  $core.bool hasEmitPartials() => $_has(10);
-  @$pb.TagNumber(13)
-  void clearEmitPartials() => $_clearField(13);
-
-  @$pb.TagNumber(15)
-  $core.String get audioFilePath => $_getSZ(11);
-  @$pb.TagNumber(15)
-  set audioFilePath($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(15)
-  $core.bool hasAudioFilePath() => $_has(11);
-  @$pb.TagNumber(15)
-  void clearAudioFilePath() => $_clearField(15);
-
-  @$pb.TagNumber(16)
-  SolutionType get typeKind => $_getN(12);
-  @$pb.TagNumber(16)
-  set typeKind(SolutionType value) => $_setField(16, value);
-  @$pb.TagNumber(16)
-  $core.bool hasTypeKind() => $_has(12);
-  @$pb.TagNumber(16)
-  void clearTypeKind() => $_clearField(16);
-
-  @$pb.TagNumber(17)
-  $core.String get ttsVoiceId => $_getSZ(13);
-  @$pb.TagNumber(17)
-  set ttsVoiceId($core.String value) => $_setString(13, value);
-  @$pb.TagNumber(17)
-  $core.bool hasTtsVoiceId() => $_has(13);
-  @$pb.TagNumber(17)
-  void clearTtsVoiceId() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  $0.LLMGenerationOptions get generation => $_getN(14);
-  @$pb.TagNumber(18)
-  set generation($0.LLMGenerationOptions value) => $_setField(18, value);
-  @$pb.TagNumber(18)
-  $core.bool hasGeneration() => $_has(14);
-  @$pb.TagNumber(18)
-  void clearGeneration() => $_clearField(18);
-  @$pb.TagNumber(18)
-  $0.LLMGenerationOptions ensureGeneration() => $_ensure(14);
+  @$pb.TagNumber(14)
+  $core.bool get emitPartials => $_getBF(13);
+  @$pb.TagNumber(14)
+  set emitPartials($core.bool value) => $_setBool(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasEmitPartials() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearEmitPartials() => $_clearField(14);
 }
 
 class RAGConfig extends $pb.GeneratedMessage {
@@ -482,7 +469,6 @@ class RAGConfig extends $pb.GeneratedMessage {
     $core.double? bm25B,
     $core.int? rrfK,
     $core.String? promptTemplate,
-    SolutionType? typeKind,
   }) {
     final result = create();
     if (embedModelId != null) result.embedModelId = embedModelId;
@@ -496,7 +482,6 @@ class RAGConfig extends $pb.GeneratedMessage {
     if (bm25B != null) result.bm25B = bm25B;
     if (rrfK != null) result.rrfK = rrfK;
     if (promptTemplate != null) result.promptTemplate = promptTemplate;
-    if (typeKind != null) result.typeKind = typeKind;
     return result;
   }
 
@@ -525,8 +510,6 @@ class RAGConfig extends $pb.GeneratedMessage {
     ..aD(9, _omitFieldNames ? '' : 'bm25B', fieldType: $pb.PbFieldType.OF)
     ..aI(10, _omitFieldNames ? '' : 'rrfK')
     ..aOS(11, _omitFieldNames ? '' : 'promptTemplate')
-    ..aE<SolutionType>(12, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -648,15 +631,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   $core.bool hasPromptTemplate() => $_has(10);
   @$pb.TagNumber(11)
   void clearPromptTemplate() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  SolutionType get typeKind => $_getN(11);
-  @$pb.TagNumber(12)
-  set typeKind(SolutionType value) => $_setField(12, value);
-  @$pb.TagNumber(12)
-  $core.bool hasTypeKind() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearTypeKind() => $_clearField(12);
 }
 
 class AgentLoopConfig extends $pb.GeneratedMessage {
@@ -666,7 +640,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
     $core.Iterable<ToolSpec>? tools,
     $core.int? maxIterations,
     $core.int? maxContextTokens,
-    SolutionType? typeKind,
   }) {
     final result = create();
     if (llmModelId != null) result.llmModelId = llmModelId;
@@ -674,7 +647,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
     if (tools != null) result.tools.addAll(tools);
     if (maxIterations != null) result.maxIterations = maxIterations;
     if (maxContextTokens != null) result.maxContextTokens = maxContextTokens;
-    if (typeKind != null) result.typeKind = typeKind;
     return result;
   }
 
@@ -697,8 +669,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
         subBuilder: ToolSpec.create)
     ..aI(4, _omitFieldNames ? '' : 'maxIterations')
     ..aI(5, _omitFieldNames ? '' : 'maxContextTokens')
-    ..aE<SolutionType>(6, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -758,15 +728,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
   $core.bool hasMaxContextTokens() => $_has(4);
   @$pb.TagNumber(5)
   void clearMaxContextTokens() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  SolutionType get typeKind => $_getN(5);
-  @$pb.TagNumber(6)
-  set typeKind(SolutionType value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTypeKind() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTypeKind() => $_clearField(6);
 }
 
 class ToolSpec extends $pb.GeneratedMessage {
@@ -854,7 +815,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
     $core.int? windowSize,
     $core.int? stride,
     $core.double? anomalyThreshold,
-    SolutionType? typeKind,
   }) {
     final result = create();
     if (anomalyModelId != null) result.anomalyModelId = anomalyModelId;
@@ -862,7 +822,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
     if (windowSize != null) result.windowSize = windowSize;
     if (stride != null) result.stride = stride;
     if (anomalyThreshold != null) result.anomalyThreshold = anomalyThreshold;
-    if (typeKind != null) result.typeKind = typeKind;
     return result;
   }
 
@@ -885,8 +844,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
     ..aI(4, _omitFieldNames ? '' : 'stride')
     ..aD(5, _omitFieldNames ? '' : 'anomalyThreshold',
         fieldType: $pb.PbFieldType.OF)
-    ..aE<SolutionType>(6, _omitFieldNames ? '' : 'typeKind',
-        enumValues: SolutionType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -953,15 +910,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   $core.bool hasAnomalyThreshold() => $_has(4);
   @$pb.TagNumber(5)
   void clearAnomalyThreshold() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  SolutionType get typeKind => $_getN(5);
-  @$pb.TagNumber(6)
-  set typeKind(SolutionType value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTypeKind() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTypeKind() => $_clearField(6);
 }
 
 const $core.bool _omitFieldNames =

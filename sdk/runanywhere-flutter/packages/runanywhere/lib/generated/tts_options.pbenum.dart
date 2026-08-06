@@ -14,31 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class TTSVoiceGender extends $pb.ProtobufEnum {
-  static const TTSVoiceGender TTS_VOICE_GENDER_UNSPECIFIED =
-      TTSVoiceGender._(0, _omitEnumNames ? '' : 'TTS_VOICE_GENDER_UNSPECIFIED');
-  static const TTSVoiceGender TTS_VOICE_GENDER_MALE =
-      TTSVoiceGender._(1, _omitEnumNames ? '' : 'TTS_VOICE_GENDER_MALE');
-  static const TTSVoiceGender TTS_VOICE_GENDER_FEMALE =
-      TTSVoiceGender._(2, _omitEnumNames ? '' : 'TTS_VOICE_GENDER_FEMALE');
-  static const TTSVoiceGender TTS_VOICE_GENDER_NEUTRAL =
-      TTSVoiceGender._(3, _omitEnumNames ? '' : 'TTS_VOICE_GENDER_NEUTRAL');
-
-  static const $core.List<TTSVoiceGender> values = <TTSVoiceGender>[
-    TTS_VOICE_GENDER_UNSPECIFIED,
-    TTS_VOICE_GENDER_MALE,
-    TTS_VOICE_GENDER_FEMALE,
-    TTS_VOICE_GENDER_NEUTRAL,
-  ];
-
-  static final $core.List<TTSVoiceGender?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static TTSVoiceGender? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const TTSVoiceGender._(super.value, super.name);
-}
-
 class TTSStreamEventKind extends $pb.ProtobufEnum {
   static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_UNSPECIFIED =
       TTSStreamEventKind._(
@@ -49,31 +24,23 @@ class TTSStreamEventKind extends $pb.ProtobufEnum {
   static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_AUDIO_CHUNK =
       TTSStreamEventKind._(
           2, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_AUDIO_CHUNK');
-  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_PHONEME =
-      TTSStreamEventKind._(
-          3, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_PHONEME');
   static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_COMPLETED =
       TTSStreamEventKind._(
           4, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_COMPLETED');
   static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_ERROR =
       TTSStreamEventKind._(
           5, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_ERROR');
-  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_PROGRESS =
-      TTSStreamEventKind._(
-          6, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_PROGRESS');
 
   static const $core.List<TTSStreamEventKind> values = <TTSStreamEventKind>[
     TTS_STREAM_EVENT_KIND_UNSPECIFIED,
     TTS_STREAM_EVENT_KIND_STARTED,
     TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
-    TTS_STREAM_EVENT_KIND_PHONEME,
     TTS_STREAM_EVENT_KIND_COMPLETED,
     TTS_STREAM_EVENT_KIND_ERROR,
-    TTS_STREAM_EVENT_KIND_PROGRESS,
   ];
 
   static final $core.List<TTSStreamEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static TTSStreamEventKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

@@ -187,11 +187,11 @@ constexpr DeviceInfo::ParseTableT_ DeviceInfo::InternalGenerateParseTable_(const
     {
       PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_._has_bits_),
       0, // no _extensions_
-      20, 248,  // max_field_number, fast_idx_mask
+      18, 248,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4293918720,  // skipmap
+      4294705152,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      20,  // num_field_entries
+      18,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -206,78 +206,72 @@ constexpr DeviceInfo::ParseTableT_ DeviceInfo::InternalGenerateParseTable_(const
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.device_model_)}},
-      // string device_name = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.device_name_)}},
-      // string platform = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 2, 0,
+      // .runanywhere.v1.Platform platform = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DeviceInfo, _impl_.platform_), 6>(),
+       {16, 6, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.platform_)}},
-      // string os_version = 4;
+      // string os_version = 3;
       {::_pbi::TcParser::FastUS1,
-       {34, 3, 0,
+       {26, 1, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.os_version_)}},
-      // string form_factor = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 4, 0,
+      // .runanywhere.v1.FormFactor form_factor = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DeviceInfo, _impl_.form_factor_), 7>(),
+       {32, 7, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.form_factor_)}},
-      // string architecture = 6;
+      // string architecture = 5;
       {::_pbi::TcParser::FastUS1,
-       {50, 5, 0,
+       {42, 2, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.architecture_)}},
-      // string chip_name = 7;
+      // string chip_name = 6;
       {::_pbi::TcParser::FastUS1,
-       {58, 6, 0,
+       {50, 3, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.chip_name_)}},
-      // int64 total_memory = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DeviceInfo, _impl_.total_memory_), 10>(),
-       {64, 10, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.total_memory_)}},
-      // int64 available_memory = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DeviceInfo, _impl_.available_memory_), 11>(),
+      // int64 total_memory_bytes = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DeviceInfo, _impl_.total_memory_bytes_), 8>(),
+       {56, 8, 0,
+        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.total_memory_bytes_)}},
+      // int64 available_memory_bytes = 8;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DeviceInfo, _impl_.available_memory_bytes_), 9>(),
+       {64, 9, 0,
+        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.available_memory_bytes_)}},
+      // bool has_npu = 9;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DeviceInfo, _impl_.has_npu_), 11>(),
        {72, 11, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.available_memory_)}},
-      // bool has_neural_engine = 10;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DeviceInfo, _impl_.has_neural_engine_), 13>(),
-       {80, 13, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.has_neural_engine_)}},
-      // int32 neural_engine_cores = 11;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DeviceInfo, _impl_.neural_engine_cores_), 12>(),
-       {88, 12, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.neural_engine_cores_)}},
-      // string gpu_family = 12;
+        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.has_npu_)}},
+      // int32 npu_cores = 10;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DeviceInfo, _impl_.npu_cores_), 10>(),
+       {80, 10, 0,
+        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.npu_cores_)}},
+      // string gpu_family = 11;
       {::_pbi::TcParser::FastUS1,
-       {98, 7, 0,
+       {90, 4, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.gpu_family_)}},
-      // optional float battery_level = 13;
+      // optional float battery_level = 12 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
-       {109, 15, 0,
+       {101, 13, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.battery_level_)}},
-      // optional string battery_state = 14;
-      {::_pbi::TcParser::FastUS1,
-       {114, 8, 0,
+      // optional .runanywhere.v1.BatteryState battery_state = 13;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DeviceInfo, _impl_.battery_state_), 14>(),
+       {104, 14, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.battery_state_)}},
-      // bool is_low_power_mode = 15;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DeviceInfo, _impl_.is_low_power_mode_), 14>(),
-       {120, 14, 0,
+      // bool is_low_power_mode = 14;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DeviceInfo, _impl_.is_low_power_mode_), 12>(),
+       {112, 12, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.is_low_power_mode_)}},
-      // int32 core_count = 16;
+      // int32 core_count = 15;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DeviceInfo, _impl_.core_count_), 15>(),
+       {120, 15, 0,
+        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.core_count_)}},
+      // int32 performance_cores = 16;
       {::_pbi::TcParser::FastV32S2,
        {384, 16, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.core_count_)}},
-      // int32 performance_cores = 17;
-      {::_pbi::TcParser::FastV32S2,
-       {392, 17, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.performance_cores_)}},
-      // int32 efficiency_cores = 18;
-      {::_pbi::TcParser::FastV32S2,
-       {400, 18, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.efficiency_cores_)}},
-      // optional string device_fingerprint = 19;
+      // optional string device_fingerprint = 17;
       {::_pbi::TcParser::FastUS2,
-       {410, 9, 0,
+       {394, 5, 0,
         PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.device_fingerprint_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -295,61 +289,53 @@ constexpr DeviceInfo::ParseTableT_ DeviceInfo::InternalGenerateParseTable_(const
     }}, {{
       // string device_model = 1;
       {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.device_model_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string device_name = 2;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.device_name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string platform = 3;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.platform_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string os_version = 4;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.os_version_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string form_factor = 5;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.form_factor_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string architecture = 6;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.architecture_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string chip_name = 7;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.chip_name_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 total_memory = 8;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.total_memory_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 available_memory = 9;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.available_memory_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // bool has_neural_engine = 10;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.has_neural_engine_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int32 neural_engine_cores = 11;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.neural_engine_cores_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // string gpu_family = 12;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.gpu_family_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional float battery_level = 13;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.battery_level_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // optional string battery_state = 14;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.battery_state_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool is_low_power_mode = 15;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.is_low_power_mode_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int32 core_count = 16;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.core_count_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 performance_cores = 17;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.performance_cores_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 efficiency_cores = 18;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.efficiency_cores_), _Internal::kHasBitsOffset + 18, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional string device_fingerprint = 19;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.device_fingerprint_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // map<string, string> platform_extras = 20;
-      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.platform_extras_), _Internal::kHasBitsOffset + 19, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
+      // .runanywhere.v1.Platform platform = 2;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.platform_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string os_version = 3;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.os_version_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.FormFactor form_factor = 4;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.form_factor_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string architecture = 5;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.architecture_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string chip_name = 6;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.chip_name_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 total_memory_bytes = 7;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.total_memory_bytes_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 available_memory_bytes = 8;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.available_memory_bytes_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // bool has_npu = 9;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.has_npu_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // int32 npu_cores = 10;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.npu_cores_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // string gpu_family = 11;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.gpu_family_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional float battery_level = 12 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.battery_level_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // optional .runanywhere.v1.BatteryState battery_state = 13;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.battery_state_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // bool is_low_power_mode = 14;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.is_low_power_mode_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // int32 core_count = 15;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.core_count_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 performance_cores = 16;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.performance_cores_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // optional string device_fingerprint = 17;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.device_fingerprint_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // map<string, string> platform_extras = 18;
+      {PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.platform_extras_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
     }},
     {{
         {::_pbi::TcParser::GetMapAuxInfo(
             1, 0, 9, 9, 0)},
     }},
     {{
-      "\31\14\13\10\12\13\14\11\0\0\0\0\12\0\15\0\0\0\0\22\17\0\0\0"
+      "\31\14\0\12\0\14\11\0\0\0\0\12\0\0\0\0\0\22\17\0\0\0\0\0"
       "runanywhere.v1.DeviceInfo"
       "device_model"
-      "device_name"
-      "platform"
       "os_version"
-      "form_factor"
       "architecture"
       "chip_name"
       "gpu_family"
-      "battery_state"
       "device_fingerprint"
       "platform_extras"
     }},
@@ -364,16 +350,7 @@ inline constexpr DeviceInfo::Impl_::Impl_(
         device_model_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        device_name_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        platform_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         os_version_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        form_factor_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         architecture_(
@@ -385,21 +362,20 @@ inline constexpr DeviceInfo::Impl_::Impl_(
         gpu_family_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        battery_state_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         device_fingerprint_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        total_memory_{::int64_t{0}},
-        available_memory_{::int64_t{0}},
-        neural_engine_cores_{0},
-        has_neural_engine_{false},
+        platform_{static_cast< ::runanywhere::v1::Platform >(0)},
+        form_factor_{static_cast< ::runanywhere::v1::FormFactor >(0)},
+        total_memory_bytes_{::int64_t{0}},
+        available_memory_bytes_{::int64_t{0}},
+        npu_cores_{0},
+        has_npu_{false},
         is_low_power_mode_{false},
         battery_level_{0},
+        battery_state_{static_cast< ::runanywhere::v1::BatteryState >(0)},
         core_count_{0},
         performance_cores_{0},
-        efficiency_cores_{0},
         platform_extras_ { visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::DeviceInfo,
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.platform_extras_)>()
@@ -500,8 +476,8 @@ const ::_pbi::ClassData* DeviceInfo_get_class_data() {
 #endif  // PROTOBUF_CUSTOM_VTABLE
 }  // namespace v1
 }  // namespace runanywhere
-static constexpr const ::_pb::EnumDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
-    file_level_enum_descriptors_device_5finfo_2eproto = nullptr;
+static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
+    file_level_enum_descriptors_device_5finfo_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_device_5finfo_2eproto = nullptr;
 const ::uint32_t
@@ -516,47 +492,43 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_._has_bits_),
-        23, // hasbit index offset
+        21, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.device_model_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.device_name_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.platform_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.os_version_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.form_factor_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.architecture_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.chip_name_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.total_memory_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.available_memory_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.has_neural_engine_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.neural_engine_cores_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.total_memory_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.available_memory_bytes_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.has_npu_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.npu_cores_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.gpu_family_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.battery_level_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.battery_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.is_low_power_mode_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.core_count_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.performance_cores_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.efficiency_cores_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.device_fingerprint_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceInfo, _impl_.platform_extras_),
         0,
+        6,
         1,
+        7,
         2,
         3,
-        4,
-        5,
-        6,
-        10,
-        11,
-        13,
-        12,
-        7,
-        15,
         8,
-        14,
-        16,
-        17,
-        18,
         9,
-        19,
+        11,
+        10,
+        4,
+        13,
+        14,
+        12,
+        15,
+        16,
+        5,
+        17,
 };
 
 static const ::_pbi::MigrationSchema
@@ -571,39 +543,58 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_device_5finfo_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\021device_info.proto\022\016runanywhere.v1\"\217\005\n\n"
-    "DeviceInfo\022\024\n\014device_model\030\001 \001(\t\022\023\n\013devi"
-    "ce_name\030\002 \001(\t\022\020\n\010platform\030\003 \001(\t\022\022\n\nos_ve"
-    "rsion\030\004 \001(\t\022\023\n\013form_factor\030\005 \001(\t\022\024\n\014arch"
-    "itecture\030\006 \001(\t\022\021\n\tchip_name\030\007 \001(\t\022\024\n\014tot"
-    "al_memory\030\010 \001(\003\022\030\n\020available_memory\030\t \001("
-    "\003\022\031\n\021has_neural_engine\030\n \001(\010\022\033\n\023neural_e"
-    "ngine_cores\030\013 \001(\005\022\022\n\ngpu_family\030\014 \001(\t\022\032\n"
-    "\rbattery_level\030\r \001(\002H\000\210\001\001\022\032\n\rbattery_sta"
-    "te\030\016 \001(\tH\001\210\001\001\022\031\n\021is_low_power_mode\030\017 \001(\010"
-    "\022\022\n\ncore_count\030\020 \001(\005\022\031\n\021performance_core"
-    "s\030\021 \001(\005\022\030\n\020efficiency_cores\030\022 \001(\005\022\037\n\022dev"
-    "ice_fingerprint\030\023 \001(\tH\002\210\001\001\022G\n\017platform_e"
-    "xtras\030\024 \003(\0132..runanywhere.v1.DeviceInfo."
-    "PlatformExtrasEntry\0325\n\023PlatformExtrasEnt"
-    "ry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\020\n\016_b"
-    "attery_levelB\020\n\016_battery_stateB\025\n\023_devic"
-    "e_fingerprintB\212\001\n\027ai.runanywhere.proto.v"
-    "1B\017DeviceInfoProtoP\001Z<github.com/runanyw"
-    "here/runanywhere-sdks/idl/v1;runanywhere"
-    "v1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006prot"
-    "o3"
+    "\n\021device_info.proto\022\016runanywhere.v1\032\021rac"
+    "_options.proto\"\304\005\n\nDeviceInfo\022\024\n\014device_"
+    "model\030\001 \001(\t\022*\n\010platform\030\002 \001(\0162\030.runanywh"
+    "ere.v1.Platform\022\022\n\nos_version\030\003 \001(\t\022/\n\013f"
+    "orm_factor\030\004 \001(\0162\032.runanywhere.v1.FormFa"
+    "ctor\022\024\n\014architecture\030\005 \001(\t\022\021\n\tchip_name\030"
+    "\006 \001(\t\022\032\n\022total_memory_bytes\030\007 \001(\003\022\036\n\026ava"
+    "ilable_memory_bytes\030\010 \001(\003\022\017\n\007has_npu\030\t \001"
+    "(\010\022\021\n\tnpu_cores\030\n \001(\005\022\022\n\ngpu_family\030\013 \001("
+    "\t\0222\n\rbattery_level\030\014 \001(\002B\026\261\265\030\000\000\000\000\000\000\000\000\271\265\030"
+    "\000\000\000\000\000\000\360\?H\000\210\001\001\0228\n\rbattery_state\030\r \001(\0162\034.r"
+    "unanywhere.v1.BatteryStateH\001\210\001\001\022\031\n\021is_lo"
+    "w_power_mode\030\016 \001(\010\022\022\n\ncore_count\030\017 \001(\005\022\031"
+    "\n\021performance_cores\030\020 \001(\005\022\037\n\022device_fing"
+    "erprint\030\021 \001(\tH\002\210\001\001\022G\n\017platform_extras\030\022 "
+    "\003(\0132..runanywhere.v1.DeviceInfo.Platform"
+    "ExtrasEntry\0325\n\023PlatformExtrasEntry\022\013\n\003ke"
+    "y\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\020\n\016_battery_l"
+    "evelB\020\n\016_battery_stateB\025\n\023_device_finger"
+    "print*\334\001\n\010Platform\022\030\n\024PLATFORM_UNSPECIFI"
+    "ED\020\000\022\020\n\014PLATFORM_IOS\020\001\022\024\n\020PLATFORM_ANDRO"
+    "ID\020\002\022\022\n\016PLATFORM_MACOS\020\003\022\020\n\014PLATFORM_WEB"
+    "\020\004\022\022\n\016PLATFORM_LINUX\020\005\022\024\n\020PLATFORM_WINDO"
+    "WS\020\006\022\021\n\rPLATFORM_TVOS\020\007\022\024\n\020PLATFORM_WATC"
+    "HOS\020\010\022\025\n\021PLATFORM_VISIONOS\020\t*\315\001\n\nFormFac"
+    "tor\022\033\n\027FORM_FACTOR_UNSPECIFIED\020\000\022\025\n\021FORM"
+    "_FACTOR_PHONE\020\001\022\026\n\022FORM_FACTOR_TABLET\020\002\022"
+    "\027\n\023FORM_FACTOR_DESKTOP\020\003\022\026\n\022FORM_FACTOR_"
+    "LAPTOP\020\004\022\022\n\016FORM_FACTOR_TV\020\005\022\025\n\021FORM_FAC"
+    "TOR_WATCH\020\006\022\027\n\023FORM_FACTOR_HEADSET\020\007*~\n\014"
+    "BatteryState\022\035\n\031BATTERY_STATE_UNSPECIFIE"
+    "D\020\000\022\032\n\026BATTERY_STATE_CHARGING\020\001\022\033\n\027BATTE"
+    "RY_STATE_UNPLUGGED\020\002\022\026\n\022BATTERY_STATE_FU"
+    "LL\020\003B\212\001\n\027ai.runanywhere.proto.v1B\017Device"
+    "InfoProtoP\001Z<github.com/runanywhere/runa"
+    "nywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004R"
+    "AV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+};
+static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
+    descriptor_table_device_5finfo_2eproto_deps[1] = {
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_device_5finfo_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_device_5finfo_2eproto = {
     false,
     false,
-    842,
+    1473,
     descriptor_table_protodef_device_5finfo_2eproto,
     "device_info.proto",
     &descriptor_table_device_5finfo_2eproto_once,
-    nullptr,
-    0,
+    descriptor_table_device_5finfo_2eproto_deps,
+    1,
     2,
     schemas,
     file_message_globals,
@@ -613,6 +604,27 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_device_5finfo_
 };
 namespace runanywhere {
 namespace v1 {
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+Platform_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_device_5finfo_2eproto);
+  return file_level_enum_descriptors_device_5finfo_2eproto[0];
+}
+PROTOBUF_CONSTINIT const uint32_t Platform_internal_data_[] = {
+    655360u, 0u, };
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+FormFactor_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_device_5finfo_2eproto);
+  return file_level_enum_descriptors_device_5finfo_2eproto[1];
+}
+PROTOBUF_CONSTINIT const uint32_t FormFactor_internal_data_[] = {
+    524288u, 0u, };
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+BatteryState_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_device_5finfo_2eproto);
+  return file_level_enum_descriptors_device_5finfo_2eproto[2];
+}
+PROTOBUF_CONSTINIT const uint32_t BatteryState_internal_data_[] = {
+    262144u, 0u, };
 // ===================================================================
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -669,14 +681,10 @@ PROTOBUF_NDEBUG_INLINE DeviceInfo::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         device_model_(arena, from.device_model_),
-        device_name_(arena, from.device_name_),
-        platform_(arena, from.platform_),
         os_version_(arena, from.os_version_),
-        form_factor_(arena, from.form_factor_),
         architecture_(arena, from.architecture_),
         chip_name_(arena, from.chip_name_),
         gpu_family_(arena, from.gpu_family_),
-        battery_state_(arena, from.battery_state_),
         device_fingerprint_(arena, from.device_fingerprint_),
         platform_extras_ {
           visibility, ::_pbi::InternalMetadataOffset::Build<
@@ -701,12 +709,12 @@ DeviceInfo::DeviceInfo(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, total_memory_),
+               offsetof(Impl_, platform_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, total_memory_),
-           offsetof(Impl_, efficiency_cores_) -
-               offsetof(Impl_, total_memory_) +
-               sizeof(Impl_::efficiency_cores_));
+               offsetof(Impl_, platform_),
+           offsetof(Impl_, performance_cores_) -
+               offsetof(Impl_, platform_) +
+               sizeof(Impl_::performance_cores_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.DeviceInfo)
 }
@@ -715,14 +723,10 @@ PROTOBUF_NDEBUG_INLINE DeviceInfo::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         device_model_(arena),
-        device_name_(arena),
-        platform_(arena),
         os_version_(arena),
-        form_factor_(arena),
         architecture_(arena),
         chip_name_(arena),
         gpu_family_(arena),
-        battery_state_(arena),
         device_fingerprint_(arena),
         platform_extras_ { visibility, ::_pbi::InternalMetadataOffset::Build<
             ::runanywhere::v1::DeviceInfo,
@@ -733,11 +737,11 @@ PROTOBUF_NDEBUG_INLINE DeviceInfo::Impl_::Impl_(
 inline void DeviceInfo::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, total_memory_),
+               offsetof(Impl_, platform_),
            0,
-           offsetof(Impl_, efficiency_cores_) -
-               offsetof(Impl_, total_memory_) +
-               sizeof(Impl_::efficiency_cores_));
+           offsetof(Impl_, performance_cores_) -
+               offsetof(Impl_, platform_) +
+               sizeof(Impl_::performance_cores_));
 }
 DeviceInfo::~DeviceInfo() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DeviceInfo)
@@ -751,14 +755,10 @@ inline void DeviceInfo::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.device_model_.Destroy();
-  this_._impl_.device_name_.Destroy();
-  this_._impl_.platform_.Destroy();
   this_._impl_.os_version_.Destroy();
-  this_._impl_.form_factor_.Destroy();
   this_._impl_.architecture_.Destroy();
   this_._impl_.chip_name_.Destroy();
   this_._impl_.gpu_family_.Destroy();
-  this_._impl_.battery_state_.Destroy();
   this_._impl_.device_fingerprint_.Destroy();
   this_._impl_.~Impl_();
 }
@@ -797,50 +797,39 @@ PROTOBUF_NOINLINE void DeviceInfo::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.device_model_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.device_name_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.platform_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.os_version_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _impl_.form_factor_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       _impl_.architecture_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.chip_name_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       _impl_.gpu_family_.ClearNonDefaultToEmpty();
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      _impl_.battery_state_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.device_fingerprint_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000fc00U)) {
-    ::memset(&_impl_.total_memory_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.battery_level_) -
-        reinterpret_cast<char*>(&_impl_.total_memory_)) + sizeof(_impl_.battery_level_));
+  if (BatchCheckHasBit(cached_has_bits, 0x000000c0U)) {
+    ::memset(&_impl_.platform_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.form_factor_) -
+        reinterpret_cast<char*>(&_impl_.platform_)) + sizeof(_impl_.form_factor_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    ::memset(&_impl_.core_count_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.efficiency_cores_) -
-        reinterpret_cast<char*>(&_impl_.core_count_)) + sizeof(_impl_.efficiency_cores_));
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+    ::memset(&_impl_.total_memory_bytes_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.core_count_) -
+        reinterpret_cast<char*>(&_impl_.total_memory_bytes_)) + sizeof(_impl_.core_count_));
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
+    _impl_.performance_cores_ = 0;
+    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       _impl_.platform_extras_.Clear();
     }
   }
@@ -877,173 +866,151 @@ PROTOBUF_NOINLINE void DeviceInfo::Clear() {
     }
   }
 
-  // string device_name = 2;
+  // .runanywhere.v1.Platform platform = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (this_._internal_platform() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          2, this_._internal_platform(), target);
+    }
+  }
+
+  // string os_version = 3;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_device_name().empty()) {
-      const ::std::string& _s = this_._internal_device_name();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.device_name");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  // string platform = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_platform().empty()) {
-      const ::std::string& _s = this_._internal_platform();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.platform");
-      target = stream->WriteStringMaybeAliased(3, _s, target);
-    }
-  }
-
-  // string os_version = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (!this_._internal_os_version().empty()) {
       const ::std::string& _s = this_._internal_os_version();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.os_version");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
+      target = stream->WriteStringMaybeAliased(3, _s, target);
     }
   }
 
-  // string form_factor = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (!this_._internal_form_factor().empty()) {
-      const ::std::string& _s = this_._internal_form_factor();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.form_factor");
-      target = stream->WriteStringMaybeAliased(5, _s, target);
+  // .runanywhere.v1.FormFactor form_factor = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_form_factor() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          4, this_._internal_form_factor(), target);
     }
   }
 
-  // string architecture = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  // string architecture = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (!this_._internal_architecture().empty()) {
       const ::std::string& _s = this_._internal_architecture();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.architecture");
-      target = stream->WriteStringMaybeAliased(6, _s, target);
+      target = stream->WriteStringMaybeAliased(5, _s, target);
     }
   }
 
-  // string chip_name = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  // string chip_name = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (!this_._internal_chip_name().empty()) {
       const ::std::string& _s = this_._internal_chip_name();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.chip_name");
-      target = stream->WriteStringMaybeAliased(7, _s, target);
+      target = stream->WriteStringMaybeAliased(6, _s, target);
     }
   }
 
-  // int64 total_memory = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-    if (this_._internal_total_memory() != 0) {
+  // int64 total_memory_bytes = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (this_._internal_total_memory_bytes() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
+              stream, this_._internal_total_memory_bytes(), target);
+    }
+  }
+
+  // int64 available_memory_bytes = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (this_._internal_available_memory_bytes() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<8>(
-              stream, this_._internal_total_memory(), target);
+              stream, this_._internal_available_memory_bytes(), target);
     }
   }
 
-  // int64 available_memory = 9;
+  // bool has_npu = 9;
   if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-    if (this_._internal_available_memory() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<9>(
-              stream, this_._internal_available_memory(), target);
-    }
-  }
-
-  // bool has_neural_engine = 10;
-  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
-    if (this_._internal_has_neural_engine() != 0) {
+    if (this_._internal_has_npu() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          10, this_._internal_has_neural_engine(), target);
+          9, this_._internal_has_npu(), target);
     }
   }
 
-  // int32 neural_engine_cores = 11;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (this_._internal_neural_engine_cores() != 0) {
+  // int32 npu_cores = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (this_._internal_npu_cores() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<11>(
-              stream, this_._internal_neural_engine_cores(), target);
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<10>(
+              stream, this_._internal_npu_cores(), target);
     }
   }
 
-  // string gpu_family = 12;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  // string gpu_family = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (!this_._internal_gpu_family().empty()) {
       const ::std::string& _s = this_._internal_gpu_family();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.gpu_family");
-      target = stream->WriteStringMaybeAliased(12, _s, target);
+      target = stream->WriteStringMaybeAliased(11, _s, target);
     }
   }
 
-  // optional float battery_level = 13;
-  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+  // optional float battery_level = 12 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteFloatToArray(
-        13, this_._internal_battery_level(), target);
+        12, this_._internal_battery_level(), target);
   }
 
-  // optional string battery_state = 14;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    const ::std::string& _s = this_._internal_battery_state();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.battery_state");
-    target = stream->WriteStringMaybeAliased(14, _s, target);
-  }
-
-  // bool is_low_power_mode = 15;
+  // optional .runanywhere.v1.BatteryState battery_state = 13;
   if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        13, this_._internal_battery_state(), target);
+  }
+
+  // bool is_low_power_mode = 14;
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (this_._internal_is_low_power_mode() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          15, this_._internal_is_low_power_mode(), target);
+          14, this_._internal_is_low_power_mode(), target);
     }
   }
 
-  // int32 core_count = 16;
-  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+  // int32 core_count = 15;
+  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
     if (this_._internal_core_count() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteInt32ToArray(
-          16, this_._internal_core_count(), target);
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<15>(
+              stream, this_._internal_core_count(), target);
     }
   }
 
-  // int32 performance_cores = 17;
-  if (CheckHasBit(cached_has_bits, 0x00020000U)) {
+  // int32 performance_cores = 16;
+  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
     if (this_._internal_performance_cores() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
-          17, this_._internal_performance_cores(), target);
+          16, this_._internal_performance_cores(), target);
     }
   }
 
-  // int32 efficiency_cores = 18;
-  if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-    if (this_._internal_efficiency_cores() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteInt32ToArray(
-          18, this_._internal_efficiency_cores(), target);
-    }
-  }
-
-  // optional string device_fingerprint = 19;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  // optional string device_fingerprint = 17;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     const ::std::string& _s = this_._internal_device_fingerprint();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.device_fingerprint");
-    target = stream->WriteStringMaybeAliased(19, _s, target);
+    target = stream->WriteStringMaybeAliased(17, _s, target);
   }
 
-  // map<string, string> platform_extras = 20;
-  if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+  // map<string, string> platform_extras = 18;
+  if (CheckHasBit(cached_has_bits, 0x00020000U)) {
     if (!this_._internal_platform_extras().empty()) {
       using MapType = ::google::protobuf::Map<::std::string, ::std::string>;
       using WireHelper = _pbi::MapEntryFuncs<::std::string, ::std::string,
@@ -1054,7 +1021,7 @@ PROTOBUF_NOINLINE void DeviceInfo::Clear() {
       if (stream->IsSerializationDeterministic() && field.size() > 1) {
         for (const auto& entry : ::google::protobuf::internal::MapSorterPtr<MapType>(field)) {
           target = WireHelper::InternalSerialize(
-              20, entry.first, entry.second, target, stream);
+              18, entry.first, entry.second, target, stream);
           ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
               entry.first.data(), static_cast<int>(entry.first.length()),
  ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.platform_extras");
@@ -1065,7 +1032,7 @@ PROTOBUF_NOINLINE void DeviceInfo::Clear() {
       } else {
         for (const auto& entry : field) {
           target = WireHelper::InternalSerialize(
-              20, entry.first, entry.second, target, stream);
+              18, entry.first, entry.second, target, stream);
           ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
               entry.first.data(), static_cast<int>(entry.first.length()),
  ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.DeviceInfo.platform_extras");
@@ -1102,7 +1069,7 @@ PROTOBUF_NOINLINE void DeviceInfo::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  total_size += static_cast<bool>(0x00008000U & cached_has_bits) * 5;
+  total_size += static_cast<bool>(0x00002000U & cached_has_bits) * 5;
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string device_model = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
@@ -1111,125 +1078,111 @@ PROTOBUF_NOINLINE void DeviceInfo::Clear() {
                                         this_._internal_device_model());
       }
     }
-    // string device_name = 2;
+    // string os_version = 3;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_device_name().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_device_name());
-      }
-    }
-    // string platform = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_platform().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_platform());
-      }
-    }
-    // string os_version = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!this_._internal_os_version().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_os_version());
       }
     }
-    // string form_factor = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (!this_._internal_form_factor().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_form_factor());
-      }
-    }
-    // string architecture = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    // string architecture = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!this_._internal_architecture().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_architecture());
       }
     }
-    // string chip_name = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    // string chip_name = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!this_._internal_chip_name().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_chip_name());
       }
     }
-    // string gpu_family = 12;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    // string gpu_family = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (!this_._internal_gpu_family().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_gpu_family());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
-    // optional string battery_state = 14;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_battery_state());
-    }
-    // optional string device_fingerprint = 19;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    // optional string device_fingerprint = 17;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_device_fingerprint());
     }
-    // int64 total_memory = 8;
+    // .runanywhere.v1.Platform platform = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_platform() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_platform());
+      }
+    }
+    // .runanywhere.v1.FormFactor form_factor = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_form_factor() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_form_factor());
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000df00U)) {
+    // int64 total_memory_bytes = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (this_._internal_total_memory_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_total_memory_bytes());
+      }
+    }
+    // int64 available_memory_bytes = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (this_._internal_available_memory_bytes() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_available_memory_bytes());
+      }
+    }
+    // int32 npu_cores = 10;
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (this_._internal_total_memory() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_total_memory());
-      }
-    }
-    // int64 available_memory = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (this_._internal_available_memory() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_available_memory());
-      }
-    }
-    // int32 neural_engine_cores = 11;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (this_._internal_neural_engine_cores() != 0) {
+      if (this_._internal_npu_cores() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_neural_engine_cores());
+            this_._internal_npu_cores());
       }
     }
-    // bool has_neural_engine = 10;
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
-      if (this_._internal_has_neural_engine() != 0) {
+    // bool has_npu = 9;
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      if (this_._internal_has_npu() != 0) {
         total_size += 2;
       }
     }
-    // bool is_low_power_mode = 15;
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    // bool is_low_power_mode = 14;
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (this_._internal_is_low_power_mode() != 0) {
         total_size += 2;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    // int32 core_count = 16;
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+    // optional .runanywhere.v1.BatteryState battery_state = 13;
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_battery_state());
+    }
+    // int32 core_count = 15;
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
       if (this_._internal_core_count() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
-                                        this_._internal_core_count());
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_core_count());
       }
     }
-    // int32 performance_cores = 17;
-    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
+    // int32 performance_cores = 16;
+    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
       if (this_._internal_performance_cores() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_performance_cores());
       }
     }
-    // int32 efficiency_cores = 18;
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-      if (this_._internal_efficiency_cores() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
-                                        this_._internal_efficiency_cores());
-      }
-    }
-    // map<string, string> platform_extras = 20;
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+    // map<string, string> platform_extras = 18;
+    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       total_size +=
           2 * ::google::protobuf::internal::FromIntSize(this_._internal_platform_extras_size());
       for (const auto& entry : this_._internal_platform_extras()) {
@@ -1267,24 +1220,6 @@ void DeviceInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_device_name().empty()) {
-        _this->_internal_set_device_name(from._internal_device_name());
-      } else {
-        if (_this->_impl_.device_name_.IsDefault()) {
-          _this->_internal_set_device_name("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_platform().empty()) {
-        _this->_internal_set_platform(from._internal_platform());
-      } else {
-        if (_this->_impl_.platform_.IsDefault()) {
-          _this->_internal_set_platform("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!from._internal_os_version().empty()) {
         _this->_internal_set_os_version(from._internal_os_version());
       } else {
@@ -1293,16 +1228,7 @@ void DeviceInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (!from._internal_form_factor().empty()) {
-        _this->_internal_set_form_factor(from._internal_form_factor());
-      } else {
-        if (_this->_impl_.form_factor_.IsDefault()) {
-          _this->_internal_set_form_factor("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!from._internal_architecture().empty()) {
         _this->_internal_set_architecture(from._internal_architecture());
       } else {
@@ -1311,7 +1237,7 @@ void DeviceInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!from._internal_chip_name().empty()) {
         _this->_internal_set_chip_name(from._internal_chip_name());
       } else {
@@ -1320,7 +1246,7 @@ void DeviceInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (!from._internal_gpu_family().empty()) {
         _this->_internal_set_gpu_family(from._internal_gpu_family());
       } else {
@@ -1329,60 +1255,65 @@ void DeviceInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      _this->_internal_set_device_fingerprint(from._internal_device_fingerprint());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_platform() != 0) {
+        _this->_impl_.platform_ = from._impl_.platform_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_form_factor() != 0) {
+        _this->_impl_.form_factor_ = from._impl_.form_factor_;
+      }
+    }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      _this->_internal_set_battery_state(from._internal_battery_state());
+      if (from._internal_total_memory_bytes() != 0) {
+        _this->_impl_.total_memory_bytes_ = from._impl_.total_memory_bytes_;
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      _this->_internal_set_device_fingerprint(from._internal_device_fingerprint());
+      if (from._internal_available_memory_bytes() != 0) {
+        _this->_impl_.available_memory_bytes_ = from._impl_.available_memory_bytes_;
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (from._internal_total_memory() != 0) {
-        _this->_impl_.total_memory_ = from._impl_.total_memory_;
+      if (from._internal_npu_cores() != 0) {
+        _this->_impl_.npu_cores_ = from._impl_.npu_cores_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (from._internal_available_memory() != 0) {
-        _this->_impl_.available_memory_ = from._impl_.available_memory_;
+      if (from._internal_has_npu() != 0) {
+        _this->_impl_.has_npu_ = from._impl_.has_npu_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (from._internal_neural_engine_cores() != 0) {
-        _this->_impl_.neural_engine_cores_ = from._impl_.neural_engine_cores_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
-      if (from._internal_has_neural_engine() != 0) {
-        _this->_impl_.has_neural_engine_ = from._impl_.has_neural_engine_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (from._internal_is_low_power_mode() != 0) {
         _this->_impl_.is_low_power_mode_ = from._impl_.is_low_power_mode_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       _this->_impl_.battery_level_ = from._impl_.battery_level_;
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+      _this->_impl_.battery_state_ = from._impl_.battery_state_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
       if (from._internal_core_count() != 0) {
         _this->_impl_.core_count_ = from._impl_.core_count_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
       if (from._internal_performance_cores() != 0) {
         _this->_impl_.performance_cores_ = from._impl_.performance_cores_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
-      if (from._internal_efficiency_cores() != 0) {
-        _this->_impl_.efficiency_cores_ = from._impl_.efficiency_cores_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       _this->_impl_.platform_extras_.MergeFrom(from._impl_.platform_extras_);
     }
   }
@@ -1406,21 +1337,17 @@ void DeviceInfo::InternalSwap(DeviceInfo* PROTOBUF_RESTRICT PROTOBUF_NONNULL oth
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.device_model_, &other->_impl_.device_model_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.device_name_, &other->_impl_.device_name_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.platform_, &other->_impl_.platform_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.os_version_, &other->_impl_.os_version_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.form_factor_, &other->_impl_.form_factor_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.architecture_, &other->_impl_.architecture_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.chip_name_, &other->_impl_.chip_name_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.gpu_family_, &other->_impl_.gpu_family_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.battery_state_, &other->_impl_.battery_state_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.device_fingerprint_, &other->_impl_.device_fingerprint_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.efficiency_cores_)
-      + sizeof(DeviceInfo::_impl_.efficiency_cores_)
-      - PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.total_memory_)>(
-          reinterpret_cast<char*>(&_impl_.total_memory_),
-          reinterpret_cast<char*>(&other->_impl_.total_memory_));
+      PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.performance_cores_)
+      + sizeof(DeviceInfo::_impl_.performance_cores_)
+      - PROTOBUF_FIELD_OFFSET(DeviceInfo, _impl_.platform_)>(
+          reinterpret_cast<char*>(&_impl_.platform_),
+          reinterpret_cast<char*>(&other->_impl_.platform_));
   _impl_.platform_extras_.InternalSwap(&other->_impl_.platform_extras_);
 }
 

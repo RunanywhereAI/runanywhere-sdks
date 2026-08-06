@@ -27,8 +27,10 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
 }
 
 /// Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
-/// into COMPONENT; the modality is recoverable from c_abi_code and
-/// ErrorContext.operation, so it is not encoded twice.
+/// into COMPONENT; use SDKError.component to tell them apart.
+///
+/// The rac_wire_string values are the one form every SDK prints, so a crash
+/// report written by Swift and one written by Web say the same word.
 public nonisolated enum RAErrorCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -967,71 +969,12 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// Debugging metadata captured at the throw site. Stack traces are deliberately
-/// absent: they are platform-shaped and belong in platform-local logging.
-public nonisolated struct RAErrorContext: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Telemetry tagging.
-  public var metadata: Dictionary<String,String> = [:]
-
-  public var sourceFile: String {
-    get {_sourceFile ?? String()}
-    set {_sourceFile = newValue}
-  }
-  /// Returns true if `sourceFile` has been explicitly set.
-  public var hasSourceFile: Bool {self._sourceFile != nil}
-  /// Clears the value of `sourceFile`. Subsequent reads from it will return its default value.
-  public mutating func clearSourceFile() {self._sourceFile = nil}
-
-  public var sourceLine: Int32 {
-    get {_sourceLine ?? 0}
-    set {_sourceLine = newValue}
-  }
-  /// Returns true if `sourceLine` has been explicitly set.
-  public var hasSourceLine: Bool {self._sourceLine != nil}
-  /// Clears the value of `sourceLine`. Subsequent reads from it will return its default value.
-  public mutating func clearSourceLine() {self._sourceLine = nil}
-
-  /// Logical operation ("loadModel", "generate", "transcribeStream"), so
-  /// clients can route without parsing free text.
-  public var operation: String {
-    get {_operation ?? String()}
-    set {_operation = newValue}
-  }
-  /// Returns true if `operation` has been explicitly set.
-  public var hasOperation: Bool {self._operation != nil}
-  /// Clears the value of `operation`. Subsequent reads from it will return its default value.
-  public mutating func clearOperation() {self._operation = nil}
-
-  /// "<Message>.<field>" for validation errors. The generated validate()
-  /// emits this.
-  public var fieldPath: String {
-    get {_fieldPath ?? String()}
-    set {_fieldPath = newValue}
-  }
-  /// Returns true if `fieldPath` has been explicitly set.
-  public var hasFieldPath: Bool {self._fieldPath != nil}
-  /// Clears the value of `fieldPath`. Subsequent reads from it will return its default value.
-  public mutating func clearFieldPath() {self._fieldPath = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _sourceFile: String? = nil
-  fileprivate var _sourceLine: Int32? = nil
-  fileprivate var _operation: String? = nil
-  fileprivate var _fieldPath: String? = nil
-}
-
 /// The unified error payload every SDK throws or returns.
 ///
 /// `code` is always non-zero: an SDKError implies failure, and success is
 /// signalled by its absence. `message` is non-localized; localization is a
-/// consumer concern.
+/// consumer concern. Stack traces are deliberately absent: they are
+/// platform-shaped and belong in platform-local logging.
 public nonisolated struct RASDKError: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1042,15 +985,6 @@ public nonisolated struct RASDKError: Sendable {
   public var category: RAErrorCategory = .unspecified
 
   public var message: String = String()
-
-  public var context: RAErrorContext {
-    get {_context ?? RAErrorContext()}
-    set {_context = newValue}
-  }
-  /// Returns true if `context` has been explicitly set.
-  public var hasContext: Bool {self._context != nil}
-  /// Clears the value of `context`. Subsequent reads from it will return its default value.
-  public mutating func clearContext() {self._context = nil}
 
   /// Signed rac_result_t. Equals -code for codes <= 899. Unset for the
   /// Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
@@ -1074,27 +1008,40 @@ public nonisolated struct RASDKError: Sendable {
   /// Clears the value of `nestedMessage`. Subsequent reads from it will return its default value.
   public mutating func clearNestedMessage() {self._nestedMessage = nil}
 
-  /// `component` is a stable lowercase key ("llm", "stt", "rag", "download").
-  /// SDKEvent carries the enum-typed component instead.
   public var timestampMs: Int64 = 0
 
   public var severity: RAErrorSeverity = .unspecified
 
+  /// Which subsystem raised the error, written as SDKComponent's
+  /// rac_wire_string ("llm", "stt", "rag", "rerank"). Producers MUST write
+  /// the wire string, never the proto constant name. Errors raised outside
+  /// any SDKComponent may carry their own lowercase key.
   public var component: String = String()
 
   public var retryable: Bool = false
 
-  public var remediationHint: String = String()
+  /// Ties this failure to the operation that produced it. Named for
+  /// Anthropic's body-level `request_id`. Producers MUST set it.
+  public var requestID: String = String()
 
-  public var correlationID: String = String()
+  /// "<Message>.<field>" for validation errors, e.g. "STTOptions.sampleRate".
+  /// OpenAI's `param`. The generated validate() emits this.
+  public var param: String {
+    get {_param ?? String()}
+    set {_param = newValue}
+  }
+  /// Returns true if `param` has been explicitly set.
+  public var hasParam: Bool {self._param != nil}
+  /// Clears the value of `param`. Subsequent reads from it will return its default value.
+  public mutating func clearParam() {self._param = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _context: RAErrorContext? = nil
   fileprivate var _cAbiCode: Int32? = nil
   fileprivate var _nestedMessage: String? = nil
+  fileprivate var _param: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -1113,63 +1060,9 @@ nonisolated extension RAErrorCode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_CODE_UNSPECIFIED\0\u{2}d\u{1}ERROR_CODE_NOT_INITIALIZED\0\u{1}ERROR_CODE_ALREADY_INITIALIZED\0\u{1}ERROR_CODE_INITIALIZATION_FAILED\0\u{1}ERROR_CODE_INVALID_CONFIGURATION\0\u{1}ERROR_CODE_INVALID_API_KEY\0\u{1}ERROR_CODE_ENVIRONMENT_MISMATCH\0\u{1}ERROR_CODE_INVALID_PARAMETER\0\u{2}\u{4}ERROR_CODE_MODEL_NOT_FOUND\0\u{1}ERROR_CODE_MODEL_LOAD_FAILED\0\u{1}ERROR_CODE_MODEL_VALIDATION_FAILED\0\u{1}ERROR_CODE_MODEL_INCOMPATIBLE\0\u{1}ERROR_CODE_INVALID_MODEL_FORMAT\0\u{1}ERROR_CODE_MODEL_STORAGE_CORRUPTED\0\u{1}ERROR_CODE_MODEL_NOT_LOADED\0\u{2}\u{e}ERROR_CODE_GENERATION_FAILED\0\u{1}ERROR_CODE_GENERATION_TIMEOUT\0\u{1}ERROR_CODE_CONTEXT_TOO_LONG\0\u{1}ERROR_CODE_TOKEN_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_COST_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_INFERENCE_FAILED\0\u{1}ERROR_CODE_GENERATION_CANCELLED\0\u{2}\u{e}ERROR_CODE_NETWORK_UNAVAILABLE\0\u{1}ERROR_CODE_NETWORK_ERROR\0\u{1}ERROR_CODE_REQUEST_FAILED\0\u{1}ERROR_CODE_DOWNLOAD_FAILED\0\u{1}ERROR_CODE_SERVER_ERROR\0\u{1}ERROR_CODE_TIMEOUT\0\u{1}ERROR_CODE_INVALID_RESPONSE\0\u{1}ERROR_CODE_HTTP_ERROR\0\u{1}ERROR_CODE_CONNECTION_LOST\0\u{1}ERROR_CODE_PARTIAL_DOWNLOAD\0\u{1}ERROR_CODE_HTTP_REQUEST_FAILED\0\u{1}ERROR_CODE_HTTP_NOT_SUPPORTED\0\u{2}\u{13}ERROR_CODE_INSUFFICIENT_STORAGE\0\u{1}ERROR_CODE_STORAGE_FULL\0\u{1}ERROR_CODE_STORAGE_ERROR\0\u{1}ERROR_CODE_FILE_NOT_FOUND\0\u{1}ERROR_CODE_FILE_READ_FAILED\0\u{1}ERROR_CODE_FILE_WRITE_FAILED\0\u{1}ERROR_CODE_PERMISSION_DENIED\0\u{1}ERROR_CODE_DELETE_FAILED\0\u{1}ERROR_CODE_MOVE_FAILED\0\u{1}ERROR_CODE_DIRECTORY_CREATION_FAILED\0\u{1}ERROR_CODE_DIRECTORY_NOT_FOUND\0\u{1}ERROR_CODE_INVALID_PATH\0\u{1}ERROR_CODE_INVALID_FILE_NAME\0\u{1}ERROR_CODE_TEMP_FILE_CREATION_FAILED\0\u{2}\u{1b}ERROR_CODE_HARDWARE_UNSUPPORTED\0\u{1}ERROR_CODE_INSUFFICIENT_MEMORY\0\u{2}\u{9}ERROR_CODE_COMPONENT_NOT_READY\0\u{1}ERROR_CODE_INVALID_STATE\0\u{1}ERROR_CODE_SERVICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_SERVICE_BUSY\0\u{1}ERROR_CODE_PROCESSING_FAILED\0\u{1}ERROR_CODE_START_FAILED\0\u{1}ERROR_CODE_NOT_SUPPORTED\0\u{2}\u{e}ERROR_CODE_VALIDATION_FAILED\0\u{1}ERROR_CODE_INVALID_INPUT\0\u{1}ERROR_CODE_INVALID_FORMAT\0\u{1}ERROR_CODE_EMPTY_INPUT\0\u{1}ERROR_CODE_TEXT_TOO_LONG\0\u{1}ERROR_CODE_INVALID_SSML\0\u{1}ERROR_CODE_INVALID_SPEAKING_RATE\0\u{1}ERROR_CODE_INVALID_PITCH\0\u{1}ERROR_CODE_INVALID_VOLUME\0\u{1}ERROR_CODE_INVALID_ARGUMENT\0\u{1}ERROR_CODE_NULL_POINTER\0\u{1}ERROR_CODE_BUFFER_TOO_SMALL\0\u{1}ERROR_CODE_OUTPUT_TRUNCATED\0\u{2}\u{12}ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED\0\u{1}ERROR_CODE_AUDIO_SESSION_FAILED\0\u{1}ERROR_CODE_MICROPHONE_PERMISSION_DENIED\0\u{1}ERROR_CODE_INSUFFICIENT_AUDIO_DATA\0\u{1}ERROR_CODE_EMPTY_AUDIO_BUFFER\0\u{1}ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAILED\0\u{2}\u{f}ERROR_CODE_LANGUAGE_NOT_SUPPORTED\0\u{1}ERROR_CODE_VOICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_STREAMING_NOT_SUPPORTED\0\u{1}ERROR_CODE_STREAM_CANCELLED\0\u{2}\u{11}ERROR_CODE_AUTHENTICATION_FAILED\0\u{1}ERROR_CODE_UNAUTHORIZED\0\u{1}ERROR_CODE_FORBIDDEN\0\u{2}\u{8}ERROR_CODE_KEYCHAIN_ERROR\0\u{1}ERROR_CODE_ENCODING_ERROR\0\u{1}ERROR_CODE_DECODING_ERROR\0\u{1}ERROR_CODE_SECURE_STORAGE_FAILED\0\u{2}\u{11}ERROR_CODE_EXTRACTION_FAILED\0\u{1}ERROR_CODE_CHECKSUM_MISMATCH\0\u{1}ERROR_CODE_UNSUPPORTED_ARCHIVE\0\u{2}\u{12}ERROR_CODE_CALIBRATION_FAILED\0\u{1}ERROR_CODE_CALIBRATION_TIMEOUT\0\u{2}\u{9}ERROR_CODE_CANCELLED\0\u{2}\u{14}ERROR_CODE_MODULE_NOT_FOUND\0\u{1}ERROR_CODE_MODULE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_MODULE_LOAD_FAILED\0\u{2}\u{8}ERROR_CODE_SERVICE_NOT_FOUND\0\u{1}ERROR_CODE_SERVICE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_SERVICE_CREATE_FAILED\0\u{2}\u{8}ERROR_CODE_CAPABILITY_NOT_FOUND\0\u{1}ERROR_CODE_PROVIDER_NOT_FOUND\0\u{1}ERROR_CODE_NO_CAPABLE_PROVIDER\0\u{1}ERROR_CODE_NOT_FOUND\0\u{2}M\u{1}ERROR_CODE_ADAPTER_NOT_SET\0\u{2}d\u{1}ERROR_CODE_BACKEND_NOT_FOUND\0\u{1}ERROR_CODE_BACKEND_NOT_READY\0\u{1}ERROR_CODE_BACKEND_INIT_FAILED\0\u{1}ERROR_CODE_BACKEND_BUSY\0\u{1}ERROR_CODE_BACKEND_UNAVAILABLE\0\u{1}ERROR_CODE_RUNTIME_UNAVAILABLE\0\u{1}ERROR_CODE_BACKEND_ERROR\0\u{2}\u{4}ERROR_CODE_INVALID_HANDLE\0\u{2}Z\u{1}ERROR_CODE_EVENT_INVALID_CATEGORY\0\u{1}ERROR_CODE_EVENT_SUBSCRIPTION_FAILED\0\u{1}ERROR_CODE_EVENT_PUBLISH_FAILED\0\u{2}b\u{1}ERROR_CODE_NOT_IMPLEMENTED\0\u{1}ERROR_CODE_FEATURE_NOT_AVAILABLE\0\u{1}ERROR_CODE_FRAMEWORK_NOT_AVAILABLE\0\u{1}ERROR_CODE_UNSUPPORTED_MODALITY\0\u{1}ERROR_CODE_UNKNOWN\0\u{1}ERROR_CODE_INTERNAL\0\u{2}\u{5}ERROR_CODE_ABI_VERSION_MISMATCH\0\u{1}ERROR_CODE_CAPABILITY_UNSUPPORTED\0\u{1}ERROR_CODE_PLUGIN_DUPLICATE\0\u{2}\u{8}ERROR_CODE_PLUGIN_LOAD_FAILED\0\u{1}ERROR_CODE_PLUGIN_BUSY\0\u{2}O\u{1}ERROR_CODE_WASM_LOAD_FAILED\0\u{1}ERROR_CODE_WASM_NOT_LOADED\0\u{1}ERROR_CODE_WASM_CALLBACK_ERROR\0\u{1}ERROR_CODE_WASM_MEMORY_ERROR\0")
 }
 
-nonisolated extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ErrorContext"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}metadata\0\u{3}source_file\0\u{3}source_line\0\u{1}operation\0\u{3}field_path\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._sourceFile) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self._sourceLine) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._operation) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._fieldPath) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 1)
-    }
-    try { if let v = self._sourceFile {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._sourceLine {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._operation {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._fieldPath {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAErrorContext, rhs: RAErrorContext) -> Bool {
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs._sourceFile != rhs._sourceFile {return false}
-    if lhs._sourceLine != rhs._sourceLine {return false}
-    if lhs._operation != rhs._operation {return false}
-    if lhs._fieldPath != rhs._fieldPath {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKError"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{1}context\0\u{3}c_abi_code\0\u{3}nested_message\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}component\0\u{1}retryable\0\u{3}remediation_hint\0\u{3}correlation_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{3}c_abi_code\0\u{3}nested_message\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}component\0\u{1}retryable\0\u{3}request_id\0\u{1}param\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1180,15 +1073,14 @@ nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 1: try { try decoder.decodeSingularEnumField(value: &self.code) }()
       case 2: try { try decoder.decodeSingularEnumField(value: &self.category) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.message) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._context) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self._cAbiCode) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._nestedMessage) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
-      case 8: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.component) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self.retryable) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.remediationHint) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self.correlationID) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self._cAbiCode) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._nestedMessage) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.component) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.retryable) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._param) }()
       default: break
       }
     }
@@ -1208,33 +1100,30 @@ nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.message.isEmpty {
       try visitor.visitSingularStringField(value: self.message, fieldNumber: 3)
     }
-    try { if let v = self._context {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
     try { if let v = self._cAbiCode {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 5)
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 4)
     } }()
     try { if let v = self._nestedMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
     if self.timestampMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 7)
+      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 6)
     }
     if self.severity != .unspecified {
-      try visitor.visitSingularEnumField(value: self.severity, fieldNumber: 8)
+      try visitor.visitSingularEnumField(value: self.severity, fieldNumber: 7)
     }
     if !self.component.isEmpty {
-      try visitor.visitSingularStringField(value: self.component, fieldNumber: 9)
+      try visitor.visitSingularStringField(value: self.component, fieldNumber: 8)
     }
     if self.retryable != false {
-      try visitor.visitSingularBoolField(value: self.retryable, fieldNumber: 10)
+      try visitor.visitSingularBoolField(value: self.retryable, fieldNumber: 9)
     }
-    if !self.remediationHint.isEmpty {
-      try visitor.visitSingularStringField(value: self.remediationHint, fieldNumber: 11)
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 10)
     }
-    if !self.correlationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.correlationID, fieldNumber: 12)
-    }
+    try { if let v = self._param {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1242,15 +1131,14 @@ nonisolated extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.code != rhs.code {return false}
     if lhs.category != rhs.category {return false}
     if lhs.message != rhs.message {return false}
-    if lhs._context != rhs._context {return false}
     if lhs._cAbiCode != rhs._cAbiCode {return false}
     if lhs._nestedMessage != rhs._nestedMessage {return false}
     if lhs.timestampMs != rhs.timestampMs {return false}
     if lhs.severity != rhs.severity {return false}
     if lhs.component != rhs.component {return false}
     if lhs.retryable != rhs.retryable {return false}
-    if lhs.remediationHint != rhs.remediationHint {return false}
-    if lhs.correlationID != rhs.correlationID {return false}
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs._param != rhs._param {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

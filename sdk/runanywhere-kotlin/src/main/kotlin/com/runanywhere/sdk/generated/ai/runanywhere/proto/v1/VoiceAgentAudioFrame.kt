@@ -28,6 +28,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * Streamed capture frame. Same fixed input contract as VoiceAgentTurnRequest.
+ */
 public class VoiceAgentAudioFrame(
   @field:WireField(
     tag = 1,
@@ -41,10 +44,10 @@ public class VoiceAgentAudioFrame(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sampleRate",
+    jsonName = "sampleRateHz",
     schemaIndex = 1,
   )
-  public val sample_rate: Int = 0,
+  public val sample_rate_hz: Int = 0,
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -52,6 +55,10 @@ public class VoiceAgentAudioFrame(
     schemaIndex = 2,
   )
   public val channels: Int = 0,
+  /**
+   * Commons accepts AUDIO_ENCODING_UNSPECIFIED and AUDIO_ENCODING_PCM_S16_LE
+   * and rejects every other value.
+   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
@@ -80,7 +87,7 @@ public class VoiceAgentAudioFrame(
     if (other !is VoiceAgentAudioFrame) return false
     if (unknownFields != other.unknownFields) return false
     if (audio_data != other.audio_data) return false
-    if (sample_rate != other.sample_rate) return false
+    if (sample_rate_hz != other.sample_rate_hz) return false
     if (channels != other.channels) return false
     if (encoding != other.encoding) return false
     if (is_final != other.is_final) return false
@@ -92,7 +99,7 @@ public class VoiceAgentAudioFrame(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + audio_data.hashCode()
-      result = result * 37 + sample_rate.hashCode()
+      result = result * 37 + sample_rate_hz.hashCode()
       result = result * 37 + channels.hashCode()
       result = result * 37 + encoding.hashCode()
       result = result * 37 + is_final.hashCode()
@@ -104,7 +111,7 @@ public class VoiceAgentAudioFrame(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """audio_data=$audio_data"""
-    result += """sample_rate=$sample_rate"""
+    result += """sample_rate_hz=$sample_rate_hz"""
     result += """channels=$channels"""
     result += """encoding=$encoding"""
     result += """is_final=$is_final"""
@@ -113,12 +120,12 @@ public class VoiceAgentAudioFrame(
 
   public fun copy(
     audio_data: ByteString = this.audio_data,
-    sample_rate: Int = this.sample_rate,
+    sample_rate_hz: Int = this.sample_rate_hz,
     channels: Int = this.channels,
     encoding: AudioEncoding = this.encoding,
     is_final: Boolean = this.is_final,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentAudioFrame = VoiceAgentAudioFrame(audio_data, sample_rate, channels, encoding, is_final, unknownFields)
+  ): VoiceAgentAudioFrame = VoiceAgentAudioFrame(audio_data, sample_rate_hz, channels, encoding, is_final, unknownFields)
 
   public companion object {
     @JvmField
@@ -136,8 +143,8 @@ public class VoiceAgentAudioFrame(
         if (value.audio_data != okio.ByteString.EMPTY) {
           size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.audio_data)
         }
-        if (value.sample_rate != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.sample_rate)
+        if (value.sample_rate_hz != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.sample_rate_hz)
         }
         if (value.channels != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.channels)
@@ -155,8 +162,8 @@ public class VoiceAgentAudioFrame(
         if (value.audio_data != okio.ByteString.EMPTY) {
           ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
         }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.sample_rate)
+        if (value.sample_rate_hz != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.sample_rate_hz)
         }
         if (value.channels != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.channels)
@@ -181,8 +188,8 @@ public class VoiceAgentAudioFrame(
         if (value.channels != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.channels)
         }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.sample_rate)
+        if (value.sample_rate_hz != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.sample_rate_hz)
         }
         if (value.audio_data != okio.ByteString.EMPTY) {
           ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
@@ -191,14 +198,14 @@ public class VoiceAgentAudioFrame(
 
       override fun decode(reader: ProtoReader): VoiceAgentAudioFrame {
         var audio_data: ByteString = ByteString.EMPTY
-        var sample_rate: Int = 0
+        var sample_rate_hz: Int = 0
         var channels: Int = 0
         var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
         var is_final: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> audio_data = ProtoAdapter.BYTES.decode(reader)
-            2 -> sample_rate = ProtoAdapter.INT32.decode(reader)
+            2 -> sample_rate_hz = ProtoAdapter.INT32.decode(reader)
             3 -> channels = ProtoAdapter.INT32.decode(reader)
             4 -> try {
               encoding = AudioEncoding.ADAPTER.decode(reader)
@@ -211,7 +218,7 @@ public class VoiceAgentAudioFrame(
         }
         return VoiceAgentAudioFrame(
           audio_data = audio_data,
-          sample_rate = sample_rate,
+          sample_rate_hz = sample_rate_hz,
           channels = channels,
           encoding = encoding,
           is_final = is_final,

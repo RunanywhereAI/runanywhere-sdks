@@ -44,19 +44,15 @@ public class FrameworkEvent(
   )
   public val kind: FrameworkEventKind = FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED,
   /**
-   * For ADAPTER_REGISTERED / *_RETRIEVED — bound framework. Uses
-   * canonical InferenceFramework from model_types.proto, but stored as
-   * its enum int32 here to avoid cross-file message dependency just for
-   * a single field. Frontends decode via the shared codegen.
-   * InferenceFramework
+   * For ADAPTER_REGISTERED / *_RETRIEVED — bound framework.
    */
   @field:WireField(
     tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 1,
   )
-  public val framework: Int = 0,
+  public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
   /**
    * For ADAPTER_REGISTERED — adapter display name.
    */
@@ -176,7 +172,7 @@ public class FrameworkEvent(
 
   public fun copy(
     kind: FrameworkEventKind = this.kind,
-    framework: Int = this.framework,
+    framework: InferenceFramework = this.framework,
     adapter_name: String = this.adapter_name,
     adapter_count: Int = this.adapter_count,
     framework_count: Int = this.framework_count,
@@ -201,8 +197,8 @@ public class FrameworkEvent(
         if (value.kind != ai.runanywhere.proto.v1.FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED) {
           size += FrameworkEventKind.ADAPTER.encodedSizeWithTag(1, value.kind)
         }
-        if (value.framework != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          size += InferenceFramework.ADAPTER.encodedSizeWithTag(2, value.framework)
         }
         if (value.adapter_name != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.adapter_name)
@@ -229,8 +225,8 @@ public class FrameworkEvent(
         if (value.kind != ai.runanywhere.proto.v1.FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED) {
           FrameworkEventKind.ADAPTER.encodeWithTag(writer, 1, value.kind)
         }
-        if (value.framework != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 2, value.framework)
         }
         if (value.adapter_name != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.adapter_name)
@@ -273,8 +269,8 @@ public class FrameworkEvent(
         if (value.adapter_name != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.adapter_name)
         }
-        if (value.framework != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 2, value.framework)
         }
         if (value.kind != ai.runanywhere.proto.v1.FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED) {
           FrameworkEventKind.ADAPTER.encodeWithTag(writer, 1, value.kind)
@@ -283,7 +279,7 @@ public class FrameworkEvent(
 
       override fun decode(reader: ProtoReader): FrameworkEvent {
         var kind: FrameworkEventKind = FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED
-        var framework: Int = 0
+        var framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         var adapter_name: String = ""
         var adapter_count: Int = 0
         var framework_count: Int = 0
@@ -297,7 +293,11 @@ public class FrameworkEvent(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            2 -> framework = ProtoAdapter.INT32.decode(reader)
+            2 -> try {
+              framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             3 -> adapter_name = ProtoAdapter.STRING.decode(reader)
             4 -> adapter_count = ProtoAdapter.INT32.decode(reader)
             5 -> framework_count = ProtoAdapter.INT32.decode(reader)

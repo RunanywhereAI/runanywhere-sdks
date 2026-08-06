@@ -15,21 +15,10 @@
 /* eslint-disable */
 
 import { StructuredOutputOptions } from '../structured_output';
-import { ValidationError } from './_errors';
 
 export const structuredOutputOptionsDefaults = (): StructuredOutputOptions => ({
-  includeSchemaInPrompt: false,
-  jsonSchema: '',
-  mode: 0,
-  repairJson: false,
-  maxRetries: 0,
+  includeSchemaInPrompt: true,
+  schema: '',
+  grammar: '',
+  regex: '',
 });
-
-export const validateStructuredOutputOptions = (m: StructuredOutputOptions): void => {
-  if (m.maxRetries < 0) {
-    throw new ValidationError({
-      fieldPath: 'StructuredOutputOptions.max_retries',
-      message: `max_retries must be >= 0 (got ${m.maxRetries})`,
-    });
-  }
-};

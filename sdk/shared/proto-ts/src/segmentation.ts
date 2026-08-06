@@ -63,12 +63,6 @@ export interface SegmentationImage {
   width: number;
   height: number;
   pixelFormat: SegmentationPixelFormat;
-  /**
-   * Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
-   * C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
-   * wire counterpart.
-   */
-  strideBytes: number;
 }
 
 export interface SegmentationOptions {
@@ -77,17 +71,36 @@ export interface SegmentationOptions {
    * canonical class_mask_u16_le remains the machine-readable result.
    */
   includeDiagnosticRgba: boolean;
+  /**
+   * When true, also return confidence_mask_u8: the model's probability for
+   * the class it chose, per pixel. Costs width * height extra bytes.
+   */
+  includeConfidence: boolean;
 }
 
 export interface SegmentationRequest {
   image?: SegmentationImage | undefined;
-  options?: SegmentationOptions | undefined;
+  options?:
+    | SegmentationOptions
+    | undefined;
+  /**
+   * Registry id, catalog id, or absolute path. Unset = use the resident
+   * semantic-segmentation model. Mirrors EmbeddingsRequest.model_id and
+   * VLMGenerationRequest.model_id.
+   */
+  modelId?: string | undefined;
 }
 
+/**
+ * Coverage share of a class is pixel_count / (SegmentationResult.width *
+ * SegmentationResult.height). Commons rejects any result whose pixel_counts
+ * do not sum to that product before encoding it into a SegmentationResult, so
+ * within this message the summaries partition the image and the division is
+ * exact.
+ */
 export interface SegmentationClassSummary {
   classId: number;
   pixelCount: number;
-  fraction: number;
   label: string;
 }
 
@@ -103,10 +116,17 @@ export interface SegmentationResult {
   classSummaries: SegmentationClassSummary[];
   processingTimeMs: number;
   modelId: string;
+  /**
+   * Confidence of the class in class_mask_u16_le, one byte per pixel,
+   * 0..255 == probability 0.0..1.0. Same row-major order and dimensions as
+   * the class mask. Present iff SegmentationOptions.include_confidence was
+   * set, and then exactly width * height bytes.
+   */
+  confidenceMaskU8?: Uint8Array | undefined;
 }
 
 function createBaseSegmentationImage(): SegmentationImage {
-  return { data: new Uint8Array(0), width: 0, height: 0, pixelFormat: 0, strideBytes: 0 };
+  return { data: new Uint8Array(0), width: 0, height: 0, pixelFormat: 0 };
 }
 
 export const SegmentationImage: MessageFns<SegmentationImage> = {
@@ -122,9 +142,6 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
     }
     if (message.pixelFormat !== 0) {
       writer.uint32(32).int32(message.pixelFormat);
-    }
-    if (message.strideBytes !== 0) {
-      writer.uint32(40).uint32(message.strideBytes);
     }
     return writer;
   },
@@ -168,14 +185,6 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
           message.pixelFormat = reader.int32() as any;
           continue;
         }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.strideBytes = reader.uint32();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -195,11 +204,6 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
         : isSet(object.pixel_format)
         ? segmentationPixelFormatFromJSON(object.pixel_format)
         : 0,
-      strideBytes: isSet(object.strideBytes)
-        ? globalThis.Number(object.strideBytes)
-        : isSet(object.stride_bytes)
-        ? globalThis.Number(object.stride_bytes)
-        : 0,
     };
   },
 
@@ -217,9 +221,6 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
     if (message.pixelFormat !== 0) {
       obj.pixelFormat = segmentationPixelFormatToJSON(message.pixelFormat);
     }
-    if (message.strideBytes !== 0) {
-      obj.strideBytes = Math.round(message.strideBytes);
-    }
     return obj;
   },
 
@@ -232,19 +233,21 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
     message.width = object.width ?? 0;
     message.height = object.height ?? 0;
     message.pixelFormat = object.pixelFormat ?? 0;
-    message.strideBytes = object.strideBytes ?? 0;
     return message;
   },
 };
 
 function createBaseSegmentationOptions(): SegmentationOptions {
-  return { includeDiagnosticRgba: false };
+  return { includeDiagnosticRgba: false, includeConfidence: false };
 }
 
 export const SegmentationOptions: MessageFns<SegmentationOptions> = {
   encode(message: SegmentationOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.includeDiagnosticRgba !== false) {
       writer.uint32(8).bool(message.includeDiagnosticRgba);
+    }
+    if (message.includeConfidence !== false) {
+      writer.uint32(16).bool(message.includeConfidence);
     }
     return writer;
   },
@@ -264,6 +267,14 @@ export const SegmentationOptions: MessageFns<SegmentationOptions> = {
           message.includeDiagnosticRgba = reader.bool();
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.includeConfidence = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -280,6 +291,11 @@ export const SegmentationOptions: MessageFns<SegmentationOptions> = {
         : isSet(object.include_diagnostic_rgba)
         ? globalThis.Boolean(object.include_diagnostic_rgba)
         : false,
+      includeConfidence: isSet(object.includeConfidence)
+        ? globalThis.Boolean(object.includeConfidence)
+        : isSet(object.include_confidence)
+        ? globalThis.Boolean(object.include_confidence)
+        : false,
     };
   },
 
@@ -287,6 +303,9 @@ export const SegmentationOptions: MessageFns<SegmentationOptions> = {
     const obj: any = {};
     if (message.includeDiagnosticRgba !== false) {
       obj.includeDiagnosticRgba = message.includeDiagnosticRgba;
+    }
+    if (message.includeConfidence !== false) {
+      obj.includeConfidence = message.includeConfidence;
     }
     return obj;
   },
@@ -297,12 +316,13 @@ export const SegmentationOptions: MessageFns<SegmentationOptions> = {
   fromPartial<I extends Exact<DeepPartial<SegmentationOptions>, I>>(object: I): SegmentationOptions {
     const message = createBaseSegmentationOptions();
     message.includeDiagnosticRgba = object.includeDiagnosticRgba ?? false;
+    message.includeConfidence = object.includeConfidence ?? false;
     return message;
   },
 };
 
 function createBaseSegmentationRequest(): SegmentationRequest {
-  return { image: undefined, options: undefined };
+  return { image: undefined, options: undefined, modelId: undefined };
 }
 
 export const SegmentationRequest: MessageFns<SegmentationRequest> = {
@@ -312,6 +332,9 @@ export const SegmentationRequest: MessageFns<SegmentationRequest> = {
     }
     if (message.options !== undefined) {
       SegmentationOptions.encode(message.options, writer.uint32(18).fork()).join();
+    }
+    if (message.modelId !== undefined) {
+      writer.uint32(26).string(message.modelId);
     }
     return writer;
   },
@@ -339,6 +362,14 @@ export const SegmentationRequest: MessageFns<SegmentationRequest> = {
           message.options = SegmentationOptions.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -352,6 +383,11 @@ export const SegmentationRequest: MessageFns<SegmentationRequest> = {
     return {
       image: isSet(object.image) ? SegmentationImage.fromJSON(object.image) : undefined,
       options: isSet(object.options) ? SegmentationOptions.fromJSON(object.options) : undefined,
+      modelId: isSet(object.modelId)
+        ? globalThis.String(object.modelId)
+        : isSet(object.model_id)
+        ? globalThis.String(object.model_id)
+        : undefined,
     };
   },
 
@@ -362,6 +398,9 @@ export const SegmentationRequest: MessageFns<SegmentationRequest> = {
     }
     if (message.options !== undefined) {
       obj.options = SegmentationOptions.toJSON(message.options);
+    }
+    if (message.modelId !== undefined) {
+      obj.modelId = message.modelId;
     }
     return obj;
   },
@@ -377,12 +416,13 @@ export const SegmentationRequest: MessageFns<SegmentationRequest> = {
     message.options = (object.options !== undefined && object.options !== null)
       ? SegmentationOptions.fromPartial(object.options)
       : undefined;
+    message.modelId = object.modelId ?? undefined;
     return message;
   },
 };
 
 function createBaseSegmentationClassSummary(): SegmentationClassSummary {
-  return { classId: 0, pixelCount: 0, fraction: 0, label: "" };
+  return { classId: 0, pixelCount: 0, label: "" };
 }
 
 export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
@@ -393,11 +433,8 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
     if (message.pixelCount !== 0) {
       writer.uint32(16).uint64(message.pixelCount);
     }
-    if (message.fraction !== 0) {
-      writer.uint32(29).float(message.fraction);
-    }
     if (message.label !== "") {
-      writer.uint32(34).string(message.label);
+      writer.uint32(26).string(message.label);
     }
     return writer;
   },
@@ -426,15 +463,7 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
           continue;
         }
         case 3: {
-          if (tag !== 29) {
-            break;
-          }
-
-          message.fraction = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
+          if (tag !== 26) {
             break;
           }
 
@@ -462,7 +491,6 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
         : isSet(object.pixel_count)
         ? globalThis.Number(object.pixel_count)
         : 0,
-      fraction: isSet(object.fraction) ? globalThis.Number(object.fraction) : 0,
       label: isSet(object.label) ? globalThis.String(object.label) : "",
     };
   },
@@ -474,9 +502,6 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
     }
     if (message.pixelCount !== 0) {
       obj.pixelCount = Math.round(message.pixelCount);
-    }
-    if (message.fraction !== 0) {
-      obj.fraction = message.fraction;
     }
     if (message.label !== "") {
       obj.label = message.label;
@@ -491,7 +516,6 @@ export const SegmentationClassSummary: MessageFns<SegmentationClassSummary> = {
     const message = createBaseSegmentationClassSummary();
     message.classId = object.classId ?? 0;
     message.pixelCount = object.pixelCount ?? 0;
-    message.fraction = object.fraction ?? 0;
     message.label = object.label ?? "";
     return message;
   },
@@ -506,6 +530,7 @@ function createBaseSegmentationResult(): SegmentationResult {
     classSummaries: [],
     processingTimeMs: 0,
     modelId: "",
+    confidenceMaskU8: undefined,
   };
 }
 
@@ -531,6 +556,9 @@ export const SegmentationResult: MessageFns<SegmentationResult> = {
     }
     if (message.modelId !== "") {
       writer.uint32(58).string(message.modelId);
+    }
+    if (message.confidenceMaskU8 !== undefined) {
+      writer.uint32(66).bytes(message.confidenceMaskU8);
     }
     return writer;
   },
@@ -598,6 +626,14 @@ export const SegmentationResult: MessageFns<SegmentationResult> = {
           message.modelId = reader.string();
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.confidenceMaskU8 = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -636,6 +672,11 @@ export const SegmentationResult: MessageFns<SegmentationResult> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
+      confidenceMaskU8: isSet(object.confidenceMaskU8)
+        ? bytesFromBase64(object.confidenceMaskU8)
+        : isSet(object.confidence_mask_u8)
+        ? bytesFromBase64(object.confidence_mask_u8)
+        : undefined,
     };
   },
 
@@ -662,6 +703,9 @@ export const SegmentationResult: MessageFns<SegmentationResult> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
+    if (message.confidenceMaskU8 !== undefined) {
+      obj.confidenceMaskU8 = base64FromBytes(message.confidenceMaskU8);
+    }
     return obj;
   },
 
@@ -677,6 +721,7 @@ export const SegmentationResult: MessageFns<SegmentationResult> = {
     message.classSummaries = object.classSummaries?.map((e) => SegmentationClassSummary.fromPartial(e)) || [];
     message.processingTimeMs = object.processingTimeMs ?? 0;
     message.modelId = object.modelId ?? "";
+    message.confidenceMaskU8 = object.confidenceMaskU8 ?? undefined;
     return message;
   },
 };

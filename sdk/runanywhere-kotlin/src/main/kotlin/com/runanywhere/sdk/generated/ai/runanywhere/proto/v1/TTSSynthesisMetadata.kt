@@ -29,6 +29,11 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * TTSPhonemeTimestamp deleted -- never produced, and the wrong granularity.
+ * If timings are wanted later, add a request-side `timestamps` enum
+ * {none, word, character} plus repeated TTSTimestamp {text, start_ms, end_ms}.
+ */
 public class TTSSynthesisMetadata(
   @field:WireField(
     tag = 1,
@@ -57,22 +62,17 @@ public class TTSSynthesisMetadata(
     schemaIndex = 2,
   )
   public val processing_time_ms: Long = 0L,
+  /**
+   * UTF-8 byte length of the spoken input, not a codepoint count.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "characterCount",
+    jsonName = "inputBytes",
     schemaIndex = 3,
   )
-  public val character_count: Int = 0,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioDurationMs",
-    schemaIndex = 4,
-  )
-  public val audio_duration_ms: Long = 0L,
+  public val input_bytes: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSSynthesisMetadata, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -88,8 +88,7 @@ public class TTSSynthesisMetadata(
     if (voice_id != other.voice_id) return false
     if (language_code != other.language_code) return false
     if (processing_time_ms != other.processing_time_ms) return false
-    if (character_count != other.character_count) return false
-    if (audio_duration_ms != other.audio_duration_ms) return false
+    if (input_bytes != other.input_bytes) return false
     return true
   }
 
@@ -100,8 +99,7 @@ public class TTSSynthesisMetadata(
       result = result * 37 + voice_id.hashCode()
       result = result * 37 + language_code.hashCode()
       result = result * 37 + processing_time_ms.hashCode()
-      result = result * 37 + character_count.hashCode()
-      result = result * 37 + audio_duration_ms.hashCode()
+      result = result * 37 + input_bytes.hashCode()
       super.hashCode = result
     }
     return result
@@ -112,8 +110,7 @@ public class TTSSynthesisMetadata(
     result += """voice_id=${sanitize(voice_id)}"""
     result += """language_code=${sanitize(language_code)}"""
     result += """processing_time_ms=$processing_time_ms"""
-    result += """character_count=$character_count"""
-    result += """audio_duration_ms=$audio_duration_ms"""
+    result += """input_bytes=$input_bytes"""
     return result.joinToString(prefix = "TTSSynthesisMetadata{", separator = ", ", postfix = "}")
   }
 
@@ -121,10 +118,9 @@ public class TTSSynthesisMetadata(
     voice_id: String = this.voice_id,
     language_code: String = this.language_code,
     processing_time_ms: Long = this.processing_time_ms,
-    character_count: Int = this.character_count,
-    audio_duration_ms: Long = this.audio_duration_ms,
+    input_bytes: Int = this.input_bytes,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSSynthesisMetadata = TTSSynthesisMetadata(voice_id, language_code, processing_time_ms, character_count, audio_duration_ms, unknownFields)
+  ): TTSSynthesisMetadata = TTSSynthesisMetadata(voice_id, language_code, processing_time_ms, input_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -148,11 +144,8 @@ public class TTSSynthesisMetadata(
         if (value.processing_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.processing_time_ms)
         }
-        if (value.character_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.character_count)
-        }
-        if (value.audio_duration_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.audio_duration_ms)
+        if (value.input_bytes != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.input_bytes)
         }
         return size
       }
@@ -167,22 +160,16 @@ public class TTSSynthesisMetadata(
         if (value.processing_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.processing_time_ms)
         }
-        if (value.character_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.character_count)
-        }
-        if (value.audio_duration_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.audio_duration_ms)
+        if (value.input_bytes != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.input_bytes)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSSynthesisMetadata) {
         writer.writeBytes(value.unknownFields)
-        if (value.audio_duration_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.audio_duration_ms)
-        }
-        if (value.character_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.character_count)
+        if (value.input_bytes != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.input_bytes)
         }
         if (value.processing_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.processing_time_ms)
@@ -199,15 +186,13 @@ public class TTSSynthesisMetadata(
         var voice_id: String = ""
         var language_code: String = ""
         var processing_time_ms: Long = 0L
-        var character_count: Int = 0
-        var audio_duration_ms: Long = 0L
+        var input_bytes: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> voice_id = ProtoAdapter.STRING.decode(reader)
             2 -> language_code = ProtoAdapter.STRING.decode(reader)
             3 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
-            4 -> character_count = ProtoAdapter.INT32.decode(reader)
-            5 -> audio_duration_ms = ProtoAdapter.INT64.decode(reader)
+            4 -> input_bytes = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -215,8 +200,7 @@ public class TTSSynthesisMetadata(
           voice_id = voice_id,
           language_code = language_code,
           processing_time_ms = processing_time_ms,
-          character_count = character_count,
-          audio_duration_ms = audio_duration_ms,
+          input_bytes = input_bytes,
           unknownFields = unknownFields
         )
       }

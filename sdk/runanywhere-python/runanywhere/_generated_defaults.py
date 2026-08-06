@@ -37,7 +37,6 @@ class AudioCaptureDefaults:
     MIC_SAMPLE_RATE_HZ: Final[int] = 16000
     MIC_CHANNELS: Final[int] = 1
     MIC_CHANNEL_CAPACITY: Final[int] = 128
-    MIC_TAP_BUFFER_FRAMES: Final[int] = 4096
     TTS_SAMPLE_RATE_HZ: Final[int] = 22050
 
 
@@ -49,12 +48,6 @@ class VoiceAgentDefaults:
     DEFAULT_VAD_MODEL_ID: Final[str] = "silero-vad"
     SPEECH_RMS_THRESHOLD: Final[float] = 0.015
     SPEECH_FLOOR_MULTIPLIER: Final[float] = 2.0
-
-
-class HybridDefaults:
-    """Generated from HybridDefaults in idl/sdk_defaults.proto."""
-
-    STT_CONFIDENCE_THRESHOLD: Final[float] = 0.5
 
 
 class WorkerDefaults:
@@ -91,4 +84,4 @@ class StorageDefaults:
     CONTEXT_LENGTH: Final[int] = 2048
 
 
-__all__ = ["NetworkDefaults", "ConnectDefaults", "AudioCaptureDefaults", "VoiceAgentDefaults", "HybridDefaults", "WorkerDefaults", "FFIDefaults", "EnvironmentDefaults", "StructuredOutputDefaults", "StorageDefaults"]
+__all__ = ["NetworkDefaults", "ConnectDefaults", "AudioCaptureDefaults", "VoiceAgentDefaults", "WorkerDefaults", "FFIDefaults", "EnvironmentDefaults", "StructuredOutputDefaults", "StorageDefaults"]

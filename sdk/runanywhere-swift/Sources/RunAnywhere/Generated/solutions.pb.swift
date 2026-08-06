@@ -25,14 +25,23 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// Lets frontends switch on one enum instead of inspecting the oneof.
+/// Frontends switch on the SolutionConfig oneof case. This enum exists only
+/// for logs and handles, and its numbers now match the oneof tags.
 public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
+
+  /// SolutionConfig.voice_agent = 1
   case voiceAgent // = 1
+
+  /// SolutionConfig.rag         = 2
   case rag // = 2
-  case timeSeries // = 4
-  case agentLoop // = 5
+
+  /// SolutionConfig.agent_loop  = 4
+  case agentLoop // = 4
+
+  /// SolutionConfig.time_series = 5
+  case timeSeries // = 5
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -44,8 +53,8 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 0: self = .unspecified
     case 1: self = .voiceAgent
     case 2: self = .rag
-    case 4: self = .timeSeries
-    case 5: self = .agentLoop
+    case 4: self = .agentLoop
+    case 5: self = .timeSeries
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -55,8 +64,8 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .unspecified: return 0
     case .voiceAgent: return 1
     case .rag: return 2
-    case .timeSeries: return 4
-    case .agentLoop: return 5
+    case .agentLoop: return 4
+    case .timeSeries: return 5
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -66,8 +75,8 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
     .unspecified,
     .voiceAgent,
     .rag,
-    .timeSeries,
     .agentLoop,
+    .timeSeries,
   ]
 
 }
@@ -288,22 +297,12 @@ public nonisolated struct RAVoiceAgentConfig: Sendable {
   /// Emit partial transcripts as non-final user-said events.
   public var emitPartials: Bool = false
 
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _enableBargeIn: Bool? = nil
   fileprivate var _generation: RALLMGenerationOptions? = nil
-  fileprivate var _typeKind: RASolutionType? = nil
 }
 
 public nonisolated struct RARAGConfig: Sendable {
@@ -336,20 +335,9 @@ public nonisolated struct RARAGConfig: Sendable {
 
   public var promptTemplate: String = String()
 
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _typeKind: RASolutionType? = nil
 }
 
 public nonisolated struct RAAgentLoopConfig: Sendable {
@@ -367,20 +355,9 @@ public nonisolated struct RAAgentLoopConfig: Sendable {
 
   public var maxContextTokens: Int32 = 0
 
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _typeKind: RASolutionType? = nil
 }
 
 public nonisolated struct RAToolSpec: Sendable {
@@ -416,20 +393,9 @@ public nonisolated struct RATimeSeriesConfig: Sendable {
 
   public var anomalyThreshold: Float = 0
 
-  public var typeKind: RASolutionType {
-    get {_typeKind ?? .unspecified}
-    set {_typeKind = newValue}
-  }
-  /// Returns true if `typeKind` has been explicitly set.
-  public var hasTypeKind: Bool {self._typeKind != nil}
-  /// Clears the value of `typeKind`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeKind() {self._typeKind = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _typeKind: RASolutionType? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -437,7 +403,7 @@ public nonisolated struct RATimeSeriesConfig: Sendable {
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RASolutionType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOLUTION_TYPE_UNSPECIFIED\0\u{1}SOLUTION_TYPE_VOICE_AGENT\0\u{1}SOLUTION_TYPE_RAG\0\u{2}\u{2}SOLUTION_TYPE_TIME_SERIES\0\u{1}SOLUTION_TYPE_AGENT_LOOP\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOLUTION_TYPE_UNSPECIFIED\0\u{1}SOLUTION_TYPE_VOICE_AGENT\0\u{1}SOLUTION_TYPE_RAG\0\u{2}\u{2}SOLUTION_TYPE_AGENT_LOOP\0\u{1}SOLUTION_TYPE_TIME_SERIES\0")
 }
 
 nonisolated extension RAAudioSource: SwiftProtobuf._ProtoNameProviding {
@@ -600,7 +566,7 @@ nonisolated extension RASolutionHandle: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}stt_model_id\0\u{3}tts_model_id\0\u{3}vad_model_id\0\u{3}sample_rate_hz\0\u{3}chunk_ms\0\u{3}audio_source\0\u{3}enable_barge_in\0\u{3}barge_in_threshold_ms\0\u{4}\u{2}max_context_tokens\0\u{4}\u{2}emit_partials\0\u{4}\u{2}audio_file_path\0\u{3}type_kind\0\u{3}tts_voice_id\0\u{1}generation\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}stt_model_id\0\u{3}tts_model_id\0\u{3}vad_model_id\0\u{3}tts_voice_id\0\u{3}sample_rate_hz\0\u{3}chunk_ms\0\u{3}audio_source\0\u{3}audio_file_path\0\u{3}enable_barge_in\0\u{3}barge_in_threshold_ms\0\u{1}generation\0\u{3}max_context_tokens\0\u{3}emit_partials\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -612,17 +578,16 @@ nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._
       case 2: try { try decoder.decodeSingularStringField(value: &self.sttModelID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.ttsModelID) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.vadModelID) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.sampleRateHz) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.chunkMs) }()
-      case 7: try { try decoder.decodeSingularEnumField(value: &self.audioSource) }()
-      case 8: try { try decoder.decodeSingularBoolField(value: &self._enableBargeIn) }()
-      case 9: try { try decoder.decodeSingularInt32Field(value: &self.bargeInThresholdMs) }()
-      case 11: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
-      case 13: try { try decoder.decodeSingularBoolField(value: &self.emitPartials) }()
-      case 15: try { try decoder.decodeSingularStringField(value: &self.audioFilePath) }()
-      case 16: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
-      case 17: try { try decoder.decodeSingularStringField(value: &self.ttsVoiceID) }()
-      case 18: try { try decoder.decodeSingularMessageField(value: &self._generation) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.ttsVoiceID) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.sampleRateHz) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.chunkMs) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.audioSource) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.audioFilePath) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self._enableBargeIn) }()
+      case 11: try { try decoder.decodeSingularInt32Field(value: &self.bargeInThresholdMs) }()
+      case 12: try { try decoder.decodeSingularMessageField(value: &self._generation) }()
+      case 13: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
+      case 14: try { try decoder.decodeSingularBoolField(value: &self.emitPartials) }()
       default: break
       }
     }
@@ -645,39 +610,36 @@ nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.vadModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.vadModelID, fieldNumber: 4)
     }
+    if !self.ttsVoiceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.ttsVoiceID, fieldNumber: 5)
+    }
     if self.sampleRateHz != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRateHz, fieldNumber: 5)
+      try visitor.visitSingularInt32Field(value: self.sampleRateHz, fieldNumber: 6)
     }
     if self.chunkMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.chunkMs, fieldNumber: 6)
+      try visitor.visitSingularInt32Field(value: self.chunkMs, fieldNumber: 7)
     }
     if self.audioSource != .unspecified {
-      try visitor.visitSingularEnumField(value: self.audioSource, fieldNumber: 7)
-    }
-    try { if let v = self._enableBargeIn {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
-    } }()
-    if self.bargeInThresholdMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.bargeInThresholdMs, fieldNumber: 9)
-    }
-    if self.maxContextTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 11)
-    }
-    if self.emitPartials != false {
-      try visitor.visitSingularBoolField(value: self.emitPartials, fieldNumber: 13)
+      try visitor.visitSingularEnumField(value: self.audioSource, fieldNumber: 8)
     }
     if !self.audioFilePath.isEmpty {
-      try visitor.visitSingularStringField(value: self.audioFilePath, fieldNumber: 15)
+      try visitor.visitSingularStringField(value: self.audioFilePath, fieldNumber: 9)
     }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 16)
+    try { if let v = self._enableBargeIn {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
     } }()
-    if !self.ttsVoiceID.isEmpty {
-      try visitor.visitSingularStringField(value: self.ttsVoiceID, fieldNumber: 17)
+    if self.bargeInThresholdMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.bargeInThresholdMs, fieldNumber: 11)
     }
     try { if let v = self._generation {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
     } }()
+    if self.maxContextTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 13)
+    }
+    if self.emitPartials != false {
+      try visitor.visitSingularBoolField(value: self.emitPartials, fieldNumber: 14)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -696,7 +658,6 @@ nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs._generation != rhs._generation {return false}
     if lhs.maxContextTokens != rhs.maxContextTokens {return false}
     if lhs.emitPartials != rhs.emitPartials {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -704,7 +665,7 @@ nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embed_model_id\0\u{3}rerank_model_id\0\u{3}llm_model_id\0\u{3}vector_store\0\u{3}vector_store_path\0\u{3}retrieve_k\0\u{3}rerank_top\0\u{3}bm25_k1\0\u{3}bm25_b\0\u{3}rrf_k\0\u{3}prompt_template\0\u{3}type_kind\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embed_model_id\0\u{3}rerank_model_id\0\u{3}llm_model_id\0\u{3}vector_store\0\u{3}vector_store_path\0\u{3}retrieve_k\0\u{3}rerank_top\0\u{3}bm25_k1\0\u{3}bm25_b\0\u{3}rrf_k\0\u{3}prompt_template\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -723,17 +684,12 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
       case 9: try { try decoder.decodeSingularFloatField(value: &self.bm25B) }()
       case 10: try { try decoder.decodeSingularInt32Field(value: &self.rrfK) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self.promptTemplate) }()
-      case 12: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.embedModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.embedModelID, fieldNumber: 1)
     }
@@ -767,9 +723,6 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.promptTemplate.isEmpty {
       try visitor.visitSingularStringField(value: self.promptTemplate, fieldNumber: 11)
     }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 12)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -785,7 +738,6 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs.bm25B != rhs.bm25B {return false}
     if lhs.rrfK != rhs.rrfK {return false}
     if lhs.promptTemplate != rhs.promptTemplate {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -793,7 +745,7 @@ nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AgentLoopConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}system_prompt\0\u{1}tools\0\u{3}max_iterations\0\u{3}max_context_tokens\0\u{3}type_kind\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}system_prompt\0\u{1}tools\0\u{3}max_iterations\0\u{3}max_context_tokens\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -806,17 +758,12 @@ nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._M
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.tools) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxIterations) }()
       case 5: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.llmModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.llmModelID, fieldNumber: 1)
     }
@@ -832,9 +779,6 @@ nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._M
     if self.maxContextTokens != 0 {
       try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 5)
     }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -844,7 +788,6 @@ nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.tools != rhs.tools {return false}
     if lhs.maxIterations != rhs.maxIterations {return false}
     if lhs.maxContextTokens != rhs.maxContextTokens {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -892,7 +835,7 @@ nonisolated extension RAToolSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TimeSeriesConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}anomaly_model_id\0\u{3}llm_model_id\0\u{3}window_size\0\u{1}stride\0\u{3}anomaly_threshold\0\u{3}type_kind\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}anomaly_model_id\0\u{3}llm_model_id\0\u{3}window_size\0\u{1}stride\0\u{3}anomaly_threshold\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -905,17 +848,12 @@ nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.windowSize) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.stride) }()
       case 5: try { try decoder.decodeSingularFloatField(value: &self.anomalyThreshold) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self._typeKind) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.anomalyModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.anomalyModelID, fieldNumber: 1)
     }
@@ -931,9 +869,6 @@ nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._
     if self.anomalyThreshold.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.anomalyThreshold, fieldNumber: 5)
     }
-    try { if let v = self._typeKind {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -943,7 +878,6 @@ nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.windowSize != rhs.windowSize {return false}
     if lhs.stride != rhs.stride {return false}
     if lhs.anomalyThreshold != rhs.anomalyThreshold {return false}
-    if lhs._typeKind != rhs._typeKind {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

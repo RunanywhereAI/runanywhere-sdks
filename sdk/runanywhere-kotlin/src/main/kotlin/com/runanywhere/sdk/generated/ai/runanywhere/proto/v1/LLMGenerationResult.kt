@@ -65,32 +65,17 @@ public class LLMGenerationResult(
   )
   public val generation_time_ms: Double = 0.0,
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    jsonName = "ttftMs",
-    schemaIndex = 4,
-  )
-  public val ttft_ms: Double? = null,
-  @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val framework: String? = null,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "finishReason",
-    schemaIndex = 6,
-  )
-  public val finish_reason: String = "",
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "thinkingTokens",
-    schemaIndex = 7,
+    schemaIndex = 5,
   )
   public val thinking_tokens: Int = 0,
   @field:WireField(
@@ -98,16 +83,36 @@ public class LLMGenerationResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "responseTokens",
-    schemaIndex = 8,
+    schemaIndex = 6,
   )
   public val response_tokens: Int = 0,
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "jsonOutput",
-    schemaIndex = 9,
+    schemaIndex = 7,
   )
   public val json_output: String? = null,
+  @field:WireField(
+    tag = 27,
+    adapter = "ai.runanywhere.proto.v1.FinishReason#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "finishReason",
+    schemaIndex = 8,
+  )
+  public val finish_reason: FinishReason = FinishReason.FINISH_REASON_UNSPECIFIED,
+  /**
+   * Which of options.stop_sequences fired. Set only when finish_reason ==
+   * FINISH_REASON_STOP_SEQUENCE. Industry: Anthropic `stop_sequence`,
+   * llama.cpp `stopping_word`.
+   */
+  @field:WireField(
+    tag = 28,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "stopSequence",
+    schemaIndex = 9,
+  )
+  public val stop_sequence: String? = null,
   /**
    * Nothing reads performance or executed_on.
    */
@@ -204,12 +209,12 @@ public class LLMGenerationResult(
     if (thinking_content != other.thinking_content) return false
     if (model_used != other.model_used) return false
     if (generation_time_ms != other.generation_time_ms) return false
-    if (ttft_ms != other.ttft_ms) return false
     if (framework != other.framework) return false
-    if (finish_reason != other.finish_reason) return false
     if (thinking_tokens != other.thinking_tokens) return false
     if (response_tokens != other.response_tokens) return false
     if (json_output != other.json_output) return false
+    if (finish_reason != other.finish_reason) return false
+    if (stop_sequence != other.stop_sequence) return false
     if (performance != other.performance) return false
     if (executed_on != other.executed_on) return false
     if (structured_output_validation != other.structured_output_validation) return false
@@ -231,12 +236,12 @@ public class LLMGenerationResult(
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
       result = result * 37 + model_used.hashCode()
       result = result * 37 + generation_time_ms.hashCode()
-      result = result * 37 + (ttft_ms?.hashCode() ?: 0)
       result = result * 37 + (framework?.hashCode() ?: 0)
-      result = result * 37 + finish_reason.hashCode()
       result = result * 37 + thinking_tokens.hashCode()
       result = result * 37 + response_tokens.hashCode()
       result = result * 37 + (json_output?.hashCode() ?: 0)
+      result = result * 37 + finish_reason.hashCode()
+      result = result * 37 + (stop_sequence?.hashCode() ?: 0)
       result = result * 37 + (performance?.hashCode() ?: 0)
       result = result * 37 + (executed_on?.hashCode() ?: 0)
       result = result * 37 + (structured_output_validation?.hashCode() ?: 0)
@@ -258,12 +263,12 @@ public class LLMGenerationResult(
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     result += """model_used=${sanitize(model_used)}"""
     result += """generation_time_ms=$generation_time_ms"""
-    if (ttft_ms != null) result += """ttft_ms=$ttft_ms"""
     if (framework != null) result += """framework=${sanitize(framework)}"""
-    result += """finish_reason=${sanitize(finish_reason)}"""
     result += """thinking_tokens=$thinking_tokens"""
     result += """response_tokens=$response_tokens"""
     if (json_output != null) result += """json_output=${sanitize(json_output)}"""
+    result += """finish_reason=$finish_reason"""
+    if (stop_sequence != null) result += """stop_sequence=${sanitize(stop_sequence)}"""
     if (performance != null) result += """performance=$performance"""
     if (executed_on != null) result += """executed_on=$executed_on"""
     if (structured_output_validation != null) result += """structured_output_validation=$structured_output_validation"""
@@ -282,12 +287,12 @@ public class LLMGenerationResult(
     thinking_content: String? = this.thinking_content,
     model_used: String = this.model_used,
     generation_time_ms: Double = this.generation_time_ms,
-    ttft_ms: Double? = this.ttft_ms,
     framework: String? = this.framework,
-    finish_reason: String = this.finish_reason,
     thinking_tokens: Int = this.thinking_tokens,
     response_tokens: Int = this.response_tokens,
     json_output: String? = this.json_output,
+    finish_reason: FinishReason = this.finish_reason,
+    stop_sequence: String? = this.stop_sequence,
     performance: PerformanceMetrics? = this.performance,
     executed_on: ExecutionTarget? = this.executed_on,
     structured_output_validation: StructuredOutputValidation? = this.structured_output_validation,
@@ -299,7 +304,7 @@ public class LLMGenerationResult(
     usage: TokenUsage? = this.usage,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, model_used, generation_time_ms, ttft_ms, framework, finish_reason, thinking_tokens, response_tokens, json_output, performance, executed_on, structured_output_validation, cached_prompt_tokens, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, usage, error, unknownFields)
+  ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, model_used, generation_time_ms, framework, thinking_tokens, response_tokens, json_output, finish_reason, stop_sequence, performance, executed_on, structured_output_validation, cached_prompt_tokens, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, usage, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -324,11 +329,7 @@ public class LLMGenerationResult(
         if (!value.generation_time_ms.equals(0.0)) {
           size += ProtoAdapter.DOUBLE.encodedSizeWithTag(6, value.generation_time_ms)
         }
-        size += ProtoAdapter.DOUBLE.encodedSizeWithTag(7, value.ttft_ms)
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.framework)
-        if (value.finish_reason != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.finish_reason)
-        }
         if (value.thinking_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.thinking_tokens)
         }
@@ -336,6 +337,10 @@ public class LLMGenerationResult(
           size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.response_tokens)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.json_output)
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          size += FinishReason.ADAPTER.encodedSizeWithTag(27, value.finish_reason)
+        }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(28, value.stop_sequence)
         size += PerformanceMetrics.ADAPTER.encodedSizeWithTag(14, value.performance)
         size += ExecutionTarget.ADAPTER.encodedSizeWithTag(15, value.executed_on)
         size += StructuredOutputValidation.ADAPTER.encodedSizeWithTag(16, value.structured_output_validation)
@@ -368,11 +373,7 @@ public class LLMGenerationResult(
         if (!value.generation_time_ms.equals(0.0)) {
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.generation_time_ms)
         }
-        ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.ttft_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.framework)
-        if (value.finish_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.finish_reason)
-        }
         if (value.thinking_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 11, value.thinking_tokens)
         }
@@ -380,6 +381,10 @@ public class LLMGenerationResult(
           ProtoAdapter.INT32.encodeWithTag(writer, 12, value.response_tokens)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.json_output)
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          FinishReason.ADAPTER.encodeWithTag(writer, 27, value.finish_reason)
+        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 28, value.stop_sequence)
         PerformanceMetrics.ADAPTER.encodeWithTag(writer, 14, value.performance)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
         StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 16, value.structured_output_validation)
@@ -421,6 +426,10 @@ public class LLMGenerationResult(
         StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 16, value.structured_output_validation)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
         PerformanceMetrics.ADAPTER.encodeWithTag(writer, 14, value.performance)
+        ProtoAdapter.STRING.encodeWithTag(writer, 28, value.stop_sequence)
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          FinishReason.ADAPTER.encodeWithTag(writer, 27, value.finish_reason)
+        }
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.json_output)
         if (value.response_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 12, value.response_tokens)
@@ -428,11 +437,7 @@ public class LLMGenerationResult(
         if (value.thinking_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 11, value.thinking_tokens)
         }
-        if (value.finish_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.finish_reason)
-        }
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.framework)
-        ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.ttft_ms)
         if (!value.generation_time_ms.equals(0.0)) {
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.generation_time_ms)
         }
@@ -450,12 +455,12 @@ public class LLMGenerationResult(
         var thinking_content: String? = null
         var model_used: String = ""
         var generation_time_ms: Double = 0.0
-        var ttft_ms: Double? = null
         var framework: String? = null
-        var finish_reason: String = ""
         var thinking_tokens: Int = 0
         var response_tokens: Int = 0
         var json_output: String? = null
+        var finish_reason: FinishReason = FinishReason.FINISH_REASON_UNSPECIFIED
+        var stop_sequence: String? = null
         var performance: PerformanceMetrics? = null
         var executed_on: ExecutionTarget? = null
         var structured_output_validation: StructuredOutputValidation? = null
@@ -472,12 +477,16 @@ public class LLMGenerationResult(
             2 -> thinking_content = ProtoAdapter.STRING.decode(reader)
             5 -> model_used = ProtoAdapter.STRING.decode(reader)
             6 -> generation_time_ms = ProtoAdapter.DOUBLE.decode(reader)
-            7 -> ttft_ms = ProtoAdapter.DOUBLE.decode(reader)
             9 -> framework = ProtoAdapter.STRING.decode(reader)
-            10 -> finish_reason = ProtoAdapter.STRING.decode(reader)
             11 -> thinking_tokens = ProtoAdapter.INT32.decode(reader)
             12 -> response_tokens = ProtoAdapter.INT32.decode(reader)
             13 -> json_output = ProtoAdapter.STRING.decode(reader)
+            27 -> try {
+              finish_reason = FinishReason.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            28 -> stop_sequence = ProtoAdapter.STRING.decode(reader)
             14 -> performance = PerformanceMetrics.ADAPTER.decode(reader)
             15 -> try {
               executed_on = ExecutionTarget.ADAPTER.decode(reader)
@@ -500,12 +509,12 @@ public class LLMGenerationResult(
           thinking_content = thinking_content,
           model_used = model_used,
           generation_time_ms = generation_time_ms,
-          ttft_ms = ttft_ms,
           framework = framework,
-          finish_reason = finish_reason,
           thinking_tokens = thinking_tokens,
           response_tokens = response_tokens,
           json_output = json_output,
+          finish_reason = finish_reason,
+          stop_sequence = stop_sequence,
           performance = performance,
           executed_on = executed_on,
           structured_output_validation = structured_output_validation,

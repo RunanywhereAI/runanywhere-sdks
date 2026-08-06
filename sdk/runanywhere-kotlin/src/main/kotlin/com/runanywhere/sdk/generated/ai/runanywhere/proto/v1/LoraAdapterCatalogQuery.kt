@@ -53,6 +53,9 @@ public class LoraAdapterCatalogQuery(
     schemaIndex = 2,
   )
   public val downloaded_only: Boolean? = null,
+  /**
+   * Substring match against name.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

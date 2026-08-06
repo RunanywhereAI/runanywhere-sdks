@@ -31,7 +31,6 @@ abstract final class RADefaultsAudioCapture {
   static const int micSampleRateHz = 16000;
   static const int micChannels = 1;
   static const int micChannelCapacity = 128;
-  static const int micTapBufferFrames = 4096;
   static const int ttsSampleRateHz = 22050;
 }
 
@@ -41,10 +40,6 @@ abstract final class RADefaultsVoiceAgent {
   static const String defaultVadModelId = "silero-vad";
   static const double speechRmsThreshold = 0.015;
   static const double speechFloorMultiplier = 2.0;
-}
-
-abstract final class RADefaultsHybrid {
-  static const double sttConfidenceThreshold = 0.5;
 }
 
 abstract final class RADefaultsWorker {

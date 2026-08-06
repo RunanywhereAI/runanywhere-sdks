@@ -31,6 +31,9 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
+/**
+ * enum TTSVoiceGender deleted -- its only field is gone.
+ */
 public class TTSVoiceList(
   voices: List<TTSVoiceInfo> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,

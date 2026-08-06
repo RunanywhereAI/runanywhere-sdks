@@ -173,51 +173,6 @@ class PipelineState extends $pb.ProtobufEnum {
   const PipelineState._(super.value, super.name);
 }
 
-class SpeechTurnDetectionEventKind extends $pb.ProtobufEnum {
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED =
-      SpeechTurnDetectionEventKind._(0,
-          _omitEnumNames ? '' : 'SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED =
-      SpeechTurnDetectionEventKind._(
-          1,
-          _omitEnumNames
-              ? ''
-              : 'SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED =
-      SpeechTurnDetectionEventKind._(2,
-          _omitEnumNames ? '' : 'SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED =
-      SpeechTurnDetectionEventKind._(
-          3,
-          _omitEnumNames
-              ? ''
-              : 'SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS =
-      SpeechTurnDetectionEventKind._(4,
-          _omitEnumNames ? '' : 'SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS');
-
-  static const $core.List<SpeechTurnDetectionEventKind> values =
-      <SpeechTurnDetectionEventKind>[
-    SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS,
-  ];
-
-  static final $core.List<SpeechTurnDetectionEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
-  static SpeechTurnDetectionEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const SpeechTurnDetectionEventKind._(super.value, super.name);
-}
-
 class TurnLifecycleEventKind extends $pb.ProtobufEnum {
   static const TurnLifecycleEventKind TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED =
       TurnLifecycleEventKind._(

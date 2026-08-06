@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -99,7 +100,7 @@ export interface LogEntry {
   function: string;
   errorCode: number;
   modelId: string;
-  framework: string;
+  framework: InferenceFramework;
 }
 
 export interface LogEntry_MetadataEntry {
@@ -269,7 +270,7 @@ function createBaseLogEntry(): LogEntry {
     function: "",
     errorCode: 0,
     modelId: "",
-    framework: "",
+    framework: 0,
   };
 }
 
@@ -305,8 +306,8 @@ export const LogEntry: MessageFns<LogEntry> = {
     if (message.modelId !== "") {
       writer.uint32(82).string(message.modelId);
     }
-    if (message.framework !== "") {
-      writer.uint32(90).string(message.framework);
+    if (message.framework !== 0) {
+      writer.uint32(88).int32(message.framework);
     }
     return writer;
   },
@@ -402,11 +403,11 @@ export const LogEntry: MessageFns<LogEntry> = {
           continue;
         }
         case 11: {
-          if (tag !== 90) {
+          if (tag !== 88) {
             break;
           }
 
-          message.framework = reader.string();
+          message.framework = reader.int32() as any;
           continue;
         }
       }
@@ -450,7 +451,7 @@ export const LogEntry: MessageFns<LogEntry> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      framework: isSet(object.framework) ? globalThis.String(object.framework) : "",
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
     };
   },
 
@@ -492,8 +493,8 @@ export const LogEntry: MessageFns<LogEntry> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.framework !== "") {
-      obj.framework = message.framework;
+    if (message.framework !== 0) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
     }
     return obj;
   },
@@ -521,7 +522,7 @@ export const LogEntry: MessageFns<LogEntry> = {
     message.function = object.function ?? "";
     message.errorCode = object.errorCode ?? 0;
     message.modelId = object.modelId ?? "";
-    message.framework = object.framework ?? "";
+    message.framework = object.framework ?? 0;
     return message;
   },
 };

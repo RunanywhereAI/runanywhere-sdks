@@ -19,6 +19,7 @@ import { ValidationError } from './_errors';
 
 export const rerankOptionsDefaults = (): RerankOptions => ({
   topN: 0,
+  maxTokensPerDoc: 0,
 });
 
 export const validateRerankRequest = (m: RerankRequest): void => {

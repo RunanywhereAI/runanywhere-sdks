@@ -49,6 +49,9 @@ public class RAGResult(
     schemaIndex = 2,
   )
   public val context_used: String = "",
+  /**
+   * Measured directly, not by subtraction: embed the query + search + fuse.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -65,40 +68,38 @@ public class RAGResult(
     schemaIndex = 4,
   )
   public val generation_time_ms: Long = 0L,
+  /**
+   * MUST be set by rac_rag_proto_abi (event_id()).
+   */
   @field:WireField(
     tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "totalTimeMs",
-    schemaIndex = 5,
-  )
-  public val total_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val request_id: String = "",
   @field:WireField(
-    tag = 13,
+    tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "thinkingContent",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val thinking_content: String? = null,
+  /**
+   * MUST be copied from the LLM result the pipeline already holds.
+   */
   @field:WireField(
-    tag = 14,
+    tag = 8,
     adapter = "ai.runanywhere.proto.v1.TokenUsage#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val usage: TokenUsage? = null,
   @field:WireField(
-    tag = 15,
+    tag = 9,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -128,7 +129,6 @@ public class RAGResult(
     if (context_used != other.context_used) return false
     if (retrieval_time_ms != other.retrieval_time_ms) return false
     if (generation_time_ms != other.generation_time_ms) return false
-    if (total_time_ms != other.total_time_ms) return false
     if (request_id != other.request_id) return false
     if (thinking_content != other.thinking_content) return false
     if (usage != other.usage) return false
@@ -145,7 +145,6 @@ public class RAGResult(
       result = result * 37 + context_used.hashCode()
       result = result * 37 + retrieval_time_ms.hashCode()
       result = result * 37 + generation_time_ms.hashCode()
-      result = result * 37 + total_time_ms.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
       result = result * 37 + (usage?.hashCode() ?: 0)
@@ -162,7 +161,6 @@ public class RAGResult(
     result += """context_used=${sanitize(context_used)}"""
     result += """retrieval_time_ms=$retrieval_time_ms"""
     result += """generation_time_ms=$generation_time_ms"""
-    result += """total_time_ms=$total_time_ms"""
     result += """request_id=${sanitize(request_id)}"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     if (usage != null) result += """usage=$usage"""
@@ -176,13 +174,12 @@ public class RAGResult(
     context_used: String = this.context_used,
     retrieval_time_ms: Long = this.retrieval_time_ms,
     generation_time_ms: Long = this.generation_time_ms,
-    total_time_ms: Long = this.total_time_ms,
     request_id: String = this.request_id,
     thinking_content: String? = this.thinking_content,
     usage: TokenUsage? = this.usage,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGResult = RAGResult(answer, retrieved_chunks, context_used, retrieval_time_ms, generation_time_ms, total_time_ms, request_id, thinking_content, usage, error, unknownFields)
+  ): RAGResult = RAGResult(answer, retrieved_chunks, context_used, retrieval_time_ms, generation_time_ms, request_id, thinking_content, usage, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -209,17 +206,14 @@ public class RAGResult(
         if (value.generation_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.generation_time_ms)
         }
-        if (value.total_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.total_time_ms)
-        }
         if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.request_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.request_id)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.thinking_content)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.thinking_content)
         if (value.usage != null) {
-          size += TokenUsage.ADAPTER.encodedSizeWithTag(14, value.usage)
+          size += TokenUsage.ADAPTER.encodedSizeWithTag(8, value.usage)
         }
-        size += SDKError.ADAPTER.encodedSizeWithTag(15, value.error)
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
@@ -237,32 +231,26 @@ public class RAGResult(
         if (value.generation_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.generation_time_ms)
         }
-        if (value.total_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.total_time_ms)
-        }
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.request_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.request_id)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.thinking_content)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.thinking_content)
         if (value.usage != null) {
-          TokenUsage.ADAPTER.encodeWithTag(writer, 14, value.usage)
+          TokenUsage.ADAPTER.encodeWithTag(writer, 8, value.usage)
         }
-        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGResult) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         if (value.usage != null) {
-          TokenUsage.ADAPTER.encodeWithTag(writer, 14, value.usage)
+          TokenUsage.ADAPTER.encodeWithTag(writer, 8, value.usage)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.thinking_content)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.thinking_content)
         if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.request_id)
-        }
-        if (value.total_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.total_time_ms)
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.request_id)
         }
         if (value.generation_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.generation_time_ms)
@@ -285,7 +273,6 @@ public class RAGResult(
         var context_used: String = ""
         var retrieval_time_ms: Long = 0L
         var generation_time_ms: Long = 0L
-        var total_time_ms: Long = 0L
         var request_id: String = ""
         var thinking_content: String? = null
         var usage: TokenUsage? = null
@@ -297,11 +284,10 @@ public class RAGResult(
             3 -> context_used = ProtoAdapter.STRING.decode(reader)
             4 -> retrieval_time_ms = ProtoAdapter.INT64.decode(reader)
             5 -> generation_time_ms = ProtoAdapter.INT64.decode(reader)
-            6 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
-            12 -> request_id = ProtoAdapter.STRING.decode(reader)
-            13 -> thinking_content = ProtoAdapter.STRING.decode(reader)
-            14 -> usage = TokenUsage.ADAPTER.decode(reader)
-            15 -> error = SDKError.ADAPTER.decode(reader)
+            6 -> request_id = ProtoAdapter.STRING.decode(reader)
+            7 -> thinking_content = ProtoAdapter.STRING.decode(reader)
+            8 -> usage = TokenUsage.ADAPTER.decode(reader)
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -311,7 +297,6 @@ public class RAGResult(
           context_used = context_used,
           retrieval_time_ms = retrieval_time_ms,
           generation_time_ms = generation_time_ms,
-          total_time_ms = total_time_ms,
           request_id = request_id,
           thinking_content = thinking_content,
           usage = usage,

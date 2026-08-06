@@ -33,92 +33,45 @@ import okio.ByteString
  * Returned by Phase 1, Phase 2, and retryHTTP.
  *
  * A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
- * to fail in offline mode, in which case error is unset, http_configured=false,
- * and warning holds the offline notice while the SDK continues on cached
- * models.
+ * to fail in offline mode, in which case error is unset and warning holds the
+ * offline notice while the SDK continues on cached models.
  */
 public class SdkInitResult(
   @field:WireField(
     tag = 1,
-    adapter = "ai.runanywhere.proto.v1.SdkInitPhase#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val phase: SdkInitPhase = SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED,
-  @field:WireField(
-    tag = 3,
-    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
   public val error: SDKError? = null,
   /**
-   * HTTP transport wired at this call site.
+   * Registry rows that linked to local files.
+   */
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "linkedModelsCount",
+    schemaIndex = 1,
+  )
+  public val linked_models_count: Int = 0,
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 2,
+  )
+  public val warning: String = "",
+  /**
+   * The cross-phase latched bit that survives between calls. SDKs read this
+   * to decide whether an authenticated call can proceed without a retryHTTP.
    */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "httpConfigured",
-    schemaIndex = 2,
-  )
-  public val http_configured: Boolean = false,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "deviceRegistered",
-    schemaIndex = 3,
-  )
-  public val device_registered: Boolean = false,
-  /**
-   * Registry rows that linked to local files.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "linkedModelsCount",
-    schemaIndex = 4,
-  )
-  public val linked_models_count: Int = 0,
-  /**
-   * On-disk folders with no registry row.
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "discoveredOrphans",
-    schemaIndex = 5,
-  )
-  public val discovered_orphans: Int = 0,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
-  )
-  public val warning: String = "",
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "durationMs",
-    schemaIndex = 7,
-  )
-  public val duration_ms: Long = 0L,
-  /**
-   * The cross-phase latched bit that survives between calls, as opposed to
-   * http_configured, which describes only the calling phase. SDKs read this
-   * to decide whether an authenticated call can proceed without a retryHTTP.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "hasCompletedHttpSetup",
-    schemaIndex = 8,
+    schemaIndex = 3,
   )
   public val has_completed_http_setup: Boolean = false,
   /**
@@ -127,11 +80,11 @@ public class SdkInitResult(
    * retrying HTTP on every guarded call.
    */
   @field:WireField(
-    tag = 11,
+    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "httpApplicable",
-    schemaIndex = 9,
+    schemaIndex = 4,
   )
   public val http_applicable: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -146,14 +99,9 @@ public class SdkInitResult(
     if (other === this) return true
     if (other !is SdkInitResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (phase != other.phase) return false
     if (error != other.error) return false
-    if (http_configured != other.http_configured) return false
-    if (device_registered != other.device_registered) return false
     if (linked_models_count != other.linked_models_count) return false
-    if (discovered_orphans != other.discovered_orphans) return false
     if (warning != other.warning) return false
-    if (duration_ms != other.duration_ms) return false
     if (has_completed_http_setup != other.has_completed_http_setup) return false
     if (http_applicable != other.http_applicable) return false
     return true
@@ -163,14 +111,9 @@ public class SdkInitResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + phase.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
-      result = result * 37 + http_configured.hashCode()
-      result = result * 37 + device_registered.hashCode()
       result = result * 37 + linked_models_count.hashCode()
-      result = result * 37 + discovered_orphans.hashCode()
       result = result * 37 + warning.hashCode()
-      result = result * 37 + duration_ms.hashCode()
       result = result * 37 + has_completed_http_setup.hashCode()
       result = result * 37 + http_applicable.hashCode()
       super.hashCode = result
@@ -180,32 +123,22 @@ public class SdkInitResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """phase=$phase"""
     if (error != null) result += """error=$error"""
-    result += """http_configured=$http_configured"""
-    result += """device_registered=$device_registered"""
     result += """linked_models_count=$linked_models_count"""
-    result += """discovered_orphans=$discovered_orphans"""
     result += """warning=${sanitize(warning)}"""
-    result += """duration_ms=$duration_ms"""
     result += """has_completed_http_setup=$has_completed_http_setup"""
     result += """http_applicable=$http_applicable"""
     return result.joinToString(prefix = "SdkInitResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    phase: SdkInitPhase = this.phase,
     error: SDKError? = this.error,
-    http_configured: Boolean = this.http_configured,
-    device_registered: Boolean = this.device_registered,
     linked_models_count: Int = this.linked_models_count,
-    discovered_orphans: Int = this.discovered_orphans,
     warning: String = this.warning,
-    duration_ms: Long = this.duration_ms,
     has_completed_http_setup: Boolean = this.has_completed_http_setup,
     http_applicable: Boolean = this.http_applicable,
     unknownFields: ByteString = this.unknownFields,
-  ): SdkInitResult = SdkInitResult(phase, error, http_configured, device_registered, linked_models_count, discovered_orphans, warning, duration_ms, has_completed_http_setup, http_applicable, unknownFields)
+  ): SdkInitResult = SdkInitResult(error, linked_models_count, warning, has_completed_http_setup, http_applicable, unknownFields)
 
   public companion object {
     @JvmField
@@ -219,69 +152,39 @@ public class SdkInitResult(
     ) {
       override fun encodedSize(`value`: SdkInitResult): Int {
         var size = value.unknownFields.size
-        if (value.phase != ai.runanywhere.proto.v1.SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED) {
-          size += SdkInitPhase.ADAPTER.encodedSizeWithTag(1, value.phase)
-        }
         if (value.error != null) {
-          size += SDKError.ADAPTER.encodedSizeWithTag(3, value.error)
-        }
-        if (value.http_configured != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.http_configured)
-        }
-        if (value.device_registered != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.device_registered)
+          size += SDKError.ADAPTER.encodedSizeWithTag(1, value.error)
         }
         if (value.linked_models_count != 0) {
-          size += ProtoAdapter.UINT32.encodedSizeWithTag(6, value.linked_models_count)
-        }
-        if (value.discovered_orphans != 0) {
-          size += ProtoAdapter.UINT32.encodedSizeWithTag(7, value.discovered_orphans)
+          size += ProtoAdapter.UINT32.encodedSizeWithTag(2, value.linked_models_count)
         }
         if (value.warning != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.warning)
-        }
-        if (value.duration_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.duration_ms)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.warning)
         }
         if (value.has_completed_http_setup != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.has_completed_http_setup)
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.has_completed_http_setup)
         }
         if (value.http_applicable != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.http_applicable)
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.http_applicable)
         }
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: SdkInitResult) {
-        if (value.phase != ai.runanywhere.proto.v1.SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED) {
-          SdkInitPhase.ADAPTER.encodeWithTag(writer, 1, value.phase)
-        }
         if (value.error != null) {
-          SDKError.ADAPTER.encodeWithTag(writer, 3, value.error)
-        }
-        if (value.http_configured != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.http_configured)
-        }
-        if (value.device_registered != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.device_registered)
+          SDKError.ADAPTER.encodeWithTag(writer, 1, value.error)
         }
         if (value.linked_models_count != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 6, value.linked_models_count)
-        }
-        if (value.discovered_orphans != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 7, value.discovered_orphans)
+          ProtoAdapter.UINT32.encodeWithTag(writer, 2, value.linked_models_count)
         }
         if (value.warning != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.warning)
-        }
-        if (value.duration_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.warning)
         }
         if (value.has_completed_http_setup != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_completed_http_setup)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.has_completed_http_setup)
         }
         if (value.http_applicable != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.http_applicable)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.http_applicable)
         }
         writer.writeBytes(value.unknownFields)
       }
@@ -289,76 +192,42 @@ public class SdkInitResult(
       override fun encode(writer: ReverseProtoWriter, `value`: SdkInitResult) {
         writer.writeBytes(value.unknownFields)
         if (value.http_applicable != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.http_applicable)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.http_applicable)
         }
         if (value.has_completed_http_setup != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_completed_http_setup)
-        }
-        if (value.duration_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.has_completed_http_setup)
         }
         if (value.warning != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.warning)
-        }
-        if (value.discovered_orphans != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 7, value.discovered_orphans)
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.warning)
         }
         if (value.linked_models_count != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 6, value.linked_models_count)
-        }
-        if (value.device_registered != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.device_registered)
-        }
-        if (value.http_configured != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.http_configured)
+          ProtoAdapter.UINT32.encodeWithTag(writer, 2, value.linked_models_count)
         }
         if (value.error != null) {
-          SDKError.ADAPTER.encodeWithTag(writer, 3, value.error)
-        }
-        if (value.phase != ai.runanywhere.proto.v1.SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED) {
-          SdkInitPhase.ADAPTER.encodeWithTag(writer, 1, value.phase)
+          SDKError.ADAPTER.encodeWithTag(writer, 1, value.error)
         }
       }
 
       override fun decode(reader: ProtoReader): SdkInitResult {
-        var phase: SdkInitPhase = SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED
         var error: SDKError? = null
-        var http_configured: Boolean = false
-        var device_registered: Boolean = false
         var linked_models_count: Int = 0
-        var discovered_orphans: Int = 0
         var warning: String = ""
-        var duration_ms: Long = 0L
         var has_completed_http_setup: Boolean = false
         var http_applicable: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> try {
-              phase = SdkInitPhase.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            3 -> error = SDKError.ADAPTER.decode(reader)
-            4 -> http_configured = ProtoAdapter.BOOL.decode(reader)
-            5 -> device_registered = ProtoAdapter.BOOL.decode(reader)
-            6 -> linked_models_count = ProtoAdapter.UINT32.decode(reader)
-            7 -> discovered_orphans = ProtoAdapter.UINT32.decode(reader)
-            8 -> warning = ProtoAdapter.STRING.decode(reader)
-            9 -> duration_ms = ProtoAdapter.INT64.decode(reader)
-            10 -> has_completed_http_setup = ProtoAdapter.BOOL.decode(reader)
-            11 -> http_applicable = ProtoAdapter.BOOL.decode(reader)
+            1 -> error = SDKError.ADAPTER.decode(reader)
+            2 -> linked_models_count = ProtoAdapter.UINT32.decode(reader)
+            3 -> warning = ProtoAdapter.STRING.decode(reader)
+            4 -> has_completed_http_setup = ProtoAdapter.BOOL.decode(reader)
+            5 -> http_applicable = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return SdkInitResult(
-          phase = phase,
           error = error,
-          http_configured = http_configured,
-          device_registered = device_registered,
           linked_models_count = linked_models_count,
-          discovered_orphans = discovered_orphans,
           warning = warning,
-          duration_ms = duration_ms,
           has_completed_http_setup = has_completed_http_setup,
           http_applicable = http_applicable,
           unknownFields = unknownFields

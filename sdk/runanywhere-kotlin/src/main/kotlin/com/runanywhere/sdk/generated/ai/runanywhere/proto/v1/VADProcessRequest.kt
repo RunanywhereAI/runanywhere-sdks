@@ -16,8 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -28,42 +26,23 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 public class VADProcessRequest(
   @field:WireField(
     tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "requestId",
-    schemaIndex = 0,
-  )
-  public val request_id: String = "",
-  @field:WireField(
-    tag = 2,
     adapter = "ai.runanywhere.proto.v1.VADAudioSource#ADAPTER",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val audio: VADAudioSource? = null,
   @field:WireField(
-    tag = 3,
+    tag = 2,
     adapter = "ai.runanywhere.proto.v1.VADOptions#ADAPTER",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val options: VADOptions? = null,
-  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADProcessRequest, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 4,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 3,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -74,10 +53,8 @@ public class VADProcessRequest(
     if (other === this) return true
     if (other !is VADProcessRequest) return false
     if (unknownFields != other.unknownFields) return false
-    if (request_id != other.request_id) return false
     if (audio != other.audio) return false
     if (options != other.options) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -85,10 +62,8 @@ public class VADProcessRequest(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + request_id.hashCode()
       result = result * 37 + (audio?.hashCode() ?: 0)
       result = result * 37 + (options?.hashCode() ?: 0)
-      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -96,20 +71,16 @@ public class VADProcessRequest(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """request_id=${sanitize(request_id)}"""
     if (audio != null) result += """audio=$audio"""
     if (options != null) result += """options=$options"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "VADProcessRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    request_id: String = this.request_id,
     audio: VADAudioSource? = this.audio,
     options: VADOptions? = this.options,
-    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): VADProcessRequest = VADProcessRequest(request_id, audio, options, metadata, unknownFields)
+  ): VADProcessRequest = VADProcessRequest(audio, options, unknownFields)
 
   public companion object {
     @JvmField
@@ -121,59 +92,38 @@ public class VADProcessRequest(
       null, 
       "vad_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: VADProcessRequest): Int {
         var size = value.unknownFields.size
-        if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.request_id)
-        }
-        size += VADAudioSource.ADAPTER.encodedSizeWithTag(2, value.audio)
-        size += VADOptions.ADAPTER.encodedSizeWithTag(3, value.options)
-        size += metadataAdapter.encodedSizeWithTag(4, value.metadata)
+        size += VADAudioSource.ADAPTER.encodedSizeWithTag(1, value.audio)
+        size += VADOptions.ADAPTER.encodedSizeWithTag(2, value.options)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: VADProcessRequest) {
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
-        }
-        VADAudioSource.ADAPTER.encodeWithTag(writer, 2, value.audio)
-        VADOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
-        metadataAdapter.encodeWithTag(writer, 4, value.metadata)
+        VADAudioSource.ADAPTER.encodeWithTag(writer, 1, value.audio)
+        VADOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADProcessRequest) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 4, value.metadata)
-        VADOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
-        VADAudioSource.ADAPTER.encodeWithTag(writer, 2, value.audio)
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
-        }
+        VADOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
+        VADAudioSource.ADAPTER.encodeWithTag(writer, 1, value.audio)
       }
 
       override fun decode(reader: ProtoReader): VADProcessRequest {
-        var request_id: String = ""
         var audio: VADAudioSource? = null
         var options: VADOptions? = null
-        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> request_id = ProtoAdapter.STRING.decode(reader)
-            2 -> audio = VADAudioSource.ADAPTER.decode(reader)
-            3 -> options = VADOptions.ADAPTER.decode(reader)
-            4 -> metadata.putAll(metadataAdapter.decode(reader))
+            1 -> audio = VADAudioSource.ADAPTER.decode(reader)
+            2 -> options = VADOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADProcessRequest(
-          request_id = request_id,
           audio = audio,
           options = options,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }

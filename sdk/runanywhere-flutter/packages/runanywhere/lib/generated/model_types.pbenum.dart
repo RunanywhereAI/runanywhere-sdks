@@ -245,8 +245,7 @@ class InferenceFramework extends $pb.ProtobufEnum {
   const InferenceFramework._(super.value, super.name);
 }
 
-/// What a model does. There is no RERANK member, which is why the rerank
-/// primitive cannot auto-load a model.
+/// What a model does.
 class ModelCategory extends $pb.ProtobufEnum {
   static const ModelCategory MODEL_CATEGORY_UNSPECIFIED =
       ModelCategory._(0, _omitEnumNames ? '' : 'MODEL_CATEGORY_UNSPECIFIED');
@@ -276,6 +275,8 @@ class ModelCategory extends $pb.ProtobufEnum {
   static const ModelCategory MODEL_CATEGORY_SEMANTIC_SEGMENTATION =
       ModelCategory._(
           11, _omitEnumNames ? '' : 'MODEL_CATEGORY_SEMANTIC_SEGMENTATION');
+  static const ModelCategory MODEL_CATEGORY_RERANK =
+      ModelCategory._(12, _omitEnumNames ? '' : 'MODEL_CATEGORY_RERANK');
 
   static const $core.List<ModelCategory> values = <ModelCategory>[
     MODEL_CATEGORY_UNSPECIFIED,
@@ -290,10 +291,11 @@ class ModelCategory extends $pb.ProtobufEnum {
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
     MODEL_CATEGORY_SPEAKER_DIARIZATION,
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
+    MODEL_CATEGORY_RERANK,
   ];
 
   static final $core.List<ModelCategory?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 11);
+      $pb.ProtobufEnum.$_initByValueList(values, 12);
   static ModelCategory? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -517,47 +519,6 @@ class ModelRegistryStatus extends $pb.ProtobufEnum {
   const ModelRegistryStatus._(super.value, super.name);
 }
 
-class ModelQuerySortField extends $pb.ProtobufEnum {
-  static const ModelQuerySortField MODEL_QUERY_SORT_FIELD_UNSPECIFIED =
-      ModelQuerySortField._(
-          0, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_FIELD_UNSPECIFIED');
-  static const ModelQuerySortField MODEL_QUERY_SORT_FIELD_NAME =
-      ModelQuerySortField._(
-          1, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_FIELD_NAME');
-  static const ModelQuerySortField MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS =
-      ModelQuerySortField._(
-          2, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS');
-  static const ModelQuerySortField MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS =
-      ModelQuerySortField._(
-          3, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS');
-  static const ModelQuerySortField MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES =
-      ModelQuerySortField._(4,
-          _omitEnumNames ? '' : 'MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES');
-  static const ModelQuerySortField MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS =
-      ModelQuerySortField._(5,
-          _omitEnumNames ? '' : 'MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS');
-  static const ModelQuerySortField MODEL_QUERY_SORT_FIELD_USAGE_COUNT =
-      ModelQuerySortField._(
-          6, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_FIELD_USAGE_COUNT');
-
-  static const $core.List<ModelQuerySortField> values = <ModelQuerySortField>[
-    MODEL_QUERY_SORT_FIELD_UNSPECIFIED,
-    MODEL_QUERY_SORT_FIELD_NAME,
-    MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS,
-    MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS,
-    MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES,
-    MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS,
-    MODEL_QUERY_SORT_FIELD_USAGE_COUNT,
-  ];
-
-  static final $core.List<ModelQuerySortField?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
-  static ModelQuerySortField? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const ModelQuerySortField._(super.value, super.name);
-}
-
 /// Role of a file inside a single/multi-file artifact. The generic COMPANION
 /// role covers arbitrary sidecars; specific roles document common public
 /// catalog files such as VLM mmproj files and tokenizer/config assets.
@@ -632,6 +593,36 @@ class RoutingPolicy extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const RoutingPolicy._(super.value, super.name);
+}
+
+/// Requested execution placement for a load. LiteRT/ExecuTorch-aligned.
+class AcceleratorPolicy extends $pb.ProtobufEnum {
+  static const AcceleratorPolicy ACCELERATOR_POLICY_UNSPECIFIED =
+      AcceleratorPolicy._(
+          0, _omitEnumNames ? '' : 'ACCELERATOR_POLICY_UNSPECIFIED');
+  static const AcceleratorPolicy ACCELERATOR_POLICY_AUTO =
+      AcceleratorPolicy._(1, _omitEnumNames ? '' : 'ACCELERATOR_POLICY_AUTO');
+  static const AcceleratorPolicy ACCELERATOR_POLICY_CPU =
+      AcceleratorPolicy._(2, _omitEnumNames ? '' : 'ACCELERATOR_POLICY_CPU');
+  static const AcceleratorPolicy ACCELERATOR_POLICY_GPU =
+      AcceleratorPolicy._(3, _omitEnumNames ? '' : 'ACCELERATOR_POLICY_GPU');
+  static const AcceleratorPolicy ACCELERATOR_POLICY_NPU =
+      AcceleratorPolicy._(4, _omitEnumNames ? '' : 'ACCELERATOR_POLICY_NPU');
+
+  static const $core.List<AcceleratorPolicy> values = <AcceleratorPolicy>[
+    ACCELERATOR_POLICY_UNSPECIFIED,
+    ACCELERATOR_POLICY_AUTO,
+    ACCELERATOR_POLICY_CPU,
+    ACCELERATOR_POLICY_GPU,
+    ACCELERATOR_POLICY_NPU,
+  ];
+
+  static final $core.List<AcceleratorPolicy?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static AcceleratorPolicy? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AcceleratorPolicy._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

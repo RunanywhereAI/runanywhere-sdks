@@ -30,7 +30,6 @@ public enum RADefaults {
         public static let micSampleRateHz: Int = 16000
         public static let micChannels: Int = 1
         public static let micChannelCapacity: Int = 128
-        public static let micTapBufferFrames: Int = 4096
         public static let ttsSampleRateHz: Int = 22050
     }
 
@@ -40,10 +39,6 @@ public enum RADefaults {
         public static let defaultVadModelID: String = "silero-vad"
         public static let speechRmsThreshold: Float = 0.015
         public static let speechFloorMultiplier: Float = 2.0
-    }
-
-    public enum Hybrid {
-        public static let sttConfidenceThreshold: Float = 0.5
     }
 
     public enum Worker {

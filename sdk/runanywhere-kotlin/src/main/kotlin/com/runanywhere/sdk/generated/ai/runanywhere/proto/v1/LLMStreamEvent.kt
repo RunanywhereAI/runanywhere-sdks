@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -31,7 +30,13 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * `result` is populated only on the terminal event.
+ * LLMStreamFinalResult is deleted: the stream terminates with the same
+ * LLMGenerationResult type the unary call returns (see `result` below), so
+ * one mapper serves both paths instead of two near-identical ones.
+ *
+ * Exactly one terminal event per stream: event_kind == COMPLETED (with
+ * `result` set) or == ERROR (with `error` set). `event_kind` is the primary
+ * discriminator.
  */
 public class LLMStreamEvent(
   /**
@@ -44,126 +49,83 @@ public class LLMStreamEvent(
     schemaIndex = 0,
   )
   public val seq: Long = 0L,
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "timestampUs",
-    schemaIndex = 1,
-  )
-  public val timestamp_us: Long = 0L,
+  /**
+   * The delta. Answer text when event_kind == TOKEN, reasoning text when
+   * event_kind == THINKING.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val token: String = "",
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "isFinal",
-    schemaIndex = 3,
-  )
-  public val is_final: Boolean = false,
-  @field:WireField(
-    tag = 5,
-    adapter = "ai.runanywhere.proto.v1.TokenKind#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokenId",
-    schemaIndex = 5,
-  )
-  public val token_id: Int = 0,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
-  )
-  public val logprob: Float = 0f,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "finishReason",
-    schemaIndex = 7,
-  )
-  public val finish_reason: String = "",
-  @field:WireField(
-    tag = 10,
-    adapter = "ai.runanywhere.proto.v1.LLMStreamFinalResult#ADAPTER",
-    schemaIndex = 8,
-  )
-  public val result: LLMStreamFinalResult? = null,
   @field:WireField(
     tag = 12,
     adapter = "ai.runanywhere.proto.v1.LLMStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "eventKind",
-    schemaIndex = 9,
+    schemaIndex = 2,
   )
   public val event_kind: LLMStreamEventKind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED,
+  /**
+   * Correlation id, echoed from the request on every event.
+   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 10,
+    schemaIndex = 3,
   )
   public val request_id: String = "",
   @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    tag = 21,
+    adapter = "ai.runanywhere.proto.v1.FinishReason#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "conversationId",
-    schemaIndex = 11,
+    jsonName = "finishReason",
+    schemaIndex = 4,
   )
-  public val conversation_id: String = "",
+  public val finish_reason: FinishReason = FinishReason.FINISH_REASON_UNSPECIFIED,
+  /**
+   * Present exactly when event_kind == COMPLETED.
+   */
   @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "promptTokensProcessed",
-    schemaIndex = 12,
+    tag = 22,
+    adapter = "ai.runanywhere.proto.v1.LLMGenerationResult#ADAPTER",
+    schemaIndex = 5,
   )
-  public val prompt_tokens_processed: Int = 0,
-  @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "completionTokensGenerated",
-    schemaIndex = 13,
-  )
-  public val completion_tokens_generated: Int = 0,
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "elapsedMs",
-    schemaIndex = 14,
-  )
-  public val elapsed_ms: Long = 0L,
+  public val result: LLMGenerationResult? = null,
+  /**
+   * Present exactly when event_kind == TOOL_CALL.
+   */
   @field:WireField(
     tag = 18,
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
     jsonName = "toolCall",
-    schemaIndex = 15,
+    schemaIndex = 6,
   )
   public val tool_call: ToolCall? = null,
+  /**
+   * Present exactly when event_kind == ERROR.
+   */
   @field:WireField(
     tag = 19,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 16,
+    schemaIndex = 7,
   )
   public val error: SDKError? = null,
+  /**
+   * Largest complete JSON value visible in the output so far, when
+   * LLMGenerationOptions.structured_output is set.
+   */
+  @field:WireField(
+    tag = 20,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "partialJson",
+    schemaIndex = 8,
+  )
+  public val partial_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -177,22 +139,14 @@ public class LLMStreamEvent(
     if (other !is LLMStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
     if (seq != other.seq) return false
-    if (timestamp_us != other.timestamp_us) return false
     if (token != other.token) return false
-    if (is_final != other.is_final) return false
-    if (kind != other.kind) return false
-    if (token_id != other.token_id) return false
-    if (logprob != other.logprob) return false
-    if (finish_reason != other.finish_reason) return false
-    if (result != other.result) return false
     if (event_kind != other.event_kind) return false
     if (request_id != other.request_id) return false
-    if (conversation_id != other.conversation_id) return false
-    if (prompt_tokens_processed != other.prompt_tokens_processed) return false
-    if (completion_tokens_generated != other.completion_tokens_generated) return false
-    if (elapsed_ms != other.elapsed_ms) return false
+    if (finish_reason != other.finish_reason) return false
+    if (result != other.result) return false
     if (tool_call != other.tool_call) return false
     if (error != other.error) return false
+    if (partial_json != other.partial_json) return false
     return true
   }
 
@@ -201,22 +155,14 @@ public class LLMStreamEvent(
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
       result_ = result_ * 37 + seq.hashCode()
-      result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + token.hashCode()
-      result_ = result_ * 37 + is_final.hashCode()
-      result_ = result_ * 37 + kind.hashCode()
-      result_ = result_ * 37 + token_id.hashCode()
-      result_ = result_ * 37 + logprob.hashCode()
-      result_ = result_ * 37 + finish_reason.hashCode()
-      result_ = result_ * 37 + (result?.hashCode() ?: 0)
       result_ = result_ * 37 + event_kind.hashCode()
       result_ = result_ * 37 + request_id.hashCode()
-      result_ = result_ * 37 + conversation_id.hashCode()
-      result_ = result_ * 37 + prompt_tokens_processed.hashCode()
-      result_ = result_ * 37 + completion_tokens_generated.hashCode()
-      result_ = result_ * 37 + elapsed_ms.hashCode()
+      result_ = result_ * 37 + finish_reason.hashCode()
+      result_ = result_ * 37 + (result?.hashCode() ?: 0)
       result_ = result_ * 37 + (tool_call?.hashCode() ?: 0)
       result_ = result_ * 37 + (error?.hashCode() ?: 0)
+      result_ = result_ * 37 + (partial_json?.hashCode() ?: 0)
       super.hashCode = result_
     }
     return result_
@@ -225,45 +171,29 @@ public class LLMStreamEvent(
   override fun toString(): String {
     val result_ = mutableListOf<String>()
     result_ += """seq=$seq"""
-    result_ += """timestamp_us=$timestamp_us"""
     result_ += """token=${sanitize(token)}"""
-    result_ += """is_final=$is_final"""
-    result_ += """kind=$kind"""
-    result_ += """token_id=$token_id"""
-    result_ += """logprob=$logprob"""
-    result_ += """finish_reason=${sanitize(finish_reason)}"""
-    if (result != null) result_ += """result=$result"""
     result_ += """event_kind=$event_kind"""
     result_ += """request_id=${sanitize(request_id)}"""
-    result_ += """conversation_id=${sanitize(conversation_id)}"""
-    result_ += """prompt_tokens_processed=$prompt_tokens_processed"""
-    result_ += """completion_tokens_generated=$completion_tokens_generated"""
-    result_ += """elapsed_ms=$elapsed_ms"""
+    result_ += """finish_reason=$finish_reason"""
+    if (result != null) result_ += """result=$result"""
     if (tool_call != null) result_ += """tool_call=$tool_call"""
     if (error != null) result_ += """error=$error"""
+    if (partial_json != null) result_ += """partial_json=${sanitize(partial_json)}"""
     return result_.joinToString(prefix = "LLMStreamEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     seq: Long = this.seq,
-    timestamp_us: Long = this.timestamp_us,
     token: String = this.token,
-    is_final: Boolean = this.is_final,
-    kind: TokenKind = this.kind,
-    token_id: Int = this.token_id,
-    logprob: Float = this.logprob,
-    finish_reason: String = this.finish_reason,
-    result: LLMStreamFinalResult? = this.result,
     event_kind: LLMStreamEventKind = this.event_kind,
     request_id: String = this.request_id,
-    conversation_id: String = this.conversation_id,
-    prompt_tokens_processed: Int = this.prompt_tokens_processed,
-    completion_tokens_generated: Int = this.completion_tokens_generated,
-    elapsed_ms: Long = this.elapsed_ms,
+    finish_reason: FinishReason = this.finish_reason,
+    result: LLMGenerationResult? = this.result,
     tool_call: ToolCall? = this.tool_call,
     error: SDKError? = this.error,
+    partial_json: String? = this.partial_json,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMStreamEvent = LLMStreamEvent(seq, timestamp_us, token, is_final, kind, token_id, logprob, finish_reason, result, event_kind, request_id, conversation_id, prompt_tokens_processed, completion_tokens_generated, elapsed_ms, tool_call, error, unknownFields)
+  ): LLMStreamEvent = LLMStreamEvent(seq, token, event_kind, request_id, finish_reason, result, tool_call, error, partial_json, unknownFields)
 
   public companion object {
     @JvmField
@@ -280,48 +210,22 @@ public class LLMStreamEvent(
         if (value.seq != 0L) {
           size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
         }
-        if (value.timestamp_us != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
-        }
         if (value.token != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.token)
         }
-        if (value.is_final != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.is_final)
-        }
-        if (value.kind != ai.runanywhere.proto.v1.TokenKind.TOKEN_KIND_UNSPECIFIED) {
-          size += TokenKind.ADAPTER.encodedSizeWithTag(5, value.kind)
-        }
-        if (value.token_id != 0) {
-          size += ProtoAdapter.UINT32.encodedSizeWithTag(6, value.token_id)
-        }
-        if (!value.logprob.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(7, value.logprob)
-        }
-        if (value.finish_reason != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.finish_reason)
-        }
-        size += LLMStreamFinalResult.ADAPTER.encodedSizeWithTag(10, value.result)
         if (value.event_kind != ai.runanywhere.proto.v1.LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED) {
           size += LLMStreamEventKind.ADAPTER.encodedSizeWithTag(12, value.event_kind)
         }
         if (value.request_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.request_id)
         }
-        if (value.conversation_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.conversation_id)
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          size += FinishReason.ADAPTER.encodedSizeWithTag(21, value.finish_reason)
         }
-        if (value.prompt_tokens_processed != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(15, value.prompt_tokens_processed)
-        }
-        if (value.completion_tokens_generated != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(16, value.completion_tokens_generated)
-        }
-        if (value.elapsed_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(17, value.elapsed_ms)
-        }
+        size += LLMGenerationResult.ADAPTER.encodedSizeWithTag(22, value.result)
         size += ToolCall.ADAPTER.encodedSizeWithTag(18, value.tool_call)
         size += SDKError.ADAPTER.encodedSizeWithTag(19, value.error)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(20, value.partial_json)
         return size
       }
 
@@ -329,66 +233,33 @@ public class LLMStreamEvent(
         if (value.seq != 0L) {
           ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
         }
-        if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
-        }
         if (value.token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.token)
         }
-        if (value.is_final != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_final)
-        }
-        if (value.kind != ai.runanywhere.proto.v1.TokenKind.TOKEN_KIND_UNSPECIFIED) {
-          TokenKind.ADAPTER.encodeWithTag(writer, 5, value.kind)
-        }
-        if (value.token_id != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 6, value.token_id)
-        }
-        if (!value.logprob.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.logprob)
-        }
-        if (value.finish_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.finish_reason)
-        }
-        LLMStreamFinalResult.ADAPTER.encodeWithTag(writer, 10, value.result)
         if (value.event_kind != ai.runanywhere.proto.v1.LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED) {
           LLMStreamEventKind.ADAPTER.encodeWithTag(writer, 12, value.event_kind)
         }
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 13, value.request_id)
         }
-        if (value.conversation_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.conversation_id)
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          FinishReason.ADAPTER.encodeWithTag(writer, 21, value.finish_reason)
         }
-        if (value.prompt_tokens_processed != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 15, value.prompt_tokens_processed)
-        }
-        if (value.completion_tokens_generated != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.completion_tokens_generated)
-        }
-        if (value.elapsed_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 17, value.elapsed_ms)
-        }
+        LLMGenerationResult.ADAPTER.encodeWithTag(writer, 22, value.result)
         ToolCall.ADAPTER.encodeWithTag(writer, 18, value.tool_call)
         SDKError.ADAPTER.encodeWithTag(writer, 19, value.error)
+        ProtoAdapter.STRING.encodeWithTag(writer, 20, value.partial_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMStreamEvent) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 20, value.partial_json)
         SDKError.ADAPTER.encodeWithTag(writer, 19, value.error)
         ToolCall.ADAPTER.encodeWithTag(writer, 18, value.tool_call)
-        if (value.elapsed_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 17, value.elapsed_ms)
-        }
-        if (value.completion_tokens_generated != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.completion_tokens_generated)
-        }
-        if (value.prompt_tokens_processed != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 15, value.prompt_tokens_processed)
-        }
-        if (value.conversation_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.conversation_id)
+        LLMGenerationResult.ADAPTER.encodeWithTag(writer, 22, value.result)
+        if (value.finish_reason != ai.runanywhere.proto.v1.FinishReason.FINISH_REASON_UNSPECIFIED) {
+          FinishReason.ADAPTER.encodeWithTag(writer, 21, value.finish_reason)
         }
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 13, value.request_id)
@@ -396,27 +267,8 @@ public class LLMStreamEvent(
         if (value.event_kind != ai.runanywhere.proto.v1.LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED) {
           LLMStreamEventKind.ADAPTER.encodeWithTag(writer, 12, value.event_kind)
         }
-        LLMStreamFinalResult.ADAPTER.encodeWithTag(writer, 10, value.result)
-        if (value.finish_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.finish_reason)
-        }
-        if (!value.logprob.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.logprob)
-        }
-        if (value.token_id != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 6, value.token_id)
-        }
-        if (value.kind != ai.runanywhere.proto.v1.TokenKind.TOKEN_KIND_UNSPECIFIED) {
-          TokenKind.ADAPTER.encodeWithTag(writer, 5, value.kind)
-        }
-        if (value.is_final != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_final)
-        }
         if (value.token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.token)
-        }
-        if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
         if (value.seq != 0L) {
           ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
@@ -425,76 +277,52 @@ public class LLMStreamEvent(
 
       override fun decode(reader: ProtoReader): LLMStreamEvent {
         var seq: Long = 0L
-        var timestamp_us: Long = 0L
         var token: String = ""
-        var is_final: Boolean = false
-        var kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED
-        var token_id: Int = 0
-        var logprob: Float = 0f
-        var finish_reason: String = ""
-        var result: LLMStreamFinalResult? = null
         var event_kind: LLMStreamEventKind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED
         var request_id: String = ""
-        var conversation_id: String = ""
-        var prompt_tokens_processed: Int = 0
-        var completion_tokens_generated: Int = 0
-        var elapsed_ms: Long = 0L
+        var finish_reason: FinishReason = FinishReason.FINISH_REASON_UNSPECIFIED
+        var result: LLMGenerationResult? = null
         var tool_call: ToolCall? = null
         var error: SDKError? = null
+        var partial_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
-            2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> token = ProtoAdapter.STRING.decode(reader)
-            4 -> is_final = ProtoAdapter.BOOL.decode(reader)
-            5 -> try {
-              kind = TokenKind.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            6 -> token_id = ProtoAdapter.UINT32.decode(reader)
-            7 -> logprob = ProtoAdapter.FLOAT.decode(reader)
-            8 -> finish_reason = ProtoAdapter.STRING.decode(reader)
-            10 -> result = LLMStreamFinalResult.ADAPTER.decode(reader)
             12 -> try {
               event_kind = LLMStreamEventKind.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             13 -> request_id = ProtoAdapter.STRING.decode(reader)
-            14 -> conversation_id = ProtoAdapter.STRING.decode(reader)
-            15 -> prompt_tokens_processed = ProtoAdapter.INT32.decode(reader)
-            16 -> completion_tokens_generated = ProtoAdapter.INT32.decode(reader)
-            17 -> elapsed_ms = ProtoAdapter.INT64.decode(reader)
+            21 -> try {
+              finish_reason = FinishReason.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            22 -> result = LLMGenerationResult.ADAPTER.decode(reader)
             18 -> tool_call = ToolCall.ADAPTER.decode(reader)
             19 -> error = SDKError.ADAPTER.decode(reader)
+            20 -> partial_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LLMStreamEvent(
           seq = seq,
-          timestamp_us = timestamp_us,
           token = token,
-          is_final = is_final,
-          kind = kind,
-          token_id = token_id,
-          logprob = logprob,
-          finish_reason = finish_reason,
-          result = result,
           event_kind = event_kind,
           request_id = request_id,
-          conversation_id = conversation_id,
-          prompt_tokens_processed = prompt_tokens_processed,
-          completion_tokens_generated = completion_tokens_generated,
-          elapsed_ms = elapsed_ms,
+          finish_reason = finish_reason,
+          result = result,
           tool_call = tool_call,
           error = error,
+          partial_json = partial_json,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMStreamEvent): LLMStreamEvent = value.copy(
-        result = value.result?.let(LLMStreamFinalResult.ADAPTER::redact),
+        result = value.result?.let(LLMGenerationResult.ADAPTER::redact),
         tool_call = value.tool_call?.let(ToolCall.ADAPTER::redact),
         error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY

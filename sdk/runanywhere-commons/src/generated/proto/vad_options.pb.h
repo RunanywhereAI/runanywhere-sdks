@@ -29,10 +29,6 @@
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/repeated_field.h"  // IWYU pragma: export
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
-#include "google/protobuf/map.h"  // IWYU pragma: export
-#include "google/protobuf/map_type_handler.h"  // IWYU pragma: export
-#include "google/protobuf/map_entry.h"
-#include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
@@ -106,14 +102,6 @@ extern VADProcessRequestGlobalsTypeInternal VADProcessRequest_globals_;
 extern const ::google::protobuf::internal::ClassDataFull VADProcessRequest_class_data_;
 #else
 extern const VADProcessRequestGlobalsTypeInternal VADProcessRequest_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class VADProcessRequest_MetadataEntry_DoNotUse;
-struct VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal VADProcessRequest_MetadataEntry_DoNotUse_globals_;
-extern const ::google::protobuf::internal::ClassDataFull VADProcessRequest_MetadataEntry_DoNotUse_class_data_;
-#else
-extern const VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal VADProcessRequest_MetadataEntry_DoNotUse_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 class VADResult;
 struct VADResultGlobalsTypeInternal;
@@ -206,13 +194,9 @@ template <>
 }
 enum VADStreamEventKind : int {
   VAD_STREAM_EVENT_KIND_UNSPECIFIED = 0,
-  VAD_STREAM_EVENT_KIND_STARTED = 1,
-  VAD_STREAM_EVENT_KIND_FRAME = 2,
-  VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY = 3,
-  VAD_STREAM_EVENT_KIND_STATISTICS = 4,
-  VAD_STREAM_EVENT_KIND_STOPPED = 5,
-  VAD_STREAM_EVENT_KIND_ERROR = 6,
-  VAD_STREAM_EVENT_KIND_BARGE_IN = 7,
+  VAD_STREAM_EVENT_KIND_FRAME = 1,
+  VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY = 2,
+  VAD_STREAM_EVENT_KIND_ERROR = 3,
   VADStreamEventKind_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   VADStreamEventKind_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -223,11 +207,11 @@ extern const uint32_t VADStreamEventKind_internal_data_[];
 inline constexpr VADStreamEventKind VADStreamEventKind_MIN =
     static_cast<VADStreamEventKind>(0);
 inline constexpr VADStreamEventKind VADStreamEventKind_MAX =
-    static_cast<VADStreamEventKind>(7);
+    static_cast<VADStreamEventKind>(3);
 [[nodiscard]] inline bool VADStreamEventKind_IsValid(int value) {
-  return 0 <= value && value <= 7;
+  return 0 <= value && value <= 3;
 }
-inline constexpr int VADStreamEventKind_ARRAYSIZE = 7 + 1;
+inline constexpr int VADStreamEventKind_ARRAYSIZE = 3 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 VADStreamEventKind_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VADStreamEventKind) {
@@ -242,7 +226,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& VADStreamEventKind_Name(VADStreamEventKind value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VADStreamEventKind_descriptor, 0, 7>(
+  return ::google::protobuf::internal::NameOfDenseEnum<VADStreamEventKind_descriptor, 0, 3>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool VADStreamEventKind_Parse(
@@ -314,7 +298,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStatistics final : public ::goog
   [[nodiscard]] static const VADStatistics& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VADStatistics>(&VADStatistics_globals_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(VADStatistics& a, VADStatistics& b) { a.Swap(&b); }
   inline void Swap(VADStatistics* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -555,55 +539,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStatistics final : public ::goog
 };
 // -------------------------------------------------------------------
 
-class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest_MetadataEntry_DoNotUse final
-    : public ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING> {
- public:
-  using SuperType =
-      ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING>;
-  VADProcessRequest_MetadataEntry_DoNotUse();
-  template <typename = void>
-  explicit constexpr VADProcessRequest_MetadataEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-  explicit VADProcessRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr const void* PROTOBUF_NONNULL internal_message_globals() {
-    return &VADProcessRequest_MetadataEntry_DoNotUse_globals_;
-  }
-
-
-  static constexpr auto InternalGenerateClassData_(
-      const ::google::protobuf::MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
- private:
-  friend class ::google::protobuf::MessageLite;
-  friend struct ::TableStruct_vad_5foptions_2eproto;
-  friend ::google::protobuf::internal::PrivateAccess;
-  friend VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal;
-
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 2,
-                          0, 63,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-};
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.VADOptions) */ {
  public:
@@ -752,54 +687,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
 
   // accessors -------------------------------------------------------
   enum : int {
+    kActivationThresholdFieldNumber = 1,
     kMinSpeechDurationMsFieldNumber = 2,
     kMinSilenceDurationMsFieldNumber = 3,
     kMaxSpeechDurationMsFieldNumber = 4,
-    kIncludeStatisticsFieldNumber = 5,
-    kActivationThresholdFieldNumber = 6,
-    kPrefixPaddingMsFieldNumber = 7,
+    kPrefixPaddingMsFieldNumber = 5,
+    kSampleRateFieldNumber = 6,
   };
-  // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
-  void clear_min_speech_duration_ms() ;
-  [[nodiscard]] ::int32_t min_speech_duration_ms() const;
-  void set_min_speech_duration_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_min_speech_duration_ms() const;
-  void _internal_set_min_speech_duration_ms(::int32_t value);
-
-  public:
-  // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
-  void clear_min_silence_duration_ms() ;
-  [[nodiscard]] ::int32_t min_silence_duration_ms() const;
-  void set_min_silence_duration_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_min_silence_duration_ms() const;
-  void _internal_set_min_silence_duration_ms(::int32_t value);
-
-  public:
-  // int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
-  void clear_max_speech_duration_ms() ;
-  [[nodiscard]] ::int32_t max_speech_duration_ms() const;
-  void set_max_speech_duration_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_speech_duration_ms() const;
-  void _internal_set_max_speech_duration_ms(::int32_t value);
-
-  public:
-  // bool include_statistics = 5;
-  void clear_include_statistics() ;
-  [[nodiscard]] bool include_statistics() const;
-  void set_include_statistics(bool value);
-
-  private:
-  bool _internal_include_statistics() const;
-  void _internal_set_include_statistics(bool value);
-
-  public:
-  // float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // optional float activation_threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  [[nodiscard]] bool has_activation_threshold()
+      const;
   void clear_activation_threshold() ;
   [[nodiscard]] float activation_threshold() const;
   void set_activation_threshold(float value);
@@ -809,7 +706,39 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
   void _internal_set_activation_threshold(float value);
 
   public:
-  // int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+  // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "250"];
+  void clear_min_speech_duration_ms() ;
+  [[nodiscard]] ::int32_t min_speech_duration_ms() const;
+  void set_min_speech_duration_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_min_speech_duration_ms() const;
+  void _internal_set_min_speech_duration_ms(::int32_t value);
+
+  public:
+  // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "500"];
+  void clear_min_silence_duration_ms() ;
+  [[nodiscard]] ::int32_t min_silence_duration_ms() const;
+  void set_min_silence_duration_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_min_silence_duration_ms() const;
+  void _internal_set_min_silence_duration_ms(::int32_t value);
+
+  public:
+  // optional int32 max_speech_duration_ms = 4;
+  [[nodiscard]] bool has_max_speech_duration_ms()
+      const;
+  void clear_max_speech_duration_ms() ;
+  [[nodiscard]] ::int32_t max_speech_duration_ms() const;
+  void set_max_speech_duration_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_speech_duration_ms() const;
+  void _internal_set_max_speech_duration_ms(::int32_t value);
+
+  public:
+  // int32 prefix_padding_ms = 5 [(.runanywhere.v1.rac_default) = "300"];
   void clear_prefix_padding_ms() ;
   [[nodiscard]] ::int32_t prefix_padding_ms() const;
   void set_prefix_padding_ms(::int32_t value);
@@ -817,6 +746,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
   private:
   ::int32_t _internal_prefix_padding_ms() const;
   void _internal_set_prefix_padding_ms(::int32_t value);
+
+  public:
+  // int32 sample_rate = 6 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+  void clear_sample_rate() ;
+  [[nodiscard]] ::int32_t sample_rate() const;
+  void set_sample_rate(::int32_t value);
+
+  private:
+  ::int32_t _internal_sample_rate() const;
+  void _internal_set_sample_rate(::int32_t value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADOptions)
@@ -852,12 +791,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
         const VADOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    float activation_threshold_;
     ::int32_t min_speech_duration_ms_;
     ::int32_t min_silence_duration_ms_;
     ::int32_t max_speech_duration_ms_;
-    bool include_statistics_;
-    float activation_threshold_;
     ::int32_t prefix_padding_ms_;
+    ::int32_t sample_rate_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1021,8 +960,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
     kEnableAutoCalibrationFieldNumber = 5,
     kCalibrationMultiplierFieldNumber = 6,
     kPreferredFrameworkFieldNumber = 7,
-    kWindowSizeSamplesFieldNumber = 9,
-    kMaxSpeechDurationMsFieldNumber = 10,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -1076,7 +1013,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_frame_length_ms(::int32_t value);
 
   public:
-  // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   void clear_activation_threshold() ;
   [[nodiscard]] float activation_threshold() const;
   void set_activation_threshold(float value);
@@ -1118,31 +1055,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value);
 
   public:
-  // int32 window_size_samples = 9;
-  void clear_window_size_samples() ;
-  [[nodiscard]] ::int32_t window_size_samples() const;
-  void set_window_size_samples(::int32_t value);
-
-  private:
-  ::int32_t _internal_window_size_samples() const;
-  void _internal_set_window_size_samples(::int32_t value);
-
-  public:
-  // int32 max_speech_duration_ms = 10;
-  void clear_max_speech_duration_ms() ;
-  [[nodiscard]] ::int32_t max_speech_duration_ms() const;
-  void set_max_speech_duration_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_speech_duration_ms() const;
-  void _internal_set_max_speech_duration_ms(::int32_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADConfiguration)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 10,
+      ::google::protobuf::internal::TcParseTable<3, 8,
                           0, 66,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -1179,8 +1096,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
     bool enable_auto_calibration_;
     float calibration_multiplier_;
     int preferred_framework_;
-    ::int32_t window_size_samples_;
-    ::int32_t max_speech_duration_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1244,11 +1159,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADAudioSource final : public ::goo
   [[nodiscard]] static const VADAudioSource& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VADAudioSource>(&VADAudioSource_globals_);
   }
-  enum SourceCase {
-    kAudioData = 1,
-    kAdapterHandle = 2,
-    SOURCE_NOT_SET = 0,
-  };
   static constexpr int kIndexInFileMessages = 2;
   friend void swap(VADAudioSource& a, VADAudioSource& b) { a.Swap(&b); }
   inline void Swap(VADAudioSource* PROTOBUF_NONNULL other) {
@@ -1341,56 +1251,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADAudioSource final : public ::goo
 
   // accessors -------------------------------------------------------
   enum : int {
-    kEncodingFieldNumber = 3,
-    kSampleRateFieldNumber = 4,
-    kFrameOffsetMsFieldNumber = 6,
-    kChannelsFieldNumber = 5,
     kAudioDataFieldNumber = 1,
-    kAdapterHandleFieldNumber = 2,
+    kEncodingFieldNumber = 2,
+    kSampleRateFieldNumber = 3,
+    kFrameOffsetMsFieldNumber = 5,
+    kChannelsFieldNumber = 4,
   };
-  // .runanywhere.v1.AudioEncoding encoding = 3;
-  void clear_encoding() ;
-  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
-  void set_encoding(::runanywhere::v1::AudioEncoding value);
-
-  private:
-  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
-  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
-
-  public:
-  // int32 sample_rate = 4;
-  void clear_sample_rate() ;
-  [[nodiscard]] ::int32_t sample_rate() const;
-  void set_sample_rate(::int32_t value);
-
-  private:
-  ::int32_t _internal_sample_rate() const;
-  void _internal_set_sample_rate(::int32_t value);
-
-  public:
-  // int64 frame_offset_ms = 6;
-  void clear_frame_offset_ms() ;
-  [[nodiscard]] ::int64_t frame_offset_ms() const;
-  void set_frame_offset_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_frame_offset_ms() const;
-  void _internal_set_frame_offset_ms(::int64_t value);
-
-  public:
-  // int32 channels = 5;
-  void clear_channels() ;
-  [[nodiscard]] ::int32_t channels() const;
-  void set_channels(::int32_t value);
-
-  private:
-  ::int32_t _internal_channels() const;
-  void _internal_set_channels(::int32_t value);
-
-  public:
   // bytes audio_data = 1;
-  [[nodiscard]] bool has_audio_data()
-      const;
   void clear_audio_data() ;
   [[nodiscard]] const ::std::string& audio_data() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -1405,35 +1272,52 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADAudioSource final : public ::goo
   ::std::string* PROTOBUF_NONNULL _internal_mutable_audio_data();
 
   public:
-  // string adapter_handle = 2;
-  [[nodiscard]] bool has_adapter_handle()
-      const;
-  void clear_adapter_handle() ;
-  [[nodiscard]] const ::std::string& adapter_handle() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_adapter_handle(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_adapter_handle();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_adapter_handle();
-  void set_allocated_adapter_handle(::std::string* PROTOBUF_NULLABLE value);
+  // .runanywhere.v1.AudioEncoding encoding = 2;
+  void clear_encoding() ;
+  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
+  void set_encoding(::runanywhere::v1::AudioEncoding value);
 
   private:
-  const ::std::string& _internal_adapter_handle() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_adapter_handle(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_adapter_handle();
+  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
+  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
 
   public:
-  void clear_source();
-  SourceCase source_case() const;
+  // int32 sample_rate = 3;
+  void clear_sample_rate() ;
+  [[nodiscard]] ::int32_t sample_rate() const;
+  void set_sample_rate(::int32_t value);
+
+  private:
+  ::int32_t _internal_sample_rate() const;
+  void _internal_set_sample_rate(::int32_t value);
+
+  public:
+  // int64 frame_offset_ms = 5;
+  void clear_frame_offset_ms() ;
+  [[nodiscard]] ::int64_t frame_offset_ms() const;
+  void set_frame_offset_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_frame_offset_ms() const;
+  void _internal_set_frame_offset_ms(::int64_t value);
+
+  public:
+  // int32 channels = 4;
+  void clear_channels() ;
+  [[nodiscard]] ::int32_t channels() const;
+  void set_channels(::int32_t value);
+
+  private:
+  ::int32_t _internal_channels() const;
+  void _internal_set_channels(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADAudioSource)
  private:
   class _Internal;
-  void set_has_audio_data();
-  void set_has_adapter_handle();
-  [[nodiscard]] inline bool has_source() const;
-  inline void clear_has_source();
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 6,
-                          0, 52,
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1461,17 +1345,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADAudioSource final : public ::goo
         const VADAudioSource& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr audio_data_;
     int encoding_;
     ::int32_t sample_rate_;
     ::int64_t frame_offset_ms_;
     ::int32_t channels_;
-    union SourceUnion {
-      constexpr SourceUnion() : _constinit_{} {}
-      ::google::protobuf::internal::ConstantInitialized _constinit_;
-      ::google::protobuf::internal::ArenaStringPtr audio_data_;
-      ::google::protobuf::internal::ArenaStringPtr adapter_handle_;
-    } source_;
-    ::uint32_t _oneof_case_[1];
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1479,31 +1357,31 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADAudioSource final : public ::goo
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.VADProcessRequest) */ {
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.SpeechActivityEvent) */ {
  public:
-  inline VADProcessRequest() : VADProcessRequest(nullptr) {}
-  ~VADProcessRequest() PROTOBUF_FINAL;
+  inline SpeechActivityEvent() : SpeechActivityEvent(nullptr) {}
+  ~SpeechActivityEvent() PROTOBUF_FINAL;
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(VADProcessRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+  void operator delete(SpeechActivityEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
     SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(VADProcessRequest));
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(SpeechActivityEvent));
   }
 #endif
 
   template <typename = void>
-  explicit constexpr VADProcessRequest(::google::protobuf::internal::ConstantInitialized,
+  explicit constexpr SpeechActivityEvent(::google::protobuf::internal::ConstantInitialized,
                            const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
                                class_data);
 
-  inline VADProcessRequest(const VADProcessRequest& from) : VADProcessRequest(nullptr, from) {}
-  inline VADProcessRequest(VADProcessRequest&& from) noexcept : VADProcessRequest(nullptr, ::std::move(from)) {}
-  inline VADProcessRequest& operator=(const VADProcessRequest& from) {
+  inline SpeechActivityEvent(const SpeechActivityEvent& from) : SpeechActivityEvent(nullptr, from) {}
+  inline SpeechActivityEvent(SpeechActivityEvent&& from) noexcept : SpeechActivityEvent(nullptr, ::std::move(from)) {}
+  inline SpeechActivityEvent& operator=(const SpeechActivityEvent& from) {
     CopyFrom(from);
     return *this;
   }
-  inline VADProcessRequest& operator=(VADProcessRequest&& from) noexcept {
+  inline SpeechActivityEvent& operator=(SpeechActivityEvent&& from) noexcept {
     if (this == &from) return *this;
     if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
       InternalSwap(&from);
@@ -1532,12 +1410,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::
   [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  [[nodiscard]] static const VADProcessRequest& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VADProcessRequest>(&VADProcessRequest_globals_);
+  [[nodiscard]] static const SpeechActivityEvent& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<SpeechActivityEvent>(&SpeechActivityEvent_globals_);
   }
-  static constexpr int kIndexInFileMessages = 4;
-  friend void swap(VADProcessRequest& a, VADProcessRequest& b) { a.Swap(&b); }
-  inline void Swap(VADProcessRequest* PROTOBUF_NONNULL other) {
+  static constexpr int kIndexInFileMessages = 6;
+  friend void swap(SpeechActivityEvent& a, SpeechActivityEvent& b) { a.Swap(&b); }
+  inline void Swap(SpeechActivityEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
     if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
       InternalSwap(other);
@@ -1545,7 +1423,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::
       ::google::protobuf::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(VADProcessRequest* PROTOBUF_NONNULL other) {
+  void UnsafeArenaSwap(SpeechActivityEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
     ABSL_DCHECK(GetArena() == other->GetArena());
     InternalSwap(other);
@@ -1553,14 +1431,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::
 
   // implements Message ----------------------------------------------
 
-  [[nodiscard]] VADProcessRequest* PROTOBUF_NONNULL
+  [[nodiscard]] SpeechActivityEvent* PROTOBUF_NONNULL
   New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<VADProcessRequest>(arena);
+    return ::google::protobuf::Message::DefaultConstruct<SpeechActivityEvent>(arena);
   }
   using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const VADProcessRequest& from);
+  void CopyFrom(const SpeechActivityEvent& from);
   using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const VADProcessRequest& from) { VADProcessRequest::MergeImpl(*this, from); }
+  void MergeFrom(const SpeechActivityEvent& from) { SpeechActivityEvent::MergeImpl(*this, from); }
 
   private:
   static void MergeImpl(::google::protobuf::MessageLite& to_msg,
@@ -1598,17 +1476,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::
   private:
   void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static void SharedDtor(MessageLite& self);
-  void InternalSwap(VADProcessRequest* PROTOBUF_NONNULL other);
+  void InternalSwap(SpeechActivityEvent* PROTOBUF_NONNULL other);
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.VADProcessRequest"; }
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.SpeechActivityEvent"; }
 
-  explicit VADProcessRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  VADProcessRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const VADProcessRequest& from);
-  VADProcessRequest(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, VADProcessRequest&& from) noexcept
-      : VADProcessRequest(arena) {
+  explicit SpeechActivityEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  SpeechActivityEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const SpeechActivityEvent& from);
+  SpeechActivityEvent(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, SpeechActivityEvent&& from) noexcept
+      : SpeechActivityEvent(arena) {
     *this = ::std::move(from);
   }
   const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
@@ -1627,80 +1505,75 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::
 
   // accessors -------------------------------------------------------
   enum : int {
-    kRequestIdFieldNumber = 1,
-    kAudioFieldNumber = 2,
-    kOptionsFieldNumber = 3,
-    kMetadataFieldNumber = 4,
+    kSegmentIdFieldNumber = 5,
+    kTimestampMsFieldNumber = 2,
+    kAudioStartMsFieldNumber = 3,
+    kAudioEndMsFieldNumber = 4,
+    kEventTypeFieldNumber = 1,
   };
-  // string request_id = 1;
-  void clear_request_id() ;
-  [[nodiscard]] const ::std::string& request_id() const;
+  // optional string segment_id = 5;
+  [[nodiscard]] bool has_segment_id()
+      const;
+  void clear_segment_id() ;
+  [[nodiscard]] const ::std::string& segment_id() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_request_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_request_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
-  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+  void set_segment_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_segment_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_segment_id();
+  void set_allocated_segment_id(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_request_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+  const ::std::string& _internal_segment_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_segment_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_segment_id();
 
   public:
-  // optional .runanywhere.v1.VADAudioSource audio = 2;
-  [[nodiscard]] bool has_audio()
-      const;
-  void clear_audio() ;
-  [[nodiscard]] const ::runanywhere::v1::VADAudioSource& audio() const;
-  [[nodiscard]] ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE release_audio();
-  ::runanywhere::v1::VADAudioSource* PROTOBUF_NONNULL mutable_audio();
-  void set_allocated_audio(::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_audio(::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE unsafe_arena_release_audio();
+  // int64 timestamp_ms = 2;
+  void clear_timestamp_ms() ;
+  [[nodiscard]] ::int64_t timestamp_ms() const;
+  void set_timestamp_ms(::int64_t value);
 
   private:
-  const ::runanywhere::v1::VADAudioSource& _internal_audio() const;
-  ::runanywhere::v1::VADAudioSource* PROTOBUF_NONNULL _internal_mutable_audio();
+  ::int64_t _internal_timestamp_ms() const;
+  void _internal_set_timestamp_ms(::int64_t value);
 
   public:
-  // optional .runanywhere.v1.VADOptions options = 3;
-  [[nodiscard]] bool has_options()
-      const;
-  void clear_options() ;
-  [[nodiscard]] const ::runanywhere::v1::VADOptions& options() const;
-  [[nodiscard]] ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE release_options();
-  ::runanywhere::v1::VADOptions* PROTOBUF_NONNULL mutable_options();
-  void set_allocated_options(::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_options(::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE unsafe_arena_release_options();
+  // int64 audio_start_ms = 3;
+  void clear_audio_start_ms() ;
+  [[nodiscard]] ::int64_t audio_start_ms() const;
+  void set_audio_start_ms(::int64_t value);
 
   private:
-  const ::runanywhere::v1::VADOptions& _internal_options() const;
-  ::runanywhere::v1::VADOptions* PROTOBUF_NONNULL _internal_mutable_options();
+  ::int64_t _internal_audio_start_ms() const;
+  void _internal_set_audio_start_ms(::int64_t value);
 
   public:
-  // map<string, string> metadata = 4;
-  [[nodiscard]] int metadata_size()
-      const;
-  private:
-  int _internal_metadata_size() const;
-
-  public:
-  void clear_metadata() ;
-  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::std::string>& metadata() const;
-  [[nodiscard]] ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL mutable_metadata();
+  // int64 audio_end_ms = 4;
+  void clear_audio_end_ms() ;
+  [[nodiscard]] ::int64_t audio_end_ms() const;
+  void set_audio_end_ms(::int64_t value);
 
   private:
-  const ::google::protobuf::Map<::std::string, ::std::string>& _internal_metadata() const;
-  ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL _internal_mutable_metadata();
+  ::int64_t _internal_audio_end_ms() const;
+  void _internal_set_audio_end_ms(::int64_t value);
 
   public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.VADProcessRequest)
+  // .runanywhere.v1.SpeechActivityKind event_type = 1;
+  void clear_event_type() ;
+  [[nodiscard]] ::runanywhere::v1::SpeechActivityKind event_type() const;
+  void set_event_type(::runanywhere::v1::SpeechActivityKind value);
+
+  private:
+  ::runanywhere::v1::SpeechActivityKind _internal_event_type() const;
+  void _internal_set_event_type(::runanywhere::v1::SpeechActivityKind value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.SpeechActivityEvent)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
-                          3, 59,
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          0, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1725,13 +1598,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::
     inline explicit Impl_(
         ::google::protobuf::internal::InternalVisibility visibility,
         ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const VADProcessRequest& from_msg);
+        const SpeechActivityEvent& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE audio_;
-    ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE options_;
-    ::google::protobuf::internal::MapField<VADProcessRequest_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
+    ::google::protobuf::internal::ArenaStringPtr segment_id_;
+    ::int64_t timestamp_ms_;
+    ::int64_t audio_start_ms_;
+    ::int64_t audio_end_ms_;
+    int event_type_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1795,7 +1669,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADServiceState final : public ::go
   [[nodiscard]] static const VADServiceState& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VADServiceState>(&VADServiceState_globals_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(VADServiceState& a, VADServiceState& b) { a.Swap(&b); }
   inline void Swap(VADServiceState* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1888,10 +1762,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADServiceState final : public ::go
   // accessors -------------------------------------------------------
   enum : int {
     kCurrentModelFieldNumber = 6,
-    kErrorFieldNumber = 9,
+    kErrorFieldNumber = 7,
     kIsReadyFieldNumber = 1,
     kIsSpeechActiveFieldNumber = 2,
-    kEnergyThresholdFieldNumber = 3,
+    kActivationThresholdFieldNumber = 3,
     kSampleRateFieldNumber = 4,
     kFrameLengthMsFieldNumber = 5,
   };
@@ -1912,7 +1786,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADServiceState final : public ::go
   ::std::string* PROTOBUF_NONNULL _internal_mutable_current_model();
 
   public:
-  // optional .runanywhere.v1.SDKError error = 9;
+  // optional .runanywhere.v1.SDKError error = 7;
   [[nodiscard]] bool has_error()
       const;
   void clear_error() ;
@@ -1948,14 +1822,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADServiceState final : public ::go
   void _internal_set_is_speech_active(bool value);
 
   public:
-  // float energy_threshold = 3;
-  void clear_energy_threshold() ;
-  [[nodiscard]] float energy_threshold() const;
-  void set_energy_threshold(float value);
+  // float activation_threshold = 3;
+  void clear_activation_threshold() ;
+  [[nodiscard]] float activation_threshold() const;
+  void set_activation_threshold(float value);
 
   private:
-  float _internal_energy_threshold() const;
-  void _internal_set_energy_threshold(float value);
+  float _internal_activation_threshold() const;
+  void _internal_set_activation_threshold(float value);
 
   public:
   // int32 sample_rate = 4;
@@ -2015,7 +1889,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADServiceState final : public ::go
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     bool is_ready_;
     bool is_speech_active_;
-    float energy_threshold_;
+    float activation_threshold_;
     ::int32_t sample_rate_;
     ::int32_t frame_length_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -2081,7 +1955,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
   [[nodiscard]] static const VADResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VADResult>(&VADResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 5;
+  static constexpr int kIndexInFileMessages = 4;
   friend void swap(VADResult& a, VADResult& b) { a.Swap(&b); }
   inline void Swap(VADResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2173,33 +2047,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
 
   // accessors -------------------------------------------------------
   enum : int {
-    kStatisticsFieldNumber = 8,
-    kErrorFieldNumber = 11,
+    kErrorFieldNumber = 6,
     kIsSpeechFieldNumber = 1,
-    kConfidenceFieldNumber = 2,
+    kProbabilityFieldNumber = 2,
     kEnergyFieldNumber = 3,
     kDurationMsFieldNumber = 4,
     kTimestampMsFieldNumber = 5,
-    kStartTimeMsFieldNumber = 6,
-    kEndTimeMsFieldNumber = 7,
   };
-  // optional .runanywhere.v1.VADStatistics statistics = 8;
-  [[nodiscard]] bool has_statistics()
-      const;
-  void clear_statistics() ;
-  [[nodiscard]] const ::runanywhere::v1::VADStatistics& statistics() const;
-  [[nodiscard]] ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE release_statistics();
-  ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL mutable_statistics();
-  void set_allocated_statistics(::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_statistics(::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE unsafe_arena_release_statistics();
-
-  private:
-  const ::runanywhere::v1::VADStatistics& _internal_statistics() const;
-  ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL _internal_mutable_statistics();
-
-  public:
-  // optional .runanywhere.v1.SDKError error = 11;
+  // optional .runanywhere.v1.SDKError error = 6;
   [[nodiscard]] bool has_error()
       const;
   void clear_error() ;
@@ -2225,14 +2080,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
   void _internal_set_is_speech(bool value);
 
   public:
-  // float confidence = 2;
-  void clear_confidence() ;
-  [[nodiscard]] float confidence() const;
-  void set_confidence(float value);
+  // float probability = 2;
+  void clear_probability() ;
+  [[nodiscard]] float probability() const;
+  void set_probability(float value);
 
   private:
-  float _internal_confidence() const;
-  void _internal_set_confidence(float value);
+  float _internal_probability() const;
+  void _internal_set_probability(float value);
 
   public:
   // float energy = 3;
@@ -2265,32 +2120,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
   void _internal_set_timestamp_ms(::int64_t value);
 
   public:
-  // int64 start_time_ms = 6;
-  void clear_start_time_ms() ;
-  [[nodiscard]] ::int64_t start_time_ms() const;
-  void set_start_time_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_start_time_ms() const;
-  void _internal_set_start_time_ms(::int64_t value);
-
-  public:
-  // int64 end_time_ms = 7;
-  void clear_end_time_ms() ;
-  [[nodiscard]] ::int64_t end_time_ms() const;
-  void set_end_time_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_end_time_ms() const;
-  void _internal_set_end_time_ms(::int64_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 9,
-                          2, 0,
+      ::google::protobuf::internal::TcParseTable<3, 6,
+                          1, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2318,15 +2153,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
         const VADResult& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE statistics_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     bool is_speech_;
-    float confidence_;
+    float probability_;
     float energy_;
     ::int32_t duration_ms_;
     ::int64_t timestamp_ms_;
-    ::int64_t start_time_ms_;
-    ::int64_t end_time_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2334,31 +2166,31 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADResult final : public ::google::
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.SpeechActivityEvent) */ {
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADProcessRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.VADProcessRequest) */ {
  public:
-  inline SpeechActivityEvent() : SpeechActivityEvent(nullptr) {}
-  ~SpeechActivityEvent() PROTOBUF_FINAL;
+  inline VADProcessRequest() : VADProcessRequest(nullptr) {}
+  ~VADProcessRequest() PROTOBUF_FINAL;
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(SpeechActivityEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+  void operator delete(VADProcessRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
     SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(SpeechActivityEvent));
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(VADProcessRequest));
   }
 #endif
 
   template <typename = void>
-  explicit constexpr SpeechActivityEvent(::google::protobuf::internal::ConstantInitialized,
+  explicit constexpr VADProcessRequest(::google::protobuf::internal::ConstantInitialized,
                            const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
                                class_data);
 
-  inline SpeechActivityEvent(const SpeechActivityEvent& from) : SpeechActivityEvent(nullptr, from) {}
-  inline SpeechActivityEvent(SpeechActivityEvent&& from) noexcept : SpeechActivityEvent(nullptr, ::std::move(from)) {}
-  inline SpeechActivityEvent& operator=(const SpeechActivityEvent& from) {
+  inline VADProcessRequest(const VADProcessRequest& from) : VADProcessRequest(nullptr, from) {}
+  inline VADProcessRequest(VADProcessRequest&& from) noexcept : VADProcessRequest(nullptr, ::std::move(from)) {}
+  inline VADProcessRequest& operator=(const VADProcessRequest& from) {
     CopyFrom(from);
     return *this;
   }
-  inline SpeechActivityEvent& operator=(SpeechActivityEvent&& from) noexcept {
+  inline VADProcessRequest& operator=(VADProcessRequest&& from) noexcept {
     if (this == &from) return *this;
     if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
       InternalSwap(&from);
@@ -2387,12 +2219,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public 
   [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  [[nodiscard]] static const SpeechActivityEvent& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<SpeechActivityEvent>(&SpeechActivityEvent_globals_);
+  [[nodiscard]] static const VADProcessRequest& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VADProcessRequest>(&VADProcessRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 7;
-  friend void swap(SpeechActivityEvent& a, SpeechActivityEvent& b) { a.Swap(&b); }
-  inline void Swap(SpeechActivityEvent* PROTOBUF_NONNULL other) {
+  static constexpr int kIndexInFileMessages = 3;
+  friend void swap(VADProcessRequest& a, VADProcessRequest& b) { a.Swap(&b); }
+  inline void Swap(VADProcessRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
     if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
       InternalSwap(other);
@@ -2400,7 +2232,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public 
       ::google::protobuf::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(SpeechActivityEvent* PROTOBUF_NONNULL other) {
+  void UnsafeArenaSwap(VADProcessRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
     ABSL_DCHECK(GetArena() == other->GetArena());
     InternalSwap(other);
@@ -2408,14 +2240,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public 
 
   // implements Message ----------------------------------------------
 
-  [[nodiscard]] SpeechActivityEvent* PROTOBUF_NONNULL
+  [[nodiscard]] VADProcessRequest* PROTOBUF_NONNULL
   New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<SpeechActivityEvent>(arena);
+    return ::google::protobuf::Message::DefaultConstruct<VADProcessRequest>(arena);
   }
   using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const SpeechActivityEvent& from);
+  void CopyFrom(const VADProcessRequest& from);
   using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const SpeechActivityEvent& from) { SpeechActivityEvent::MergeImpl(*this, from); }
+  void MergeFrom(const VADProcessRequest& from) { VADProcessRequest::MergeImpl(*this, from); }
 
   private:
   static void MergeImpl(::google::protobuf::MessageLite& to_msg,
@@ -2453,17 +2285,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public 
   private:
   void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static void SharedDtor(MessageLite& self);
-  void InternalSwap(SpeechActivityEvent* PROTOBUF_NONNULL other);
+  void InternalSwap(VADProcessRequest* PROTOBUF_NONNULL other);
  private:
   template <typename T>
   friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.SpeechActivityEvent"; }
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.VADProcessRequest"; }
 
-  explicit SpeechActivityEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  SpeechActivityEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const SpeechActivityEvent& from);
-  SpeechActivityEvent(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, SpeechActivityEvent&& from) noexcept
-      : SpeechActivityEvent(arena) {
+  explicit VADProcessRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  VADProcessRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const VADProcessRequest& from);
+  VADProcessRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, VADProcessRequest&& from) noexcept
+      : VADProcessRequest(arena) {
     *this = ::std::move(from);
   }
   const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
@@ -2482,92 +2314,47 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public 
 
   // accessors -------------------------------------------------------
   enum : int {
-    kSegmentIdFieldNumber = 6,
-    kResultFieldNumber = 5,
-    kTimestampMsFieldNumber = 2,
-    kEventTypeFieldNumber = 1,
-    kDurationMsFieldNumber = 3,
-    kConfidenceFieldNumber = 4,
+    kAudioFieldNumber = 1,
+    kOptionsFieldNumber = 2,
   };
-  // optional string segment_id = 6;
-  [[nodiscard]] bool has_segment_id()
+  // optional .runanywhere.v1.VADAudioSource audio = 1;
+  [[nodiscard]] bool has_audio()
       const;
-  void clear_segment_id() ;
-  [[nodiscard]] const ::std::string& segment_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_segment_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_segment_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_segment_id();
-  void set_allocated_segment_id(::std::string* PROTOBUF_NULLABLE value);
+  void clear_audio() ;
+  [[nodiscard]] const ::runanywhere::v1::VADAudioSource& audio() const;
+  [[nodiscard]] ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE release_audio();
+  ::runanywhere::v1::VADAudioSource* PROTOBUF_NONNULL mutable_audio();
+  void set_allocated_audio(::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_audio(::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE unsafe_arena_release_audio();
 
   private:
-  const ::std::string& _internal_segment_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_segment_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_segment_id();
+  const ::runanywhere::v1::VADAudioSource& _internal_audio() const;
+  ::runanywhere::v1::VADAudioSource* PROTOBUF_NONNULL _internal_mutable_audio();
 
   public:
-  // optional .runanywhere.v1.VADResult result = 5;
-  [[nodiscard]] bool has_result()
+  // optional .runanywhere.v1.VADOptions options = 2;
+  [[nodiscard]] bool has_options()
       const;
-  void clear_result() ;
-  [[nodiscard]] const ::runanywhere::v1::VADResult& result() const;
-  [[nodiscard]] ::runanywhere::v1::VADResult* PROTOBUF_NULLABLE release_result();
-  ::runanywhere::v1::VADResult* PROTOBUF_NONNULL mutable_result();
-  void set_allocated_result(::runanywhere::v1::VADResult* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_result(::runanywhere::v1::VADResult* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::VADResult* PROTOBUF_NULLABLE unsafe_arena_release_result();
+  void clear_options() ;
+  [[nodiscard]] const ::runanywhere::v1::VADOptions& options() const;
+  [[nodiscard]] ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE release_options();
+  ::runanywhere::v1::VADOptions* PROTOBUF_NONNULL mutable_options();
+  void set_allocated_options(::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_options(::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE unsafe_arena_release_options();
 
   private:
-  const ::runanywhere::v1::VADResult& _internal_result() const;
-  ::runanywhere::v1::VADResult* PROTOBUF_NONNULL _internal_mutable_result();
+  const ::runanywhere::v1::VADOptions& _internal_options() const;
+  ::runanywhere::v1::VADOptions* PROTOBUF_NONNULL _internal_mutable_options();
 
   public:
-  // int64 timestamp_ms = 2;
-  void clear_timestamp_ms() ;
-  [[nodiscard]] ::int64_t timestamp_ms() const;
-  void set_timestamp_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_timestamp_ms() const;
-  void _internal_set_timestamp_ms(::int64_t value);
-
-  public:
-  // .runanywhere.v1.SpeechActivityKind event_type = 1;
-  void clear_event_type() ;
-  [[nodiscard]] ::runanywhere::v1::SpeechActivityKind event_type() const;
-  void set_event_type(::runanywhere::v1::SpeechActivityKind value);
-
-  private:
-  ::runanywhere::v1::SpeechActivityKind _internal_event_type() const;
-  void _internal_set_event_type(::runanywhere::v1::SpeechActivityKind value);
-
-  public:
-  // int32 duration_ms = 3;
-  void clear_duration_ms() ;
-  [[nodiscard]] ::int32_t duration_ms() const;
-  void set_duration_ms(::int32_t value);
-
-  private:
-  ::int32_t _internal_duration_ms() const;
-  void _internal_set_duration_ms(::int32_t value);
-
-  public:
-  // float confidence = 4;
-  void clear_confidence() ;
-  [[nodiscard]] float confidence() const;
-  void set_confidence(float value);
-
-  private:
-  float _internal_confidence() const;
-  void _internal_set_confidence(float value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.SpeechActivityEvent)
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.VADProcessRequest)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
-                          1, 53,
+      ::google::protobuf::internal::TcParseTable<1, 2,
+                          2, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2592,15 +2379,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SpeechActivityEvent final : public 
     inline explicit Impl_(
         ::google::protobuf::internal::InternalVisibility visibility,
         ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const SpeechActivityEvent& from_msg);
+        const VADProcessRequest& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr segment_id_;
-    ::runanywhere::v1::VADResult* PROTOBUF_NULLABLE result_;
-    ::int64_t timestamp_ms_;
-    int event_type_;
-    ::int32_t duration_ms_;
-    float confidence_;
+    ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE audio_;
+    ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE options_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2664,7 +2447,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
   [[nodiscard]] static const VADStreamEvent& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VADStreamEvent>(&VADStreamEvent_globals_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(VADStreamEvent& a, VADStreamEvent& b) { a.Swap(&b); }
   inline void Swap(VADStreamEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2759,8 +2542,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
     kRequestIdFieldNumber = 3,
     kResultFieldNumber = 5,
     kActivityFieldNumber = 6,
-    kStatisticsFieldNumber = 7,
-    kErrorFieldNumber = 10,
+    kErrorFieldNumber = 7,
     kSeqFieldNumber = 1,
     kTimestampUsFieldNumber = 2,
     kKindFieldNumber = 4,
@@ -2812,23 +2594,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
   ::runanywhere::v1::SpeechActivityEvent* PROTOBUF_NONNULL _internal_mutable_activity();
 
   public:
-  // optional .runanywhere.v1.VADStatistics statistics = 7;
-  [[nodiscard]] bool has_statistics()
-      const;
-  void clear_statistics() ;
-  [[nodiscard]] const ::runanywhere::v1::VADStatistics& statistics() const;
-  [[nodiscard]] ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE release_statistics();
-  ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL mutable_statistics();
-  void set_allocated_statistics(::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_statistics(::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE unsafe_arena_release_statistics();
-
-  private:
-  const ::runanywhere::v1::VADStatistics& _internal_statistics() const;
-  ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL _internal_mutable_statistics();
-
-  public:
-  // optional .runanywhere.v1.SDKError error = 10;
+  // optional .runanywhere.v1.SDKError error = 7;
   [[nodiscard]] bool has_error()
       const;
   void clear_error() ;
@@ -2878,8 +2644,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 8,
-                          4, 56,
+      ::google::protobuf::internal::TcParseTable<3, 7,
+                          3, 48,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2910,7 +2676,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
     ::google::protobuf::internal::ArenaStringPtr request_id_;
     ::runanywhere::v1::VADResult* PROTOBUF_NULLABLE result_;
     ::runanywhere::v1::SpeechActivityEvent* PROTOBUF_NULLABLE activity_;
-    ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE statistics_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     ::uint64_t seq_;
     ::int64_t timestamp_us_;
@@ -3049,7 +2814,7 @@ inline void VADConfiguration::_internal_set_frame_length_ms(::int32_t value) {
   _impl_.frame_length_ms_ = value;
 }
 
-// float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+// float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline void VADConfiguration::clear_activation_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.activation_threshold_ = 0;
@@ -3217,63 +2982,19 @@ inline void VADConfiguration::set_allocated_model_path(::std::string* PROTOBUF_N
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADConfiguration.model_path)
 }
 
-// int32 window_size_samples = 9;
-inline void VADConfiguration::clear_window_size_samples() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.window_size_samples_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
-}
-inline ::int32_t VADConfiguration::window_size_samples() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.window_size_samples)
-  return _internal_window_size_samples();
-}
-inline void VADConfiguration::set_window_size_samples(::int32_t value) {
-  _internal_set_window_size_samples(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.window_size_samples)
-}
-inline ::int32_t VADConfiguration::_internal_window_size_samples() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.window_size_samples_;
-}
-inline void VADConfiguration::_internal_set_window_size_samples(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.window_size_samples_ = value;
-}
-
-// int32 max_speech_duration_ms = 10;
-inline void VADConfiguration::clear_max_speech_duration_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_speech_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
-}
-inline ::int32_t VADConfiguration::max_speech_duration_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.max_speech_duration_ms)
-  return _internal_max_speech_duration_ms();
-}
-inline void VADConfiguration::set_max_speech_duration_ms(::int32_t value) {
-  _internal_set_max_speech_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.max_speech_duration_ms)
-}
-inline ::int32_t VADConfiguration::_internal_max_speech_duration_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_speech_duration_ms_;
-}
-inline void VADConfiguration::_internal_set_max_speech_duration_ms(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_speech_duration_ms_ = value;
-}
-
 // -------------------------------------------------------------------
 
 // VADOptions
 
-// float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+// optional float activation_threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+inline bool VADOptions::has_activation_threshold() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  return value;
+}
 inline void VADOptions::clear_activation_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.activation_threshold_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline float VADOptions::activation_threshold() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.activation_threshold)
@@ -3281,7 +3002,7 @@ inline float VADOptions::activation_threshold() const {
 }
 inline void VADOptions::set_activation_threshold(float value) {
   _internal_set_activation_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.activation_threshold)
 }
 inline float VADOptions::_internal_activation_threshold() const {
@@ -3293,11 +3014,11 @@ inline void VADOptions::_internal_set_activation_threshold(float value) {
   _impl_.activation_threshold_ = value;
 }
 
-// int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
+// int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "250"];
 inline void VADOptions::clear_min_speech_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_speech_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline ::int32_t VADOptions::min_speech_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.min_speech_duration_ms)
@@ -3305,7 +3026,7 @@ inline ::int32_t VADOptions::min_speech_duration_ms() const {
 }
 inline void VADOptions::set_min_speech_duration_ms(::int32_t value) {
   _internal_set_min_speech_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.min_speech_duration_ms)
 }
 inline ::int32_t VADOptions::_internal_min_speech_duration_ms() const {
@@ -3317,11 +3038,11 @@ inline void VADOptions::_internal_set_min_speech_duration_ms(::int32_t value) {
   _impl_.min_speech_duration_ms_ = value;
 }
 
-// int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
+// int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "500"];
 inline void VADOptions::clear_min_silence_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_silence_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::int32_t VADOptions::min_silence_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.min_silence_duration_ms)
@@ -3329,7 +3050,7 @@ inline ::int32_t VADOptions::min_silence_duration_ms() const {
 }
 inline void VADOptions::set_min_silence_duration_ms(::int32_t value) {
   _internal_set_min_silence_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.min_silence_duration_ms)
 }
 inline ::int32_t VADOptions::_internal_min_silence_duration_ms() const {
@@ -3341,11 +3062,15 @@ inline void VADOptions::_internal_set_min_silence_duration_ms(::int32_t value) {
   _impl_.min_silence_duration_ms_ = value;
 }
 
-// int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
+// optional int32 max_speech_duration_ms = 4;
+inline bool VADOptions::has_max_speech_duration_ms() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  return value;
+}
 inline void VADOptions::clear_max_speech_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_speech_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::int32_t VADOptions::max_speech_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.max_speech_duration_ms)
@@ -3353,7 +3078,7 @@ inline ::int32_t VADOptions::max_speech_duration_ms() const {
 }
 inline void VADOptions::set_max_speech_duration_ms(::int32_t value) {
   _internal_set_max_speech_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.max_speech_duration_ms)
 }
 inline ::int32_t VADOptions::_internal_max_speech_duration_ms() const {
@@ -3365,11 +3090,11 @@ inline void VADOptions::_internal_set_max_speech_duration_ms(::int32_t value) {
   _impl_.max_speech_duration_ms_ = value;
 }
 
-// int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+// int32 prefix_padding_ms = 5 [(.runanywhere.v1.rac_default) = "300"];
 inline void VADOptions::clear_prefix_padding_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prefix_padding_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int32_t VADOptions::prefix_padding_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.prefix_padding_ms)
@@ -3377,7 +3102,7 @@ inline ::int32_t VADOptions::prefix_padding_ms() const {
 }
 inline void VADOptions::set_prefix_padding_ms(::int32_t value) {
   _internal_set_prefix_padding_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.prefix_padding_ms)
 }
 inline ::int32_t VADOptions::_internal_prefix_padding_ms() const {
@@ -3389,28 +3114,28 @@ inline void VADOptions::_internal_set_prefix_padding_ms(::int32_t value) {
   _impl_.prefix_padding_ms_ = value;
 }
 
-// bool include_statistics = 5;
-inline void VADOptions::clear_include_statistics() {
+// int32 sample_rate = 6 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+inline void VADOptions::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.include_statistics_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.sample_rate_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
-inline bool VADOptions::include_statistics() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.include_statistics)
-  return _internal_include_statistics();
+inline ::int32_t VADOptions::sample_rate() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.sample_rate)
+  return _internal_sample_rate();
 }
-inline void VADOptions::set_include_statistics(bool value) {
-  _internal_set_include_statistics(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.include_statistics)
+inline void VADOptions::set_sample_rate(::int32_t value) {
+  _internal_set_sample_rate(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.sample_rate)
 }
-inline bool VADOptions::_internal_include_statistics() const {
+inline ::int32_t VADOptions::_internal_sample_rate() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.include_statistics_;
+  return _impl_.sample_rate_;
 }
-inline void VADOptions::_internal_set_include_statistics(bool value) {
+inline void VADOptions::_internal_set_sample_rate(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.include_statistics_ = value;
+  _impl_.sample_rate_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -3418,18 +3143,10 @@ inline void VADOptions::_internal_set_include_statistics(bool value) {
 // VADAudioSource
 
 // bytes audio_data = 1;
-inline bool VADAudioSource::has_audio_data() const {
-  return source_case() == kAudioData;
-}
-inline void VADAudioSource::set_has_audio_data() {
-  _impl_._oneof_case_[0] = kAudioData;
-}
 inline void VADAudioSource::clear_audio_data() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (source_case() == kAudioData) {
-    _impl_.source_.audio_data_.Destroy();
-    clear_has_source();
-  }
+  _impl_.audio_data_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline const ::std::string& VADAudioSource::audio_data() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3439,147 +3156,61 @@ inline const ::std::string& VADAudioSource::audio_data() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void VADAudioSource::set_audio_data(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (source_case() != kAudioData) {
-    clear_source();
-
-    set_has_audio_data();
-    _impl_.source_.audio_data_.InitDefault();
-  }
-  _impl_.source_.audio_data_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.audio_data_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADAudioSource.audio_data)
 }
 inline ::std::string* PROTOBUF_NONNULL VADAudioSource::mutable_audio_data()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  if (source_case() != kAudioData) {
-    clear_source();
-
-    set_has_audio_data();
-    _impl_.source_.audio_data_.InitDefault();
-  }
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::std::string* _s = _internal_mutable_audio_data();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADAudioSource.audio_data)
   return _s;
 }
 inline const ::std::string& VADAudioSource::_internal_audio_data() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  if (source_case() != kAudioData) {
-    return ::google::protobuf::internal::GetEmptyStringAlreadyInited();
-  }
-  return _impl_.source_.audio_data_.Get();
+  return _impl_.audio_data_.Get();
 }
 inline void VADAudioSource::_internal_set_audio_data(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.source_.audio_data_.Set(value, GetArena());
+  _impl_.audio_data_.Set(value, GetArena());
 }
 inline ::std::string* PROTOBUF_NONNULL VADAudioSource::_internal_mutable_audio_data() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.source_.audio_data_.Mutable( GetArena());
+  return _impl_.audio_data_.Mutable( GetArena());
 }
 inline ::std::string* PROTOBUF_NULLABLE VADAudioSource::release_audio_data() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VADAudioSource.audio_data)
-  if (source_case() != kAudioData) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
     return nullptr;
   }
-  clear_has_source();
-  return _impl_.source_.audio_data_.Release();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.audio_data_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.audio_data_.Set("", GetArena());
+  }
+  return released;
 }
 inline void VADAudioSource::set_allocated_audio_data(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (has_source()) {
-    clear_source();
-  }
   if (value != nullptr) {
-    set_has_audio_data();
-    _impl_.source_.audio_data_.InitAllocated(value, GetArena());
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.audio_data_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.audio_data_.IsDefault()) {
+    _impl_.audio_data_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADAudioSource.audio_data)
 }
 
-// string adapter_handle = 2;
-inline bool VADAudioSource::has_adapter_handle() const {
-  return source_case() == kAdapterHandle;
-}
-inline void VADAudioSource::set_has_adapter_handle() {
-  _impl_._oneof_case_[0] = kAdapterHandle;
-}
-inline void VADAudioSource::clear_adapter_handle() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (source_case() == kAdapterHandle) {
-    _impl_.source_.adapter_handle_.Destroy();
-    clear_has_source();
-  }
-}
-inline const ::std::string& VADAudioSource::adapter_handle() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADAudioSource.adapter_handle)
-  return _internal_adapter_handle();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void VADAudioSource::set_adapter_handle(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (source_case() != kAdapterHandle) {
-    clear_source();
-
-    set_has_adapter_handle();
-    _impl_.source_.adapter_handle_.InitDefault();
-  }
-  _impl_.source_.adapter_handle_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADAudioSource.adapter_handle)
-}
-inline ::std::string* PROTOBUF_NONNULL VADAudioSource::mutable_adapter_handle()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  if (source_case() != kAdapterHandle) {
-    clear_source();
-
-    set_has_adapter_handle();
-    _impl_.source_.adapter_handle_.InitDefault();
-  }
-  ::std::string* _s = _internal_mutable_adapter_handle();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADAudioSource.adapter_handle)
-  return _s;
-}
-inline const ::std::string& VADAudioSource::_internal_adapter_handle() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  if (source_case() != kAdapterHandle) {
-    return ::google::protobuf::internal::GetEmptyStringAlreadyInited();
-  }
-  return _impl_.source_.adapter_handle_.Get();
-}
-inline void VADAudioSource::_internal_set_adapter_handle(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.source_.adapter_handle_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL VADAudioSource::_internal_mutable_adapter_handle() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.source_.adapter_handle_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE VADAudioSource::release_adapter_handle() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.VADAudioSource.adapter_handle)
-  if (source_case() != kAdapterHandle) {
-    return nullptr;
-  }
-  clear_has_source();
-  return _impl_.source_.adapter_handle_.Release();
-}
-inline void VADAudioSource::set_allocated_adapter_handle(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (has_source()) {
-    clear_source();
-  }
-  if (value != nullptr) {
-    set_has_adapter_handle();
-    _impl_.source_.adapter_handle_.InitAllocated(value, GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADAudioSource.adapter_handle)
-}
-
-// .runanywhere.v1.AudioEncoding encoding = 3;
+// .runanywhere.v1.AudioEncoding encoding = 2;
 inline void VADAudioSource::clear_encoding() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline ::runanywhere::v1::AudioEncoding VADAudioSource::encoding() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADAudioSource.encoding)
@@ -3587,7 +3218,7 @@ inline ::runanywhere::v1::AudioEncoding VADAudioSource::encoding() const {
 }
 inline void VADAudioSource::set_encoding(::runanywhere::v1::AudioEncoding value) {
   _internal_set_encoding(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADAudioSource.encoding)
 }
 inline ::runanywhere::v1::AudioEncoding VADAudioSource::_internal_encoding() const {
@@ -3599,11 +3230,11 @@ inline void VADAudioSource::_internal_set_encoding(::runanywhere::v1::AudioEncod
   _impl_.encoding_ = value;
 }
 
-// int32 sample_rate = 4;
+// int32 sample_rate = 3;
 inline void VADAudioSource::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::int32_t VADAudioSource::sample_rate() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADAudioSource.sample_rate)
@@ -3611,7 +3242,7 @@ inline ::int32_t VADAudioSource::sample_rate() const {
 }
 inline void VADAudioSource::set_sample_rate(::int32_t value) {
   _internal_set_sample_rate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADAudioSource.sample_rate)
 }
 inline ::int32_t VADAudioSource::_internal_sample_rate() const {
@@ -3623,11 +3254,11 @@ inline void VADAudioSource::_internal_set_sample_rate(::int32_t value) {
   _impl_.sample_rate_ = value;
 }
 
-// int32 channels = 5;
+// int32 channels = 4;
 inline void VADAudioSource::clear_channels() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.channels_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int32_t VADAudioSource::channels() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADAudioSource.channels)
@@ -3635,7 +3266,7 @@ inline ::int32_t VADAudioSource::channels() const {
 }
 inline void VADAudioSource::set_channels(::int32_t value) {
   _internal_set_channels(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADAudioSource.channels)
 }
 inline ::int32_t VADAudioSource::_internal_channels() const {
@@ -3647,11 +3278,11 @@ inline void VADAudioSource::_internal_set_channels(::int32_t value) {
   _impl_.channels_ = value;
 }
 
-// int64 frame_offset_ms = 6;
+// int64 frame_offset_ms = 5;
 inline void VADAudioSource::clear_frame_offset_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.frame_offset_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::int64_t VADAudioSource::frame_offset_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADAudioSource.frame_offset_ms)
@@ -3659,7 +3290,7 @@ inline ::int64_t VADAudioSource::frame_offset_ms() const {
 }
 inline void VADAudioSource::set_frame_offset_ms(::int64_t value) {
   _internal_set_frame_offset_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADAudioSource.frame_offset_ms)
 }
 inline ::int64_t VADAudioSource::_internal_frame_offset_ms() const {
@@ -3671,95 +3302,20 @@ inline void VADAudioSource::_internal_set_frame_offset_ms(::int64_t value) {
   _impl_.frame_offset_ms_ = value;
 }
 
-inline bool VADAudioSource::has_source() const {
-  return source_case() != SOURCE_NOT_SET;
-}
-inline void VADAudioSource::clear_has_source() {
-  _impl_._oneof_case_[0] = SOURCE_NOT_SET;
-}
-inline VADAudioSource::SourceCase VADAudioSource::source_case() const {
-  return VADAudioSource::SourceCase(_impl_._oneof_case_[0]);
-}
-// -------------------------------------------------------------------
-
 // -------------------------------------------------------------------
 
 // VADProcessRequest
 
-// string request_id = 1;
-inline void VADProcessRequest::clear_request_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.request_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& VADProcessRequest::request_id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADProcessRequest.request_id)
-  return _internal_request_id();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void VADProcessRequest::set_request_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.request_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADProcessRequest.request_id)
-}
-inline ::std::string* PROTOBUF_NONNULL VADProcessRequest::mutable_request_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_request_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADProcessRequest.request_id)
-  return _s;
-}
-inline const ::std::string& VADProcessRequest::_internal_request_id() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.request_id_.Get();
-}
-inline void VADProcessRequest::_internal_set_request_id(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.request_id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL VADProcessRequest::_internal_mutable_request_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.request_id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE VADProcessRequest::release_request_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.VADProcessRequest.request_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.request_id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.request_id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void VADProcessRequest::set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.request_id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.request_id_.IsDefault()) {
-    _impl_.request_id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADProcessRequest.request_id)
-}
-
-// optional .runanywhere.v1.VADAudioSource audio = 2;
+// optional .runanywhere.v1.VADAudioSource audio = 1;
 inline bool VADProcessRequest::has_audio() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   PROTOBUF_ASSUME(!value || _impl_.audio_ != nullptr);
   return value;
 }
 inline void VADProcessRequest::clear_audio() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.audio_ != nullptr) _impl_.audio_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline const ::runanywhere::v1::VADAudioSource& VADProcessRequest::_internal_audio() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3778,16 +3334,16 @@ inline void VADProcessRequest::unsafe_arena_set_allocated_audio(
   }
   _impl_.audio_ = reinterpret_cast<::runanywhere::v1::VADAudioSource*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VADProcessRequest.audio)
 }
 inline ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE VADProcessRequest::release_audio() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::runanywhere::v1::VADAudioSource* released = _impl_.audio_;
   _impl_.audio_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3807,7 +3363,7 @@ inline ::runanywhere::v1::VADAudioSource* PROTOBUF_NULLABLE VADProcessRequest::u
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VADProcessRequest.audio)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::runanywhere::v1::VADAudioSource* temp = _impl_.audio_;
   _impl_.audio_ = nullptr;
   return temp;
@@ -3822,7 +3378,7 @@ inline ::runanywhere::v1::VADAudioSource* PROTOBUF_NONNULL VADProcessRequest::_i
 }
 inline ::runanywhere::v1::VADAudioSource* PROTOBUF_NONNULL VADProcessRequest::mutable_audio()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::runanywhere::v1::VADAudioSource* _msg = _internal_mutable_audio();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADProcessRequest.audio)
   return _msg;
@@ -3839,25 +3395,25 @@ inline void VADProcessRequest::set_allocated_audio(::runanywhere::v1::VADAudioSo
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
 
   _impl_.audio_ = reinterpret_cast<::runanywhere::v1::VADAudioSource*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADProcessRequest.audio)
 }
 
-// optional .runanywhere.v1.VADOptions options = 3;
+// optional .runanywhere.v1.VADOptions options = 2;
 inline bool VADProcessRequest::has_options() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.options_ != nullptr);
   return value;
 }
 inline void VADProcessRequest::clear_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.options_ != nullptr) _impl_.options_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::runanywhere::v1::VADOptions& VADProcessRequest::_internal_options() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3876,16 +3432,16 @@ inline void VADProcessRequest::unsafe_arena_set_allocated_options(
   }
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::VADOptions*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VADProcessRequest.options)
 }
 inline ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE VADProcessRequest::release_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::VADOptions* released = _impl_.options_;
   _impl_.options_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3905,7 +3461,7 @@ inline ::runanywhere::v1::VADOptions* PROTOBUF_NULLABLE VADProcessRequest::unsaf
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VADProcessRequest.options)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::VADOptions* temp = _impl_.options_;
   _impl_.options_ = nullptr;
   return temp;
@@ -3920,7 +3476,7 @@ inline ::runanywhere::v1::VADOptions* PROTOBUF_NONNULL VADProcessRequest::_inter
 }
 inline ::runanywhere::v1::VADOptions* PROTOBUF_NONNULL VADProcessRequest::mutable_options()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::VADOptions* _msg = _internal_mutable_options();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADProcessRequest.options)
   return _msg;
@@ -3937,44 +3493,13 @@ inline void VADProcessRequest::set_allocated_options(::runanywhere::v1::VADOptio
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
 
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::VADOptions*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADProcessRequest.options)
-}
-
-// map<string, string> metadata = 4;
-inline int VADProcessRequest::_internal_metadata_size() const {
-  return _internal_metadata().size();
-}
-inline int VADProcessRequest::metadata_size() const {
-  return _internal_metadata_size();
-}
-inline void VADProcessRequest::clear_metadata() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.metadata_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline const ::google::protobuf::Map<::std::string, ::std::string>& VADProcessRequest::_internal_metadata() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.metadata_.GetMap();
-}
-inline const ::google::protobuf::Map<::std::string, ::std::string>& VADProcessRequest::metadata() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_map:runanywhere.v1.VADProcessRequest.metadata)
-  return _internal_metadata();
-}
-inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL VADProcessRequest::_internal_mutable_metadata() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.metadata_.MutableMap();
-}
-inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL VADProcessRequest::mutable_metadata()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.VADProcessRequest.metadata)
-  return _internal_mutable_metadata();
 }
 
 // -------------------------------------------------------------------
@@ -3985,7 +3510,7 @@ inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL V
 inline void VADResult::clear_is_speech() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_speech_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline bool VADResult::is_speech() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.is_speech)
@@ -3993,7 +3518,7 @@ inline bool VADResult::is_speech() const {
 }
 inline void VADResult::set_is_speech(bool value) {
   _internal_set_is_speech(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.is_speech)
 }
 inline bool VADResult::_internal_is_speech() const {
@@ -4005,35 +3530,35 @@ inline void VADResult::_internal_set_is_speech(bool value) {
   _impl_.is_speech_ = value;
 }
 
-// float confidence = 2;
-inline void VADResult::clear_confidence() {
+// float probability = 2;
+inline void VADResult::clear_probability() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.probability_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline float VADResult::confidence() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.confidence)
-  return _internal_confidence();
+inline float VADResult::probability() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.probability)
+  return _internal_probability();
 }
-inline void VADResult::set_confidence(float value) {
-  _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.confidence)
+inline void VADResult::set_probability(float value) {
+  _internal_set_probability(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.probability)
 }
-inline float VADResult::_internal_confidence() const {
+inline float VADResult::_internal_probability() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.confidence_;
+  return _impl_.probability_;
 }
-inline void VADResult::_internal_set_confidence(float value) {
+inline void VADResult::_internal_set_probability(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = value;
+  _impl_.probability_ = value;
 }
 
 // float energy = 3;
 inline void VADResult::clear_energy() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.energy_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline float VADResult::energy() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.energy)
@@ -4041,7 +3566,7 @@ inline float VADResult::energy() const {
 }
 inline void VADResult::set_energy(float value) {
   _internal_set_energy(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.energy)
 }
 inline float VADResult::_internal_energy() const {
@@ -4057,7 +3582,7 @@ inline void VADResult::_internal_set_energy(float value) {
 inline void VADResult::clear_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int32_t VADResult::duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.duration_ms)
@@ -4065,7 +3590,7 @@ inline ::int32_t VADResult::duration_ms() const {
 }
 inline void VADResult::set_duration_ms(::int32_t value) {
   _internal_set_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.duration_ms)
 }
 inline ::int32_t VADResult::_internal_duration_ms() const {
@@ -4081,7 +3606,7 @@ inline void VADResult::_internal_set_duration_ms(::int32_t value) {
 inline void VADResult::clear_timestamp_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::int64_t VADResult::timestamp_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.timestamp_ms)
@@ -4089,7 +3614,7 @@ inline ::int64_t VADResult::timestamp_ms() const {
 }
 inline void VADResult::set_timestamp_ms(::int64_t value) {
   _internal_set_timestamp_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.timestamp_ms)
 }
 inline ::int64_t VADResult::_internal_timestamp_ms() const {
@@ -4101,155 +3626,9 @@ inline void VADResult::_internal_set_timestamp_ms(::int64_t value) {
   _impl_.timestamp_ms_ = value;
 }
 
-// int64 start_time_ms = 6;
-inline void VADResult::clear_start_time_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.start_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-}
-inline ::int64_t VADResult::start_time_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.start_time_ms)
-  return _internal_start_time_ms();
-}
-inline void VADResult::set_start_time_ms(::int64_t value) {
-  _internal_set_start_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.start_time_ms)
-}
-inline ::int64_t VADResult::_internal_start_time_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.start_time_ms_;
-}
-inline void VADResult::_internal_set_start_time_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.start_time_ms_ = value;
-}
-
-// int64 end_time_ms = 7;
-inline void VADResult::clear_end_time_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.end_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
-}
-inline ::int64_t VADResult::end_time_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.end_time_ms)
-  return _internal_end_time_ms();
-}
-inline void VADResult::set_end_time_ms(::int64_t value) {
-  _internal_set_end_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADResult.end_time_ms)
-}
-inline ::int64_t VADResult::_internal_end_time_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.end_time_ms_;
-}
-inline void VADResult::_internal_set_end_time_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.end_time_ms_ = value;
-}
-
-// optional .runanywhere.v1.VADStatistics statistics = 8;
-inline bool VADResult::has_statistics() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
-  PROTOBUF_ASSUME(!value || _impl_.statistics_ != nullptr);
-  return value;
-}
-inline void VADResult::clear_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.statistics_ != nullptr) _impl_.statistics_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::runanywhere::v1::VADStatistics& VADResult::_internal_statistics() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::VADStatistics* p = _impl_.statistics_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::VADStatistics>(&::runanywhere::v1::VADStatistics_globals_);
-}
-inline const ::runanywhere::v1::VADStatistics& VADResult::statistics() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADResult.statistics)
-  return _internal_statistics();
-}
-inline void VADResult::unsafe_arena_set_allocated_statistics(
-    ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.statistics_);
-  }
-  _impl_.statistics_ = reinterpret_cast<::runanywhere::v1::VADStatistics*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VADResult.statistics)
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE VADResult::release_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::runanywhere::v1::VADStatistics* released = _impl_.statistics_;
-  _impl_.statistics_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE VADResult::unsafe_arena_release_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.VADResult.statistics)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::runanywhere::v1::VADStatistics* temp = _impl_.statistics_;
-  _impl_.statistics_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL VADResult::_internal_mutable_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.statistics_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::VADStatistics>(GetArena());
-    _impl_.statistics_ = reinterpret_cast<::runanywhere::v1::VADStatistics*>(p);
-  }
-  return _impl_.statistics_;
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL VADResult::mutable_statistics()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::runanywhere::v1::VADStatistics* _msg = _internal_mutable_statistics();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADResult.statistics)
-  return _msg;
-}
-inline void VADResult::set_allocated_statistics(::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.statistics_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-
-  _impl_.statistics_ = reinterpret_cast<::runanywhere::v1::VADStatistics*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADResult.statistics)
-}
-
-// optional .runanywhere.v1.SDKError error = 11;
+// optional .runanywhere.v1.SDKError error = 6;
 inline bool VADResult::has_error() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
@@ -4270,16 +3649,16 @@ inline void VADResult::unsafe_arena_set_allocated_error(
   }
   _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VADResult.error)
 }
 inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VADResult::release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::runanywhere::v1::SDKError* released = _impl_.error_;
   _impl_.error_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -4299,7 +3678,7 @@ inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VADResult::unsafe_arena_re
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VADResult.error)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::runanywhere::v1::SDKError* temp = _impl_.error_;
   _impl_.error_ = nullptr;
   return temp;
@@ -4314,7 +3693,7 @@ inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VADResult::_internal_mutabl
 }
 inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VADResult::mutable_error()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADResult.error)
   return _msg;
@@ -4331,9 +3710,9 @@ inline void VADResult::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
 
   _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
@@ -4568,7 +3947,7 @@ inline void VADStatistics::_internal_set_peak_energy(float value) {
 inline void SpeechActivityEvent::clear_event_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.event_type_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::runanywhere::v1::SpeechActivityKind SpeechActivityEvent::event_type() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SpeechActivityEvent.event_type)
@@ -4576,7 +3955,7 @@ inline ::runanywhere::v1::SpeechActivityKind SpeechActivityEvent::event_type() c
 }
 inline void SpeechActivityEvent::set_event_type(::runanywhere::v1::SpeechActivityKind value) {
   _internal_set_event_type(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SpeechActivityEvent.event_type)
 }
 inline ::runanywhere::v1::SpeechActivityKind SpeechActivityEvent::_internal_event_type() const {
@@ -4592,7 +3971,7 @@ inline void SpeechActivityEvent::_internal_set_event_type(::runanywhere::v1::Spe
 inline void SpeechActivityEvent::clear_timestamp_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline ::int64_t SpeechActivityEvent::timestamp_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SpeechActivityEvent.timestamp_ms)
@@ -4600,7 +3979,7 @@ inline ::int64_t SpeechActivityEvent::timestamp_ms() const {
 }
 inline void SpeechActivityEvent::set_timestamp_ms(::int64_t value) {
   _internal_set_timestamp_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SpeechActivityEvent.timestamp_ms)
 }
 inline ::int64_t SpeechActivityEvent::_internal_timestamp_ms() const {
@@ -4612,153 +3991,55 @@ inline void SpeechActivityEvent::_internal_set_timestamp_ms(::int64_t value) {
   _impl_.timestamp_ms_ = value;
 }
 
-// int32 duration_ms = 3;
-inline void SpeechActivityEvent::clear_duration_ms() {
+// int64 audio_start_ms = 3;
+inline void SpeechActivityEvent::clear_audio_start_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.audio_start_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::int32_t SpeechActivityEvent::duration_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SpeechActivityEvent.duration_ms)
-  return _internal_duration_ms();
+inline ::int64_t SpeechActivityEvent::audio_start_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SpeechActivityEvent.audio_start_ms)
+  return _internal_audio_start_ms();
 }
-inline void SpeechActivityEvent::set_duration_ms(::int32_t value) {
-  _internal_set_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SpeechActivityEvent.duration_ms)
+inline void SpeechActivityEvent::set_audio_start_ms(::int64_t value) {
+  _internal_set_audio_start_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SpeechActivityEvent.audio_start_ms)
 }
-inline ::int32_t SpeechActivityEvent::_internal_duration_ms() const {
+inline ::int64_t SpeechActivityEvent::_internal_audio_start_ms() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.duration_ms_;
+  return _impl_.audio_start_ms_;
 }
-inline void SpeechActivityEvent::_internal_set_duration_ms(::int32_t value) {
+inline void SpeechActivityEvent::_internal_set_audio_start_ms(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.duration_ms_ = value;
+  _impl_.audio_start_ms_ = value;
 }
 
-// float confidence = 4;
-inline void SpeechActivityEvent::clear_confidence() {
+// int64 audio_end_ms = 4;
+inline void SpeechActivityEvent::clear_audio_end_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.audio_end_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
-inline float SpeechActivityEvent::confidence() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SpeechActivityEvent.confidence)
-  return _internal_confidence();
+inline ::int64_t SpeechActivityEvent::audio_end_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SpeechActivityEvent.audio_end_ms)
+  return _internal_audio_end_ms();
 }
-inline void SpeechActivityEvent::set_confidence(float value) {
-  _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SpeechActivityEvent.confidence)
+inline void SpeechActivityEvent::set_audio_end_ms(::int64_t value) {
+  _internal_set_audio_end_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SpeechActivityEvent.audio_end_ms)
 }
-inline float SpeechActivityEvent::_internal_confidence() const {
+inline ::int64_t SpeechActivityEvent::_internal_audio_end_ms() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.confidence_;
+  return _impl_.audio_end_ms_;
 }
-inline void SpeechActivityEvent::_internal_set_confidence(float value) {
+inline void SpeechActivityEvent::_internal_set_audio_end_ms(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = value;
+  _impl_.audio_end_ms_ = value;
 }
 
-// optional .runanywhere.v1.VADResult result = 5;
-inline bool SpeechActivityEvent::has_result() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
-  PROTOBUF_ASSUME(!value || _impl_.result_ != nullptr);
-  return value;
-}
-inline void SpeechActivityEvent::clear_result() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.result_ != nullptr) _impl_.result_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::runanywhere::v1::VADResult& SpeechActivityEvent::_internal_result() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::VADResult* p = _impl_.result_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::VADResult>(&::runanywhere::v1::VADResult_globals_);
-}
-inline const ::runanywhere::v1::VADResult& SpeechActivityEvent::result() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SpeechActivityEvent.result)
-  return _internal_result();
-}
-inline void SpeechActivityEvent::unsafe_arena_set_allocated_result(
-    ::runanywhere::v1::VADResult* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.result_);
-  }
-  _impl_.result_ = reinterpret_cast<::runanywhere::v1::VADResult*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.SpeechActivityEvent.result)
-}
-inline ::runanywhere::v1::VADResult* PROTOBUF_NULLABLE SpeechActivityEvent::release_result() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::VADResult* released = _impl_.result_;
-  _impl_.result_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::VADResult* PROTOBUF_NULLABLE SpeechActivityEvent::unsafe_arena_release_result() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.SpeechActivityEvent.result)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::VADResult* temp = _impl_.result_;
-  _impl_.result_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::VADResult* PROTOBUF_NONNULL SpeechActivityEvent::_internal_mutable_result() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.result_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::VADResult>(GetArena());
-    _impl_.result_ = reinterpret_cast<::runanywhere::v1::VADResult*>(p);
-  }
-  return _impl_.result_;
-}
-inline ::runanywhere::v1::VADResult* PROTOBUF_NONNULL SpeechActivityEvent::mutable_result()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::VADResult* _msg = _internal_mutable_result();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SpeechActivityEvent.result)
-  return _msg;
-}
-inline void SpeechActivityEvent::set_allocated_result(::runanywhere::v1::VADResult* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.result_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-
-  _impl_.result_ = reinterpret_cast<::runanywhere::v1::VADResult*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SpeechActivityEvent.result)
-}
-
-// optional string segment_id = 6;
+// optional string segment_id = 5;
 inline bool SpeechActivityEvent::has_segment_id() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   return value;
@@ -4834,7 +4115,7 @@ inline void SpeechActivityEvent::set_allocated_segment_id(::std::string* PROTOBU
 inline void VADStreamEvent::clear_seq() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.seq_ = ::uint64_t{0u};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::uint64_t VADStreamEvent::seq() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADStreamEvent.seq)
@@ -4842,7 +4123,7 @@ inline ::uint64_t VADStreamEvent::seq() const {
 }
 inline void VADStreamEvent::set_seq(::uint64_t value) {
   _internal_set_seq(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADStreamEvent.seq)
 }
 inline ::uint64_t VADStreamEvent::_internal_seq() const {
@@ -4858,7 +4139,7 @@ inline void VADStreamEvent::_internal_set_seq(::uint64_t value) {
 inline void VADStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::int64_t VADStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADStreamEvent.timestamp_us)
@@ -4866,7 +4147,7 @@ inline ::int64_t VADStreamEvent::timestamp_us() const {
 }
 inline void VADStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADStreamEvent.timestamp_us)
 }
 inline ::int64_t VADStreamEvent::_internal_timestamp_us() const {
@@ -4946,7 +4227,7 @@ inline void VADStreamEvent::set_allocated_request_id(::std::string* PROTOBUF_NUL
 inline void VADStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::runanywhere::v1::VADStreamEventKind VADStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADStreamEvent.kind)
@@ -4954,7 +4235,7 @@ inline ::runanywhere::v1::VADStreamEventKind VADStreamEvent::kind() const {
 }
 inline void VADStreamEvent::set_kind(::runanywhere::v1::VADStreamEventKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADStreamEvent.kind)
 }
 inline ::runanywhere::v1::VADStreamEventKind VADStreamEvent::_internal_kind() const {
@@ -5162,107 +4443,9 @@ inline void VADStreamEvent::set_allocated_activity(::runanywhere::v1::SpeechActi
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADStreamEvent.activity)
 }
 
-// optional .runanywhere.v1.VADStatistics statistics = 7;
-inline bool VADStreamEvent::has_statistics() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
-  PROTOBUF_ASSUME(!value || _impl_.statistics_ != nullptr);
-  return value;
-}
-inline void VADStreamEvent::clear_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.statistics_ != nullptr) _impl_.statistics_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline const ::runanywhere::v1::VADStatistics& VADStreamEvent::_internal_statistics() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::VADStatistics* p = _impl_.statistics_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::VADStatistics>(&::runanywhere::v1::VADStatistics_globals_);
-}
-inline const ::runanywhere::v1::VADStatistics& VADStreamEvent::statistics() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADStreamEvent.statistics)
-  return _internal_statistics();
-}
-inline void VADStreamEvent::unsafe_arena_set_allocated_statistics(
-    ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.statistics_);
-  }
-  _impl_.statistics_ = reinterpret_cast<::runanywhere::v1::VADStatistics*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VADStreamEvent.statistics)
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE VADStreamEvent::release_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::runanywhere::v1::VADStatistics* released = _impl_.statistics_;
-  _impl_.statistics_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE VADStreamEvent::unsafe_arena_release_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.VADStreamEvent.statistics)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::runanywhere::v1::VADStatistics* temp = _impl_.statistics_;
-  _impl_.statistics_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL VADStreamEvent::_internal_mutable_statistics() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.statistics_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::VADStatistics>(GetArena());
-    _impl_.statistics_ = reinterpret_cast<::runanywhere::v1::VADStatistics*>(p);
-  }
-  return _impl_.statistics_;
-}
-inline ::runanywhere::v1::VADStatistics* PROTOBUF_NONNULL VADStreamEvent::mutable_statistics()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::runanywhere::v1::VADStatistics* _msg = _internal_mutable_statistics();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADStreamEvent.statistics)
-  return _msg;
-}
-inline void VADStreamEvent::set_allocated_statistics(::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.statistics_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  }
-
-  _impl_.statistics_ = reinterpret_cast<::runanywhere::v1::VADStatistics*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADStreamEvent.statistics)
-}
-
-// optional .runanywhere.v1.SDKError error = 10;
+// optional .runanywhere.v1.SDKError error = 7;
 inline bool VADStreamEvent::has_error() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
   PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
@@ -5283,16 +4466,16 @@ inline void VADStreamEvent::unsafe_arena_set_allocated_error(
   }
   _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VADStreamEvent.error)
 }
 inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VADStreamEvent::release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::SDKError* released = _impl_.error_;
   _impl_.error_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -5312,7 +4495,7 @@ inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VADStreamEvent::unsafe_are
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VADStreamEvent.error)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::SDKError* temp = _impl_.error_;
   _impl_.error_ = nullptr;
   return temp;
@@ -5327,7 +4510,7 @@ inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VADStreamEvent::_internal_m
 }
 inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VADStreamEvent::mutable_error()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VADStreamEvent.error)
   return _msg;
@@ -5344,9 +4527,9 @@ inline void VADStreamEvent::set_allocated_error(::runanywhere::v1::SDKError* PRO
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
 
   _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
@@ -5405,28 +4588,28 @@ inline void VADServiceState::_internal_set_is_speech_active(bool value) {
   _impl_.is_speech_active_ = value;
 }
 
-// float energy_threshold = 3;
-inline void VADServiceState::clear_energy_threshold() {
+// float activation_threshold = 3;
+inline void VADServiceState::clear_activation_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.energy_threshold_ = 0;
+  _impl_.activation_threshold_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
-inline float VADServiceState::energy_threshold() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADServiceState.energy_threshold)
-  return _internal_energy_threshold();
+inline float VADServiceState::activation_threshold() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADServiceState.activation_threshold)
+  return _internal_activation_threshold();
 }
-inline void VADServiceState::set_energy_threshold(float value) {
-  _internal_set_energy_threshold(value);
+inline void VADServiceState::set_activation_threshold(float value) {
+  _internal_set_activation_threshold(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADServiceState.energy_threshold)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADServiceState.activation_threshold)
 }
-inline float VADServiceState::_internal_energy_threshold() const {
+inline float VADServiceState::_internal_activation_threshold() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.energy_threshold_;
+  return _impl_.activation_threshold_;
 }
-inline void VADServiceState::_internal_set_energy_threshold(float value) {
+inline void VADServiceState::_internal_set_activation_threshold(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.energy_threshold_ = value;
+  _impl_.activation_threshold_ = value;
 }
 
 // int32 sample_rate = 4;
@@ -5545,7 +4728,7 @@ inline void VADServiceState::set_allocated_current_model(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADServiceState.current_model)
 }
 
-// optional .runanywhere.v1.SDKError error = 9;
+// optional .runanywhere.v1.SDKError error = 7;
 inline bool VADServiceState::has_error() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);

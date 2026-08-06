@@ -32,7 +32,6 @@ public object RADefaults {
         public const val MIC_SAMPLE_RATE_HZ: Int = 16000
         public const val MIC_CHANNELS: Int = 1
         public const val MIC_CHANNEL_CAPACITY: Int = 128
-        public const val MIC_TAP_BUFFER_FRAMES: Int = 4096
         public const val TTS_SAMPLE_RATE_HZ: Int = 22050
     }
 
@@ -42,10 +41,6 @@ public object RADefaults {
         public const val DEFAULT_VAD_MODEL_ID: String = "silero-vad"
         public const val SPEECH_RMS_THRESHOLD: Float = 0.015f
         public const val SPEECH_FLOOR_MULTIPLIER: Float = 2.0f
-    }
-
-    public object Hybrid {
-        public const val STT_CONFIDENCE_THRESHOLD: Float = 0.5f
     }
 
     public object Worker {

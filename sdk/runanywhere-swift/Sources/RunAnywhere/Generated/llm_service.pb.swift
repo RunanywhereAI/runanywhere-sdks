@@ -86,15 +86,15 @@ public nonisolated struct RALLMGenerateRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var prompt: String = String()
-
+  /// Correlation id, echoed on every LLMStreamEvent for this call. Empty =
+  /// commons generates one, which is the normal case and matches industry
+  /// practice (provider-generated: OpenAI `id`, Anthropic `request-id`). A
+  /// non-empty caller value is honoured verbatim.
   public var requestID: String = String()
 
   public var modelID: String = String()
 
   public var conversationID: String = String()
-
-  public var metadata: Dictionary<String,String> = [:]
 
   public var options: RALLMGenerationOptions {
     get {_options ?? RALLMGenerationOptions()}
@@ -105,9 +105,10 @@ public nonisolated struct RALLMGenerateRequest: Sendable {
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
   public mutating func clearOptions() {self._options = nil}
 
-  /// Prior turns, excluding `prompt` (the live user turn) and
-  /// options.system_prompt.
-  public var history: [RAChatMessage] = []
+  /// The whole conversation, oldest first, ending with the turn the model
+  /// must answer. Never empty. System turns belong in
+  /// options.system_prompt, not here.
+  public var messages: [RAChatMessage] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -116,86 +117,13 @@ public nonisolated struct RALLMGenerateRequest: Sendable {
   fileprivate var _options: RALLMGenerationOptions? = nil
 }
 
-public nonisolated struct RALLMStreamFinalResult: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var text: String {
-    get {_storage._text}
-    set {_uniqueStorage()._text = newValue}
-  }
-
-  public var thinkingContent: String {
-    get {_storage._thinkingContent ?? String()}
-    set {_uniqueStorage()._thinkingContent = newValue}
-  }
-  /// Returns true if `thinkingContent` has been explicitly set.
-  public var hasThinkingContent: Bool {_storage._thinkingContent != nil}
-  /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
-  public mutating func clearThinkingContent() {_uniqueStorage()._thinkingContent = nil}
-
-  public var totalTimeMs: Int64 {
-    get {_storage._totalTimeMs}
-    set {_uniqueStorage()._totalTimeMs = newValue}
-  }
-
-  public var timeToFirstTokenMs: Int64 {
-    get {_storage._timeToFirstTokenMs}
-    set {_uniqueStorage()._timeToFirstTokenMs = newValue}
-  }
-
-  public var finishReason: String {
-    get {_storage._finishReason}
-    set {_uniqueStorage()._finishReason = newValue}
-  }
-
-  public var promptEvalTimeMs: Int64 {
-    get {_storage._promptEvalTimeMs}
-    set {_uniqueStorage()._promptEvalTimeMs = newValue}
-  }
-
-  public var decodeTimeMs: Int64 {
-    get {_storage._decodeTimeMs}
-    set {_uniqueStorage()._decodeTimeMs = newValue}
-  }
-
-  public var toolCalls: [RAToolCall] {
-    get {_storage._toolCalls}
-    set {_uniqueStorage()._toolCalls = newValue}
-  }
-
-  public var toolResults: [RAToolResult] {
-    get {_storage._toolResults}
-    set {_uniqueStorage()._toolResults = newValue}
-  }
-
-  public var usage: RATokenUsage {
-    get {_storage._usage ?? RATokenUsage()}
-    set {_uniqueStorage()._usage = newValue}
-  }
-  /// Returns true if `usage` has been explicitly set.
-  public var hasUsage: Bool {_storage._usage != nil}
-  /// Clears the value of `usage`. Subsequent reads from it will return its default value.
-  public mutating func clearUsage() {_uniqueStorage()._usage = nil}
-
-  public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-/// `result` is populated only on the terminal event.
+/// LLMStreamFinalResult is deleted: the stream terminates with the same
+/// LLMGenerationResult type the unary call returns (see `result` below), so
+/// one mapper serves both paths instead of two near-identical ones.
+///
+/// Exactly one terminal event per stream: event_kind == COMPLETED (with
+/// `result` set) or == ERROR (with `error` set). `event_kind` is the primary
+/// discriminator.
 public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -207,43 +135,32 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._seq = newValue}
   }
 
-  public var timestampUs: Int64 {
-    get {_storage._timestampUs}
-    set {_uniqueStorage()._timestampUs = newValue}
-  }
-
+  /// The delta. Answer text when event_kind == TOKEN, reasoning text when
+  /// event_kind == THINKING.
   public var token: String {
     get {_storage._token}
     set {_uniqueStorage()._token = newValue}
   }
 
-  public var isFinal: Bool {
-    get {_storage._isFinal}
-    set {_uniqueStorage()._isFinal = newValue}
+  public var eventKind: RALLMStreamEventKind {
+    get {_storage._eventKind}
+    set {_uniqueStorage()._eventKind = newValue}
   }
 
-  public var kind: RATokenKind {
-    get {_storage._kind}
-    set {_uniqueStorage()._kind = newValue}
+  /// Correlation id, echoed from the request on every event.
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
   }
 
-  public var tokenID: UInt32 {
-    get {_storage._tokenID}
-    set {_uniqueStorage()._tokenID = newValue}
-  }
-
-  public var logprob: Float {
-    get {_storage._logprob}
-    set {_uniqueStorage()._logprob = newValue}
-  }
-
-  public var finishReason: String {
+  public var finishReason: RAFinishReason {
     get {_storage._finishReason}
     set {_uniqueStorage()._finishReason = newValue}
   }
 
-  public var result: RALLMStreamFinalResult {
-    get {_storage._result ?? RALLMStreamFinalResult()}
+  /// Present exactly when event_kind == COMPLETED.
+  public var result: RALLMGenerationResult {
+    get {_storage._result ?? RALLMGenerationResult()}
     set {_uniqueStorage()._result = newValue}
   }
   /// Returns true if `result` has been explicitly set.
@@ -251,36 +168,7 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   /// Clears the value of `result`. Subsequent reads from it will return its default value.
   public mutating func clearResult() {_uniqueStorage()._result = nil}
 
-  public var eventKind: RALLMStreamEventKind {
-    get {_storage._eventKind}
-    set {_uniqueStorage()._eventKind = newValue}
-  }
-
-  public var requestID: String {
-    get {_storage._requestID}
-    set {_uniqueStorage()._requestID = newValue}
-  }
-
-  public var conversationID: String {
-    get {_storage._conversationID}
-    set {_uniqueStorage()._conversationID = newValue}
-  }
-
-  public var promptTokensProcessed: Int32 {
-    get {_storage._promptTokensProcessed}
-    set {_uniqueStorage()._promptTokensProcessed = newValue}
-  }
-
-  public var completionTokensGenerated: Int32 {
-    get {_storage._completionTokensGenerated}
-    set {_uniqueStorage()._completionTokensGenerated = newValue}
-  }
-
-  public var elapsedMs: Int64 {
-    get {_storage._elapsedMs}
-    set {_uniqueStorage()._elapsedMs = newValue}
-  }
-
+  /// Present exactly when event_kind == TOOL_CALL.
   public var toolCall: RAToolCall {
     get {_storage._toolCall ?? RAToolCall()}
     set {_uniqueStorage()._toolCall = newValue}
@@ -290,6 +178,7 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   /// Clears the value of `toolCall`. Subsequent reads from it will return its default value.
   public mutating func clearToolCall() {_uniqueStorage()._toolCall = nil}
 
+  /// Present exactly when event_kind == ERROR.
   public var error: RASDKError {
     get {_storage._error ?? RASDKError()}
     set {_uniqueStorage()._error = newValue}
@@ -298,6 +187,17 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   public var hasError: Bool {_storage._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   public mutating func clearError() {_uniqueStorage()._error = nil}
+
+  /// Largest complete JSON value visible in the output so far, when
+  /// LLMGenerationOptions.structured_output is set.
+  public var partialJson: String {
+    get {_storage._partialJson ?? String()}
+    set {_uniqueStorage()._partialJson = newValue}
+  }
+  /// Returns true if `partialJson` has been explicitly set.
+  public var hasPartialJson: Bool {_storage._partialJson != nil}
+  /// Clears the value of `partialJson`. Subsequent reads from it will return its default value.
+  public mutating func clearPartialJson() {_uniqueStorage()._partialJson = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -316,7 +216,7 @@ nonisolated extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{4}\u{d}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{2}\u{9}metadata\0\u{1}options\0\u{1}history\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{e}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{2}\u{a}options\0\u{2}\u{2}messages\0\u{b}prompt\0\u{b}metadata\0\u{b}history\0\u{c}\u{1}\u{1}\u{c}\u{19}\u{1}\u{c}\u{1b}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -324,13 +224,11 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
       case 14: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 15: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
       case 16: try { try decoder.decodeSingularStringField(value: &self.conversationID) }()
-      case 25: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       case 26: try { try decoder.decodeSingularMessageField(value: &self._options) }()
-      case 27: try { try decoder.decodeRepeatedMessageField(value: &self.history) }()
+      case 28: try { try decoder.decodeRepeatedMessageField(value: &self.messages) }()
       default: break
       }
     }
@@ -341,9 +239,6 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.prompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
-    }
     if !self.requestID.isEmpty {
       try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 14)
     }
@@ -353,166 +248,21 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
     if !self.conversationID.isEmpty {
       try visitor.visitSingularStringField(value: self.conversationID, fieldNumber: 16)
     }
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 25)
-    }
     try { if let v = self._options {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
     } }()
-    if !self.history.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.history, fieldNumber: 27)
+    if !self.messages.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.messages, fieldNumber: 28)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RALLMGenerateRequest, rhs: RALLMGenerateRequest) -> Bool {
-    if lhs.prompt != rhs.prompt {return false}
     if lhs.requestID != rhs.requestID {return false}
     if lhs.modelID != rhs.modelID {return false}
     if lhs.conversationID != rhs.conversationID {return false}
-    if lhs.metadata != rhs.metadata {return false}
     if lhs._options != rhs._options {return false}
-    if lhs.history != rhs.history {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LLMStreamFinalResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{4}total_time_ms\0\u{3}time_to_first_token_ms\0\u{4}\u{2}finish_reason\0\u{4}\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _text: String = String()
-    var _thinkingContent: String? = nil
-    var _totalTimeMs: Int64 = 0
-    var _timeToFirstTokenMs: Int64 = 0
-    var _finishReason: String = String()
-    var _promptEvalTimeMs: Int64 = 0
-    var _decodeTimeMs: Int64 = 0
-    var _toolCalls: [RAToolCall] = []
-    var _toolResults: [RAToolResult] = []
-    var _usage: RATokenUsage? = nil
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _text = source._text
-      _thinkingContent = source._thinkingContent
-      _totalTimeMs = source._totalTimeMs
-      _timeToFirstTokenMs = source._timeToFirstTokenMs
-      _finishReason = source._finishReason
-      _promptEvalTimeMs = source._promptEvalTimeMs
-      _decodeTimeMs = source._decodeTimeMs
-      _toolCalls = source._toolCalls
-      _toolResults = source._toolResults
-      _usage = source._usage
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._text) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._thinkingContent) }()
-        case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._totalTimeMs) }()
-        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._timeToFirstTokenMs) }()
-        case 9: try { try decoder.decodeSingularStringField(value: &_storage._finishReason) }()
-        case 12: try { try decoder.decodeSingularInt64Field(value: &_storage._promptEvalTimeMs) }()
-        case 13: try { try decoder.decodeSingularInt64Field(value: &_storage._decodeTimeMs) }()
-        case 14: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolCalls) }()
-        case 15: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolResults) }()
-        case 16: try { try decoder.decodeSingularMessageField(value: &_storage._usage) }()
-        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._text.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._text, fieldNumber: 1)
-      }
-      try { if let v = _storage._thinkingContent {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      if _storage._totalTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._totalTimeMs, fieldNumber: 6)
-      }
-      if _storage._timeToFirstTokenMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._timeToFirstTokenMs, fieldNumber: 7)
-      }
-      if !_storage._finishReason.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._finishReason, fieldNumber: 9)
-      }
-      if _storage._promptEvalTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._promptEvalTimeMs, fieldNumber: 12)
-      }
-      if _storage._decodeTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._decodeTimeMs, fieldNumber: 13)
-      }
-      if !_storage._toolCalls.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._toolCalls, fieldNumber: 14)
-      }
-      if !_storage._toolResults.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._toolResults, fieldNumber: 15)
-      }
-      try { if let v = _storage._usage {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
-      } }()
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RALLMStreamFinalResult, rhs: RALLMStreamFinalResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._text != rhs_storage._text {return false}
-        if _storage._thinkingContent != rhs_storage._thinkingContent {return false}
-        if _storage._totalTimeMs != rhs_storage._totalTimeMs {return false}
-        if _storage._timeToFirstTokenMs != rhs_storage._timeToFirstTokenMs {return false}
-        if _storage._finishReason != rhs_storage._finishReason {return false}
-        if _storage._promptEvalTimeMs != rhs_storage._promptEvalTimeMs {return false}
-        if _storage._decodeTimeMs != rhs_storage._decodeTimeMs {return false}
-        if _storage._toolCalls != rhs_storage._toolCalls {return false}
-        if _storage._toolResults != rhs_storage._toolResults {return false}
-        if _storage._usage != rhs_storage._usage {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.messages != rhs.messages {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -520,26 +270,18 @@ nonisolated extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{2}\u{2}result\0\u{4}\u{2}event_kind\0\u{3}request_id\0\u{3}conversation_id\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{3}elapsed_ms\0\u{3}tool_call\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{2}\u{2}token\0\u{4}\u{9}event_kind\0\u{3}request_id\0\u{4}\u{5}tool_call\0\u{1}error\0\u{3}partial_json\0\u{3}finish_reason\0\u{1}result\0\u{b}timestamp_us\0\u{b}is_final\0\u{b}kind\0\u{b}token_id\0\u{b}logprob\0\u{b}conversation_id\0\u{b}prompt_tokens_processed\0\u{b}completion_tokens_generated\0\u{b}elapsed_ms\0\u{c}\u{2}\u{1}\u{c}\u{4}\u{1}\u{c}\u{5}\u{1}\u{c}\u{6}\u{1}\u{c}\u{7}\u{1}\u{c}\u{8}\u{1}\u{c}\u{9}\u{1}\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}\u{c}\u{e}\u{1}\u{c}\u{f}\u{1}\u{c}\u{10}\u{1}\u{c}\u{11}\u{1}")
 
   fileprivate class _StorageClass {
     var _seq: UInt64 = 0
-    var _timestampUs: Int64 = 0
     var _token: String = String()
-    var _isFinal: Bool = false
-    var _kind: RATokenKind = .unspecified
-    var _tokenID: UInt32 = 0
-    var _logprob: Float = 0
-    var _finishReason: String = String()
-    var _result: RALLMStreamFinalResult? = nil
     var _eventKind: RALLMStreamEventKind = .unspecified
     var _requestID: String = String()
-    var _conversationID: String = String()
-    var _promptTokensProcessed: Int32 = 0
-    var _completionTokensGenerated: Int32 = 0
-    var _elapsedMs: Int64 = 0
+    var _finishReason: RAFinishReason = .unspecified
+    var _result: RALLMGenerationResult? = nil
     var _toolCall: RAToolCall? = nil
     var _error: RASDKError? = nil
+    var _partialJson: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -551,22 +293,14 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
 
     init(copying source: _StorageClass) {
       _seq = source._seq
-      _timestampUs = source._timestampUs
       _token = source._token
-      _isFinal = source._isFinal
-      _kind = source._kind
-      _tokenID = source._tokenID
-      _logprob = source._logprob
-      _finishReason = source._finishReason
-      _result = source._result
       _eventKind = source._eventKind
       _requestID = source._requestID
-      _conversationID = source._conversationID
-      _promptTokensProcessed = source._promptTokensProcessed
-      _completionTokensGenerated = source._completionTokensGenerated
-      _elapsedMs = source._elapsedMs
+      _finishReason = source._finishReason
+      _result = source._result
       _toolCall = source._toolCall
       _error = source._error
+      _partialJson = source._partialJson
     }
   }
 
@@ -586,22 +320,14 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
-        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
         case 3: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
-        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._isFinal) }()
-        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
-        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._tokenID) }()
-        case 7: try { try decoder.decodeSingularFloatField(value: &_storage._logprob) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._finishReason) }()
-        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
         case 12: try { try decoder.decodeSingularEnumField(value: &_storage._eventKind) }()
         case 13: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._conversationID) }()
-        case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._promptTokensProcessed) }()
-        case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._completionTokensGenerated) }()
-        case 17: try { try decoder.decodeSingularInt64Field(value: &_storage._elapsedMs) }()
         case 18: try { try decoder.decodeSingularMessageField(value: &_storage._toolCall) }()
         case 19: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        case 20: try { try decoder.decodeSingularStringField(value: &_storage._partialJson) }()
+        case 21: try { try decoder.decodeSingularEnumField(value: &_storage._finishReason) }()
+        case 22: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
         default: break
         }
       }
@@ -617,53 +343,29 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       if _storage._seq != 0 {
         try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
       }
-      if _storage._timestampUs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
-      }
       if !_storage._token.isEmpty {
         try visitor.visitSingularStringField(value: _storage._token, fieldNumber: 3)
       }
-      if _storage._isFinal != false {
-        try visitor.visitSingularBoolField(value: _storage._isFinal, fieldNumber: 4)
-      }
-      if _storage._kind != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 5)
-      }
-      if _storage._tokenID != 0 {
-        try visitor.visitSingularUInt32Field(value: _storage._tokenID, fieldNumber: 6)
-      }
-      if _storage._logprob.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._logprob, fieldNumber: 7)
-      }
-      if !_storage._finishReason.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._finishReason, fieldNumber: 8)
-      }
-      try { if let v = _storage._result {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
-      } }()
       if _storage._eventKind != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._eventKind, fieldNumber: 12)
       }
       if !_storage._requestID.isEmpty {
         try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 13)
       }
-      if !_storage._conversationID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._conversationID, fieldNumber: 14)
-      }
-      if _storage._promptTokensProcessed != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._promptTokensProcessed, fieldNumber: 15)
-      }
-      if _storage._completionTokensGenerated != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._completionTokensGenerated, fieldNumber: 16)
-      }
-      if _storage._elapsedMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._elapsedMs, fieldNumber: 17)
-      }
       try { if let v = _storage._toolCall {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
       } }()
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
+      } }()
+      try { if let v = _storage._partialJson {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 20)
+      } }()
+      if _storage._finishReason != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._finishReason, fieldNumber: 21)
+      }
+      try { if let v = _storage._result {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -675,22 +377,14 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._seq != rhs_storage._seq {return false}
-        if _storage._timestampUs != rhs_storage._timestampUs {return false}
         if _storage._token != rhs_storage._token {return false}
-        if _storage._isFinal != rhs_storage._isFinal {return false}
-        if _storage._kind != rhs_storage._kind {return false}
-        if _storage._tokenID != rhs_storage._tokenID {return false}
-        if _storage._logprob != rhs_storage._logprob {return false}
-        if _storage._finishReason != rhs_storage._finishReason {return false}
-        if _storage._result != rhs_storage._result {return false}
         if _storage._eventKind != rhs_storage._eventKind {return false}
         if _storage._requestID != rhs_storage._requestID {return false}
-        if _storage._conversationID != rhs_storage._conversationID {return false}
-        if _storage._promptTokensProcessed != rhs_storage._promptTokensProcessed {return false}
-        if _storage._completionTokensGenerated != rhs_storage._completionTokensGenerated {return false}
-        if _storage._elapsedMs != rhs_storage._elapsedMs {return false}
+        if _storage._finishReason != rhs_storage._finishReason {return false}
+        if _storage._result != rhs_storage._result {return false}
         if _storage._toolCall != rhs_storage._toolCall {return false}
         if _storage._error != rhs_storage._error {return false}
+        if _storage._partialJson != rhs_storage._partialJson {return false}
         return true
       }
       if !storagesAreEqual {return false}

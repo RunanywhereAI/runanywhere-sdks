@@ -43,48 +43,32 @@ class SpeechActivityKind extends $pb.ProtobufEnum {
   const SpeechActivityKind._(super.value, super.name);
 }
 
+/// Every value here is emitted by commons. Barge-in is a session-level
+/// decision, not a detector verdict: it lives on InterruptedEvent /
+/// InterruptReason in voice_events.proto.
 class VADStreamEventKind extends $pb.ProtobufEnum {
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_UNSPECIFIED =
       VADStreamEventKind._(
           0, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_UNSPECIFIED');
-  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STARTED =
-      VADStreamEventKind._(
-          1, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STARTED');
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_FRAME =
       VADStreamEventKind._(
-          2, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_FRAME');
+          1, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_FRAME');
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY =
       VADStreamEventKind._(
-          3, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY');
-  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STATISTICS =
-      VADStreamEventKind._(
-          4, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STATISTICS');
-  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STOPPED =
-      VADStreamEventKind._(
-          5, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STOPPED');
+          2, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY');
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_ERROR =
       VADStreamEventKind._(
-          6, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_ERROR');
-
-  /// Speech that interrupts active assistant playback. Downstream pipeline
-  /// also routes this through InterruptedEvent/InterruptReason.
-  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_BARGE_IN =
-      VADStreamEventKind._(
-          7, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_BARGE_IN');
+          3, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_ERROR');
 
   static const $core.List<VADStreamEventKind> values = <VADStreamEventKind>[
     VAD_STREAM_EVENT_KIND_UNSPECIFIED,
-    VAD_STREAM_EVENT_KIND_STARTED,
     VAD_STREAM_EVENT_KIND_FRAME,
     VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
-    VAD_STREAM_EVENT_KIND_STATISTICS,
-    VAD_STREAM_EVENT_KIND_STOPPED,
     VAD_STREAM_EVENT_KIND_ERROR,
-    VAD_STREAM_EVENT_KIND_BARGE_IN,
   ];
 
   static final $core.List<VADStreamEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 7);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static VADStreamEventKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

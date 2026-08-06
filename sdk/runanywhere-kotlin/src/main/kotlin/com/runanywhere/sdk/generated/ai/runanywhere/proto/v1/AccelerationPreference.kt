@@ -18,29 +18,32 @@ import kotlin.Suppress
 
 /**
  * ---------------------------------------------------------------------------
- * Hardware acceleration preference for inference. Canonical single enum —
- * previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
- * file and `AccelerationPreference` in model_types.proto. Consolidated here
- * because it is a pure hardware concept and
- * hardware_profile.proto has no imports (model_types.proto already imports
- * this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
- *   Web    enums.ts:165   (Auto / WebGPU / CPU)
- *   Swift  extensions     (CPU / GPU / NPU / Metal)
- *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
- * Canonicalized union below.
+ * Hardware acceleration preference for inference. Device CLASS, not graphics
+ * API. A hint, never a hard requirement — the runtime may fall back.
+ * UNSPECIFIED means "you choose".
+ *
+ * Canonical single enum. It lives in this file rather than model_types.proto
+ * because model_types.proto already imports this file; placing it here avoids
+ * a cyclic import.
  * ---------------------------------------------------------------------------
  */
 public enum class AccelerationPreference(
   override val `value`: Int,
 ) : WireEnum {
+  /**
+   * let the runtime choose
+   */
   ACCELERATION_PREFERENCE_UNSPECIFIED(0),
+  /**
+   * DEPRECATED: alias of UNSPECIFIED
+   */
   ACCELERATION_PREFERENCE_AUTO(1),
   ACCELERATION_PREFERENCE_CPU(2),
+  /**
+   * covers Metal / Vulkan / WebGPU
+   */
   ACCELERATION_PREFERENCE_GPU(3),
   ACCELERATION_PREFERENCE_NPU(4),
-  ACCELERATION_PREFERENCE_WEBGPU(5),
-  ACCELERATION_PREFERENCE_METAL(6),
-  ACCELERATION_PREFERENCE_VULKAN(7),
   ;
 
   public companion object {
@@ -61,9 +64,6 @@ public enum class AccelerationPreference(
       2 -> ACCELERATION_PREFERENCE_CPU
       3 -> ACCELERATION_PREFERENCE_GPU
       4 -> ACCELERATION_PREFERENCE_NPU
-      5 -> ACCELERATION_PREFERENCE_WEBGPU
-      6 -> ACCELERATION_PREFERENCE_METAL
-      7 -> ACCELERATION_PREFERENCE_VULKAN
       else -> null
     }
   }

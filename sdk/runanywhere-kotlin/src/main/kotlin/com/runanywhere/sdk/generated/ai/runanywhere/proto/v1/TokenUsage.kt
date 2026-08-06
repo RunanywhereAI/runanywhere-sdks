@@ -32,7 +32,9 @@ import okio.ByteString
 /**
  * One token-accounting shape embedded by every result and metrics message,
  * replacing the input/output/total/throughput quadruple that was copied inline
- * across LLM, VLM, and RAG results. Names follow the OpenAI Responses API.
+ * across LLM, VLM, and RAG results. Names follow the OpenAI Responses API; the
+ * timing fields follow llama.cpp's `timings` object, which names the phase it
+ * measures.
  */
 public class TokenUsage(
   @field:WireField(
@@ -59,14 +61,45 @@ public class TokenUsage(
     schemaIndex = 2,
   )
   public val total_tokens: Int = 0,
+  /**
+   * Decode-phase throughput only: output_tokens / decode_ms. Excludes
+   * prefill. cf. llama.cpp timings.predicted_per_second.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokensPerSecond",
+    jsonName = "decodeTokensPerSecond",
     schemaIndex = 3,
   )
-  public val tokens_per_second: Double = 0.0,
+  public val decode_tokens_per_second: Double = 0.0,
+  /**
+   * Prefill (prompt eval) wall time. cf. llama.cpp timings.prompt_ms,
+   * Ollama prompt_eval_duration. 0 when the backend does not report it.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "prefillMs",
+    schemaIndex = 4,
+  )
+  public val prefill_ms: Long = 0L,
+  /**
+   * Request start to first output token. The canonical spelling for every
+   * result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
+   * report TTFT here and nowhere else. SDKEvent's own telemetry fields
+   * (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
+   * their separate event-stream spelling.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "ttftMs",
+    schemaIndex = 5,
+  )
+  public val ttft_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TokenUsage, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -82,7 +115,9 @@ public class TokenUsage(
     if (input_tokens != other.input_tokens) return false
     if (output_tokens != other.output_tokens) return false
     if (total_tokens != other.total_tokens) return false
-    if (tokens_per_second != other.tokens_per_second) return false
+    if (decode_tokens_per_second != other.decode_tokens_per_second) return false
+    if (prefill_ms != other.prefill_ms) return false
+    if (ttft_ms != other.ttft_ms) return false
     return true
   }
 
@@ -93,7 +128,9 @@ public class TokenUsage(
       result = result * 37 + input_tokens.hashCode()
       result = result * 37 + output_tokens.hashCode()
       result = result * 37 + total_tokens.hashCode()
-      result = result * 37 + tokens_per_second.hashCode()
+      result = result * 37 + decode_tokens_per_second.hashCode()
+      result = result * 37 + prefill_ms.hashCode()
+      result = result * 37 + ttft_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -104,7 +141,9 @@ public class TokenUsage(
     result += """input_tokens=$input_tokens"""
     result += """output_tokens=$output_tokens"""
     result += """total_tokens=$total_tokens"""
-    result += """tokens_per_second=$tokens_per_second"""
+    result += """decode_tokens_per_second=$decode_tokens_per_second"""
+    result += """prefill_ms=$prefill_ms"""
+    result += """ttft_ms=$ttft_ms"""
     return result.joinToString(prefix = "TokenUsage{", separator = ", ", postfix = "}")
   }
 
@@ -112,9 +151,11 @@ public class TokenUsage(
     input_tokens: Int = this.input_tokens,
     output_tokens: Int = this.output_tokens,
     total_tokens: Int = this.total_tokens,
-    tokens_per_second: Double = this.tokens_per_second,
+    decode_tokens_per_second: Double = this.decode_tokens_per_second,
+    prefill_ms: Long = this.prefill_ms,
+    ttft_ms: Long = this.ttft_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): TokenUsage = TokenUsage(input_tokens, output_tokens, total_tokens, tokens_per_second, unknownFields)
+  ): TokenUsage = TokenUsage(input_tokens, output_tokens, total_tokens, decode_tokens_per_second, prefill_ms, ttft_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -137,8 +178,14 @@ public class TokenUsage(
         if (value.total_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.total_tokens)
         }
-        if (!value.tokens_per_second.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(4, value.tokens_per_second)
+        if (!value.decode_tokens_per_second.equals(0.0)) {
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(4, value.decode_tokens_per_second)
+        }
+        if (value.prefill_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.prefill_ms)
+        }
+        if (value.ttft_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.ttft_ms)
         }
         return size
       }
@@ -153,16 +200,28 @@ public class TokenUsage(
         if (value.total_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.total_tokens)
         }
-        if (!value.tokens_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 4, value.tokens_per_second)
+        if (!value.decode_tokens_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 4, value.decode_tokens_per_second)
+        }
+        if (value.prefill_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.prefill_ms)
+        }
+        if (value.ttft_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.ttft_ms)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TokenUsage) {
         writer.writeBytes(value.unknownFields)
-        if (!value.tokens_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 4, value.tokens_per_second)
+        if (value.ttft_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.ttft_ms)
+        }
+        if (value.prefill_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.prefill_ms)
+        }
+        if (!value.decode_tokens_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 4, value.decode_tokens_per_second)
         }
         if (value.total_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.total_tokens)
@@ -179,13 +238,17 @@ public class TokenUsage(
         var input_tokens: Int = 0
         var output_tokens: Int = 0
         var total_tokens: Int = 0
-        var tokens_per_second: Double = 0.0
+        var decode_tokens_per_second: Double = 0.0
+        var prefill_ms: Long = 0L
+        var ttft_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> input_tokens = ProtoAdapter.INT32.decode(reader)
             2 -> output_tokens = ProtoAdapter.INT32.decode(reader)
             3 -> total_tokens = ProtoAdapter.INT32.decode(reader)
-            4 -> tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
+            4 -> decode_tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
+            5 -> prefill_ms = ProtoAdapter.INT64.decode(reader)
+            6 -> ttft_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -193,7 +256,9 @@ public class TokenUsage(
           input_tokens = input_tokens,
           output_tokens = output_tokens,
           total_tokens = total_tokens,
-          tokens_per_second = tokens_per_second,
+          decode_tokens_per_second = decode_tokens_per_second,
+          prefill_ms = prefill_ms,
+          ttft_ms = ttft_ms,
           unknownFields = unknownFields
         )
       }

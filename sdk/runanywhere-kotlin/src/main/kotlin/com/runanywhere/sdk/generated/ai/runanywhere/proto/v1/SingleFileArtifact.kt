@@ -16,8 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -28,46 +26,18 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
 public class SingleFileArtifact(
-  required_patterns: List<String> = emptyList(),
-  optional_patterns: List<String> = emptyList(),
-  /**
-   * Full manifest form for SDK-local wrappers that attach expected files to
-   * a single-file artifact. The pattern fields above remain for existing
-   * generated consumers.
-   */
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.ExpectedModelFiles#ADAPTER",
     jsonName = "expectedFiles",
-    schemaIndex = 2,
+    schemaIndex = 0,
   )
   public val expected_files: ExpectedModelFiles? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SingleFileArtifact, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "requiredPatterns",
-    schemaIndex = 0,
-  )
-  public val required_patterns: List<String> =
-      immutableCopyOf("required_patterns", required_patterns)
-
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "optionalPatterns",
-    schemaIndex = 1,
-  )
-  public val optional_patterns: List<String> =
-      immutableCopyOf("optional_patterns", optional_patterns)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -78,8 +48,6 @@ public class SingleFileArtifact(
     if (other === this) return true
     if (other !is SingleFileArtifact) return false
     if (unknownFields != other.unknownFields) return false
-    if (required_patterns != other.required_patterns) return false
-    if (optional_patterns != other.optional_patterns) return false
     if (expected_files != other.expected_files) return false
     return true
   }
@@ -88,8 +56,6 @@ public class SingleFileArtifact(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + required_patterns.hashCode()
-      result = result * 37 + optional_patterns.hashCode()
       result = result * 37 + (expected_files?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -98,18 +64,11 @@ public class SingleFileArtifact(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    if (required_patterns.isNotEmpty()) result += """required_patterns=${sanitize(required_patterns)}"""
-    if (optional_patterns.isNotEmpty()) result += """optional_patterns=${sanitize(optional_patterns)}"""
     if (expected_files != null) result += """expected_files=$expected_files"""
     return result.joinToString(prefix = "SingleFileArtifact{", separator = ", ", postfix = "}")
   }
 
-  public fun copy(
-    required_patterns: List<String> = this.required_patterns,
-    optional_patterns: List<String> = this.optional_patterns,
-    expected_files: ExpectedModelFiles? = this.expected_files,
-    unknownFields: ByteString = this.unknownFields,
-  ): SingleFileArtifact = SingleFileArtifact(required_patterns, optional_patterns, expected_files, unknownFields)
+  public fun copy(expected_files: ExpectedModelFiles? = this.expected_files, unknownFields: ByteString = this.unknownFields): SingleFileArtifact = SingleFileArtifact(expected_files, unknownFields)
 
   public companion object {
     @JvmField
@@ -124,15 +83,11 @@ public class SingleFileArtifact(
     ) {
       override fun encodedSize(`value`: SingleFileArtifact): Int {
         var size = value.unknownFields.size
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(1, value.required_patterns)
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(2, value.optional_patterns)
         size += ExpectedModelFiles.ADAPTER.encodedSizeWithTag(3, value.expected_files)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: SingleFileArtifact) {
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 1, value.required_patterns)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 2, value.optional_patterns)
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 3, value.expected_files)
         writer.writeBytes(value.unknownFields)
       }
@@ -140,25 +95,17 @@ public class SingleFileArtifact(
       override fun encode(writer: ReverseProtoWriter, `value`: SingleFileArtifact) {
         writer.writeBytes(value.unknownFields)
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 3, value.expected_files)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 2, value.optional_patterns)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 1, value.required_patterns)
       }
 
       override fun decode(reader: ProtoReader): SingleFileArtifact {
-        val required_patterns = mutableListOf<String>()
-        val optional_patterns = mutableListOf<String>()
         var expected_files: ExpectedModelFiles? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> required_patterns.add(ProtoAdapter.STRING.decode(reader))
-            2 -> optional_patterns.add(ProtoAdapter.STRING.decode(reader))
             3 -> expected_files = ExpectedModelFiles.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return SingleFileArtifact(
-          required_patterns = required_patterns,
-          optional_patterns = optional_patterns,
           expected_files = expected_files,
           unknownFields = unknownFields
         )

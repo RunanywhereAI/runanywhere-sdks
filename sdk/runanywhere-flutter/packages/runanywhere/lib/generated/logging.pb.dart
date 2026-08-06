@@ -16,6 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'logging.pbenum.dart';
+import 'model_types.pbenum.dart' as $0;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -144,7 +145,7 @@ class LogEntry extends $pb.GeneratedMessage {
     $core.String? function,
     $core.int? errorCode,
     $core.String? modelId,
-    $core.String? framework,
+    $0.InferenceFramework? framework,
   }) {
     final result = create();
     if (timestampUnixMs != null) result.timestampUnixMs = timestampUnixMs;
@@ -189,7 +190,8 @@ class LogEntry extends $pb.GeneratedMessage {
     ..aOS(8, _omitFieldNames ? '' : 'function')
     ..aI(9, _omitFieldNames ? '' : 'errorCode')
     ..aOS(10, _omitFieldNames ? '' : 'modelId')
-    ..aOS(11, _omitFieldNames ? '' : 'framework')
+    ..aE<$0.InferenceFramework>(11, _omitFieldNames ? '' : 'framework',
+        enumValues: $0.InferenceFramework.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -297,9 +299,9 @@ class LogEntry extends $pb.GeneratedMessage {
   void clearModelId() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.String get framework => $_getSZ(10);
+  $0.InferenceFramework get framework => $_getN(10);
   @$pb.TagNumber(11)
-  set framework($core.String value) => $_setString(10, value);
+  set framework($0.InferenceFramework value) => $_setField(11, value);
   @$pb.TagNumber(11)
   $core.bool hasFramework() => $_has(10);
   @$pb.TagNumber(11)

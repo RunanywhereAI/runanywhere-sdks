@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -28,10 +27,12 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
+/**
+ * TTSConfiguration deleted. It was write-only: engine pinning already
+ * resolves off ModelLoadRequest, and "which voice" is TTSOptions.model.
+ */
 public class TTSSynthesisRequest(
   @field:WireField(
     tag = 1,
@@ -49,28 +50,13 @@ public class TTSSynthesisRequest(
   )
   public val text: String = "",
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 2,
-  )
-  public val ssml: String? = null,
-  @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.TTSOptions#ADAPTER",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val options: TTSOptions? = null,
-  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSSynthesisRequest, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 5,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 4,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -83,9 +69,7 @@ public class TTSSynthesisRequest(
     if (unknownFields != other.unknownFields) return false
     if (request_id != other.request_id) return false
     if (text != other.text) return false
-    if (ssml != other.ssml) return false
     if (options != other.options) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -95,9 +79,7 @@ public class TTSSynthesisRequest(
       result = unknownFields.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + text.hashCode()
-      result = result * 37 + (ssml?.hashCode() ?: 0)
       result = result * 37 + (options?.hashCode() ?: 0)
-      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -107,20 +89,16 @@ public class TTSSynthesisRequest(
     val result = mutableListOf<String>()
     result += """request_id=${sanitize(request_id)}"""
     result += """text=${sanitize(text)}"""
-    if (ssml != null) result += """ssml=${sanitize(ssml)}"""
     if (options != null) result += """options=$options"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "TTSSynthesisRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     request_id: String = this.request_id,
     text: String = this.text,
-    ssml: String? = this.ssml,
     options: TTSOptions? = this.options,
-    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSSynthesisRequest = TTSSynthesisRequest(request_id, text, ssml, options, metadata, unknownFields)
+  ): TTSSynthesisRequest = TTSSynthesisRequest(request_id, text, options, unknownFields)
 
   public companion object {
     @JvmField
@@ -133,9 +111,6 @@ public class TTSSynthesisRequest(
       null, 
       "tts_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: TTSSynthesisRequest): Int {
         var size = value.unknownFields.size
         if (value.request_id != "") {
@@ -144,9 +119,7 @@ public class TTSSynthesisRequest(
         if (value.text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.text)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.ssml)
         size += TTSOptions.ADAPTER.encodedSizeWithTag(4, value.options)
-        size += metadataAdapter.encodedSizeWithTag(5, value.metadata)
         return size
       }
 
@@ -157,17 +130,13 @@ public class TTSSynthesisRequest(
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.ssml)
         TTSOptions.ADAPTER.encodeWithTag(writer, 4, value.options)
-        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSSynthesisRequest) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         TTSOptions.ADAPTER.encodeWithTag(writer, 4, value.options)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.ssml)
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
         }
@@ -179,25 +148,19 @@ public class TTSSynthesisRequest(
       override fun decode(reader: ProtoReader): TTSSynthesisRequest {
         var request_id: String = ""
         var text: String = ""
-        var ssml: String? = null
         var options: TTSOptions? = null
-        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> request_id = ProtoAdapter.STRING.decode(reader)
             2 -> text = ProtoAdapter.STRING.decode(reader)
-            3 -> ssml = ProtoAdapter.STRING.decode(reader)
             4 -> options = TTSOptions.ADAPTER.decode(reader)
-            5 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
         return TTSSynthesisRequest(
           request_id = request_id,
           text = text,
-          ssml = ssml,
           options = options,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }

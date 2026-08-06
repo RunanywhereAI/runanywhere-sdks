@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -32,18 +31,9 @@ import okio.ByteString
 
 public class RerankScoredItem(
   /**
-   * Echo of RerankCandidate.id for correlation.
-   */
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val id: String = "",
-  /**
-   * Relevance score from the reranker (higher = more relevant). Not
-   * normalized to a fixed range; comparable only within one result set.
+   * Relevance of this document to the query, normalized to \[0, 1\] (sigmoid
+   * of the cross-encoder logit). Ordinal, not cardinal: 0.9 is not "twice
+   * as relevant" as 0.45, and scores are not comparable across models.
    * Industry name (Cohere/Voyage `relevance_score`).
    */
   @field:WireField(
@@ -51,30 +41,20 @@ public class RerankScoredItem(
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "relevanceScore",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val relevance_score: Float = 0f,
   /**
-   * Index of this candidate in the original RerankRequest.candidates list.
+   * Index of this document in the original RerankRequest.documents list.
    * Industry name (`index`).
    */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val index: Int = 0,
-  /**
-   * 0-based position after sorting by score descending (0 = most relevant).
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val rank: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RerankScoredItem, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -87,10 +67,8 @@ public class RerankScoredItem(
     if (other === this) return true
     if (other !is RerankScoredItem) return false
     if (unknownFields != other.unknownFields) return false
-    if (id != other.id) return false
     if (relevance_score != other.relevance_score) return false
     if (index != other.index) return false
-    if (rank != other.rank) return false
     return true
   }
 
@@ -98,10 +76,8 @@ public class RerankScoredItem(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + id.hashCode()
       result = result * 37 + relevance_score.hashCode()
       result = result * 37 + index.hashCode()
-      result = result * 37 + rank.hashCode()
       super.hashCode = result
     }
     return result
@@ -109,20 +85,16 @@ public class RerankScoredItem(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """id=${sanitize(id)}"""
     result += """relevance_score=$relevance_score"""
     result += """index=$index"""
-    result += """rank=$rank"""
     return result.joinToString(prefix = "RerankScoredItem{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    id: String = this.id,
     relevance_score: Float = this.relevance_score,
     index: Int = this.index,
-    rank: Int = this.rank,
     unknownFields: ByteString = this.unknownFields,
-  ): RerankScoredItem = RerankScoredItem(id, relevance_score, index, rank, unknownFields)
+  ): RerankScoredItem = RerankScoredItem(relevance_score, index, unknownFields)
 
   public companion object {
     @JvmField
@@ -136,72 +108,48 @@ public class RerankScoredItem(
     ) {
       override fun encodedSize(`value`: RerankScoredItem): Int {
         var size = value.unknownFields.size
-        if (value.id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.id)
-        }
         if (!value.relevance_score.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.relevance_score)
         }
         if (value.index != 0) {
           size += ProtoAdapter.UINT32.encodedSizeWithTag(3, value.index)
         }
-        if (value.rank != 0) {
-          size += ProtoAdapter.UINT32.encodedSizeWithTag(4, value.rank)
-        }
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: RerankScoredItem) {
-        if (value.id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.id)
-        }
         if (!value.relevance_score.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.relevance_score)
         }
         if (value.index != 0) {
           ProtoAdapter.UINT32.encodeWithTag(writer, 3, value.index)
-        }
-        if (value.rank != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.rank)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RerankScoredItem) {
         writer.writeBytes(value.unknownFields)
-        if (value.rank != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.rank)
-        }
         if (value.index != 0) {
           ProtoAdapter.UINT32.encodeWithTag(writer, 3, value.index)
         }
         if (!value.relevance_score.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.relevance_score)
         }
-        if (value.id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.id)
-        }
       }
 
       override fun decode(reader: ProtoReader): RerankScoredItem {
-        var id: String = ""
         var relevance_score: Float = 0f
         var index: Int = 0
-        var rank: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> id = ProtoAdapter.STRING.decode(reader)
             2 -> relevance_score = ProtoAdapter.FLOAT.decode(reader)
             3 -> index = ProtoAdapter.UINT32.decode(reader)
-            4 -> rank = ProtoAdapter.UINT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RerankScoredItem(
-          id = id,
           relevance_score = relevance_score,
           index = index,
-          rank = rank,
           unknownFields = unknownFields
         )
       }

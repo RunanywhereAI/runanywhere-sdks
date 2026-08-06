@@ -30,7 +30,6 @@ export const audioCaptureDefaults = Object.freeze({
   micSampleRateHz: 16000 as number,
   micChannels: 1 as number,
   micChannelCapacity: 128 as number,
-  micTapBufferFrames: 4096 as number,
   ttsSampleRateHz: 22050 as number,
 });
 
@@ -40,10 +39,6 @@ export const voiceAgentDefaults = Object.freeze({
   defaultVadModelId: "silero-vad" as string,
   speechRmsThreshold: 0.015 as number,
   speechFloorMultiplier: 2.0 as number,
-});
-
-export const hybridDefaults = Object.freeze({
-  sttConfidenceThreshold: 0.5 as number,
 });
 
 export const workerDefaults = Object.freeze({

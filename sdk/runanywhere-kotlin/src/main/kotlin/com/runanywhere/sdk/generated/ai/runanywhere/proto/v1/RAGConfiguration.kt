@@ -66,16 +66,19 @@ public class RAGConfiguration(
     schemaIndex = 3,
   )
   public val top_k: Int? = null,
+  /**
+   * Drop hits scoring below this. 0.0 = no filtering.
+   */
   @RacDefaultOption("0.0")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    jsonName = "similarityThreshold",
+    jsonName = "scoreThreshold",
     schemaIndex = 4,
   )
-  public val similarity_threshold: Float? = null,
+  public val score_threshold: Float? = null,
   /**
    * Tokens per chunk, and the overlap carried between adjacent chunks.
    */
@@ -118,46 +121,17 @@ public class RAGConfiguration(
     schemaIndex = 9,
   )
   public val embedding_config_json: String? = null,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "llmConfigJson",
-    schemaIndex = 10,
-  )
-  public val llm_config_json: String? = null,
   /**
-   * Where the vector index lives, and whether it survives the session.
+   * Pointwise rerank of the retrieved chunks using the session LLM.
    */
   @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "indexPath",
-    schemaIndex = 11,
-  )
-  public val index_path: String? = null,
-  @field:WireField(
-    tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "persistIndex",
-    schemaIndex = 12,
-  )
-  public val persist_index: Boolean = false,
-  @field:WireField(
-    tag = 14,
+    tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "rerankResults",
-    schemaIndex = 13,
+    schemaIndex = 10,
   )
   public val rerank_results: Boolean = false,
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "rerankerModelId",
-    schemaIndex = 14,
-  )
-  public val reranker_model_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -174,17 +148,13 @@ public class RAGConfiguration(
     if (llm_model_id != other.llm_model_id) return false
     if (embedding_dimension != other.embedding_dimension) return false
     if (top_k != other.top_k) return false
-    if (similarity_threshold != other.similarity_threshold) return false
+    if (score_threshold != other.score_threshold) return false
     if (chunk_size != other.chunk_size) return false
     if (chunk_overlap != other.chunk_overlap) return false
     if (max_context_tokens != other.max_context_tokens) return false
     if (prompt_template != other.prompt_template) return false
     if (embedding_config_json != other.embedding_config_json) return false
-    if (llm_config_json != other.llm_config_json) return false
-    if (index_path != other.index_path) return false
-    if (persist_index != other.persist_index) return false
     if (rerank_results != other.rerank_results) return false
-    if (reranker_model_id != other.reranker_model_id) return false
     return true
   }
 
@@ -196,17 +166,13 @@ public class RAGConfiguration(
       result = result * 37 + llm_model_id.hashCode()
       result = result * 37 + (embedding_dimension?.hashCode() ?: 0)
       result = result * 37 + (top_k?.hashCode() ?: 0)
-      result = result * 37 + (similarity_threshold?.hashCode() ?: 0)
+      result = result * 37 + (score_threshold?.hashCode() ?: 0)
       result = result * 37 + (chunk_size?.hashCode() ?: 0)
       result = result * 37 + (chunk_overlap?.hashCode() ?: 0)
       result = result * 37 + (max_context_tokens?.hashCode() ?: 0)
       result = result * 37 + (prompt_template?.hashCode() ?: 0)
       result = result * 37 + (embedding_config_json?.hashCode() ?: 0)
-      result = result * 37 + (llm_config_json?.hashCode() ?: 0)
-      result = result * 37 + (index_path?.hashCode() ?: 0)
-      result = result * 37 + persist_index.hashCode()
       result = result * 37 + rerank_results.hashCode()
-      result = result * 37 + (reranker_model_id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -218,17 +184,13 @@ public class RAGConfiguration(
     result += """llm_model_id=${sanitize(llm_model_id)}"""
     if (embedding_dimension != null) result += """embedding_dimension=$embedding_dimension"""
     if (top_k != null) result += """top_k=$top_k"""
-    if (similarity_threshold != null) result += """similarity_threshold=$similarity_threshold"""
+    if (score_threshold != null) result += """score_threshold=$score_threshold"""
     if (chunk_size != null) result += """chunk_size=$chunk_size"""
     if (chunk_overlap != null) result += """chunk_overlap=$chunk_overlap"""
     if (max_context_tokens != null) result += """max_context_tokens=$max_context_tokens"""
     if (prompt_template != null) result += """prompt_template=${sanitize(prompt_template)}"""
     if (embedding_config_json != null) result += """embedding_config_json=${sanitize(embedding_config_json)}"""
-    if (llm_config_json != null) result += """llm_config_json=${sanitize(llm_config_json)}"""
-    if (index_path != null) result += """index_path=${sanitize(index_path)}"""
-    result += """persist_index=$persist_index"""
     result += """rerank_results=$rerank_results"""
-    if (reranker_model_id != null) result += """reranker_model_id=${sanitize(reranker_model_id)}"""
     return result.joinToString(prefix = "RAGConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -237,19 +199,15 @@ public class RAGConfiguration(
     llm_model_id: String = this.llm_model_id,
     embedding_dimension: Int? = this.embedding_dimension,
     top_k: Int? = this.top_k,
-    similarity_threshold: Float? = this.similarity_threshold,
+    score_threshold: Float? = this.score_threshold,
     chunk_size: Int? = this.chunk_size,
     chunk_overlap: Int? = this.chunk_overlap,
     max_context_tokens: Int? = this.max_context_tokens,
     prompt_template: String? = this.prompt_template,
     embedding_config_json: String? = this.embedding_config_json,
-    llm_config_json: String? = this.llm_config_json,
-    index_path: String? = this.index_path,
-    persist_index: Boolean = this.persist_index,
     rerank_results: Boolean = this.rerank_results,
-    reranker_model_id: String? = this.reranker_model_id,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGConfiguration = RAGConfiguration(embedding_model_id, llm_model_id, embedding_dimension, top_k, similarity_threshold, chunk_size, chunk_overlap, max_context_tokens, prompt_template, embedding_config_json, llm_config_json, index_path, persist_index, rerank_results, reranker_model_id, unknownFields)
+  ): RAGConfiguration = RAGConfiguration(embedding_model_id, llm_model_id, embedding_dimension, top_k, score_threshold, chunk_size, chunk_overlap, max_context_tokens, prompt_template, embedding_config_json, rerank_results, unknownFields)
 
   public companion object {
     @JvmField
@@ -271,21 +229,15 @@ public class RAGConfiguration(
         }
         size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.embedding_dimension)
         size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.top_k)
-        size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.similarity_threshold)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.score_threshold)
         size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.chunk_size)
         size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.chunk_overlap)
         size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.max_context_tokens)
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.prompt_template)
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.embedding_config_json)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.llm_config_json)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.index_path)
-        if (value.persist_index != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(13, value.persist_index)
-        }
         if (value.rerank_results != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(14, value.rerank_results)
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.rerank_results)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.reranker_model_id)
         return size
       }
 
@@ -298,41 +250,29 @@ public class RAGConfiguration(
         }
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.embedding_dimension)
         ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.similarity_threshold)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.score_threshold)
         ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
         ProtoAdapter.INT32.encodeWithTag(writer, 7, value.chunk_overlap)
         ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_context_tokens)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
-        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.index_path)
-        if (value.persist_index != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.persist_index)
-        }
         if (value.rerank_results != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.rerank_results)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.rerank_results)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGConfiguration) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_id)
         if (value.rerank_results != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.rerank_results)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.rerank_results)
         }
-        if (value.persist_index != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.persist_index)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.index_path)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
         ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_context_tokens)
         ProtoAdapter.INT32.encodeWithTag(writer, 7, value.chunk_overlap)
         ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.similarity_threshold)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.score_threshold)
         ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.embedding_dimension)
         if (value.llm_model_id != "") {
@@ -348,34 +288,26 @@ public class RAGConfiguration(
         var llm_model_id: String = ""
         var embedding_dimension: Int? = null
         var top_k: Int? = null
-        var similarity_threshold: Float? = null
+        var score_threshold: Float? = null
         var chunk_size: Int? = null
         var chunk_overlap: Int? = null
         var max_context_tokens: Int? = null
         var prompt_template: String? = null
         var embedding_config_json: String? = null
-        var llm_config_json: String? = null
-        var index_path: String? = null
-        var persist_index: Boolean = false
         var rerank_results: Boolean = false
-        var reranker_model_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> embedding_model_id = ProtoAdapter.STRING.decode(reader)
             2 -> llm_model_id = ProtoAdapter.STRING.decode(reader)
             3 -> embedding_dimension = ProtoAdapter.INT32.decode(reader)
             4 -> top_k = ProtoAdapter.INT32.decode(reader)
-            5 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
+            5 -> score_threshold = ProtoAdapter.FLOAT.decode(reader)
             6 -> chunk_size = ProtoAdapter.INT32.decode(reader)
             7 -> chunk_overlap = ProtoAdapter.INT32.decode(reader)
             8 -> max_context_tokens = ProtoAdapter.INT32.decode(reader)
             9 -> prompt_template = ProtoAdapter.STRING.decode(reader)
             10 -> embedding_config_json = ProtoAdapter.STRING.decode(reader)
-            11 -> llm_config_json = ProtoAdapter.STRING.decode(reader)
-            12 -> index_path = ProtoAdapter.STRING.decode(reader)
-            13 -> persist_index = ProtoAdapter.BOOL.decode(reader)
-            14 -> rerank_results = ProtoAdapter.BOOL.decode(reader)
-            15 -> reranker_model_id = ProtoAdapter.STRING.decode(reader)
+            11 -> rerank_results = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -384,17 +316,13 @@ public class RAGConfiguration(
           llm_model_id = llm_model_id,
           embedding_dimension = embedding_dimension,
           top_k = top_k,
-          similarity_threshold = similarity_threshold,
+          score_threshold = score_threshold,
           chunk_size = chunk_size,
           chunk_overlap = chunk_overlap,
           max_context_tokens = max_context_tokens,
           prompt_template = prompt_template,
           embedding_config_json = embedding_config_json,
-          llm_config_json = llm_config_json,
-          index_path = index_path,
-          persist_index = persist_index,
           rerank_results = rerank_results,
-          reranker_model_id = reranker_model_id,
           unknownFields = unknownFields
         )
       }

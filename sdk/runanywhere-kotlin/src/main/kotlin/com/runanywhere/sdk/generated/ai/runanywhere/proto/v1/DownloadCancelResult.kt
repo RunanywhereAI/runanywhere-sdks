@@ -71,17 +71,9 @@ public class DownloadCancelResult(
   )
   public val partial_bytes_preserved: Boolean = false,
   @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "resumeToken",
-    schemaIndex = 5,
-  )
-  public val resume_token: String = "",
-  @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -101,7 +93,6 @@ public class DownloadCancelResult(
     if (partial_bytes_deleted != other.partial_bytes_deleted) return false
     if (was_running != other.was_running) return false
     if (partial_bytes_preserved != other.partial_bytes_preserved) return false
-    if (resume_token != other.resume_token) return false
     if (error != other.error) return false
     return true
   }
@@ -115,7 +106,6 @@ public class DownloadCancelResult(
       result = result * 37 + partial_bytes_deleted.hashCode()
       result = result * 37 + was_running.hashCode()
       result = result * 37 + partial_bytes_preserved.hashCode()
-      result = result * 37 + resume_token.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -129,7 +119,6 @@ public class DownloadCancelResult(
     result += """partial_bytes_deleted=$partial_bytes_deleted"""
     result += """was_running=$was_running"""
     result += """partial_bytes_preserved=$partial_bytes_preserved"""
-    result += """resume_token=${sanitize(resume_token)}"""
     if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "DownloadCancelResult{", separator = ", ", postfix = "}")
   }
@@ -140,10 +129,9 @@ public class DownloadCancelResult(
     partial_bytes_deleted: Long = this.partial_bytes_deleted,
     was_running: Boolean = this.was_running,
     partial_bytes_preserved: Boolean = this.partial_bytes_preserved,
-    resume_token: String = this.resume_token,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadCancelResult = DownloadCancelResult(task_id, model_id, partial_bytes_deleted, was_running, partial_bytes_preserved, resume_token, error, unknownFields)
+  ): DownloadCancelResult = DownloadCancelResult(task_id, model_id, partial_bytes_deleted, was_running, partial_bytes_preserved, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -173,9 +161,6 @@ public class DownloadCancelResult(
         if (value.partial_bytes_preserved != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.partial_bytes_preserved)
         }
-        if (value.resume_token != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.resume_token)
-        }
         size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
@@ -196,9 +181,6 @@ public class DownloadCancelResult(
         if (value.partial_bytes_preserved != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.partial_bytes_preserved)
         }
-        if (value.resume_token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.resume_token)
-        }
         SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
@@ -206,9 +188,6 @@ public class DownloadCancelResult(
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadCancelResult) {
         writer.writeBytes(value.unknownFields)
         SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
-        if (value.resume_token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.resume_token)
-        }
         if (value.partial_bytes_preserved != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.partial_bytes_preserved)
         }
@@ -232,7 +211,6 @@ public class DownloadCancelResult(
         var partial_bytes_deleted: Long = 0L
         var was_running: Boolean = false
         var partial_bytes_preserved: Boolean = false
-        var resume_token: String = ""
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -241,7 +219,6 @@ public class DownloadCancelResult(
             4 -> partial_bytes_deleted = ProtoAdapter.INT64.decode(reader)
             6 -> was_running = ProtoAdapter.BOOL.decode(reader)
             7 -> partial_bytes_preserved = ProtoAdapter.BOOL.decode(reader)
-            8 -> resume_token = ProtoAdapter.STRING.decode(reader)
             9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -252,7 +229,6 @@ public class DownloadCancelResult(
           partial_bytes_deleted = partial_bytes_deleted,
           was_running = was_running,
           partial_bytes_preserved = partial_bytes_preserved,
-          resume_token = resume_token,
           error = error,
           unknownFields = unknownFields
         )

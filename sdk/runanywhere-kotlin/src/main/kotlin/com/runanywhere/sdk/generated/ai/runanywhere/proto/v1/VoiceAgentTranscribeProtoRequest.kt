@@ -46,36 +46,16 @@ public class VoiceAgentTranscribeProtoRequest(
     schemaIndex = 1,
   )
   public val session_id: String = "",
+  /**
+   * BCP-47. Empty means auto-detect.
+   */
   @field:WireField(
     tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sampleRate",
-    schemaIndex = 2,
-  )
-  public val sample_rate: Int = 0,
-  @field:WireField(
-    tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "languageHint",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
-  public val language_hint: String = "",
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val channels: Int = 0,
-  @field:WireField(
-    tag = 6,
-    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
-  )
-  public val encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
+  public val language: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentTranscribeProtoRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -90,10 +70,7 @@ public class VoiceAgentTranscribeProtoRequest(
     if (unknownFields != other.unknownFields) return false
     if (audio_data != other.audio_data) return false
     if (session_id != other.session_id) return false
-    if (sample_rate != other.sample_rate) return false
-    if (language_hint != other.language_hint) return false
-    if (channels != other.channels) return false
-    if (encoding != other.encoding) return false
+    if (language != other.language) return false
     return true
   }
 
@@ -103,10 +80,7 @@ public class VoiceAgentTranscribeProtoRequest(
       result = unknownFields.hashCode()
       result = result * 37 + audio_data.hashCode()
       result = result * 37 + session_id.hashCode()
-      result = result * 37 + sample_rate.hashCode()
-      result = result * 37 + language_hint.hashCode()
-      result = result * 37 + channels.hashCode()
-      result = result * 37 + encoding.hashCode()
+      result = result * 37 + language.hashCode()
       super.hashCode = result
     }
     return result
@@ -116,22 +90,16 @@ public class VoiceAgentTranscribeProtoRequest(
     val result = mutableListOf<String>()
     result += """audio_data=$audio_data"""
     result += """session_id=${sanitize(session_id)}"""
-    result += """sample_rate=$sample_rate"""
-    result += """language_hint=${sanitize(language_hint)}"""
-    result += """channels=$channels"""
-    result += """encoding=$encoding"""
+    result += """language=${sanitize(language)}"""
     return result.joinToString(prefix = "VoiceAgentTranscribeProtoRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     audio_data: ByteString = this.audio_data,
     session_id: String = this.session_id,
-    sample_rate: Int = this.sample_rate,
-    language_hint: String = this.language_hint,
-    channels: Int = this.channels,
-    encoding: AudioEncoding = this.encoding,
+    language: String = this.language,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentTranscribeProtoRequest = VoiceAgentTranscribeProtoRequest(audio_data, session_id, sample_rate, language_hint, channels, encoding, unknownFields)
+  ): VoiceAgentTranscribeProtoRequest = VoiceAgentTranscribeProtoRequest(audio_data, session_id, language, unknownFields)
 
   public companion object {
     @JvmField
@@ -152,17 +120,8 @@ public class VoiceAgentTranscribeProtoRequest(
         if (value.session_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.session_id)
         }
-        if (value.sample_rate != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.sample_rate)
-        }
-        if (value.language_hint != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.language_hint)
-        }
-        if (value.channels != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.channels)
-        }
-        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          size += AudioEncoding.ADAPTER.encodedSizeWithTag(6, value.encoding)
+        if (value.language != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.language)
         }
         return size
       }
@@ -174,34 +133,16 @@ public class VoiceAgentTranscribeProtoRequest(
         if (value.session_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.session_id)
         }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.sample_rate)
-        }
-        if (value.language_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.language_hint)
-        }
-        if (value.channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.channels)
-        }
-        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          AudioEncoding.ADAPTER.encodeWithTag(writer, 6, value.encoding)
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.language)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentTranscribeProtoRequest) {
         writer.writeBytes(value.unknownFields)
-        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          AudioEncoding.ADAPTER.encodeWithTag(writer, 6, value.encoding)
-        }
-        if (value.channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.channels)
-        }
-        if (value.language_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.language_hint)
-        }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.sample_rate)
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.language)
         }
         if (value.session_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.session_id)
@@ -214,32 +155,19 @@ public class VoiceAgentTranscribeProtoRequest(
       override fun decode(reader: ProtoReader): VoiceAgentTranscribeProtoRequest {
         var audio_data: ByteString = ByteString.EMPTY
         var session_id: String = ""
-        var sample_rate: Int = 0
-        var language_hint: String = ""
-        var channels: Int = 0
-        var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
+        var language: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> audio_data = ProtoAdapter.BYTES.decode(reader)
             2 -> session_id = ProtoAdapter.STRING.decode(reader)
-            3 -> sample_rate = ProtoAdapter.INT32.decode(reader)
-            4 -> language_hint = ProtoAdapter.STRING.decode(reader)
-            5 -> channels = ProtoAdapter.INT32.decode(reader)
-            6 -> try {
-              encoding = AudioEncoding.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            3 -> language = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VoiceAgentTranscribeProtoRequest(
           audio_data = audio_data,
           session_id = session_id,
-          sample_rate = sample_rate,
-          language_hint = language_hint,
-          channels = channels,
-          encoding = encoding,
+          language = language,
           unknownFields = unknownFields
         )
       }

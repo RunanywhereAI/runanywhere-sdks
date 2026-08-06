@@ -16,38 +16,92 @@
 
 package com.runanywhere.sdk.generated.convenience
 
+import ai.runanywhere.proto.v1.AcceleratorPolicy
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.AudioFormat
+import ai.runanywhere.proto.v1.BatteryFilter
+import ai.runanywhere.proto.v1.ConfidenceCascade
+import ai.runanywhere.proto.v1.DeviceInfo
 import ai.runanywhere.proto.v1.DiarizationOptions
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
-import ai.runanywhere.proto.v1.EmbeddingsConfiguration
+import ai.runanywhere.proto.v1.DiffusionOutputFormat
 import ai.runanywhere.proto.v1.EmbeddingsOptions
-import ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy
+import ai.runanywhere.proto.v1.ErrorCategory
+import ai.runanywhere.proto.v1.HybridRoutingPolicy
 import ai.runanywhere.proto.v1.LLMConfiguration
 import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LoRAAdapterConfig
 import ai.runanywhere.proto.v1.LogLevel
 import ai.runanywhere.proto.v1.LoggingConfiguration
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
+import ai.runanywhere.proto.v1.LoraAdapterConfig
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.RAGConfiguration
+import ai.runanywhere.proto.v1.RAGDeleteRequest
 import ai.runanywhere.proto.v1.RAGQueryOptions
+import ai.runanywhere.proto.v1.RAGRetrievalOptions
 import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RerankOptions
 import ai.runanywhere.proto.v1.RerankRequest
+import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.SDKEnvironment
 import ai.runanywhere.proto.v1.STTConfiguration
 import ai.runanywhere.proto.v1.STTOptions
+import ai.runanywhere.proto.v1.SdkInitPhase1Request
 import ai.runanywhere.proto.v1.SegmentationImage
 import ai.runanywhere.proto.v1.StructuredOutputOptions
-import ai.runanywhere.proto.v1.TTSConfiguration
 import ai.runanywhere.proto.v1.TTSOptions
+import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
-import ai.runanywhere.proto.v1.VLMGenerationOptions
 import com.runanywhere.sdk.foundation.errors.SDKException
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun ToolCallingOptions.Companion.defaults(): ToolCallingOptions =
+    ToolCallingOptions(
+        max_tool_calls = 5,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun ToolCallingOptions.validate() {
+    if (max_tool_calls != null && (max_tool_calls < 1)) {
+        throw SDKException.validationFailed(
+            fieldPath = "ToolCallingOptions.max_tool_calls",
+            message = "max_tool_calls must be >= 1 (got ${max_tool_calls})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
+public val ErrorCategory.wireString: String
+    get() = when (this) {
+        ErrorCategory.ERROR_CATEGORY_UNSPECIFIED -> "unspecified"
+        ErrorCategory.ERROR_CATEGORY_NETWORK -> "network_error"
+        ErrorCategory.ERROR_CATEGORY_VALIDATION -> "invalid_request_error"
+        ErrorCategory.ERROR_CATEGORY_MODEL -> "model_error"
+        ErrorCategory.ERROR_CATEGORY_COMPONENT -> "component_error"
+        ErrorCategory.ERROR_CATEGORY_IO -> "io_error"
+        ErrorCategory.ERROR_CATEGORY_AUTH -> "authentication_error"
+        ErrorCategory.ERROR_CATEGORY_INTERNAL -> "internal_error"
+        ErrorCategory.ERROR_CATEGORY_CONFIGURATION -> "configuration_error"
+        else -> ""
+    }
+
+/** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
+public fun ErrorCategory.Companion.fromWireString(value: String): ErrorCategory? =
+    when (value.lowercase()) {
+        "unspecified" -> ErrorCategory.ERROR_CATEGORY_UNSPECIFIED
+        "network_error" -> ErrorCategory.ERROR_CATEGORY_NETWORK
+        "invalid_request_error" -> ErrorCategory.ERROR_CATEGORY_VALIDATION
+        "model_error" -> ErrorCategory.ERROR_CATEGORY_MODEL
+        "component_error" -> ErrorCategory.ERROR_CATEGORY_COMPONENT
+        "io_error" -> ErrorCategory.ERROR_CATEGORY_IO
+        "authentication_error" -> ErrorCategory.ERROR_CATEGORY_AUTH
+        "internal_error" -> ErrorCategory.ERROR_CATEGORY_INTERNAL
+        "configuration_error" -> ErrorCategory.ERROR_CATEGORY_CONFIGURATION
+        else -> null
+    }
 
 /** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
 public val AudioFormat.wireString: String
@@ -96,6 +150,7 @@ public val ModelCategory.wireString: String
         ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> "voice-activity-detection"
         ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION -> "speaker-diarization"
         ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION -> "semantic-segmentation"
+        ModelCategory.MODEL_CATEGORY_RERANK -> "rerank"
         else -> ""
     }
 
@@ -114,6 +169,7 @@ public fun ModelCategory.Companion.fromWireString(value: String): ModelCategory?
         "voice-activity-detection" -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         "speaker-diarization" -> ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION
         "semantic-segmentation" -> ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION
+        "rerank" -> ModelCategory.MODEL_CATEGORY_RERANK
         else -> null
     }
 
@@ -177,21 +233,33 @@ public fun ArchiveStructure.Companion.fromWireString(value: String): ArchiveStru
         else -> null
     }
 
+/** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
+public val AcceleratorPolicy.wireString: String
+    get() = when (this) {
+        AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED -> "unspecified"
+        AcceleratorPolicy.ACCELERATOR_POLICY_AUTO -> "auto"
+        AcceleratorPolicy.ACCELERATOR_POLICY_CPU -> "cpu"
+        AcceleratorPolicy.ACCELERATOR_POLICY_GPU -> "gpu"
+        AcceleratorPolicy.ACCELERATOR_POLICY_NPU -> "npu"
+        else -> ""
+    }
+
+/** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
+public fun AcceleratorPolicy.Companion.fromWireString(value: String): AcceleratorPolicy? =
+    when (value.lowercase()) {
+        "unspecified" -> AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED
+        "auto" -> AcceleratorPolicy.ACCELERATOR_POLICY_AUTO
+        "cpu" -> AcceleratorPolicy.ACCELERATOR_POLICY_CPU
+        "gpu" -> AcceleratorPolicy.ACCELERATOR_POLICY_GPU
+        "npu" -> AcceleratorPolicy.ACCELERATOR_POLICY_NPU
+        else -> null
+    }
+
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun StructuredOutputOptions.Companion.defaults(): StructuredOutputOptions =
     StructuredOutputOptions(
-        max_retries = 0,
+        include_schema_in_prompt = true,
     )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun StructuredOutputOptions.validate() {
-    if (max_retries < 0) {
-        throw SDKException.validationFailed(
-            fieldPath = "StructuredOutputOptions.max_retries",
-            message = "max_retries must be >= 0 (got ${max_retries})",
-        )
-    }
-}
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun LLMGenerationOptions.Companion.defaults(): LLMGenerationOptions =
@@ -199,46 +267,45 @@ public fun LLMGenerationOptions.Companion.defaults(): LLMGenerationOptions =
         max_output_tokens = 512,
         temperature = 0.7f,
         top_p = 1.0f,
-        top_k = 0,
-        repetition_penalty = 1.0f,
+        top_k = 40,
+        repeat_penalty = 1.1f,
         seed = 0L,
         frequency_penalty = 0.0f,
         presence_penalty = 0.0f,
         repeat_last_n = 0,
-        min_p = 0.0f,
-        n_threads = 0,
+        min_p = 0.05f,
     )
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
 public fun LLMGenerationOptions.validate() {
-    if (max_output_tokens < 0) {
+    if (max_output_tokens != null && (max_output_tokens < 0)) {
         throw SDKException.validationFailed(
             fieldPath = "LLMGenerationOptions.max_output_tokens",
             message = "max_output_tokens must be >= 0 (got ${max_output_tokens})",
         )
     }
-    if (!temperature.isFinite() || temperature < 0.0 || temperature > 2.0) {
+    if (temperature != null && (!temperature.isFinite() || temperature < 0.0 || temperature > 2.0)) {
         throw SDKException.validationFailed(
             fieldPath = "LLMGenerationOptions.temperature",
             message = "temperature must be in 0.0...2.0 (got ${temperature})",
         )
     }
-    if (!top_p.isFinite() || top_p < 0.0 || top_p > 1.0) {
+    if (top_p != null && (!top_p.isFinite() || top_p < 0.0 || top_p > 1.0)) {
         throw SDKException.validationFailed(
             fieldPath = "LLMGenerationOptions.top_p",
             message = "top_p must be in 0.0...1.0 (got ${top_p})",
         )
     }
-    if (top_k < 0) {
+    if (top_k != null && (top_k < 0)) {
         throw SDKException.validationFailed(
             fieldPath = "LLMGenerationOptions.top_k",
             message = "top_k must be >= 0 (got ${top_k})",
         )
     }
-    if (!repetition_penalty.isFinite() || repetition_penalty < 0.0) {
+    if (repeat_penalty != null && (!repeat_penalty.isFinite() || repeat_penalty < 0.0)) {
         throw SDKException.validationFailed(
-            fieldPath = "LLMGenerationOptions.repetition_penalty",
-            message = "repetition_penalty must be >= 0.0 (got ${repetition_penalty})",
+            fieldPath = "LLMGenerationOptions.repeat_penalty",
+            message = "repeat_penalty must be >= 0.0 (got ${repeat_penalty})",
         )
     }
 }
@@ -249,58 +316,12 @@ public fun LLMConfiguration.Companion.defaults(): LLMConfiguration =
         context_length = 2048,
     )
 
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun VADConfiguration.Companion.defaults(): VADConfiguration =
-    VADConfiguration(
-        sample_rate = 16000,
-        frame_length_ms = 100,
-        activation_threshold = 0.015f,
-        calibration_multiplier = 2.0f,
-    )
-
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun VADConfiguration.validate() {
-    if (sample_rate < 8000 || sample_rate > 48000) {
+public fun DeviceInfo.validate() {
+    if (battery_level != null && (!battery_level.isFinite() || battery_level < 0.0 || battery_level > 1.0)) {
         throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.sample_rate",
-            message = "sample_rate must be in 8000...48000 (got ${sample_rate})",
-        )
-    }
-    if (frame_length_ms < 20 || frame_length_ms > 1000) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.frame_length_ms",
-            message = "frame_length_ms must be in 20...1000 (got ${frame_length_ms})",
-        )
-    }
-    if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.activation_threshold",
-            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
-        )
-    }
-    if (!calibration_multiplier.isFinite() || calibration_multiplier < 1.2 || calibration_multiplier > 4.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.calibration_multiplier",
-            message = "calibration_multiplier must be in 1.2...4.0 (got ${calibration_multiplier})",
-        )
-    }
-}
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun VADOptions.Companion.defaults(): VADOptions =
-    VADOptions(
-        min_speech_duration_ms = 100,
-        min_silence_duration_ms = 300,
-        max_speech_duration_ms = 0,
-        prefix_padding_ms = 0,
-    )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun VADOptions.validate() {
-    if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADOptions.activation_threshold",
-            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
+            fieldPath = "DeviceInfo.battery_level",
+            message = "battery_level must be in 0.0...1.0 (got ${battery_level})",
         )
     }
 }
@@ -316,10 +337,10 @@ public fun DiarizationOptions.Companion.defaults(): DiarizationOptions =
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
 public fun DiarizationOptions.validate() {
-    if (sample_rate != null && (sample_rate < 8000 || sample_rate > 48000)) {
+    if (sample_rate != null && (sample_rate < 16000 || sample_rate > 16000)) {
         throw SDKException.validationFailed(
             fieldPath = "DiarizationOptions.sample_rate",
-            message = "sample_rate must be in 8000...48000 (got ${sample_rate})",
+            message = "sample_rate must be in 16000...16000 (got ${sample_rate})",
         )
     }
     if (channels != null && (channels < 1 || channels > 1)) {
@@ -346,6 +367,12 @@ public fun DiarizationOptions.validate() {
             message = "merge_gap_ms must be >= 0 (got ${merge_gap_ms})",
         )
     }
+    if (max_speakers != null && (max_speakers < 1)) {
+        throw SDKException.validationFailed(
+            fieldPath = "DiarizationOptions.max_speakers",
+            message = "max_speakers must be >= 1 (got ${max_speakers})",
+        )
+    }
 }
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
@@ -355,8 +382,9 @@ public fun DiffusionGenerationOptions.Companion.defaults(): DiffusionGenerationO
         height = 0,
         steps = 0,
         guidance_scale = 0.0f,
-        seed = -1L,
-        denoise_strength = 0.75f,
+        strength = 0.75f,
+        n = 1,
+        output_format = DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_PNG,
     )
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
@@ -379,41 +407,16 @@ public fun DiffusionGenerationOptions.validate() {
             message = "guidance_scale must be in 0.0...20.0 (got ${guidance_scale})",
         )
     }
-    if (!denoise_strength.isFinite() || denoise_strength < 0.0 || denoise_strength > 1.0) {
+    if (!strength.isFinite() || strength < 0.0 || strength > 1.0) {
         throw SDKException.validationFailed(
-            fieldPath = "DiffusionGenerationOptions.denoise_strength",
-            message = "denoise_strength must be in 0.0...1.0 (got ${denoise_strength})",
+            fieldPath = "DiffusionGenerationOptions.strength",
+            message = "strength must be in 0.0...1.0 (got ${strength})",
         )
     }
-}
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun EmbeddingsConfiguration.Companion.defaults(): EmbeddingsConfiguration =
-    EmbeddingsConfiguration(
-        embedding_dimension = 384,
-        max_sequence_length = 512,
-        normalize = true,
-        pooling = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
-    )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun EmbeddingsConfiguration.validate() {
-    if (model_id.isEmpty()) {
+    if (n != null && (n < 1 || n > 8)) {
         throw SDKException.validationFailed(
-            fieldPath = "EmbeddingsConfiguration.model_id",
-            message = "model_id is required",
-        )
-    }
-    if (embedding_dimension < 1) {
-        throw SDKException.validationFailed(
-            fieldPath = "EmbeddingsConfiguration.embedding_dimension",
-            message = "embedding_dimension must be >= 1 (got ${embedding_dimension})",
-        )
-    }
-    if (max_sequence_length < 1) {
-        throw SDKException.validationFailed(
-            fieldPath = "EmbeddingsConfiguration.max_sequence_length",
-            message = "max_sequence_length must be >= 1 (got ${max_sequence_length})",
+            fieldPath = "DiffusionGenerationOptions.n",
+            message = "n must be in 1...8 (got ${n})",
         )
     }
 }
@@ -421,6 +424,7 @@ public fun EmbeddingsConfiguration.validate() {
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun EmbeddingsOptions.Companion.defaults(): EmbeddingsOptions =
     EmbeddingsOptions(
+        normalize = true,
         n_threads = 0,
     )
 
@@ -430,6 +434,60 @@ public fun EmbeddingsOptions.validate() {
         throw SDKException.validationFailed(
             fieldPath = "EmbeddingsOptions.batch_size",
             message = "batch_size must be in 1...8192 (got ${batch_size})",
+        )
+    }
+    if (dimensions != null && (dimensions < 1)) {
+        throw SDKException.validationFailed(
+            fieldPath = "EmbeddingsOptions.dimensions",
+            message = "dimensions must be >= 1 (got ${dimensions})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun BatteryFilter.Companion.defaults(): BatteryFilter =
+    BatteryFilter(
+        min_battery_percent = 20,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun BatteryFilter.validate() {
+    if (min_battery_percent < 0 || min_battery_percent > 100) {
+        throw SDKException.validationFailed(
+            fieldPath = "BatteryFilter.min_battery_percent",
+            message = "min_battery_percent must be in 0...100 (got ${min_battery_percent})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun ConfidenceCascade.Companion.defaults(): ConfidenceCascade =
+    ConfidenceCascade(
+        threshold = 0.5f,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun ConfidenceCascade.validate() {
+    if (!threshold.isFinite() || threshold < 0.0 || threshold > 1.0) {
+        throw SDKException.validationFailed(
+            fieldPath = "ConfidenceCascade.threshold",
+            message = "threshold must be in 0.0...1.0 (got ${threshold})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun HybridRoutingPolicy.Companion.defaults(): HybridRoutingPolicy =
+    HybridRoutingPolicy(
+        attempt_timeout_ms = 0,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun HybridRoutingPolicy.validate() {
+    if (attempt_timeout_ms < 0) {
+        throw SDKException.validationFailed(
+            fieldPath = "HybridRoutingPolicy.attempt_timeout_ms",
+            message = "attempt_timeout_ms must be >= 0 (got ${attempt_timeout_ms})",
         )
     }
 }
@@ -477,17 +535,17 @@ public fun LoggingConfiguration.Companion.defaults(): LoggingConfiguration =
     )
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun LoRAAdapterConfig.Companion.defaults(): LoRAAdapterConfig =
-    LoRAAdapterConfig(
+public fun LoraAdapterConfig.Companion.defaults(): LoraAdapterConfig =
+    LoraAdapterConfig(
         scale = 1.0f,
     )
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun LoRAAdapterConfig.validate() {
-    if (adapter_path.isEmpty()) {
+public fun LoraAdapterConfig.validate() {
+    if (adapter_id.isEmpty()) {
         throw SDKException.validationFailed(
-            fieldPath = "LoRAAdapterConfig.adapter_path",
-            message = "adapter_path is required",
+            fieldPath = "LoraAdapterConfig.adapter_id",
+            message = "adapter_id is required",
         )
     }
 }
@@ -502,7 +560,7 @@ public fun LoraAdapterCatalogEntry.Companion.defaults(): LoraAdapterCatalogEntry
 public fun RAGConfiguration.Companion.defaults(): RAGConfiguration =
     RAGConfiguration(
         top_k = 5,
-        similarity_threshold = 0.0f,
+        score_threshold = 0.0f,
         chunk_size = 512,
         chunk_overlap = 64,
     )
@@ -515,10 +573,10 @@ public fun RAGConfiguration.validate() {
             message = "top_k must be >= 1 (got ${top_k})",
         )
     }
-    if (similarity_threshold != null && (!similarity_threshold.isFinite() || similarity_threshold < 0.0 || similarity_threshold > 1.0)) {
+    if (score_threshold != null && (!score_threshold.isFinite() || score_threshold < 0.0 || score_threshold > 1.0)) {
         throw SDKException.validationFailed(
-            fieldPath = "RAGConfiguration.similarity_threshold",
-            message = "similarity_threshold must be in 0.0...1.0 (got ${similarity_threshold})",
+            fieldPath = "RAGConfiguration.score_threshold",
+            message = "score_threshold must be in 0.0...1.0 (got ${score_threshold})",
         )
     }
     if (chunk_size != null && (chunk_size < 1)) {
@@ -535,46 +593,60 @@ public fun RAGConfiguration.validate() {
     }
 }
 
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun RAGQueryOptions.Companion.defaults(): RAGQueryOptions =
-    RAGQueryOptions(
-        multi_query_count = 3,
-    )
-
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun RAGQueryOptions.validate() {
-    if (question.isEmpty()) {
+public fun RAGDeleteRequest.validate() {
+    if (document_ids.isEmpty()) {
         throw SDKException.validationFailed(
-            fieldPath = "RAGQueryOptions.question",
-            message = "question is required",
-        )
-    }
-    if (multi_query_count != null && (multi_query_count < 1 || multi_query_count > 8)) {
-        throw SDKException.validationFailed(
-            fieldPath = "RAGQueryOptions.multi_query_count",
-            message = "multi_query_count must be in 1...8 (got ${multi_query_count})",
+            fieldPath = "RAGDeleteRequest.document_ids",
+            message = "document_ids is required",
         )
     }
 }
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun RAGSearchRequest.Companion.defaults(): RAGSearchRequest =
-    RAGSearchRequest(
+public fun RAGRetrievalOptions.Companion.defaults(): RAGRetrievalOptions =
+    RAGRetrievalOptions(
         multi_query_count = 3,
     )
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun RAGSearchRequest.validate() {
-    if (question.isEmpty()) {
+public fun RAGRetrievalOptions.validate() {
+    if (top_k != null && (top_k < 1)) {
         throw SDKException.validationFailed(
-            fieldPath = "RAGSearchRequest.question",
-            message = "question is required",
+            fieldPath = "RAGRetrievalOptions.top_k",
+            message = "top_k must be >= 1 (got ${top_k})",
+        )
+    }
+    if (score_threshold != null && (!score_threshold.isFinite() || score_threshold < 0.0 || score_threshold > 1.0)) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGRetrievalOptions.score_threshold",
+            message = "score_threshold must be in 0.0...1.0 (got ${score_threshold})",
         )
     }
     if (multi_query_count != null && (multi_query_count < 1 || multi_query_count > 8)) {
         throw SDKException.validationFailed(
-            fieldPath = "RAGSearchRequest.multi_query_count",
+            fieldPath = "RAGRetrievalOptions.multi_query_count",
             message = "multi_query_count must be in 1...8 (got ${multi_query_count})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun RAGQueryOptions.validate() {
+    if (query.isEmpty()) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGQueryOptions.query",
+            message = "query is required",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun RAGSearchRequest.validate() {
+    if (query.isEmpty()) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGSearchRequest.query",
+            message = "query is required",
         )
     }
 }
@@ -583,6 +655,7 @@ public fun RAGSearchRequest.validate() {
 public fun RerankOptions.Companion.defaults(): RerankOptions =
     RerankOptions(
         top_n = 0,
+        max_tokens_per_doc = 0,
     )
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
@@ -596,10 +669,123 @@ public fun RerankRequest.validate() {
 }
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun SegmentationImage.Companion.defaults(): SegmentationImage =
-    SegmentationImage(
-        stride_bytes = 0,
+public fun VADConfiguration.Companion.defaults(): VADConfiguration =
+    VADConfiguration(
+        sample_rate = 16000,
+        frame_length_ms = 100,
+        activation_threshold = 0.5f,
+        calibration_multiplier = 2.0f,
     )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun VADConfiguration.validate() {
+    if (sample_rate < 8000 || sample_rate > 48000) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.sample_rate",
+            message = "sample_rate must be in 8000...48000 (got ${sample_rate})",
+        )
+    }
+    if (frame_length_ms < 20 || frame_length_ms > 1000) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.frame_length_ms",
+            message = "frame_length_ms must be in 20...1000 (got ${frame_length_ms})",
+        )
+    }
+    if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.activation_threshold",
+            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
+        )
+    }
+    if (!calibration_multiplier.isFinite() || calibration_multiplier < 1.2 || calibration_multiplier > 4.0) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.calibration_multiplier",
+            message = "calibration_multiplier must be in 1.2...4.0 (got ${calibration_multiplier})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun VADOptions.Companion.defaults(): VADOptions =
+    VADOptions(
+        activation_threshold = 0.5f,
+        min_speech_duration_ms = 250,
+        min_silence_duration_ms = 500,
+        prefix_padding_ms = 300,
+        sample_rate = 16000,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun VADOptions.validate() {
+    if (activation_threshold != null && (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0)) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADOptions.activation_threshold",
+            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
+        )
+    }
+    if (sample_rate < 8000 || sample_rate > 48000) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADOptions.sample_rate",
+            message = "sample_rate must be in 8000...48000 (got ${sample_rate})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
+public val SDKComponent.wireString: String
+    get() = when (this) {
+        SDKComponent.SDK_COMPONENT_UNSPECIFIED -> "unspecified"
+        SDKComponent.SDK_COMPONENT_STT -> "stt"
+        SDKComponent.SDK_COMPONENT_TTS -> "tts"
+        SDKComponent.SDK_COMPONENT_VAD -> "vad"
+        SDKComponent.SDK_COMPONENT_LLM -> "llm"
+        SDKComponent.SDK_COMPONENT_VLM -> "vlm"
+        SDKComponent.SDK_COMPONENT_DIFFUSION -> "diffusion"
+        SDKComponent.SDK_COMPONENT_RAG -> "rag"
+        SDKComponent.SDK_COMPONENT_EMBEDDINGS -> "embeddings"
+        SDKComponent.SDK_COMPONENT_VOICE_AGENT -> "voice_agent"
+        SDKComponent.SDK_COMPONENT_WAKEWORD -> "wakeword"
+        SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION -> "speaker_diarization"
+        SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION -> "semantic_segmentation"
+        SDKComponent.SDK_COMPONENT_RERANK -> "rerank"
+        else -> ""
+    }
+
+/** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
+public fun SDKComponent.Companion.fromWireString(value: String): SDKComponent? =
+    when (value.lowercase()) {
+        "unspecified" -> SDKComponent.SDK_COMPONENT_UNSPECIFIED
+        "stt" -> SDKComponent.SDK_COMPONENT_STT
+        "tts" -> SDKComponent.SDK_COMPONENT_TTS
+        "vad" -> SDKComponent.SDK_COMPONENT_VAD
+        "llm" -> SDKComponent.SDK_COMPONENT_LLM
+        "vlm" -> SDKComponent.SDK_COMPONENT_VLM
+        "diffusion" -> SDKComponent.SDK_COMPONENT_DIFFUSION
+        "rag" -> SDKComponent.SDK_COMPONENT_RAG
+        "embeddings" -> SDKComponent.SDK_COMPONENT_EMBEDDINGS
+        "voice_agent" -> SDKComponent.SDK_COMPONENT_VOICE_AGENT
+        "wakeword" -> SDKComponent.SDK_COMPONENT_WAKEWORD
+        "speaker_diarization" -> SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION
+        "semantic_segmentation" -> SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION
+        "rerank" -> SDKComponent.SDK_COMPONENT_RERANK
+        else -> null
+    }
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun SdkInitPhase1Request.validate() {
+    if (request_timeout_ms != null && (request_timeout_ms < 1000)) {
+        throw SDKException.validationFailed(
+            fieldPath = "SdkInitPhase1Request.request_timeout_ms",
+            message = "request_timeout_ms must be >= 1000 (got ${request_timeout_ms})",
+        )
+    }
+    if (max_retries != null && (max_retries < 0 || max_retries > 10)) {
+        throw SDKException.validationFailed(
+            fieldPath = "SdkInitPhase1Request.max_retries",
+            message = "max_retries must be in 0...10 (got ${max_retries})",
+        )
+    }
+}
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
 public fun SegmentationImage.validate() {
@@ -609,10 +795,22 @@ public fun SegmentationImage.validate() {
             message = "width is required",
         )
     }
+    if (width < 1 || width > 4096) {
+        throw SDKException.validationFailed(
+            fieldPath = "SegmentationImage.width",
+            message = "width must be in 1...4096 (got ${width})",
+        )
+    }
     if (height == 0) {
         throw SDKException.validationFailed(
             fieldPath = "SegmentationImage.height",
             message = "height is required",
+        )
+    }
+    if (height < 1 || height > 4096) {
+        throw SDKException.validationFailed(
+            fieldPath = "SegmentationImage.height",
+            message = "height must be in 1...4096 (got ${height})",
         )
     }
 }
@@ -639,16 +837,8 @@ public fun STTConfiguration.validate() {
 public fun STTOptions.Companion.defaults(): STTOptions =
     STTOptions(
         enable_punctuation = true,
-        max_speakers = 0,
         enable_word_timestamps = true,
-        beam_size = 0,
-        max_alternatives = 0,
-    )
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun TTSConfiguration.Companion.defaults(): TTSConfiguration =
-    TTSConfiguration(
-        enable_neural_voice = true,
+        silence_duration_ms = 0,
     )
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
@@ -659,7 +849,7 @@ public fun TTSOptions.Companion.defaults(): TTSOptions =
         pitch = 1.0f,
         volume = 1.0f,
         audio_format = AudioFormat.AUDIO_FORMAT_PCM,
-        sample_rate = 22050,
+        sample_rate = 0,
     )
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
@@ -670,50 +860,10 @@ public fun TTSOptions.validate() {
             message = "speed must be in 0.5...2.0 (got ${speed})",
         )
     }
-}
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun VLMGenerationOptions.Companion.defaults(): VLMGenerationOptions =
-    VLMGenerationOptions(
-        max_output_tokens = 2048,
-        temperature = 0.7f,
-        top_p = 0.9f,
-        top_k = 0,
-        use_gpu = true,
-        repetition_penalty = 1.1f,
-        min_p = 0.0f,
-    )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun VLMGenerationOptions.validate() {
-    if (max_output_tokens < 0) {
+    if (!pitch.isFinite() || pitch < 0.5 || pitch > 2.0) {
         throw SDKException.validationFailed(
-            fieldPath = "VLMGenerationOptions.max_output_tokens",
-            message = "max_output_tokens must be >= 0 (got ${max_output_tokens})",
-        )
-    }
-    if (!temperature.isFinite() || temperature < 0.0 || temperature > 2.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VLMGenerationOptions.temperature",
-            message = "temperature must be in 0.0...2.0 (got ${temperature})",
-        )
-    }
-    if (!top_p.isFinite() || top_p < 0.0 || top_p > 1.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VLMGenerationOptions.top_p",
-            message = "top_p must be in 0.0...1.0 (got ${top_p})",
-        )
-    }
-    if (top_k < 0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VLMGenerationOptions.top_k",
-            message = "top_k must be >= 0 (got ${top_k})",
-        )
-    }
-    if (!repetition_penalty.isFinite() || repetition_penalty < 0.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VLMGenerationOptions.repetition_penalty",
-            message = "repetition_penalty must be >= 0.0 (got ${repetition_penalty})",
+            fieldPath = "TTSOptions.pitch",
+            message = "pitch must be in 0.5...2.0 (got ${pitch})",
         )
     }
 }

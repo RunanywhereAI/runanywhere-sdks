@@ -63,18 +63,33 @@ export function diarizationStreamEventKindToJSON(object: DiarizationStreamEventK
 }
 
 export interface DiarizationOptions {
+  /**
+   * Only 16 kHz is accepted: the engine does not resample, and any other
+   * rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
+   */
   sampleRate?: number | undefined;
   channels?:
     | number
     | undefined;
   /**
-   * Commons normalizes either PCM representation to float samples before
-   * dispatching to an engine.
+   * Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+   * AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+   * float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+   * and AUDIO_ENCODING_UNSPECIFIED are rejected with
+   * RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
    */
   encoding?: AudioEncoding | undefined;
   threshold?: number | undefined;
   minimumDurationMs: number;
   mergeGapMs: number;
+  /**
+   * Speaker-count hint: an upper bound, not an exact count. Unset =
+   * auto-detect. An engine that detects more than max_speakers speakers
+   * ranks them by total active duration, drops the weakest, and re-densifies
+   * the speaker indices. Values above the loaded model's speaker capacity
+   * are clamped.
+   */
+  maxSpeakers?: number | undefined;
 }
 
 export interface DiarizationRequest {
@@ -119,6 +134,7 @@ function createBaseDiarizationOptions(): DiarizationOptions {
     threshold: undefined,
     minimumDurationMs: 0,
     mergeGapMs: 0,
+    maxSpeakers: undefined,
   };
 }
 
@@ -141,6 +157,9 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
     }
     if (message.mergeGapMs !== 0) {
       writer.uint32(48).int64(message.mergeGapMs);
+    }
+    if (message.maxSpeakers !== undefined) {
+      writer.uint32(64).int32(message.maxSpeakers);
     }
     return writer;
   },
@@ -200,6 +219,14 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
           message.mergeGapMs = longToNumber(reader.int64());
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.maxSpeakers = reader.int32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -229,6 +256,11 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
         : isSet(object.merge_gap_ms)
         ? globalThis.Number(object.merge_gap_ms)
         : 0,
+      maxSpeakers: isSet(object.maxSpeakers)
+        ? globalThis.Number(object.maxSpeakers)
+        : isSet(object.max_speakers)
+        ? globalThis.Number(object.max_speakers)
+        : undefined,
     };
   },
 
@@ -252,6 +284,9 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
     if (message.mergeGapMs !== 0) {
       obj.mergeGapMs = Math.round(message.mergeGapMs);
     }
+    if (message.maxSpeakers !== undefined) {
+      obj.maxSpeakers = Math.round(message.maxSpeakers);
+    }
     return obj;
   },
 
@@ -266,6 +301,7 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
     message.threshold = object.threshold ?? undefined;
     message.minimumDurationMs = object.minimumDurationMs ?? 0;
     message.mergeGapMs = object.mergeGapMs ?? 0;
+    message.maxSpeakers = object.maxSpeakers ?? undefined;
     return message;
   },
 };

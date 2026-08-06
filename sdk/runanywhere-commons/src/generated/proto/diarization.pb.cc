@@ -223,11 +223,11 @@ constexpr DiarizationOptions::ParseTableT_ DiarizationOptions::InternalGenerateP
     {
       PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_._has_bits_),
       0, // no _extensions_
-      6, 56,  // max_field_number, fast_idx_mask
+      8, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967104,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
+      7,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -237,8 +237,11 @@ constexpr DiarizationOptions::ParseTableT_ DiarizationOptions::InternalGenerateP
       ::_pbi::TcParser::GetTable<::runanywhere::v1::DiarizationOptions>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+      // optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiarizationOptions, _impl_.max_speakers_), 6>(),
+       {64, 6, 0,
+        PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.max_speakers_)}},
+      // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiarizationOptions, _impl_.sample_rate_), 0>(),
        {8, 0, 0,
         PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.sample_rate_)}},
@@ -266,7 +269,7 @@ constexpr DiarizationOptions::ParseTableT_ DiarizationOptions::InternalGenerateP
     }}, {{
       65535, 65535
     }}, {{
-      // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+      // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
       {PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.sample_rate_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional int32 channels = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
       {PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.channels_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
@@ -278,6 +281,8 @@ constexpr DiarizationOptions::ParseTableT_ DiarizationOptions::InternalGenerateP
       {PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.minimum_duration_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // int64 merge_gap_ms = 6 [(.runanywhere.v1.rac_min) = 0];
       {PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.merge_gap_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+      {PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.max_speakers_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     }},
     // no aux_entries
     {{
@@ -295,7 +300,8 @@ inline constexpr DiarizationOptions::Impl_::Impl_(
         encoding_{static_cast< ::runanywhere::v1::AudioEncoding >(0)},
         threshold_{0},
         minimum_duration_ms_{::int64_t{0}},
-        merge_gap_ms_{::int64_t{0}} {}
+        merge_gap_ms_{::int64_t{0}},
+        max_speakers_{0} {}
 
 template <typename>
 constexpr DiarizationOptions::DiarizationOptions(::_pbi::ConstantInitialized,
@@ -932,19 +938,21 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_._has_bits_),
-        9, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_.sample_rate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_.channels_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_.encoding_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_.threshold_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_.minimum_duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_.merge_gap_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationOptions, _impl_.max_speakers_),
         0,
         1,
         2,
         3,
         4,
         5,
+        6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationRequest, _impl_._has_bits_),
         5, // hasbit index offset
@@ -996,10 +1004,10 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::DiarizationOptions)},
-        {15, sizeof(::runanywhere::v1::DiarizationRequest)},
-        {22, sizeof(::runanywhere::v1::DiarizationSegment)},
-        {33, sizeof(::runanywhere::v1::DiarizationResult)},
-        {46, sizeof(::runanywhere::v1::DiarizationStreamEvent)},
+        {17, sizeof(::runanywhere::v1::DiarizationRequest)},
+        {24, sizeof(::runanywhere::v1::DiarizationSegment)},
+        {35, sizeof(::runanywhere::v1::DiarizationResult)},
+        {48, sizeof(::runanywhere::v1::DiarizationStreamEvent)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -1013,42 +1021,43 @@ const char descriptor_table_protodef_diarization_2eproto[] ABSL_ATTRIBUTE_SECTIO
     protodesc_cold) = {
     "\n\021diarization.proto\022\016runanywhere.v1\032\014err"
     "ors.proto\032\021model_types.proto\032\021rac_option"
-    "s.proto\"\355\002\n\022DiarizationOptions\022.\n\013sample"
-    "_rate\030\001 \001(\005B\024\212\265\030\00516000\240\265\030\300>\250\265\030\200\367\002H\000\210\001\001\022$"
-    "\n\010channels\030\002 \001(\005B\r\212\265\030\0011\240\265\030\001\250\265\030\001H\001\210\001\001\022S\n\010"
-    "encoding\030\003 \001(\0162\035.runanywhere.v1.AudioEnc"
-    "odingB\035\212\265\030\031AUDIO_ENCODING_PCM_F32_LEH\002\210\001"
-    "\001\0225\n\tthreshold\030\004 \001(\002B\035\212\265\030\0030.5\261\265\030\000\000\000\000\000\000\000\000"
-    "\271\265\030\000\000\000\000\000\000\360\?H\003\210\001\001\022!\n\023minimum_duration_ms\030"
-    "\005 \001(\003B\004\240\265\030\000\022\032\n\014merge_gap_ms\030\006 \001(\003B\004\240\265\030\000B"
-    "\016\n\014_sample_rateB\013\n\t_channelsB\013\n\t_encodin"
-    "gB\014\n\n_threshold\"n\n\022DiarizationRequest\022\022\n"
-    "\naudio_data\030\001 \001(\014\0228\n\007options\030\002 \001(\0132\".run"
-    "anywhere.v1.DiarizationOptionsH\000\210\001\001B\n\n\010_"
-    "options\"a\n\022DiarizationSegment\022\020\n\010start_m"
-    "s\030\001 \001(\003\022\016\n\006end_ms\030\002 \001(\003\022\025\n\rspeaker_index"
-    "\030\003 \001(\005\022\022\n\nspeaker_id\030\004 \001(\t\"\251\001\n\021Diarizati"
-    "onResult\0224\n\010segments\030\001 \003(\0132\".runanywhere"
-    ".v1.DiarizationSegment\022\025\n\rspeaker_count\030"
-    "\002 \001(\005\022\031\n\021audio_duration_ms\030\003 \001(\003\022\032\n\022proc"
-    "essing_time_ms\030\004 \001(\003\022\020\n\010model_id\030\005 \001(\t\"\204"
-    "\002\n\026DiarizationStreamEvent\022\022\n\nsession_id\030"
-    "\001 \001(\004\022\013\n\003seq\030\002 \001(\004\022\024\n\014timestamp_us\030\003 \001(\003"
-    "\0228\n\004kind\030\004 \001(\0162*.runanywhere.v1.Diarizat"
-    "ionStreamEventKind\0226\n\006result\030\005 \001(\0132!.run"
-    "anywhere.v1.DiarizationResultH\000\210\001\001\022,\n\005er"
-    "ror\030\006 \001(\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001"
-    "B\t\n\007_resultB\010\n\006_error*\362\001\n\032DiarizationStr"
-    "eamEventKind\022-\n)DIARIZATION_STREAM_EVENT"
-    "_KIND_UNSPECIFIED\020\000\022)\n%DIARIZATION_STREA"
-    "M_EVENT_KIND_STARTED\020\001\022(\n$DIARIZATION_ST"
-    "REAM_EVENT_KIND_UPDATE\020\002\022\'\n#DIARIZATION_"
-    "STREAM_EVENT_KIND_FINAL\020\003\022\'\n#DIARIZATION"
-    "_STREAM_EVENT_KIND_ERROR\020\004B\213\001\n\027ai.runany"
-    "where.proto.v1B\020DiarizationProtoP\001Z<gith"
-    "ub.com/runanywhere/runanywhere-sdks/idl/"
-    "v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere"
-    ".V1\272\002\002RAb\006proto3"
+    "s.proto\"\236\003\n\022DiarizationOptions\022-\n\013sample"
+    "_rate\030\001 \001(\005B\023\212\265\030\00516000\240\265\030\200}\250\265\030\200}H\000\210\001\001\022$\n"
+    "\010channels\030\002 \001(\005B\r\212\265\030\0011\240\265\030\001\250\265\030\001H\001\210\001\001\022S\n\010e"
+    "ncoding\030\003 \001(\0162\035.runanywhere.v1.AudioEnco"
+    "dingB\035\212\265\030\031AUDIO_ENCODING_PCM_F32_LEH\002\210\001\001"
+    "\0225\n\tthreshold\030\004 \001(\002B\035\212\265\030\0030.5\261\265\030\000\000\000\000\000\000\000\000\271"
+    "\265\030\000\000\000\000\000\000\360\?H\003\210\001\001\022!\n\023minimum_duration_ms\030\005"
+    " \001(\003B\004\240\265\030\000\022\032\n\014merge_gap_ms\030\006 \001(\003B\004\240\265\030\000\022\037"
+    "\n\014max_speakers\030\010 \001(\005B\004\240\265\030\001H\004\210\001\001B\016\n\014_samp"
+    "le_rateB\013\n\t_channelsB\013\n\t_encodingB\014\n\n_th"
+    "resholdB\017\n\r_max_speakers\"n\n\022DiarizationR"
+    "equest\022\022\n\naudio_data\030\001 \001(\014\0228\n\007options\030\002 "
+    "\001(\0132\".runanywhere.v1.DiarizationOptionsH"
+    "\000\210\001\001B\n\n\010_options\"a\n\022DiarizationSegment\022\020"
+    "\n\010start_ms\030\001 \001(\003\022\016\n\006end_ms\030\002 \001(\003\022\025\n\rspea"
+    "ker_index\030\003 \001(\005\022\022\n\nspeaker_id\030\004 \001(\t\"\251\001\n\021"
+    "DiarizationResult\0224\n\010segments\030\001 \003(\0132\".ru"
+    "nanywhere.v1.DiarizationSegment\022\025\n\rspeak"
+    "er_count\030\002 \001(\005\022\031\n\021audio_duration_ms\030\003 \001("
+    "\003\022\032\n\022processing_time_ms\030\004 \001(\003\022\020\n\010model_i"
+    "d\030\005 \001(\t\"\204\002\n\026DiarizationStreamEvent\022\022\n\nse"
+    "ssion_id\030\001 \001(\004\022\013\n\003seq\030\002 \001(\004\022\024\n\014timestamp"
+    "_us\030\003 \001(\003\0228\n\004kind\030\004 \001(\0162*.runanywhere.v1"
+    ".DiarizationStreamEventKind\0226\n\006result\030\005 "
+    "\001(\0132!.runanywhere.v1.DiarizationResultH\000"
+    "\210\001\001\022,\n\005error\030\006 \001(\0132\030.runanywhere.v1.SDKE"
+    "rrorH\001\210\001\001B\t\n\007_resultB\010\n\006_error*\362\001\n\032Diari"
+    "zationStreamEventKind\022-\n)DIARIZATION_STR"
+    "EAM_EVENT_KIND_UNSPECIFIED\020\000\022)\n%DIARIZAT"
+    "ION_STREAM_EVENT_KIND_STARTED\020\001\022(\n$DIARI"
+    "ZATION_STREAM_EVENT_KIND_UPDATE\020\002\022\'\n#DIA"
+    "RIZATION_STREAM_EVENT_KIND_FINAL\020\003\022\'\n#DI"
+    "ARIZATION_STREAM_EVENT_KIND_ERROR\020\004B\213\001\n\027"
+    "ai.runanywhere.proto.v1B\020DiarizationProt"
+    "oP\001Z<github.com/runanywhere/runanywhere-"
+    "sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Ru"
+    "nanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_diarization_2eproto_deps[3] = {
@@ -1060,7 +1069,7 @@ static ::absl::once_flag descriptor_table_diarization_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_diarization_2eproto = {
     false,
     false,
-    1496,
+    1545,
     descriptor_table_protodef_diarization_2eproto,
     "diarization.proto",
     &descriptor_table_diarization_2eproto_once,
@@ -1114,9 +1123,9 @@ inline void DiarizationOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, sample_rate_),
            0,
-           offsetof(Impl_, merge_gap_ms_) -
+           offsetof(Impl_, max_speakers_) -
                offsetof(Impl_, sample_rate_) +
-               sizeof(Impl_::merge_gap_ms_));
+               sizeof(Impl_::max_speakers_));
 }
 DiarizationOptions::~DiarizationOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DiarizationOptions)
@@ -1166,10 +1175,10 @@ PROTOBUF_NOINLINE void DiarizationOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     ::memset(&_impl_.sample_rate_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.merge_gap_ms_) -
-        reinterpret_cast<char*>(&_impl_.sample_rate_)) + sizeof(_impl_.merge_gap_ms_));
+        reinterpret_cast<char*>(&_impl_.max_speakers_) -
+        reinterpret_cast<char*>(&_impl_.sample_rate_)) + sizeof(_impl_.max_speakers_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -1194,7 +1203,7 @@ PROTOBUF_NOINLINE void DiarizationOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+  // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<1>(
@@ -1240,6 +1249,13 @@ PROTOBUF_NOINLINE void DiarizationOptions::Clear() {
     }
   }
 
+  // optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<8>(
+            stream, this_._internal_max_speakers(), target);
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1266,8 +1282,8 @@ PROTOBUF_NOINLINE void DiarizationOptions::Clear() {
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
   total_size += static_cast<bool>(0x00000008U & cached_has_bits) * 5;
-  if (BatchCheckHasBit(cached_has_bits, 0x00000037U)) {
-    // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000077U)) {
+    // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
           this_._internal_sample_rate());
@@ -1296,6 +1312,11 @@ PROTOBUF_NOINLINE void DiarizationOptions::Clear() {
             this_._internal_merge_gap_ms());
       }
     }
+    // optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_max_speakers());
+    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -1314,7 +1335,7 @@ void DiarizationOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_impl_.sample_rate_ = from._impl_.sample_rate_;
     }
@@ -1337,6 +1358,9 @@ void DiarizationOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.merge_gap_ms_ = from._impl_.merge_gap_ms_;
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      _this->_impl_.max_speakers_ = from._impl_.max_speakers_;
+    }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
@@ -1356,8 +1380,8 @@ void DiarizationOptions::InternalSwap(DiarizationOptions* PROTOBUF_RESTRICT PROT
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.merge_gap_ms_)
-      + sizeof(DiarizationOptions::_impl_.merge_gap_ms_)
+      PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.max_speakers_)
+      + sizeof(DiarizationOptions::_impl_.max_speakers_)
       - PROTOBUF_FIELD_OFFSET(DiarizationOptions, _impl_.sample_rate_)>(
           reinterpret_cast<char*>(&_impl_.sample_rate_),
           reinterpret_cast<char*>(&other->_impl_.sample_rate_));

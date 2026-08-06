@@ -30,8 +30,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * Most state is already resident in commons after Phase 1; these are the
- * per-call hints that stay SDK-owned.
+ * The one value that legitimately varies between a dev build and a release.
+ * Telemetry flushing and registry/local-file reconciliation are commons
+ * behaviour, not per-call hints.
  */
 public class SdkInitPhase2Request(
   /**
@@ -45,41 +46,6 @@ public class SdkInitPhase2Request(
     schemaIndex = 0,
   )
   public val build_token: String = "",
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "forceRefreshAssignments",
-    schemaIndex = 1,
-  )
-  public val force_refresh_assignments: Boolean = false,
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "flushTelemetry",
-    schemaIndex = 2,
-  )
-  public val flush_telemetry: Boolean = false,
-  /**
-   * Reconcile registry rows with local files.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "discoverDownloadedModels",
-    schemaIndex = 3,
-  )
-  public val discover_downloaded_models: Boolean = false,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "rescanLocalModels",
-    schemaIndex = 4,
-  )
-  public val rescan_local_models: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SdkInitPhase2Request, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -93,10 +59,6 @@ public class SdkInitPhase2Request(
     if (other !is SdkInitPhase2Request) return false
     if (unknownFields != other.unknownFields) return false
     if (build_token != other.build_token) return false
-    if (force_refresh_assignments != other.force_refresh_assignments) return false
-    if (flush_telemetry != other.flush_telemetry) return false
-    if (discover_downloaded_models != other.discover_downloaded_models) return false
-    if (rescan_local_models != other.rescan_local_models) return false
     return true
   }
 
@@ -105,10 +67,6 @@ public class SdkInitPhase2Request(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + build_token.hashCode()
-      result = result * 37 + force_refresh_assignments.hashCode()
-      result = result * 37 + flush_telemetry.hashCode()
-      result = result * 37 + discover_downloaded_models.hashCode()
-      result = result * 37 + rescan_local_models.hashCode()
       super.hashCode = result
     }
     return result
@@ -117,21 +75,10 @@ public class SdkInitPhase2Request(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """build_token=${sanitize(build_token)}"""
-    result += """force_refresh_assignments=$force_refresh_assignments"""
-    result += """flush_telemetry=$flush_telemetry"""
-    result += """discover_downloaded_models=$discover_downloaded_models"""
-    result += """rescan_local_models=$rescan_local_models"""
     return result.joinToString(prefix = "SdkInitPhase2Request{", separator = ", ", postfix = "}")
   }
 
-  public fun copy(
-    build_token: String = this.build_token,
-    force_refresh_assignments: Boolean = this.force_refresh_assignments,
-    flush_telemetry: Boolean = this.flush_telemetry,
-    discover_downloaded_models: Boolean = this.discover_downloaded_models,
-    rescan_local_models: Boolean = this.rescan_local_models,
-    unknownFields: ByteString = this.unknownFields,
-  ): SdkInitPhase2Request = SdkInitPhase2Request(build_token, force_refresh_assignments, flush_telemetry, discover_downloaded_models, rescan_local_models, unknownFields)
+  public fun copy(build_token: String = this.build_token, unknownFields: ByteString = this.unknownFields): SdkInitPhase2Request = SdkInitPhase2Request(build_token, unknownFields)
 
   public companion object {
     @JvmField
@@ -149,18 +96,6 @@ public class SdkInitPhase2Request(
         if (value.build_token != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.build_token)
         }
-        if (value.force_refresh_assignments != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.force_refresh_assignments)
-        }
-        if (value.flush_telemetry != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.flush_telemetry)
-        }
-        if (value.discover_downloaded_models != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.discover_downloaded_models)
-        }
-        if (value.rescan_local_models != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.rescan_local_models)
-        }
         return size
       }
 
@@ -168,35 +103,11 @@ public class SdkInitPhase2Request(
         if (value.build_token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.build_token)
         }
-        if (value.force_refresh_assignments != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.force_refresh_assignments)
-        }
-        if (value.flush_telemetry != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.flush_telemetry)
-        }
-        if (value.discover_downloaded_models != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.discover_downloaded_models)
-        }
-        if (value.rescan_local_models != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.rescan_local_models)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SdkInitPhase2Request) {
         writer.writeBytes(value.unknownFields)
-        if (value.rescan_local_models != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.rescan_local_models)
-        }
-        if (value.discover_downloaded_models != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.discover_downloaded_models)
-        }
-        if (value.flush_telemetry != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.flush_telemetry)
-        }
-        if (value.force_refresh_assignments != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.force_refresh_assignments)
-        }
         if (value.build_token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.build_token)
         }
@@ -204,26 +115,14 @@ public class SdkInitPhase2Request(
 
       override fun decode(reader: ProtoReader): SdkInitPhase2Request {
         var build_token: String = ""
-        var force_refresh_assignments: Boolean = false
-        var flush_telemetry: Boolean = false
-        var discover_downloaded_models: Boolean = false
-        var rescan_local_models: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> build_token = ProtoAdapter.STRING.decode(reader)
-            2 -> force_refresh_assignments = ProtoAdapter.BOOL.decode(reader)
-            3 -> flush_telemetry = ProtoAdapter.BOOL.decode(reader)
-            4 -> discover_downloaded_models = ProtoAdapter.BOOL.decode(reader)
-            5 -> rescan_local_models = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return SdkInitPhase2Request(
           build_token = build_token,
-          force_refresh_assignments = force_refresh_assignments,
-          flush_telemetry = flush_telemetry,
-          discover_downloaded_models = discover_downloaded_models,
-          rescan_local_models = rescan_local_models,
           unknownFields = unknownFields
         )
       }

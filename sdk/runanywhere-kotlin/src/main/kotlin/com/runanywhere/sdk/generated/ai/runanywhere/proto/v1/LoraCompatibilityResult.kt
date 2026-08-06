@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -28,7 +27,6 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
 public class LoraCompatibilityResult(
@@ -41,32 +39,23 @@ public class LoraCompatibilityResult(
   )
   public val is_compatible: Boolean = false,
   @field:WireField(
-    tag = 3,
+    tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "baseModelRequired",
     schemaIndex = 1,
   )
   public val base_model_required: String? = null,
-  warnings: List<String> = emptyList(),
   /**
    * Populated when is_compatible is false.
    */
   @field:WireField(
-    tag = 6,
+    tag = 3,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraCompatibilityResult, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    schemaIndex = 2,
-  )
-  public val warnings: List<String> = immutableCopyOf("warnings", warnings)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -79,7 +68,6 @@ public class LoraCompatibilityResult(
     if (unknownFields != other.unknownFields) return false
     if (is_compatible != other.is_compatible) return false
     if (base_model_required != other.base_model_required) return false
-    if (warnings != other.warnings) return false
     if (error != other.error) return false
     return true
   }
@@ -90,7 +78,6 @@ public class LoraCompatibilityResult(
       result = unknownFields.hashCode()
       result = result * 37 + is_compatible.hashCode()
       result = result * 37 + (base_model_required?.hashCode() ?: 0)
-      result = result * 37 + warnings.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -101,7 +88,6 @@ public class LoraCompatibilityResult(
     val result = mutableListOf<String>()
     result += """is_compatible=$is_compatible"""
     if (base_model_required != null) result += """base_model_required=${sanitize(base_model_required)}"""
-    if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoraCompatibilityResult{", separator = ", ", postfix = "}")
   }
@@ -109,10 +95,9 @@ public class LoraCompatibilityResult(
   public fun copy(
     is_compatible: Boolean = this.is_compatible,
     base_model_required: String? = this.base_model_required,
-    warnings: List<String> = this.warnings,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoraCompatibilityResult = LoraCompatibilityResult(is_compatible, base_model_required, warnings, error, unknownFields)
+  ): LoraCompatibilityResult = LoraCompatibilityResult(is_compatible, base_model_required, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -130,9 +115,8 @@ public class LoraCompatibilityResult(
         if (value.is_compatible != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.is_compatible)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.base_model_required)
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.warnings)
-        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.base_model_required)
+        size += SDKError.ADAPTER.encodedSizeWithTag(3, value.error)
         return size
       }
 
@@ -140,17 +124,15 @@ public class LoraCompatibilityResult(
         if (value.is_compatible != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.is_compatible)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.base_model_required)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
-        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
+        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.base_model_required)
+        SDKError.ADAPTER.encodeWithTag(writer, 3, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraCompatibilityResult) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.base_model_required)
+        SDKError.ADAPTER.encodeWithTag(writer, 3, value.error)
+        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.base_model_required)
         if (value.is_compatible != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.is_compatible)
         }
@@ -159,21 +141,18 @@ public class LoraCompatibilityResult(
       override fun decode(reader: ProtoReader): LoraCompatibilityResult {
         var is_compatible: Boolean = false
         var base_model_required: String? = null
-        val warnings = mutableListOf<String>()
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_compatible = ProtoAdapter.BOOL.decode(reader)
-            3 -> base_model_required = ProtoAdapter.STRING.decode(reader)
-            4 -> warnings.add(ProtoAdapter.STRING.decode(reader))
-            6 -> error = SDKError.ADAPTER.decode(reader)
+            2 -> base_model_required = ProtoAdapter.STRING.decode(reader)
+            3 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoraCompatibilityResult(
           is_compatible = is_compatible,
           base_model_required = base_model_required,
-          warnings = warnings,
           error = error,
           unknownFields = unknownFields
         )

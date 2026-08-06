@@ -44,6 +44,10 @@ public class CloudSttBackendConfig(
     schemaIndex = 1,
   )
   public val model: String = "",
+  /**
+   * SECRET. Held in memory only; never logged, never persisted, never
+   * included in a toString()/toJSON() dump.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

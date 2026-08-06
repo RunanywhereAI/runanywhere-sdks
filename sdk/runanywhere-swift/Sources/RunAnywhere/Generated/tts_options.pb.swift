@@ -31,57 +31,13 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-public nonisolated enum RATTSVoiceGender: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case male // = 1
-  case female // = 2
-  case neutral // = 3
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .male
-    case 2: self = .female
-    case 3: self = .neutral
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .male: return 1
-    case .female: return 2
-    case .neutral: return 3
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RATTSVoiceGender] = [
-    .unspecified,
-    .male,
-    .female,
-    .neutral,
-  ]
-
-}
-
 public nonisolated enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
   case audioChunk // = 2
-  case phoneme // = 3
   case completed // = 4
   case error // = 5
-  case progress // = 6
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -93,10 +49,8 @@ public nonisolated enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
     case 0: self = .unspecified
     case 1: self = .started
     case 2: self = .audioChunk
-    case 3: self = .phoneme
     case 4: self = .completed
     case 5: self = .error
-    case 6: self = .progress
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -106,10 +60,8 @@ public nonisolated enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
     case .unspecified: return 0
     case .started: return 1
     case .audioChunk: return 2
-    case .phoneme: return 3
     case .completed: return 4
     case .error: return 5
-    case .progress: return 6
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -119,51 +71,10 @@ public nonisolated enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
     .unspecified,
     .started,
     .audioChunk,
-    .phoneme,
     .completed,
     .error,
-    .progress,
   ]
 
-}
-
-public nonisolated struct RATTSConfiguration: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Voice model file id, e.g. a piper voice. Empty for platform TTS engines
-  /// (Apple System TTS, Android TextToSpeech), which need no model file.
-  public var modelID: String = String()
-
-  /// Use the neural or premium voice when available.
-  public var enableNeuralVoice: Bool = false
-
-  public var preferredFramework: RAInferenceFramework {
-    get {_preferredFramework ?? .unspecified}
-    set {_preferredFramework = newValue}
-  }
-  /// Returns true if `preferredFramework` has been explicitly set.
-  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
-  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
-  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
-
-  /// Applied when a per-call TTSOptions is absent or leaves a field unset.
-  public var defaultOptions: RATTSOptions {
-    get {_defaultOptions ?? RATTSOptions()}
-    set {_defaultOptions = newValue}
-  }
-  /// Returns true if `defaultOptions` has been explicitly set.
-  public var hasDefaultOptions: Bool {self._defaultOptions != nil}
-  /// Clears the value of `defaultOptions`. Subsequent reads from it will return its default value.
-  public mutating func clearDefaultOptions() {self._defaultOptions = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _preferredFramework: RAInferenceFramework? = nil
-  fileprivate var _defaultOptions: RATTSOptions? = nil
 }
 
 public nonisolated struct RATTSOptions: Sendable {
@@ -174,44 +85,48 @@ public nonisolated struct RATTSOptions: Sendable {
   /// Empty = use the component's configured voice.
   public var voice: String = String()
 
+  /// Voice/model id to synthesize with. Unset = use whatever is already
+  /// loaded for MODEL_CATEGORY_SPEECH_SYNTHESIS; set = load it first,
+  /// downloading if needed.
+  public var model: String {
+    get {_model ?? String()}
+    set {_model = newValue}
+  }
+  /// Returns true if `model` has been explicitly set.
+  public var hasModel: Bool {self._model != nil}
+  /// Clears the value of `model`. Subsequent reads from it will return its default value.
+  public mutating func clearModel() {self._model = nil}
+
   /// BCP-47. Empty = use the component default.
   public var languageCode: String = String()
 
   /// Speed multiplier, matching OpenAI /audio/speech `speed`.
   public var speed: Float = 0
 
-  /// 0.5 - 2.0.
+  /// Fundamental-frequency multiplier, 1.0 = the voice's own pitch. Honoured
+  /// only by the platform backend (Apple System TTS / Android TextToSpeech);
+  /// neural voices (sherpa/Piper/Kokoro, qhexrt) ignore it, because for them
+  /// pitch is voice identity rather than a dial.
   public var pitch: Float = 0
 
   /// 0.0 - 1.0.
   public var volume: Float = 0
 
-  /// Whether the input carries SSML markup.
-  public var enableSsml: Bool = false
-
+  /// TTS honours exactly AUDIO_FORMAT_PCM (float32) and AUDIO_FORMAT_WAV.
+  /// Other values, including AUDIO_FORMAT_PCM_S16LE, fall through to PCM
+  /// silently today; do not rely on them until that is fixed.
   public var audioFormat: RAAudioFormat = .unspecified
 
-  /// 0 = component default.
+  /// 0 (the default) = render at the voice's native rate. Naming any other
+  /// rate forces a resample and costs quality. TTSOutput.sample_rate always
+  /// reports the rate actually used.
   public var sampleRate: Int32 = 0
-
-  /// For multi-speaker voices. -1 or 0 = backend default, per model convention.
-  public var speakerID: Int32 = 0
-
-  /// Style or emotion hint for voices supporting style transfer.
-  public var style: String {
-    get {_style ?? String()}
-    set {_style = newValue}
-  }
-  /// Returns true if `style` has been explicitly set.
-  public var hasStyle: Bool {self._style != nil}
-  /// Clears the value of `style`. Subsequent reads from it will return its default value.
-  public mutating func clearStyle() {self._style = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _style: String? = nil
+  fileprivate var _model: String? = nil
 }
 
 public nonisolated struct RATTSSynthesisRequest: Sendable {
@@ -223,15 +138,6 @@ public nonisolated struct RATTSSynthesisRequest: Sendable {
 
   public var text: String = String()
 
-  public var ssml: String {
-    get {_ssml ?? String()}
-    set {_ssml = newValue}
-  }
-  /// Returns true if `ssml` has been explicitly set.
-  public var hasSsml: Bool {self._ssml != nil}
-  /// Clears the value of `ssml`. Subsequent reads from it will return its default value.
-  public mutating func clearSsml() {self._ssml = nil}
-
   public var options: RATTSOptions {
     get {_options ?? RATTSOptions()}
     set {_options = newValue}
@@ -241,32 +147,11 @@ public nonisolated struct RATTSSynthesisRequest: Sendable {
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
   public mutating func clearOptions() {self._options = nil}
 
-  public var metadata: Dictionary<String,String> = [:]
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _ssml: String? = nil
   fileprivate var _options: RATTSOptions? = nil
-}
-
-public nonisolated struct RATTSPhonemeTimestamp: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// IPA or engine-specific symbol.
-  public var phoneme: String = String()
-
-  /// Offsets within the synthesized audio.
-  public var startMs: Int64 = 0
-
-  public var endMs: Int64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
 }
 
 public nonisolated struct RATTSSynthesisMetadata: Sendable {
@@ -281,9 +166,8 @@ public nonisolated struct RATTSSynthesisMetadata: Sendable {
 
   public var processingTimeMs: Int64 = 0
 
-  public var characterCount: Int32 = 0
-
-  public var audioDurationMs: Int64 = 0
+  /// UTF-8 byte length of the spoken input, not a codepoint count.
+  public var inputBytes: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -318,12 +202,6 @@ public nonisolated struct RATTSOutput: @unchecked Sendable {
     set {_uniqueStorage()._durationMs = newValue}
   }
 
-  /// Empty unless the engine produced them.
-  public var phonemeTimestamps: [RATTSPhonemeTimestamp] {
-    get {_storage._phonemeTimestamps}
-    set {_uniqueStorage()._phonemeTimestamps = newValue}
-  }
-
   public var metadata: RATTSSynthesisMetadata {
     get {_storage._metadata ?? RATTSSynthesisMetadata()}
     set {_uniqueStorage()._metadata = newValue}
@@ -348,11 +226,6 @@ public nonisolated struct RATTSOutput: @unchecked Sendable {
   public var isFinal: Bool {
     get {_storage._isFinal}
     set {_uniqueStorage()._isFinal = newValue}
-  }
-
-  public var audioSizeBytes: Int64 {
-    get {_storage._audioSizeBytes}
-    set {_uniqueStorage()._audioSizeBytes = newValue}
   }
 
   public var error: RASDKError {
@@ -438,24 +311,16 @@ public nonisolated struct RATTSVoiceInfo: Sendable {
   /// Passed back as TTSOptions.voice.
   public var id: String = String()
 
-  /// e.g. "Samantha".
+  /// e.g. "Samantha". MUST NOT be a copy of `id` -- fall back to the model
+  /// id only when the engine reports no display name.
   public var displayName: String = String()
 
   /// BCP-47.
   public var languageCode: String = String()
 
-  public var gender: RATTSVoiceGender = .unspecified
-
-  /// Locale, age, or style notes.
-  public var description_p: String = String()
-
-  public var isNeural: Bool = false
-
-  public var isSystem: Bool = false
-
+  /// The voice's native rate in Hz -- tells the caller whether naming a
+  /// different TTSOptions.sample_rate buys anything.
   public var sampleRate: Int32 = 0
-
-  public var supportedStyles: [String] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -474,204 +339,89 @@ public nonisolated struct RATTSVoiceList: Sendable {
   public init() {}
 }
 
-public nonisolated struct RATTSStreamEvent: @unchecked Sendable {
+public nonisolated struct RATTSStreamEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var timestampUs: Int64 {
-    get {_storage._timestampUs}
-    set {_uniqueStorage()._timestampUs = newValue}
-  }
+  public var timestampUs: Int64 = 0
 
-  public var requestID: String {
-    get {_storage._requestID}
-    set {_uniqueStorage()._requestID = newValue}
-  }
+  public var requestID: String = String()
 
-  public var kind: RATTSStreamEventKind {
-    get {_storage._kind}
-    set {_uniqueStorage()._kind = newValue}
-  }
+  public var kind: RATTSStreamEventKind = .unspecified
 
   public var output: RATTSOutput {
-    get {_storage._output ?? RATTSOutput()}
-    set {_uniqueStorage()._output = newValue}
+    get {_output ?? RATTSOutput()}
+    set {_output = newValue}
   }
   /// Returns true if `output` has been explicitly set.
-  public var hasOutput: Bool {_storage._output != nil}
+  public var hasOutput: Bool {self._output != nil}
   /// Clears the value of `output`. Subsequent reads from it will return its default value.
-  public mutating func clearOutput() {_uniqueStorage()._output = nil}
-
-  public var phoneme: RATTSPhonemeTimestamp {
-    get {_storage._phoneme ?? RATTSPhonemeTimestamp()}
-    set {_uniqueStorage()._phoneme = newValue}
-  }
-  /// Returns true if `phoneme` has been explicitly set.
-  public var hasPhoneme: Bool {_storage._phoneme != nil}
-  /// Clears the value of `phoneme`. Subsequent reads from it will return its default value.
-  public mutating func clearPhoneme() {_uniqueStorage()._phoneme = nil}
-
-  public var speakResult: RATTSSpeakResult {
-    get {_storage._speakResult ?? RATTSSpeakResult()}
-    set {_uniqueStorage()._speakResult = newValue}
-  }
-  /// Returns true if `speakResult` has been explicitly set.
-  public var hasSpeakResult: Bool {_storage._speakResult != nil}
-  /// Clears the value of `speakResult`. Subsequent reads from it will return its default value.
-  public mutating func clearSpeakResult() {_uniqueStorage()._speakResult = nil}
-
-  /// progress is 0.0-1.0 when known; total_chunks 0 = unknown.
-  public var progress: Float {
-    get {_storage._progress}
-    set {_uniqueStorage()._progress = newValue}
-  }
-
-  public var chunkIndex: Int32 {
-    get {_storage._chunkIndex}
-    set {_uniqueStorage()._chunkIndex = newValue}
-  }
-
-  public var totalChunks: Int32 {
-    get {_storage._totalChunks}
-    set {_uniqueStorage()._totalChunks = newValue}
-  }
-
-  public var elapsedMs: Int64 {
-    get {_storage._elapsedMs}
-    set {_uniqueStorage()._elapsedMs = newValue}
-  }
-
-  public var statusMessage: String {
-    get {_storage._statusMessage}
-    set {_uniqueStorage()._statusMessage = newValue}
-  }
+  public mutating func clearOutput() {self._output = nil}
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _output: RATTSOutput? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
-public nonisolated struct RATTSServiceState: @unchecked Sendable {
+public nonisolated struct RATTSServiceState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var isReady: Bool {
-    get {_storage._isReady}
-    set {_uniqueStorage()._isReady = newValue}
-  }
+  public var isReady: Bool = false
 
   public var currentVoice: String {
-    get {_storage._currentVoice ?? String()}
-    set {_uniqueStorage()._currentVoice = newValue}
+    get {_currentVoice ?? String()}
+    set {_currentVoice = newValue}
   }
   /// Returns true if `currentVoice` has been explicitly set.
-  public var hasCurrentVoice: Bool {_storage._currentVoice != nil}
+  public var hasCurrentVoice: Bool {self._currentVoice != nil}
   /// Clears the value of `currentVoice`. Subsequent reads from it will return its default value.
-  public mutating func clearCurrentVoice() {_uniqueStorage()._currentVoice = nil}
+  public mutating func clearCurrentVoice() {self._currentVoice = nil}
 
-  public var voices: [RATTSVoiceInfo] {
-    get {_storage._voices}
-    set {_uniqueStorage()._voices = newValue}
-  }
-
-  public var supportedLanguageCodes: [String] {
-    get {_storage._supportedLanguageCodes}
-    set {_uniqueStorage()._supportedLanguageCodes = newValue}
-  }
+  public var supportedLanguageCodes: [String] = []
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _currentVoice: String? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RATTSVoiceGender: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TTS_VOICE_GENDER_UNSPECIFIED\0\u{1}TTS_VOICE_GENDER_MALE\0\u{1}TTS_VOICE_GENDER_FEMALE\0\u{1}TTS_VOICE_GENDER_NEUTRAL\0")
-}
-
 nonisolated extension RATTSStreamEventKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TTS_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}TTS_STREAM_EVENT_KIND_STARTED\0\u{1}TTS_STREAM_EVENT_KIND_AUDIO_CHUNK\0\u{1}TTS_STREAM_EVENT_KIND_PHONEME\0\u{1}TTS_STREAM_EVENT_KIND_COMPLETED\0\u{1}TTS_STREAM_EVENT_KIND_ERROR\0\u{1}TTS_STREAM_EVENT_KIND_PROGRESS\0")
-}
-
-nonisolated extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TTSConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{4}\u{8}enable_neural_voice\0\u{4}\u{2}preferred_framework\0\u{3}default_options\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 9: try { try decoder.decodeSingularBoolField(value: &self.enableNeuralVoice) }()
-      case 11: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
-      case 12: try { try decoder.decodeSingularMessageField(value: &self._defaultOptions) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
-    }
-    if self.enableNeuralVoice != false {
-      try visitor.visitSingularBoolField(value: self.enableNeuralVoice, fieldNumber: 9)
-    }
-    try { if let v = self._preferredFramework {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 11)
-    } }()
-    try { if let v = self._defaultOptions {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RATTSConfiguration, rhs: RATTSConfiguration) -> Bool {
-    if lhs.modelID != rhs.modelID {return false}
-    if lhs.enableNeuralVoice != rhs.enableNeuralVoice {return false}
-    if lhs._preferredFramework != rhs._preferredFramework {return false}
-    if lhs._defaultOptions != rhs._defaultOptions {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TTS_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}TTS_STREAM_EVENT_KIND_STARTED\0\u{1}TTS_STREAM_EVENT_KIND_AUDIO_CHUNK\0\u{2}\u{2}TTS_STREAM_EVENT_KIND_COMPLETED\0\u{1}TTS_STREAM_EVENT_KIND_ERROR\0")
 }
 
 nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{1}speed\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}speaker_id\0\u{2}\u{2}style\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{1}speed\0\u{1}pitch\0\u{1}volume\0\u{4}\u{2}audio_format\0\u{3}sample_rate\0\u{2}\u{5}model\0\u{b}enable_ssml\0\u{b}speaker_id\0\u{b}style\0\u{c}\u{6}\u{1}\u{c}\u{9}\u{1}\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -684,11 +434,9 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 3: try { try decoder.decodeSingularFloatField(value: &self.speed) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self.pitch) }()
       case 5: try { try decoder.decodeSingularFloatField(value: &self.volume) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.enableSsml) }()
       case 7: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
       case 8: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
-      case 9: try { try decoder.decodeSingularInt32Field(value: &self.speakerID) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self._style) }()
+      case 13: try { try decoder.decodeSingularStringField(value: &self._model) }()
       default: break
       }
     }
@@ -714,35 +462,27 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.volume.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.volume, fieldNumber: 5)
     }
-    if self.enableSsml != false {
-      try visitor.visitSingularBoolField(value: self.enableSsml, fieldNumber: 6)
-    }
     if self.audioFormat != .unspecified {
       try visitor.visitSingularEnumField(value: self.audioFormat, fieldNumber: 7)
     }
     if self.sampleRate != 0 {
       try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 8)
     }
-    if self.speakerID != 0 {
-      try visitor.visitSingularInt32Field(value: self.speakerID, fieldNumber: 9)
-    }
-    try { if let v = self._style {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 13)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RATTSOptions, rhs: RATTSOptions) -> Bool {
     if lhs.voice != rhs.voice {return false}
+    if lhs._model != rhs._model {return false}
     if lhs.languageCode != rhs.languageCode {return false}
     if lhs.speed != rhs.speed {return false}
     if lhs.pitch != rhs.pitch {return false}
     if lhs.volume != rhs.volume {return false}
-    if lhs.enableSsml != rhs.enableSsml {return false}
     if lhs.audioFormat != rhs.audioFormat {return false}
     if lhs.sampleRate != rhs.sampleRate {return false}
-    if lhs.speakerID != rhs.speakerID {return false}
-    if lhs._style != rhs._style {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -750,7 +490,7 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
 nonisolated extension RATTSSynthesisRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSSynthesisRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}text\0\u{1}ssml\0\u{1}options\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}text\0\u{2}\u{2}options\0\u{b}ssml\0\u{b}metadata\0\u{c}\u{3}\u{1}\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -760,9 +500,7 @@ nonisolated extension RATTSSynthesisRequest: SwiftProtobuf.Message, SwiftProtobu
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._ssml) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._options) }()
-      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       default: break
       }
     }
@@ -779,64 +517,16 @@ nonisolated extension RATTSSynthesisRequest: SwiftProtobuf.Message, SwiftProtobu
     if !self.text.isEmpty {
       try visitor.visitSingularStringField(value: self.text, fieldNumber: 2)
     }
-    try { if let v = self._ssml {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
     try { if let v = self._options {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RATTSSynthesisRequest, rhs: RATTSSynthesisRequest) -> Bool {
     if lhs.requestID != rhs.requestID {return false}
     if lhs.text != rhs.text {return false}
-    if lhs._ssml != rhs._ssml {return false}
     if lhs._options != rhs._options {return false}
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RATTSPhonemeTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TTSPhonemeTimestamp"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phoneme\0\u{3}start_ms\0\u{3}end_ms\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.phoneme) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.startMs) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.endMs) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.phoneme.isEmpty {
-      try visitor.visitSingularStringField(value: self.phoneme, fieldNumber: 1)
-    }
-    if self.startMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.startMs, fieldNumber: 2)
-    }
-    if self.endMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.endMs, fieldNumber: 3)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RATTSPhonemeTimestamp, rhs: RATTSPhonemeTimestamp) -> Bool {
-    if lhs.phoneme != rhs.phoneme {return false}
-    if lhs.startMs != rhs.startMs {return false}
-    if lhs.endMs != rhs.endMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -844,7 +534,7 @@ nonisolated extension RATTSPhonemeTimestamp: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSSynthesisMetadata"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_id\0\u{3}language_code\0\u{3}processing_time_ms\0\u{3}character_count\0\u{3}audio_duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_id\0\u{3}language_code\0\u{3}processing_time_ms\0\u{3}input_bytes\0\u{b}audio_duration_ms\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -855,8 +545,7 @@ nonisolated extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtob
       case 1: try { try decoder.decodeSingularStringField(value: &self.voiceID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.languageCode) }()
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.processingTimeMs) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.characterCount) }()
-      case 5: try { try decoder.decodeSingularInt64Field(value: &self.audioDurationMs) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.inputBytes) }()
       default: break
       }
     }
@@ -872,11 +561,8 @@ nonisolated extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtob
     if self.processingTimeMs != 0 {
       try visitor.visitSingularInt64Field(value: self.processingTimeMs, fieldNumber: 3)
     }
-    if self.characterCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.characterCount, fieldNumber: 4)
-    }
-    if self.audioDurationMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.audioDurationMs, fieldNumber: 5)
+    if self.inputBytes != 0 {
+      try visitor.visitSingularInt32Field(value: self.inputBytes, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -885,8 +571,7 @@ nonisolated extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtob
     if lhs.voiceID != rhs.voiceID {return false}
     if lhs.languageCode != rhs.languageCode {return false}
     if lhs.processingTimeMs != rhs.processingTimeMs {return false}
-    if lhs.characterCount != rhs.characterCount {return false}
-    if lhs.audioDurationMs != rhs.audioDurationMs {return false}
+    if lhs.inputBytes != rhs.inputBytes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -894,19 +579,17 @@ nonisolated extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSOutput"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}duration_ms\0\u{3}phoneme_timestamps\0\u{1}metadata\0\u{3}timestamp_ms\0\u{3}chunk_index\0\u{3}is_final\0\u{3}audio_size_bytes\0\u{2}\u{3}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}duration_ms\0\u{2}\u{2}metadata\0\u{3}timestamp_ms\0\u{3}chunk_index\0\u{3}is_final\0\u{2}\u{4}error\0\u{b}phoneme_timestamps\0\u{b}audio_size_bytes\0\u{c}\u{5}\u{1}\u{c}\u{a}\u{1}")
 
   fileprivate class _StorageClass {
     var _audioData: Data = Data()
     var _audioFormat: RAAudioFormat = .unspecified
     var _sampleRate: Int32 = 0
     var _durationMs: Int64 = 0
-    var _phonemeTimestamps: [RATTSPhonemeTimestamp] = []
     var _metadata: RATTSSynthesisMetadata? = nil
     var _timestampMs: Int64 = 0
     var _chunkIndex: Int32 = 0
     var _isFinal: Bool = false
-    var _audioSizeBytes: Int64 = 0
     var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
@@ -922,12 +605,10 @@ nonisolated extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
       _audioFormat = source._audioFormat
       _sampleRate = source._sampleRate
       _durationMs = source._durationMs
-      _phonemeTimestamps = source._phonemeTimestamps
       _metadata = source._metadata
       _timestampMs = source._timestampMs
       _chunkIndex = source._chunkIndex
       _isFinal = source._isFinal
-      _audioSizeBytes = source._audioSizeBytes
       _error = source._error
     }
   }
@@ -951,12 +632,10 @@ nonisolated extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
         case 2: try { try decoder.decodeSingularEnumField(value: &_storage._audioFormat) }()
         case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._sampleRate) }()
         case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._durationMs) }()
-        case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._phonemeTimestamps) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._metadata) }()
         case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampMs) }()
         case 8: try { try decoder.decodeSingularInt32Field(value: &_storage._chunkIndex) }()
         case 9: try { try decoder.decodeSingularBoolField(value: &_storage._isFinal) }()
-        case 10: try { try decoder.decodeSingularInt64Field(value: &_storage._audioSizeBytes) }()
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
@@ -982,9 +661,6 @@ nonisolated extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
       if _storage._durationMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._durationMs, fieldNumber: 4)
       }
-      if !_storage._phonemeTimestamps.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._phonemeTimestamps, fieldNumber: 5)
-      }
       try { if let v = _storage._metadata {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
       } }()
@@ -996,9 +672,6 @@ nonisolated extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
       }
       if _storage._isFinal != false {
         try visitor.visitSingularBoolField(value: _storage._isFinal, fieldNumber: 9)
-      }
-      if _storage._audioSizeBytes != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._audioSizeBytes, fieldNumber: 10)
       }
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
@@ -1016,12 +689,10 @@ nonisolated extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
         if _storage._audioFormat != rhs_storage._audioFormat {return false}
         if _storage._sampleRate != rhs_storage._sampleRate {return false}
         if _storage._durationMs != rhs_storage._durationMs {return false}
-        if _storage._phonemeTimestamps != rhs_storage._phonemeTimestamps {return false}
         if _storage._metadata != rhs_storage._metadata {return false}
         if _storage._timestampMs != rhs_storage._timestampMs {return false}
         if _storage._chunkIndex != rhs_storage._chunkIndex {return false}
         if _storage._isFinal != rhs_storage._isFinal {return false}
-        if _storage._audioSizeBytes != rhs_storage._audioSizeBytes {return false}
         if _storage._error != rhs_storage._error {return false}
         return true
       }
@@ -1146,7 +817,7 @@ nonisolated extension RATTSSpeakResult: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 nonisolated extension RATTSVoiceInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSVoiceInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}display_name\0\u{3}language_code\0\u{1}gender\0\u{1}description\0\u{3}is_neural\0\u{3}is_system\0\u{3}sample_rate\0\u{3}supported_styles\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}display_name\0\u{3}language_code\0\u{4}\u{5}sample_rate\0\u{b}gender\0\u{b}description\0\u{b}is_neural\0\u{b}is_system\0\u{b}supported_styles\0\u{c}\u{4}\u{1}\u{c}\u{5}\u{1}\u{c}\u{6}\u{1}\u{c}\u{7}\u{1}\u{c}\u{9}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1157,12 +828,7 @@ nonisolated extension RATTSVoiceInfo: SwiftProtobuf.Message, SwiftProtobuf._Mess
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.displayName) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.languageCode) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self.gender) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.isNeural) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self.isSystem) }()
       case 8: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
-      case 9: try { try decoder.decodeRepeatedStringField(value: &self.supportedStyles) }()
       default: break
       }
     }
@@ -1178,23 +844,8 @@ nonisolated extension RATTSVoiceInfo: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if !self.languageCode.isEmpty {
       try visitor.visitSingularStringField(value: self.languageCode, fieldNumber: 3)
     }
-    if self.gender != .unspecified {
-      try visitor.visitSingularEnumField(value: self.gender, fieldNumber: 4)
-    }
-    if !self.description_p.isEmpty {
-      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 5)
-    }
-    if self.isNeural != false {
-      try visitor.visitSingularBoolField(value: self.isNeural, fieldNumber: 6)
-    }
-    if self.isSystem != false {
-      try visitor.visitSingularBoolField(value: self.isSystem, fieldNumber: 7)
-    }
     if self.sampleRate != 0 {
       try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 8)
-    }
-    if !self.supportedStyles.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.supportedStyles, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1203,12 +854,7 @@ nonisolated extension RATTSVoiceInfo: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if lhs.id != rhs.id {return false}
     if lhs.displayName != rhs.displayName {return false}
     if lhs.languageCode != rhs.languageCode {return false}
-    if lhs.gender != rhs.gender {return false}
-    if lhs.description_p != rhs.description_p {return false}
-    if lhs.isNeural != rhs.isNeural {return false}
-    if lhs.isSystem != rhs.isSystem {return false}
     if lhs.sampleRate != rhs.sampleRate {return false}
-    if lhs.supportedStyles != rhs.supportedStyles {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1246,146 +892,53 @@ nonisolated extension RATTSVoiceList: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 nonisolated extension RATTSStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}output\0\u{1}phoneme\0\u{3}speak_result\0\u{2}\u{3}progress\0\u{3}chunk_index\0\u{3}total_chunks\0\u{3}elapsed_ms\0\u{3}status_message\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _timestampUs: Int64 = 0
-    var _requestID: String = String()
-    var _kind: RATTSStreamEventKind = .unspecified
-    var _output: RATTSOutput? = nil
-    var _phoneme: RATTSPhonemeTimestamp? = nil
-    var _speakResult: RATTSSpeakResult? = nil
-    var _progress: Float = 0
-    var _chunkIndex: Int32 = 0
-    var _totalChunks: Int32 = 0
-    var _elapsedMs: Int64 = 0
-    var _statusMessage: String = String()
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _timestampUs = source._timestampUs
-      _requestID = source._requestID
-      _kind = source._kind
-      _output = source._output
-      _phoneme = source._phoneme
-      _speakResult = source._speakResult
-      _progress = source._progress
-      _chunkIndex = source._chunkIndex
-      _totalChunks = source._totalChunks
-      _elapsedMs = source._elapsedMs
-      _statusMessage = source._statusMessage
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}output\0\u{2}\u{a}error\0\u{b}phoneme\0\u{b}speak_result\0\u{b}progress\0\u{b}chunk_index\0\u{b}total_chunks\0\u{b}elapsed_ms\0\u{b}status_message\0\u{c}\u{1}\u{1}\u{c}\u{6}\u{1}\u{c}\u{7}\u{1}\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}\u{c}\u{c}\u{1}\u{c}\u{d}\u{1}\u{c}\u{e}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
-        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
-        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._output) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._phoneme) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._speakResult) }()
-        case 10: try { try decoder.decodeSingularFloatField(value: &_storage._progress) }()
-        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._chunkIndex) }()
-        case 12: try { try decoder.decodeSingularInt32Field(value: &_storage._totalChunks) }()
-        case 13: try { try decoder.decodeSingularInt64Field(value: &_storage._elapsedMs) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._statusMessage) }()
-        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.timestampUs) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._output) }()
+      case 15: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._timestampUs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
-      }
-      if !_storage._requestID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 3)
-      }
-      if _storage._kind != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 4)
-      }
-      try { if let v = _storage._output {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._phoneme {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._speakResult {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
-      if _storage._progress.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._progress, fieldNumber: 10)
-      }
-      if _storage._chunkIndex != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._chunkIndex, fieldNumber: 11)
-      }
-      if _storage._totalChunks != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._totalChunks, fieldNumber: 12)
-      }
-      if _storage._elapsedMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._elapsedMs, fieldNumber: 13)
-      }
-      if !_storage._statusMessage.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._statusMessage, fieldNumber: 14)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.timestampUs != 0 {
+      try visitor.visitSingularInt64Field(value: self.timestampUs, fieldNumber: 2)
     }
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 3)
+    }
+    if self.kind != .unspecified {
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 4)
+    }
+    try { if let v = self._output {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RATTSStreamEvent, rhs: RATTSStreamEvent) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._timestampUs != rhs_storage._timestampUs {return false}
-        if _storage._requestID != rhs_storage._requestID {return false}
-        if _storage._kind != rhs_storage._kind {return false}
-        if _storage._output != rhs_storage._output {return false}
-        if _storage._phoneme != rhs_storage._phoneme {return false}
-        if _storage._speakResult != rhs_storage._speakResult {return false}
-        if _storage._progress != rhs_storage._progress {return false}
-        if _storage._chunkIndex != rhs_storage._chunkIndex {return false}
-        if _storage._totalChunks != rhs_storage._totalChunks {return false}
-        if _storage._elapsedMs != rhs_storage._elapsedMs {return false}
-        if _storage._statusMessage != rhs_storage._statusMessage {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.timestampUs != rhs.timestampUs {return false}
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs.kind != rhs.kind {return false}
+    if lhs._output != rhs._output {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1393,97 +946,48 @@ nonisolated extension RATTSStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 nonisolated extension RATTSServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSServiceState"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_voice\0\u{1}voices\0\u{3}supported_language_codes\0\u{2}\u{3}error\0")
-
-  fileprivate class _StorageClass {
-    var _isReady: Bool = false
-    var _currentVoice: String? = nil
-    var _voices: [RATTSVoiceInfo] = []
-    var _supportedLanguageCodes: [String] = []
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _isReady = source._isReady
-      _currentVoice = source._currentVoice
-      _voices = source._voices
-      _supportedLanguageCodes = source._supportedLanguageCodes
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_voice\0\u{4}\u{2}supported_language_codes\0\u{2}\u{3}error\0\u{b}voices\0\u{c}\u{3}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._isReady) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._currentVoice) }()
-        case 3: try { try decoder.decodeRepeatedMessageField(value: &_storage._voices) }()
-        case 4: try { try decoder.decodeRepeatedStringField(value: &_storage._supportedLanguageCodes) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.isReady) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._currentVoice) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.supportedLanguageCodes) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._isReady != false {
-        try visitor.visitSingularBoolField(value: _storage._isReady, fieldNumber: 1)
-      }
-      try { if let v = _storage._currentVoice {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      if !_storage._voices.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._voices, fieldNumber: 3)
-      }
-      if !_storage._supportedLanguageCodes.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._supportedLanguageCodes, fieldNumber: 4)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.isReady != false {
+      try visitor.visitSingularBoolField(value: self.isReady, fieldNumber: 1)
     }
+    try { if let v = self._currentVoice {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    if !self.supportedLanguageCodes.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.supportedLanguageCodes, fieldNumber: 4)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RATTSServiceState, rhs: RATTSServiceState) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._isReady != rhs_storage._isReady {return false}
-        if _storage._currentVoice != rhs_storage._currentVoice {return false}
-        if _storage._voices != rhs_storage._voices {return false}
-        if _storage._supportedLanguageCodes != rhs_storage._supportedLanguageCodes {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.isReady != rhs.isReady {return false}
+    if lhs._currentVoice != rhs._currentVoice {return false}
+    if lhs.supportedLanguageCodes != rhs.supportedLanguageCodes {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

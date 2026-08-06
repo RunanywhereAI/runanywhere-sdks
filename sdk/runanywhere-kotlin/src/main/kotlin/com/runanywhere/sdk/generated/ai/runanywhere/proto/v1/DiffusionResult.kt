@@ -17,7 +17,7 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.sanitize
+import com.squareup.wire.`internal`.redactElements
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -32,96 +32,29 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class DiffusionResult(
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "imageData",
-    schemaIndex = 0,
-  )
-  public val image_data: ByteString = ByteString.EMPTY,
+  images: List<DiffusionImage> = emptyList(),
   @field:WireField(
     tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
-  public val width: Int = 0,
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
-  )
-  public val height: Int = 0,
-  /**
-   * The resolved seed, so a run can be reproduced when seed was -1.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "seedUsed",
-    schemaIndex = 3,
-  )
-  public val seed_used: Long = 0L,
-  @field:WireField(
-    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalTimeMs",
-    schemaIndex = 4,
+    schemaIndex = 1,
   )
   public val total_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "safetyFlag",
-    schemaIndex = 5,
-  )
-  public val safety_flag: Boolean = false,
-  @field:WireField(
-    tag = 7,
-    adapter = "ai.runanywhere.proto.v1.DiffusionScheduler#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "usedScheduler",
-    schemaIndex = 6,
-  )
-  public val used_scheduler:
-      DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "imageMediaType",
-    schemaIndex = 7,
-  )
-  public val image_media_type: String? = null,
-  batch_images: List<ByteString> = emptyList(),
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "imagesGenerated",
-    schemaIndex = 9,
-  )
-  public val images_generated: Int = 0,
-  @field:WireField(
-    tag = 13,
-    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 10,
-  )
-  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionResult, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * One entry per requested image, in request order. commons emits exactly
+   * one entry until the C ABI grows a list: rac_diffusion_result_t is a
+   * single-image struct with one image_data/image_size pair.
+   */
   @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    tag = 1,
+    adapter = "ai.runanywhere.proto.v1.DiffusionImage#ADAPTER",
     label = WireField.Label.REPEATED,
-    jsonName = "batchImages",
-    schemaIndex = 8,
+    schemaIndex = 0,
   )
-  public val batch_images: List<ByteString> = immutableCopyOf("batch_images", batch_images)
+  public val images: List<DiffusionImage> = immutableCopyOf("images", images)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -133,17 +66,8 @@ public class DiffusionResult(
     if (other === this) return true
     if (other !is DiffusionResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (image_data != other.image_data) return false
-    if (width != other.width) return false
-    if (height != other.height) return false
-    if (seed_used != other.seed_used) return false
+    if (images != other.images) return false
     if (total_time_ms != other.total_time_ms) return false
-    if (safety_flag != other.safety_flag) return false
-    if (used_scheduler != other.used_scheduler) return false
-    if (image_media_type != other.image_media_type) return false
-    if (batch_images != other.batch_images) return false
-    if (images_generated != other.images_generated) return false
-    if (error != other.error) return false
     return true
   }
 
@@ -151,17 +75,8 @@ public class DiffusionResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + image_data.hashCode()
-      result = result * 37 + width.hashCode()
-      result = result * 37 + height.hashCode()
-      result = result * 37 + seed_used.hashCode()
+      result = result * 37 + images.hashCode()
       result = result * 37 + total_time_ms.hashCode()
-      result = result * 37 + safety_flag.hashCode()
-      result = result * 37 + used_scheduler.hashCode()
-      result = result * 37 + (image_media_type?.hashCode() ?: 0)
-      result = result * 37 + batch_images.hashCode()
-      result = result * 37 + images_generated.hashCode()
-      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -169,34 +84,16 @@ public class DiffusionResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """image_data=$image_data"""
-    result += """width=$width"""
-    result += """height=$height"""
-    result += """seed_used=$seed_used"""
+    if (images.isNotEmpty()) result += """images=$images"""
     result += """total_time_ms=$total_time_ms"""
-    result += """safety_flag=$safety_flag"""
-    result += """used_scheduler=$used_scheduler"""
-    if (image_media_type != null) result += """image_media_type=${sanitize(image_media_type)}"""
-    if (batch_images.isNotEmpty()) result += """batch_images=$batch_images"""
-    result += """images_generated=$images_generated"""
-    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "DiffusionResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    image_data: ByteString = this.image_data,
-    width: Int = this.width,
-    height: Int = this.height,
-    seed_used: Long = this.seed_used,
+    images: List<DiffusionImage> = this.images,
     total_time_ms: Long = this.total_time_ms,
-    safety_flag: Boolean = this.safety_flag,
-    used_scheduler: DiffusionScheduler = this.used_scheduler,
-    image_media_type: String? = this.image_media_type,
-    batch_images: List<ByteString> = this.batch_images,
-    images_generated: Int = this.images_generated,
-    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionResult = DiffusionResult(image_data, width, height, seed_used, total_time_ms, safety_flag, used_scheduler, image_media_type, batch_images, images_generated, error, unknownFields)
+  ): DiffusionResult = DiffusionResult(images, total_time_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -210,148 +107,48 @@ public class DiffusionResult(
     ) {
       override fun encodedSize(`value`: DiffusionResult): Int {
         var size = value.unknownFields.size
-        if (value.image_data != okio.ByteString.EMPTY) {
-          size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.image_data)
-        }
-        if (value.width != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.width)
-        }
-        if (value.height != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.height)
-        }
-        if (value.seed_used != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.seed_used)
-        }
+        size += DiffusionImage.ADAPTER.asRepeated().encodedSizeWithTag(1, value.images)
         if (value.total_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.total_time_ms)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.total_time_ms)
         }
-        if (value.safety_flag != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.safety_flag)
-        }
-        if (value.used_scheduler != ai.runanywhere.proto.v1.DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED) {
-          size += DiffusionScheduler.ADAPTER.encodedSizeWithTag(7, value.used_scheduler)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.image_media_type)
-        size += ProtoAdapter.BYTES.asRepeated().encodedSizeWithTag(11, value.batch_images)
-        if (value.images_generated != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.images_generated)
-        }
-        size += SDKError.ADAPTER.encodedSizeWithTag(13, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: DiffusionResult) {
-        if (value.image_data != okio.ByteString.EMPTY) {
-          ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.image_data)
-        }
-        if (value.width != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.width)
-        }
-        if (value.height != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.height)
-        }
-        if (value.seed_used != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.seed_used)
-        }
+        DiffusionImage.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.images)
         if (value.total_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.total_time_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.total_time_ms)
         }
-        if (value.safety_flag != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.safety_flag)
-        }
-        if (value.used_scheduler != ai.runanywhere.proto.v1.DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED) {
-          DiffusionScheduler.ADAPTER.encodeWithTag(writer, 7, value.used_scheduler)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.image_media_type)
-        ProtoAdapter.BYTES.asRepeated().encodeWithTag(writer, 11, value.batch_images)
-        if (value.images_generated != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.images_generated)
-        }
-        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionResult) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
-        if (value.images_generated != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.images_generated)
-        }
-        ProtoAdapter.BYTES.asRepeated().encodeWithTag(writer, 11, value.batch_images)
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.image_media_type)
-        if (value.used_scheduler != ai.runanywhere.proto.v1.DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED) {
-          DiffusionScheduler.ADAPTER.encodeWithTag(writer, 7, value.used_scheduler)
-        }
-        if (value.safety_flag != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.safety_flag)
-        }
         if (value.total_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.total_time_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.total_time_ms)
         }
-        if (value.seed_used != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.seed_used)
-        }
-        if (value.height != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.height)
-        }
-        if (value.width != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.width)
-        }
-        if (value.image_data != okio.ByteString.EMPTY) {
-          ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.image_data)
-        }
+        DiffusionImage.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.images)
       }
 
       override fun decode(reader: ProtoReader): DiffusionResult {
-        var image_data: ByteString = ByteString.EMPTY
-        var width: Int = 0
-        var height: Int = 0
-        var seed_used: Long = 0L
+        val images = mutableListOf<DiffusionImage>()
         var total_time_ms: Long = 0L
-        var safety_flag: Boolean = false
-        var used_scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED
-        var image_media_type: String? = null
-        val batch_images = mutableListOf<ByteString>()
-        var images_generated: Int = 0
-        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> image_data = ProtoAdapter.BYTES.decode(reader)
-            2 -> width = ProtoAdapter.INT32.decode(reader)
-            3 -> height = ProtoAdapter.INT32.decode(reader)
-            4 -> seed_used = ProtoAdapter.INT64.decode(reader)
-            5 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
-            6 -> safety_flag = ProtoAdapter.BOOL.decode(reader)
-            7 -> try {
-              used_scheduler = DiffusionScheduler.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            10 -> image_media_type = ProtoAdapter.STRING.decode(reader)
-            11 -> batch_images.add(ProtoAdapter.BYTES.decode(reader))
-            12 -> images_generated = ProtoAdapter.INT32.decode(reader)
-            13 -> error = SDKError.ADAPTER.decode(reader)
+            1 -> images.add(DiffusionImage.ADAPTER.decode(reader))
+            2 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DiffusionResult(
-          image_data = image_data,
-          width = width,
-          height = height,
-          seed_used = seed_used,
+          images = images,
           total_time_ms = total_time_ms,
-          safety_flag = safety_flag,
-          used_scheduler = used_scheduler,
-          image_media_type = image_media_type,
-          batch_images = batch_images,
-          images_generated = images_generated,
-          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: DiffusionResult): DiffusionResult = value.copy(
-        error = value.error?.let(SDKError.ADAPTER::redact),
+        images = value.images.redactElements(DiffusionImage.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

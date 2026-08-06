@@ -17,8 +17,7 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * What a model does. There is no RERANK member, which is why the rerank
- * primitive cannot auto-load a model.
+ * What a model does.
  */
 public enum class ModelCategory(
   override val `value`: Int,
@@ -50,6 +49,8 @@ public enum class ModelCategory(
   MODEL_CATEGORY_SPEAKER_DIARIZATION(10),
   @RacWireStringOption("semantic-segmentation")
   MODEL_CATEGORY_SEMANTIC_SEGMENTATION(11),
+  @RacWireStringOption("rerank")
+  MODEL_CATEGORY_RERANK(12),
   ;
 
   public companion object {
@@ -76,6 +77,7 @@ public enum class ModelCategory(
       9 -> MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
       10 -> MODEL_CATEGORY_SPEAKER_DIARIZATION
       11 -> MODEL_CATEGORY_SEMANTIC_SEGMENTATION
+      12 -> MODEL_CATEGORY_RERANK
       else -> null
     }
   }

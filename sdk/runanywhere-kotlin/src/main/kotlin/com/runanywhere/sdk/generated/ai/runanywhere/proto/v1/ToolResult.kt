@@ -74,18 +74,22 @@ public class ToolResult(
   )
   public val error: String? = null,
   /**
-   * Whether execution succeeded. If unset/false and error is empty,
-   * consumers should fall back to result_json/error semantics.
+   * True when the tool failed, so commons tells the model the call errored
+   * instead of feeding result_json back as data and the model can
+   * self-correct. The proto3 zero value (false) is the correct default: a
+   * ToolResult nobody touched reads as a good result, not a failed one.
+   * Industry: Anthropic `is_error`, MCP `isError`.
    */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isError",
     schemaIndex = 4,
   )
-  public val success: Boolean = false,
+  public val is_error: Boolean = false,
   @field:WireField(
-    tag = 8,
+    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "startedAtMs",
@@ -93,7 +97,7 @@ public class ToolResult(
   )
   public val started_at_ms: Long = 0L,
   @field:WireField(
-    tag = 9,
+    tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "completedAtMs",
@@ -116,7 +120,7 @@ public class ToolResult(
     if (name != other.name) return false
     if (result_json != other.result_json) return false
     if (error != other.error) return false
-    if (success != other.success) return false
+    if (is_error != other.is_error) return false
     if (started_at_ms != other.started_at_ms) return false
     if (completed_at_ms != other.completed_at_ms) return false
     return true
@@ -130,7 +134,7 @@ public class ToolResult(
       result = result * 37 + name.hashCode()
       result = result * 37 + result_json.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
-      result = result * 37 + success.hashCode()
+      result = result * 37 + is_error.hashCode()
       result = result * 37 + started_at_ms.hashCode()
       result = result * 37 + completed_at_ms.hashCode()
       super.hashCode = result
@@ -144,7 +148,7 @@ public class ToolResult(
     result += """name=${sanitize(name)}"""
     result += """result_json=${sanitize(result_json)}"""
     if (error != null) result += """error=${sanitize(error)}"""
-    result += """success=$success"""
+    result += """is_error=$is_error"""
     result += """started_at_ms=$started_at_ms"""
     result += """completed_at_ms=$completed_at_ms"""
     return result.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
@@ -155,11 +159,11 @@ public class ToolResult(
     name: String = this.name,
     result_json: String = this.result_json,
     error: String? = this.error,
-    success: Boolean = this.success,
+    is_error: Boolean = this.is_error,
     started_at_ms: Long = this.started_at_ms,
     completed_at_ms: Long = this.completed_at_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, started_at_ms, completed_at_ms, unknownFields)
+  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, is_error, started_at_ms, completed_at_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -183,14 +187,14 @@ public class ToolResult(
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.result_json)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error)
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.success)
+        if (value.is_error != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.is_error)
         }
         if (value.started_at_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.started_at_ms)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.started_at_ms)
         }
         if (value.completed_at_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.completed_at_ms)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.completed_at_ms)
         }
         return size
       }
@@ -206,14 +210,14 @@ public class ToolResult(
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.result_json)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
+        if (value.is_error != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.is_error)
         }
         if (value.started_at_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.started_at_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.started_at_ms)
         }
         if (value.completed_at_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.completed_at_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.completed_at_ms)
         }
         writer.writeBytes(value.unknownFields)
       }
@@ -221,13 +225,13 @@ public class ToolResult(
       override fun encode(writer: ReverseProtoWriter, `value`: ToolResult) {
         writer.writeBytes(value.unknownFields)
         if (value.completed_at_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.completed_at_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.completed_at_ms)
         }
         if (value.started_at_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.started_at_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.started_at_ms)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
+        if (value.is_error != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.is_error)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
         if (value.result_json != "") {
@@ -246,7 +250,7 @@ public class ToolResult(
         var name: String = ""
         var result_json: String = ""
         var error: String? = null
-        var success: Boolean = false
+        var is_error: Boolean = false
         var started_at_ms: Long = 0L
         var completed_at_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
@@ -255,9 +259,9 @@ public class ToolResult(
             2 -> name = ProtoAdapter.STRING.decode(reader)
             3 -> result_json = ProtoAdapter.STRING.decode(reader)
             4 -> error = ProtoAdapter.STRING.decode(reader)
-            5 -> success = ProtoAdapter.BOOL.decode(reader)
-            8 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
-            9 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
+            5 -> is_error = ProtoAdapter.BOOL.decode(reader)
+            6 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -266,7 +270,7 @@ public class ToolResult(
           name = name,
           result_json = result_json,
           error = error,
-          success = success,
+          is_error = is_error,
           started_at_ms = started_at_ms,
           completed_at_ms = completed_at_ms,
           unknownFields = unknownFields

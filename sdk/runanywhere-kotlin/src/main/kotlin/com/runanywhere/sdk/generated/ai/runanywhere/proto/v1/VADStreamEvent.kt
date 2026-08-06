@@ -37,6 +37,10 @@ public class VADStreamEvent(
     schemaIndex = 0,
   )
   public val seq: Long = 0L,
+  /**
+   * Microseconds since epoch. Genuine sub-millisecond precision: the
+   * streaming dispatcher stamps this from a microsecond clock.
+   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -74,14 +78,8 @@ public class VADStreamEvent(
   public val activity: SpeechActivityEvent? = null,
   @field:WireField(
     tag = 7,
-    adapter = "ai.runanywhere.proto.v1.VADStatistics#ADAPTER",
-    schemaIndex = 6,
-  )
-  public val statistics: VADStatistics? = null,
-  @field:WireField(
-    tag = 10,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -102,7 +100,6 @@ public class VADStreamEvent(
     if (kind != other.kind) return false
     if (result != other.result) return false
     if (activity != other.activity) return false
-    if (statistics != other.statistics) return false
     if (error != other.error) return false
     return true
   }
@@ -117,7 +114,6 @@ public class VADStreamEvent(
       result_ = result_ * 37 + kind.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
       result_ = result_ * 37 + (activity?.hashCode() ?: 0)
-      result_ = result_ * 37 + (statistics?.hashCode() ?: 0)
       result_ = result_ * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result_
     }
@@ -132,7 +128,6 @@ public class VADStreamEvent(
     result_ += """kind=$kind"""
     if (result != null) result_ += """result=$result"""
     if (activity != null) result_ += """activity=$activity"""
-    if (statistics != null) result_ += """statistics=$statistics"""
     if (error != null) result_ += """error=$error"""
     return result_.joinToString(prefix = "VADStreamEvent{", separator = ", ", postfix = "}")
   }
@@ -144,10 +139,9 @@ public class VADStreamEvent(
     kind: VADStreamEventKind = this.kind,
     result: VADResult? = this.result,
     activity: SpeechActivityEvent? = this.activity,
-    statistics: VADStatistics? = this.statistics,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VADStreamEvent = VADStreamEvent(seq, timestamp_us, request_id, kind, result, activity, statistics, error, unknownFields)
+  ): VADStreamEvent = VADStreamEvent(seq, timestamp_us, request_id, kind, result, activity, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -175,8 +169,7 @@ public class VADStreamEvent(
         }
         size += VADResult.ADAPTER.encodedSizeWithTag(5, value.result)
         size += SpeechActivityEvent.ADAPTER.encodedSizeWithTag(6, value.activity)
-        size += VADStatistics.ADAPTER.encodedSizeWithTag(7, value.statistics)
-        size += SDKError.ADAPTER.encodedSizeWithTag(10, value.error)
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
@@ -195,15 +188,13 @@ public class VADStreamEvent(
         }
         VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
         SpeechActivityEvent.ADAPTER.encodeWithTag(writer, 6, value.activity)
-        VADStatistics.ADAPTER.encodeWithTag(writer, 7, value.statistics)
-        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
-        VADStatistics.ADAPTER.encodeWithTag(writer, 7, value.statistics)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         SpeechActivityEvent.ADAPTER.encodeWithTag(writer, 6, value.activity)
         VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
         if (value.kind != ai.runanywhere.proto.v1.VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED) {
@@ -227,7 +218,6 @@ public class VADStreamEvent(
         var kind: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED
         var result: VADResult? = null
         var activity: SpeechActivityEvent? = null
-        var statistics: VADStatistics? = null
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -241,8 +231,7 @@ public class VADStreamEvent(
             }
             5 -> result = VADResult.ADAPTER.decode(reader)
             6 -> activity = SpeechActivityEvent.ADAPTER.decode(reader)
-            7 -> statistics = VADStatistics.ADAPTER.decode(reader)
-            10 -> error = SDKError.ADAPTER.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -253,7 +242,6 @@ public class VADStreamEvent(
           kind = kind,
           result = result,
           activity = activity,
-          statistics = statistics,
           error = error,
           unknownFields = unknownFields
         )
@@ -262,7 +250,6 @@ public class VADStreamEvent(
       override fun redact(`value`: VADStreamEvent): VADStreamEvent = value.copy(
         result = value.result?.let(VADResult.ADAPTER::redact),
         activity = value.activity?.let(SpeechActivityEvent.ADAPTER::redact),
-        statistics = value.statistics?.let(VADStatistics.ADAPTER::redact),
         error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )

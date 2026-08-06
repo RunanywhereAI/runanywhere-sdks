@@ -83,6 +83,8 @@ public nonisolated struct RADiarizationOptions: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  /// Only 16 kHz is accepted: the engine does not resample, and any other
+  /// rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
   public var sampleRate: Int32 {
     get {_sampleRate ?? 0}
     set {_sampleRate = newValue}
@@ -101,8 +103,11 @@ public nonisolated struct RADiarizationOptions: Sendable {
   /// Clears the value of `channels`. Subsequent reads from it will return its default value.
   public mutating func clearChannels() {self._channels = nil}
 
-  /// Commons normalizes either PCM representation to float samples before
-  /// dispatching to an engine.
+  /// Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+  /// AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+  /// float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+  /// and AUDIO_ENCODING_UNSPECIFIED are rejected with
+  /// RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
   public var encoding: RAAudioEncoding {
     get {_encoding ?? .unspecified}
     set {_encoding = newValue}
@@ -125,6 +130,20 @@ public nonisolated struct RADiarizationOptions: Sendable {
 
   public var mergeGapMs: Int64 = 0
 
+  /// Speaker-count hint: an upper bound, not an exact count. Unset =
+  /// auto-detect. An engine that detects more than max_speakers speakers
+  /// ranks them by total active duration, drops the weakest, and re-densifies
+  /// the speaker indices. Values above the loaded model's speaker capacity
+  /// are clamped.
+  public var maxSpeakers: Int32 {
+    get {_maxSpeakers ?? 0}
+    set {_maxSpeakers = newValue}
+  }
+  /// Returns true if `maxSpeakers` has been explicitly set.
+  public var hasMaxSpeakers: Bool {self._maxSpeakers != nil}
+  /// Clears the value of `maxSpeakers`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxSpeakers() {self._maxSpeakers = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -133,6 +152,7 @@ public nonisolated struct RADiarizationOptions: Sendable {
   fileprivate var _channels: Int32? = nil
   fileprivate var _encoding: RAAudioEncoding? = nil
   fileprivate var _threshold: Float? = nil
+  fileprivate var _maxSpeakers: Int32? = nil
 }
 
 public nonisolated struct RADiarizationRequest: Sendable {
@@ -259,7 +279,7 @@ nonisolated extension RADiarizationStreamEventKind: SwiftProtobuf._ProtoNameProv
 
 nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiarizationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}sample_rate\0\u{1}channels\0\u{1}encoding\0\u{1}threshold\0\u{3}minimum_duration_ms\0\u{3}merge_gap_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}sample_rate\0\u{1}channels\0\u{1}encoding\0\u{1}threshold\0\u{3}minimum_duration_ms\0\u{3}merge_gap_ms\0\u{4}\u{2}max_speakers\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -273,6 +293,7 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
       case 4: try { try decoder.decodeSingularFloatField(value: &self._threshold) }()
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.minimumDurationMs) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self.mergeGapMs) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self._maxSpeakers) }()
       default: break
       }
     }
@@ -301,6 +322,9 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
     if self.mergeGapMs != 0 {
       try visitor.visitSingularInt64Field(value: self.mergeGapMs, fieldNumber: 6)
     }
+    try { if let v = self._maxSpeakers {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -311,6 +335,7 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
     if lhs._threshold != rhs._threshold {return false}
     if lhs.minimumDurationMs != rhs.minimumDurationMs {return false}
     if lhs.mergeGapMs != rhs.mergeGapMs {return false}
+    if lhs._maxSpeakers != rhs._maxSpeakers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -17,7 +17,6 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -41,22 +40,41 @@ public class RerankRequest(
     schemaIndex = 0,
   )
   public val query: String = "",
-  candidates: List<RerankCandidate> = emptyList(),
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.RerankOptions#ADAPTER",
-    schemaIndex = 2,
-  )
-  public val options: RerankOptions? = null,
-  unknownFields: ByteString = ByteString.EMPTY,
-) : Message<RerankRequest, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 2,
-    adapter = "ai.runanywhere.proto.v1.RerankCandidate#ADAPTER",
-    label = WireField.Label.REPEATED,
     schemaIndex = 1,
   )
-  public val candidates: List<RerankCandidate> = immutableCopyOf("candidates", candidates)
+  public val options: RerankOptions? = null,
+  documents: List<String> = emptyList(),
+  /**
+   * Registry id of the reranker to score with. Unset = whatever model is
+   * already resident under the rerank component. Mirrors
+   * EmbeddingsRequest.model_id and the industry-universal `model` field.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "modelId",
+    schemaIndex = 3,
+  )
+  public val model_id: String? = null,
+  unknownFields: ByteString = ByteString.EMPTY,
+) : Message<RerankRequest, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * The passages to score, in caller order. Results point back at these by
+   * index. Cost is LINEAR (one model pass per document), so this is a
+   * second-stage reranker over a retriever's output, not a corpus scan;
+   * commons rejects more than 100,000 entries with
+   * RAC_ERROR_INVALID_PARAMETER. Industry name (Cohere/Voyage/Jina `documents`).
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 2,
+  )
+  public val documents: List<String> = immutableCopyOf("documents", documents)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -69,8 +87,9 @@ public class RerankRequest(
     if (other !is RerankRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (query != other.query) return false
-    if (candidates != other.candidates) return false
     if (options != other.options) return false
+    if (documents != other.documents) return false
+    if (model_id != other.model_id) return false
     return true
   }
 
@@ -79,8 +98,9 @@ public class RerankRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + query.hashCode()
-      result = result * 37 + candidates.hashCode()
       result = result * 37 + (options?.hashCode() ?: 0)
+      result = result * 37 + documents.hashCode()
+      result = result * 37 + (model_id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -89,17 +109,19 @@ public class RerankRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """query=${sanitize(query)}"""
-    if (candidates.isNotEmpty()) result += """candidates=$candidates"""
     if (options != null) result += """options=$options"""
+    if (documents.isNotEmpty()) result += """documents=${sanitize(documents)}"""
+    if (model_id != null) result += """model_id=${sanitize(model_id)}"""
     return result.joinToString(prefix = "RerankRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     query: String = this.query,
-    candidates: List<RerankCandidate> = this.candidates,
     options: RerankOptions? = this.options,
+    documents: List<String> = this.documents,
+    model_id: String? = this.model_id,
     unknownFields: ByteString = this.unknownFields,
-  ): RerankRequest = RerankRequest(query, candidates, options, unknownFields)
+  ): RerankRequest = RerankRequest(query, options, documents, model_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -116,8 +138,9 @@ public class RerankRequest(
         if (value.query != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.query)
         }
-        size += RerankCandidate.ADAPTER.asRepeated().encodedSizeWithTag(2, value.candidates)
         size += RerankOptions.ADAPTER.encodedSizeWithTag(3, value.options)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.documents)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.model_id)
         return size
       }
 
@@ -125,15 +148,17 @@ public class RerankRequest(
         if (value.query != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.query)
         }
-        RerankCandidate.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.candidates)
         RerankOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.documents)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RerankRequest) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.documents)
         RerankOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
-        RerankCandidate.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.candidates)
         if (value.query != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.query)
         }
@@ -141,26 +166,28 @@ public class RerankRequest(
 
       override fun decode(reader: ProtoReader): RerankRequest {
         var query: String = ""
-        val candidates = mutableListOf<RerankCandidate>()
         var options: RerankOptions? = null
+        val documents = mutableListOf<String>()
+        var model_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> query = ProtoAdapter.STRING.decode(reader)
-            2 -> candidates.add(RerankCandidate.ADAPTER.decode(reader))
             3 -> options = RerankOptions.ADAPTER.decode(reader)
+            4 -> documents.add(ProtoAdapter.STRING.decode(reader))
+            5 -> model_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RerankRequest(
           query = query,
-          candidates = candidates,
           options = options,
+          documents = documents,
+          model_id = model_id,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: RerankRequest): RerankRequest = value.copy(
-        candidates = value.candidates.redactElements(RerankCandidate.ADAPTER),
         options = value.options?.let(RerankOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )

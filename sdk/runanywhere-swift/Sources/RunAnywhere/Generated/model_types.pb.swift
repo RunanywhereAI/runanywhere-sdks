@@ -370,8 +370,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
-/// What a model does. There is no RERANK member, which is why the rerank
-/// primitive cannot auto-load a model.
+/// What a model does.
 public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -388,6 +387,7 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
   case voiceActivityDetection // = 9
   case speakerDiarization // = 10
   case semanticSegmentation // = 11
+  case rerank // = 12
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -408,6 +408,7 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case 9: self = .voiceActivityDetection
     case 10: self = .speakerDiarization
     case 11: self = .semanticSegmentation
+    case 12: self = .rerank
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -426,6 +427,7 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case .voiceActivityDetection: return 9
     case .speakerDiarization: return 10
     case .semanticSegmentation: return 11
+    case .rerank: return 12
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -444,6 +446,7 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     .voiceActivityDetection,
     .speakerDiarization,
     .semanticSegmentation,
+    .rerank,
   ]
 
 }
@@ -762,60 +765,6 @@ public nonisolated enum RAModelRegistryStatus: SwiftProtobuf.Enum, Swift.CaseIte
 
 }
 
-public nonisolated enum RAModelQuerySortField: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case name // = 1
-  case createdAtUnixMs // = 2
-  case updatedAtUnixMs // = 3
-  case downloadSizeBytes // = 4
-  case lastUsedAtUnixMs // = 5
-  case usageCount // = 6
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .name
-    case 2: self = .createdAtUnixMs
-    case 3: self = .updatedAtUnixMs
-    case 4: self = .downloadSizeBytes
-    case 5: self = .lastUsedAtUnixMs
-    case 6: self = .usageCount
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .name: return 1
-    case .createdAtUnixMs: return 2
-    case .updatedAtUnixMs: return 3
-    case .downloadSizeBytes: return 4
-    case .lastUsedAtUnixMs: return 5
-    case .usageCount: return 6
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAModelQuerySortField] = [
-    .unspecified,
-    .name,
-    .createdAtUnixMs,
-    .updatedAtUnixMs,
-    .downloadSizeBytes,
-    .lastUsedAtUnixMs,
-    .usageCount,
-  ]
-
-}
-
 /// Role of a file inside a single/multi-file artifact. The generic COMPANION
 /// role covers arbitrary sidecars; specific roles document common public
 /// catalog files such as VLM mmproj files and tokenizer/config assets.
@@ -939,6 +888,53 @@ public nonisolated enum RARoutingPolicy: SwiftProtobuf.Enum, Swift.CaseIterable 
     .costOptimized,
     .latencyOptimized,
     .manual,
+  ]
+
+}
+
+/// Requested execution placement for a load. LiteRT/ExecuTorch-aligned.
+public nonisolated enum RAAcceleratorPolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case auto // = 1
+  case cpu // = 2
+  case gpu // = 3
+  case npu // = 4
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .auto
+    case 2: self = .cpu
+    case 3: self = .gpu
+    case 4: self = .npu
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .auto: return 1
+    case .cpu: return 2
+    case .gpu: return 3
+    case .npu: return 4
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAAcceleratorPolicy] = [
+    .unspecified,
+    .auto,
+    .cpu,
+    .gpu,
+    .npu,
   ]
 
 }
@@ -1105,6 +1101,9 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
   /// Clears the value of `metadata`. Subsequent reads from it will return its default value.
   public mutating func clearMetadata() {_uniqueStorage()._metadata = nil}
 
+  /// The one declaration of what this bundle is. The variant decides the
+  /// fetch-and-verify strategy; the expected-file manifest hangs off the
+  /// variant that owns it.
   public var artifact: OneOf_Artifact? {
     get {return _storage._artifact}
     set {_uniqueStorage()._artifact = newValue}
@@ -1134,14 +1133,6 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
     set {_uniqueStorage()._artifact = .multiFile(newValue)}
   }
 
-  public var customStrategyID: String {
-    get {
-      if case .customStrategyID(let v)? = _storage._artifact {return v}
-      return String()
-    }
-    set {_uniqueStorage()._artifact = .customStrategyID(newValue)}
-  }
-
   public var builtIn: Bool {
     get {
       if case .builtIn(let v)? = _storage._artifact {return v}
@@ -1149,28 +1140,6 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
     }
     set {_uniqueStorage()._artifact = .builtIn(newValue)}
   }
-
-  /// High-level artifact classification, complementary to the `artifact`
-  /// oneof above. Allows catalog entries to carry a coarse type tag without
-  /// resolving the full strategy variant.
-  public var artifactType: RAModelArtifactType {
-    get {_storage._artifactType ?? .unspecified}
-    set {_uniqueStorage()._artifactType = newValue}
-  }
-  /// Returns true if `artifactType` has been explicitly set.
-  public var hasArtifactType: Bool {_storage._artifactType != nil}
-  /// Clears the value of `artifactType`. Subsequent reads from it will return its default value.
-  public mutating func clearArtifactType() {_uniqueStorage()._artifactType = nil}
-
-  /// Manifest of files that are expected on disk after fetch/extraction.
-  public var expectedFiles: RAExpectedModelFiles {
-    get {_storage._expectedFiles ?? RAExpectedModelFiles()}
-    set {_uniqueStorage()._expectedFiles = newValue}
-  }
-  /// Returns true if `expectedFiles` has been explicitly set.
-  public var hasExpectedFiles: Bool {_storage._expectedFiles != nil}
-  /// Clears the value of `expectedFiles`. Subsequent reads from it will return its default value.
-  public mutating func clearExpectedFiles() {_uniqueStorage()._expectedFiles = nil}
 
   /// Preferred hardware acceleration backend for this model.
   public var accelerationPreference: RAAccelerationPreference {
@@ -1212,8 +1181,10 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
   /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
   public mutating func clearPreferredFramework() {_uniqueStorage()._preferredFramework = nil}
 
-  /// Durable registry state. Live byte progress belongs to
-  /// download_service.DownloadProgress, not ModelInfo.
+  /// The single durable state of this entry, and the only downloaded-ness
+  /// signal. A non-empty local_path (7) is location data, NOT state: it
+  /// stays populated for an entry whose files were deleted. Live byte
+  /// progress belongs to download_service.DownloadProgress, not ModelInfo.
   public var registryStatus: RAModelRegistryStatus {
     get {_storage._registryStatus ?? .unspecified}
     set {_uniqueStorage()._registryStatus = newValue}
@@ -1222,15 +1193,6 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
   public var hasRegistryStatus: Bool {_storage._registryStatus != nil}
   /// Clears the value of `registryStatus`. Subsequent reads from it will return its default value.
   public mutating func clearRegistryStatus() {_uniqueStorage()._registryStatus = nil}
-
-  public var isDownloaded: Bool {
-    get {_storage._isDownloaded ?? false}
-    set {_uniqueStorage()._isDownloaded = newValue}
-  }
-  /// Returns true if `isDownloaded` has been explicitly set.
-  public var hasIsDownloaded: Bool {_storage._isDownloaded != nil}
-  /// Clears the value of `isDownloaded`. Subsequent reads from it will return its default value.
-  public mutating func clearIsDownloaded() {_uniqueStorage()._isDownloaded = nil}
 
   public var isAvailable: Bool {
     get {_storage._isAvailable ?? false}
@@ -1250,33 +1212,6 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
   /// Clears the value of `lastUsedAtUnixMs`. Subsequent reads from it will return its default value.
   public mutating func clearLastUsedAtUnixMs() {_uniqueStorage()._lastUsedAtUnixMs = nil}
 
-  public var usageCount: Int32 {
-    get {_storage._usageCount ?? 0}
-    set {_uniqueStorage()._usageCount = newValue}
-  }
-  /// Returns true if `usageCount` has been explicitly set.
-  public var hasUsageCount: Bool {_storage._usageCount != nil}
-  /// Clears the value of `usageCount`. Subsequent reads from it will return its default value.
-  public mutating func clearUsageCount() {_uniqueStorage()._usageCount = nil}
-
-  public var syncPending: Bool {
-    get {_storage._syncPending ?? false}
-    set {_uniqueStorage()._syncPending = newValue}
-  }
-  /// Returns true if `syncPending` has been explicitly set.
-  public var hasSyncPending: Bool {_storage._syncPending != nil}
-  /// Clears the value of `syncPending`. Subsequent reads from it will return its default value.
-  public mutating func clearSyncPending() {_uniqueStorage()._syncPending = nil}
-
-  public var statusMessage: String {
-    get {_storage._statusMessage ?? String()}
-    set {_uniqueStorage()._statusMessage = newValue}
-  }
-  /// Returns true if `statusMessage` has been explicitly set.
-  public var hasStatusMessage: Bool {_storage._statusMessage != nil}
-  /// Clears the value of `statusMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearStatusMessage() {_uniqueStorage()._statusMessage = nil}
-
   /// Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
   /// this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
   /// models. Lets the catalog mark which models are drivable through
@@ -1292,11 +1227,13 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
+  /// The one declaration of what this bundle is. The variant decides the
+  /// fetch-and-verify strategy; the expected-file manifest hangs off the
+  /// variant that owns it.
   public nonisolated enum OneOf_Artifact: Equatable, Sendable {
     case singleFile(RASingleFileArtifact)
     case archive(RAArchiveArtifact)
     case multiFile(RAMultiFileArtifact)
-    case customStrategyID(String)
     case builtIn(Bool)
 
   }
@@ -1325,13 +1262,6 @@ public nonisolated struct RASingleFileArtifact: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var requiredPatterns: [String] = []
-
-  public var optionalPatterns: [String] = []
-
-  /// Full manifest form for SDK-local wrappers that attach expected files to
-  /// a single-file artifact. The pattern fields above remain for existing
-  /// generated consumers.
   public var expectedFiles: RAExpectedModelFiles {
     get {_expectedFiles ?? RAExpectedModelFiles()}
     set {_expectedFiles = newValue}
@@ -1356,10 +1286,6 @@ public nonisolated struct RAArchiveArtifact: Sendable {
   public var type: RAArchiveType = .unspecified
 
   public var structure: RAArchiveStructure = .unspecified
-
-  public var requiredPatterns: [String] = []
-
-  public var optionalPatterns: [String] = []
 
   /// Full manifest form for archive artifacts after extraction. Archive
   /// extraction policy is portable; native filesystem permissions and handles
@@ -1389,12 +1315,8 @@ public nonisolated struct RAModelFileDescriptor: Sendable {
 
   public var filename: String = String()
 
-  public var isRequired: Bool = false
+  public var isOptional: Bool = false
 
-  /// Extended descriptor fields (Flutter model_types.dart:~350,
-  /// Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
-  /// canonical "required" flag — the documented `required` boolean from
-  /// newer SDK sources maps onto it (default true, mirrored in Swift).
   /// Exact on-disk artifact size, verified after download.
   public var sizeBytes: Int64 {
     get {_sizeBytes ?? 0}
@@ -1520,6 +1442,7 @@ public nonisolated struct RAExpectedModelFiles: Sendable {
 /// Registry/query filters shared by SDK model-management APIs. UI-only
 /// presentation state and platform filesystem handles are intentionally not
 /// represented here.
+/// Filters only. Ordering is the client's -- a local catalog is tens of rows.
 public nonisolated struct RAModelQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1561,15 +1484,6 @@ public nonisolated struct RAModelQuery: Sendable {
   /// Clears the value of `downloadedOnly`. Subsequent reads from it will return its default value.
   public mutating func clearDownloadedOnly() {self._downloadedOnly = nil}
 
-  public var availableOnly: Bool {
-    get {_availableOnly ?? false}
-    set {_availableOnly = newValue}
-  }
-  /// Returns true if `availableOnly` has been explicitly set.
-  public var hasAvailableOnly: Bool {self._availableOnly != nil}
-  /// Clears the value of `availableOnly`. Subsequent reads from it will return its default value.
-  public mutating func clearAvailableOnly() {self._availableOnly = nil}
-
   public var maxSizeBytes: Int64 {
     get {_maxSizeBytes ?? 0}
     set {_maxSizeBytes = newValue}
@@ -1579,34 +1493,15 @@ public nonisolated struct RAModelQuery: Sendable {
   /// Clears the value of `maxSizeBytes`. Subsequent reads from it will return its default value.
   public mutating func clearMaxSizeBytes() {self._maxSizeBytes = nil}
 
-  public var searchQuery: String = String()
-
-  public var source: RAModelSource {
-    get {_source ?? .unspecified}
-    set {_source = newValue}
+  /// Optional so "no search" is expressible; empty string is not a filter.
+  public var searchQuery: String {
+    get {_searchQuery ?? String()}
+    set {_searchQuery = newValue}
   }
-  /// Returns true if `source` has been explicitly set.
-  public var hasSource: Bool {self._source != nil}
-  /// Clears the value of `source`. Subsequent reads from it will return its default value.
-  public mutating func clearSource() {self._source = nil}
-
-  public var sortField: RAModelQuerySortField {
-    get {_sortField ?? .unspecified}
-    set {_sortField = newValue}
-  }
-  /// Returns true if `sortField` has been explicitly set.
-  public var hasSortField: Bool {self._sortField != nil}
-  /// Clears the value of `sortField`. Subsequent reads from it will return its default value.
-  public mutating func clearSortField() {self._sortField = nil}
-
-  public var descending: Bool {
-    get {_descending ?? false}
-    set {_descending = newValue}
-  }
-  /// Returns true if `descending` has been explicitly set.
-  public var hasDescending: Bool {self._descending != nil}
-  /// Clears the value of `descending`. Subsequent reads from it will return its default value.
-  public mutating func clearDescending() {self._descending = nil}
+  /// Returns true if `searchQuery` has been explicitly set.
+  public var hasSearchQuery: Bool {self._searchQuery != nil}
+  /// Clears the value of `searchQuery`. Subsequent reads from it will return its default value.
+  public mutating func clearSearchQuery() {self._searchQuery = nil}
 
   public var registryStatus: RAModelRegistryStatus {
     get {_registryStatus ?? .unspecified}
@@ -1625,146 +1520,85 @@ public nonisolated struct RAModelQuery: Sendable {
   fileprivate var _category: RAModelCategory? = nil
   fileprivate var _format: RAModelFormat? = nil
   fileprivate var _downloadedOnly: Bool? = nil
-  fileprivate var _availableOnly: Bool? = nil
   fileprivate var _maxSizeBytes: Int64? = nil
-  fileprivate var _source: RAModelSource? = nil
-  fileprivate var _sortField: RAModelQuerySortField? = nil
-  fileprivate var _descending: Bool? = nil
+  fileprivate var _searchQuery: String? = nil
   fileprivate var _registryStatus: RAModelRegistryStatus? = nil
 }
 
-public nonisolated struct RAModelRegistryRefreshRequest: @unchecked Sendable {
+public nonisolated struct RAModelRegistryRefreshRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Fetch or merge a remote catalog through the platform/network adapter.
-  public var includeRemoteCatalog: Bool {
-    get {_storage._includeRemoteCatalog}
-    set {_uniqueStorage()._includeRemoteCatalog = newValue}
-  }
+  public var includeRemoteCatalog: Bool = false
 
   /// Scan managed model directories and link valid on-disk artifacts.
-  public var rescanLocal: Bool {
-    get {_storage._rescanLocal}
-    set {_uniqueStorage()._rescanLocal = newValue}
-  }
+  public var rescanLocal: Bool = false
 
   /// Clear downloaded/available state for registry rows whose files vanished.
-  public var pruneOrphans: Bool {
-    get {_storage._pruneOrphans}
-    set {_uniqueStorage()._pruneOrphans = newValue}
-  }
+  public var pruneOrphans: Bool = false
 
   /// Optional post-refresh filter for the returned model list.
   public var query: RAModelQuery {
-    get {_storage._query ?? RAModelQuery()}
-    set {_uniqueStorage()._query = newValue}
+    get {_query ?? RAModelQuery()}
+    set {_query = newValue}
   }
   /// Returns true if `query` has been explicitly set.
-  public var hasQuery: Bool {_storage._query != nil}
+  public var hasQuery: Bool {self._query != nil}
   /// Clears the value of `query`. Subsequent reads from it will return its default value.
-  public mutating func clearQuery() {_uniqueStorage()._query = nil}
+  public mutating func clearQuery() {self._query = nil}
 
   /// Portable catalog selector. Auth state, cookies, native HTTP clients, and
   /// background transfer handles are supplied by platform adapters.
-  public var catalogUri: String {
-    get {_storage._catalogUri}
-    set {_uniqueStorage()._catalogUri = newValue}
-  }
+  public var catalogUri: String = String()
 
   /// Ignore cached catalog metadata and force a fresh adapter-backed refresh.
-  public var forceRefresh: Bool {
-    get {_storage._forceRefresh}
-    set {_uniqueStorage()._forceRefresh = newValue}
-  }
+  public var forceRefresh: Bool = false
 
   /// Include local downloaded/available state reconciliation in the refresh.
-  public var includeDownloadedState: Bool {
-    get {_storage._includeDownloadedState}
-    set {_uniqueStorage()._includeDownloadedState = newValue}
-  }
+  public var includeDownloadedState: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _query: RAModelQuery? = nil
 }
 
-public nonisolated struct RAModelRegistryRefreshResult: @unchecked Sendable {
+public nonisolated struct RAModelRegistryRefreshResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var models: RAModelInfoList {
-    get {_storage._models ?? RAModelInfoList()}
-    set {_uniqueStorage()._models = newValue}
+    get {_models ?? RAModelInfoList()}
+    set {_models = newValue}
   }
   /// Returns true if `models` has been explicitly set.
-  public var hasModels: Bool {_storage._models != nil}
+  public var hasModels: Bool {self._models != nil}
   /// Clears the value of `models`. Subsequent reads from it will return its default value.
-  public mutating func clearModels() {_uniqueStorage()._models = nil}
+  public mutating func clearModels() {self._models = nil}
 
-  public var registeredCount: Int32 {
-    get {_storage._registeredCount}
-    set {_uniqueStorage()._registeredCount = newValue}
-  }
+  public var refreshedAtUnixMs: Int64 = 0
 
-  public var updatedCount: Int32 {
-    get {_storage._updatedCount}
-    set {_uniqueStorage()._updatedCount = newValue}
-  }
-
-  public var discoveredCount: Int32 {
-    get {_storage._discoveredCount}
-    set {_uniqueStorage()._discoveredCount = newValue}
-  }
-
-  public var prunedCount: Int32 {
-    get {_storage._prunedCount}
-    set {_uniqueStorage()._prunedCount = newValue}
-  }
-
-  public var refreshedAtUnixMs: Int64 {
-    get {_storage._refreshedAtUnixMs}
-    set {_uniqueStorage()._refreshedAtUnixMs = newValue}
-  }
-
-  public var warnings: [String] {
-    get {_storage._warnings}
-    set {_uniqueStorage()._warnings = newValue}
-  }
-
-  public var downloadedCount: Int32 {
-    get {_storage._downloadedCount}
-    set {_uniqueStorage()._downloadedCount = newValue}
-  }
-
-  public var availableCount: Int32 {
-    get {_storage._availableCount}
-    set {_uniqueStorage()._availableCount = newValue}
-  }
-
-  public var errorCount: Int32 {
-    get {_storage._errorCount}
-    set {_uniqueStorage()._errorCount = newValue}
-  }
+  public var warnings: [String] = []
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _models: RAModelInfoList? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 public nonisolated struct RAModelListRequest: Sendable {
@@ -1782,9 +1616,6 @@ public nonisolated struct RAModelListRequest: Sendable {
   /// Clears the value of `query`. Subsequent reads from it will return its default value.
   public mutating func clearQuery() {self._query = nil}
 
-  /// Include denormalized counts in ModelListResult.
-  public var includeCounts: Bool = false
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1792,54 +1623,35 @@ public nonisolated struct RAModelListRequest: Sendable {
   fileprivate var _query: RAModelQuery? = nil
 }
 
-public nonisolated struct RAModelListResult: @unchecked Sendable {
+public nonisolated struct RAModelListResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var models: RAModelInfoList {
-    get {_storage._models ?? RAModelInfoList()}
-    set {_uniqueStorage()._models = newValue}
+    get {_models ?? RAModelInfoList()}
+    set {_models = newValue}
   }
   /// Returns true if `models` has been explicitly set.
-  public var hasModels: Bool {_storage._models != nil}
+  public var hasModels: Bool {self._models != nil}
   /// Clears the value of `models`. Subsequent reads from it will return its default value.
-  public mutating func clearModels() {_uniqueStorage()._models = nil}
-
-  public var totalCount: Int32 {
-    get {_storage._totalCount}
-    set {_uniqueStorage()._totalCount = newValue}
-  }
-
-  public var downloadedCount: Int32 {
-    get {_storage._downloadedCount}
-    set {_uniqueStorage()._downloadedCount = newValue}
-  }
-
-  public var availableCount: Int32 {
-    get {_storage._availableCount}
-    set {_uniqueStorage()._availableCount = newValue}
-  }
-
-  public var filteredCount: Int32 {
-    get {_storage._filteredCount}
-    set {_uniqueStorage()._filteredCount = newValue}
-  }
+  public mutating func clearModels() {self._models = nil}
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _models: RAModelInfoList? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 public nonisolated struct RAModelGetRequest: Sendable {
@@ -1854,39 +1666,37 @@ public nonisolated struct RAModelGetRequest: Sendable {
   public init() {}
 }
 
-public nonisolated struct RAModelGetResult: @unchecked Sendable {
+public nonisolated struct RAModelGetResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var found: Bool {
-    get {_storage._found}
-    set {_uniqueStorage()._found = newValue}
-  }
+  public var found: Bool = false
 
   public var model: RAModelInfo {
-    get {_storage._model ?? RAModelInfo()}
-    set {_uniqueStorage()._model = newValue}
+    get {_model ?? RAModelInfo()}
+    set {_model = newValue}
   }
   /// Returns true if `model` has been explicitly set.
-  public var hasModel: Bool {_storage._model != nil}
+  public var hasModel: Bool {self._model != nil}
   /// Clears the value of `model`. Subsequent reads from it will return its default value.
-  public mutating func clearModel() {_uniqueStorage()._model = nil}
+  public mutating func clearModel() {self._model = nil}
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _model: RAModelInfo? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 public nonisolated struct RAModelImportRequest: Sendable {
@@ -1981,57 +1791,39 @@ public nonisolated struct RAModelImportResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RAModelDiscoveryRequest: @unchecked Sendable {
+public nonisolated struct RAModelDiscoveryRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Platform adapters own permission and sandbox traversal. These are stable
   /// roots that C++ may inspect using registered filesystem callbacks.
-  public var searchRoots: [String] {
-    get {_storage._searchRoots}
-    set {_uniqueStorage()._searchRoots = newValue}
-  }
+  public var searchRoots: [String] = []
 
-  public var recursive: Bool {
-    get {_storage._recursive}
-    set {_uniqueStorage()._recursive = newValue}
-  }
+  public var recursive: Bool = false
 
-  public var linkDownloaded: Bool {
-    get {_storage._linkDownloaded}
-    set {_uniqueStorage()._linkDownloaded = newValue}
-  }
+  public var linkDownloaded: Bool = false
 
-  public var purgeInvalid: Bool {
-    get {_storage._purgeInvalid}
-    set {_uniqueStorage()._purgeInvalid = newValue}
-  }
+  public var purgeInvalid: Bool = false
 
   public var query: RAModelQuery {
-    get {_storage._query ?? RAModelQuery()}
-    set {_uniqueStorage()._query = newValue}
+    get {_query ?? RAModelQuery()}
+    set {_query = newValue}
   }
   /// Returns true if `query` has been explicitly set.
-  public var hasQuery: Bool {_storage._query != nil}
+  public var hasQuery: Bool {self._query != nil}
   /// Clears the value of `query`. Subsequent reads from it will return its default value.
-  public mutating func clearQuery() {_uniqueStorage()._query = nil}
+  public mutating func clearQuery() {self._query = nil}
 
-  public var includeBuiltIn: Bool {
-    get {_storage._includeBuiltIn}
-    set {_uniqueStorage()._includeBuiltIn = newValue}
-  }
+  public var includeBuiltIn: Bool = false
 
-  public var includeUserImports: Bool {
-    get {_storage._includeUserImports}
-    set {_uniqueStorage()._includeUserImports = newValue}
-  }
+  public var includeUserImports: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _query: RAModelQuery? = nil
 }
 
 public nonisolated struct RADiscoveredModel: Sendable {
@@ -2065,55 +1857,29 @@ public nonisolated struct RADiscoveredModel: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public nonisolated struct RAModelDiscoveryResult: @unchecked Sendable {
+public nonisolated struct RAModelDiscoveryResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var discoveredModels: [RADiscoveredModel] {
-    get {_storage._discoveredModels}
-    set {_uniqueStorage()._discoveredModels = newValue}
-  }
+  public var discoveredModels: [RADiscoveredModel] = []
 
-  public var linkedCount: Int32 {
-    get {_storage._linkedCount}
-    set {_uniqueStorage()._linkedCount = newValue}
-  }
-
-  public var purgedCount: Int32 {
-    get {_storage._purgedCount}
-    set {_uniqueStorage()._purgedCount = newValue}
-  }
-
-  public var warnings: [String] {
-    get {_storage._warnings}
-    set {_uniqueStorage()._warnings = newValue}
-  }
-
-  public var scannedCount: Int32 {
-    get {_storage._scannedCount}
-    set {_uniqueStorage()._scannedCount = newValue}
-  }
-
-  public var importedCount: Int32 {
-    get {_storage._importedCount}
-    set {_uniqueStorage()._importedCount = newValue}
-  }
+  public var warnings: [String] = []
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _error: RASDKError? = nil
 }
 
 public nonisolated struct RAModelLoadRequest: Sendable {
@@ -2147,7 +1913,9 @@ public nonisolated struct RAModelLoadRequest: Sendable {
 
   public var validateAvailability: Bool = false
 
-  /// v4 placement knobs (honored end-to-end; never silently dropped).
+  /// The one load knob every on-device runtime exposes. Unset or 0 means
+  /// "take it from the model" (llama.cpp --ctx-size semantics) -- never a
+  /// hardcoded small default. Carried by the native load ABI.
   public var contextLength: Int32 {
     get {_contextLength ?? 0}
     set {_contextLength = newValue}
@@ -2157,16 +1925,7 @@ public nonisolated struct RAModelLoadRequest: Sendable {
   /// Clears the value of `contextLength`. Subsequent reads from it will return its default value.
   public mutating func clearContextLength() {self._contextLength = nil}
 
-  public var threads: Int32 {
-    get {_threads ?? 0}
-    set {_threads = newValue}
-  }
-  /// Returns true if `threads` has been explicitly set.
-  public var hasThreads: Bool {self._threads != nil}
-  /// Clears the value of `threads`. Subsequent reads from it will return its default value.
-  public mutating func clearThreads() {self._threads = nil}
-
-  /// deprecated adapter; maps to accelerator
+  /// a hard runtime guarantee
   public var useGpu: Bool {
     get {_useGpu ?? false}
     set {_useGpu = newValue}
@@ -2178,10 +1937,8 @@ public nonisolated struct RAModelLoadRequest: Sendable {
 
   public var backendPreferences: [RAInferenceFramework] = []
 
-  /// AcceleratorPolicy values live in public_api_v4.proto; stored as int32
-  /// here to avoid a circular import with LoadedModelInfo helpers.
-  public var acceleratorPolicy: Int32 {
-    get {_acceleratorPolicy ?? 0}
+  public var acceleratorPolicy: RAAcceleratorPolicy {
+    get {_acceleratorPolicy ?? .unspecified}
     set {_acceleratorPolicy = newValue}
   }
   /// Returns true if `acceleratorPolicy` has been explicitly set.
@@ -2196,9 +1953,8 @@ public nonisolated struct RAModelLoadRequest: Sendable {
   fileprivate var _category: RAModelCategory? = nil
   fileprivate var _framework: RAInferenceFramework? = nil
   fileprivate var _contextLength: Int32? = nil
-  fileprivate var _threads: Int32? = nil
   fileprivate var _useGpu: Bool? = nil
-  fileprivate var _acceleratorPolicy: Int32? = nil
+  fileprivate var _acceleratorPolicy: RAAcceleratorPolicy? = nil
 }
 
 public nonisolated struct RAModelLoadResult: @unchecked Sendable {
@@ -2324,6 +2080,17 @@ public nonisolated struct RAModelLoadResult: @unchecked Sendable {
   /// Clears the value of `fallbackReason`. Subsequent reads from it will return its default value.
   public mutating func clearFallbackReason() {_uniqueStorage()._fallbackReason = nil}
 
+  /// What context length the runtime actually allocated -- a request is
+  /// not a promise.
+  public var allocatedContextLength: Int32 {
+    get {_storage._allocatedContextLength ?? 0}
+    set {_uniqueStorage()._allocatedContextLength = newValue}
+  }
+  /// Returns true if `allocatedContextLength` has been explicitly set.
+  public var hasAllocatedContextLength: Bool {_storage._allocatedContextLength != nil}
+  /// Clears the value of `allocatedContextLength`. Subsequent reads from it will return its default value.
+  public mutating func clearAllocatedContextLength() {_uniqueStorage()._allocatedContextLength = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -2366,40 +2133,31 @@ public nonisolated struct RAModelUnloadRequest: Sendable {
   fileprivate var _framework: RAInferenceFramework? = nil
 }
 
-public nonisolated struct RAModelUnloadResult: @unchecked Sendable {
+public nonisolated struct RAModelUnloadResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var unloadedModelIds: [String] {
-    get {_storage._unloadedModelIds}
-    set {_uniqueStorage()._unloadedModelIds = newValue}
-  }
+  public var unloadedModelIds: [String] = []
 
-  public var unloadedAtUnixMs: Int64 {
-    get {_storage._unloadedAtUnixMs}
-    set {_uniqueStorage()._unloadedAtUnixMs = newValue}
-  }
+  public var unloadedAtUnixMs: Int64 = 0
 
-  public var warnings: [String] {
-    get {_storage._warnings}
-    set {_uniqueStorage()._warnings = newValue}
-  }
+  public var warnings: [String] = []
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _error: RASDKError? = nil
 }
 
 public nonisolated struct RACurrentModelRequest: Sendable {
@@ -2500,55 +2258,33 @@ public nonisolated struct RACurrentModelResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RAModelDeleteResult: @unchecked Sendable {
+/// delete(model_id) frees DISK. It always unloads the model first if it is
+/// resident -- there is no flag, and no failure mode for "still loaded".
+/// Entries whose source is MODEL_SOURCE_BUILT_IN are never deletable and fail
+/// with an SDKError. Success is the absence of `error`.
+public nonisolated struct RAModelDeleteResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var modelID: String {
-    get {_storage._modelID}
-    set {_uniqueStorage()._modelID = newValue}
-  }
+  public var modelID: String = String()
 
-  public var deletedBytes: Int64 {
-    get {_storage._deletedBytes}
-    set {_uniqueStorage()._deletedBytes = newValue}
-  }
-
-  public var filesDeleted: Bool {
-    get {_storage._filesDeleted}
-    set {_uniqueStorage()._filesDeleted = newValue}
-  }
-
-  public var registryUpdated: Bool {
-    get {_storage._registryUpdated}
-    set {_uniqueStorage()._registryUpdated = newValue}
-  }
-
-  public var wasLoaded: Bool {
-    get {_storage._wasLoaded}
-    set {_uniqueStorage()._wasLoaded = newValue}
-  }
-
-  public var warnings: [String] {
-    get {_storage._warnings}
-    set {_uniqueStorage()._warnings = newValue}
-  }
+  public var deletedBytes: Int64 = 0
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _error: RASDKError? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -2566,18 +2302,6 @@ public nonisolated struct RAModelCompatibilityRequest: Sendable {
 
   /// Required. Model identifier to evaluate.
   public var modelID: String = String()
-
-  /// Optional cached hardware profile from the platform adapter. If
-  /// unset, commons will read whatever it has cached internally; the
-  /// RAM/storage values below remain authoritative for the verdict.
-  public var hardwareProfile: RAHardwareProfile {
-    get {_hardwareProfile ?? RAHardwareProfile()}
-    set {_hardwareProfile = newValue}
-  }
-  /// Returns true if `hardwareProfile` has been explicitly set.
-  public var hasHardwareProfile: Bool {self._hardwareProfile != nil}
-  /// Clears the value of `hardwareProfile`. Subsequent reads from it will return its default value.
-  public mutating func clearHardwareProfile() {self._hardwareProfile = nil}
 
   /// Available RAM in bytes (from device probe). 0 = unknown — commons
   /// will treat the requirement as satisfied.
@@ -2610,7 +2334,6 @@ public nonisolated struct RAModelCompatibilityRequest: Sendable {
 
   public init() {}
 
-  fileprivate var _hardwareProfile: RAHardwareProfile? = nil
   fileprivate var _acceleratorPreference: RAAccelerationPreference? = nil
   fileprivate var _preferredFramework: RAInferenceFramework? = nil
 }
@@ -2827,44 +2550,39 @@ public nonisolated struct RAModelRegistryFetchAssignmentsRequest: Sendable {
   fileprivate var _environment: RASDKEnvironment? = nil
 }
 
-public nonisolated struct RAModelRegistryFetchAssignmentsResult: @unchecked Sendable {
+public nonisolated struct RAModelRegistryFetchAssignmentsResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var models: RAModelInfoList {
-    get {_storage._models ?? RAModelInfoList()}
-    set {_uniqueStorage()._models = newValue}
+    get {_models ?? RAModelInfoList()}
+    set {_models = newValue}
   }
   /// Returns true if `models` has been explicitly set.
-  public var hasModels: Bool {_storage._models != nil}
+  public var hasModels: Bool {self._models != nil}
   /// Clears the value of `models`. Subsequent reads from it will return its default value.
-  public mutating func clearModels() {_uniqueStorage()._models = nil}
+  public mutating func clearModels() {self._models = nil}
 
-  public var modelCount: Int32 {
-    get {_storage._modelCount}
-    set {_uniqueStorage()._modelCount = newValue}
-  }
+  public var modelCount: Int32 = 0
 
-  public var fetchedAtUnixMs: Int64 {
-    get {_storage._fetchedAtUnixMs}
-    set {_uniqueStorage()._fetchedAtUnixMs = newValue}
-  }
+  public var fetchedAtUnixMs: Int64 = 0
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _models: RAModelInfoList? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -3238,7 +2956,7 @@ nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0\u{1}MODEL_CATEGORY_SPEAKER_DIARIZATION\0\u{1}MODEL_CATEGORY_SEMANTIC_SEGMENTATION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0\u{1}MODEL_CATEGORY_SPEAKER_DIARIZATION\0\u{1}MODEL_CATEGORY_SEMANTIC_SEGMENTATION\0\u{1}MODEL_CATEGORY_RERANK\0")
 }
 
 nonisolated extension RASDKEnvironment: SwiftProtobuf._ProtoNameProviding {
@@ -3265,16 +2983,16 @@ nonisolated extension RAModelRegistryStatus: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_REGISTRY_STATUS_UNSPECIFIED\0\u{1}MODEL_REGISTRY_STATUS_REGISTERED\0\u{1}MODEL_REGISTRY_STATUS_DOWNLOADING\0\u{1}MODEL_REGISTRY_STATUS_DOWNLOADED\0\u{1}MODEL_REGISTRY_STATUS_LOADING\0\u{1}MODEL_REGISTRY_STATUS_LOADED\0\u{1}MODEL_REGISTRY_STATUS_ERROR\0")
 }
 
-nonisolated extension RAModelQuerySortField: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_QUERY_SORT_FIELD_UNSPECIFIED\0\u{1}MODEL_QUERY_SORT_FIELD_NAME\0\u{1}MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS\0\u{1}MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS\0\u{1}MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES\0\u{1}MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS\0\u{1}MODEL_QUERY_SORT_FIELD_USAGE_COUNT\0")
-}
-
 nonisolated extension RAModelFileRole: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_FILE_ROLE_UNSPECIFIED\0\u{1}MODEL_FILE_ROLE_PRIMARY_MODEL\0\u{1}MODEL_FILE_ROLE_COMPANION\0\u{1}MODEL_FILE_ROLE_VISION_PROJECTOR\0\u{1}MODEL_FILE_ROLE_TOKENIZER\0\u{1}MODEL_FILE_ROLE_CONFIG\0\u{1}MODEL_FILE_ROLE_VOCABULARY\0\u{1}MODEL_FILE_ROLE_MERGES\0\u{1}MODEL_FILE_ROLE_LABELS\0")
 }
 
 nonisolated extension RARoutingPolicy: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ROUTING_POLICY_UNSPECIFIED\0\u{1}ROUTING_POLICY_PREFER_LOCAL\0\u{1}ROUTING_POLICY_PREFER_CLOUD\0\u{1}ROUTING_POLICY_COST_OPTIMIZED\0\u{1}ROUTING_POLICY_LATENCY_OPTIMIZED\0\u{1}ROUTING_POLICY_MANUAL\0")
+}
+
+nonisolated extension RAAcceleratorPolicy: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATOR_POLICY_UNSPECIFIED\0\u{1}ACCELERATOR_POLICY_AUTO\0\u{1}ACCELERATOR_POLICY_CPU\0\u{1}ACCELERATOR_POLICY_GPU\0\u{1}ACCELERATOR_POLICY_NPU\0")
 }
 
 nonisolated extension RAModelInfoMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -3364,7 +3082,7 @@ nonisolated extension RAModelRuntimeCompatibility: SwiftProtobuf.Message, SwiftP
 
 nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}category\0\u{1}format\0\u{1}framework\0\u{3}download_url\0\u{3}local_path\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{2}\u{2}source\0\u{3}created_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}memory_required_bytes\0\u{3}checksum_sha256\0\u{3}thinking_pattern\0\u{1}metadata\0\u{3}single_file\0\u{1}archive\0\u{3}multi_file\0\u{3}custom_strategy_id\0\u{3}built_in\0\u{3}artifact_type\0\u{3}expected_files\0\u{3}acceleration_preference\0\u{3}routing_policy\0\u{1}compatibility\0\u{3}preferred_framework\0\u{3}registry_status\0\u{3}is_downloaded\0\u{3}is_available\0\u{3}last_used_at_unix_ms\0\u{3}usage_count\0\u{3}sync_pending\0\u{3}status_message\0\u{3}cua_profile\0\u{c}\u{c}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}category\0\u{1}format\0\u{1}framework\0\u{3}download_url\0\u{3}local_path\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{2}\u{2}source\0\u{3}created_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}memory_required_bytes\0\u{3}checksum_sha256\0\u{3}thinking_pattern\0\u{1}metadata\0\u{3}single_file\0\u{1}archive\0\u{3}multi_file\0\u{4}\u{2}built_in\0\u{4}\u{3}acceleration_preference\0\u{3}routing_policy\0\u{1}compatibility\0\u{3}preferred_framework\0\u{3}registry_status\0\u{4}\u{2}is_available\0\u{3}last_used_at_unix_ms\0\u{4}\u{4}cua_profile\0\u{c}\u{c}\u{1}\u{c}\u{17}\u{1}\u{c}\u{19}\u{1}\u{c}\u{1a}\u{1}\u{c} \u{1}\u{c}#\u{1}\u{c}$\u{1}\u{c}%\u{1}")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -3386,19 +3104,13 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _thinkingPattern: RAThinkingTagPattern? = nil
     var _metadata: RAModelInfoMetadata? = nil
     var _artifact: RAModelInfo.OneOf_Artifact?
-    var _artifactType: RAModelArtifactType? = nil
-    var _expectedFiles: RAExpectedModelFiles? = nil
     var _accelerationPreference: RAAccelerationPreference? = nil
     var _routingPolicy: RARoutingPolicy? = nil
     var _compatibility: RAModelRuntimeCompatibility? = nil
     var _preferredFramework: RAInferenceFramework? = nil
     var _registryStatus: RAModelRegistryStatus? = nil
-    var _isDownloaded: Bool? = nil
     var _isAvailable: Bool? = nil
     var _lastUsedAtUnixMs: Int64? = nil
-    var _usageCount: Int32? = nil
-    var _syncPending: Bool? = nil
-    var _statusMessage: String? = nil
     var _cuaProfile: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
@@ -3429,19 +3141,13 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
       _thinkingPattern = source._thinkingPattern
       _metadata = source._metadata
       _artifact = source._artifact
-      _artifactType = source._artifactType
-      _expectedFiles = source._expectedFiles
       _accelerationPreference = source._accelerationPreference
       _routingPolicy = source._routingPolicy
       _compatibility = source._compatibility
       _preferredFramework = source._preferredFramework
       _registryStatus = source._registryStatus
-      _isDownloaded = source._isDownloaded
       _isAvailable = source._isAvailable
       _lastUsedAtUnixMs = source._lastUsedAtUnixMs
-      _usageCount = source._usageCount
-      _syncPending = source._syncPending
-      _statusMessage = source._statusMessage
       _cuaProfile = source._cuaProfile
     }
   }
@@ -3518,14 +3224,6 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
             _storage._artifact = .multiFile(v)
           }
         }()
-        case 23: try {
-          var v: String?
-          try decoder.decodeSingularStringField(value: &v)
-          if let v = v {
-            if _storage._artifact != nil {try decoder.handleConflictingOneOf()}
-            _storage._artifact = .customStrategyID(v)
-          }
-        }()
         case 24: try {
           var v: Bool?
           try decoder.decodeSingularBoolField(value: &v)
@@ -3534,19 +3232,13 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
             _storage._artifact = .builtIn(v)
           }
         }()
-        case 25: try { try decoder.decodeSingularEnumField(value: &_storage._artifactType) }()
-        case 26: try { try decoder.decodeSingularMessageField(value: &_storage._expectedFiles) }()
         case 27: try { try decoder.decodeSingularEnumField(value: &_storage._accelerationPreference) }()
         case 28: try { try decoder.decodeSingularEnumField(value: &_storage._routingPolicy) }()
         case 29: try { try decoder.decodeSingularMessageField(value: &_storage._compatibility) }()
         case 30: try { try decoder.decodeSingularEnumField(value: &_storage._preferredFramework) }()
         case 31: try { try decoder.decodeSingularEnumField(value: &_storage._registryStatus) }()
-        case 32: try { try decoder.decodeSingularBoolField(value: &_storage._isDownloaded) }()
         case 33: try { try decoder.decodeSingularBoolField(value: &_storage._isAvailable) }()
         case 34: try { try decoder.decodeSingularInt64Field(value: &_storage._lastUsedAtUnixMs) }()
-        case 35: try { try decoder.decodeSingularInt32Field(value: &_storage._usageCount) }()
-        case 36: try { try decoder.decodeSingularBoolField(value: &_storage._syncPending) }()
-        case 37: try { try decoder.decodeSingularStringField(value: &_storage._statusMessage) }()
         case 38: try { try decoder.decodeSingularStringField(value: &_storage._cuaProfile) }()
         default: break
         }
@@ -3627,22 +3319,12 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
         guard case .multiFile(let v)? = _storage._artifact else { preconditionFailure() }
         try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
       }()
-      case .customStrategyID?: try {
-        guard case .customStrategyID(let v)? = _storage._artifact else { preconditionFailure() }
-        try visitor.visitSingularStringField(value: v, fieldNumber: 23)
-      }()
       case .builtIn?: try {
         guard case .builtIn(let v)? = _storage._artifact else { preconditionFailure() }
         try visitor.visitSingularBoolField(value: v, fieldNumber: 24)
       }()
       case nil: break
       }
-      try { if let v = _storage._artifactType {
-        try visitor.visitSingularEnumField(value: v, fieldNumber: 25)
-      } }()
-      try { if let v = _storage._expectedFiles {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
-      } }()
       try { if let v = _storage._accelerationPreference {
         try visitor.visitSingularEnumField(value: v, fieldNumber: 27)
       } }()
@@ -3658,23 +3340,11 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
       try { if let v = _storage._registryStatus {
         try visitor.visitSingularEnumField(value: v, fieldNumber: 31)
       } }()
-      try { if let v = _storage._isDownloaded {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 32)
-      } }()
       try { if let v = _storage._isAvailable {
         try visitor.visitSingularBoolField(value: v, fieldNumber: 33)
       } }()
       try { if let v = _storage._lastUsedAtUnixMs {
         try visitor.visitSingularInt64Field(value: v, fieldNumber: 34)
-      } }()
-      try { if let v = _storage._usageCount {
-        try visitor.visitSingularInt32Field(value: v, fieldNumber: 35)
-      } }()
-      try { if let v = _storage._syncPending {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 36)
-      } }()
-      try { if let v = _storage._statusMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 37)
       } }()
       try { if let v = _storage._cuaProfile {
         try visitor.visitSingularStringField(value: v, fieldNumber: 38)
@@ -3707,19 +3377,13 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
         if _storage._thinkingPattern != rhs_storage._thinkingPattern {return false}
         if _storage._metadata != rhs_storage._metadata {return false}
         if _storage._artifact != rhs_storage._artifact {return false}
-        if _storage._artifactType != rhs_storage._artifactType {return false}
-        if _storage._expectedFiles != rhs_storage._expectedFiles {return false}
         if _storage._accelerationPreference != rhs_storage._accelerationPreference {return false}
         if _storage._routingPolicy != rhs_storage._routingPolicy {return false}
         if _storage._compatibility != rhs_storage._compatibility {return false}
         if _storage._preferredFramework != rhs_storage._preferredFramework {return false}
         if _storage._registryStatus != rhs_storage._registryStatus {return false}
-        if _storage._isDownloaded != rhs_storage._isDownloaded {return false}
         if _storage._isAvailable != rhs_storage._isAvailable {return false}
         if _storage._lastUsedAtUnixMs != rhs_storage._lastUsedAtUnixMs {return false}
-        if _storage._usageCount != rhs_storage._usageCount {return false}
-        if _storage._syncPending != rhs_storage._syncPending {return false}
-        if _storage._statusMessage != rhs_storage._statusMessage {return false}
         if _storage._cuaProfile != rhs_storage._cuaProfile {return false}
         return true
       }
@@ -3762,7 +3426,7 @@ nonisolated extension RAModelInfoList: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
 nonisolated extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SingleFileArtifact"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}required_patterns\0\u{3}optional_patterns\0\u{3}expected_files\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{3}expected_files\0\u{c}\u{1}\u{1}\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3770,8 +3434,6 @@ nonisolated extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedStringField(value: &self.requiredPatterns) }()
-      case 2: try { try decoder.decodeRepeatedStringField(value: &self.optionalPatterns) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._expectedFiles) }()
       default: break
       }
@@ -3783,12 +3445,6 @@ nonisolated extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.requiredPatterns.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.requiredPatterns, fieldNumber: 1)
-    }
-    if !self.optionalPatterns.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.optionalPatterns, fieldNumber: 2)
-    }
     try { if let v = self._expectedFiles {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
@@ -3796,8 +3452,6 @@ nonisolated extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf
   }
 
   public static func ==(lhs: RASingleFileArtifact, rhs: RASingleFileArtifact) -> Bool {
-    if lhs.requiredPatterns != rhs.requiredPatterns {return false}
-    if lhs.optionalPatterns != rhs.optionalPatterns {return false}
     if lhs._expectedFiles != rhs._expectedFiles {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3806,7 +3460,7 @@ nonisolated extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ArchiveArtifact"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}structure\0\u{3}required_patterns\0\u{3}optional_patterns\0\u{3}expected_files\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}structure\0\u{4}\u{3}expected_files\0\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3816,8 +3470,6 @@ nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._M
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
       case 2: try { try decoder.decodeSingularEnumField(value: &self.structure) }()
-      case 3: try { try decoder.decodeRepeatedStringField(value: &self.requiredPatterns) }()
-      case 4: try { try decoder.decodeRepeatedStringField(value: &self.optionalPatterns) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._expectedFiles) }()
       default: break
       }
@@ -3835,12 +3487,6 @@ nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._M
     if self.structure != .unspecified {
       try visitor.visitSingularEnumField(value: self.structure, fieldNumber: 2)
     }
-    if !self.requiredPatterns.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.requiredPatterns, fieldNumber: 3)
-    }
-    if !self.optionalPatterns.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.optionalPatterns, fieldNumber: 4)
-    }
     try { if let v = self._expectedFiles {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
@@ -3850,8 +3496,6 @@ nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._M
   public static func ==(lhs: RAArchiveArtifact, rhs: RAArchiveArtifact) -> Bool {
     if lhs.type != rhs.type {return false}
     if lhs.structure != rhs.structure {return false}
-    if lhs.requiredPatterns != rhs.requiredPatterns {return false}
-    if lhs.optionalPatterns != rhs.optionalPatterns {return false}
     if lhs._expectedFiles != rhs._expectedFiles {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3860,7 +3504,7 @@ nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFileDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{c}\u{5}\u{1}\u{c}\u{b}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{4}\u{2}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{4}\u{2}is_optional\0\u{c}\u{3}\u{1}\u{c}\u{5}\u{1}\u{c}\u{b}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3870,13 +3514,13 @@ nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobu
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.filename) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.isRequired) }()
       case 4: try { try decoder.decodeSingularInt64Field(value: &self._sizeBytes) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._relativePath) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._destinationPath) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self._role) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self._localPath) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._checksumSha256) }()
+      case 12: try { try decoder.decodeSingularBoolField(value: &self.isOptional) }()
       default: break
       }
     }
@@ -3892,9 +3536,6 @@ nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobu
     }
     if !self.filename.isEmpty {
       try visitor.visitSingularStringField(value: self.filename, fieldNumber: 2)
-    }
-    if self.isRequired != false {
-      try visitor.visitSingularBoolField(value: self.isRequired, fieldNumber: 3)
     }
     try { if let v = self._sizeBytes {
       try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
@@ -3914,13 +3555,16 @@ nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobu
     try { if let v = self._checksumSha256 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 10)
     } }()
+    if self.isOptional != false {
+      try visitor.visitSingularBoolField(value: self.isOptional, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelFileDescriptor, rhs: RAModelFileDescriptor) -> Bool {
     if lhs.url != rhs.url {return false}
     if lhs.filename != rhs.filename {return false}
-    if lhs.isRequired != rhs.isRequired {return false}
+    if lhs.isOptional != rhs.isOptional {return false}
     if lhs._sizeBytes != rhs._sizeBytes {return false}
     if lhs._relativePath != rhs._relativePath {return false}
     if lhs._destinationPath != rhs._destinationPath {return false}
@@ -4018,7 +3662,7 @@ nonisolated extension RAExpectedModelFiles: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelQuery"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}framework\0\u{1}category\0\u{1}format\0\u{3}downloaded_only\0\u{3}available_only\0\u{3}max_size_bytes\0\u{3}search_query\0\u{1}source\0\u{3}sort_field\0\u{1}descending\0\u{3}registry_status\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}framework\0\u{1}category\0\u{1}format\0\u{3}downloaded_only\0\u{4}\u{2}max_size_bytes\0\u{3}search_query\0\u{4}\u{4}registry_status\0\u{c}\u{5}\u{1}\u{c}\u{8}\u{1}\u{c}\u{9}\u{1}\u{c}\u{a}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4030,12 +3674,8 @@ nonisolated extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 2: try { try decoder.decodeSingularEnumField(value: &self._category) }()
       case 3: try { try decoder.decodeSingularEnumField(value: &self._format) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self._downloadedOnly) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self._availableOnly) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self._maxSizeBytes) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.searchQuery) }()
-      case 8: try { try decoder.decodeSingularEnumField(value: &self._source) }()
-      case 9: try { try decoder.decodeSingularEnumField(value: &self._sortField) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self._descending) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._searchQuery) }()
       case 11: try { try decoder.decodeSingularEnumField(value: &self._registryStatus) }()
       default: break
       }
@@ -4059,23 +3699,11 @@ nonisolated extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._Messag
     try { if let v = self._downloadedOnly {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
     } }()
-    try { if let v = self._availableOnly {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
-    } }()
     try { if let v = self._maxSizeBytes {
       try visitor.visitSingularInt64Field(value: v, fieldNumber: 6)
     } }()
-    if !self.searchQuery.isEmpty {
-      try visitor.visitSingularStringField(value: self.searchQuery, fieldNumber: 7)
-    }
-    try { if let v = self._source {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._sortField {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._descending {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
+    try { if let v = self._searchQuery {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
     } }()
     try { if let v = self._registryStatus {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 11)
@@ -4088,12 +3716,8 @@ nonisolated extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs._category != rhs._category {return false}
     if lhs._format != rhs._format {return false}
     if lhs._downloadedOnly != rhs._downloadedOnly {return false}
-    if lhs._availableOnly != rhs._availableOnly {return false}
     if lhs._maxSizeBytes != rhs._maxSizeBytes {return false}
-    if lhs.searchQuery != rhs.searchQuery {return false}
-    if lhs._source != rhs._source {return false}
-    if lhs._sortField != rhs._sortField {return false}
-    if lhs._descending != rhs._descending {return false}
+    if lhs._searchQuery != rhs._searchQuery {return false}
     if lhs._registryStatus != rhs._registryStatus {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -4104,109 +3728,61 @@ nonisolated extension RAModelRegistryRefreshRequest: SwiftProtobuf.Message, Swif
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryRefreshRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_remote_catalog\0\u{3}rescan_local\0\u{3}prune_orphans\0\u{1}query\0\u{3}catalog_uri\0\u{3}force_refresh\0\u{3}include_downloaded_state\0")
 
-  fileprivate class _StorageClass {
-    var _includeRemoteCatalog: Bool = false
-    var _rescanLocal: Bool = false
-    var _pruneOrphans: Bool = false
-    var _query: RAModelQuery? = nil
-    var _catalogUri: String = String()
-    var _forceRefresh: Bool = false
-    var _includeDownloadedState: Bool = false
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _includeRemoteCatalog = source._includeRemoteCatalog
-      _rescanLocal = source._rescanLocal
-      _pruneOrphans = source._pruneOrphans
-      _query = source._query
-      _catalogUri = source._catalogUri
-      _forceRefresh = source._forceRefresh
-      _includeDownloadedState = source._includeDownloadedState
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._includeRemoteCatalog) }()
-        case 2: try { try decoder.decodeSingularBoolField(value: &_storage._rescanLocal) }()
-        case 3: try { try decoder.decodeSingularBoolField(value: &_storage._pruneOrphans) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._query) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._catalogUri) }()
-        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._forceRefresh) }()
-        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._includeDownloadedState) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.includeRemoteCatalog) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.rescanLocal) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.pruneOrphans) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._query) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.catalogUri) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.forceRefresh) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.includeDownloadedState) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._includeRemoteCatalog != false {
-        try visitor.visitSingularBoolField(value: _storage._includeRemoteCatalog, fieldNumber: 1)
-      }
-      if _storage._rescanLocal != false {
-        try visitor.visitSingularBoolField(value: _storage._rescanLocal, fieldNumber: 2)
-      }
-      if _storage._pruneOrphans != false {
-        try visitor.visitSingularBoolField(value: _storage._pruneOrphans, fieldNumber: 3)
-      }
-      try { if let v = _storage._query {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-      if !_storage._catalogUri.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._catalogUri, fieldNumber: 5)
-      }
-      if _storage._forceRefresh != false {
-        try visitor.visitSingularBoolField(value: _storage._forceRefresh, fieldNumber: 6)
-      }
-      if _storage._includeDownloadedState != false {
-        try visitor.visitSingularBoolField(value: _storage._includeDownloadedState, fieldNumber: 7)
-      }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.includeRemoteCatalog != false {
+      try visitor.visitSingularBoolField(value: self.includeRemoteCatalog, fieldNumber: 1)
+    }
+    if self.rescanLocal != false {
+      try visitor.visitSingularBoolField(value: self.rescanLocal, fieldNumber: 2)
+    }
+    if self.pruneOrphans != false {
+      try visitor.visitSingularBoolField(value: self.pruneOrphans, fieldNumber: 3)
+    }
+    try { if let v = self._query {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    if !self.catalogUri.isEmpty {
+      try visitor.visitSingularStringField(value: self.catalogUri, fieldNumber: 5)
+    }
+    if self.forceRefresh != false {
+      try visitor.visitSingularBoolField(value: self.forceRefresh, fieldNumber: 6)
+    }
+    if self.includeDownloadedState != false {
+      try visitor.visitSingularBoolField(value: self.includeDownloadedState, fieldNumber: 7)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelRegistryRefreshRequest, rhs: RAModelRegistryRefreshRequest) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._includeRemoteCatalog != rhs_storage._includeRemoteCatalog {return false}
-        if _storage._rescanLocal != rhs_storage._rescanLocal {return false}
-        if _storage._pruneOrphans != rhs_storage._pruneOrphans {return false}
-        if _storage._query != rhs_storage._query {return false}
-        if _storage._catalogUri != rhs_storage._catalogUri {return false}
-        if _storage._forceRefresh != rhs_storage._forceRefresh {return false}
-        if _storage._includeDownloadedState != rhs_storage._includeDownloadedState {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.includeRemoteCatalog != rhs.includeRemoteCatalog {return false}
+    if lhs.rescanLocal != rhs.rescanLocal {return false}
+    if lhs.pruneOrphans != rhs.pruneOrphans {return false}
+    if lhs._query != rhs._query {return false}
+    if lhs.catalogUri != rhs.catalogUri {return false}
+    if lhs.forceRefresh != rhs.forceRefresh {return false}
+    if lhs.includeDownloadedState != rhs.includeDownloadedState {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4214,139 +3790,48 @@ nonisolated extension RAModelRegistryRefreshRequest: SwiftProtobuf.Message, Swif
 
 nonisolated extension RAModelRegistryRefreshResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryRefreshResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}models\0\u{3}registered_count\0\u{3}updated_count\0\u{3}discovered_count\0\u{3}pruned_count\0\u{3}refreshed_at_unix_ms\0\u{1}warnings\0\u{4}\u{2}downloaded_count\0\u{3}available_count\0\u{3}error_count\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _models: RAModelInfoList? = nil
-    var _registeredCount: Int32 = 0
-    var _updatedCount: Int32 = 0
-    var _discoveredCount: Int32 = 0
-    var _prunedCount: Int32 = 0
-    var _refreshedAtUnixMs: Int64 = 0
-    var _warnings: [String] = []
-    var _downloadedCount: Int32 = 0
-    var _availableCount: Int32 = 0
-    var _errorCount: Int32 = 0
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _models = source._models
-      _registeredCount = source._registeredCount
-      _updatedCount = source._updatedCount
-      _discoveredCount = source._discoveredCount
-      _prunedCount = source._prunedCount
-      _refreshedAtUnixMs = source._refreshedAtUnixMs
-      _warnings = source._warnings
-      _downloadedCount = source._downloadedCount
-      _availableCount = source._availableCount
-      _errorCount = source._errorCount
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}models\0\u{4}\u{5}refreshed_at_unix_ms\0\u{1}warnings\0\u{2}\u{5}error\0\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}\u{c}\u{5}\u{1}\u{c}\u{6}\u{1}\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}\u{c}\u{c}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._models) }()
-        case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._registeredCount) }()
-        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._updatedCount) }()
-        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._discoveredCount) }()
-        case 6: try { try decoder.decodeSingularInt32Field(value: &_storage._prunedCount) }()
-        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._refreshedAtUnixMs) }()
-        case 8: try { try decoder.decodeRepeatedStringField(value: &_storage._warnings) }()
-        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._downloadedCount) }()
-        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._availableCount) }()
-        case 12: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCount) }()
-        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._models) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.refreshedAtUnixMs) }()
+      case 8: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
+      case 13: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._models {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      if _storage._registeredCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._registeredCount, fieldNumber: 3)
-      }
-      if _storage._updatedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._updatedCount, fieldNumber: 4)
-      }
-      if _storage._discoveredCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._discoveredCount, fieldNumber: 5)
-      }
-      if _storage._prunedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._prunedCount, fieldNumber: 6)
-      }
-      if _storage._refreshedAtUnixMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._refreshedAtUnixMs, fieldNumber: 7)
-      }
-      if !_storage._warnings.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._warnings, fieldNumber: 8)
-      }
-      if _storage._downloadedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._downloadedCount, fieldNumber: 10)
-      }
-      if _storage._availableCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._availableCount, fieldNumber: 11)
-      }
-      if _storage._errorCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCount, fieldNumber: 12)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._models {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.refreshedAtUnixMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.refreshedAtUnixMs, fieldNumber: 7)
     }
+    if !self.warnings.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 8)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelRegistryRefreshResult, rhs: RAModelRegistryRefreshResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._models != rhs_storage._models {return false}
-        if _storage._registeredCount != rhs_storage._registeredCount {return false}
-        if _storage._updatedCount != rhs_storage._updatedCount {return false}
-        if _storage._discoveredCount != rhs_storage._discoveredCount {return false}
-        if _storage._prunedCount != rhs_storage._prunedCount {return false}
-        if _storage._refreshedAtUnixMs != rhs_storage._refreshedAtUnixMs {return false}
-        if _storage._warnings != rhs_storage._warnings {return false}
-        if _storage._downloadedCount != rhs_storage._downloadedCount {return false}
-        if _storage._availableCount != rhs_storage._availableCount {return false}
-        if _storage._errorCount != rhs_storage._errorCount {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._models != rhs._models {return false}
+    if lhs.refreshedAtUnixMs != rhs.refreshedAtUnixMs {return false}
+    if lhs.warnings != rhs.warnings {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4354,7 +3839,7 @@ nonisolated extension RAModelRegistryRefreshResult: SwiftProtobuf.Message, Swift
 
 nonisolated extension RAModelListRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelListRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{3}include_counts\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4363,7 +3848,6 @@ nonisolated extension RAModelListRequest: SwiftProtobuf.Message, SwiftProtobuf._
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._query) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeCounts) }()
       default: break
       }
     }
@@ -4377,15 +3861,11 @@ nonisolated extension RAModelListRequest: SwiftProtobuf.Message, SwiftProtobuf._
     try { if let v = self._query {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    if self.includeCounts != false {
-      try visitor.visitSingularBoolField(value: self.includeCounts, fieldNumber: 2)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelListRequest, rhs: RAModelListRequest) -> Bool {
     if lhs._query != rhs._query {return false}
-    if lhs.includeCounts != rhs.includeCounts {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4393,104 +3873,38 @@ nonisolated extension RAModelListRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RAModelListResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelListResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}models\0\u{4}\u{2}total_count\0\u{3}downloaded_count\0\u{3}available_count\0\u{3}filtered_count\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _models: RAModelInfoList? = nil
-    var _totalCount: Int32 = 0
-    var _downloadedCount: Int32 = 0
-    var _availableCount: Int32 = 0
-    var _filteredCount: Int32 = 0
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _models = source._models
-      _totalCount = source._totalCount
-      _downloadedCount = source._downloadedCount
-      _availableCount = source._availableCount
-      _filteredCount = source._filteredCount
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}models\0\u{2}\u{6}error\0\u{c}\u{4}\u{1}\u{c}\u{5}\u{1}\u{c}\u{6}\u{1}\u{c}\u{7}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._models) }()
-        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._totalCount) }()
-        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._downloadedCount) }()
-        case 6: try { try decoder.decodeSingularInt32Field(value: &_storage._availableCount) }()
-        case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._filteredCount) }()
-        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._models) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._models {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      if _storage._totalCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._totalCount, fieldNumber: 4)
-      }
-      if _storage._downloadedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._downloadedCount, fieldNumber: 5)
-      }
-      if _storage._availableCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._availableCount, fieldNumber: 6)
-      }
-      if _storage._filteredCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._filteredCount, fieldNumber: 7)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-      } }()
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._models {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelListResult, rhs: RAModelListResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._models != rhs_storage._models {return false}
-        if _storage._totalCount != rhs_storage._totalCount {return false}
-        if _storage._downloadedCount != rhs_storage._downloadedCount {return false}
-        if _storage._availableCount != rhs_storage._availableCount {return false}
-        if _storage._filteredCount != rhs_storage._filteredCount {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._models != rhs._models {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4530,81 +3944,41 @@ nonisolated extension RAModelGetResult: SwiftProtobuf.Message, SwiftProtobuf._Me
   public static let protoMessageName: String = _protobuf_package + ".ModelGetResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}found\0\u{1}model\0\u{2}\u{2}error\0")
 
-  fileprivate class _StorageClass {
-    var _found: Bool = false
-    var _model: RAModelInfo? = nil
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _found = source._found
-      _model = source._model
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._found) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._model) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.found) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._model) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._found != false {
-        try visitor.visitSingularBoolField(value: _storage._found, fieldNumber: 1)
-      }
-      try { if let v = _storage._model {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.found != false {
+      try visitor.visitSingularBoolField(value: self.found, fieldNumber: 1)
     }
+    try { if let v = self._model {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelGetResult, rhs: RAModelGetResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._found != rhs_storage._found {return false}
-        if _storage._model != rhs_storage._model {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.found != rhs.found {return false}
+    if lhs._model != rhs._model {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4785,109 +4159,61 @@ nonisolated extension RAModelDiscoveryRequest: SwiftProtobuf.Message, SwiftProto
   public static let protoMessageName: String = _protobuf_package + ".ModelDiscoveryRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}search_roots\0\u{1}recursive\0\u{3}link_downloaded\0\u{3}purge_invalid\0\u{1}query\0\u{3}include_built_in\0\u{3}include_user_imports\0")
 
-  fileprivate class _StorageClass {
-    var _searchRoots: [String] = []
-    var _recursive: Bool = false
-    var _linkDownloaded: Bool = false
-    var _purgeInvalid: Bool = false
-    var _query: RAModelQuery? = nil
-    var _includeBuiltIn: Bool = false
-    var _includeUserImports: Bool = false
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _searchRoots = source._searchRoots
-      _recursive = source._recursive
-      _linkDownloaded = source._linkDownloaded
-      _purgeInvalid = source._purgeInvalid
-      _query = source._query
-      _includeBuiltIn = source._includeBuiltIn
-      _includeUserImports = source._includeUserImports
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeRepeatedStringField(value: &_storage._searchRoots) }()
-        case 2: try { try decoder.decodeSingularBoolField(value: &_storage._recursive) }()
-        case 3: try { try decoder.decodeSingularBoolField(value: &_storage._linkDownloaded) }()
-        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._purgeInvalid) }()
-        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._query) }()
-        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._includeBuiltIn) }()
-        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._includeUserImports) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.searchRoots) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.recursive) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.linkDownloaded) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.purgeInvalid) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._query) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.includeBuiltIn) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.includeUserImports) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._searchRoots.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._searchRoots, fieldNumber: 1)
-      }
-      if _storage._recursive != false {
-        try visitor.visitSingularBoolField(value: _storage._recursive, fieldNumber: 2)
-      }
-      if _storage._linkDownloaded != false {
-        try visitor.visitSingularBoolField(value: _storage._linkDownloaded, fieldNumber: 3)
-      }
-      if _storage._purgeInvalid != false {
-        try visitor.visitSingularBoolField(value: _storage._purgeInvalid, fieldNumber: 4)
-      }
-      try { if let v = _storage._query {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-      } }()
-      if _storage._includeBuiltIn != false {
-        try visitor.visitSingularBoolField(value: _storage._includeBuiltIn, fieldNumber: 6)
-      }
-      if _storage._includeUserImports != false {
-        try visitor.visitSingularBoolField(value: _storage._includeUserImports, fieldNumber: 7)
-      }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.searchRoots.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.searchRoots, fieldNumber: 1)
+    }
+    if self.recursive != false {
+      try visitor.visitSingularBoolField(value: self.recursive, fieldNumber: 2)
+    }
+    if self.linkDownloaded != false {
+      try visitor.visitSingularBoolField(value: self.linkDownloaded, fieldNumber: 3)
+    }
+    if self.purgeInvalid != false {
+      try visitor.visitSingularBoolField(value: self.purgeInvalid, fieldNumber: 4)
+    }
+    try { if let v = self._query {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    if self.includeBuiltIn != false {
+      try visitor.visitSingularBoolField(value: self.includeBuiltIn, fieldNumber: 6)
+    }
+    if self.includeUserImports != false {
+      try visitor.visitSingularBoolField(value: self.includeUserImports, fieldNumber: 7)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelDiscoveryRequest, rhs: RAModelDiscoveryRequest) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._searchRoots != rhs_storage._searchRoots {return false}
-        if _storage._recursive != rhs_storage._recursive {return false}
-        if _storage._linkDownloaded != rhs_storage._linkDownloaded {return false}
-        if _storage._purgeInvalid != rhs_storage._purgeInvalid {return false}
-        if _storage._query != rhs_storage._query {return false}
-        if _storage._includeBuiltIn != rhs_storage._includeBuiltIn {return false}
-        if _storage._includeUserImports != rhs_storage._includeUserImports {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.searchRoots != rhs.searchRoots {return false}
+    if lhs.recursive != rhs.recursive {return false}
+    if lhs.linkDownloaded != rhs.linkDownloaded {return false}
+    if lhs.purgeInvalid != rhs.purgeInvalid {return false}
+    if lhs._query != rhs._query {return false}
+    if lhs.includeBuiltIn != rhs.includeBuiltIn {return false}
+    if lhs.includeUserImports != rhs.includeUserImports {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4954,111 +4280,43 @@ nonisolated extension RADiscoveredModel: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAModelDiscoveryResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelDiscoveryResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}discovered_models\0\u{3}linked_count\0\u{3}purged_count\0\u{1}warnings\0\u{4}\u{2}scanned_count\0\u{3}imported_count\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _discoveredModels: [RADiscoveredModel] = []
-    var _linkedCount: Int32 = 0
-    var _purgedCount: Int32 = 0
-    var _warnings: [String] = []
-    var _scannedCount: Int32 = 0
-    var _importedCount: Int32 = 0
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _discoveredModels = source._discoveredModels
-      _linkedCount = source._linkedCount
-      _purgedCount = source._purgedCount
-      _warnings = source._warnings
-      _scannedCount = source._scannedCount
-      _importedCount = source._importedCount
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}discovered_models\0\u{2}\u{3}warnings\0\u{2}\u{4}error\0\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}\u{c}\u{7}\u{1}\u{c}\u{8}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeRepeatedMessageField(value: &_storage._discoveredModels) }()
-        case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._linkedCount) }()
-        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._purgedCount) }()
-        case 5: try { try decoder.decodeRepeatedStringField(value: &_storage._warnings) }()
-        case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._scannedCount) }()
-        case 8: try { try decoder.decodeSingularInt32Field(value: &_storage._importedCount) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.discoveredModels) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._discoveredModels.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._discoveredModels, fieldNumber: 2)
-      }
-      if _storage._linkedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._linkedCount, fieldNumber: 3)
-      }
-      if _storage._purgedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._purgedCount, fieldNumber: 4)
-      }
-      if !_storage._warnings.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._warnings, fieldNumber: 5)
-      }
-      if _storage._scannedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._scannedCount, fieldNumber: 7)
-      }
-      if _storage._importedCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._importedCount, fieldNumber: 8)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.discoveredModels.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.discoveredModels, fieldNumber: 2)
     }
+    if !self.warnings.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 5)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelDiscoveryResult, rhs: RAModelDiscoveryResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._discoveredModels != rhs_storage._discoveredModels {return false}
-        if _storage._linkedCount != rhs_storage._linkedCount {return false}
-        if _storage._purgedCount != rhs_storage._purgedCount {return false}
-        if _storage._warnings != rhs_storage._warnings {return false}
-        if _storage._scannedCount != rhs_storage._scannedCount {return false}
-        if _storage._importedCount != rhs_storage._importedCount {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.discoveredModels != rhs.discoveredModels {return false}
+    if lhs.warnings != rhs.warnings {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5066,7 +4324,7 @@ nonisolated extension RAModelDiscoveryResult: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelLoadRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}category\0\u{1}framework\0\u{3}force_reload\0\u{3}validate_availability\0\u{3}context_length\0\u{1}threads\0\u{3}use_gpu\0\u{3}backend_preferences\0\u{3}accelerator_policy\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}category\0\u{1}framework\0\u{3}force_reload\0\u{3}validate_availability\0\u{3}context_length\0\u{4}\u{2}use_gpu\0\u{3}backend_preferences\0\u{3}accelerator_policy\0\u{c}\u{7}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5080,10 +4338,9 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
       case 4: try { try decoder.decodeSingularBoolField(value: &self.forceReload) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.validateAvailability) }()
       case 6: try { try decoder.decodeSingularInt32Field(value: &self._contextLength) }()
-      case 7: try { try decoder.decodeSingularInt32Field(value: &self._threads) }()
       case 8: try { try decoder.decodeSingularBoolField(value: &self._useGpu) }()
       case 9: try { try decoder.decodeRepeatedEnumField(value: &self.backendPreferences) }()
-      case 10: try { try decoder.decodeSingularInt32Field(value: &self._acceleratorPolicy) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self._acceleratorPolicy) }()
       default: break
       }
     }
@@ -5112,9 +4369,6 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
     try { if let v = self._contextLength {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 6)
     } }()
-    try { if let v = self._threads {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 7)
-    } }()
     try { if let v = self._useGpu {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
     } }()
@@ -5122,7 +4376,7 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
       try visitor.visitPackedEnumField(value: self.backendPreferences, fieldNumber: 9)
     }
     try { if let v = self._acceleratorPolicy {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 10)
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 10)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5134,7 +4388,6 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.forceReload != rhs.forceReload {return false}
     if lhs.validateAvailability != rhs.validateAvailability {return false}
     if lhs._contextLength != rhs._contextLength {return false}
-    if lhs._threads != rhs._threads {return false}
     if lhs._useGpu != rhs._useGpu {return false}
     if lhs.backendPreferences != rhs.backendPreferences {return false}
     if lhs._acceleratorPolicy != rhs._acceleratorPolicy {return false}
@@ -5145,7 +4398,7 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelLoadResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}loaded_at_unix_ms\0\u{2}\u{2}warnings\0\u{3}already_loaded\0\u{3}resolved_artifacts\0\u{1}error\0\u{3}requested_backend\0\u{3}actual_device_id\0\u{3}actual_device_name\0\u{3}actual_device_kind\0\u{3}runtime_version\0\u{3}abi_version\0\u{3}fallback_reason\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}loaded_at_unix_ms\0\u{2}\u{2}warnings\0\u{3}already_loaded\0\u{3}resolved_artifacts\0\u{1}error\0\u{3}requested_backend\0\u{3}actual_device_id\0\u{3}actual_device_name\0\u{3}actual_device_kind\0\u{3}runtime_version\0\u{3}abi_version\0\u{3}fallback_reason\0\u{3}allocated_context_length\0")
 
   fileprivate class _StorageClass {
     var _modelID: String = String()
@@ -5164,6 +4417,7 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
     var _runtimeVersion: String? = nil
     var _abiVersion: String? = nil
     var _fallbackReason: String? = nil
+    var _allocatedContextLength: Int32? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -5190,6 +4444,7 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
       _runtimeVersion = source._runtimeVersion
       _abiVersion = source._abiVersion
       _fallbackReason = source._fallbackReason
+      _allocatedContextLength = source._allocatedContextLength
     }
   }
 
@@ -5224,6 +4479,7 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
         case 16: try { try decoder.decodeSingularStringField(value: &_storage._runtimeVersion) }()
         case 17: try { try decoder.decodeSingularStringField(value: &_storage._abiVersion) }()
         case 18: try { try decoder.decodeSingularStringField(value: &_storage._fallbackReason) }()
+        case 19: try { try decoder.decodeSingularInt32Field(value: &_storage._allocatedContextLength) }()
         default: break
         }
       }
@@ -5284,6 +4540,9 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
       try { if let v = _storage._fallbackReason {
         try visitor.visitSingularStringField(value: v, fieldNumber: 18)
       } }()
+      try { if let v = _storage._allocatedContextLength {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 19)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5309,6 +4568,7 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._runtimeVersion != rhs_storage._runtimeVersion {return false}
         if _storage._abiVersion != rhs_storage._abiVersion {return false}
         if _storage._fallbackReason != rhs_storage._fallbackReason {return false}
+        if _storage._allocatedContextLength != rhs_storage._allocatedContextLength {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -5371,88 +4631,46 @@ nonisolated extension RAModelUnloadResult: SwiftProtobuf.Message, SwiftProtobuf.
   public static let protoMessageName: String = _protobuf_package + ".ModelUnloadResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}unloaded_model_ids\0\u{4}\u{2}unloaded_at_unix_ms\0\u{1}warnings\0\u{1}error\0")
 
-  fileprivate class _StorageClass {
-    var _unloadedModelIds: [String] = []
-    var _unloadedAtUnixMs: Int64 = 0
-    var _warnings: [String] = []
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _unloadedModelIds = source._unloadedModelIds
-      _unloadedAtUnixMs = source._unloadedAtUnixMs
-      _warnings = source._warnings
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeRepeatedStringField(value: &_storage._unloadedModelIds) }()
-        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._unloadedAtUnixMs) }()
-        case 5: try { try decoder.decodeRepeatedStringField(value: &_storage._warnings) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.unloadedModelIds) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.unloadedAtUnixMs) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._unloadedModelIds.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._unloadedModelIds, fieldNumber: 2)
-      }
-      if _storage._unloadedAtUnixMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._unloadedAtUnixMs, fieldNumber: 4)
-      }
-      if !_storage._warnings.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._warnings, fieldNumber: 5)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.unloadedModelIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.unloadedModelIds, fieldNumber: 2)
     }
+    if self.unloadedAtUnixMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.unloadedAtUnixMs, fieldNumber: 4)
+    }
+    if !self.warnings.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 5)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelUnloadResult, rhs: RAModelUnloadResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._unloadedModelIds != rhs_storage._unloadedModelIds {return false}
-        if _storage._unloadedAtUnixMs != rhs_storage._unloadedAtUnixMs {return false}
-        if _storage._warnings != rhs_storage._warnings {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.unloadedModelIds != rhs.unloadedModelIds {return false}
+    if lhs.unloadedAtUnixMs != rhs.unloadedAtUnixMs {return false}
+    if lhs.warnings != rhs.warnings {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5630,111 +4848,43 @@ nonisolated extension RACurrentModelResult: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RAModelDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelDeleteResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{3}deleted_bytes\0\u{3}files_deleted\0\u{3}registry_updated\0\u{3}was_loaded\0\u{2}\u{2}warnings\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _modelID: String = String()
-    var _deletedBytes: Int64 = 0
-    var _filesDeleted: Bool = false
-    var _registryUpdated: Bool = false
-    var _wasLoaded: Bool = false
-    var _warnings: [String] = []
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _modelID = source._modelID
-      _deletedBytes = source._deletedBytes
-      _filesDeleted = source._filesDeleted
-      _registryUpdated = source._registryUpdated
-      _wasLoaded = source._wasLoaded
-      _warnings = source._warnings
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{3}deleted_bytes\0\u{2}\u{6}error\0\u{c}\u{4}\u{1}\u{c}\u{5}\u{1}\u{c}\u{6}\u{1}\u{c}\u{8}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
-        case 3: try { try decoder.decodeSingularInt64Field(value: &_storage._deletedBytes) }()
-        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._filesDeleted) }()
-        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._registryUpdated) }()
-        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._wasLoaded) }()
-        case 8: try { try decoder.decodeRepeatedStringField(value: &_storage._warnings) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.deletedBytes) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._modelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 2)
-      }
-      if _storage._deletedBytes != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._deletedBytes, fieldNumber: 3)
-      }
-      if _storage._filesDeleted != false {
-        try visitor.visitSingularBoolField(value: _storage._filesDeleted, fieldNumber: 4)
-      }
-      if _storage._registryUpdated != false {
-        try visitor.visitSingularBoolField(value: _storage._registryUpdated, fieldNumber: 5)
-      }
-      if _storage._wasLoaded != false {
-        try visitor.visitSingularBoolField(value: _storage._wasLoaded, fieldNumber: 6)
-      }
-      if !_storage._warnings.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._warnings, fieldNumber: 8)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
     }
+    if self.deletedBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.deletedBytes, fieldNumber: 3)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelDeleteResult, rhs: RAModelDeleteResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._modelID != rhs_storage._modelID {return false}
-        if _storage._deletedBytes != rhs_storage._deletedBytes {return false}
-        if _storage._filesDeleted != rhs_storage._filesDeleted {return false}
-        if _storage._registryUpdated != rhs_storage._registryUpdated {return false}
-        if _storage._wasLoaded != rhs_storage._wasLoaded {return false}
-        if _storage._warnings != rhs_storage._warnings {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.deletedBytes != rhs.deletedBytes {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5742,7 +4892,7 @@ nonisolated extension RAModelDeleteResult: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}hardware_profile\0\u{3}available_ram_bytes\0\u{3}available_storage_bytes\0\u{3}accelerator_preference\0\u{3}preferred_framework\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}available_ram_bytes\0\u{3}available_storage_bytes\0\u{3}accelerator_preference\0\u{3}preferred_framework\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5751,11 +4901,10 @@ nonisolated extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftP
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._hardwareProfile) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.availableRamBytes) }()
-      case 4: try { try decoder.decodeSingularInt64Field(value: &self.availableStorageBytes) }()
-      case 5: try { try decoder.decodeSingularEnumField(value: &self._acceleratorPreference) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.availableRamBytes) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.availableStorageBytes) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self._acceleratorPreference) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
       default: break
       }
     }
@@ -5769,27 +4918,23 @@ nonisolated extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftP
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
     }
-    try { if let v = self._hardwareProfile {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
     if self.availableRamBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.availableRamBytes, fieldNumber: 3)
+      try visitor.visitSingularInt64Field(value: self.availableRamBytes, fieldNumber: 2)
     }
     if self.availableStorageBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.availableStorageBytes, fieldNumber: 4)
+      try visitor.visitSingularInt64Field(value: self.availableStorageBytes, fieldNumber: 3)
     }
     try { if let v = self._acceleratorPreference {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
     } }()
     try { if let v = self._preferredFramework {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelCompatibilityRequest, rhs: RAModelCompatibilityRequest) -> Bool {
     if lhs.modelID != rhs.modelID {return false}
-    if lhs._hardwareProfile != rhs._hardwareProfile {return false}
     if lhs.availableRamBytes != rhs.availableRamBytes {return false}
     if lhs.availableStorageBytes != rhs.availableStorageBytes {return false}
     if lhs._acceleratorPreference != rhs._acceleratorPreference {return false}
@@ -6137,88 +5282,46 @@ nonisolated extension RAModelRegistryFetchAssignmentsResult: SwiftProtobuf.Messa
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryFetchAssignmentsResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}models\0\u{3}model_count\0\u{3}fetched_at_unix_ms\0\u{2}\u{3}error\0")
 
-  fileprivate class _StorageClass {
-    var _models: RAModelInfoList? = nil
-    var _modelCount: Int32 = 0
-    var _fetchedAtUnixMs: Int64 = 0
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _models = source._models
-      _modelCount = source._modelCount
-      _fetchedAtUnixMs = source._fetchedAtUnixMs
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._models) }()
-        case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._modelCount) }()
-        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._fetchedAtUnixMs) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._models) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.modelCount) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.fetchedAtUnixMs) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._models {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      if _storage._modelCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._modelCount, fieldNumber: 3)
-      }
-      if _storage._fetchedAtUnixMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._fetchedAtUnixMs, fieldNumber: 4)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._models {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.modelCount != 0 {
+      try visitor.visitSingularInt32Field(value: self.modelCount, fieldNumber: 3)
     }
+    if self.fetchedAtUnixMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.fetchedAtUnixMs, fieldNumber: 4)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAModelRegistryFetchAssignmentsResult, rhs: RAModelRegistryFetchAssignmentsResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._models != rhs_storage._models {return false}
-        if _storage._modelCount != rhs_storage._modelCount {return false}
-        if _storage._fetchedAtUnixMs != rhs_storage._fetchedAtUnixMs {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._models != rhs._models {return false}
+    if lhs.modelCount != rhs.modelCount {return false}
+    if lhs.fetchedAtUnixMs != rhs.fetchedAtUnixMs {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

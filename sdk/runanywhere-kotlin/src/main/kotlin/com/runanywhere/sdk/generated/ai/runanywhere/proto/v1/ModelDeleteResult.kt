@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -28,9 +27,14 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
+/**
+ * delete(model_id) frees DISK. It always unloads the model first if it is
+ * resident -- there is no flag, and no failure mode for "still loaded".
+ * Entries whose source is MODEL_SOURCE_BUILT_IN are never deletable and fail
+ * with an SDKError. Success is the absence of `error`.
+ */
 public class ModelDeleteResult(
   @field:WireField(
     tag = 2,
@@ -49,46 +53,13 @@ public class ModelDeleteResult(
   )
   public val deleted_bytes: Long = 0L,
   @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "filesDeleted",
-    schemaIndex = 2,
-  )
-  public val files_deleted: Boolean = false,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "registryUpdated",
-    schemaIndex = 3,
-  )
-  public val registry_updated: Boolean = false,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "wasLoaded",
-    schemaIndex = 4,
-  )
-  public val was_loaded: Boolean = false,
-  warnings: List<String> = emptyList(),
-  @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 2,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelDeleteResult, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    schemaIndex = 5,
-  )
-  public val warnings: List<String> = immutableCopyOf("warnings", warnings)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -101,10 +72,6 @@ public class ModelDeleteResult(
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
     if (deleted_bytes != other.deleted_bytes) return false
-    if (files_deleted != other.files_deleted) return false
-    if (registry_updated != other.registry_updated) return false
-    if (was_loaded != other.was_loaded) return false
-    if (warnings != other.warnings) return false
     if (error != other.error) return false
     return true
   }
@@ -115,10 +82,6 @@ public class ModelDeleteResult(
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + deleted_bytes.hashCode()
-      result = result * 37 + files_deleted.hashCode()
-      result = result * 37 + registry_updated.hashCode()
-      result = result * 37 + was_loaded.hashCode()
-      result = result * 37 + warnings.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -129,10 +92,6 @@ public class ModelDeleteResult(
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
     result += """deleted_bytes=$deleted_bytes"""
-    result += """files_deleted=$files_deleted"""
-    result += """registry_updated=$registry_updated"""
-    result += """was_loaded=$was_loaded"""
-    if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelDeleteResult{", separator = ", ", postfix = "}")
   }
@@ -140,13 +99,9 @@ public class ModelDeleteResult(
   public fun copy(
     model_id: String = this.model_id,
     deleted_bytes: Long = this.deleted_bytes,
-    files_deleted: Boolean = this.files_deleted,
-    registry_updated: Boolean = this.registry_updated,
-    was_loaded: Boolean = this.was_loaded,
-    warnings: List<String> = this.warnings,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelDeleteResult = ModelDeleteResult(model_id, deleted_bytes, files_deleted, registry_updated, was_loaded, warnings, error, unknownFields)
+  ): ModelDeleteResult = ModelDeleteResult(model_id, deleted_bytes, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -166,16 +121,6 @@ public class ModelDeleteResult(
         if (value.deleted_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.deleted_bytes)
         }
-        if (value.files_deleted != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.files_deleted)
-        }
-        if (value.registry_updated != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.registry_updated)
-        }
-        if (value.was_loaded != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.was_loaded)
-        }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
         size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
@@ -187,16 +132,6 @@ public class ModelDeleteResult(
         if (value.deleted_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.deleted_bytes)
         }
-        if (value.files_deleted != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.files_deleted)
-        }
-        if (value.registry_updated != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.registry_updated)
-        }
-        if (value.was_loaded != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_loaded)
-        }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
@@ -204,16 +139,6 @@ public class ModelDeleteResult(
       override fun encode(writer: ReverseProtoWriter, `value`: ModelDeleteResult) {
         writer.writeBytes(value.unknownFields)
         SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
-        if (value.was_loaded != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_loaded)
-        }
-        if (value.registry_updated != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.registry_updated)
-        }
-        if (value.files_deleted != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.files_deleted)
-        }
         if (value.deleted_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.deleted_bytes)
         }
@@ -225,19 +150,11 @@ public class ModelDeleteResult(
       override fun decode(reader: ProtoReader): ModelDeleteResult {
         var model_id: String = ""
         var deleted_bytes: Long = 0L
-        var files_deleted: Boolean = false
-        var registry_updated: Boolean = false
-        var was_loaded: Boolean = false
-        val warnings = mutableListOf<String>()
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
             3 -> deleted_bytes = ProtoAdapter.INT64.decode(reader)
-            4 -> files_deleted = ProtoAdapter.BOOL.decode(reader)
-            5 -> registry_updated = ProtoAdapter.BOOL.decode(reader)
-            6 -> was_loaded = ProtoAdapter.BOOL.decode(reader)
-            8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -245,10 +162,6 @@ public class ModelDeleteResult(
         return ModelDeleteResult(
           model_id = model_id,
           deleted_bytes = deleted_bytes,
-          files_deleted = files_deleted,
-          registry_updated = registry_updated,
-          was_loaded = was_loaded,
-          warnings = warnings,
           error = error,
           unknownFields = unknownFields
         )

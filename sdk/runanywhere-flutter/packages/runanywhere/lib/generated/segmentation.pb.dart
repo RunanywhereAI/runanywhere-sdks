@@ -27,14 +27,12 @@ class SegmentationImage extends $pb.GeneratedMessage {
     $core.int? width,
     $core.int? height,
     SegmentationPixelFormat? pixelFormat,
-    $core.int? strideBytes,
   }) {
     final result = create();
     if (data != null) result.data = data;
     if (width != null) result.width = width;
     if (height != null) result.height = height;
     if (pixelFormat != null) result.pixelFormat = pixelFormat;
-    if (strideBytes != null) result.strideBytes = strideBytes;
     return result;
   }
 
@@ -57,8 +55,6 @@ class SegmentationImage extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OU3)
     ..aE<SegmentationPixelFormat>(4, _omitFieldNames ? '' : 'pixelFormat',
         enumValues: SegmentationPixelFormat.values)
-    ..aI(5, _omitFieldNames ? '' : 'strideBytes',
-        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -115,27 +111,17 @@ class SegmentationImage extends $pb.GeneratedMessage {
   $core.bool hasPixelFormat() => $_has(3);
   @$pb.TagNumber(4)
   void clearPixelFormat() => $_clearField(4);
-
-  /// Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
-  /// C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
-  /// wire counterpart.
-  @$pb.TagNumber(5)
-  $core.int get strideBytes => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set strideBytes($core.int value) => $_setUnsignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasStrideBytes() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearStrideBytes() => $_clearField(5);
 }
 
 class SegmentationOptions extends $pb.GeneratedMessage {
   factory SegmentationOptions({
     $core.bool? includeDiagnosticRgba,
+    $core.bool? includeConfidence,
   }) {
     final result = create();
     if (includeDiagnosticRgba != null)
       result.includeDiagnosticRgba = includeDiagnosticRgba;
+    if (includeConfidence != null) result.includeConfidence = includeConfidence;
     return result;
   }
 
@@ -153,6 +139,7 @@ class SegmentationOptions extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'includeDiagnosticRgba')
+    ..aOB(2, _omitFieldNames ? '' : 'includeConfidence')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -184,16 +171,29 @@ class SegmentationOptions extends $pb.GeneratedMessage {
   $core.bool hasIncludeDiagnosticRgba() => $_has(0);
   @$pb.TagNumber(1)
   void clearIncludeDiagnosticRgba() => $_clearField(1);
+
+  /// When true, also return confidence_mask_u8: the model's probability for
+  /// the class it chose, per pixel. Costs width * height extra bytes.
+  @$pb.TagNumber(2)
+  $core.bool get includeConfidence => $_getBF(1);
+  @$pb.TagNumber(2)
+  set includeConfidence($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasIncludeConfidence() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIncludeConfidence() => $_clearField(2);
 }
 
 class SegmentationRequest extends $pb.GeneratedMessage {
   factory SegmentationRequest({
     SegmentationImage? image,
     SegmentationOptions? options,
+    $core.String? modelId,
   }) {
     final result = create();
     if (image != null) result.image = image;
     if (options != null) result.options = options;
+    if (modelId != null) result.modelId = modelId;
     return result;
   }
 
@@ -214,6 +214,7 @@ class SegmentationRequest extends $pb.GeneratedMessage {
         subBuilder: SegmentationImage.create)
     ..aOM<SegmentationOptions>(2, _omitFieldNames ? '' : 'options',
         subBuilder: SegmentationOptions.create)
+    ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -256,19 +257,34 @@ class SegmentationRequest extends $pb.GeneratedMessage {
   void clearOptions() => $_clearField(2);
   @$pb.TagNumber(2)
   SegmentationOptions ensureOptions() => $_ensure(1);
+
+  /// Registry id, catalog id, or absolute path. Unset = use the resident
+  /// semantic-segmentation model. Mirrors EmbeddingsRequest.model_id and
+  /// VLMGenerationRequest.model_id.
+  @$pb.TagNumber(3)
+  $core.String get modelId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set modelId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasModelId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearModelId() => $_clearField(3);
 }
 
+/// Coverage share of a class is pixel_count / (SegmentationResult.width *
+/// SegmentationResult.height). Commons rejects any result whose pixel_counts
+/// do not sum to that product before encoding it into a SegmentationResult, so
+/// within this message the summaries partition the image and the division is
+/// exact.
 class SegmentationClassSummary extends $pb.GeneratedMessage {
   factory SegmentationClassSummary({
     $core.int? classId,
     $fixnum.Int64? pixelCount,
-    $core.double? fraction,
     $core.String? label,
   }) {
     final result = create();
     if (classId != null) result.classId = classId;
     if (pixelCount != null) result.pixelCount = pixelCount;
-    if (fraction != null) result.fraction = fraction;
     if (label != null) result.label = label;
     return result;
   }
@@ -290,8 +306,7 @@ class SegmentationClassSummary extends $pb.GeneratedMessage {
     ..a<$fixnum.Int64>(
         2, _omitFieldNames ? '' : 'pixelCount', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
-    ..aD(3, _omitFieldNames ? '' : 'fraction', fieldType: $pb.PbFieldType.OF)
-    ..aOS(4, _omitFieldNames ? '' : 'label')
+    ..aOS(3, _omitFieldNames ? '' : 'label')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -333,22 +348,13 @@ class SegmentationClassSummary extends $pb.GeneratedMessage {
   void clearPixelCount() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.double get fraction => $_getN(2);
+  $core.String get label => $_getSZ(2);
   @$pb.TagNumber(3)
-  set fraction($core.double value) => $_setFloat(2, value);
+  set label($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasFraction() => $_has(2);
+  $core.bool hasLabel() => $_has(2);
   @$pb.TagNumber(3)
-  void clearFraction() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get label => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set label($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasLabel() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearLabel() => $_clearField(4);
+  void clearLabel() => $_clearField(3);
 }
 
 class SegmentationResult extends $pb.GeneratedMessage {
@@ -360,6 +366,7 @@ class SegmentationResult extends $pb.GeneratedMessage {
     $core.Iterable<SegmentationClassSummary>? classSummaries,
     $fixnum.Int64? processingTimeMs,
     $core.String? modelId,
+    $core.List<$core.int>? confidenceMaskU8,
   }) {
     final result = create();
     if (width != null) result.width = width;
@@ -369,6 +376,7 @@ class SegmentationResult extends $pb.GeneratedMessage {
     if (classSummaries != null) result.classSummaries.addAll(classSummaries);
     if (processingTimeMs != null) result.processingTimeMs = processingTimeMs;
     if (modelId != null) result.modelId = modelId;
+    if (confidenceMaskU8 != null) result.confidenceMaskU8 = confidenceMaskU8;
     return result;
   }
 
@@ -395,6 +403,8 @@ class SegmentationResult extends $pb.GeneratedMessage {
         subBuilder: SegmentationClassSummary.create)
     ..aInt64(6, _omitFieldNames ? '' : 'processingTimeMs')
     ..aOS(7, _omitFieldNames ? '' : 'modelId')
+    ..a<$core.List<$core.int>>(
+        8, _omitFieldNames ? '' : 'confidenceMaskU8', $pb.PbFieldType.OY)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -474,6 +484,19 @@ class SegmentationResult extends $pb.GeneratedMessage {
   $core.bool hasModelId() => $_has(6);
   @$pb.TagNumber(7)
   void clearModelId() => $_clearField(7);
+
+  /// Confidence of the class in class_mask_u16_le, one byte per pixel,
+  /// 0..255 == probability 0.0..1.0. Same row-major order and dimensions as
+  /// the class mask. Present iff SegmentationOptions.include_confidence was
+  /// set, and then exactly width * height bytes.
+  @$pb.TagNumber(8)
+  $core.List<$core.int> get confidenceMaskU8 => $_getN(7);
+  @$pb.TagNumber(8)
+  set confidenceMaskU8($core.List<$core.int> value) => $_setBytes(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasConfidenceMaskU8() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearConfidenceMaskU8() => $_clearField(8);
 }
 
 const $core.bool _omitFieldNames =

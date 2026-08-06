@@ -423,9 +423,9 @@ constexpr StorageDeleteCandidate::ParseTableT_ StorageDeleteCandidate::InternalG
       0, // no _extensions_
       8, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967040,  // skipmap
+      4294967044,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      8,  // num_field_entries
+      7,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -447,25 +447,22 @@ constexpr StorageDeleteCandidate::ParseTableT_ StorageDeleteCandidate::InternalG
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeleteCandidate, _impl_.reclaimable_bytes_), 3>(),
        {16, 3, 0,
         PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.reclaimable_bytes_)}},
-      // optional int64 last_used_ms = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageDeleteCandidate, _impl_.last_used_ms_), 4>(),
-       {24, 4, 0,
-        PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.last_used_ms_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // bool is_loaded = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteCandidate, _impl_.is_loaded_), 5>(),
-       {32, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteCandidate, _impl_.is_loaded_), 4>(),
+       {32, 4, 0,
         PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.is_loaded_)}},
       // string local_path = 5;
       {::_pbi::TcParser::FastUS1,
        {42, 1, 0,
         PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.local_path_)}},
       // bool requires_unload = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteCandidate, _impl_.requires_unload_), 6>(),
-       {48, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteCandidate, _impl_.requires_unload_), 5>(),
+       {48, 5, 0,
         PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.requires_unload_)}},
       // bool requires_platform_delete = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteCandidate, _impl_.requires_platform_delete_), 7>(),
-       {56, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteCandidate, _impl_.requires_platform_delete_), 6>(),
+       {56, 6, 0,
         PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.requires_platform_delete_)}},
     }}, {{
       65535, 65535
@@ -474,22 +471,20 @@ constexpr StorageDeleteCandidate::ParseTableT_ StorageDeleteCandidate::InternalG
       {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int64 reclaimable_bytes = 2;
       {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.reclaimable_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // optional int64 last_used_ms = 3;
-      {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.last_used_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // bool is_loaded = 4;
-      {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.is_loaded_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.is_loaded_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // string local_path = 5;
       {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.local_path_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // bool requires_unload = 6;
-      {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.requires_unload_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.requires_unload_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool requires_platform_delete = 7;
-      {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.requires_platform_delete_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.requires_platform_delete_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // string storage_key = 8;
       {PROTOBUF_FIELD_OFFSET(StorageDeleteCandidate, _impl_.storage_key_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\45\10\0\0\0\12\0\0\13\0\0\0\0\0\0\0"
+      "\45\10\0\0\12\0\0\13"
       "runanywhere.v1.StorageDeleteCandidate"
       "model_id"
       "local_path"
@@ -513,7 +508,6 @@ inline constexpr StorageDeleteCandidate::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         reclaimable_bytes_{::int64_t{0}},
-        last_used_ms_{::int64_t{0}},
         is_loaded_{false},
         requires_unload_{false},
         requires_platform_delete_{false} {}
@@ -622,9 +616,9 @@ constexpr StorageAvailabilityRequest::ParseTableT_ StorageAvailabilityRequest::I
     {
       PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_._has_bits_),
       0, // no _extensions_
-      6, 56,  // max_field_number, fast_idx_mask
+      7, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967172,  // skipmap
       offsetof(ParseTableT_, field_entries),
       6,  // num_field_entries
       0,  // num_aux_entries
@@ -645,10 +639,7 @@ constexpr StorageAvailabilityRequest::ParseTableT_ StorageAvailabilityRequest::I
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageAvailabilityRequest, _impl_.required_bytes_), 1>(),
        {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.required_bytes_)}},
-      // double safety_margin = 3;
-      {::_pbi::TcParser::FastF64S1,
-       {25, 2, 0,
-        PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.safety_margin_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // bool include_existing_model_bytes = 4;
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageAvailabilityRequest, _impl_.include_existing_model_bytes_), 3>(),
        {32, 3, 0,
@@ -661,7 +652,10 @@ constexpr StorageAvailabilityRequest::ParseTableT_ StorageAvailabilityRequest::I
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageAvailabilityRequest, _impl_.allow_cache_reclamation_), 5>(),
        {48, 5, 0,
         PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.allow_cache_reclamation_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // int64 required_free_bytes_after_download = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageAvailabilityRequest, _impl_.required_free_bytes_after_download_), 2>(),
+       {56, 2, 0,
+        PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.required_free_bytes_after_download_)}},
     }}, {{
       65535, 65535
     }}, {{
@@ -669,14 +663,14 @@ constexpr StorageAvailabilityRequest::ParseTableT_ StorageAvailabilityRequest::I
       {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int64 required_bytes = 2;
       {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.required_bytes_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // double safety_margin = 3;
-      {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.safety_margin_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
       // bool include_existing_model_bytes = 4;
       {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.include_existing_model_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool include_delete_plan = 5;
       {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.include_delete_plan_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool allow_cache_reclamation = 6;
       {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.allow_cache_reclamation_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // int64 required_free_bytes_after_download = 7;
+      {PROTOBUF_FIELD_OFFSET(StorageAvailabilityRequest, _impl_.required_free_bytes_after_download_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
     // no aux_entries
     {{
@@ -696,7 +690,7 @@ inline constexpr StorageAvailabilityRequest::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         required_bytes_{::int64_t{0}},
-        safety_margin_{0},
+        required_free_bytes_after_download_{::int64_t{0}},
         include_existing_model_bytes_{false},
         include_delete_plan_{false},
         allow_cache_reclamation_{false} {}
@@ -805,11 +799,11 @@ constexpr StorageAvailability::ParseTableT_ StorageAvailability::InternalGenerat
     {
       PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_._has_bits_),
       0, // no _extensions_
-      7, 56,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967168,  // skipmap
+      4294967264,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
+      5,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -840,14 +834,8 @@ constexpr StorageAvailability::ParseTableT_ StorageAvailability::InternalGenerat
       {::_pbi::TcParser::FastUS1,
        {42, 1, 0,
         PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.recommendation_)}},
-      // int64 shortfall_bytes = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageAvailability, _impl_.shortfall_bytes_), 6>(),
-       {48, 6, 0,
-        PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.shortfall_bytes_)}},
-      // float required_to_available_ratio = 7;
-      {::_pbi::TcParser::FastF32S1,
-       {61, 5, 0,
-        PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.required_to_available_ratio_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
@@ -861,10 +849,6 @@ constexpr StorageAvailability::ParseTableT_ StorageAvailability::InternalGenerat
       {PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.warning_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional string recommendation = 5;
       {PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.recommendation_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 shortfall_bytes = 6;
-      {PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.shortfall_bytes_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // float required_to_available_ratio = 7;
-      {PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.required_to_available_ratio_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
     }},
     // no aux_entries
     {{
@@ -889,9 +873,7 @@ inline constexpr StorageAvailability::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         required_bytes_{::int64_t{0}},
         available_bytes_{::int64_t{0}},
-        is_available_{false},
-        required_to_available_ratio_{0},
-        shortfall_bytes_{::int64_t{0}} {}
+        is_available_{false} {}
 
 template <typename>
 constexpr StorageAvailability::StorageAvailability(::_pbi::ConstantInitialized,
@@ -997,11 +979,11 @@ constexpr ModelStorageMetrics::ParseTableT_ ModelStorageMetrics::InternalGenerat
     {
       PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_._has_bits_),
       0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
+      2, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
+      4294967292,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
+      2,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -1011,19 +993,14 @@ constexpr ModelStorageMetrics::ParseTableT_ ModelStorageMetrics::InternalGenerat
       ::_pbi::TcParser::GetTable<::runanywhere::v1::ModelStorageMetrics>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string model_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.model_id_)}},
       // int64 size_on_disk_bytes = 2;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ModelStorageMetrics, _impl_.size_on_disk_bytes_), 1>(),
        {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.size_on_disk_bytes_)}},
-      // optional int64 last_used_ms = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ModelStorageMetrics, _impl_.last_used_ms_), 2>(),
-       {24, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.last_used_ms_)}},
+      // string model_id = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.model_id_)}},
     }}, {{
       65535, 65535
     }}, {{
@@ -1031,8 +1008,6 @@ constexpr ModelStorageMetrics::ParseTableT_ ModelStorageMetrics::InternalGenerat
       {PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int64 size_on_disk_bytes = 2;
       {PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.size_on_disk_bytes_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // optional int64 last_used_ms = 3;
-      {PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.last_used_ms_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
     // no aux_entries
     {{
@@ -1051,8 +1026,7 @@ inline constexpr ModelStorageMetrics::Impl_::Impl_(
         model_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        size_on_disk_bytes_{::int64_t{0}},
-        last_used_ms_{::int64_t{0}} {}
+        size_on_disk_bytes_{::int64_t{0}} {}
 
 template <typename>
 constexpr ModelStorageMetrics::ModelStorageMetrics(::_pbi::ConstantInitialized,
@@ -1158,11 +1132,11 @@ constexpr DeviceStorageInfo::ParseTableT_ DeviceStorageInfo::InternalGeneratePar
     {
       PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      3, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
+      3,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -1172,10 +1146,7 @@ constexpr DeviceStorageInfo::ParseTableT_ DeviceStorageInfo::InternalGeneratePar
       ::_pbi::TcParser::GetTable<::runanywhere::v1::DeviceStorageInfo>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // float used_percent = 4;
-      {::_pbi::TcParser::FastF32S1,
-       {37, 3, 0,
-        PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_.used_percent_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // int64 total_bytes = 1;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DeviceStorageInfo, _impl_.total_bytes_), 0>(),
        {8, 0, 0,
@@ -1197,8 +1168,6 @@ constexpr DeviceStorageInfo::ParseTableT_ DeviceStorageInfo::InternalGeneratePar
       {PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_.free_bytes_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // int64 used_bytes = 3;
       {PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_.used_bytes_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // float used_percent = 4;
-      {PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_.used_percent_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
     }},
     // no aux_entries
     {{
@@ -1213,8 +1182,7 @@ inline constexpr DeviceStorageInfo::Impl_::Impl_(
       : _cached_size_{0},
         total_bytes_{::int64_t{0}},
         free_bytes_{::int64_t{0}},
-        used_bytes_{::int64_t{0}},
-        used_percent_{0} {}
+        used_bytes_{::int64_t{0}} {}
 
 template <typename>
 constexpr DeviceStorageInfo::DeviceStorageInfo(::_pbi::ConstantInitialized,
@@ -1484,9 +1452,9 @@ constexpr StorageInfo::ParseTableT_ StorageInfo::InternalGenerateParseTable_(con
       0, // no _extensions_
       5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
+      4294967272,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
+      4,  // num_field_entries
       3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1509,10 +1477,7 @@ constexpr StorageInfo::ParseTableT_ StorageInfo::InternalGenerateParseTable_(con
       {::_pbi::TcParser::FastMtR1,
        {26, 0, 2,
         PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.models_)}},
-      // int32 total_models = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(StorageInfo, _impl_.total_models_), 4>(),
-       {32, 4, 0,
-        PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.total_models_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // int64 total_models_bytes = 5;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StorageInfo, _impl_.total_models_bytes_), 3>(),
        {40, 3, 0,
@@ -1528,8 +1493,6 @@ constexpr StorageInfo::ParseTableT_ StorageInfo::InternalGenerateParseTable_(con
       {PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.device_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // repeated .runanywhere.v1.ModelStorageMetrics models = 3;
       {PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.models_), _Internal::kHasBitsOffset + 0, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
-      // int32 total_models = 4;
-      {PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.total_models_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int64 total_models_bytes = 5;
       {PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.total_models_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
@@ -1567,8 +1530,7 @@ inline constexpr StorageInfo::Impl_::Impl_(
         ,
         app_{nullptr},
         device_{nullptr},
-        total_models_bytes_{::int64_t{0}},
-        total_models_{0} {}
+        total_models_bytes_{::int64_t{0}} {}
 
 template <typename>
 constexpr StorageInfo::StorageInfo(::_pbi::ConstantInitialized,
@@ -1658,180 +1620,6 @@ const ::_pbi::ClassData* StorageInfo_get_class_data() {
   return StorageInfo_globals_.GetClassData();
 #else
   return StorageInfo_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class StorageInfoResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<StorageInfoResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._has_bits_);
-};
-
-constexpr StorageInfoResult::ParseTableT_ StorageInfoResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._has_bits_),
-      0, // no _extensions_
-      5, 24,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967269,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
-      2,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageInfoResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // repeated string warnings = 4;
-      {::_pbi::TcParser::FastUR1,
-       {34, 0, 0,
-        PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.warnings_)}},
-      // optional .runanywhere.v1.SDKError error = 5;
-      {::_pbi::TcParser::FastMtS1,
-       {42, 2, 1,
-        PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.error_)}},
-      // .runanywhere.v1.StorageInfo info = 2;
-      {::_pbi::TcParser::FastMtS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.info_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.StorageInfo info = 2;
-      {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.info_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // repeated string warnings = 4;
-      {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.warnings_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
-      // optional .runanywhere.v1.SDKError error = 5;
-      {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.error_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::StorageInfo>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::StorageInfo_globals_},
-        #endif
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
-        #endif
-    }},
-    {{
-      "\40\0\10\0\0\0\0\0"
-      "runanywhere.v1.StorageInfoResult"
-      "warnings"
-    }},
-  };
-}
-
-
-inline constexpr StorageInfoResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        warnings_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::StorageInfoResult,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoResult, _impl_.warnings_)>()
-         }
-        ,
-        info_{nullptr},
-        error_{nullptr} {}
-
-template <typename>
-constexpr StorageInfoResult::StorageInfoResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL StorageInfoResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) StorageInfoResult(arena);
-}
-constexpr auto StorageInfoResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageInfoResult), alignof(StorageInfoResult));
-}
-constexpr auto StorageInfoResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &StorageInfoResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<StorageInfoResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &StorageInfoResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<StorageInfoResult>(), &StorageInfoResult::ByteSizeLong,
-              &StorageInfoResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[6],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_storage_5ftypes_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct StorageInfoResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr StorageInfoResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 StorageInfoResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(StorageInfoResult::InternalGenerateClassData_(
-            _default, &StorageInfoResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<StorageInfoResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~StorageInfoResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) StorageInfoResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<StorageInfoResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(StorageInfoResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST StorageInfoResultGlobalsTypeInternal StorageInfoResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* StorageInfoResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return StorageInfoResult_globals_.GetClassData();
-#else
-  return StorageInfoResult_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -2082,9 +1870,9 @@ constexpr StorageDeletePlan::ParseTableT_ StorageDeletePlan::InternalGeneratePar
       0, // no _extensions_
       10, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966304,  // skipmap
+      4294966560,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
+      8,  // num_field_entries
       2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -2124,10 +1912,7 @@ constexpr StorageDeletePlan::ParseTableT_ StorageDeletePlan::InternalGeneratePar
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeletePlan, _impl_.requires_platform_delete_), 7>(),
        {64, 7, 0,
         PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.requires_platform_delete_)}},
-      // int32 candidate_count = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(StorageDeletePlan, _impl_.candidate_count_), 8>(),
-       {72, 8, 0,
-        PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.candidate_count_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // optional .runanywhere.v1.SDKError error = 10;
       {::_pbi::TcParser::FastMtS1,
        {82, 2, 1,
@@ -2154,8 +1939,6 @@ constexpr StorageDeletePlan::ParseTableT_ StorageDeletePlan::InternalGeneratePar
       {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.requires_unload_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool requires_platform_delete = 8;
       {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.requires_platform_delete_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int32 candidate_count = 9;
-      {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.candidate_count_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional .runanywhere.v1.SDKError error = 10;
       {PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.error_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
@@ -2199,8 +1982,7 @@ inline constexpr StorageDeletePlan::Impl_::Impl_(
         reclaimable_bytes_{::int64_t{0}},
         can_reclaim_required_bytes_{false},
         requires_unload_{false},
-        requires_platform_delete_{false},
-        candidate_count_{0} {}
+        requires_platform_delete_{false} {}
 
 template <typename>
 constexpr StorageDeletePlan::StorageDeletePlan(::_pbi::ConstantInitialized,
@@ -2294,6 +2076,180 @@ const ::_pbi::ClassData* StorageDeletePlan_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class StorageInfoResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<StorageInfoResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._has_bits_);
+};
+
+constexpr StorageInfoResult::ParseTableT_ StorageInfoResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._has_bits_),
+      0, // no _extensions_
+      5, 24,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967269,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      3,  // num_field_entries
+      2,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::StorageInfoResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // repeated string warnings = 4;
+      {::_pbi::TcParser::FastUR1,
+       {34, 0, 0,
+        PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.warnings_)}},
+      // optional .runanywhere.v1.SDKError error = 5;
+      {::_pbi::TcParser::FastMtS1,
+       {42, 2, 1,
+        PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.error_)}},
+      // .runanywhere.v1.StorageInfo info = 2;
+      {::_pbi::TcParser::FastMtS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.info_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // .runanywhere.v1.StorageInfo info = 2;
+      {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.info_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // repeated string warnings = 4;
+      {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.warnings_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
+      // optional .runanywhere.v1.SDKError error = 5;
+      {PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_.error_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::StorageInfo>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::StorageInfo_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\40\0\10\0\0\0\0\0"
+      "runanywhere.v1.StorageInfoResult"
+      "warnings"
+    }},
+  };
+}
+
+
+inline constexpr StorageInfoResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        warnings_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::StorageInfoResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoResult, _impl_.warnings_)>()
+         }
+        ,
+        info_{nullptr},
+        error_{nullptr} {}
+
+template <typename>
+constexpr StorageInfoResult::StorageInfoResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL StorageInfoResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) StorageInfoResult(arena);
+}
+constexpr auto StorageInfoResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StorageInfoResult), alignof(StorageInfoResult));
+}
+constexpr auto StorageInfoResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &StorageInfoResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<StorageInfoResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &StorageInfoResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<StorageInfoResult>(), &StorageInfoResult::ByteSizeLong,
+              &StorageInfoResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(StorageInfoResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[6],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_storage_5ftypes_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct StorageInfoResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr StorageInfoResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 StorageInfoResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(StorageInfoResult::InternalGenerateClassData_(
+            _default, &StorageInfoResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<StorageInfoResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~StorageInfoResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) StorageInfoResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<StorageInfoResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(StorageInfoResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST StorageInfoResultGlobalsTypeInternal StorageInfoResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* StorageInfoResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return StorageInfoResult_globals_.GetClassData();
+#else
+  return StorageInfoResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class StorageDeleteRequest::_Internal {
  public:
   using HasBits = decltype(::std::declval<StorageDeleteRequest>()._impl_._has_bits_);
@@ -2328,10 +2284,10 @@ constexpr StorageDeleteRequest::ParseTableT_ StorageDeleteRequest::InternalGener
       {::_pbi::TcParser::FastUR1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.model_ids_)}},
-      // bool delete_files = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteRequest, _impl_.delete_files_), 2>(),
+      // bool keep_files_on_disk = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteRequest, _impl_.keep_files_on_disk_), 2>(),
        {16, 2, 0,
-        PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.delete_files_)}},
+        PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.keep_files_on_disk_)}},
       // bool clear_registry_paths = 3;
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(StorageDeleteRequest, _impl_.clear_registry_paths_), 3>(),
        {24, 3, 0,
@@ -2357,8 +2313,8 @@ constexpr StorageDeleteRequest::ParseTableT_ StorageDeleteRequest::InternalGener
     }}, {{
       // repeated string model_ids = 1;
       {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.model_ids_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
-      // bool delete_files = 2;
-      {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.delete_files_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool keep_files_on_disk = 2;
+      {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.keep_files_on_disk_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool clear_registry_paths = 3;
       {PROTOBUF_FIELD_OFFSET(StorageDeleteRequest, _impl_.clear_registry_paths_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool unload_if_loaded = 4;
@@ -2398,7 +2354,7 @@ inline constexpr StorageDeleteRequest::Impl_::Impl_(
          }
         ,
         plan_{nullptr},
-        delete_files_{false},
+        keep_files_on_disk_{false},
         clear_registry_paths_{false},
         unload_if_loaded_{false},
         dry_run_{false},
@@ -2697,15 +2653,13 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceStorageInfo, _impl_._has_bits_),
-        7, // hasbit index offset
+        6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceStorageInfo, _impl_.total_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceStorageInfo, _impl_.free_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceStorageInfo, _impl_.used_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DeviceStorageInfo, _impl_.used_percent_),
         0,
         1,
         2,
-        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AppStorageInfo, _impl_._has_bits_),
         7, // hasbit index offset
@@ -2719,43 +2673,35 @@ const ::uint32_t
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelStorageMetrics, _impl_._has_bits_),
-        6, // hasbit index offset
+        5, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelStorageMetrics, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelStorageMetrics, _impl_.size_on_disk_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelStorageMetrics, _impl_.last_used_ms_),
         0,
         1,
-        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfo, _impl_._has_bits_),
-        8, // hasbit index offset
+        7, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfo, _impl_.app_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfo, _impl_.device_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfo, _impl_.models_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfo, _impl_.total_models_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfo, _impl_.total_models_bytes_),
         1,
         2,
         0,
-        4,
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_._has_bits_),
-        10, // hasbit index offset
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_.is_available_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_.required_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_.available_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_.warning_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_.recommendation_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_.shortfall_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailability, _impl_.required_to_available_ratio_),
         4,
         2,
         3,
         0,
         1,
-        6,
-        5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoRequest, _impl_._has_bits_),
         7, // hasbit index offset
@@ -2781,7 +2727,7 @@ const ::uint32_t
         9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.required_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.safety_margin_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.required_free_bytes_after_download_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.include_existing_model_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.include_delete_plan_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageAvailabilityRequest, _impl_.allow_cache_reclamation_),
@@ -2819,10 +2765,9 @@ const ::uint32_t
         5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_._has_bits_),
-        11, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.reclaimable_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.last_used_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.is_loaded_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.local_path_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteCandidate, _impl_.requires_unload_),
@@ -2831,14 +2776,13 @@ const ::uint32_t
         0,
         3,
         4,
-        5,
         1,
+        5,
         6,
-        7,
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_._has_bits_),
-        12, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.can_reclaim_required_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.required_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.reclaimable_bytes_),
@@ -2846,7 +2790,6 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.warnings_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.requires_unload_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.requires_platform_delete_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.candidate_count_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeletePlan, _impl_.error_),
         5,
         3,
@@ -2855,13 +2798,12 @@ const ::uint32_t
         1,
         6,
         7,
-        8,
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_._has_bits_),
         11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.model_ids_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.delete_files_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.keep_files_on_disk_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.clear_registry_paths_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.unload_if_loaded_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageDeleteRequest, _impl_.dry_run_),
@@ -2902,19 +2844,19 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::DeviceStorageInfo)},
-        {11, sizeof(::runanywhere::v1::AppStorageInfo)},
-        {22, sizeof(::runanywhere::v1::ModelStorageMetrics)},
-        {31, sizeof(::runanywhere::v1::StorageInfo)},
-        {44, sizeof(::runanywhere::v1::StorageAvailability)},
-        {61, sizeof(::runanywhere::v1::StorageInfoRequest)},
-        {72, sizeof(::runanywhere::v1::StorageInfoResult)},
-        {81, sizeof(::runanywhere::v1::StorageAvailabilityRequest)},
-        {96, sizeof(::runanywhere::v1::StorageAvailabilityResult)},
-        {107, sizeof(::runanywhere::v1::StorageDeletePlanRequest)},
-        {122, sizeof(::runanywhere::v1::StorageDeleteCandidate)},
-        {141, sizeof(::runanywhere::v1::StorageDeletePlan)},
-        {162, sizeof(::runanywhere::v1::StorageDeleteRequest)},
-        {181, sizeof(::runanywhere::v1::StorageDeleteResult)},
+        {9, sizeof(::runanywhere::v1::AppStorageInfo)},
+        {20, sizeof(::runanywhere::v1::ModelStorageMetrics)},
+        {27, sizeof(::runanywhere::v1::StorageInfo)},
+        {38, sizeof(::runanywhere::v1::StorageAvailability)},
+        {51, sizeof(::runanywhere::v1::StorageInfoRequest)},
+        {62, sizeof(::runanywhere::v1::StorageInfoResult)},
+        {71, sizeof(::runanywhere::v1::StorageAvailabilityRequest)},
+        {86, sizeof(::runanywhere::v1::StorageAvailabilityResult)},
+        {97, sizeof(::runanywhere::v1::StorageDeletePlanRequest)},
+        {112, sizeof(::runanywhere::v1::StorageDeleteCandidate)},
+        {129, sizeof(::runanywhere::v1::StorageDeletePlan)},
+        {148, sizeof(::runanywhere::v1::StorageDeleteRequest)},
+        {167, sizeof(::runanywhere::v1::StorageDeleteResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2936,85 +2878,81 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_storage_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\023storage_types.proto\022\016runanywhere.v1\032\014e"
-    "rrors.proto\"f\n\021DeviceStorageInfo\022\023\n\013tota"
+    "rrors.proto\"V\n\021DeviceStorageInfo\022\023\n\013tota"
     "l_bytes\030\001 \001(\003\022\022\n\nfree_bytes\030\002 \001(\003\022\022\n\nuse"
-    "d_bytes\030\003 \001(\003\022\024\n\014used_percent\030\004 \001(\002\"n\n\016A"
-    "ppStorageInfo\022\027\n\017documents_bytes\030\001 \001(\003\022\023"
-    "\n\013cache_bytes\030\002 \001(\003\022\031\n\021app_support_bytes"
-    "\030\003 \001(\003\022\023\n\013total_bytes\030\004 \001(\003\"o\n\023ModelStor"
-    "ageMetrics\022\020\n\010model_id\030\001 \001(\t\022\032\n\022size_on_"
-    "disk_bytes\030\002 \001(\003\022\031\n\014last_used_ms\030\003 \001(\003H\000"
-    "\210\001\001B\017\n\r_last_used_ms\"\324\001\n\013StorageInfo\022+\n\003"
-    "app\030\001 \001(\0132\036.runanywhere.v1.AppStorageInf"
-    "o\0221\n\006device\030\002 \001(\0132!.runanywhere.v1.Devic"
-    "eStorageInfo\0223\n\006models\030\003 \003(\0132#.runanywhe"
-    "re.v1.ModelStorageMetrics\022\024\n\014total_model"
-    "s\030\004 \001(\005\022\032\n\022total_models_bytes\030\005 \001(\003\"\374\001\n\023"
-    "StorageAvailability\022\024\n\014is_available\030\001 \001("
-    "\010\022\026\n\016required_bytes\030\002 \001(\003\022\027\n\017available_b"
-    "ytes\030\003 \001(\003\022\034\n\017warning_message\030\004 \001(\tH\000\210\001\001"
-    "\022\033\n\016recommendation\030\005 \001(\tH\001\210\001\001\022\027\n\017shortfa"
-    "ll_bytes\030\006 \001(\003\022#\n\033required_to_available_"
-    "ratio\030\007 \001(\002B\022\n\020_warning_messageB\021\n\017_reco"
-    "mmendation\"p\n\022StorageInfoRequest\022\026\n\016incl"
+    "d_bytes\030\003 \001(\003J\004\010\004\020\005\"n\n\016AppStorageInfo\022\027\n"
+    "\017documents_bytes\030\001 \001(\003\022\023\n\013cache_bytes\030\002 "
+    "\001(\003\022\031\n\021app_support_bytes\030\003 \001(\003\022\023\n\013total_"
+    "bytes\030\004 \001(\003\"I\n\023ModelStorageMetrics\022\020\n\010mo"
+    "del_id\030\001 \001(\t\022\032\n\022size_on_disk_bytes\030\002 \001(\003"
+    "J\004\010\003\020\004\"\304\001\n\013StorageInfo\022+\n\003app\030\001 \001(\0132\036.ru"
+    "nanywhere.v1.AppStorageInfo\0221\n\006device\030\002 "
+    "\001(\0132!.runanywhere.v1.DeviceStorageInfo\0223"
+    "\n\006models\030\003 \003(\0132#.runanywhere.v1.ModelSto"
+    "rageMetrics\022\032\n\022total_models_bytes\030\005 \001(\003J"
+    "\004\010\004\020\005\"\312\001\n\023StorageAvailability\022\024\n\014is_avai"
+    "lable\030\001 \001(\010\022\026\n\016required_bytes\030\002 \001(\003\022\027\n\017a"
+    "vailable_bytes\030\003 \001(\003\022\034\n\017warning_message\030"
+    "\004 \001(\tH\000\210\001\001\022\033\n\016recommendation\030\005 \001(\tH\001\210\001\001B"
+    "\022\n\020_warning_messageB\021\n\017_recommendationJ\004"
+    "\010\006\020\007J\004\010\007\020\010\"p\n\022StorageInfoRequest\022\026\n\016incl"
     "ude_device\030\001 \001(\010\022\023\n\013include_app\030\002 \001(\010\022\026\n"
     "\016include_models\030\003 \001(\010\022\025\n\rinclude_cache\030\004"
     " \001(\010\"\210\001\n\021StorageInfoResult\022)\n\004info\030\002 \001(\013"
     "2\033.runanywhere.v1.StorageInfo\022\020\n\010warning"
     "s\030\004 \003(\t\022,\n\005error\030\005 \001(\0132\030.runanywhere.v1."
-    "SDKErrorH\000\210\001\001B\010\n\006_error\"\301\001\n\032StorageAvail"
+    "SDKErrorH\000\210\001\001B\010\n\006_error\"\334\001\n\032StorageAvail"
     "abilityRequest\022\020\n\010model_id\030\001 \001(\t\022\026\n\016requ"
-    "ired_bytes\030\002 \001(\003\022\025\n\rsafety_margin\030\003 \001(\001\022"
-    "$\n\034include_existing_model_bytes\030\004 \001(\010\022\033\n"
-    "\023include_delete_plan\030\005 \001(\010\022\037\n\027allow_cach"
-    "e_reclamation\030\006 \001(\010\"\355\001\n\031StorageAvailabil"
-    "ityResult\0229\n\014availability\030\002 \001(\0132#.runany"
-    "where.v1.StorageAvailability\022\020\n\010warnings"
-    "\030\003 \003(\t\022;\n\013delete_plan\030\005 \001(\0132!.runanywher"
-    "e.v1.StorageDeletePlanH\000\210\001\001\022,\n\005error\030\006 \001"
-    "(\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001B\016\n\014_de"
-    "lete_planB\010\n\006_error\"\262\001\n\030StorageDeletePla"
-    "nRequest\022\021\n\tmodel_ids\030\001 \003(\t\022\026\n\016required_"
-    "bytes\030\002 \001(\003\022\025\n\rinclude_cache\030\003 \001(\010\022\024\n\014ol"
-    "dest_first\030\004 \001(\010\022\033\n\023allow_loaded_models\030"
-    "\005 \001(\010\022!\n\031include_download_partials\030\006 \001(\010"
-    "\"\350\001\n\026StorageDeleteCandidate\022\020\n\010model_id\030"
-    "\001 \001(\t\022\031\n\021reclaimable_bytes\030\002 \001(\003\022\031\n\014last"
-    "_used_ms\030\003 \001(\003H\000\210\001\001\022\021\n\tis_loaded\030\004 \001(\010\022\022"
+    "ired_bytes\030\002 \001(\003\022*\n\"required_free_bytes_"
+    "after_download\030\007 \001(\003\022$\n\034include_existing"
+    "_model_bytes\030\004 \001(\010\022\033\n\023include_delete_pla"
+    "n\030\005 \001(\010\022\037\n\027allow_cache_reclamation\030\006 \001(\010"
+    "J\004\010\003\020\004\"\355\001\n\031StorageAvailabilityResult\0229\n\014"
+    "availability\030\002 \001(\0132#.runanywhere.v1.Stor"
+    "ageAvailability\022\020\n\010warnings\030\003 \003(\t\022;\n\013del"
+    "ete_plan\030\005 \001(\0132!.runanywhere.v1.StorageD"
+    "eletePlanH\000\210\001\001\022,\n\005error\030\006 \001(\0132\030.runanywh"
+    "ere.v1.SDKErrorH\001\210\001\001B\016\n\014_delete_planB\010\n\006"
+    "_error\"\262\001\n\030StorageDeletePlanRequest\022\021\n\tm"
+    "odel_ids\030\001 \003(\t\022\026\n\016required_bytes\030\002 \001(\003\022\025"
+    "\n\rinclude_cache\030\003 \001(\010\022\024\n\014oldest_first\030\004 "
+    "\001(\010\022\033\n\023allow_loaded_models\030\005 \001(\010\022!\n\031incl"
+    "ude_download_partials\030\006 \001(\010\"\302\001\n\026StorageD"
+    "eleteCandidate\022\020\n\010model_id\030\001 \001(\t\022\031\n\021recl"
+    "aimable_bytes\030\002 \001(\003\022\021\n\tis_loaded\030\004 \001(\010\022\022"
     "\n\nlocal_path\030\005 \001(\t\022\027\n\017requires_unload\030\006 "
     "\001(\010\022 \n\030requires_platform_delete\030\007 \001(\010\022\023\n"
-    "\013storage_key\030\010 \001(\tB\017\n\r_last_used_ms\"\304\002\n\021"
-    "StorageDeletePlan\022\"\n\032can_reclaim_require"
-    "d_bytes\030\001 \001(\010\022\026\n\016required_bytes\030\002 \001(\003\022\031\n"
-    "\021reclaimable_bytes\030\003 \001(\003\022:\n\ncandidates\030\004"
-    " \003(\0132&.runanywhere.v1.StorageDeleteCandi"
-    "date\022\020\n\010warnings\030\005 \003(\t\022\027\n\017requires_unloa"
-    "d\030\007 \001(\010\022 \n\030requires_platform_delete\030\010 \001("
-    "\010\022\027\n\017candidate_count\030\t \001(\005\022,\n\005error\030\n \001("
-    "\0132\030.runanywhere.v1.SDKErrorH\000\210\001\001B\010\n\006_err"
-    "or\"\202\002\n\024StorageDeleteRequest\022\021\n\tmodel_ids"
-    "\030\001 \003(\t\022\024\n\014delete_files\030\002 \001(\010\022\034\n\024clear_re"
-    "gistry_paths\030\003 \001(\010\022\030\n\020unload_if_loaded\030\004"
-    " \001(\010\022\017\n\007dry_run\030\005 \001(\010\0224\n\004plan\030\006 \001(\0132!.ru"
-    "nanywhere.v1.StorageDeletePlanH\000\210\001\001\022\032\n\022r"
-    "equire_plan_match\030\007 \001(\010\022\035\n\025allow_platfor"
-    "m_delete\030\010 \001(\010B\007\n\005_plan\"\210\002\n\023StorageDelet"
-    "eResult\022\025\n\rdeleted_bytes\030\002 \001(\003\022\031\n\021delete"
-    "d_model_ids\030\003 \003(\t\022\030\n\020failed_model_ids\030\004 "
-    "\003(\t\022\020\n\010warnings\030\005 \003(\t\022\031\n\021skipped_model_i"
-    "ds\030\007 \003(\t\022\017\n\007dry_run\030\010 \001(\010\022\030\n\020registry_up"
-    "dated\030\t \001(\010\022\025\n\rfiles_deleted\030\n \001(\010\022,\n\005er"
-    "ror\030\013 \001(\0132\030.runanywhere.v1.SDKErrorH\000\210\001\001"
-    "B\010\n\006_error*\327\001\n\007NPUChip\022\030\n\024NPU_CHIP_UNSPE"
-    "CIFIED\020\000\022\021\n\rNPU_CHIP_NONE\020\001\022 \n\034NPU_CHIP_"
-    "APPLE_NEURAL_ENGINE\020\002\022\035\n\031NPU_CHIP_QUALCO"
-    "MM_HEXAGON\020\003\022\031\n\025NPU_CHIP_MEDIATEK_APU\020\004\022"
-    "\027\n\023NPU_CHIP_GOOGLE_TPU\020\005\022\026\n\022NPU_CHIP_INT"
-    "EL_NPU\020\006\022\022\n\016NPU_CHIP_OTHER\020cB\214\001\n\027ai.runa"
-    "nywhere.proto.v1B\021StorageTypesProtoP\001Z<g"
-    "ithub.com/runanywhere/runanywhere-sdks/i"
-    "dl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywh"
-    "ere.V1\272\002\002RAb\006proto3"
+    "\013storage_key\030\010 \001(\tJ\004\010\003\020\004\"\261\002\n\021StorageDele"
+    "tePlan\022\"\n\032can_reclaim_required_bytes\030\001 \001"
+    "(\010\022\026\n\016required_bytes\030\002 \001(\003\022\031\n\021reclaimabl"
+    "e_bytes\030\003 \001(\003\022:\n\ncandidates\030\004 \003(\0132&.runa"
+    "nywhere.v1.StorageDeleteCandidate\022\020\n\010war"
+    "nings\030\005 \003(\t\022\027\n\017requires_unload\030\007 \001(\010\022 \n\030"
+    "requires_platform_delete\030\010 \001(\010\022,\n\005error\030"
+    "\n \001(\0132\030.runanywhere.v1.SDKErrorH\000\210\001\001B\010\n\006"
+    "_errorJ\004\010\t\020\n\"\210\002\n\024StorageDeleteRequest\022\021\n"
+    "\tmodel_ids\030\001 \003(\t\022\032\n\022keep_files_on_disk\030\002"
+    " \001(\010\022\034\n\024clear_registry_paths\030\003 \001(\010\022\030\n\020un"
+    "load_if_loaded\030\004 \001(\010\022\017\n\007dry_run\030\005 \001(\010\0224\n"
+    "\004plan\030\006 \001(\0132!.runanywhere.v1.StorageDele"
+    "tePlanH\000\210\001\001\022\032\n\022require_plan_match\030\007 \001(\010\022"
+    "\035\n\025allow_platform_delete\030\010 \001(\010B\007\n\005_plan\""
+    "\210\002\n\023StorageDeleteResult\022\025\n\rdeleted_bytes"
+    "\030\002 \001(\003\022\031\n\021deleted_model_ids\030\003 \003(\t\022\030\n\020fai"
+    "led_model_ids\030\004 \003(\t\022\020\n\010warnings\030\005 \003(\t\022\031\n"
+    "\021skipped_model_ids\030\007 \003(\t\022\017\n\007dry_run\030\010 \001("
+    "\010\022\030\n\020registry_updated\030\t \001(\010\022\025\n\rfiles_del"
+    "eted\030\n \001(\010\022,\n\005error\030\013 \001(\0132\030.runanywhere."
+    "v1.SDKErrorH\000\210\001\001B\010\n\006_error*\327\001\n\007NPUChip\022\030"
+    "\n\024NPU_CHIP_UNSPECIFIED\020\000\022\021\n\rNPU_CHIP_NON"
+    "E\020\001\022 \n\034NPU_CHIP_APPLE_NEURAL_ENGINE\020\002\022\035\n"
+    "\031NPU_CHIP_QUALCOMM_HEXAGON\020\003\022\031\n\025NPU_CHIP"
+    "_MEDIATEK_APU\020\004\022\027\n\023NPU_CHIP_GOOGLE_TPU\020\005"
+    "\022\026\n\022NPU_CHIP_INTEL_NPU\020\006\022\022\n\016NPU_CHIP_OTH"
+    "ER\020cB\214\001\n\027ai.runanywhere.proto.v1B\021Storag"
+    "eTypesProtoP\001Z<github.com/runanywhere/ru"
+    "nanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002"
+    "\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_storage_5ftypes_2eproto_deps[1] = {
@@ -3024,7 +2962,7 @@ static ::absl::once_flag descriptor_table_storage_5ftypes_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_storage_5ftypes_2eproto = {
     false,
     false,
-    3179,
+    3035,
     descriptor_table_protodef_storage_5ftypes_2eproto,
     "storage_types.proto",
     &descriptor_table_storage_5ftypes_2eproto_once,
@@ -3078,9 +3016,9 @@ inline void DeviceStorageInfo::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena)
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, total_bytes_),
            0,
-           offsetof(Impl_, used_percent_) -
+           offsetof(Impl_, used_bytes_) -
                offsetof(Impl_, total_bytes_) +
-               sizeof(Impl_::used_percent_));
+               sizeof(Impl_::used_bytes_));
 }
 DeviceStorageInfo::~DeviceStorageInfo() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.DeviceStorageInfo)
@@ -3130,10 +3068,10 @@ PROTOBUF_NOINLINE void DeviceStorageInfo::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     ::memset(&_impl_.total_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.used_percent_) -
-        reinterpret_cast<char*>(&_impl_.total_bytes_)) + sizeof(_impl_.used_percent_));
+        reinterpret_cast<char*>(&_impl_.used_bytes_) -
+        reinterpret_cast<char*>(&_impl_.total_bytes_)) + sizeof(_impl_.used_bytes_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -3185,15 +3123,6 @@ PROTOBUF_NOINLINE void DeviceStorageInfo::Clear() {
     }
   }
 
-  // float used_percent = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_used_percent()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          4, this_._internal_used_percent(), target);
-    }
-  }
-
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -3219,7 +3148,7 @@ PROTOBUF_NOINLINE void DeviceStorageInfo::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     // int64 total_bytes = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (this_._internal_total_bytes() != 0) {
@@ -3241,12 +3170,6 @@ PROTOBUF_NOINLINE void DeviceStorageInfo::Clear() {
             this_._internal_used_bytes());
       }
     }
-    // float used_percent = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_used_percent()) != 0) {
-        total_size += 5;
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -3265,7 +3188,7 @@ void DeviceStorageInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (from._internal_total_bytes() != 0) {
         _this->_impl_.total_bytes_ = from._impl_.total_bytes_;
@@ -3279,11 +3202,6 @@ void DeviceStorageInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_used_bytes() != 0) {
         _this->_impl_.used_bytes_ = from._impl_.used_bytes_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_used_percent()) != 0) {
-        _this->_impl_.used_percent_ = from._impl_.used_percent_;
       }
     }
   }
@@ -3305,8 +3223,8 @@ void DeviceStorageInfo::InternalSwap(DeviceStorageInfo* PROTOBUF_RESTRICT PROTOB
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_.used_percent_)
-      + sizeof(DeviceStorageInfo::_impl_.used_percent_)
+      PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_.used_bytes_)
+      + sizeof(DeviceStorageInfo::_impl_.used_bytes_)
       - PROTOBUF_FIELD_OFFSET(DeviceStorageInfo, _impl_.total_bytes_)>(
           reinterpret_cast<char*>(&_impl_.total_bytes_),
           reinterpret_cast<char*>(&other->_impl_.total_bytes_));
@@ -3618,13 +3536,7 @@ ModelStorageMetrics::ModelStorageMetrics(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, size_on_disk_bytes_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, size_on_disk_bytes_),
-           offsetof(Impl_, last_used_ms_) -
-               offsetof(Impl_, size_on_disk_bytes_) +
-               sizeof(Impl_::last_used_ms_));
+  _impl_.size_on_disk_bytes_ = from._impl_.size_on_disk_bytes_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ModelStorageMetrics)
 }
@@ -3636,12 +3548,7 @@ PROTOBUF_NDEBUG_INLINE ModelStorageMetrics::Impl_::Impl_(
 
 inline void ModelStorageMetrics::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, size_on_disk_bytes_),
-           0,
-           offsetof(Impl_, last_used_ms_) -
-               offsetof(Impl_, size_on_disk_bytes_) +
-               sizeof(Impl_::last_used_ms_));
+  _impl_.size_on_disk_bytes_ = {};
 }
 ModelStorageMetrics::~ModelStorageMetrics() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ModelStorageMetrics)
@@ -3695,11 +3602,7 @@ PROTOBUF_NOINLINE void ModelStorageMetrics::Clear() {
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     _impl_.model_id_.ClearNonDefaultToEmpty();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
-    ::memset(&_impl_.size_on_disk_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.last_used_ms_) -
-        reinterpret_cast<char*>(&_impl_.size_on_disk_bytes_)) + sizeof(_impl_.last_used_ms_));
-  }
+  _impl_.size_on_disk_bytes_ = ::int64_t{0};
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -3742,13 +3645,6 @@ PROTOBUF_NOINLINE void ModelStorageMetrics::Clear() {
     }
   }
 
-  // optional int64 last_used_ms = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    target =
-        ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
-            stream, this_._internal_last_used_ms(), target);
-  }
-
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -3774,7 +3670,7 @@ PROTOBUF_NOINLINE void ModelStorageMetrics::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     // string model_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_model_id().empty()) {
@@ -3788,11 +3684,6 @@ PROTOBUF_NOINLINE void ModelStorageMetrics::Clear() {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_size_on_disk_bytes());
       }
-    }
-    // optional int64 last_used_ms = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-          this_._internal_last_used_ms());
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -3812,7 +3703,7 @@ void ModelStorageMetrics::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_model_id().empty()) {
         _this->_internal_set_model_id(from._internal_model_id());
@@ -3826,9 +3717,6 @@ void ModelStorageMetrics::MergeImpl(::google::protobuf::MessageLite& to_msg,
       if (from._internal_size_on_disk_bytes() != 0) {
         _this->_impl_.size_on_disk_bytes_ = from._impl_.size_on_disk_bytes_;
       }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_impl_.last_used_ms_ = from._impl_.last_used_ms_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -3851,12 +3739,7 @@ void ModelStorageMetrics::InternalSwap(ModelStorageMetrics* PROTOBUF_RESTRICT PR
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.last_used_ms_)
-      + sizeof(ModelStorageMetrics::_impl_.last_used_ms_)
-      - PROTOBUF_FIELD_OFFSET(ModelStorageMetrics, _impl_.size_on_disk_bytes_)>(
-          reinterpret_cast<char*>(&_impl_.size_on_disk_bytes_),
-          reinterpret_cast<char*>(&other->_impl_.size_on_disk_bytes_));
+  swap(_impl_.size_on_disk_bytes_, other->_impl_.size_on_disk_bytes_);
 }
 
 ::google::protobuf::Metadata ModelStorageMetrics::GetMetadata() const {
@@ -3908,13 +3791,7 @@ StorageInfo::StorageInfo(
   _impl_.device_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.device_)
                 : nullptr;
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, total_models_bytes_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, total_models_bytes_),
-           offsetof(Impl_, total_models_) -
-               offsetof(Impl_, total_models_bytes_) +
-               sizeof(Impl_::total_models_));
+  _impl_.total_models_bytes_ = from._impl_.total_models_bytes_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageInfo)
 }
@@ -3933,9 +3810,9 @@ inline void StorageInfo::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, app_),
            0,
-           offsetof(Impl_, total_models_) -
+           offsetof(Impl_, total_models_bytes_) -
                offsetof(Impl_, app_) +
-               sizeof(Impl_::total_models_));
+               sizeof(Impl_::total_models_bytes_));
 }
 StorageInfo::~StorageInfo() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.StorageInfo)
@@ -4000,11 +3877,7 @@ PROTOBUF_NOINLINE void StorageInfo::Clear() {
       _impl_.device_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000018U)) {
-    ::memset(&_impl_.total_models_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.total_models_) -
-        reinterpret_cast<char*>(&_impl_.total_models_bytes_)) + sizeof(_impl_.total_models_));
-  }
+  _impl_.total_models_bytes_ = ::int64_t{0};
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -4055,15 +3928,6 @@ PROTOBUF_NOINLINE void StorageInfo::Clear() {
     }
   }
 
-  // int32 total_models = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_total_models() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
-              stream, this_._internal_total_models(), target);
-    }
-  }
-
   // int64 total_models_bytes = 5;
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_total_models_bytes() != 0) {
@@ -4098,7 +3962,7 @@ PROTOBUF_NOINLINE void StorageInfo::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     // repeated .runanywhere.v1.ModelStorageMetrics models = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_models_size();
@@ -4123,13 +3987,6 @@ PROTOBUF_NOINLINE void StorageInfo::Clear() {
             this_._internal_total_models_bytes());
       }
     }
-    // int32 total_models = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_total_models() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_total_models());
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -4149,7 +4006,7 @@ void StorageInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_models()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
@@ -4176,11 +4033,6 @@ void StorageInfo::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.total_models_bytes_ = from._impl_.total_models_bytes_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_total_models() != 0) {
-        _this->_impl_.total_models_ = from._impl_.total_models_;
-      }
-    }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
@@ -4201,8 +4053,8 @@ void StorageInfo::InternalSwap(StorageInfo* PROTOBUF_RESTRICT PROTOBUF_NONNULL o
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.models_.InternalSwap(&other->_impl_.models_);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.total_models_)
-      + sizeof(StorageInfo::_impl_.total_models_)
+      PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.total_models_bytes_)
+      + sizeof(StorageInfo::_impl_.total_models_bytes_)
       - PROTOBUF_FIELD_OFFSET(StorageInfo, _impl_.app_)>(
           reinterpret_cast<char*>(&_impl_.app_),
           reinterpret_cast<char*>(&other->_impl_.app_));
@@ -4249,9 +4101,9 @@ StorageAvailability::StorageAvailability(
                offsetof(Impl_, required_bytes_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, required_bytes_),
-           offsetof(Impl_, shortfall_bytes_) -
+           offsetof(Impl_, is_available_) -
                offsetof(Impl_, required_bytes_) +
-               sizeof(Impl_::shortfall_bytes_));
+               sizeof(Impl_::is_available_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageAvailability)
 }
@@ -4267,9 +4119,9 @@ inline void StorageAvailability::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE aren
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, required_bytes_),
            0,
-           offsetof(Impl_, shortfall_bytes_) -
+           offsetof(Impl_, is_available_) -
                offsetof(Impl_, required_bytes_) +
-               sizeof(Impl_::shortfall_bytes_));
+               sizeof(Impl_::is_available_));
 }
 StorageAvailability::~StorageAvailability() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.StorageAvailability)
@@ -4329,10 +4181,10 @@ PROTOBUF_NOINLINE void StorageAvailability::Clear() {
       _impl_.recommendation_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007cU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
     ::memset(&_impl_.required_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.shortfall_bytes_) -
-        reinterpret_cast<char*>(&_impl_.required_bytes_)) + sizeof(_impl_.shortfall_bytes_));
+        reinterpret_cast<char*>(&_impl_.is_available_) -
+        reinterpret_cast<char*>(&_impl_.required_bytes_)) + sizeof(_impl_.is_available_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4400,24 +4252,6 @@ PROTOBUF_NOINLINE void StorageAvailability::Clear() {
     target = stream->WriteStringMaybeAliased(5, _s, target);
   }
 
-  // int64 shortfall_bytes = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_shortfall_bytes() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<6>(
-              stream, this_._internal_shortfall_bytes(), target);
-    }
-  }
-
-  // float required_to_available_ratio = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_required_to_available_ratio()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          7, this_._internal_required_to_available_ratio(), target);
-    }
-  }
-
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -4443,7 +4277,7 @@ PROTOBUF_NOINLINE void StorageAvailability::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     // optional string warning_message = 4;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -4474,19 +4308,6 @@ PROTOBUF_NOINLINE void StorageAvailability::Clear() {
         total_size += 2;
       }
     }
-    // float required_to_available_ratio = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_required_to_available_ratio()) != 0) {
-        total_size += 5;
-      }
-    }
-    // int64 shortfall_bytes = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_shortfall_bytes() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_shortfall_bytes());
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -4505,7 +4326,7 @@ void StorageAvailability::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_set_warning_message(from._internal_warning_message());
     }
@@ -4525,16 +4346,6 @@ void StorageAvailability::MergeImpl(::google::protobuf::MessageLite& to_msg,
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_is_available() != 0) {
         _this->_impl_.is_available_ = from._impl_.is_available_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_required_to_available_ratio()) != 0) {
-        _this->_impl_.required_to_available_ratio_ = from._impl_.required_to_available_ratio_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_shortfall_bytes() != 0) {
-        _this->_impl_.shortfall_bytes_ = from._impl_.shortfall_bytes_;
       }
     }
   }
@@ -4560,8 +4371,8 @@ void StorageAvailability::InternalSwap(StorageAvailability* PROTOBUF_RESTRICT PR
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.warning_message_, &other->_impl_.warning_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.recommendation_, &other->_impl_.recommendation_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.shortfall_bytes_)
-      + sizeof(StorageAvailability::_impl_.shortfall_bytes_)
+      PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.is_available_)
+      + sizeof(StorageAvailability::_impl_.is_available_)
       - PROTOBUF_FIELD_OFFSET(StorageAvailability, _impl_.required_bytes_)>(
           reinterpret_cast<char*>(&_impl_.required_bytes_),
           reinterpret_cast<char*>(&other->_impl_.required_bytes_));
@@ -5289,15 +5100,6 @@ PROTOBUF_NOINLINE void StorageAvailabilityRequest::Clear() {
     }
   }
 
-  // double safety_margin = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (::absl::bit_cast<::uint64_t>(this_._internal_safety_margin()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
-          3, this_._internal_safety_margin(), target);
-    }
-  }
-
   // bool include_existing_model_bytes = 4;
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_include_existing_model_bytes() != 0) {
@@ -5322,6 +5124,15 @@ PROTOBUF_NOINLINE void StorageAvailabilityRequest::Clear() {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
           6, this_._internal_allow_cache_reclamation(), target);
+    }
+  }
+
+  // int64 required_free_bytes_after_download = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_required_free_bytes_after_download() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
+              stream, this_._internal_required_free_bytes_after_download(), target);
     }
   }
 
@@ -5365,10 +5176,11 @@ PROTOBUF_NOINLINE void StorageAvailabilityRequest::Clear() {
             this_._internal_required_bytes());
       }
     }
-    // double safety_margin = 3;
+    // int64 required_free_bytes_after_download = 7;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (::absl::bit_cast<::uint64_t>(this_._internal_safety_margin()) != 0) {
-        total_size += 9;
+      if (this_._internal_required_free_bytes_after_download() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_required_free_bytes_after_download());
       }
     }
     // bool include_existing_model_bytes = 4;
@@ -5423,8 +5235,8 @@ void StorageAvailabilityRequest::MergeImpl(::google::protobuf::MessageLite& to_m
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (::absl::bit_cast<::uint64_t>(from._internal_safety_margin()) != 0) {
-        _this->_impl_.safety_margin_ = from._impl_.safety_margin_;
+      if (from._internal_required_free_bytes_after_download() != 0) {
+        _this->_impl_.required_free_bytes_after_download_ = from._impl_.required_free_bytes_after_download_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
@@ -6273,7 +6085,7 @@ PROTOBUF_NOINLINE void StorageDeleteCandidate::Clear() {
       _impl_.storage_key_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000078U)) {
     ::memset(&_impl_.reclaimable_bytes_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.requires_platform_delete_) -
         reinterpret_cast<char*>(&_impl_.reclaimable_bytes_)) + sizeof(_impl_.requires_platform_delete_));
@@ -6320,15 +6132,8 @@ PROTOBUF_NOINLINE void StorageDeleteCandidate::Clear() {
     }
   }
 
-  // optional int64 last_used_ms = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    target =
-        ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
-            stream, this_._internal_last_used_ms(), target);
-  }
-
   // bool is_loaded = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_is_loaded() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -6347,7 +6152,7 @@ PROTOBUF_NOINLINE void StorageDeleteCandidate::Clear() {
   }
 
   // bool requires_unload = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_requires_unload() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -6356,7 +6161,7 @@ PROTOBUF_NOINLINE void StorageDeleteCandidate::Clear() {
   }
 
   // bool requires_platform_delete = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_requires_platform_delete() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -6399,7 +6204,7 @@ PROTOBUF_NOINLINE void StorageDeleteCandidate::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     // string model_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_model_id().empty()) {
@@ -6428,25 +6233,20 @@ PROTOBUF_NOINLINE void StorageDeleteCandidate::Clear() {
             this_._internal_reclaimable_bytes());
       }
     }
-    // optional int64 last_used_ms = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-          this_._internal_last_used_ms());
-    }
     // bool is_loaded = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_is_loaded() != 0) {
         total_size += 2;
       }
     }
     // bool requires_unload = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_requires_unload() != 0) {
         total_size += 2;
       }
     }
     // bool requires_platform_delete = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_requires_platform_delete() != 0) {
         total_size += 2;
       }
@@ -6469,7 +6269,7 @@ void StorageDeleteCandidate::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_model_id().empty()) {
         _this->_internal_set_model_id(from._internal_model_id());
@@ -6503,19 +6303,16 @@ void StorageDeleteCandidate::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _this->_impl_.last_used_ms_ = from._impl_.last_used_ms_;
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_is_loaded() != 0) {
         _this->_impl_.is_loaded_ = from._impl_.is_loaded_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_requires_unload() != 0) {
         _this->_impl_.requires_unload_ = from._impl_.requires_unload_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_requires_platform_delete() != 0) {
         _this->_impl_.requires_platform_delete_ = from._impl_.requires_platform_delete_;
       }
@@ -6613,9 +6410,9 @@ StorageDeletePlan::StorageDeletePlan(
                offsetof(Impl_, required_bytes_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, required_bytes_),
-           offsetof(Impl_, candidate_count_) -
+           offsetof(Impl_, requires_platform_delete_) -
                offsetof(Impl_, required_bytes_) +
-               sizeof(Impl_::candidate_count_));
+               sizeof(Impl_::requires_platform_delete_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageDeletePlan)
 }
@@ -6639,9 +6436,9 @@ inline void StorageDeletePlan::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena)
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, candidate_count_) -
+           offsetof(Impl_, requires_platform_delete_) -
                offsetof(Impl_, error_) +
-               sizeof(Impl_::candidate_count_));
+               sizeof(Impl_::requires_platform_delete_));
 }
 StorageDeletePlan::~StorageDeletePlan() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.StorageDeletePlan)
@@ -6709,7 +6506,6 @@ PROTOBUF_NOINLINE void StorageDeletePlan::Clear() {
         reinterpret_cast<char*>(&_impl_.requires_platform_delete_) -
         reinterpret_cast<char*>(&_impl_.required_bytes_)) + sizeof(_impl_.requires_platform_delete_));
   }
-  _impl_.candidate_count_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -6801,15 +6597,6 @@ PROTOBUF_NOINLINE void StorageDeletePlan::Clear() {
     }
   }
 
-  // int32 candidate_count = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_candidate_count() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
-              stream, this_._internal_candidate_count(), target);
-    }
-  }
-
   // optional .runanywhere.v1.SDKError error = 10;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
@@ -6897,15 +6684,6 @@ PROTOBUF_NOINLINE void StorageDeletePlan::Clear() {
       }
     }
   }
-   {
-    // int32 candidate_count = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_candidate_count() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_candidate_count());
-      }
-    }
-  }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
 }
@@ -6969,11 +6747,6 @@ void StorageDeletePlan::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
   }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_candidate_count() != 0) {
-      _this->_impl_.candidate_count_ = from._impl_.candidate_count_;
-    }
-  }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
@@ -6994,8 +6767,8 @@ void StorageDeletePlan::InternalSwap(StorageDeletePlan* PROTOBUF_RESTRICT PROTOB
   _impl_.candidates_.InternalSwap(&other->_impl_.candidates_);
   _impl_.warnings_.InternalSwap(&other->_impl_.warnings_);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.candidate_count_)
-      + sizeof(StorageDeletePlan::_impl_.candidate_count_)
+      PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.requires_platform_delete_)
+      + sizeof(StorageDeletePlan::_impl_.requires_platform_delete_)
       - PROTOBUF_FIELD_OFFSET(StorageDeletePlan, _impl_.error_)>(
           reinterpret_cast<char*>(&_impl_.error_),
           reinterpret_cast<char*>(&other->_impl_.error_));
@@ -7048,11 +6821,11 @@ StorageDeleteRequest::StorageDeleteRequest(
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.plan_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, delete_files_),
+               offsetof(Impl_, keep_files_on_disk_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, delete_files_),
+               offsetof(Impl_, keep_files_on_disk_),
            offsetof(Impl_, allow_platform_delete_) -
-               offsetof(Impl_, delete_files_) +
+               offsetof(Impl_, keep_files_on_disk_) +
                sizeof(Impl_::allow_platform_delete_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StorageDeleteRequest)
@@ -7135,9 +6908,9 @@ PROTOBUF_NOINLINE void StorageDeleteRequest::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
-    ::memset(&_impl_.delete_files_, 0, static_cast<::size_t>(
+    ::memset(&_impl_.keep_files_on_disk_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.allow_platform_delete_) -
-        reinterpret_cast<char*>(&_impl_.delete_files_)) + sizeof(_impl_.allow_platform_delete_));
+        reinterpret_cast<char*>(&_impl_.keep_files_on_disk_)) + sizeof(_impl_.allow_platform_delete_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -7172,12 +6945,12 @@ PROTOBUF_NOINLINE void StorageDeleteRequest::Clear() {
     }
   }
 
-  // bool delete_files = 2;
+  // bool keep_files_on_disk = 2;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_delete_files() != 0) {
+    if (this_._internal_keep_files_on_disk() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          2, this_._internal_delete_files(), target);
+          2, this_._internal_keep_files_on_disk(), target);
     }
   }
 
@@ -7273,9 +7046,9 @@ PROTOBUF_NOINLINE void StorageDeleteRequest::Clear() {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.plan_);
     }
-    // bool delete_files = 2;
+    // bool keep_files_on_disk = 2;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_delete_files() != 0) {
+      if (this_._internal_keep_files_on_disk() != 0) {
         total_size += 2;
       }
     }
@@ -7343,8 +7116,8 @@ void StorageDeleteRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_delete_files() != 0) {
-        _this->_impl_.delete_files_ = from._impl_.delete_files_;
+      if (from._internal_keep_files_on_disk() != 0) {
+        _this->_impl_.keep_files_on_disk_ = from._impl_.keep_files_on_disk_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {

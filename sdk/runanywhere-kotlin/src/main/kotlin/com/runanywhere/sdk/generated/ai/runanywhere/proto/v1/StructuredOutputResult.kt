@@ -30,14 +30,16 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class StructuredOutputResult(
+  /**
+   * The extracted JSON document, as UTF-8 text. Parse it client-side.
+   */
   @field:WireField(
     tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "parsedJson",
     schemaIndex = 0,
   )
-  public val parsed_json: ByteString = ByteString.EMPTY,
+  public val json: String = "",
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputValidation#ADAPTER",
@@ -53,7 +55,7 @@ public class StructuredOutputResult(
   )
   public val raw_text: String? = null,
   @field:WireField(
-    tag = 6,
+    tag = 4,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 3,
   )
@@ -70,7 +72,7 @@ public class StructuredOutputResult(
     if (other === this) return true
     if (other !is StructuredOutputResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (parsed_json != other.parsed_json) return false
+    if (json != other.json) return false
     if (validation != other.validation) return false
     if (raw_text != other.raw_text) return false
     if (error != other.error) return false
@@ -81,7 +83,7 @@ public class StructuredOutputResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + parsed_json.hashCode()
+      result = result * 37 + json.hashCode()
       result = result * 37 + (validation?.hashCode() ?: 0)
       result = result * 37 + (raw_text?.hashCode() ?: 0)
       result = result * 37 + (error?.hashCode() ?: 0)
@@ -92,7 +94,7 @@ public class StructuredOutputResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """parsed_json=$parsed_json"""
+    result += """json=${sanitize(json)}"""
     if (validation != null) result += """validation=$validation"""
     if (raw_text != null) result += """raw_text=${sanitize(raw_text)}"""
     if (error != null) result += """error=$error"""
@@ -100,12 +102,12 @@ public class StructuredOutputResult(
   }
 
   public fun copy(
-    parsed_json: ByteString = this.parsed_json,
+    json: String = this.json,
     validation: StructuredOutputValidation? = this.validation,
     raw_text: String? = this.raw_text,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): StructuredOutputResult = StructuredOutputResult(parsed_json, validation, raw_text, error, unknownFields)
+  ): StructuredOutputResult = StructuredOutputResult(json, validation, raw_text, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -120,57 +122,57 @@ public class StructuredOutputResult(
     ) {
       override fun encodedSize(`value`: StructuredOutputResult): Int {
         var size = value.unknownFields.size
-        if (value.parsed_json != okio.ByteString.EMPTY) {
-          size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.parsed_json)
+        if (value.json != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.json)
         }
         if (value.validation != null) {
           size += StructuredOutputValidation.ADAPTER.encodedSizeWithTag(2, value.validation)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.raw_text)
-        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
+        size += SDKError.ADAPTER.encodedSizeWithTag(4, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: StructuredOutputResult) {
-        if (value.parsed_json != okio.ByteString.EMPTY) {
-          ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.parsed_json)
+        if (value.json != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.json)
         }
         if (value.validation != null) {
           StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 2, value.validation)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.raw_text)
-        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 4, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputResult) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 4, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.raw_text)
         if (value.validation != null) {
           StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 2, value.validation)
         }
-        if (value.parsed_json != okio.ByteString.EMPTY) {
-          ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.parsed_json)
+        if (value.json != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 1, value.json)
         }
       }
 
       override fun decode(reader: ProtoReader): StructuredOutputResult {
-        var parsed_json: ByteString = ByteString.EMPTY
+        var json: String = ""
         var validation: StructuredOutputValidation? = null
         var raw_text: String? = null
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> parsed_json = ProtoAdapter.BYTES.decode(reader)
+            1 -> json = ProtoAdapter.STRING.decode(reader)
             2 -> validation = StructuredOutputValidation.ADAPTER.decode(reader)
             3 -> raw_text = ProtoAdapter.STRING.decode(reader)
-            6 -> error = SDKError.ADAPTER.decode(reader)
+            4 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return StructuredOutputResult(
-          parsed_json = parsed_json,
+          json = json,
           validation = validation,
           raw_text = raw_text,
           error = error,

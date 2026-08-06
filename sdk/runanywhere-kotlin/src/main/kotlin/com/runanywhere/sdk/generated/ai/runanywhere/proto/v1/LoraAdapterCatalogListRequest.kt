@@ -35,14 +35,6 @@ public class LoraAdapterCatalogListRequest(
     schemaIndex = 0,
   )
   public val query: LoraAdapterCatalogQuery? = null,
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "includeCounts",
-    schemaIndex = 1,
-  )
-  public val include_counts: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraAdapterCatalogListRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -56,7 +48,6 @@ public class LoraAdapterCatalogListRequest(
     if (other !is LoraAdapterCatalogListRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (query != other.query) return false
-    if (include_counts != other.include_counts) return false
     return true
   }
 
@@ -65,7 +56,6 @@ public class LoraAdapterCatalogListRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + (query?.hashCode() ?: 0)
-      result = result * 37 + include_counts.hashCode()
       super.hashCode = result
     }
     return result
@@ -74,15 +64,10 @@ public class LoraAdapterCatalogListRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (query != null) result += """query=$query"""
-    result += """include_counts=$include_counts"""
     return result.joinToString(prefix = "LoraAdapterCatalogListRequest{", separator = ", ", postfix = "}")
   }
 
-  public fun copy(
-    query: LoraAdapterCatalogQuery? = this.query,
-    include_counts: Boolean = this.include_counts,
-    unknownFields: ByteString = this.unknownFields,
-  ): LoraAdapterCatalogListRequest = LoraAdapterCatalogListRequest(query, include_counts, unknownFields)
+  public fun copy(query: LoraAdapterCatalogQuery? = this.query, unknownFields: ByteString = this.unknownFields): LoraAdapterCatalogListRequest = LoraAdapterCatalogListRequest(query, unknownFields)
 
   public companion object {
     @JvmField
@@ -98,41 +83,29 @@ public class LoraAdapterCatalogListRequest(
       override fun encodedSize(`value`: LoraAdapterCatalogListRequest): Int {
         var size = value.unknownFields.size
         size += LoraAdapterCatalogQuery.ADAPTER.encodedSizeWithTag(1, value.query)
-        if (value.include_counts != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.include_counts)
-        }
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: LoraAdapterCatalogListRequest) {
         LoraAdapterCatalogQuery.ADAPTER.encodeWithTag(writer, 1, value.query)
-        if (value.include_counts != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.include_counts)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraAdapterCatalogListRequest) {
         writer.writeBytes(value.unknownFields)
-        if (value.include_counts != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.include_counts)
-        }
         LoraAdapterCatalogQuery.ADAPTER.encodeWithTag(writer, 1, value.query)
       }
 
       override fun decode(reader: ProtoReader): LoraAdapterCatalogListRequest {
         var query: LoraAdapterCatalogQuery? = null
-        var include_counts: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> query = LoraAdapterCatalogQuery.ADAPTER.decode(reader)
-            2 -> include_counts = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoraAdapterCatalogListRequest(
           query = query,
-          include_counts = include_counts,
           unknownFields = unknownFields
         )
       }

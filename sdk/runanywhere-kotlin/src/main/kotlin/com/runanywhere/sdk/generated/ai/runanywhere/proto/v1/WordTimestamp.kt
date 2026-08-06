@@ -61,6 +61,10 @@ public class WordTimestamp(
     schemaIndex = 3,
   )
   public val confidence: Float = 0f,
+  /**
+   * Always empty today: no backend fills this. Kept live -- read by all
+   * five SDK facades as public API -- pending real diarization wiring.
+   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

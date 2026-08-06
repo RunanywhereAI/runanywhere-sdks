@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -30,8 +29,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class DiffusionStreamEvent(
+  /**
+   * Generation is single-flight, so the stream itself is the correlation.
+   */
   @field:WireField(
-    tag = 2,
+    tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
@@ -39,37 +41,29 @@ public class DiffusionStreamEvent(
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "requestId",
-    schemaIndex = 1,
-  )
-  public val request_id: String = "",
-  @field:WireField(
-    tag = 4,
+    tag = 2,
     adapter = "ai.runanywhere.proto.v1.DiffusionStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val kind:
       DiffusionStreamEventKind = DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
-    tag = 5,
+    tag = 3,
     adapter = "ai.runanywhere.proto.v1.DiffusionProgress#ADAPTER",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val progress: DiffusionProgress? = null,
   @field:WireField(
-    tag = 6,
+    tag = 4,
     adapter = "ai.runanywhere.proto.v1.DiffusionResult#ADAPTER",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val result: DiffusionResult? = null,
   @field:WireField(
-    tag = 9,
+    tag = 5,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -85,7 +79,6 @@ public class DiffusionStreamEvent(
     if (other !is DiffusionStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
     if (timestamp_us != other.timestamp_us) return false
-    if (request_id != other.request_id) return false
     if (kind != other.kind) return false
     if (progress != other.progress) return false
     if (result != other.result) return false
@@ -98,7 +91,6 @@ public class DiffusionStreamEvent(
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
-      result_ = result_ * 37 + request_id.hashCode()
       result_ = result_ * 37 + kind.hashCode()
       result_ = result_ * 37 + (progress?.hashCode() ?: 0)
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
@@ -111,7 +103,6 @@ public class DiffusionStreamEvent(
   override fun toString(): String {
     val result_ = mutableListOf<String>()
     result_ += """timestamp_us=$timestamp_us"""
-    result_ += """request_id=${sanitize(request_id)}"""
     result_ += """kind=$kind"""
     if (progress != null) result_ += """progress=$progress"""
     if (result != null) result_ += """result=$result"""
@@ -121,13 +112,12 @@ public class DiffusionStreamEvent(
 
   public fun copy(
     timestamp_us: Long = this.timestamp_us,
-    request_id: String = this.request_id,
     kind: DiffusionStreamEventKind = this.kind,
     progress: DiffusionProgress? = this.progress,
     result: DiffusionResult? = this.result,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionStreamEvent = DiffusionStreamEvent(timestamp_us, request_id, kind, progress, result, error, unknownFields)
+  ): DiffusionStreamEvent = DiffusionStreamEvent(timestamp_us, kind, progress, result, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -143,77 +133,65 @@ public class DiffusionStreamEvent(
       override fun encodedSize(`value`: DiffusionStreamEvent): Int {
         var size = value.unknownFields.size
         if (value.timestamp_us != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
-        }
-        if (value.request_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.request_id)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(1, value.timestamp_us)
         }
         if (value.kind != ai.runanywhere.proto.v1.DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED) {
-          size += DiffusionStreamEventKind.ADAPTER.encodedSizeWithTag(4, value.kind)
+          size += DiffusionStreamEventKind.ADAPTER.encodedSizeWithTag(2, value.kind)
         }
-        size += DiffusionProgress.ADAPTER.encodedSizeWithTag(5, value.progress)
-        size += DiffusionResult.ADAPTER.encodedSizeWithTag(6, value.result)
-        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
+        size += DiffusionProgress.ADAPTER.encodedSizeWithTag(3, value.progress)
+        size += DiffusionResult.ADAPTER.encodedSizeWithTag(4, value.result)
+        size += SDKError.ADAPTER.encodedSizeWithTag(5, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: DiffusionStreamEvent) {
         if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
-        }
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.request_id)
+          ProtoAdapter.INT64.encodeWithTag(writer, 1, value.timestamp_us)
         }
         if (value.kind != ai.runanywhere.proto.v1.DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED) {
-          DiffusionStreamEventKind.ADAPTER.encodeWithTag(writer, 4, value.kind)
+          DiffusionStreamEventKind.ADAPTER.encodeWithTag(writer, 2, value.kind)
         }
-        DiffusionProgress.ADAPTER.encodeWithTag(writer, 5, value.progress)
-        DiffusionResult.ADAPTER.encodeWithTag(writer, 6, value.result)
-        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
+        DiffusionProgress.ADAPTER.encodeWithTag(writer, 3, value.progress)
+        DiffusionResult.ADAPTER.encodeWithTag(writer, 4, value.result)
+        SDKError.ADAPTER.encodeWithTag(writer, 5, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
-        DiffusionResult.ADAPTER.encodeWithTag(writer, 6, value.result)
-        DiffusionProgress.ADAPTER.encodeWithTag(writer, 5, value.progress)
+        SDKError.ADAPTER.encodeWithTag(writer, 5, value.error)
+        DiffusionResult.ADAPTER.encodeWithTag(writer, 4, value.result)
+        DiffusionProgress.ADAPTER.encodeWithTag(writer, 3, value.progress)
         if (value.kind != ai.runanywhere.proto.v1.DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED) {
-          DiffusionStreamEventKind.ADAPTER.encodeWithTag(writer, 4, value.kind)
-        }
-        if (value.request_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.request_id)
+          DiffusionStreamEventKind.ADAPTER.encodeWithTag(writer, 2, value.kind)
         }
         if (value.timestamp_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
+          ProtoAdapter.INT64.encodeWithTag(writer, 1, value.timestamp_us)
         }
       }
 
       override fun decode(reader: ProtoReader): DiffusionStreamEvent {
         var timestamp_us: Long = 0L
-        var request_id: String = ""
         var kind: DiffusionStreamEventKind = DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED
         var progress: DiffusionProgress? = null
         var result: DiffusionResult? = null
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
-            3 -> request_id = ProtoAdapter.STRING.decode(reader)
-            4 -> try {
+            1 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
+            2 -> try {
               kind = DiffusionStreamEventKind.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            5 -> progress = DiffusionProgress.ADAPTER.decode(reader)
-            6 -> result = DiffusionResult.ADAPTER.decode(reader)
-            9 -> error = SDKError.ADAPTER.decode(reader)
+            3 -> progress = DiffusionProgress.ADAPTER.decode(reader)
+            4 -> result = DiffusionResult.ADAPTER.decode(reader)
+            5 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DiffusionStreamEvent(
           timestamp_us = timestamp_us,
-          request_id = request_id,
           kind = kind,
           progress = progress,
           result = result,

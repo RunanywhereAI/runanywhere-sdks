@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -47,6 +46,9 @@ public class VLMStreamEvent(
     schemaIndex = 1,
   )
   public val request_id: String = "",
+  /**
+   * The single terminal discriminator: COMPLETED or ERROR ends the stream.
+   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.VLMStreamEventKind#ADAPTER",
@@ -69,32 +71,20 @@ public class VLMStreamEvent(
     schemaIndex = 4,
   )
   public val token_index: Int = 0,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "isFinal",
-    schemaIndex = 5,
-  )
-  public val is_final: Boolean = false,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokensPerSecond",
-    schemaIndex = 6,
-  )
-  public val tokens_per_second: Float = 0f,
+  /**
+   * Rate comes from result.usage.tokens_per_second on the terminal event,
+   * in TokenUsage's own type. No second copy, no second scalar type.
+   */
   @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.VLMResult#ADAPTER",
-    schemaIndex = 7,
+    schemaIndex = 5,
   )
   public val result: VLMResult? = null,
   @field:WireField(
     tag = 12,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 8,
+    schemaIndex = 6,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -114,8 +104,6 @@ public class VLMStreamEvent(
     if (kind != other.kind) return false
     if (token != other.token) return false
     if (token_index != other.token_index) return false
-    if (is_final != other.is_final) return false
-    if (tokens_per_second != other.tokens_per_second) return false
     if (result != other.result) return false
     if (error != other.error) return false
     return true
@@ -130,8 +118,6 @@ public class VLMStreamEvent(
       result_ = result_ * 37 + kind.hashCode()
       result_ = result_ * 37 + token.hashCode()
       result_ = result_ * 37 + token_index.hashCode()
-      result_ = result_ * 37 + is_final.hashCode()
-      result_ = result_ * 37 + tokens_per_second.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
       result_ = result_ * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result_
@@ -146,8 +132,6 @@ public class VLMStreamEvent(
     result_ += """kind=$kind"""
     result_ += """token=${sanitize(token)}"""
     result_ += """token_index=$token_index"""
-    result_ += """is_final=$is_final"""
-    result_ += """tokens_per_second=$tokens_per_second"""
     if (result != null) result_ += """result=$result"""
     if (error != null) result_ += """error=$error"""
     return result_.joinToString(prefix = "VLMStreamEvent{", separator = ", ", postfix = "}")
@@ -159,12 +143,10 @@ public class VLMStreamEvent(
     kind: VLMStreamEventKind = this.kind,
     token: String = this.token,
     token_index: Int = this.token_index,
-    is_final: Boolean = this.is_final,
-    tokens_per_second: Float = this.tokens_per_second,
     result: VLMResult? = this.result,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMStreamEvent = VLMStreamEvent(timestamp_us, request_id, kind, token, token_index, is_final, tokens_per_second, result, error, unknownFields)
+  ): VLMStreamEvent = VLMStreamEvent(timestamp_us, request_id, kind, token, token_index, result, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -193,12 +175,6 @@ public class VLMStreamEvent(
         if (value.token_index != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.token_index)
         }
-        if (value.is_final != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.is_final)
-        }
-        if (!value.tokens_per_second.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(8, value.tokens_per_second)
-        }
         size += VLMResult.ADAPTER.encodedSizeWithTag(9, value.result)
         size += SDKError.ADAPTER.encodedSizeWithTag(12, value.error)
         return size
@@ -220,12 +196,6 @@ public class VLMStreamEvent(
         if (value.token_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.token_index)
         }
-        if (value.is_final != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.is_final)
-        }
-        if (!value.tokens_per_second.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.tokens_per_second)
-        }
         VLMResult.ADAPTER.encodeWithTag(writer, 9, value.result)
         SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
         writer.writeBytes(value.unknownFields)
@@ -235,12 +205,6 @@ public class VLMStreamEvent(
         writer.writeBytes(value.unknownFields)
         SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
         VLMResult.ADAPTER.encodeWithTag(writer, 9, value.result)
-        if (!value.tokens_per_second.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.tokens_per_second)
-        }
-        if (value.is_final != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.is_final)
-        }
         if (value.token_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.token_index)
         }
@@ -264,8 +228,6 @@ public class VLMStreamEvent(
         var kind: VLMStreamEventKind = VLMStreamEventKind.VLM_STREAM_EVENT_KIND_UNSPECIFIED
         var token: String = ""
         var token_index: Int = 0
-        var is_final: Boolean = false
-        var tokens_per_second: Float = 0f
         var result: VLMResult? = null
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
@@ -279,8 +241,6 @@ public class VLMStreamEvent(
             }
             5 -> token = ProtoAdapter.STRING.decode(reader)
             6 -> token_index = ProtoAdapter.INT32.decode(reader)
-            7 -> is_final = ProtoAdapter.BOOL.decode(reader)
-            8 -> tokens_per_second = ProtoAdapter.FLOAT.decode(reader)
             9 -> result = VLMResult.ADAPTER.decode(reader)
             12 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -292,8 +252,6 @@ public class VLMStreamEvent(
           kind = kind,
           token = token,
           token_index = token_index,
-          is_final = is_final,
-          tokens_per_second = tokens_per_second,
           result = result,
           error = error,
           unknownFields = unknownFields

@@ -228,7 +228,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
   enum : int {
     kInputTokensFieldNumber = 1,
     kOutputTokensFieldNumber = 2,
-    kTokensPerSecondFieldNumber = 4,
+    kDecodeTokensPerSecondFieldNumber = 4,
+    kPrefillMsFieldNumber = 5,
+    kTtftMsFieldNumber = 6,
     kTotalTokensFieldNumber = 3,
   };
   // int32 input_tokens = 1;
@@ -251,14 +253,34 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
   void _internal_set_output_tokens(::int32_t value);
 
   public:
-  // double tokens_per_second = 4;
-  void clear_tokens_per_second() ;
-  [[nodiscard]] double tokens_per_second() const;
-  void set_tokens_per_second(double value);
+  // double decode_tokens_per_second = 4;
+  void clear_decode_tokens_per_second() ;
+  [[nodiscard]] double decode_tokens_per_second() const;
+  void set_decode_tokens_per_second(double value);
 
   private:
-  double _internal_tokens_per_second() const;
-  void _internal_set_tokens_per_second(double value);
+  double _internal_decode_tokens_per_second() const;
+  void _internal_set_decode_tokens_per_second(double value);
+
+  public:
+  // int64 prefill_ms = 5;
+  void clear_prefill_ms() ;
+  [[nodiscard]] ::int64_t prefill_ms() const;
+  void set_prefill_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_prefill_ms() const;
+  void _internal_set_prefill_ms(::int64_t value);
+
+  public:
+  // int64 ttft_ms = 6;
+  void clear_ttft_ms() ;
+  [[nodiscard]] ::int64_t ttft_ms() const;
+  void set_ttft_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_ttft_ms() const;
+  void _internal_set_ttft_ms(::int64_t value);
 
   public:
   // int32 total_tokens = 3;
@@ -275,7 +297,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
+      ::google::protobuf::internal::TcParseTable<3, 6,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -306,7 +328,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TokenUsage final : public ::google:
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::int32_t input_tokens_;
     ::int32_t output_tokens_;
-    double tokens_per_second_;
+    double decode_tokens_per_second_;
+    ::int64_t prefill_ms_;
+    ::int64_t ttft_ms_;
     ::int32_t total_tokens_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -382,7 +406,7 @@ inline void TokenUsage::_internal_set_output_tokens(::int32_t value) {
 inline void TokenUsage::clear_total_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::int32_t TokenUsage::total_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.total_tokens)
@@ -390,7 +414,7 @@ inline ::int32_t TokenUsage::total_tokens() const {
 }
 inline void TokenUsage::set_total_tokens(::int32_t value) {
   _internal_set_total_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.total_tokens)
 }
 inline ::int32_t TokenUsage::_internal_total_tokens() const {
@@ -402,28 +426,76 @@ inline void TokenUsage::_internal_set_total_tokens(::int32_t value) {
   _impl_.total_tokens_ = value;
 }
 
-// double tokens_per_second = 4;
-inline void TokenUsage::clear_tokens_per_second() {
+// double decode_tokens_per_second = 4;
+inline void TokenUsage::clear_decode_tokens_per_second() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.tokens_per_second_ = 0;
+  _impl_.decode_tokens_per_second_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline double TokenUsage::tokens_per_second() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.tokens_per_second)
-  return _internal_tokens_per_second();
+inline double TokenUsage::decode_tokens_per_second() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.decode_tokens_per_second)
+  return _internal_decode_tokens_per_second();
 }
-inline void TokenUsage::set_tokens_per_second(double value) {
-  _internal_set_tokens_per_second(value);
+inline void TokenUsage::set_decode_tokens_per_second(double value) {
+  _internal_set_decode_tokens_per_second(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.tokens_per_second)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.decode_tokens_per_second)
 }
-inline double TokenUsage::_internal_tokens_per_second() const {
+inline double TokenUsage::_internal_decode_tokens_per_second() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.tokens_per_second_;
+  return _impl_.decode_tokens_per_second_;
 }
-inline void TokenUsage::_internal_set_tokens_per_second(double value) {
+inline void TokenUsage::_internal_set_decode_tokens_per_second(double value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.tokens_per_second_ = value;
+  _impl_.decode_tokens_per_second_ = value;
+}
+
+// int64 prefill_ms = 5;
+inline void TokenUsage::clear_prefill_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.prefill_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+inline ::int64_t TokenUsage::prefill_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.prefill_ms)
+  return _internal_prefill_ms();
+}
+inline void TokenUsage::set_prefill_ms(::int64_t value) {
+  _internal_set_prefill_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.prefill_ms)
+}
+inline ::int64_t TokenUsage::_internal_prefill_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.prefill_ms_;
+}
+inline void TokenUsage::_internal_set_prefill_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.prefill_ms_ = value;
+}
+
+// int64 ttft_ms = 6;
+inline void TokenUsage::clear_ttft_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.ttft_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline ::int64_t TokenUsage::ttft_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.TokenUsage.ttft_ms)
+  return _internal_ttft_ms();
+}
+inline void TokenUsage::set_ttft_ms(::int64_t value) {
+  _internal_set_ttft_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.TokenUsage.ttft_ms)
+}
+inline ::int64_t TokenUsage::_internal_ttft_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.ttft_ms_;
+}
+inline void TokenUsage::_internal_set_ttft_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.ttft_ms_ = value;
 }
 
 #ifdef __GNUC__

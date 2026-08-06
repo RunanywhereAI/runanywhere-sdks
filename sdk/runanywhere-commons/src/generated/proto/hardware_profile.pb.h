@@ -61,30 +61,6 @@ enum AccelerationPreference : int;
 extern const uint32_t AccelerationPreference_internal_data_[];
 enum HexagonArch : int;
 extern const uint32_t HexagonArch_internal_data_[];
-class AcceleratorInfo;
-struct AcceleratorInfoGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern AcceleratorInfoGlobalsTypeInternal AcceleratorInfo_globals_;
-extern const ::google::protobuf::internal::ClassDataFull AcceleratorInfo_class_data_;
-#else
-extern const AcceleratorInfoGlobalsTypeInternal AcceleratorInfo_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class HardwareProfile;
-struct HardwareProfileGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern HardwareProfileGlobalsTypeInternal HardwareProfile_globals_;
-extern const ::google::protobuf::internal::ClassDataFull HardwareProfile_class_data_;
-#else
-extern const HardwareProfileGlobalsTypeInternal HardwareProfile_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class HardwareProfileResult;
-struct HardwareProfileResultGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern HardwareProfileResultGlobalsTypeInternal HardwareProfileResult_globals_;
-extern const ::google::protobuf::internal::ClassDataFull HardwareProfileResult_class_data_;
-#else
-extern const HardwareProfileResultGlobalsTypeInternal HardwareProfileResult_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
 class NpuCapability;
 struct NpuCapabilityGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -114,9 +90,6 @@ enum AccelerationPreference : int {
   ACCELERATION_PREFERENCE_CPU = 2,
   ACCELERATION_PREFERENCE_GPU = 3,
   ACCELERATION_PREFERENCE_NPU = 4,
-  ACCELERATION_PREFERENCE_WEBGPU = 5,
-  ACCELERATION_PREFERENCE_METAL = 6,
-  ACCELERATION_PREFERENCE_VULKAN = 7,
   AccelerationPreference_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   AccelerationPreference_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -127,11 +100,11 @@ extern const uint32_t AccelerationPreference_internal_data_[];
 inline constexpr AccelerationPreference AccelerationPreference_MIN =
     static_cast<AccelerationPreference>(0);
 inline constexpr AccelerationPreference AccelerationPreference_MAX =
-    static_cast<AccelerationPreference>(7);
+    static_cast<AccelerationPreference>(4);
 [[nodiscard]] inline bool AccelerationPreference_IsValid(int value) {
-  return 0 <= value && value <= 7;
+  return 0 <= value && value <= 4;
 }
-inline constexpr int AccelerationPreference_ARRAYSIZE = 7 + 1;
+inline constexpr int AccelerationPreference_ARRAYSIZE = 4 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 AccelerationPreference_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(AccelerationPreference) {
@@ -146,7 +119,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& AccelerationPreference_Name(AccelerationPreference value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<AccelerationPreference_descriptor, 0, 7>(
+  return ::google::protobuf::internal::NameOfDenseEnum<AccelerationPreference_descriptor, 0, 4>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool AccelerationPreference_Parse(
@@ -258,7 +231,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuCapability final : public ::goog
   [[nodiscard]] static const NpuCapability& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<NpuCapability>(&NpuCapability_globals_);
   }
-  static constexpr int kIndexInFileMessages = 3;
+  static constexpr int kIndexInFileMessages = 0;
   friend void swap(NpuCapability& a, NpuCapability& b) { a.Swap(&b); }
   inline void Swap(NpuCapability* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -351,10 +324,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuCapability final : public ::goog
   // accessors -------------------------------------------------------
   enum : int {
     kSocModelFieldNumber = 1,
-    kArchNameFieldNumber = 5,
     kSocIdFieldNumber = 2,
     kHexagonArchFieldNumber = 3,
-    kQhexrtSupportedFieldNumber = 4,
+    kSupportedFieldNumber = 4,
+    kNpuFieldNumber = 5,
   };
   // string soc_model = 1;
   void clear_soc_model() ;
@@ -371,22 +344,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuCapability final : public ::goog
   ::std::string* PROTOBUF_NONNULL _internal_mutable_soc_model();
 
   public:
-  // string arch_name = 5;
-  void clear_arch_name() ;
-  [[nodiscard]] const ::std::string& arch_name() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_arch_name(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_arch_name();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_arch_name();
-  void set_allocated_arch_name(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_arch_name() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_arch_name(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_arch_name();
-
-  public:
-  // int32 soc_id = 2;
+  // optional int32 soc_id = 2;
+  [[nodiscard]] bool has_soc_id()
+      const;
   void clear_soc_id() ;
   [[nodiscard]] ::int32_t soc_id() const;
   void set_soc_id(::int32_t value);
@@ -406,14 +366,24 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuCapability final : public ::goog
   void _internal_set_hexagon_arch(::runanywhere::v1::HexagonArch value);
 
   public:
-  // bool qhexrt_supported = 4;
-  void clear_qhexrt_supported() ;
-  [[nodiscard]] bool qhexrt_supported() const;
-  void set_qhexrt_supported(bool value);
+  // bool supported = 4;
+  void clear_supported() ;
+  [[nodiscard]] bool supported() const;
+  void set_supported(bool value);
 
   private:
-  bool _internal_qhexrt_supported() const;
-  void _internal_set_qhexrt_supported(bool value);
+  bool _internal_supported() const;
+  void _internal_set_supported(bool value);
+
+  public:
+  // .runanywhere.v1.NPUChip npu = 5;
+  void clear_npu() ;
+  [[nodiscard]] ::runanywhere::v1::NPUChip npu() const;
+  void set_npu(::runanywhere::v1::NPUChip value);
+
+  private:
+  ::runanywhere::v1::NPUChip _internal_npu() const;
+  void _internal_set_npu(::runanywhere::v1::NPUChip value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.NpuCapability)
@@ -421,7 +391,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuCapability final : public ::goog
   class _Internal;
   using ParseTableT_ =
       ::google::protobuf::internal::TcParseTable<3, 5,
-                          0, 55,
+                          0, 46,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -450,799 +420,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED NpuCapability final : public ::goog
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr soc_model_;
-    ::google::protobuf::internal::ArenaStringPtr arch_name_;
     ::int32_t soc_id_;
     int hexagon_arch_;
-    bool qhexrt_supported_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_hardware_5fprofile_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfile final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.HardwareProfile) */ {
- public:
-  inline HardwareProfile() : HardwareProfile(nullptr) {}
-  ~HardwareProfile() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(HardwareProfile* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(HardwareProfile));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr HardwareProfile(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline HardwareProfile(const HardwareProfile& from) : HardwareProfile(nullptr, from) {}
-  inline HardwareProfile(HardwareProfile&& from) noexcept : HardwareProfile(nullptr, ::std::move(from)) {}
-  inline HardwareProfile& operator=(const HardwareProfile& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline HardwareProfile& operator=(HardwareProfile&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const HardwareProfile& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HardwareProfile>(&HardwareProfile_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 0;
-  friend void swap(HardwareProfile& a, HardwareProfile& b) { a.Swap(&b); }
-  inline void Swap(HardwareProfile* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(HardwareProfile* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] HardwareProfile* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<HardwareProfile>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const HardwareProfile& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const HardwareProfile& from) { HardwareProfile::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(HardwareProfile* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.HardwareProfile"; }
-
-  explicit HardwareProfile(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  HardwareProfile(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HardwareProfile& from);
-  HardwareProfile(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, HardwareProfile&& from) noexcept
-      : HardwareProfile(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kChipFieldNumber = 1,
-    kAccelerationModeFieldNumber = 3,
-    kArchitectureFieldNumber = 8,
-    kPlatformFieldNumber = 9,
-    kHasNeuralEngineFieldNumber = 2,
-    kCoreCountFieldNumber = 5,
-    kTotalMemoryBytesFieldNumber = 4,
-    kPerformanceCoresFieldNumber = 6,
-    kEfficiencyCoresFieldNumber = 7,
-    kNpuChipFieldNumber = 10,
-  };
-  // string chip = 1;
-  void clear_chip() ;
-  [[nodiscard]] const ::std::string& chip() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_chip(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_chip();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_chip();
-  void set_allocated_chip(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_chip() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_chip(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_chip();
-
-  public:
-  // string acceleration_mode = 3;
-  void clear_acceleration_mode() ;
-  [[nodiscard]] const ::std::string& acceleration_mode() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_acceleration_mode(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_acceleration_mode();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_acceleration_mode();
-  void set_allocated_acceleration_mode(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_acceleration_mode() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_acceleration_mode(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_acceleration_mode();
-
-  public:
-  // string architecture = 8;
-  void clear_architecture() ;
-  [[nodiscard]] const ::std::string& architecture() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_architecture(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_architecture();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_architecture();
-  void set_allocated_architecture(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_architecture() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_architecture(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_architecture();
-
-  public:
-  // string platform = 9;
-  void clear_platform() ;
-  [[nodiscard]] const ::std::string& platform() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_platform(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_platform();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_platform();
-  void set_allocated_platform(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_platform() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_platform(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_platform();
-
-  public:
-  // bool has_neural_engine = 2;
-  void clear_has_neural_engine() ;
-  [[nodiscard]] bool has_neural_engine() const;
-  void set_has_neural_engine(bool value);
-
-  private:
-  bool _internal_has_neural_engine() const;
-  void _internal_set_has_neural_engine(bool value);
-
-  public:
-  // uint32 core_count = 5;
-  void clear_core_count() ;
-  [[nodiscard]] ::uint32_t core_count() const;
-  void set_core_count(::uint32_t value);
-
-  private:
-  ::uint32_t _internal_core_count() const;
-  void _internal_set_core_count(::uint32_t value);
-
-  public:
-  // uint64 total_memory_bytes = 4;
-  void clear_total_memory_bytes() ;
-  [[nodiscard]] ::uint64_t total_memory_bytes() const;
-  void set_total_memory_bytes(::uint64_t value);
-
-  private:
-  ::uint64_t _internal_total_memory_bytes() const;
-  void _internal_set_total_memory_bytes(::uint64_t value);
-
-  public:
-  // uint32 performance_cores = 6;
-  void clear_performance_cores() ;
-  [[nodiscard]] ::uint32_t performance_cores() const;
-  void set_performance_cores(::uint32_t value);
-
-  private:
-  ::uint32_t _internal_performance_cores() const;
-  void _internal_set_performance_cores(::uint32_t value);
-
-  public:
-  // uint32 efficiency_cores = 7;
-  void clear_efficiency_cores() ;
-  [[nodiscard]] ::uint32_t efficiency_cores() const;
-  void set_efficiency_cores(::uint32_t value);
-
-  private:
-  ::uint32_t _internal_efficiency_cores() const;
-  void _internal_set_efficiency_cores(::uint32_t value);
-
-  public:
-  // .runanywhere.v1.NPUChip npu_chip = 10;
-  void clear_npu_chip() ;
-  [[nodiscard]] ::runanywhere::v1::NPUChip npu_chip() const;
-  void set_npu_chip(::runanywhere::v1::NPUChip value);
-
-  private:
-  ::runanywhere::v1::NPUChip _internal_npu_chip() const;
-  void _internal_set_npu_chip(::runanywhere::v1::NPUChip value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareProfile)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 10,
-                          0, 88,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const HardwareProfile& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr chip_;
-    ::google::protobuf::internal::ArenaStringPtr acceleration_mode_;
-    ::google::protobuf::internal::ArenaStringPtr architecture_;
-    ::google::protobuf::internal::ArenaStringPtr platform_;
-    bool has_neural_engine_;
-    ::uint32_t core_count_;
-    ::uint64_t total_memory_bytes_;
-    ::uint32_t performance_cores_;
-    ::uint32_t efficiency_cores_;
-    int npu_chip_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_hardware_5fprofile_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AcceleratorInfo final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.AcceleratorInfo) */ {
- public:
-  inline AcceleratorInfo() : AcceleratorInfo(nullptr) {}
-  ~AcceleratorInfo() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(AcceleratorInfo* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(AcceleratorInfo));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr AcceleratorInfo(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline AcceleratorInfo(const AcceleratorInfo& from) : AcceleratorInfo(nullptr, from) {}
-  inline AcceleratorInfo(AcceleratorInfo&& from) noexcept : AcceleratorInfo(nullptr, ::std::move(from)) {}
-  inline AcceleratorInfo& operator=(const AcceleratorInfo& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline AcceleratorInfo& operator=(AcceleratorInfo&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const AcceleratorInfo& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<AcceleratorInfo>(&AcceleratorInfo_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 1;
-  friend void swap(AcceleratorInfo& a, AcceleratorInfo& b) { a.Swap(&b); }
-  inline void Swap(AcceleratorInfo* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(AcceleratorInfo* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] AcceleratorInfo* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<AcceleratorInfo>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const AcceleratorInfo& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const AcceleratorInfo& from) { AcceleratorInfo::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(AcceleratorInfo* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.AcceleratorInfo"; }
-
-  explicit AcceleratorInfo(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  AcceleratorInfo(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const AcceleratorInfo& from);
-  AcceleratorInfo(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, AcceleratorInfo&& from) noexcept
-      : AcceleratorInfo(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kNameFieldNumber = 1,
-    kTypeFieldNumber = 2,
-    kAvailableFieldNumber = 3,
-  };
-  // string name = 1;
-  void clear_name() ;
-  [[nodiscard]] const ::std::string& name() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_name(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_name();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_name();
-  void set_allocated_name(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_name() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_name(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
-
-  public:
-  // .runanywhere.v1.AccelerationPreference type = 2;
-  void clear_type() ;
-  [[nodiscard]] ::runanywhere::v1::AccelerationPreference type() const;
-  void set_type(::runanywhere::v1::AccelerationPreference value);
-
-  private:
-  ::runanywhere::v1::AccelerationPreference _internal_type() const;
-  void _internal_set_type(::runanywhere::v1::AccelerationPreference value);
-
-  public:
-  // bool available = 3;
-  void clear_available() ;
-  [[nodiscard]] bool available() const;
-  void set_available(bool value);
-
-  private:
-  bool _internal_available() const;
-  void _internal_set_available(bool value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.AcceleratorInfo)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
-                          0, 43,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const AcceleratorInfo& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr name_;
-    int type_;
-    bool available_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_hardware_5fprofile_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfileResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.HardwareProfileResult) */ {
- public:
-  inline HardwareProfileResult() : HardwareProfileResult(nullptr) {}
-  ~HardwareProfileResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(HardwareProfileResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(HardwareProfileResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr HardwareProfileResult(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline HardwareProfileResult(const HardwareProfileResult& from) : HardwareProfileResult(nullptr, from) {}
-  inline HardwareProfileResult(HardwareProfileResult&& from) noexcept : HardwareProfileResult(nullptr, ::std::move(from)) {}
-  inline HardwareProfileResult& operator=(const HardwareProfileResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline HardwareProfileResult& operator=(HardwareProfileResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const HardwareProfileResult& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HardwareProfileResult>(&HardwareProfileResult_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 2;
-  friend void swap(HardwareProfileResult& a, HardwareProfileResult& b) { a.Swap(&b); }
-  inline void Swap(HardwareProfileResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(HardwareProfileResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] HardwareProfileResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<HardwareProfileResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const HardwareProfileResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const HardwareProfileResult& from) { HardwareProfileResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(HardwareProfileResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.HardwareProfileResult"; }
-
-  explicit HardwareProfileResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  HardwareProfileResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HardwareProfileResult& from);
-  HardwareProfileResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, HardwareProfileResult&& from) noexcept
-      : HardwareProfileResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kAcceleratorsFieldNumber = 2,
-    kProfileFieldNumber = 1,
-  };
-  // repeated .runanywhere.v1.AcceleratorInfo accelerators = 2;
-  [[nodiscard]] int accelerators_size()
-      const;
-  private:
-  int _internal_accelerators_size() const;
-
-  public:
-  void clear_accelerators() ;
-  [[nodiscard]] const ::runanywhere::v1::AcceleratorInfo& accelerators(int index) const;
-  [[nodiscard]] ::runanywhere::v1::AcceleratorInfo* PROTOBUF_NONNULL mutable_accelerators(int index);
-  ::runanywhere::v1::AcceleratorInfo* PROTOBUF_NONNULL add_accelerators();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>&
-  accelerators() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>* PROTOBUF_NONNULL
-  mutable_accelerators();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>& _internal_accelerators() const;
-  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>* PROTOBUF_NONNULL _internal_mutable_accelerators();
-
-  public:
-  // .runanywhere.v1.HardwareProfile profile = 1;
-  [[nodiscard]] bool has_profile()
-      const;
-  void clear_profile() ;
-  [[nodiscard]] const ::runanywhere::v1::HardwareProfile& profile() const;
-  [[nodiscard]] ::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE release_profile();
-  ::runanywhere::v1::HardwareProfile* PROTOBUF_NONNULL mutable_profile();
-  void set_allocated_profile(::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_profile(::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE unsafe_arena_release_profile();
-
-  private:
-  const ::runanywhere::v1::HardwareProfile& _internal_profile() const;
-  ::runanywhere::v1::HardwareProfile* PROTOBUF_NONNULL _internal_mutable_profile();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareProfileResult)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 2,
-                          2, 0,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const HardwareProfileResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::AcceleratorInfo > accelerators_;
-    ::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE profile_;
+    bool supported_;
+    int npu_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1261,683 +442,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfileResult final : publi
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif  // __GNUC__
-// -------------------------------------------------------------------
-
-// HardwareProfile
-
-// string chip = 1;
-inline void HardwareProfile::clear_chip() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.chip_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& HardwareProfile::chip() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.chip)
-  return _internal_chip();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void HardwareProfile::set_chip(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.chip_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.chip)
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::mutable_chip()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_chip();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HardwareProfile.chip)
-  return _s;
-}
-inline const ::std::string& HardwareProfile::_internal_chip() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.chip_.Get();
-}
-inline void HardwareProfile::_internal_set_chip(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.chip_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::_internal_mutable_chip() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.chip_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE HardwareProfile::release_chip() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HardwareProfile.chip)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.chip_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.chip_.Set("", GetArena());
-  }
-  return released;
-}
-inline void HardwareProfile::set_allocated_chip(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.chip_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.chip_.IsDefault()) {
-    _impl_.chip_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareProfile.chip)
-}
-
-// bool has_neural_engine = 2;
-inline void HardwareProfile::clear_has_neural_engine() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.has_neural_engine_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline bool HardwareProfile::has_neural_engine() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.has_neural_engine)
-  return _internal_has_neural_engine();
-}
-inline void HardwareProfile::set_has_neural_engine(bool value) {
-  _internal_set_has_neural_engine(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.has_neural_engine)
-}
-inline bool HardwareProfile::_internal_has_neural_engine() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.has_neural_engine_;
-}
-inline void HardwareProfile::_internal_set_has_neural_engine(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.has_neural_engine_ = value;
-}
-
-// string acceleration_mode = 3;
-inline void HardwareProfile::clear_acceleration_mode() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.acceleration_mode_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& HardwareProfile::acceleration_mode() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.acceleration_mode)
-  return _internal_acceleration_mode();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void HardwareProfile::set_acceleration_mode(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.acceleration_mode_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.acceleration_mode)
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::mutable_acceleration_mode()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_acceleration_mode();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HardwareProfile.acceleration_mode)
-  return _s;
-}
-inline const ::std::string& HardwareProfile::_internal_acceleration_mode() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.acceleration_mode_.Get();
-}
-inline void HardwareProfile::_internal_set_acceleration_mode(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.acceleration_mode_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::_internal_mutable_acceleration_mode() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.acceleration_mode_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE HardwareProfile::release_acceleration_mode() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HardwareProfile.acceleration_mode)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.acceleration_mode_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.acceleration_mode_.Set("", GetArena());
-  }
-  return released;
-}
-inline void HardwareProfile::set_allocated_acceleration_mode(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.acceleration_mode_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.acceleration_mode_.IsDefault()) {
-    _impl_.acceleration_mode_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareProfile.acceleration_mode)
-}
-
-// uint64 total_memory_bytes = 4;
-inline void HardwareProfile::clear_total_memory_bytes() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.total_memory_bytes_ = ::uint64_t{0u};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-}
-inline ::uint64_t HardwareProfile::total_memory_bytes() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.total_memory_bytes)
-  return _internal_total_memory_bytes();
-}
-inline void HardwareProfile::set_total_memory_bytes(::uint64_t value) {
-  _internal_set_total_memory_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.total_memory_bytes)
-}
-inline ::uint64_t HardwareProfile::_internal_total_memory_bytes() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.total_memory_bytes_;
-}
-inline void HardwareProfile::_internal_set_total_memory_bytes(::uint64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.total_memory_bytes_ = value;
-}
-
-// uint32 core_count = 5;
-inline void HardwareProfile::clear_core_count() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.core_count_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline ::uint32_t HardwareProfile::core_count() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.core_count)
-  return _internal_core_count();
-}
-inline void HardwareProfile::set_core_count(::uint32_t value) {
-  _internal_set_core_count(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.core_count)
-}
-inline ::uint32_t HardwareProfile::_internal_core_count() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.core_count_;
-}
-inline void HardwareProfile::_internal_set_core_count(::uint32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.core_count_ = value;
-}
-
-// uint32 performance_cores = 6;
-inline void HardwareProfile::clear_performance_cores() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.performance_cores_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-}
-inline ::uint32_t HardwareProfile::performance_cores() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.performance_cores)
-  return _internal_performance_cores();
-}
-inline void HardwareProfile::set_performance_cores(::uint32_t value) {
-  _internal_set_performance_cores(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.performance_cores)
-}
-inline ::uint32_t HardwareProfile::_internal_performance_cores() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.performance_cores_;
-}
-inline void HardwareProfile::_internal_set_performance_cores(::uint32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.performance_cores_ = value;
-}
-
-// uint32 efficiency_cores = 7;
-inline void HardwareProfile::clear_efficiency_cores() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.efficiency_cores_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
-}
-inline ::uint32_t HardwareProfile::efficiency_cores() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.efficiency_cores)
-  return _internal_efficiency_cores();
-}
-inline void HardwareProfile::set_efficiency_cores(::uint32_t value) {
-  _internal_set_efficiency_cores(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.efficiency_cores)
-}
-inline ::uint32_t HardwareProfile::_internal_efficiency_cores() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.efficiency_cores_;
-}
-inline void HardwareProfile::_internal_set_efficiency_cores(::uint32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.efficiency_cores_ = value;
-}
-
-// string architecture = 8;
-inline void HardwareProfile::clear_architecture() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.architecture_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& HardwareProfile::architecture() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.architecture)
-  return _internal_architecture();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void HardwareProfile::set_architecture(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.architecture_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.architecture)
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::mutable_architecture()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_architecture();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HardwareProfile.architecture)
-  return _s;
-}
-inline const ::std::string& HardwareProfile::_internal_architecture() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.architecture_.Get();
-}
-inline void HardwareProfile::_internal_set_architecture(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.architecture_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::_internal_mutable_architecture() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.architecture_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE HardwareProfile::release_architecture() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HardwareProfile.architecture)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.architecture_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.architecture_.Set("", GetArena());
-  }
-  return released;
-}
-inline void HardwareProfile::set_allocated_architecture(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.architecture_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.architecture_.IsDefault()) {
-    _impl_.architecture_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareProfile.architecture)
-}
-
-// string platform = 9;
-inline void HardwareProfile::clear_platform() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.platform_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline const ::std::string& HardwareProfile::platform() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.platform)
-  return _internal_platform();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void HardwareProfile::set_platform(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  _impl_.platform_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.platform)
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::mutable_platform()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  ::std::string* _s = _internal_mutable_platform();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HardwareProfile.platform)
-  return _s;
-}
-inline const ::std::string& HardwareProfile::_internal_platform() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.platform_.Get();
-}
-inline void HardwareProfile::_internal_set_platform(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.platform_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL HardwareProfile::_internal_mutable_platform() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.platform_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE HardwareProfile::release_platform() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HardwareProfile.platform)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  auto* released = _impl_.platform_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.platform_.Set("", GetArena());
-  }
-  return released;
-}
-inline void HardwareProfile::set_allocated_platform(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  }
-  _impl_.platform_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.platform_.IsDefault()) {
-    _impl_.platform_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareProfile.platform)
-}
-
-// .runanywhere.v1.NPUChip npu_chip = 10;
-inline void HardwareProfile::clear_npu_chip() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.npu_chip_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
-}
-inline ::runanywhere::v1::NPUChip HardwareProfile::npu_chip() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.npu_chip)
-  return _internal_npu_chip();
-}
-inline void HardwareProfile::set_npu_chip(::runanywhere::v1::NPUChip value) {
-  _internal_set_npu_chip(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.npu_chip)
-}
-inline ::runanywhere::v1::NPUChip HardwareProfile::_internal_npu_chip() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::NPUChip>(_impl_.npu_chip_);
-}
-inline void HardwareProfile::_internal_set_npu_chip(::runanywhere::v1::NPUChip value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.npu_chip_ = value;
-}
-
-// -------------------------------------------------------------------
-
-// AcceleratorInfo
-
-// string name = 1;
-inline void AcceleratorInfo::clear_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.name_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& AcceleratorInfo::name() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.AcceleratorInfo.name)
-  return _internal_name();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void AcceleratorInfo::set_name(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.AcceleratorInfo.name)
-}
-inline ::std::string* PROTOBUF_NONNULL AcceleratorInfo::mutable_name()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_name();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.AcceleratorInfo.name)
-  return _s;
-}
-inline const ::std::string& AcceleratorInfo::_internal_name() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.name_.Get();
-}
-inline void AcceleratorInfo::_internal_set_name(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.name_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL AcceleratorInfo::_internal_mutable_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.name_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE AcceleratorInfo::release_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.AcceleratorInfo.name)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.name_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", GetArena());
-  }
-  return released;
-}
-inline void AcceleratorInfo::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.name_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.AcceleratorInfo.name)
-}
-
-// .runanywhere.v1.AccelerationPreference type = 2;
-inline void AcceleratorInfo::clear_type() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.type_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline ::runanywhere::v1::AccelerationPreference AcceleratorInfo::type() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.AcceleratorInfo.type)
-  return _internal_type();
-}
-inline void AcceleratorInfo::set_type(::runanywhere::v1::AccelerationPreference value) {
-  _internal_set_type(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.AcceleratorInfo.type)
-}
-inline ::runanywhere::v1::AccelerationPreference AcceleratorInfo::_internal_type() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::AccelerationPreference>(_impl_.type_);
-}
-inline void AcceleratorInfo::_internal_set_type(::runanywhere::v1::AccelerationPreference value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.type_ = value;
-}
-
-// bool available = 3;
-inline void AcceleratorInfo::clear_available() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.available_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline bool AcceleratorInfo::available() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.AcceleratorInfo.available)
-  return _internal_available();
-}
-inline void AcceleratorInfo::set_available(bool value) {
-  _internal_set_available(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.AcceleratorInfo.available)
-}
-inline bool AcceleratorInfo::_internal_available() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.available_;
-}
-inline void AcceleratorInfo::_internal_set_available(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.available_ = value;
-}
-
-// -------------------------------------------------------------------
-
-// HardwareProfileResult
-
-// .runanywhere.v1.HardwareProfile profile = 1;
-inline bool HardwareProfileResult::has_profile() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
-  PROTOBUF_ASSUME(!value || _impl_.profile_ != nullptr);
-  return value;
-}
-inline void HardwareProfileResult::clear_profile() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.profile_ != nullptr) _impl_.profile_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::runanywhere::v1::HardwareProfile& HardwareProfileResult::_internal_profile() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::HardwareProfile* p = _impl_.profile_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::HardwareProfile>(&::runanywhere::v1::HardwareProfile_globals_);
-}
-inline const ::runanywhere::v1::HardwareProfile& HardwareProfileResult::profile() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfileResult.profile)
-  return _internal_profile();
-}
-inline void HardwareProfileResult::unsafe_arena_set_allocated_profile(
-    ::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.profile_);
-  }
-  _impl_.profile_ = reinterpret_cast<::runanywhere::v1::HardwareProfile*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.HardwareProfileResult.profile)
-}
-inline ::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE HardwareProfileResult::release_profile() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::HardwareProfile* released = _impl_.profile_;
-  _impl_.profile_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE HardwareProfileResult::unsafe_arena_release_profile() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HardwareProfileResult.profile)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::HardwareProfile* temp = _impl_.profile_;
-  _impl_.profile_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::HardwareProfile* PROTOBUF_NONNULL HardwareProfileResult::_internal_mutable_profile() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.profile_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::HardwareProfile>(GetArena());
-    _impl_.profile_ = reinterpret_cast<::runanywhere::v1::HardwareProfile*>(p);
-  }
-  return _impl_.profile_;
-}
-inline ::runanywhere::v1::HardwareProfile* PROTOBUF_NONNULL HardwareProfileResult::mutable_profile()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::HardwareProfile* _msg = _internal_mutable_profile();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HardwareProfileResult.profile)
-  return _msg;
-}
-inline void HardwareProfileResult::set_allocated_profile(::runanywhere::v1::HardwareProfile* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.profile_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-
-  _impl_.profile_ = reinterpret_cast<::runanywhere::v1::HardwareProfile*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareProfileResult.profile)
-}
-
-// repeated .runanywhere.v1.AcceleratorInfo accelerators = 2;
-inline int HardwareProfileResult::_internal_accelerators_size() const {
-  return _internal_accelerators().size();
-}
-inline int HardwareProfileResult::accelerators_size() const {
-  return _internal_accelerators_size();
-}
-inline void HardwareProfileResult::clear_accelerators() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.accelerators_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::runanywhere::v1::AcceleratorInfo& HardwareProfileResult::accelerators(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfileResult.accelerators)
-  return _internal_accelerators().Get(index);
-}
-inline ::runanywhere::v1::AcceleratorInfo* PROTOBUF_NONNULL HardwareProfileResult::mutable_accelerators(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HardwareProfileResult.accelerators)
-  return _internal_mutable_accelerators()->Mutable(index);
-}
-inline ::runanywhere::v1::AcceleratorInfo* PROTOBUF_NONNULL HardwareProfileResult::add_accelerators()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::runanywhere::v1::AcceleratorInfo* _add =
-      _internal_mutable_accelerators()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.HardwareProfileResult.accelerators)
-  return _add;
-}
-inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>& HardwareProfileResult::accelerators() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.HardwareProfileResult.accelerators)
-  return _internal_accelerators();
-}
-inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>* PROTOBUF_NONNULL
-HardwareProfileResult::mutable_accelerators() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.HardwareProfileResult.accelerators)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_accelerators();
-}
-inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>&
-HardwareProfileResult::_internal_accelerators() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.accelerators_;
-}
-inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>* PROTOBUF_NONNULL
-HardwareProfileResult::_internal_mutable_accelerators() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.accelerators_;
-}
-
 // -------------------------------------------------------------------
 
 // NpuCapability
@@ -2006,11 +510,15 @@ inline void NpuCapability::set_allocated_soc_model(::std::string* PROTOBUF_NULLA
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.NpuCapability.soc_model)
 }
 
-// int32 soc_id = 2;
+// optional int32 soc_id = 2;
+inline bool NpuCapability::has_soc_id() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
 inline void NpuCapability::clear_soc_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.soc_id_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline ::int32_t NpuCapability::soc_id() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.soc_id)
@@ -2018,7 +526,7 @@ inline ::int32_t NpuCapability::soc_id() const {
 }
 inline void NpuCapability::set_soc_id(::int32_t value) {
   _internal_set_soc_id(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.soc_id)
 }
 inline ::int32_t NpuCapability::_internal_soc_id() const {
@@ -2034,7 +542,7 @@ inline void NpuCapability::_internal_set_soc_id(::int32_t value) {
 inline void NpuCapability::clear_hexagon_arch() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.hexagon_arch_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::runanywhere::v1::HexagonArch NpuCapability::hexagon_arch() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.hexagon_arch)
@@ -2042,7 +550,7 @@ inline ::runanywhere::v1::HexagonArch NpuCapability::hexagon_arch() const {
 }
 inline void NpuCapability::set_hexagon_arch(::runanywhere::v1::HexagonArch value) {
   _internal_set_hexagon_arch(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.hexagon_arch)
 }
 inline ::runanywhere::v1::HexagonArch NpuCapability::_internal_hexagon_arch() const {
@@ -2054,92 +562,52 @@ inline void NpuCapability::_internal_set_hexagon_arch(::runanywhere::v1::Hexagon
   _impl_.hexagon_arch_ = value;
 }
 
-// bool qhexrt_supported = 4;
-inline void NpuCapability::clear_qhexrt_supported() {
+// bool supported = 4;
+inline void NpuCapability::clear_supported() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.qhexrt_supported_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.supported_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
-inline bool NpuCapability::qhexrt_supported() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.qhexrt_supported)
-  return _internal_qhexrt_supported();
+inline bool NpuCapability::supported() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.supported)
+  return _internal_supported();
 }
-inline void NpuCapability::set_qhexrt_supported(bool value) {
-  _internal_set_qhexrt_supported(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.qhexrt_supported)
+inline void NpuCapability::set_supported(bool value) {
+  _internal_set_supported(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.supported)
 }
-inline bool NpuCapability::_internal_qhexrt_supported() const {
+inline bool NpuCapability::_internal_supported() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.qhexrt_supported_;
+  return _impl_.supported_;
 }
-inline void NpuCapability::_internal_set_qhexrt_supported(bool value) {
+inline void NpuCapability::_internal_set_supported(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.qhexrt_supported_ = value;
+  _impl_.supported_ = value;
 }
 
-// string arch_name = 5;
-inline void NpuCapability::clear_arch_name() {
+// .runanywhere.v1.NPUChip npu = 5;
+inline void NpuCapability::clear_npu() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.arch_name_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.npu_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
-inline const ::std::string& NpuCapability::arch_name() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.arch_name)
-  return _internal_arch_name();
+inline ::runanywhere::v1::NPUChip NpuCapability::npu() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.NpuCapability.npu)
+  return _internal_npu();
 }
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void NpuCapability::set_arch_name(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.arch_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.arch_name)
+inline void NpuCapability::set_npu(::runanywhere::v1::NPUChip value) {
+  _internal_set_npu(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.NpuCapability.npu)
 }
-inline ::std::string* PROTOBUF_NONNULL NpuCapability::mutable_arch_name()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_arch_name();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.NpuCapability.arch_name)
-  return _s;
-}
-inline const ::std::string& NpuCapability::_internal_arch_name() const {
+inline ::runanywhere::v1::NPUChip NpuCapability::_internal_npu() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.arch_name_.Get();
+  return static_cast<::runanywhere::v1::NPUChip>(_impl_.npu_);
 }
-inline void NpuCapability::_internal_set_arch_name(const ::std::string& value) {
+inline void NpuCapability::_internal_set_npu(::runanywhere::v1::NPUChip value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.arch_name_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL NpuCapability::_internal_mutable_arch_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.arch_name_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE NpuCapability::release_arch_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.NpuCapability.arch_name)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.arch_name_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.arch_name_.Set("", GetArena());
-  }
-  return released;
-}
-inline void NpuCapability::set_allocated_arch_name(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.arch_name_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.arch_name_.IsDefault()) {
-    _impl_.arch_name_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.NpuCapability.arch_name)
+  _impl_.npu_ = value;
 }
 
 #ifdef __GNUC__

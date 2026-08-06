@@ -12,16 +12,16 @@
 //
 // Every SDK emits an identical device-telemetry record for analytics/routing:
 // Swift `Infrastructure/Device/Models/Domain/DeviceInfo.swift` and Kotlin
-// `CppBridgeDevice` produce the same 19-field snake_case JSON (the header on
-// the Swift struct notes it "matches backend schemas/device.py DeviceInfo");
-// RN exposes the same field universe via getters; Web carries a subset
+// `CppBridgeDevice` produce the same snake_case JSON (the header on the Swift
+// struct notes it "matches backend schemas/device.py DeviceInfo"); RN exposes
+// the same field universe via getters; Web carries a subset
 // (`DeviceInfoData`). This is the single source of truth for that schema.
 //
-// Distinct from hardware_profile.proto's `HardwareProfile` — that is the
-// static silicon-capability subset consumed by the `Hardware` service for
-// accelerator routing. DeviceInfo is identity + runtime telemetry. The
-// platform-only fields (Web hasWebGPU/hasSharedArrayBuffer, Android extras)
-// go in `platform_extras` rather than the typed core.
+// DeviceInfo is the ONLY device description in this IDL: identity + runtime
+// telemetry. NPU capability detail lives in exactly one other place,
+// hardware_profile.proto's `NpuCapability`. The platform-only fields (Web
+// has_webgpu/has_shared_array_buffer, Android extras) go in `platform_extras`
+// rather than the typed core.
 
 import SwiftProtobuf
 
@@ -35,6 +35,180 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+/// Host OS family. Closed set — a producer that cannot classify itself sends
+/// PLATFORM_UNSPECIFIED rather than inventing a spelling.
+public nonisolated enum RAPlatform: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case ios // = 1
+  case android // = 2
+  case macos // = 3
+  case web // = 4
+  case linux // = 5
+  case windows // = 6
+  case tvos // = 7
+  case watchos // = 8
+  case visionos // = 9
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .ios
+    case 2: self = .android
+    case 3: self = .macos
+    case 4: self = .web
+    case 5: self = .linux
+    case 6: self = .windows
+    case 7: self = .tvos
+    case 8: self = .watchos
+    case 9: self = .visionos
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .ios: return 1
+    case .android: return 2
+    case .macos: return 3
+    case .web: return 4
+    case .linux: return 5
+    case .windows: return 6
+    case .tvos: return 7
+    case .watchos: return 8
+    case .visionos: return 9
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAPlatform] = [
+    .unspecified,
+    .ios,
+    .android,
+    .macos,
+    .web,
+    .linux,
+    .windows,
+    .tvos,
+    .watchos,
+    .visionos,
+  ]
+
+}
+
+/// Physical device class.
+public nonisolated enum RAFormFactor: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+
+  /// replaces the hand-written "unknown" token
+  case unspecified // = 0
+  case phone // = 1
+  case tablet // = 2
+  case desktop // = 3
+  case laptop // = 4
+  case tv // = 5
+  case watch // = 6
+  case headset // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .phone
+    case 2: self = .tablet
+    case 3: self = .desktop
+    case 4: self = .laptop
+    case 5: self = .tv
+    case 6: self = .watch
+    case 7: self = .headset
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .phone: return 1
+    case .tablet: return 2
+    case .desktop: return 3
+    case .laptop: return 4
+    case .tv: return 5
+    case .watch: return 6
+    case .headset: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAFormFactor] = [
+    .unspecified,
+    .phone,
+    .tablet,
+    .desktop,
+    .laptop,
+    .tv,
+    .watch,
+    .headset,
+  ]
+
+}
+
+/// Charging state of the main battery.
+public nonisolated enum RABatteryState: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+
+  /// unreadable (desktop, tvOS, browser)
+  case unspecified // = 0
+  case charging // = 1
+  case unplugged // = 2
+  case full // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .charging
+    case 2: self = .unplugged
+    case 3: self = .full
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .charging: return 1
+    case .unplugged: return 2
+    case .full: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RABatteryState] = [
+    .unspecified,
+    .charging,
+    .unplugged,
+    .full,
+  ]
+
+}
+
 public nonisolated struct RADeviceInfo: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -46,14 +220,7 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
     set {_uniqueStorage()._deviceModel = newValue}
   }
 
-  /// User-facing device name.
-  public var deviceName: String {
-    get {_storage._deviceName}
-    set {_uniqueStorage()._deviceName = newValue}
-  }
-
-  /// "ios" | "android" | "macos" | "web" | ...
-  public var platform: String {
+  public var platform: RAPlatform {
     get {_storage._platform}
     set {_uniqueStorage()._platform = newValue}
   }
@@ -63,13 +230,14 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
     set {_uniqueStorage()._osVersion = newValue}
   }
 
-  /// "phone" | "tablet" | "desktop" | ...
-  public var formFactor: String {
+  public var formFactor: RAFormFactor {
     get {_storage._formFactor}
     set {_uniqueStorage()._formFactor = newValue}
   }
 
-  /// "arm64" | "x86_64" | "wasm32" | ...
+  /// ABI name as the OS reports it: Android sends Build.SUPPORTED_ABIS[0]
+  /// ("arm64-v8a"), Apple "arm64", Web "wasm32". Kept a string because no
+  /// industry API enumerates ABIs — but the spelling is the OS's, not ours.
   public var architecture: String {
     get {_storage._architecture}
     set {_uniqueStorage()._architecture = newValue}
@@ -81,26 +249,31 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
     set {_uniqueStorage()._chipName = newValue}
   }
 
-  /// Bytes.
-  public var totalMemory: Int64 {
-    get {_storage._totalMemory}
-    set {_uniqueStorage()._totalMemory = newValue}
+  /// Physical RAM installed, in BYTES. Never the JVM heap cap — Android must
+  /// read ActivityManager.MemoryInfo.totalMem, not Runtime.maxMemory().
+  public var totalMemoryBytes: Int64 {
+    get {_storage._totalMemoryBytes}
+    set {_uniqueStorage()._totalMemoryBytes = newValue}
   }
 
-  /// Bytes.
-  public var availableMemory: Int64 {
-    get {_storage._availableMemory}
-    set {_uniqueStorage()._availableMemory = newValue}
+  /// Free + reclaimable system RAM at snapshot time, in BYTES.
+  /// 0 = UNKNOWN (the Web producer cannot read it). A consumer MUST NOT read
+  /// 0 as "no memory left" and refuse to load.
+  public var availableMemoryBytes: Int64 {
+    get {_storage._availableMemoryBytes}
+    set {_uniqueStorage()._availableMemoryBytes = newValue}
   }
 
-  public var hasNeuralEngine_p: Bool {
-    get {_storage._hasNeuralEngine_p}
-    set {_uniqueStorage()._hasNeuralEngine_p = newValue}
+  /// Dedicated neural accelerator present (ANE, Hexagon, APU, ...).
+  public var hasNpu_p: Bool {
+    get {_storage._hasNpu_p}
+    set {_uniqueStorage()._hasNpu_p = newValue}
   }
 
-  public var neuralEngineCores: Int32 {
-    get {_storage._neuralEngineCores}
-    set {_uniqueStorage()._neuralEngineCores = newValue}
+  /// 0 = none OR present-but-unreported.
+  public var npuCores: Int32 {
+    get {_storage._npuCores}
+    set {_uniqueStorage()._npuCores = newValue}
   }
 
   public var gpuFamily: String {
@@ -108,7 +281,10 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
     set {_uniqueStorage()._gpuFamily = newValue}
   }
 
-  /// 0.0–1.0; unset when unavailable.
+  /// Remaining charge as a fraction of full. ABSENT is the ONLY encoding of
+  /// "unknown" — 0.0 means a flat battery, not an unreadable one. Producers
+  /// bridging through rac_device_registration_info_t (which uses a negative
+  /// sentinel) MUST map negative -> absent, never negative -> 0.
   public var batteryLevel: Float {
     get {_storage._batteryLevel ?? 0}
     set {_uniqueStorage()._batteryLevel = newValue}
@@ -118,9 +294,11 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
   /// Clears the value of `batteryLevel`. Subsequent reads from it will return its default value.
   public mutating func clearBatteryLevel() {_uniqueStorage()._batteryLevel = nil}
 
-  /// "charging" | "unplugged" | "full" | ...
-  public var batteryState: String {
-    get {_storage._batteryState ?? String()}
+  /// ABSENT when the platform reports no battery at all; UNSPECIFIED when a
+  /// battery exists but its state could not be read. The C ABI member is
+  /// documented NULL-if-unavailable, which is why this stays `optional`.
+  public var batteryState: RABatteryState {
+    get {_storage._batteryState ?? .unspecified}
     set {_uniqueStorage()._batteryState = newValue}
   }
   /// Returns true if `batteryState` has been explicitly set.
@@ -143,11 +321,6 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
     set {_uniqueStorage()._performanceCores = newValue}
   }
 
-  public var efficiencyCores: Int32 {
-    get {_storage._efficiencyCores}
-    set {_uniqueStorage()._efficiencyCores = newValue}
-  }
-
   public var deviceFingerprint: String {
     get {_storage._deviceFingerprint ?? String()}
     set {_uniqueStorage()._deviceFingerprint = newValue}
@@ -157,9 +330,23 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
   /// Clears the value of `deviceFingerprint`. Subsequent reads from it will return its default value.
   public mutating func clearDeviceFingerprint() {_uniqueStorage()._deviceFingerprint = nil}
 
-  /// Platform-specific fields that are not part of the cross-SDK core
-  /// (e.g. web: "has_webgpu", "has_shared_array_buffer"; android: "manufacturer",
-  /// "android_api_level", "os_build_id", ...).
+  /// Vendor escape hatch, CLOSED key set:
+  ///   android: "manufacturer", "device_id", "os_build_id", "sdk_version",
+  ///            "android_api_level", "locale", "timezone"
+  ///   web:     "has_webgpu", "has_shared_array_buffer"
+  ///
+  /// "manufacturer" and "device_id" are the only two the native parser reads
+  /// ("device_id" arrives as a promoted top-level JSON key). Keys not listed
+  /// here are NOT dropped: the Kotlin serializer flattens them into the
+  /// outbound registration body verbatim, where no client code reads them.
+  ///
+  /// A key that restates a typed field above MUST NOT be sent — "device_type",
+  /// "os_name", "processor_count" and "is_simulator" were removed for exactly
+  /// that reason, and "device_id" duplicates device_fingerprint and should
+  /// follow once the native parser reads the typed field instead.
+  ///
+  /// Values are always strings. This map does not cross the C ABI on Apple
+  /// platforms, so nothing load-bearing may live here.
   public var platformExtras: Dictionary<String,String> {
     get {_storage._platformExtras}
     set {_uniqueStorage()._platformExtras = newValue}
@@ -176,29 +363,39 @@ public nonisolated struct RADeviceInfo: @unchecked Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
+nonisolated extension RAPlatform: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PLATFORM_UNSPECIFIED\0\u{1}PLATFORM_IOS\0\u{1}PLATFORM_ANDROID\0\u{1}PLATFORM_MACOS\0\u{1}PLATFORM_WEB\0\u{1}PLATFORM_LINUX\0\u{1}PLATFORM_WINDOWS\0\u{1}PLATFORM_TVOS\0\u{1}PLATFORM_WATCHOS\0\u{1}PLATFORM_VISIONOS\0")
+}
+
+nonisolated extension RAFormFactor: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0FORM_FACTOR_UNSPECIFIED\0\u{1}FORM_FACTOR_PHONE\0\u{1}FORM_FACTOR_TABLET\0\u{1}FORM_FACTOR_DESKTOP\0\u{1}FORM_FACTOR_LAPTOP\0\u{1}FORM_FACTOR_TV\0\u{1}FORM_FACTOR_WATCH\0\u{1}FORM_FACTOR_HEADSET\0")
+}
+
+nonisolated extension RABatteryState: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0BATTERY_STATE_UNSPECIFIED\0\u{1}BATTERY_STATE_CHARGING\0\u{1}BATTERY_STATE_UNPLUGGED\0\u{1}BATTERY_STATE_FULL\0")
+}
+
 nonisolated extension RADeviceInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeviceInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_model\0\u{3}device_name\0\u{1}platform\0\u{3}os_version\0\u{3}form_factor\0\u{1}architecture\0\u{3}chip_name\0\u{3}total_memory\0\u{3}available_memory\0\u{3}has_neural_engine\0\u{3}neural_engine_cores\0\u{3}gpu_family\0\u{3}battery_level\0\u{3}battery_state\0\u{3}is_low_power_mode\0\u{3}core_count\0\u{3}performance_cores\0\u{3}efficiency_cores\0\u{3}device_fingerprint\0\u{3}platform_extras\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_model\0\u{1}platform\0\u{3}os_version\0\u{3}form_factor\0\u{1}architecture\0\u{3}chip_name\0\u{3}total_memory_bytes\0\u{3}available_memory_bytes\0\u{3}has_npu\0\u{3}npu_cores\0\u{3}gpu_family\0\u{3}battery_level\0\u{3}battery_state\0\u{3}is_low_power_mode\0\u{3}core_count\0\u{3}performance_cores\0\u{3}device_fingerprint\0\u{3}platform_extras\0")
 
   fileprivate class _StorageClass {
     var _deviceModel: String = String()
-    var _deviceName: String = String()
-    var _platform: String = String()
+    var _platform: RAPlatform = .unspecified
     var _osVersion: String = String()
-    var _formFactor: String = String()
+    var _formFactor: RAFormFactor = .unspecified
     var _architecture: String = String()
     var _chipName: String = String()
-    var _totalMemory: Int64 = 0
-    var _availableMemory: Int64 = 0
-    var _hasNeuralEngine_p: Bool = false
-    var _neuralEngineCores: Int32 = 0
+    var _totalMemoryBytes: Int64 = 0
+    var _availableMemoryBytes: Int64 = 0
+    var _hasNpu_p: Bool = false
+    var _npuCores: Int32 = 0
     var _gpuFamily: String = String()
     var _batteryLevel: Float? = nil
-    var _batteryState: String? = nil
+    var _batteryState: RABatteryState? = nil
     var _isLowPowerMode: Bool = false
     var _coreCount: Int32 = 0
     var _performanceCores: Int32 = 0
-    var _efficiencyCores: Int32 = 0
     var _deviceFingerprint: String? = nil
     var _platformExtras: Dictionary<String,String> = [:]
 
@@ -212,23 +409,21 @@ nonisolated extension RADeviceInfo: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
     init(copying source: _StorageClass) {
       _deviceModel = source._deviceModel
-      _deviceName = source._deviceName
       _platform = source._platform
       _osVersion = source._osVersion
       _formFactor = source._formFactor
       _architecture = source._architecture
       _chipName = source._chipName
-      _totalMemory = source._totalMemory
-      _availableMemory = source._availableMemory
-      _hasNeuralEngine_p = source._hasNeuralEngine_p
-      _neuralEngineCores = source._neuralEngineCores
+      _totalMemoryBytes = source._totalMemoryBytes
+      _availableMemoryBytes = source._availableMemoryBytes
+      _hasNpu_p = source._hasNpu_p
+      _npuCores = source._npuCores
       _gpuFamily = source._gpuFamily
       _batteryLevel = source._batteryLevel
       _batteryState = source._batteryState
       _isLowPowerMode = source._isLowPowerMode
       _coreCount = source._coreCount
       _performanceCores = source._performanceCores
-      _efficiencyCores = source._efficiencyCores
       _deviceFingerprint = source._deviceFingerprint
       _platformExtras = source._platformExtras
     }
@@ -250,25 +445,23 @@ nonisolated extension RADeviceInfo: SwiftProtobuf.Message, SwiftProtobuf._Messag
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._deviceModel) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._deviceName) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._platform) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._osVersion) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._formFactor) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._architecture) }()
-        case 7: try { try decoder.decodeSingularStringField(value: &_storage._chipName) }()
-        case 8: try { try decoder.decodeSingularInt64Field(value: &_storage._totalMemory) }()
-        case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._availableMemory) }()
-        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._hasNeuralEngine_p) }()
-        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._neuralEngineCores) }()
-        case 12: try { try decoder.decodeSingularStringField(value: &_storage._gpuFamily) }()
-        case 13: try { try decoder.decodeSingularFloatField(value: &_storage._batteryLevel) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._batteryState) }()
-        case 15: try { try decoder.decodeSingularBoolField(value: &_storage._isLowPowerMode) }()
-        case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._coreCount) }()
-        case 17: try { try decoder.decodeSingularInt32Field(value: &_storage._performanceCores) }()
-        case 18: try { try decoder.decodeSingularInt32Field(value: &_storage._efficiencyCores) }()
-        case 19: try { try decoder.decodeSingularStringField(value: &_storage._deviceFingerprint) }()
-        case 20: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._platformExtras) }()
+        case 2: try { try decoder.decodeSingularEnumField(value: &_storage._platform) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._osVersion) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._formFactor) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._architecture) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._chipName) }()
+        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._totalMemoryBytes) }()
+        case 8: try { try decoder.decodeSingularInt64Field(value: &_storage._availableMemoryBytes) }()
+        case 9: try { try decoder.decodeSingularBoolField(value: &_storage._hasNpu_p) }()
+        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._npuCores) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._gpuFamily) }()
+        case 12: try { try decoder.decodeSingularFloatField(value: &_storage._batteryLevel) }()
+        case 13: try { try decoder.decodeSingularEnumField(value: &_storage._batteryState) }()
+        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._isLowPowerMode) }()
+        case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._coreCount) }()
+        case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._performanceCores) }()
+        case 17: try { try decoder.decodeSingularStringField(value: &_storage._deviceFingerprint) }()
+        case 18: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._platformExtras) }()
         default: break
         }
       }
@@ -284,62 +477,56 @@ nonisolated extension RADeviceInfo: SwiftProtobuf.Message, SwiftProtobuf._Messag
       if !_storage._deviceModel.isEmpty {
         try visitor.visitSingularStringField(value: _storage._deviceModel, fieldNumber: 1)
       }
-      if !_storage._deviceName.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._deviceName, fieldNumber: 2)
-      }
-      if !_storage._platform.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._platform, fieldNumber: 3)
+      if _storage._platform != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._platform, fieldNumber: 2)
       }
       if !_storage._osVersion.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._osVersion, fieldNumber: 4)
+        try visitor.visitSingularStringField(value: _storage._osVersion, fieldNumber: 3)
       }
-      if !_storage._formFactor.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._formFactor, fieldNumber: 5)
+      if _storage._formFactor != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._formFactor, fieldNumber: 4)
       }
       if !_storage._architecture.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._architecture, fieldNumber: 6)
+        try visitor.visitSingularStringField(value: _storage._architecture, fieldNumber: 5)
       }
       if !_storage._chipName.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._chipName, fieldNumber: 7)
+        try visitor.visitSingularStringField(value: _storage._chipName, fieldNumber: 6)
       }
-      if _storage._totalMemory != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._totalMemory, fieldNumber: 8)
+      if _storage._totalMemoryBytes != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._totalMemoryBytes, fieldNumber: 7)
       }
-      if _storage._availableMemory != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._availableMemory, fieldNumber: 9)
+      if _storage._availableMemoryBytes != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._availableMemoryBytes, fieldNumber: 8)
       }
-      if _storage._hasNeuralEngine_p != false {
-        try visitor.visitSingularBoolField(value: _storage._hasNeuralEngine_p, fieldNumber: 10)
+      if _storage._hasNpu_p != false {
+        try visitor.visitSingularBoolField(value: _storage._hasNpu_p, fieldNumber: 9)
       }
-      if _storage._neuralEngineCores != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._neuralEngineCores, fieldNumber: 11)
+      if _storage._npuCores != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._npuCores, fieldNumber: 10)
       }
       if !_storage._gpuFamily.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._gpuFamily, fieldNumber: 12)
+        try visitor.visitSingularStringField(value: _storage._gpuFamily, fieldNumber: 11)
       }
       try { if let v = _storage._batteryLevel {
-        try visitor.visitSingularFloatField(value: v, fieldNumber: 13)
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 12)
       } }()
       try { if let v = _storage._batteryState {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 13)
       } }()
       if _storage._isLowPowerMode != false {
-        try visitor.visitSingularBoolField(value: _storage._isLowPowerMode, fieldNumber: 15)
+        try visitor.visitSingularBoolField(value: _storage._isLowPowerMode, fieldNumber: 14)
       }
       if _storage._coreCount != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._coreCount, fieldNumber: 16)
+        try visitor.visitSingularInt32Field(value: _storage._coreCount, fieldNumber: 15)
       }
       if _storage._performanceCores != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._performanceCores, fieldNumber: 17)
-      }
-      if _storage._efficiencyCores != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._efficiencyCores, fieldNumber: 18)
+        try visitor.visitSingularInt32Field(value: _storage._performanceCores, fieldNumber: 16)
       }
       try { if let v = _storage._deviceFingerprint {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 19)
+        try visitor.visitSingularStringField(value: v, fieldNumber: 17)
       } }()
       if !_storage._platformExtras.isEmpty {
-        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._platformExtras, fieldNumber: 20)
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._platformExtras, fieldNumber: 18)
       }
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -351,23 +538,21 @@ nonisolated extension RADeviceInfo: SwiftProtobuf.Message, SwiftProtobuf._Messag
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._deviceModel != rhs_storage._deviceModel {return false}
-        if _storage._deviceName != rhs_storage._deviceName {return false}
         if _storage._platform != rhs_storage._platform {return false}
         if _storage._osVersion != rhs_storage._osVersion {return false}
         if _storage._formFactor != rhs_storage._formFactor {return false}
         if _storage._architecture != rhs_storage._architecture {return false}
         if _storage._chipName != rhs_storage._chipName {return false}
-        if _storage._totalMemory != rhs_storage._totalMemory {return false}
-        if _storage._availableMemory != rhs_storage._availableMemory {return false}
-        if _storage._hasNeuralEngine_p != rhs_storage._hasNeuralEngine_p {return false}
-        if _storage._neuralEngineCores != rhs_storage._neuralEngineCores {return false}
+        if _storage._totalMemoryBytes != rhs_storage._totalMemoryBytes {return false}
+        if _storage._availableMemoryBytes != rhs_storage._availableMemoryBytes {return false}
+        if _storage._hasNpu_p != rhs_storage._hasNpu_p {return false}
+        if _storage._npuCores != rhs_storage._npuCores {return false}
         if _storage._gpuFamily != rhs_storage._gpuFamily {return false}
         if _storage._batteryLevel != rhs_storage._batteryLevel {return false}
         if _storage._batteryState != rhs_storage._batteryState {return false}
         if _storage._isLowPowerMode != rhs_storage._isLowPowerMode {return false}
         if _storage._coreCount != rhs_storage._coreCount {return false}
         if _storage._performanceCores != rhs_storage._performanceCores {return false}
-        if _storage._efficiencyCores != rhs_storage._efficiencyCores {return false}
         if _storage._deviceFingerprint != rhs_storage._deviceFingerprint {return false}
         if _storage._platformExtras != rhs_storage._platformExtras {return false}
         return true

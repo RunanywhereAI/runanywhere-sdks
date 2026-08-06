@@ -8,10 +8,14 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
 import { SDKError } from "./errors";
-import { LLMGenerationOptions } from "./llm_options";
-import { TokenUsage } from "./token_usage";
-import { ToolCall, ToolResult } from "./tool_calling";
-import { TokenKind, tokenKindFromJSON, tokenKindToJSON } from "./voice_events";
+import {
+  FinishReason,
+  finishReasonFromJSON,
+  finishReasonToJSON,
+  LLMGenerationOptions,
+  LLMGenerationResult,
+} from "./llm_options";
+import { ToolCall } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -86,71 +90,72 @@ export function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string {
 
 /** The single request envelope for both unary and streaming generation. */
 export interface LLMGenerateRequest {
-  prompt: string;
+  /**
+   * Correlation id, echoed on every LLMStreamEvent for this call. Empty =
+   * commons generates one, which is the normal case and matches industry
+   * practice (provider-generated: OpenAI `id`, Anthropic `request-id`). A
+   * non-empty caller value is honoured verbatim.
+   */
   requestId: string;
   modelId: string;
   conversationId: string;
-  metadata: { [key: string]: string };
   options?:
     | LLMGenerationOptions
     | undefined;
   /**
-   * Prior turns, excluding `prompt` (the live user turn) and
-   * options.system_prompt.
+   * The whole conversation, oldest first, ending with the turn the model
+   * must answer. Never empty. System turns belong in
+   * options.system_prompt, not here.
    */
-  history: ChatMessage[];
+  messages: ChatMessage[];
 }
 
-export interface LLMGenerateRequest_MetadataEntry {
-  key: string;
-  value: string;
-}
-
-export interface LLMStreamFinalResult {
-  text: string;
-  thinkingContent?: string | undefined;
-  totalTimeMs: number;
-  timeToFirstTokenMs: number;
-  finishReason: string;
-  promptEvalTimeMs: number;
-  decodeTimeMs: number;
-  toolCalls: ToolCall[];
-  toolResults: ToolResult[];
-  usage?: TokenUsage | undefined;
-  error?: SDKError | undefined;
-}
-
-/** `result` is populated only on the terminal event. */
+/**
+ * LLMStreamFinalResult is deleted: the stream terminates with the same
+ * LLMGenerationResult type the unary call returns (see `result` below), so
+ * one mapper serves both paths instead of two near-identical ones.
+ *
+ * Exactly one terminal event per stream: event_kind == COMPLETED (with
+ * `result` set) or == ERROR (with `error` set). `event_kind` is the primary
+ * discriminator.
+ */
 export interface LLMStreamEvent {
   /** Monotonic sequence for tool-calling session streams (#607). */
   seq: number;
-  timestampUs: number;
+  /**
+   * The delta. Answer text when event_kind == TOKEN, reasoning text when
+   * event_kind == THINKING.
+   */
   token: string;
-  isFinal: boolean;
-  kind: TokenKind;
-  tokenId: number;
-  logprob: number;
-  finishReason: string;
-  result?: LLMStreamFinalResult | undefined;
   eventKind: LLMStreamEventKind;
+  /** Correlation id, echoed from the request on every event. */
   requestId: string;
-  conversationId: string;
-  promptTokensProcessed: number;
-  completionTokensGenerated: number;
-  elapsedMs: number;
-  toolCall?: ToolCall | undefined;
-  error?: SDKError | undefined;
+  finishReason: FinishReason;
+  /** Present exactly when event_kind == COMPLETED. */
+  result?:
+    | LLMGenerationResult
+    | undefined;
+  /** Present exactly when event_kind == TOOL_CALL. */
+  toolCall?:
+    | ToolCall
+    | undefined;
+  /** Present exactly when event_kind == ERROR. */
+  error?:
+    | SDKError
+    | undefined;
+  /**
+   * Largest complete JSON value visible in the output so far, when
+   * LLMGenerationOptions.structured_output is set.
+   */
+  partialJson?: string | undefined;
 }
 
 function createBaseLLMGenerateRequest(): LLMGenerateRequest {
-  return { prompt: "", requestId: "", modelId: "", conversationId: "", metadata: {}, options: undefined, history: [] };
+  return { requestId: "", modelId: "", conversationId: "", options: undefined, messages: [] };
 }
 
 export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
   encode(message: LLMGenerateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.prompt !== "") {
-      writer.uint32(10).string(message.prompt);
-    }
     if (message.requestId !== "") {
       writer.uint32(114).string(message.requestId);
     }
@@ -160,14 +165,11 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     if (message.conversationId !== "") {
       writer.uint32(130).string(message.conversationId);
     }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      LLMGenerateRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(202).fork()).join();
-    });
     if (message.options !== undefined) {
       LLMGenerationOptions.encode(message.options, writer.uint32(210).fork()).join();
     }
-    for (const v of message.history) {
-      ChatMessage.encode(v!, writer.uint32(218).fork()).join();
+    for (const v of message.messages) {
+      ChatMessage.encode(v!, writer.uint32(226).fork()).join();
     }
     return writer;
   },
@@ -179,14 +181,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.prompt = reader.string();
-          continue;
-        }
         case 14: {
           if (tag !== 114) {
             break;
@@ -211,17 +205,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
           message.conversationId = reader.string();
           continue;
         }
-        case 25: {
-          if (tag !== 202) {
-            break;
-          }
-
-          const entry25 = LLMGenerateRequest_MetadataEntry.decode(reader, reader.uint32());
-          if (entry25.value !== undefined) {
-            message.metadata[entry25.key] = entry25.value;
-          }
-          continue;
-        }
         case 26: {
           if (tag !== 210) {
             break;
@@ -230,12 +213,12 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
           message.options = LLMGenerationOptions.decode(reader, reader.uint32());
           continue;
         }
-        case 27: {
-          if (tag !== 218) {
+        case 28: {
+          if (tag !== 226) {
             break;
           }
 
-          message.history.push(ChatMessage.decode(reader, reader.uint32()));
+          message.messages.push(ChatMessage.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -249,7 +232,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
 
   fromJSON(object: any): LLMGenerateRequest {
     return {
-      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
       requestId: isSet(object.requestId)
         ? globalThis.String(object.requestId)
         : isSet(object.request_id)
@@ -265,27 +247,15 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
         : isSet(object.conversation_id)
         ? globalThis.String(object.conversation_id)
         : "",
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
       options: isSet(object.options) ? LLMGenerationOptions.fromJSON(object.options) : undefined,
-      history: globalThis.Array.isArray(object?.history)
-        ? object.history.map((e: any) => ChatMessage.fromJSON(e))
+      messages: globalThis.Array.isArray(object?.messages)
+        ? object.messages.map((e: any) => ChatMessage.fromJSON(e))
         : [],
     };
   },
 
   toJSON(message: LLMGenerateRequest): unknown {
     const obj: any = {};
-    if (message.prompt !== "") {
-      obj.prompt = message.prompt;
-    }
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
     }
@@ -295,20 +265,11 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     if (message.conversationId !== "") {
       obj.conversationId = message.conversationId;
     }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
-    }
     if (message.options !== undefined) {
       obj.options = LLMGenerationOptions.toJSON(message.options);
     }
-    if (message.history?.length) {
-      obj.history = message.history.map((e) => ChatMessage.toJSON(e));
+    if (message.messages?.length) {
+      obj.messages = message.messages.map((e) => ChatMessage.toJSON(e));
     }
     return obj;
   },
@@ -318,371 +279,13 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
   },
   fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(object: I): LLMGenerateRequest {
     const message = createBaseLLMGenerateRequest();
-    message.prompt = object.prompt ?? "";
     message.requestId = object.requestId ?? "";
     message.modelId = object.modelId ?? "";
     message.conversationId = object.conversationId ?? "";
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
     message.options = (object.options !== undefined && object.options !== null)
       ? LLMGenerationOptions.fromPartial(object.options)
       : undefined;
-    message.history = object.history?.map((e) => ChatMessage.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseLLMGenerateRequest_MetadataEntry(): LLMGenerateRequest_MetadataEntry {
-  return { key: "", value: "" };
-}
-
-export const LLMGenerateRequest_MetadataEntry: MessageFns<LLMGenerateRequest_MetadataEntry> = {
-  encode(message: LLMGenerateRequest_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LLMGenerateRequest_MetadataEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLLMGenerateRequest_MetadataEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LLMGenerateRequest_MetadataEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: LLMGenerateRequest_MetadataEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<LLMGenerateRequest_MetadataEntry>, I>>(
-    base?: I,
-  ): LLMGenerateRequest_MetadataEntry {
-    return LLMGenerateRequest_MetadataEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest_MetadataEntry>, I>>(
-    object: I,
-  ): LLMGenerateRequest_MetadataEntry {
-    const message = createBaseLLMGenerateRequest_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
-    return message;
-  },
-};
-
-function createBaseLLMStreamFinalResult(): LLMStreamFinalResult {
-  return {
-    text: "",
-    thinkingContent: undefined,
-    totalTimeMs: 0,
-    timeToFirstTokenMs: 0,
-    finishReason: "",
-    promptEvalTimeMs: 0,
-    decodeTimeMs: 0,
-    toolCalls: [],
-    toolResults: [],
-    usage: undefined,
-    error: undefined,
-  };
-}
-
-export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
-  encode(message: LLMStreamFinalResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.text !== "") {
-      writer.uint32(10).string(message.text);
-    }
-    if (message.thinkingContent !== undefined) {
-      writer.uint32(18).string(message.thinkingContent);
-    }
-    if (message.totalTimeMs !== 0) {
-      writer.uint32(48).int64(message.totalTimeMs);
-    }
-    if (message.timeToFirstTokenMs !== 0) {
-      writer.uint32(56).int64(message.timeToFirstTokenMs);
-    }
-    if (message.finishReason !== "") {
-      writer.uint32(74).string(message.finishReason);
-    }
-    if (message.promptEvalTimeMs !== 0) {
-      writer.uint32(96).int64(message.promptEvalTimeMs);
-    }
-    if (message.decodeTimeMs !== 0) {
-      writer.uint32(104).int64(message.decodeTimeMs);
-    }
-    for (const v of message.toolCalls) {
-      ToolCall.encode(v!, writer.uint32(114).fork()).join();
-    }
-    for (const v of message.toolResults) {
-      ToolResult.encode(v!, writer.uint32(122).fork()).join();
-    }
-    if (message.usage !== undefined) {
-      TokenUsage.encode(message.usage, writer.uint32(130).fork()).join();
-    }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(138).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LLMStreamFinalResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLLMStreamFinalResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.text = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.thinkingContent = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.totalTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.timeToFirstTokenMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.finishReason = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.promptEvalTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 13: {
-          if (tag !== 104) {
-            break;
-          }
-
-          message.decodeTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 14: {
-          if (tag !== 114) {
-            break;
-          }
-
-          message.toolCalls.push(ToolCall.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 15: {
-          if (tag !== 122) {
-            break;
-          }
-
-          message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 16: {
-          if (tag !== 130) {
-            break;
-          }
-
-          message.usage = TokenUsage.decode(reader, reader.uint32());
-          continue;
-        }
-        case 17: {
-          if (tag !== 138) {
-            break;
-          }
-
-          message.error = SDKError.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LLMStreamFinalResult {
-    return {
-      text: isSet(object.text) ? globalThis.String(object.text) : "",
-      thinkingContent: isSet(object.thinkingContent)
-        ? globalThis.String(object.thinkingContent)
-        : isSet(object.thinking_content)
-        ? globalThis.String(object.thinking_content)
-        : undefined,
-      totalTimeMs: isSet(object.totalTimeMs)
-        ? globalThis.Number(object.totalTimeMs)
-        : isSet(object.total_time_ms)
-        ? globalThis.Number(object.total_time_ms)
-        : 0,
-      timeToFirstTokenMs: isSet(object.timeToFirstTokenMs)
-        ? globalThis.Number(object.timeToFirstTokenMs)
-        : isSet(object.time_to_first_token_ms)
-        ? globalThis.Number(object.time_to_first_token_ms)
-        : 0,
-      finishReason: isSet(object.finishReason)
-        ? globalThis.String(object.finishReason)
-        : isSet(object.finish_reason)
-        ? globalThis.String(object.finish_reason)
-        : "",
-      promptEvalTimeMs: isSet(object.promptEvalTimeMs)
-        ? globalThis.Number(object.promptEvalTimeMs)
-        : isSet(object.prompt_eval_time_ms)
-        ? globalThis.Number(object.prompt_eval_time_ms)
-        : 0,
-      decodeTimeMs: isSet(object.decodeTimeMs)
-        ? globalThis.Number(object.decodeTimeMs)
-        : isSet(object.decode_time_ms)
-        ? globalThis.Number(object.decode_time_ms)
-        : 0,
-      toolCalls: globalThis.Array.isArray(object?.toolCalls)
-        ? object.toolCalls.map((e: any) => ToolCall.fromJSON(e))
-        : globalThis.Array.isArray(object?.tool_calls)
-        ? object.tool_calls.map((e: any) => ToolCall.fromJSON(e))
-        : [],
-      toolResults: globalThis.Array.isArray(object?.toolResults)
-        ? object.toolResults.map((e: any) => ToolResult.fromJSON(e))
-        : globalThis.Array.isArray(object?.tool_results)
-        ? object.tool_results.map((e: any) => ToolResult.fromJSON(e))
-        : [],
-      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
-    };
-  },
-
-  toJSON(message: LLMStreamFinalResult): unknown {
-    const obj: any = {};
-    if (message.text !== "") {
-      obj.text = message.text;
-    }
-    if (message.thinkingContent !== undefined) {
-      obj.thinkingContent = message.thinkingContent;
-    }
-    if (message.totalTimeMs !== 0) {
-      obj.totalTimeMs = Math.round(message.totalTimeMs);
-    }
-    if (message.timeToFirstTokenMs !== 0) {
-      obj.timeToFirstTokenMs = Math.round(message.timeToFirstTokenMs);
-    }
-    if (message.finishReason !== "") {
-      obj.finishReason = message.finishReason;
-    }
-    if (message.promptEvalTimeMs !== 0) {
-      obj.promptEvalTimeMs = Math.round(message.promptEvalTimeMs);
-    }
-    if (message.decodeTimeMs !== 0) {
-      obj.decodeTimeMs = Math.round(message.decodeTimeMs);
-    }
-    if (message.toolCalls?.length) {
-      obj.toolCalls = message.toolCalls.map((e) => ToolCall.toJSON(e));
-    }
-    if (message.toolResults?.length) {
-      obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
-    }
-    if (message.usage !== undefined) {
-      obj.usage = TokenUsage.toJSON(message.usage);
-    }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(base?: I): LLMStreamFinalResult {
-    return LLMStreamFinalResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(object: I): LLMStreamFinalResult {
-    const message = createBaseLLMStreamFinalResult();
-    message.text = object.text ?? "";
-    message.thinkingContent = object.thinkingContent ?? undefined;
-    message.totalTimeMs = object.totalTimeMs ?? 0;
-    message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
-    message.finishReason = object.finishReason ?? "";
-    message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
-    message.decodeTimeMs = object.decodeTimeMs ?? 0;
-    message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
-    message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
-    message.usage = (object.usage !== undefined && object.usage !== null)
-      ? TokenUsage.fromPartial(object.usage)
-      : undefined;
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
+    message.messages = object.messages?.map((e) => ChatMessage.fromPartial(e)) || [];
     return message;
   },
 };
@@ -690,22 +293,14 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
 function createBaseLLMStreamEvent(): LLMStreamEvent {
   return {
     seq: 0,
-    timestampUs: 0,
     token: "",
-    isFinal: false,
-    kind: 0,
-    tokenId: 0,
-    logprob: 0,
-    finishReason: "",
-    result: undefined,
     eventKind: 0,
     requestId: "",
-    conversationId: "",
-    promptTokensProcessed: 0,
-    completionTokensGenerated: 0,
-    elapsedMs: 0,
+    finishReason: 0,
+    result: undefined,
     toolCall: undefined,
     error: undefined,
+    partialJson: undefined,
   };
 }
 
@@ -714,29 +309,8 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.seq !== 0) {
       writer.uint32(8).uint64(message.seq);
     }
-    if (message.timestampUs !== 0) {
-      writer.uint32(16).int64(message.timestampUs);
-    }
     if (message.token !== "") {
       writer.uint32(26).string(message.token);
-    }
-    if (message.isFinal !== false) {
-      writer.uint32(32).bool(message.isFinal);
-    }
-    if (message.kind !== 0) {
-      writer.uint32(40).int32(message.kind);
-    }
-    if (message.tokenId !== 0) {
-      writer.uint32(48).uint32(message.tokenId);
-    }
-    if (message.logprob !== 0) {
-      writer.uint32(61).float(message.logprob);
-    }
-    if (message.finishReason !== "") {
-      writer.uint32(66).string(message.finishReason);
-    }
-    if (message.result !== undefined) {
-      LLMStreamFinalResult.encode(message.result, writer.uint32(82).fork()).join();
     }
     if (message.eventKind !== 0) {
       writer.uint32(96).int32(message.eventKind);
@@ -744,23 +318,20 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.requestId !== "") {
       writer.uint32(106).string(message.requestId);
     }
-    if (message.conversationId !== "") {
-      writer.uint32(114).string(message.conversationId);
+    if (message.finishReason !== 0) {
+      writer.uint32(168).int32(message.finishReason);
     }
-    if (message.promptTokensProcessed !== 0) {
-      writer.uint32(120).int32(message.promptTokensProcessed);
-    }
-    if (message.completionTokensGenerated !== 0) {
-      writer.uint32(128).int32(message.completionTokensGenerated);
-    }
-    if (message.elapsedMs !== 0) {
-      writer.uint32(136).int64(message.elapsedMs);
+    if (message.result !== undefined) {
+      LLMGenerationResult.encode(message.result, writer.uint32(178).fork()).join();
     }
     if (message.toolCall !== undefined) {
       ToolCall.encode(message.toolCall, writer.uint32(146).fork()).join();
     }
     if (message.error !== undefined) {
       SDKError.encode(message.error, writer.uint32(154).fork()).join();
+    }
+    if (message.partialJson !== undefined) {
+      writer.uint32(162).string(message.partialJson);
     }
     return writer;
   },
@@ -780,68 +351,12 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
           message.seq = longToNumber(reader.uint64());
           continue;
         }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.timestampUs = longToNumber(reader.int64());
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
           }
 
           message.token = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.isFinal = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.kind = reader.int32() as any;
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.tokenId = reader.uint32();
-          continue;
-        }
-        case 7: {
-          if (tag !== 61) {
-            break;
-          }
-
-          message.logprob = reader.float();
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.finishReason = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.result = LLMStreamFinalResult.decode(reader, reader.uint32());
           continue;
         }
         case 12: {
@@ -860,36 +375,20 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
           message.requestId = reader.string();
           continue;
         }
-        case 14: {
-          if (tag !== 114) {
+        case 21: {
+          if (tag !== 168) {
             break;
           }
 
-          message.conversationId = reader.string();
+          message.finishReason = reader.int32() as any;
           continue;
         }
-        case 15: {
-          if (tag !== 120) {
+        case 22: {
+          if (tag !== 178) {
             break;
           }
 
-          message.promptTokensProcessed = reader.int32();
-          continue;
-        }
-        case 16: {
-          if (tag !== 128) {
-            break;
-          }
-
-          message.completionTokensGenerated = reader.int32();
-          continue;
-        }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.elapsedMs = longToNumber(reader.int64());
+          message.result = LLMGenerationResult.decode(reader, reader.uint32());
           continue;
         }
         case 18: {
@@ -908,6 +407,14 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
           message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.partialJson = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -920,30 +427,7 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
   fromJSON(object: any): LLMStreamEvent {
     return {
       seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
-      timestampUs: isSet(object.timestampUs)
-        ? globalThis.Number(object.timestampUs)
-        : isSet(object.timestamp_us)
-        ? globalThis.Number(object.timestamp_us)
-        : 0,
       token: isSet(object.token) ? globalThis.String(object.token) : "",
-      isFinal: isSet(object.isFinal)
-        ? globalThis.Boolean(object.isFinal)
-        : isSet(object.is_final)
-        ? globalThis.Boolean(object.is_final)
-        : false,
-      kind: isSet(object.kind) ? tokenKindFromJSON(object.kind) : 0,
-      tokenId: isSet(object.tokenId)
-        ? globalThis.Number(object.tokenId)
-        : isSet(object.token_id)
-        ? globalThis.Number(object.token_id)
-        : 0,
-      logprob: isSet(object.logprob) ? globalThis.Number(object.logprob) : 0,
-      finishReason: isSet(object.finishReason)
-        ? globalThis.String(object.finishReason)
-        : isSet(object.finish_reason)
-        ? globalThis.String(object.finish_reason)
-        : "",
-      result: isSet(object.result) ? LLMStreamFinalResult.fromJSON(object.result) : undefined,
       eventKind: isSet(object.eventKind)
         ? lLMStreamEventKindFromJSON(object.eventKind)
         : isSet(object.event_kind)
@@ -954,32 +438,23 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
         : isSet(object.request_id)
         ? globalThis.String(object.request_id)
         : "",
-      conversationId: isSet(object.conversationId)
-        ? globalThis.String(object.conversationId)
-        : isSet(object.conversation_id)
-        ? globalThis.String(object.conversation_id)
-        : "",
-      promptTokensProcessed: isSet(object.promptTokensProcessed)
-        ? globalThis.Number(object.promptTokensProcessed)
-        : isSet(object.prompt_tokens_processed)
-        ? globalThis.Number(object.prompt_tokens_processed)
+      finishReason: isSet(object.finishReason)
+        ? finishReasonFromJSON(object.finishReason)
+        : isSet(object.finish_reason)
+        ? finishReasonFromJSON(object.finish_reason)
         : 0,
-      completionTokensGenerated: isSet(object.completionTokensGenerated)
-        ? globalThis.Number(object.completionTokensGenerated)
-        : isSet(object.completion_tokens_generated)
-        ? globalThis.Number(object.completion_tokens_generated)
-        : 0,
-      elapsedMs: isSet(object.elapsedMs)
-        ? globalThis.Number(object.elapsedMs)
-        : isSet(object.elapsed_ms)
-        ? globalThis.Number(object.elapsed_ms)
-        : 0,
+      result: isSet(object.result) ? LLMGenerationResult.fromJSON(object.result) : undefined,
       toolCall: isSet(object.toolCall)
         ? ToolCall.fromJSON(object.toolCall)
         : isSet(object.tool_call)
         ? ToolCall.fromJSON(object.tool_call)
         : undefined,
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+      partialJson: isSet(object.partialJson)
+        ? globalThis.String(object.partialJson)
+        : isSet(object.partial_json)
+        ? globalThis.String(object.partial_json)
+        : undefined,
     };
   },
 
@@ -988,29 +463,8 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.seq !== 0) {
       obj.seq = Math.round(message.seq);
     }
-    if (message.timestampUs !== 0) {
-      obj.timestampUs = Math.round(message.timestampUs);
-    }
     if (message.token !== "") {
       obj.token = message.token;
-    }
-    if (message.isFinal !== false) {
-      obj.isFinal = message.isFinal;
-    }
-    if (message.kind !== 0) {
-      obj.kind = tokenKindToJSON(message.kind);
-    }
-    if (message.tokenId !== 0) {
-      obj.tokenId = Math.round(message.tokenId);
-    }
-    if (message.logprob !== 0) {
-      obj.logprob = message.logprob;
-    }
-    if (message.finishReason !== "") {
-      obj.finishReason = message.finishReason;
-    }
-    if (message.result !== undefined) {
-      obj.result = LLMStreamFinalResult.toJSON(message.result);
     }
     if (message.eventKind !== 0) {
       obj.eventKind = lLMStreamEventKindToJSON(message.eventKind);
@@ -1018,23 +472,20 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
     }
-    if (message.conversationId !== "") {
-      obj.conversationId = message.conversationId;
+    if (message.finishReason !== 0) {
+      obj.finishReason = finishReasonToJSON(message.finishReason);
     }
-    if (message.promptTokensProcessed !== 0) {
-      obj.promptTokensProcessed = Math.round(message.promptTokensProcessed);
-    }
-    if (message.completionTokensGenerated !== 0) {
-      obj.completionTokensGenerated = Math.round(message.completionTokensGenerated);
-    }
-    if (message.elapsedMs !== 0) {
-      obj.elapsedMs = Math.round(message.elapsedMs);
+    if (message.result !== undefined) {
+      obj.result = LLMGenerationResult.toJSON(message.result);
     }
     if (message.toolCall !== undefined) {
       obj.toolCall = ToolCall.toJSON(message.toolCall);
     }
     if (message.error !== undefined) {
       obj.error = SDKError.toJSON(message.error);
+    }
+    if (message.partialJson !== undefined) {
+      obj.partialJson = message.partialJson;
     }
     return obj;
   },
@@ -1045,28 +496,20 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
   fromPartial<I extends Exact<DeepPartial<LLMStreamEvent>, I>>(object: I): LLMStreamEvent {
     const message = createBaseLLMStreamEvent();
     message.seq = object.seq ?? 0;
-    message.timestampUs = object.timestampUs ?? 0;
     message.token = object.token ?? "";
-    message.isFinal = object.isFinal ?? false;
-    message.kind = object.kind ?? 0;
-    message.tokenId = object.tokenId ?? 0;
-    message.logprob = object.logprob ?? 0;
-    message.finishReason = object.finishReason ?? "";
-    message.result = (object.result !== undefined && object.result !== null)
-      ? LLMStreamFinalResult.fromPartial(object.result)
-      : undefined;
     message.eventKind = object.eventKind ?? 0;
     message.requestId = object.requestId ?? "";
-    message.conversationId = object.conversationId ?? "";
-    message.promptTokensProcessed = object.promptTokensProcessed ?? 0;
-    message.completionTokensGenerated = object.completionTokensGenerated ?? 0;
-    message.elapsedMs = object.elapsedMs ?? 0;
+    message.finishReason = object.finishReason ?? 0;
+    message.result = (object.result !== undefined && object.result !== null)
+      ? LLMGenerationResult.fromPartial(object.result)
+      : undefined;
     message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
       ? ToolCall.fromPartial(object.toolCall)
       : undefined;
     message.error = (object.error !== undefined && object.error !== null)
       ? SDKError.fromPartial(object.error)
       : undefined;
+    message.partialJson = object.partialJson ?? undefined;
     return message;
   },
 };
@@ -1092,10 +535,6 @@ function longToNumber(int64: { toString(): string }): number {
     throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
   }
   return num;
-}
-
-function isObject(value: any): boolean {
-  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

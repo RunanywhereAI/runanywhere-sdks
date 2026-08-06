@@ -59,14 +59,6 @@ public class HybridSttTranscribeResponse(
     schemaIndex = 3,
   )
   public val routing: HybridRoutedMetadata? = null,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMsg",
-    schemaIndex = 4,
-  )
-  public val error_msg: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridSttTranscribeResponse, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -83,7 +75,6 @@ public class HybridSttTranscribeResponse(
     if (text != other.text) return false
     if (detected_language != other.detected_language) return false
     if (routing != other.routing) return false
-    if (error_msg != other.error_msg) return false
     return true
   }
 
@@ -95,7 +86,6 @@ public class HybridSttTranscribeResponse(
       result = result * 37 + text.hashCode()
       result = result * 37 + detected_language.hashCode()
       result = result * 37 + (routing?.hashCode() ?: 0)
-      result = result * 37 + error_msg.hashCode()
       super.hashCode = result
     }
     return result
@@ -107,7 +97,6 @@ public class HybridSttTranscribeResponse(
     result += """text=${sanitize(text)}"""
     result += """detected_language=${sanitize(detected_language)}"""
     if (routing != null) result += """routing=$routing"""
-    result += """error_msg=${sanitize(error_msg)}"""
     return result.joinToString(prefix = "HybridSttTranscribeResponse{", separator = ", ", postfix = "}")
   }
 
@@ -116,9 +105,8 @@ public class HybridSttTranscribeResponse(
     text: String = this.text,
     detected_language: String = this.detected_language,
     routing: HybridRoutedMetadata? = this.routing,
-    error_msg: String = this.error_msg,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridSttTranscribeResponse = HybridSttTranscribeResponse(rc, text, detected_language, routing, error_msg, unknownFields)
+  ): HybridSttTranscribeResponse = HybridSttTranscribeResponse(rc, text, detected_language, routing, unknownFields)
 
   public companion object {
     @JvmField
@@ -145,9 +133,6 @@ public class HybridSttTranscribeResponse(
         if (value.routing != null) {
           size += HybridRoutedMetadata.ADAPTER.encodedSizeWithTag(4, value.routing)
         }
-        if (value.error_msg != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_msg)
-        }
         return size
       }
 
@@ -164,17 +149,11 @@ public class HybridSttTranscribeResponse(
         if (value.routing != null) {
           HybridRoutedMetadata.ADAPTER.encodeWithTag(writer, 4, value.routing)
         }
-        if (value.error_msg != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_msg)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridSttTranscribeResponse) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_msg != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_msg)
-        }
         if (value.routing != null) {
           HybridRoutedMetadata.ADAPTER.encodeWithTag(writer, 4, value.routing)
         }
@@ -194,14 +173,12 @@ public class HybridSttTranscribeResponse(
         var text: String = ""
         var detected_language: String = ""
         var routing: HybridRoutedMetadata? = null
-        var error_msg: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> rc = ProtoAdapter.INT32.decode(reader)
             2 -> text = ProtoAdapter.STRING.decode(reader)
             3 -> detected_language = ProtoAdapter.STRING.decode(reader)
             4 -> routing = HybridRoutedMetadata.ADAPTER.decode(reader)
-            5 -> error_msg = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -210,7 +187,6 @@ public class HybridSttTranscribeResponse(
           text = text,
           detected_language = detected_language,
           routing = routing,
-          error_msg = error_msg,
           unknownFields = unknownFields
         )
       }

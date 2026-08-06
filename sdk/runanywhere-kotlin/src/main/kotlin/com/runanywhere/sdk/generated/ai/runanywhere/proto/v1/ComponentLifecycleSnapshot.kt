@@ -30,6 +30,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * ComponentInitializationEvent was deleted: its fields and kinds moved into
+ * ComponentLifecycleEvent / ComponentLifecycleEventKind below. Bring-up and
+ * steady-state lifecycle are the same subject; they now share one message.
  * Snapshot of a component's current model-backed lifecycle state.
  */
 public class ComponentLifecycleSnapshot(

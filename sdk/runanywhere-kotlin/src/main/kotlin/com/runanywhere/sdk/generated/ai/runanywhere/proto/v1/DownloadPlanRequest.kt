@@ -56,19 +56,11 @@ public class DownloadPlanRequest(
   )
   public val model: ModelInfo? = null,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "resumeExisting",
-    schemaIndex = 2,
-  )
-  public val resume_existing: Boolean = false,
-  @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "availableStorageBytes",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val available_storage_bytes: Long = 0L,
   @field:WireField(
@@ -76,7 +68,7 @@ public class DownloadPlanRequest(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "allowMeteredNetwork",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val allow_metered_network: Boolean = false,
   @field:WireField(
@@ -84,7 +76,7 @@ public class DownloadPlanRequest(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "storageNamespace",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val storage_namespace: String = "",
   @field:WireField(
@@ -92,23 +84,27 @@ public class DownloadPlanRequest(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "validateExistingBytes",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val validate_existing_bytes: Boolean = false,
+  /**
+   * Checksums are verified whenever the catalog has one; set this only to
+   * opt OUT.
+   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "verifyChecksums",
-    schemaIndex = 7,
+    jsonName = "skipChecksumVerification",
+    schemaIndex = 6,
   )
-  public val verify_checksums: Boolean = false,
+  public val skip_checksum_verification: Boolean = false,
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requiredFreeBytesAfterDownload",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val required_free_bytes_after_download: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -125,12 +121,11 @@ public class DownloadPlanRequest(
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
     if (model != other.model) return false
-    if (resume_existing != other.resume_existing) return false
     if (available_storage_bytes != other.available_storage_bytes) return false
     if (allow_metered_network != other.allow_metered_network) return false
     if (storage_namespace != other.storage_namespace) return false
     if (validate_existing_bytes != other.validate_existing_bytes) return false
-    if (verify_checksums != other.verify_checksums) return false
+    if (skip_checksum_verification != other.skip_checksum_verification) return false
     if (required_free_bytes_after_download != other.required_free_bytes_after_download) return false
     return true
   }
@@ -141,12 +136,11 @@ public class DownloadPlanRequest(
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + (model?.hashCode() ?: 0)
-      result = result * 37 + resume_existing.hashCode()
       result = result * 37 + available_storage_bytes.hashCode()
       result = result * 37 + allow_metered_network.hashCode()
       result = result * 37 + storage_namespace.hashCode()
       result = result * 37 + validate_existing_bytes.hashCode()
-      result = result * 37 + verify_checksums.hashCode()
+      result = result * 37 + skip_checksum_verification.hashCode()
       result = result * 37 + required_free_bytes_after_download.hashCode()
       super.hashCode = result
     }
@@ -157,12 +151,11 @@ public class DownloadPlanRequest(
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
     if (model != null) result += """model=$model"""
-    result += """resume_existing=$resume_existing"""
     result += """available_storage_bytes=$available_storage_bytes"""
     result += """allow_metered_network=$allow_metered_network"""
     result += """storage_namespace=${sanitize(storage_namespace)}"""
     result += """validate_existing_bytes=$validate_existing_bytes"""
-    result += """verify_checksums=$verify_checksums"""
+    result += """skip_checksum_verification=$skip_checksum_verification"""
     result += """required_free_bytes_after_download=$required_free_bytes_after_download"""
     return result.joinToString(prefix = "DownloadPlanRequest{", separator = ", ", postfix = "}")
   }
@@ -170,15 +163,14 @@ public class DownloadPlanRequest(
   public fun copy(
     model_id: String = this.model_id,
     model: ModelInfo? = this.model,
-    resume_existing: Boolean = this.resume_existing,
     available_storage_bytes: Long = this.available_storage_bytes,
     allow_metered_network: Boolean = this.allow_metered_network,
     storage_namespace: String = this.storage_namespace,
     validate_existing_bytes: Boolean = this.validate_existing_bytes,
-    verify_checksums: Boolean = this.verify_checksums,
+    skip_checksum_verification: Boolean = this.skip_checksum_verification,
     required_free_bytes_after_download: Long = this.required_free_bytes_after_download,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadPlanRequest = DownloadPlanRequest(model_id, model, resume_existing, available_storage_bytes, allow_metered_network, storage_namespace, validate_existing_bytes, verify_checksums, required_free_bytes_after_download, unknownFields)
+  ): DownloadPlanRequest = DownloadPlanRequest(model_id, model, available_storage_bytes, allow_metered_network, storage_namespace, validate_existing_bytes, skip_checksum_verification, required_free_bytes_after_download, unknownFields)
 
   public companion object {
     @JvmField
@@ -197,9 +189,6 @@ public class DownloadPlanRequest(
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
         size += ModelInfo.ADAPTER.encodedSizeWithTag(2, value.model)
-        if (value.resume_existing != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.resume_existing)
-        }
         if (value.available_storage_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.available_storage_bytes)
         }
@@ -212,8 +201,8 @@ public class DownloadPlanRequest(
         if (value.validate_existing_bytes != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.validate_existing_bytes)
         }
-        if (value.verify_checksums != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.verify_checksums)
+        if (value.skip_checksum_verification != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.skip_checksum_verification)
         }
         if (value.required_free_bytes_after_download != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.required_free_bytes_after_download)
@@ -226,9 +215,6 @@ public class DownloadPlanRequest(
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
         ModelInfo.ADAPTER.encodeWithTag(writer, 2, value.model)
-        if (value.resume_existing != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.resume_existing)
-        }
         if (value.available_storage_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.available_storage_bytes)
         }
@@ -241,8 +227,8 @@ public class DownloadPlanRequest(
         if (value.validate_existing_bytes != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.validate_existing_bytes)
         }
-        if (value.verify_checksums != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.verify_checksums)
+        if (value.skip_checksum_verification != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.skip_checksum_verification)
         }
         if (value.required_free_bytes_after_download != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.required_free_bytes_after_download)
@@ -255,8 +241,8 @@ public class DownloadPlanRequest(
         if (value.required_free_bytes_after_download != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.required_free_bytes_after_download)
         }
-        if (value.verify_checksums != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.verify_checksums)
+        if (value.skip_checksum_verification != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.skip_checksum_verification)
         }
         if (value.validate_existing_bytes != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.validate_existing_bytes)
@@ -270,9 +256,6 @@ public class DownloadPlanRequest(
         if (value.available_storage_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.available_storage_bytes)
         }
-        if (value.resume_existing != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.resume_existing)
-        }
         ModelInfo.ADAPTER.encodeWithTag(writer, 2, value.model)
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
@@ -282,23 +265,21 @@ public class DownloadPlanRequest(
       override fun decode(reader: ProtoReader): DownloadPlanRequest {
         var model_id: String = ""
         var model: ModelInfo? = null
-        var resume_existing: Boolean = false
         var available_storage_bytes: Long = 0L
         var allow_metered_network: Boolean = false
         var storage_namespace: String = ""
         var validate_existing_bytes: Boolean = false
-        var verify_checksums: Boolean = false
+        var skip_checksum_verification: Boolean = false
         var required_free_bytes_after_download: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> model = ModelInfo.ADAPTER.decode(reader)
-            3 -> resume_existing = ProtoAdapter.BOOL.decode(reader)
             4 -> available_storage_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> allow_metered_network = ProtoAdapter.BOOL.decode(reader)
             6 -> storage_namespace = ProtoAdapter.STRING.decode(reader)
             7 -> validate_existing_bytes = ProtoAdapter.BOOL.decode(reader)
-            8 -> verify_checksums = ProtoAdapter.BOOL.decode(reader)
+            8 -> skip_checksum_verification = ProtoAdapter.BOOL.decode(reader)
             9 -> required_free_bytes_after_download = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -306,12 +287,11 @@ public class DownloadPlanRequest(
         return DownloadPlanRequest(
           model_id = model_id,
           model = model,
-          resume_existing = resume_existing,
           available_storage_bytes = available_storage_bytes,
           allow_metered_network = allow_metered_network,
           storage_namespace = storage_namespace,
           validate_existing_bytes = validate_existing_bytes,
-          verify_checksums = verify_checksums,
+          skip_checksum_verification = skip_checksum_verification,
           required_free_bytes_after_download = required_free_bytes_after_download,
           unknownFields = unknownFields
         )

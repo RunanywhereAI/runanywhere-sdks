@@ -52,11 +52,11 @@ constexpr SdkInitPhase2Request::ParseTableT_ SdkInitPhase2Request::InternalGener
     {
       PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_._has_bits_),
       0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
+      1, 0,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
+      4294967294,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
+      1,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -66,42 +66,15 @@ constexpr SdkInitPhase2Request::ParseTableT_ SdkInitPhase2Request::InternalGener
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SdkInitPhase2Request>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
       // string build_token = 1;
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.build_token_)}},
-      // bool force_refresh_assignments = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.force_refresh_assignments_), 1>(),
-       {16, 1, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.force_refresh_assignments_)}},
-      // bool flush_telemetry = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.flush_telemetry_), 2>(),
-       {24, 2, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.flush_telemetry_)}},
-      // bool discover_downloaded_models = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.discover_downloaded_models_), 3>(),
-       {32, 3, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.discover_downloaded_models_)}},
-      // bool rescan_local_models = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.rescan_local_models_), 4>(),
-       {40, 4, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.rescan_local_models_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // string build_token = 1;
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.build_token_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool force_refresh_assignments = 2;
-      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.force_refresh_assignments_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool flush_telemetry = 3;
-      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.flush_telemetry_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool discover_downloaded_models = 4;
-      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.discover_downloaded_models_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool rescan_local_models = 5;
-      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.rescan_local_models_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     // no aux_entries
     {{
@@ -119,11 +92,7 @@ inline constexpr SdkInitPhase2Request::Impl_::Impl_(
       : _cached_size_{0},
         build_token_(
             &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        force_refresh_assignments_{false},
-        flush_telemetry_{false},
-        discover_downloaded_models_{false},
-        rescan_local_models_{false} {}
+            ::_pbi::ConstantInitialized()) {}
 
 template <typename>
 constexpr SdkInitPhase2Request::SdkInitPhase2Request(::_pbi::ConstantInitialized,
@@ -229,11 +198,11 @@ constexpr SdkInitPhase1Request::ParseTableT_ SdkInitPhase1Request::InternalGener
     {
       PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_._has_bits_),
       0, // no _extensions_
-      6, 56,  // max_field_number, fast_idx_mask
+      8, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967040,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
+      8,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -243,8 +212,11 @@ constexpr SdkInitPhase1Request::ParseTableT_ SdkInitPhase1Request::InternalGener
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SdkInitPhase1Request>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // .runanywhere.v1.SdkInitEnvironment environment = 1;
+      // optional int32 max_retries = 8 [(.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 10];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitPhase1Request, _impl_.max_retries_), 7>(),
+       {64, 7, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.max_retries_)}},
+      // .runanywhere.v1.SDKEnvironment environment = 1;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitPhase1Request, _impl_.environment_), 5>(),
        {8, 5, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.environment_)}},
@@ -268,11 +240,14 @@ constexpr SdkInitPhase1Request::ParseTableT_ SdkInitPhase1Request::InternalGener
       {::_pbi::TcParser::FastUS1,
        {50, 4, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.sdk_version_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional int32 request_timeout_ms = 7 [(.runanywhere.v1.rac_min) = 1000];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitPhase1Request, _impl_.request_timeout_ms_), 6>(),
+       {56, 6, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.request_timeout_ms_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // .runanywhere.v1.SdkInitEnvironment environment = 1;
+      // .runanywhere.v1.SDKEnvironment environment = 1;
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.environment_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // string api_key = 2;
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.api_key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
@@ -284,10 +259,14 @@ constexpr SdkInitPhase1Request::ParseTableT_ SdkInitPhase1Request::InternalGener
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.platform_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string sdk_version = 6;
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.sdk_version_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional int32 request_timeout_ms = 7 [(.runanywhere.v1.rac_min) = 1000];
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.request_timeout_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // optional int32 max_retries = 8 [(.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 10];
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.max_retries_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     }},
     // no aux_entries
     {{
-      "\43\0\7\10\11\10\13\0"
+      "\43\0\7\10\11\10\13\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.SdkInitPhase1Request"
       "api_key"
       "base_url"
@@ -318,7 +297,9 @@ inline constexpr SdkInitPhase1Request::Impl_::Impl_(
         sdk_version_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        environment_{static_cast< ::runanywhere::v1::SdkInitEnvironment >(0)} {}
+        environment_{static_cast< ::runanywhere::v1::SDKEnvironment >(0)},
+        request_timeout_ms_{0},
+        max_retries_{0} {}
 
 template <typename>
 constexpr SdkInitPhase1Request::SdkInitPhase1Request(::_pbi::ConstantInitialized,
@@ -424,11 +405,11 @@ constexpr SdkInitResult::ParseTableT_ SdkInitResult::InternalGenerateParseTable_
     {
       PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_._has_bits_),
       0, // no _extensions_
-      11, 120,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294965250,  // skipmap
+      4294967264,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      10,  // num_field_entries
+      5,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -439,74 +420,41 @@ constexpr SdkInitResult::ParseTableT_ SdkInitResult::InternalGenerateParseTable_
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // .runanywhere.v1.SdkInitPhase phase = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitResult, _impl_.phase_), 2>(),
-       {8, 2, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.phase_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      // .runanywhere.v1.SDKError error = 3;
+      // .runanywhere.v1.SDKError error = 1;
       {::_pbi::TcParser::FastMtS1,
-       {26, 1, 0,
+       {10, 1, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.error_)}},
-      // bool http_configured = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitResult, _impl_.http_configured_), 5>(),
-       {32, 5, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.http_configured_)}},
-      // bool device_registered = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitResult, _impl_.device_registered_), 6>(),
-       {40, 6, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.device_registered_)}},
-      // uint32 linked_models_count = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitResult, _impl_.linked_models_count_), 3>(),
-       {48, 3, 0,
+      // uint32 linked_models_count = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitResult, _impl_.linked_models_count_), 2>(),
+       {16, 2, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.linked_models_count_)}},
-      // uint32 discovered_orphans = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitResult, _impl_.discovered_orphans_), 4>(),
-       {56, 4, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.discovered_orphans_)}},
-      // string warning = 8;
+      // string warning = 3;
       {::_pbi::TcParser::FastUS1,
-       {66, 0, 0,
+       {26, 0, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.warning_)}},
-      // int64 duration_ms = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SdkInitResult, _impl_.duration_ms_), 9>(),
-       {72, 9, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.duration_ms_)}},
-      // bool has_completed_http_setup = 10;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitResult, _impl_.has_completed_http_setup_), 7>(),
-       {80, 7, 0,
+      // bool has_completed_http_setup = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitResult, _impl_.has_completed_http_setup_), 3>(),
+       {32, 3, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.has_completed_http_setup_)}},
-      // bool http_applicable = 11;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitResult, _impl_.http_applicable_), 8>(),
-       {88, 8, 0,
+      // bool http_applicable = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitResult, _impl_.http_applicable_), 4>(),
+       {40, 4, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.http_applicable_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // .runanywhere.v1.SdkInitPhase phase = 1;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.phase_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.SDKError error = 3;
+      // .runanywhere.v1.SDKError error = 1;
       {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.error_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool http_configured = 4;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.http_configured_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool device_registered = 5;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.device_registered_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // uint32 linked_models_count = 6;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.linked_models_count_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
-      // uint32 discovered_orphans = 7;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.discovered_orphans_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
-      // string warning = 8;
+      // uint32 linked_models_count = 2;
+      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.linked_models_count_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+      // string warning = 3;
       {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.warning_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 duration_ms = 9;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.duration_ms_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // bool has_completed_http_setup = 10;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.has_completed_http_setup_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool http_applicable = 11;
-      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.http_applicable_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool has_completed_http_setup = 4;
+      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.has_completed_http_setup_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool http_applicable = 5;
+      {PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.http_applicable_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -516,7 +464,7 @@ constexpr SdkInitResult::ParseTableT_ SdkInitResult::InternalGenerateParseTable_
         #endif
     }},
     {{
-      "\34\0\0\0\0\0\0\7\0\0\0\0\0\0\0\0"
+      "\34\0\0\7\0\0\0\0"
       "runanywhere.v1.SdkInitResult"
       "warning"
     }},
@@ -532,14 +480,9 @@ inline constexpr SdkInitResult::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         error_{nullptr},
-        phase_{static_cast< ::runanywhere::v1::SdkInitPhase >(0)},
         linked_models_count_{0u},
-        discovered_orphans_{0u},
-        http_configured_{false},
-        device_registered_{false},
         has_completed_http_setup_{false},
-        http_applicable_{false},
-        duration_ms_{::int64_t{0}} {}
+        http_applicable_{false} {}
 
 template <typename>
 constexpr SdkInitResult::SdkInitResult(::_pbi::ConstantInitialized,
@@ -635,8 +578,8 @@ const ::_pbi::ClassData* SdkInitResult_get_class_data() {
 #endif  // PROTOBUF_CUSTOM_VTABLE
 }  // namespace v1
 }  // namespace runanywhere
-static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_sdk_5finit_2eproto[2];
+static constexpr const ::_pb::EnumDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
+    file_level_enum_descriptors_sdk_5finit_2eproto = nullptr;
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_sdk_5finit_2eproto = nullptr;
 const ::uint32_t
@@ -644,62 +587,48 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_._has_bits_),
-        9, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.environment_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.api_key_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.base_url_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.device_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.platform_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.sdk_version_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.request_timeout_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.max_retries_),
         5,
         0,
         1,
         2,
         3,
         4,
+        6,
+        7,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_._has_bits_),
-        8, // hasbit index offset
+        4, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.build_token_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.force_refresh_assignments_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.flush_telemetry_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.discover_downloaded_models_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.rescan_local_models_),
         0,
-        1,
-        2,
-        3,
-        4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_._has_bits_),
-        13, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.phase_),
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.error_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.http_configured_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.device_registered_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.linked_models_count_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.discovered_orphans_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.warning_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.has_completed_http_setup_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_.http_applicable_),
-        2,
         1,
-        5,
-        6,
+        2,
+        0,
         3,
         4,
-        0,
-        9,
-        7,
-        8,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::SdkInitPhase1Request)},
-        {15, sizeof(::runanywhere::v1::SdkInitPhase2Request)},
-        {28, sizeof(::runanywhere::v1::SdkInitResult)},
+        {19, sizeof(::runanywhere::v1::SdkInitPhase2Request)},
+        {24, sizeof(::runanywhere::v1::SdkInitResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -710,47 +639,41 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_sdk_5finit_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\016sdk_init.proto\022\016runanywhere.v1\032\014errors"
-    ".proto\"\254\001\n\024SdkInitPhase1Request\0227\n\013envir"
-    "onment\030\001 \001(\0162\".runanywhere.v1.SdkInitEnv"
-    "ironment\022\017\n\007api_key\030\002 \001(\t\022\020\n\010base_url\030\003 "
-    "\001(\t\022\021\n\tdevice_id\030\004 \001(\t\022\020\n\010platform\030\005 \001(\t"
-    "\022\023\n\013sdk_version\030\006 \001(\t\"\250\001\n\024SdkInitPhase2R"
-    "equest\022\023\n\013build_token\030\001 \001(\t\022!\n\031force_ref"
-    "resh_assignments\030\002 \001(\010\022\027\n\017flush_telemetr"
-    "y\030\003 \001(\010\022\"\n\032discover_downloaded_models\030\004 "
-    "\001(\010\022\033\n\023rescan_local_models\030\005 \001(\010\"\263\002\n\rSdk"
-    "InitResult\022+\n\005phase\030\001 \001(\0162\034.runanywhere."
-    "v1.SdkInitPhase\022\'\n\005error\030\003 \001(\0132\030.runanyw"
-    "here.v1.SDKError\022\027\n\017http_configured\030\004 \001("
-    "\010\022\031\n\021device_registered\030\005 \001(\010\022\033\n\023linked_m"
-    "odels_count\030\006 \001(\r\022\032\n\022discovered_orphans\030"
-    "\007 \001(\r\022\017\n\007warning\030\010 \001(\t\022\023\n\013duration_ms\030\t "
-    "\001(\003\022 \n\030has_completed_http_setup\030\n \001(\010\022\027\n"
-    "\017http_applicable\030\013 \001(\010*}\n\014SdkInitPhase\022\036"
-    "\n\032SDK_INIT_PHASE_UNSPECIFIED\020\000\022\026\n\022SDK_IN"
-    "IT_PHASE_ONE\020\001\022\026\n\022SDK_INIT_PHASE_TWO\020\002\022\035"
-    "\n\031SDK_INIT_PHASE_RETRY_HTTP\020\003*_\n\022SdkInit"
-    "Environment\022$\n SDK_INIT_ENVIRONMENT_DEVE"
-    "LOPMENT\020\000\022#\n\037SDK_INIT_ENVIRONMENT_PRODUC"
-    "TION\020\002B\207\001\n\027ai.runanywhere.proto.v1B\014SdkI"
-    "nitProtoP\001Z<github.com/runanywhere/runan"
-    "ywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RA"
-    "V1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    ".proto\032\021model_types.proto\032\021rac_options.p"
+    "roto\"\233\002\n\024SdkInitPhase1Request\0223\n\013environ"
+    "ment\030\001 \001(\0162\036.runanywhere.v1.SDKEnvironme"
+    "nt\022\017\n\007api_key\030\002 \001(\t\022\020\n\010base_url\030\003 \001(\t\022\021\n"
+    "\tdevice_id\030\004 \001(\t\022\020\n\010platform\030\005 \001(\t\022\023\n\013sd"
+    "k_version\030\006 \001(\t\022&\n\022request_timeout_ms\030\007 "
+    "\001(\005B\005\240\265\030\350\007H\000\210\001\001\022\"\n\013max_retries\030\010 \001(\005B\010\240\265"
+    "\030\000\250\265\030\nH\001\210\001\001B\025\n\023_request_timeout_msB\016\n\014_m"
+    "ax_retries\"+\n\024SdkInitPhase2Request\022\023\n\013bu"
+    "ild_token\030\001 \001(\t\"\241\001\n\rSdkInitResult\022\'\n\005err"
+    "or\030\001 \001(\0132\030.runanywhere.v1.SDKError\022\033\n\023li"
+    "nked_models_count\030\002 \001(\r\022\017\n\007warning\030\003 \001(\t"
+    "\022 \n\030has_completed_http_setup\030\004 \001(\010\022\027\n\017ht"
+    "tp_applicable\030\005 \001(\010B\207\001\n\027ai.runanywhere.p"
+    "roto.v1B\014SdkInitProtoP\001Z<github.com/runa"
+    "nywhere/runanywhere-sdks/idl/v1;runanywh"
+    "erev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006p"
+    "roto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_sdk_5finit_2eproto_deps[1] = {
+    descriptor_table_sdk_5finit_2eproto_deps[3] = {
         &::descriptor_table_errors_2eproto,
+        &::descriptor_table_model_5ftypes_2eproto,
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_sdk_5finit_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5finit_2eproto = {
     false,
     false,
-    1072,
+    725,
     descriptor_table_protodef_sdk_5finit_2eproto,
     "sdk_init.proto",
     &descriptor_table_sdk_5finit_2eproto_once,
     descriptor_table_sdk_5finit_2eproto_deps,
-    1,
+    3,
     3,
     schemas,
     file_message_globals,
@@ -760,20 +683,6 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5finit_2ep
 };
 namespace runanywhere {
 namespace v1 {
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-SdkInitPhase_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_sdk_5finit_2eproto);
-  return file_level_enum_descriptors_sdk_5finit_2eproto[0];
-}
-PROTOBUF_CONSTINIT const uint32_t SdkInitPhase_internal_data_[] = {
-    262144u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-SdkInitEnvironment_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_sdk_5finit_2eproto);
-  return file_level_enum_descriptors_sdk_5finit_2eproto[1];
-}
-PROTOBUF_CONSTINIT const uint32_t SdkInitEnvironment_internal_data_[] = {
-    65536u, 32u, 2u, };
 // ===================================================================
 
 SdkInitPhase1Request::SdkInitPhase1Request(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -811,7 +720,13 @@ SdkInitPhase1Request::SdkInitPhase1Request(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.environment_ = from._impl_.environment_;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, environment_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, environment_),
+           offsetof(Impl_, max_retries_) -
+               offsetof(Impl_, environment_) +
+               sizeof(Impl_::max_retries_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SdkInitPhase1Request)
 }
@@ -827,7 +742,12 @@ PROTOBUF_NDEBUG_INLINE SdkInitPhase1Request::Impl_::Impl_(
 
 inline void SdkInitPhase1Request::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.environment_ = {};
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, environment_),
+           0,
+           offsetof(Impl_, max_retries_) -
+               offsetof(Impl_, environment_) +
+               sizeof(Impl_::max_retries_));
 }
 SdkInitPhase1Request::~SdkInitPhase1Request() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SdkInitPhase1Request)
@@ -899,7 +819,11 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
       _impl_.sdk_version_.ClearNonDefaultToEmpty();
     }
   }
-  _impl_.environment_ = 0;
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
+    ::memset(&_impl_.environment_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.max_retries_) -
+        reinterpret_cast<char*>(&_impl_.environment_)) + sizeof(_impl_.max_retries_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -923,7 +847,7 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.SdkInitEnvironment environment = 1;
+  // .runanywhere.v1.SDKEnvironment environment = 1;
   if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_environment() != 0) {
       target = stream->EnsureSpace(target);
@@ -982,6 +906,20 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
     }
   }
 
+  // optional int32 request_timeout_ms = 7 [(.runanywhere.v1.rac_min) = 1000];
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
+            stream, this_._internal_request_timeout_ms(), target);
+  }
+
+  // optional int32 max_retries = 8 [(.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 10];
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<8>(
+            stream, this_._internal_max_retries(), target);
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1007,7 +945,7 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string api_key = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_api_key().empty()) {
@@ -1043,12 +981,22 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
                                         this_._internal_sdk_version());
       }
     }
-    // .runanywhere.v1.SdkInitEnvironment environment = 1;
+    // .runanywhere.v1.SDKEnvironment environment = 1;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_environment() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_environment());
       }
+    }
+    // optional int32 request_timeout_ms = 7 [(.runanywhere.v1.rac_min) = 1000];
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_request_timeout_ms());
+    }
+    // optional int32 max_retries = 8 [(.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 10];
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_max_retries());
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -1068,7 +1016,7 @@ void SdkInitPhase1Request::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_api_key().empty()) {
         _this->_internal_set_api_key(from._internal_api_key());
@@ -1119,6 +1067,12 @@ void SdkInitPhase1Request::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.environment_ = from._impl_.environment_;
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      _this->_impl_.request_timeout_ms_ = from._impl_.request_timeout_ms_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      _this->_impl_.max_retries_ = from._impl_.max_retries_;
+    }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
@@ -1144,7 +1098,12 @@ void SdkInitPhase1Request::InternalSwap(SdkInitPhase1Request* PROTOBUF_RESTRICT 
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.device_id_, &other->_impl_.device_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.platform_, &other->_impl_.platform_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.sdk_version_, &other->_impl_.sdk_version_, arena);
-  swap(_impl_.environment_, other->_impl_.environment_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.max_retries_)
+      + sizeof(SdkInitPhase1Request::_impl_.max_retries_)
+      - PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.environment_)>(
+          reinterpret_cast<char*>(&_impl_.environment_),
+          reinterpret_cast<char*>(&other->_impl_.environment_));
 }
 
 ::google::protobuf::Metadata SdkInitPhase1Request::GetMetadata() const {
@@ -1183,13 +1142,6 @@ SdkInitPhase2Request::SdkInitPhase2Request(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, force_refresh_assignments_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, force_refresh_assignments_),
-           offsetof(Impl_, rescan_local_models_) -
-               offsetof(Impl_, force_refresh_assignments_) +
-               sizeof(Impl_::rescan_local_models_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SdkInitPhase2Request)
 }
@@ -1201,12 +1153,6 @@ PROTOBUF_NDEBUG_INLINE SdkInitPhase2Request::Impl_::Impl_(
 
 inline void SdkInitPhase2Request::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, force_refresh_assignments_),
-           0,
-           offsetof(Impl_, rescan_local_models_) -
-               offsetof(Impl_, force_refresh_assignments_) +
-               sizeof(Impl_::rescan_local_models_));
 }
 SdkInitPhase2Request::~SdkInitPhase2Request() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SdkInitPhase2Request)
@@ -1260,9 +1206,6 @@ PROTOBUF_NOINLINE void SdkInitPhase2Request::Clear() {
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     _impl_.build_token_.ClearNonDefaultToEmpty();
   }
-  ::memset(&_impl_.force_refresh_assignments_, 0, static_cast<::size_t>(
-      reinterpret_cast<char*>(&_impl_.rescan_local_models_) -
-      reinterpret_cast<char*>(&_impl_.force_refresh_assignments_)) + sizeof(_impl_.rescan_local_models_));
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -1296,42 +1239,6 @@ PROTOBUF_NOINLINE void SdkInitPhase2Request::Clear() {
     }
   }
 
-  // bool force_refresh_assignments = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (this_._internal_force_refresh_assignments() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          2, this_._internal_force_refresh_assignments(), target);
-    }
-  }
-
-  // bool flush_telemetry = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_flush_telemetry() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          3, this_._internal_flush_telemetry(), target);
-    }
-  }
-
-  // bool discover_downloaded_models = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_discover_downloaded_models() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          4, this_._internal_discover_downloaded_models(), target);
-    }
-  }
-
-  // bool rescan_local_models = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_rescan_local_models() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          5, this_._internal_rescan_local_models(), target);
-    }
-  }
-
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1355,38 +1262,13 @@ PROTOBUF_NOINLINE void SdkInitPhase2Request::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void)cached_has_bits;
 
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+   {
     // string build_token = 1;
+    cached_has_bits = this_._impl_._has_bits_[0];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_build_token().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_build_token());
-      }
-    }
-    // bool force_refresh_assignments = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (this_._internal_force_refresh_assignments() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool flush_telemetry = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_flush_telemetry() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool discover_downloaded_models = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_discover_downloaded_models() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool rescan_local_models = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_rescan_local_models() != 0) {
-        total_size += 2;
       }
     }
   }
@@ -1407,34 +1289,12 @@ void SdkInitPhase2Request::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_build_token().empty()) {
-        _this->_internal_set_build_token(from._internal_build_token());
-      } else {
-        if (_this->_impl_.build_token_.IsDefault()) {
-          _this->_internal_set_build_token("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (from._internal_force_refresh_assignments() != 0) {
-        _this->_impl_.force_refresh_assignments_ = from._impl_.force_refresh_assignments_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_flush_telemetry() != 0) {
-        _this->_impl_.flush_telemetry_ = from._impl_.flush_telemetry_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_discover_downloaded_models() != 0) {
-        _this->_impl_.discover_downloaded_models_ = from._impl_.discover_downloaded_models_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_rescan_local_models() != 0) {
-        _this->_impl_.rescan_local_models_ = from._impl_.rescan_local_models_;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!from._internal_build_token().empty()) {
+      _this->_internal_set_build_token(from._internal_build_token());
+    } else {
+      if (_this->_impl_.build_token_.IsDefault()) {
+        _this->_internal_set_build_token("");
       }
     }
   }
@@ -1458,12 +1318,6 @@ void SdkInitPhase2Request::InternalSwap(SdkInitPhase2Request* PROTOBUF_RESTRICT 
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.build_token_, &other->_impl_.build_token_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.rescan_local_models_)
-      + sizeof(SdkInitPhase2Request::_impl_.rescan_local_models_)
-      - PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.force_refresh_assignments_)>(
-          reinterpret_cast<char*>(&_impl_.force_refresh_assignments_),
-          reinterpret_cast<char*>(&other->_impl_.force_refresh_assignments_));
 }
 
 ::google::protobuf::Metadata SdkInitPhase2Request::GetMetadata() const {
@@ -1512,12 +1366,12 @@ SdkInitResult::SdkInitResult(
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, phase_),
+               offsetof(Impl_, linked_models_count_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, phase_),
-           offsetof(Impl_, duration_ms_) -
-               offsetof(Impl_, phase_) +
-               sizeof(Impl_::duration_ms_));
+               offsetof(Impl_, linked_models_count_),
+           offsetof(Impl_, http_applicable_) -
+               offsetof(Impl_, linked_models_count_) +
+               sizeof(Impl_::http_applicable_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SdkInitResult)
 }
@@ -1532,9 +1386,9 @@ inline void SdkInitResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, duration_ms_) -
+           offsetof(Impl_, http_applicable_) -
                offsetof(Impl_, error_) +
-               sizeof(Impl_::duration_ms_));
+               sizeof(Impl_::http_applicable_));
 }
 SdkInitResult::~SdkInitResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SdkInitResult)
@@ -1595,15 +1449,10 @@ PROTOBUF_NOINLINE void SdkInitResult::Clear() {
       _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
-    ::memset(&_impl_.phase_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.has_completed_http_setup_) -
-        reinterpret_cast<char*>(&_impl_.phase_)) + sizeof(_impl_.has_completed_http_setup_));
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    ::memset(&_impl_.http_applicable_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.duration_ms_) -
-        reinterpret_cast<char*>(&_impl_.http_applicable_)) + sizeof(_impl_.duration_ms_));
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
+    ::memset(&_impl_.linked_models_count_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.http_applicable_) -
+        reinterpret_cast<char*>(&_impl_.linked_models_count_)) + sizeof(_impl_.http_applicable_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -1628,92 +1477,47 @@ PROTOBUF_NOINLINE void SdkInitResult::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.SdkInitPhase phase = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_phase() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          1, this_._internal_phase(), target);
-    }
-  }
-
-  // .runanywhere.v1.SDKError error = 3;
+  // .runanywhere.v1.SDKError error = 1;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        3, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        1, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
         stream);
   }
 
-  // bool http_configured = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_http_configured() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          4, this_._internal_http_configured(), target);
-    }
-  }
-
-  // bool device_registered = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_device_registered() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          5, this_._internal_device_registered(), target);
-    }
-  }
-
-  // uint32 linked_models_count = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  // uint32 linked_models_count = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_linked_models_count() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
-          6, this_._internal_linked_models_count(), target);
+          2, this_._internal_linked_models_count(), target);
     }
   }
 
-  // uint32 discovered_orphans = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_discovered_orphans() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
-          7, this_._internal_discovered_orphans(), target);
-    }
-  }
-
-  // string warning = 8;
+  // string warning = 3;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (!this_._internal_warning().empty()) {
       const ::std::string& _s = this_._internal_warning();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SdkInitResult.warning");
-      target = stream->WriteStringMaybeAliased(8, _s, target);
+      target = stream->WriteStringMaybeAliased(3, _s, target);
     }
   }
 
-  // int64 duration_ms = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-    if (this_._internal_duration_ms() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<9>(
-              stream, this_._internal_duration_ms(), target);
-    }
-  }
-
-  // bool has_completed_http_setup = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  // bool has_completed_http_setup = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_has_completed_http_setup() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          10, this_._internal_has_completed_http_setup(), target);
+          4, this_._internal_has_completed_http_setup(), target);
     }
   }
 
-  // bool http_applicable = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  // bool http_applicable = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_http_applicable() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          11, this_._internal_http_applicable(), target);
+          5, this_._internal_http_applicable(), target);
     }
   }
 
@@ -1742,71 +1546,36 @@ PROTOBUF_NOINLINE void SdkInitResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // string warning = 8;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // string warning = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_warning().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_warning());
       }
     }
-    // .runanywhere.v1.SDKError error = 3;
+    // .runanywhere.v1.SDKError error = 1;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
-    // .runanywhere.v1.SdkInitPhase phase = 1;
+    // uint32 linked_models_count = 2;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_phase() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_phase());
-      }
-    }
-    // uint32 linked_models_count = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_linked_models_count() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_linked_models_count());
       }
     }
-    // uint32 discovered_orphans = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_discovered_orphans() != 0) {
-        total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
-            this_._internal_discovered_orphans());
-      }
-    }
-    // bool http_configured = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_http_configured() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool device_registered = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_device_registered() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool has_completed_http_setup = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    // bool has_completed_http_setup = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_has_completed_http_setup() != 0) {
         total_size += 2;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    // bool http_applicable = 11;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    // bool http_applicable = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_http_applicable() != 0) {
         total_size += 2;
-      }
-    }
-    // int64 duration_ms = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_duration_ms() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_duration_ms());
       }
     }
   }
@@ -1828,7 +1597,7 @@ void SdkInitResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_warning().empty()) {
         _this->_internal_set_warning(from._internal_warning());
@@ -1847,45 +1616,18 @@ void SdkInitResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_phase() != 0) {
-        _this->_impl_.phase_ = from._impl_.phase_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_linked_models_count() != 0) {
         _this->_impl_.linked_models_count_ = from._impl_.linked_models_count_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_discovered_orphans() != 0) {
-        _this->_impl_.discovered_orphans_ = from._impl_.discovered_orphans_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_http_configured() != 0) {
-        _this->_impl_.http_configured_ = from._impl_.http_configured_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_device_registered() != 0) {
-        _this->_impl_.device_registered_ = from._impl_.device_registered_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_has_completed_http_setup() != 0) {
         _this->_impl_.has_completed_http_setup_ = from._impl_.has_completed_http_setup_;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_http_applicable() != 0) {
         _this->_impl_.http_applicable_ = from._impl_.http_applicable_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_duration_ms() != 0) {
-        _this->_impl_.duration_ms_ = from._impl_.duration_ms_;
       }
     }
   }
@@ -1910,8 +1652,8 @@ void SdkInitResult::InternalSwap(SdkInitResult* PROTOBUF_RESTRICT PROTOBUF_NONNU
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.warning_, &other->_impl_.warning_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.duration_ms_)
-      + sizeof(SdkInitResult::_impl_.duration_ms_)
+      PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.http_applicable_)
+      + sizeof(SdkInitResult::_impl_.http_applicable_)
       - PROTOBUF_FIELD_OFFSET(SdkInitResult, _impl_.error_)>(
           reinterpret_cast<char*>(&_impl_.error_),
           reinterpret_cast<char*>(&other->_impl_.error_));

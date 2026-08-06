@@ -27,67 +27,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// The JPEG/PNG/WEBP and RAW_RGBA values are reserved: no backend detects
-/// containers yet, and no SDK passes straight RGBA. Swift's Apple-only uiImage
-/// and pixelBuffer cases flatten to RAW_RGB before crossing the C ABI.
-public nonisolated enum RAVLMImageFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case jpeg // = 1
-  case png // = 2
-  case webp // = 3
-  case rawRgb // = 4
-  case rawRgba // = 5
-  case base64 // = 6
-  case filePath // = 7
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .jpeg
-    case 2: self = .png
-    case 3: self = .webp
-    case 4: self = .rawRgb
-    case 5: self = .rawRgba
-    case 6: self = .base64
-    case 7: self = .filePath
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .jpeg: return 1
-    case .png: return 2
-    case .webp: return 3
-    case .rawRgb: return 4
-    case .rawRgba: return 5
-    case .base64: return 6
-    case .filePath: return 7
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAVLMImageFormat] = [
-    .unspecified,
-    .jpeg,
-    .png,
-    .webp,
-    .rawRgb,
-    .rawRgba,
-    .base64,
-    .filePath,
-  ]
-
-}
-
 public nonisolated enum RAVLMModelFamily: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -142,6 +81,11 @@ public nonisolated enum RAVLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
+
+  /// Emitted when the vision encoder finishes and decoding begins -- the
+  /// cue for a UI to switch from "analysing image" to "writing". Emitted
+  /// where the backend measures the encode boundary
+  /// (VLMResult.image_encode_time_ms comes from the same measurement).
   case imageEncoded // = 2
   case token // = 3
   case completed // = 4
@@ -221,6 +165,9 @@ public nonisolated struct RAVLMChatTemplate: Sendable {
   fileprivate var _defaultSystemPrompt: String? = nil
 }
 
+/// Pixel buffers are tightly packed with NO row padding: RGB is 3 bytes/px,
+/// RGBA is 4, and width * height * channels MUST equal the buffer length or
+/// the request is rejected. raw_rgba drops alpha at the boundary.
 public nonisolated struct RAVLMImage: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -228,6 +175,7 @@ public nonisolated struct RAVLMImage: Sendable {
 
   public var source: RAVLMImage.OneOf_Source? = nil
 
+  /// Local file. The on-device analogue of a cloud Files-API file_id.
   public var filePath: String {
     get {
       if case .filePath(let v)? = source {return v}
@@ -236,16 +184,18 @@ public nonisolated struct RAVLMImage: Sendable {
     set {source = .filePath(newValue)}
   }
 
-  /// JPEG/PNG/WEBP container bytes
-  public var encoded: Data {
+  /// Compressed container bytes -- image/jpeg, image/png, image/webp.
+  /// Decoded by commons. Set media_type alongside. Same slot name and
+  /// meaning as ChatAttachment.data and Anthropic source.data.
+  public var data: Data {
     get {
-      if case .encoded(let v)? = source {return v}
+      if case .data(let v)? = source {return v}
       return Data()
     }
-    set {source = .encoded(newValue)}
+    set {source = .data(newValue)}
   }
 
-  /// RAW_RGB or RAW_RGBA pixel buffer
+  /// 3 bytes/px
   public var rawRgb: Data {
     get {
       if case .rawRgb(let v)? = source {return v}
@@ -254,6 +204,7 @@ public nonisolated struct RAVLMImage: Sendable {
     set {source = .rawRgb(newValue)}
   }
 
+  /// same container formats as `data`, base64-encoded
   public var base64: String {
     get {
       if case .base64(let v)? = source {return v}
@@ -262,213 +213,45 @@ public nonisolated struct RAVLMImage: Sendable {
     set {source = .base64(newValue)}
   }
 
+  /// 4 bytes/px; commons drops alpha
+  public var rawRgba: Data {
+    get {
+      if case .rawRgba(let v)? = source {return v}
+      return Data()
+    }
+    set {source = .rawRgba(newValue)}
+  }
+
+  /// required for raw_rgb / raw_rgba
   public var width: Int32 = 0
 
+  /// required for raw_rgb / raw_rgba
   public var height: Int32 = 0
 
-  public var format: RAVLMImageFormat = .unspecified
-
-  public var mediaType: String {
-    get {_mediaType ?? String()}
-    set {_mediaType = newValue}
-  }
-  /// Returns true if `mediaType` has been explicitly set.
-  public var hasMediaType: Bool {self._mediaType != nil}
-  /// Clears the value of `mediaType`. Subsequent reads from it will return its default value.
-  public mutating func clearMediaType() {self._mediaType = nil}
-
-  public var name: String {
-    get {_name ?? String()}
-    set {_name = newValue}
-  }
-  /// Returns true if `name` has been explicitly set.
-  public var hasName: Bool {self._name != nil}
-  /// Clears the value of `name`. Subsequent reads from it will return its default value.
-  public mutating func clearName() {self._name = nil}
-
-  public var sizeBytes: Int64 = 0
-
-  public var metadata: Dictionary<String,String> = [:]
+  /// MIME type of `data`/`base64`. Required when either is set. An open
+  /// string, as everywhere in the industry, so adding HEIC is not a proto
+  /// change.
+  public var mediaType: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Source: Equatable, Sendable {
+    /// Local file. The on-device analogue of a cloud Files-API file_id.
     case filePath(String)
-    /// JPEG/PNG/WEBP container bytes
-    case encoded(Data)
-    /// RAW_RGB or RAW_RGBA pixel buffer
+    /// Compressed container bytes -- image/jpeg, image/png, image/webp.
+    /// Decoded by commons. Set media_type alongside. Same slot name and
+    /// meaning as ChatAttachment.data and Anthropic source.data.
+    case data(Data)
+    /// 3 bytes/px
     case rawRgb(Data)
+    /// same container formats as `data`, base64-encoded
     case base64(String)
+    /// 4 bytes/px; commons drops alpha
+    case rawRgba(Data)
 
   }
 
   public init() {}
-
-  fileprivate var _mediaType: String? = nil
-  fileprivate var _name: String? = nil
-}
-
-public nonisolated struct RAVLMConfiguration: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var modelID: String = String()
-
-  public var maxImageSizePx: Int32 = 0
-
-  public var maxTokens: Int32 = 0
-
-  public var contextLength: Int32 = 0
-
-  public var temperature: Float = 0
-
-  public var systemPrompt: String {
-    get {_systemPrompt ?? String()}
-    set {_systemPrompt = newValue}
-  }
-  /// Returns true if `systemPrompt` has been explicitly set.
-  public var hasSystemPrompt: Bool {self._systemPrompt != nil}
-  /// Clears the value of `systemPrompt`. Subsequent reads from it will return its default value.
-  public mutating func clearSystemPrompt() {self._systemPrompt = nil}
-
-  public var streamingEnabled: Bool = false
-
-  public var preferredFramework: RAInferenceFramework {
-    get {_preferredFramework ?? .unspecified}
-    set {_preferredFramework = newValue}
-  }
-  /// Returns true if `preferredFramework` has been explicitly set.
-  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
-  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
-  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _systemPrompt: String? = nil
-  fileprivate var _preferredFramework: RAInferenceFramework? = nil
-}
-
-public nonisolated struct RAVLMGenerationOptions: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var prompt: String {
-    get {_storage._prompt}
-    set {_uniqueStorage()._prompt = newValue}
-  }
-
-  public var maxOutputTokens: Int32 {
-    get {_storage._maxOutputTokens}
-    set {_uniqueStorage()._maxOutputTokens = newValue}
-  }
-
-  public var temperature: Float {
-    get {_storage._temperature}
-    set {_uniqueStorage()._temperature = newValue}
-  }
-
-  public var topP: Float {
-    get {_storage._topP}
-    set {_uniqueStorage()._topP = newValue}
-  }
-
-  public var topK: Int32 {
-    get {_storage._topK}
-    set {_uniqueStorage()._topK = newValue}
-  }
-
-  public var stopSequences: [String] {
-    get {_storage._stopSequences}
-    set {_uniqueStorage()._stopSequences = newValue}
-  }
-
-  public var systemPrompt: String {
-    get {_storage._systemPrompt ?? String()}
-    set {_uniqueStorage()._systemPrompt = newValue}
-  }
-  /// Returns true if `systemPrompt` has been explicitly set.
-  public var hasSystemPrompt: Bool {_storage._systemPrompt != nil}
-  /// Clears the value of `systemPrompt`. Subsequent reads from it will return its default value.
-  public mutating func clearSystemPrompt() {_uniqueStorage()._systemPrompt = nil}
-
-  public var maxImageSize: Int32 {
-    get {_storage._maxImageSize}
-    set {_uniqueStorage()._maxImageSize = newValue}
-  }
-
-  public var nThreads: Int32 {
-    get {_storage._nThreads}
-    set {_uniqueStorage()._nThreads = newValue}
-  }
-
-  public var useGpu: Bool {
-    get {_storage._useGpu}
-    set {_uniqueStorage()._useGpu = newValue}
-  }
-
-  public var modelFamily: RAVLMModelFamily {
-    get {_storage._modelFamily}
-    set {_uniqueStorage()._modelFamily = newValue}
-  }
-
-  /// Commons does not convert this field on the VLM proto path, so the
-  /// llama.cpp template support behind it is currently unreachable from here.
-  public var customChatTemplate: RAVLMChatTemplate {
-    get {_storage._customChatTemplate ?? RAVLMChatTemplate()}
-    set {_uniqueStorage()._customChatTemplate = newValue}
-  }
-  /// Returns true if `customChatTemplate` has been explicitly set.
-  public var hasCustomChatTemplate: Bool {_storage._customChatTemplate != nil}
-  /// Clears the value of `customChatTemplate`. Subsequent reads from it will return its default value.
-  public mutating func clearCustomChatTemplate() {_uniqueStorage()._customChatTemplate = nil}
-
-  public var imageMarkerOverride: String {
-    get {_storage._imageMarkerOverride ?? String()}
-    set {_uniqueStorage()._imageMarkerOverride = newValue}
-  }
-  /// Returns true if `imageMarkerOverride` has been explicitly set.
-  public var hasImageMarkerOverride: Bool {_storage._imageMarkerOverride != nil}
-  /// Clears the value of `imageMarkerOverride`. Subsequent reads from it will return its default value.
-  public mutating func clearImageMarkerOverride() {_uniqueStorage()._imageMarkerOverride = nil}
-
-  public var seed: Int64 {
-    get {_storage._seed}
-    set {_uniqueStorage()._seed = newValue}
-  }
-
-  public var repetitionPenalty: Float {
-    get {_storage._repetitionPenalty}
-    set {_uniqueStorage()._repetitionPenalty = newValue}
-  }
-
-  public var minP: Float {
-    get {_storage._minP}
-    set {_uniqueStorage()._minP = newValue}
-  }
-
-  public var emitImageEmbeddings: Bool {
-    get {_storage._emitImageEmbeddings}
-    set {_uniqueStorage()._emitImageEmbeddings = newValue}
-  }
-
-  public var reasoning: RAReasoningOptions {
-    get {_storage._reasoning ?? RAReasoningOptions()}
-    set {_uniqueStorage()._reasoning = newValue}
-  }
-  /// Returns true if `reasoning` has been explicitly set.
-  public var hasReasoning: Bool {_storage._reasoning != nil}
-  /// Clears the value of `reasoning`. Subsequent reads from it will return its default value.
-  public mutating func clearReasoning() {_uniqueStorage()._reasoning = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public nonisolated struct RAVLMGenerationRequest: Sendable {
@@ -480,14 +263,35 @@ public nonisolated struct RAVLMGenerationRequest: Sendable {
 
   public var images: [RAVLMImage] = []
 
-  public var options: RAVLMGenerationOptions {
-    get {_options ?? RAVLMGenerationOptions()}
+  /// Ordered conversation. A follow-up question about the same picture is
+  /// just another turn; images ride as ChatMessage.attachments.
+  public var messages: [RAChatMessage] = []
+
+  /// The question about the image, for the single-turn quickstart path.
+  public var prompt: String = String()
+
+  /// One options set for all text generation, image or not -- same names,
+  /// same defaults, same validation as the text API. Carries
+  /// structured_output, which is how OCR / field extraction / bounding
+  /// boxes are expressed (deliberately no ocr() or detect() verb).
+  public var options: RALLMGenerationOptions {
+    get {_options ?? RALLMGenerationOptions()}
     set {_options = newValue}
   }
   /// Returns true if `options` has been explicitly set.
   public var hasOptions: Bool {self._options != nil}
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
   public mutating func clearOptions() {self._options = nil}
+
+  /// Only the knobs that have no text-generation meaning.
+  public var vision: RAVLMVisionOptions {
+    get {_vision ?? RAVLMVisionOptions()}
+    set {_vision = newValue}
+  }
+  /// Returns true if `vision` has been explicitly set.
+  public var hasVision: Bool {self._vision != nil}
+  /// Clears the value of `vision`. Subsequent reads from it will return its default value.
+  public mutating func clearVision() {self._vision = nil}
 
   public var modelID: String {
     get {_modelID ?? String()}
@@ -498,14 +302,56 @@ public nonisolated struct RAVLMGenerationRequest: Sendable {
   /// Clears the value of `modelID`. Subsequent reads from it will return its default value.
   public mutating func clearModelID() {self._modelID = nil}
 
-  public var metadata: Dictionary<String,String> = [:]
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _options: RALLMGenerationOptions? = nil
+  fileprivate var _vision: RAVLMVisionOptions? = nil
+  fileprivate var _modelID: String? = nil
+}
+
+/// The four genuinely vision-specific knobs. Everything else in the old
+/// VLMGenerationOptions was either a copy of LLMGenerationOptions or dead.
+public nonisolated struct RAVLMVisionOptions: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var modelFamily: RAVLMModelFamily = .unspecified
+
+  /// Live end-to-end (commons converts it, llama.cpp applies it); it is
+  /// simply not surfaced by the v3 facades yet.
+  public var customChatTemplate: RAVLMChatTemplate {
+    get {_customChatTemplate ?? RAVLMChatTemplate()}
+    set {_customChatTemplate = newValue}
+  }
+  /// Returns true if `customChatTemplate` has been explicitly set.
+  public var hasCustomChatTemplate: Bool {self._customChatTemplate != nil}
+  /// Clears the value of `customChatTemplate`. Subsequent reads from it will return its default value.
+  public mutating func clearCustomChatTemplate() {self._customChatTemplate = nil}
+
+  public var imageMarkerOverride: String {
+    get {_imageMarkerOverride ?? String()}
+    set {_imageMarkerOverride = newValue}
+  }
+  /// Returns true if `imageMarkerOverride` has been explicitly set.
+  public var hasImageMarkerOverride: Bool {self._imageMarkerOverride != nil}
+  /// Clears the value of `imageMarkerOverride`. Subsequent reads from it will return its default value.
+  public mutating func clearImageMarkerOverride() {self._imageMarkerOverride = nil}
+
+  /// Per-image vision-token budget -- the unit that actually drives
+  /// prefill (cf. llama.cpp --image-max-tokens, Gemini media_resolution).
+  /// 0 = the bundle's compiled default. The value actually used is
+  /// reported back as VLMResult.image_tokens.
+  public var maxImageTokens: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _options: RAVLMGenerationOptions? = nil
-  fileprivate var _modelID: String? = nil
+  fileprivate var _customChatTemplate: RAVLMChatTemplate? = nil
+  fileprivate var _imageMarkerOverride: String? = nil
 }
 
 public nonisolated struct RAVLMResult: @unchecked Sendable {
@@ -518,9 +364,11 @@ public nonisolated struct RAVLMResult: @unchecked Sendable {
     set {_uniqueStorage()._text = newValue}
   }
 
-  public var processingTimeMs: Int64 {
-    get {_storage._processingTimeMs}
-    set {_uniqueStorage()._processingTimeMs = newValue}
+  /// Wall-clock for the whole call, image encode included. int64 ms is the
+  /// unit for every duration on this surface; the _ms suffix stays explicit.
+  public var totalTimeMs: Int64 {
+    get {_storage._totalTimeMs}
+    set {_uniqueStorage()._totalTimeMs = newValue}
   }
 
   public var imageTokens: Int32 {
@@ -528,33 +376,17 @@ public nonisolated struct RAVLMResult: @unchecked Sendable {
     set {_uniqueStorage()._imageTokens = newValue}
   }
 
-  public var timeToFirstTokenMs: Int64 {
-    get {_storage._timeToFirstTokenMs}
-    set {_uniqueStorage()._timeToFirstTokenMs = newValue}
-  }
-
+  /// canonical spelling (usage = 15)
   public var imageEncodeTimeMs: Int64 {
     get {_storage._imageEncodeTimeMs}
     set {_uniqueStorage()._imageEncodeTimeMs = newValue}
   }
 
-  public var hardwareUsed: String {
-    get {_storage._hardwareUsed ?? String()}
-    set {_uniqueStorage()._hardwareUsed = newValue}
-  }
-  /// Returns true if `hardwareUsed` has been explicitly set.
-  public var hasHardwareUsed: Bool {_storage._hardwareUsed != nil}
-  /// Clears the value of `hardwareUsed`. Subsequent reads from it will return its default value.
-  public mutating func clearHardwareUsed() {_uniqueStorage()._hardwareUsed = nil}
-
+  /// Produced by commons on both the one-shot and the streaming path, with
+  /// the LLM domain's vocabulary: "stop" | "length" | "stop_sequence".
   public var finishReason: String {
     get {_storage._finishReason}
     set {_uniqueStorage()._finishReason = newValue}
-  }
-
-  public var imagesProcessed: Int32 {
-    get {_storage._imagesProcessed}
-    set {_uniqueStorage()._imagesProcessed = newValue}
   }
 
   public var usage: RATokenUsage {
@@ -597,6 +429,7 @@ public nonisolated struct RAVLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._requestID = newValue}
   }
 
+  /// The single terminal discriminator: COMPLETED or ERROR ends the stream.
   public var kind: RAVLMStreamEventKind {
     get {_storage._kind}
     set {_uniqueStorage()._kind = newValue}
@@ -612,16 +445,8 @@ public nonisolated struct RAVLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._tokenIndex = newValue}
   }
 
-  public var isFinal: Bool {
-    get {_storage._isFinal}
-    set {_uniqueStorage()._isFinal = newValue}
-  }
-
-  public var tokensPerSecond: Float {
-    get {_storage._tokensPerSecond}
-    set {_uniqueStorage()._tokensPerSecond = newValue}
-  }
-
+  /// Rate comes from result.usage.tokens_per_second on the terminal event,
+  /// in TokenUsage's own type. No second copy, no second scalar type.
   public var result: RAVLMResult {
     get {_storage._result ?? RAVLMResult()}
     set {_uniqueStorage()._result = newValue}
@@ -647,72 +472,9 @@ public nonisolated struct RAVLMStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RAVLMServiceState: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var isReady: Bool {
-    get {_storage._isReady}
-    set {_uniqueStorage()._isReady = newValue}
-  }
-
-  public var currentModel: String {
-    get {_storage._currentModel ?? String()}
-    set {_uniqueStorage()._currentModel = newValue}
-  }
-  /// Returns true if `currentModel` has been explicitly set.
-  public var hasCurrentModel: Bool {_storage._currentModel != nil}
-  /// Clears the value of `currentModel`. Subsequent reads from it will return its default value.
-  public mutating func clearCurrentModel() {_uniqueStorage()._currentModel = nil}
-
-  public var contextLength: Int32 {
-    get {_storage._contextLength}
-    set {_uniqueStorage()._contextLength = newValue}
-  }
-
-  public var supportsStreaming: Bool {
-    get {_storage._supportsStreaming}
-    set {_uniqueStorage()._supportsStreaming = newValue}
-  }
-
-  public var supportsMultipleImages: Bool {
-    get {_storage._supportsMultipleImages}
-    set {_uniqueStorage()._supportsMultipleImages = newValue}
-  }
-
-  public var visionEncoderType: String {
-    get {_storage._visionEncoderType ?? String()}
-    set {_uniqueStorage()._visionEncoderType = newValue}
-  }
-  /// Returns true if `visionEncoderType` has been explicitly set.
-  public var hasVisionEncoderType: Bool {_storage._visionEncoderType != nil}
-  /// Clears the value of `visionEncoderType`. Subsequent reads from it will return its default value.
-  public mutating func clearVisionEncoderType() {_uniqueStorage()._visionEncoderType = nil}
-
-  public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
-
-nonisolated extension RAVLMImageFormat: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_IMAGE_FORMAT_UNSPECIFIED\0\u{1}VLM_IMAGE_FORMAT_JPEG\0\u{1}VLM_IMAGE_FORMAT_PNG\0\u{1}VLM_IMAGE_FORMAT_WEBP\0\u{1}VLM_IMAGE_FORMAT_RAW_RGB\0\u{1}VLM_IMAGE_FORMAT_RAW_RGBA\0\u{1}VLM_IMAGE_FORMAT_BASE64\0\u{1}VLM_IMAGE_FORMAT_FILE_PATH\0")
-}
 
 nonisolated extension RAVLMModelFamily: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_MODEL_FAMILY_UNSPECIFIED\0\u{1}VLM_MODEL_FAMILY_AUTO\0\u{1}VLM_MODEL_FAMILY_QWEN2_VL\0\u{1}VLM_MODEL_FAMILY_SMOLVLM\0\u{1}VLM_MODEL_FAMILY_LLAVA\0\u{2}_\u{1}VLM_MODEL_FAMILY_CUSTOM\0")
@@ -768,7 +530,7 @@ nonisolated extension RAVLMChatTemplate: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMImage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_path\0\u{1}encoded\0\u{3}raw_rgb\0\u{1}base64\0\u{1}width\0\u{1}height\0\u{1}format\0\u{3}media_type\0\u{1}name\0\u{3}size_bytes\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_path\0\u{1}data\0\u{3}raw_rgb\0\u{1}base64\0\u{1}width\0\u{1}height\0\u{4}\u{2}media_type\0\u{4}\u{4}raw_rgba\0\u{b}format\0\u{b}name\0\u{b}size_bytes\0\u{b}metadata\0\u{c}\u{7}\u{1}\u{c}\u{9}\u{1}\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -789,7 +551,7 @@ nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageI
         try decoder.decodeSingularBytesField(value: &v)
         if let v = v {
           if self.source != nil {try decoder.handleConflictingOneOf()}
-          self.source = .encoded(v)
+          self.source = .data(v)
         }
       }()
       case 3: try {
@@ -810,11 +572,15 @@ nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       }()
       case 5: try { try decoder.decodeSingularInt32Field(value: &self.width) }()
       case 6: try { try decoder.decodeSingularInt32Field(value: &self.height) }()
-      case 7: try { try decoder.decodeSingularEnumField(value: &self.format) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._mediaType) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._name) }()
-      case 10: try { try decoder.decodeSingularInt64Field(value: &self.sizeBytes) }()
-      case 11: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.mediaType) }()
+      case 12: try {
+        var v: Data?
+        try decoder.decodeSingularBytesField(value: &v)
+        if let v = v {
+          if self.source != nil {try decoder.handleConflictingOneOf()}
+          self.source = .rawRgba(v)
+        }
+      }()
       default: break
       }
     }
@@ -830,8 +596,8 @@ nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       guard case .filePath(let v)? = self.source else { preconditionFailure() }
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
     }()
-    case .encoded?: try {
-      guard case .encoded(let v)? = self.source else { preconditionFailure() }
+    case .data?: try {
+      guard case .data(let v)? = self.source else { preconditionFailure() }
       try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
     }()
     case .rawRgb?: try {
@@ -842,7 +608,7 @@ nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       guard case .base64(let v)? = self.source else { preconditionFailure() }
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     }()
-    case nil: break
+    default: break
     }
     if self.width != 0 {
       try visitor.visitSingularInt32Field(value: self.width, fieldNumber: 5)
@@ -850,21 +616,12 @@ nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if self.height != 0 {
       try visitor.visitSingularInt32Field(value: self.height, fieldNumber: 6)
     }
-    if self.format != .unspecified {
-      try visitor.visitSingularEnumField(value: self.format, fieldNumber: 7)
+    if !self.mediaType.isEmpty {
+      try visitor.visitSingularStringField(value: self.mediaType, fieldNumber: 8)
     }
-    try { if let v = self._mediaType {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    try { if case .rawRgba(let v)? = self.source {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 12)
     } }()
-    try { if let v = self._name {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
-    if self.sizeBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.sizeBytes, fieldNumber: 10)
-    }
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 11)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -872,269 +629,7 @@ nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.source != rhs.source {return false}
     if lhs.width != rhs.width {return false}
     if lhs.height != rhs.height {return false}
-    if lhs.format != rhs.format {return false}
-    if lhs._mediaType != rhs._mediaType {return false}
-    if lhs._name != rhs._name {return false}
-    if lhs.sizeBytes != rhs.sizeBytes {return false}
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VLMConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}max_image_size_px\0\u{3}max_tokens\0\u{3}context_length\0\u{1}temperature\0\u{3}system_prompt\0\u{3}streaming_enabled\0\u{3}preferred_framework\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.maxImageSizePx) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.contextLength) }()
-      case 5: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._systemPrompt) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self.streamingEnabled) }()
-      case 8: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
-    }
-    if self.maxImageSizePx != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxImageSizePx, fieldNumber: 2)
-    }
-    if self.maxTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 3)
-    }
-    if self.contextLength != 0 {
-      try visitor.visitSingularInt32Field(value: self.contextLength, fieldNumber: 4)
-    }
-    if self.temperature.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.temperature, fieldNumber: 5)
-    }
-    try { if let v = self._systemPrompt {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
-    if self.streamingEnabled != false {
-      try visitor.visitSingularBoolField(value: self.streamingEnabled, fieldNumber: 7)
-    }
-    try { if let v = self._preferredFramework {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 8)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAVLMConfiguration, rhs: RAVLMConfiguration) -> Bool {
-    if lhs.modelID != rhs.modelID {return false}
-    if lhs.maxImageSizePx != rhs.maxImageSizePx {return false}
-    if lhs.maxTokens != rhs.maxTokens {return false}
-    if lhs.contextLength != rhs.contextLength {return false}
-    if lhs.temperature != rhs.temperature {return false}
-    if lhs._systemPrompt != rhs._systemPrompt {return false}
-    if lhs.streamingEnabled != rhs.streamingEnabled {return false}
-    if lhs._preferredFramework != rhs._preferredFramework {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VLMGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_output_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}stop_sequences\0\u{4}\u{2}system_prompt\0\u{3}max_image_size\0\u{3}n_threads\0\u{3}use_gpu\0\u{3}model_family\0\u{3}custom_chat_template\0\u{3}image_marker_override\0\u{1}seed\0\u{3}repetition_penalty\0\u{3}min_p\0\u{3}emit_image_embeddings\0\u{1}reasoning\0")
-
-  fileprivate class _StorageClass {
-    var _prompt: String = String()
-    var _maxOutputTokens: Int32 = 0
-    var _temperature: Float = 0
-    var _topP: Float = 0
-    var _topK: Int32 = 0
-    var _stopSequences: [String] = []
-    var _systemPrompt: String? = nil
-    var _maxImageSize: Int32 = 0
-    var _nThreads: Int32 = 0
-    var _useGpu: Bool = false
-    var _modelFamily: RAVLMModelFamily = .unspecified
-    var _customChatTemplate: RAVLMChatTemplate? = nil
-    var _imageMarkerOverride: String? = nil
-    var _seed: Int64 = 0
-    var _repetitionPenalty: Float = 0
-    var _minP: Float = 0
-    var _emitImageEmbeddings: Bool = false
-    var _reasoning: RAReasoningOptions? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _prompt = source._prompt
-      _maxOutputTokens = source._maxOutputTokens
-      _temperature = source._temperature
-      _topP = source._topP
-      _topK = source._topK
-      _stopSequences = source._stopSequences
-      _systemPrompt = source._systemPrompt
-      _maxImageSize = source._maxImageSize
-      _nThreads = source._nThreads
-      _useGpu = source._useGpu
-      _modelFamily = source._modelFamily
-      _customChatTemplate = source._customChatTemplate
-      _imageMarkerOverride = source._imageMarkerOverride
-      _seed = source._seed
-      _repetitionPenalty = source._repetitionPenalty
-      _minP = source._minP
-      _emitImageEmbeddings = source._emitImageEmbeddings
-      _reasoning = source._reasoning
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._prompt) }()
-        case 2: try { try decoder.decodeSingularInt32Field(value: &_storage._maxOutputTokens) }()
-        case 3: try { try decoder.decodeSingularFloatField(value: &_storage._temperature) }()
-        case 4: try { try decoder.decodeSingularFloatField(value: &_storage._topP) }()
-        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._topK) }()
-        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._stopSequences) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._systemPrompt) }()
-        case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._maxImageSize) }()
-        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
-        case 11: try { try decoder.decodeSingularBoolField(value: &_storage._useGpu) }()
-        case 12: try { try decoder.decodeSingularEnumField(value: &_storage._modelFamily) }()
-        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._customChatTemplate) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._imageMarkerOverride) }()
-        case 15: try { try decoder.decodeSingularInt64Field(value: &_storage._seed) }()
-        case 16: try { try decoder.decodeSingularFloatField(value: &_storage._repetitionPenalty) }()
-        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._minP) }()
-        case 18: try { try decoder.decodeSingularBoolField(value: &_storage._emitImageEmbeddings) }()
-        case 19: try { try decoder.decodeSingularMessageField(value: &_storage._reasoning) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._prompt.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._prompt, fieldNumber: 1)
-      }
-      if _storage._maxOutputTokens != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._maxOutputTokens, fieldNumber: 2)
-      }
-      if _storage._temperature.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._temperature, fieldNumber: 3)
-      }
-      if _storage._topP.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._topP, fieldNumber: 4)
-      }
-      if _storage._topK != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._topK, fieldNumber: 5)
-      }
-      if !_storage._stopSequences.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._stopSequences, fieldNumber: 6)
-      }
-      try { if let v = _storage._systemPrompt {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-      } }()
-      if _storage._maxImageSize != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._maxImageSize, fieldNumber: 9)
-      }
-      if _storage._nThreads != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._nThreads, fieldNumber: 10)
-      }
-      if _storage._useGpu != false {
-        try visitor.visitSingularBoolField(value: _storage._useGpu, fieldNumber: 11)
-      }
-      if _storage._modelFamily != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._modelFamily, fieldNumber: 12)
-      }
-      try { if let v = _storage._customChatTemplate {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
-      } }()
-      try { if let v = _storage._imageMarkerOverride {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
-      } }()
-      if _storage._seed != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._seed, fieldNumber: 15)
-      }
-      if _storage._repetitionPenalty.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._repetitionPenalty, fieldNumber: 16)
-      }
-      if _storage._minP.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._minP, fieldNumber: 17)
-      }
-      if _storage._emitImageEmbeddings != false {
-        try visitor.visitSingularBoolField(value: _storage._emitImageEmbeddings, fieldNumber: 18)
-      }
-      try { if let v = _storage._reasoning {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAVLMGenerationOptions, rhs: RAVLMGenerationOptions) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._prompt != rhs_storage._prompt {return false}
-        if _storage._maxOutputTokens != rhs_storage._maxOutputTokens {return false}
-        if _storage._temperature != rhs_storage._temperature {return false}
-        if _storage._topP != rhs_storage._topP {return false}
-        if _storage._topK != rhs_storage._topK {return false}
-        if _storage._stopSequences != rhs_storage._stopSequences {return false}
-        if _storage._systemPrompt != rhs_storage._systemPrompt {return false}
-        if _storage._maxImageSize != rhs_storage._maxImageSize {return false}
-        if _storage._nThreads != rhs_storage._nThreads {return false}
-        if _storage._useGpu != rhs_storage._useGpu {return false}
-        if _storage._modelFamily != rhs_storage._modelFamily {return false}
-        if _storage._customChatTemplate != rhs_storage._customChatTemplate {return false}
-        if _storage._imageMarkerOverride != rhs_storage._imageMarkerOverride {return false}
-        if _storage._seed != rhs_storage._seed {return false}
-        if _storage._repetitionPenalty != rhs_storage._repetitionPenalty {return false}
-        if _storage._minP != rhs_storage._minP {return false}
-        if _storage._emitImageEmbeddings != rhs_storage._emitImageEmbeddings {return false}
-        if _storage._reasoning != rhs_storage._reasoning {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.mediaType != rhs.mediaType {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1142,7 +637,7 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMGenerationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}images\0\u{1}options\0\u{3}model_id\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}images\0\u{4}\u{2}model_id\0\u{2}\u{2}prompt\0\u{1}vision\0\u{1}messages\0\u{1}options\0\u{b}metadata\0\u{c}\u{3}\u{1}\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1152,9 +647,11 @@ nonisolated extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtob
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.images) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._options) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
-      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._vision) }()
+      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.messages) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._options) }()
       default: break
       }
     }
@@ -1171,24 +668,81 @@ nonisolated extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtob
     if !self.images.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.images, fieldNumber: 2)
     }
-    try { if let v = self._options {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
     try { if let v = self._modelID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 5)
+    if !self.prompt.isEmpty {
+      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 6)
     }
+    try { if let v = self._vision {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
+    if !self.messages.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.messages, fieldNumber: 8)
+    }
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAVLMGenerationRequest, rhs: RAVLMGenerationRequest) -> Bool {
     if lhs.requestID != rhs.requestID {return false}
     if lhs.images != rhs.images {return false}
+    if lhs.messages != rhs.messages {return false}
+    if lhs.prompt != rhs.prompt {return false}
     if lhs._options != rhs._options {return false}
+    if lhs._vision != rhs._vision {return false}
     if lhs._modelID != rhs._modelID {return false}
-    if lhs.metadata != rhs.metadata {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RAVLMVisionOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VLMVisionOptions"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_family\0\u{3}custom_chat_template\0\u{3}image_marker_override\0\u{3}max_image_tokens\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.modelFamily) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._customChatTemplate) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._imageMarkerOverride) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxImageTokens) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.modelFamily != .unspecified {
+      try visitor.visitSingularEnumField(value: self.modelFamily, fieldNumber: 1)
+    }
+    try { if let v = self._customChatTemplate {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._imageMarkerOverride {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    if self.maxImageTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxImageTokens, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVLMVisionOptions, rhs: RAVLMVisionOptions) -> Bool {
+    if lhs.modelFamily != rhs.modelFamily {return false}
+    if lhs._customChatTemplate != rhs._customChatTemplate {return false}
+    if lhs._imageMarkerOverride != rhs._imageMarkerOverride {return false}
+    if lhs.maxImageTokens != rhs.maxImageTokens {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1196,17 +750,14 @@ nonisolated extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{4}\u{4}processing_time_ms\0\u{4}\u{2}image_tokens\0\u{3}time_to_first_token_ms\0\u{3}image_encode_time_ms\0\u{3}hardware_used\0\u{4}\u{3}finish_reason\0\u{3}images_processed\0\u{1}usage\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{4}\u{4}total_time_ms\0\u{4}\u{2}image_tokens\0\u{4}\u{2}image_encode_time_ms\0\u{4}\u{4}finish_reason\0\u{2}\u{2}usage\0\u{1}error\0\u{b}hardware_used\0\u{b}images_processed\0\u{c}\u{2}\u{1}\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}\u{c}\u{6}\u{1}\u{c}\u{b}\u{1}\u{c}\u{c}\u{1}\u{c}\u{8}\u{1}\u{c}\u{a}\u{1}\u{c}\u{e}\u{1}")
 
   fileprivate class _StorageClass {
     var _text: String = String()
-    var _processingTimeMs: Int64 = 0
+    var _totalTimeMs: Int64 = 0
     var _imageTokens: Int32 = 0
-    var _timeToFirstTokenMs: Int64 = 0
     var _imageEncodeTimeMs: Int64 = 0
-    var _hardwareUsed: String? = nil
     var _finishReason: String = String()
-    var _imagesProcessed: Int32 = 0
     var _usage: RATokenUsage? = nil
     var _error: RASDKError? = nil
 
@@ -1220,13 +771,10 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
 
     init(copying source: _StorageClass) {
       _text = source._text
-      _processingTimeMs = source._processingTimeMs
+      _totalTimeMs = source._totalTimeMs
       _imageTokens = source._imageTokens
-      _timeToFirstTokenMs = source._timeToFirstTokenMs
       _imageEncodeTimeMs = source._imageEncodeTimeMs
-      _hardwareUsed = source._hardwareUsed
       _finishReason = source._finishReason
-      _imagesProcessed = source._imagesProcessed
       _usage = source._usage
       _error = source._error
     }
@@ -1248,13 +796,10 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._text) }()
-        case 5: try { try decoder.decodeSingularInt64Field(value: &_storage._processingTimeMs) }()
+        case 5: try { try decoder.decodeSingularInt64Field(value: &_storage._totalTimeMs) }()
         case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._imageTokens) }()
-        case 8: try { try decoder.decodeSingularInt64Field(value: &_storage._timeToFirstTokenMs) }()
         case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._imageEncodeTimeMs) }()
-        case 10: try { try decoder.decodeSingularStringField(value: &_storage._hardwareUsed) }()
         case 13: try { try decoder.decodeSingularStringField(value: &_storage._finishReason) }()
-        case 14: try { try decoder.decodeSingularInt32Field(value: &_storage._imagesProcessed) }()
         case 15: try { try decoder.decodeSingularMessageField(value: &_storage._usage) }()
         case 16: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
@@ -1272,26 +817,17 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
       if !_storage._text.isEmpty {
         try visitor.visitSingularStringField(value: _storage._text, fieldNumber: 1)
       }
-      if _storage._processingTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._processingTimeMs, fieldNumber: 5)
+      if _storage._totalTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._totalTimeMs, fieldNumber: 5)
       }
       if _storage._imageTokens != 0 {
         try visitor.visitSingularInt32Field(value: _storage._imageTokens, fieldNumber: 7)
       }
-      if _storage._timeToFirstTokenMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._timeToFirstTokenMs, fieldNumber: 8)
-      }
       if _storage._imageEncodeTimeMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._imageEncodeTimeMs, fieldNumber: 9)
       }
-      try { if let v = _storage._hardwareUsed {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 10)
-      } }()
       if !_storage._finishReason.isEmpty {
         try visitor.visitSingularStringField(value: _storage._finishReason, fieldNumber: 13)
-      }
-      if _storage._imagesProcessed != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._imagesProcessed, fieldNumber: 14)
       }
       try { if let v = _storage._usage {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
@@ -1309,13 +845,10 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._text != rhs_storage._text {return false}
-        if _storage._processingTimeMs != rhs_storage._processingTimeMs {return false}
+        if _storage._totalTimeMs != rhs_storage._totalTimeMs {return false}
         if _storage._imageTokens != rhs_storage._imageTokens {return false}
-        if _storage._timeToFirstTokenMs != rhs_storage._timeToFirstTokenMs {return false}
         if _storage._imageEncodeTimeMs != rhs_storage._imageEncodeTimeMs {return false}
-        if _storage._hardwareUsed != rhs_storage._hardwareUsed {return false}
         if _storage._finishReason != rhs_storage._finishReason {return false}
-        if _storage._imagesProcessed != rhs_storage._imagesProcessed {return false}
         if _storage._usage != rhs_storage._usage {return false}
         if _storage._error != rhs_storage._error {return false}
         return true
@@ -1329,7 +862,7 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 nonisolated extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}token\0\u{3}token_index\0\u{3}is_final\0\u{3}tokens_per_second\0\u{1}result\0\u{2}\u{3}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}token\0\u{3}token_index\0\u{2}\u{3}result\0\u{2}\u{3}error\0\u{b}is_final\0\u{b}tokens_per_second\0\u{c}\u{1}\u{1}\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}\u{c}\u{7}\u{1}\u{c}\u{8}\u{1}")
 
   fileprivate class _StorageClass {
     var _timestampUs: Int64 = 0
@@ -1337,8 +870,6 @@ nonisolated extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _kind: RAVLMStreamEventKind = .unspecified
     var _token: String = String()
     var _tokenIndex: Int32 = 0
-    var _isFinal: Bool = false
-    var _tokensPerSecond: Float = 0
     var _result: RAVLMResult? = nil
     var _error: RASDKError? = nil
 
@@ -1356,8 +887,6 @@ nonisolated extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       _kind = source._kind
       _token = source._token
       _tokenIndex = source._tokenIndex
-      _isFinal = source._isFinal
-      _tokensPerSecond = source._tokensPerSecond
       _result = source._result
       _error = source._error
     }
@@ -1383,8 +912,6 @@ nonisolated extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
         case 5: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
         case 6: try { try decoder.decodeSingularInt32Field(value: &_storage._tokenIndex) }()
-        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._isFinal) }()
-        case 8: try { try decoder.decodeSingularFloatField(value: &_storage._tokensPerSecond) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
         case 12: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
@@ -1414,12 +941,6 @@ nonisolated extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       if _storage._tokenIndex != 0 {
         try visitor.visitSingularInt32Field(value: _storage._tokenIndex, fieldNumber: 6)
       }
-      if _storage._isFinal != false {
-        try visitor.visitSingularBoolField(value: _storage._isFinal, fieldNumber: 7)
-      }
-      if _storage._tokensPerSecond.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._tokensPerSecond, fieldNumber: 8)
-      }
       try { if let v = _storage._result {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
@@ -1440,121 +961,7 @@ nonisolated extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._kind != rhs_storage._kind {return false}
         if _storage._token != rhs_storage._token {return false}
         if _storage._tokenIndex != rhs_storage._tokenIndex {return false}
-        if _storage._isFinal != rhs_storage._isFinal {return false}
-        if _storage._tokensPerSecond != rhs_storage._tokensPerSecond {return false}
         if _storage._result != rhs_storage._result {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAVLMServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VLMServiceState"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_model\0\u{3}context_length\0\u{3}supports_streaming\0\u{3}supports_multiple_images\0\u{3}vision_encoder_type\0\u{2}\u{3}error\0")
-
-  fileprivate class _StorageClass {
-    var _isReady: Bool = false
-    var _currentModel: String? = nil
-    var _contextLength: Int32 = 0
-    var _supportsStreaming: Bool = false
-    var _supportsMultipleImages: Bool = false
-    var _visionEncoderType: String? = nil
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _isReady = source._isReady
-      _currentModel = source._currentModel
-      _contextLength = source._contextLength
-      _supportsStreaming = source._supportsStreaming
-      _supportsMultipleImages = source._supportsMultipleImages
-      _visionEncoderType = source._visionEncoderType
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._isReady) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._currentModel) }()
-        case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._contextLength) }()
-        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._supportsStreaming) }()
-        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._supportsMultipleImages) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._visionEncoderType) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._isReady != false {
-        try visitor.visitSingularBoolField(value: _storage._isReady, fieldNumber: 1)
-      }
-      try { if let v = _storage._currentModel {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      if _storage._contextLength != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._contextLength, fieldNumber: 3)
-      }
-      if _storage._supportsStreaming != false {
-        try visitor.visitSingularBoolField(value: _storage._supportsStreaming, fieldNumber: 4)
-      }
-      if _storage._supportsMultipleImages != false {
-        try visitor.visitSingularBoolField(value: _storage._supportsMultipleImages, fieldNumber: 5)
-      }
-      try { if let v = _storage._visionEncoderType {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAVLMServiceState, rhs: RAVLMServiceState) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._isReady != rhs_storage._isReady {return false}
-        if _storage._currentModel != rhs_storage._currentModel {return false}
-        if _storage._contextLength != rhs_storage._contextLength {return false}
-        if _storage._supportsStreaming != rhs_storage._supportsStreaming {return false}
-        if _storage._supportsMultipleImages != rhs_storage._supportsMultipleImages {return false}
-        if _storage._visionEncoderType != rhs_storage._visionEncoderType {return false}
         if _storage._error != rhs_storage._error {return false}
         return true
       }

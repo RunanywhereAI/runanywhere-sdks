@@ -6,86 +6,12 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { ChatMessage } from "./chat";
 import { SDKError } from "./errors";
-import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
-import { ReasoningOptions } from "./thinking_tag_pattern";
+import { LLMGenerationOptions } from "./llm_options";
 import { TokenUsage } from "./token_usage";
 
 export const protobufPackage = "runanywhere.v1";
-
-/**
- * The JPEG/PNG/WEBP and RAW_RGBA values are reserved: no backend detects
- * containers yet, and no SDK passes straight RGBA. Swift's Apple-only uiImage
- * and pixelBuffer cases flatten to RAW_RGB before crossing the C ABI.
- */
-export enum VLMImageFormat {
-  VLM_IMAGE_FORMAT_UNSPECIFIED = 0,
-  VLM_IMAGE_FORMAT_JPEG = 1,
-  VLM_IMAGE_FORMAT_PNG = 2,
-  VLM_IMAGE_FORMAT_WEBP = 3,
-  VLM_IMAGE_FORMAT_RAW_RGB = 4,
-  VLM_IMAGE_FORMAT_RAW_RGBA = 5,
-  VLM_IMAGE_FORMAT_BASE64 = 6,
-  VLM_IMAGE_FORMAT_FILE_PATH = 7,
-  UNRECOGNIZED = -1,
-}
-
-export function vLMImageFormatFromJSON(object: any): VLMImageFormat {
-  switch (object) {
-    case 0:
-    case "VLM_IMAGE_FORMAT_UNSPECIFIED":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED;
-    case 1:
-    case "VLM_IMAGE_FORMAT_JPEG":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_JPEG;
-    case 2:
-    case "VLM_IMAGE_FORMAT_PNG":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_PNG;
-    case 3:
-    case "VLM_IMAGE_FORMAT_WEBP":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_WEBP;
-    case 4:
-    case "VLM_IMAGE_FORMAT_RAW_RGB":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB;
-    case 5:
-    case "VLM_IMAGE_FORMAT_RAW_RGBA":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA;
-    case 6:
-    case "VLM_IMAGE_FORMAT_BASE64":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_BASE64;
-    case 7:
-    case "VLM_IMAGE_FORMAT_FILE_PATH":
-      return VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return VLMImageFormat.UNRECOGNIZED;
-  }
-}
-
-export function vLMImageFormatToJSON(object: VLMImageFormat): string {
-  switch (object) {
-    case VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED:
-      return "VLM_IMAGE_FORMAT_UNSPECIFIED";
-    case VLMImageFormat.VLM_IMAGE_FORMAT_JPEG:
-      return "VLM_IMAGE_FORMAT_JPEG";
-    case VLMImageFormat.VLM_IMAGE_FORMAT_PNG:
-      return "VLM_IMAGE_FORMAT_PNG";
-    case VLMImageFormat.VLM_IMAGE_FORMAT_WEBP:
-      return "VLM_IMAGE_FORMAT_WEBP";
-    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB:
-      return "VLM_IMAGE_FORMAT_RAW_RGB";
-    case VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA:
-      return "VLM_IMAGE_FORMAT_RAW_RGBA";
-    case VLMImageFormat.VLM_IMAGE_FORMAT_BASE64:
-      return "VLM_IMAGE_FORMAT_BASE64";
-    case VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH:
-      return "VLM_IMAGE_FORMAT_FILE_PATH";
-    case VLMImageFormat.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
 
 export enum VLMModelFamily {
   VLM_MODEL_FAMILY_UNSPECIFIED = 0,
@@ -147,6 +73,12 @@ export function vLMModelFamilyToJSON(object: VLMModelFamily): string {
 export enum VLMStreamEventKind {
   VLM_STREAM_EVENT_KIND_UNSPECIFIED = 0,
   VLM_STREAM_EVENT_KIND_STARTED = 1,
+  /**
+   * VLM_STREAM_EVENT_KIND_IMAGE_ENCODED - Emitted when the vision encoder finishes and decoding begins -- the
+   * cue for a UI to switch from "analysing image" to "writing". Emitted
+   * where the backend measures the encode boundary
+   * (VLMResult.image_encode_time_ms comes from the same measurement).
+   */
   VLM_STREAM_EVENT_KIND_IMAGE_ENCODED = 2,
   VLM_STREAM_EVENT_KIND_TOKEN = 3,
   VLM_STREAM_EVENT_KIND_COMPLETED = 4,
@@ -207,89 +139,110 @@ export interface VLMChatTemplate {
   defaultSystemPrompt?: string | undefined;
 }
 
+/**
+ * Pixel buffers are tightly packed with NO row padding: RGB is 3 bytes/px,
+ * RGBA is 4, and width * height * channels MUST equal the buffer length or
+ * the request is rejected. raw_rgba drops alpha at the boundary.
+ */
 export interface VLMImage {
+  /** Local file. The on-device analogue of a cloud Files-API file_id. */
   filePath?:
     | string
     | undefined;
-  /** JPEG/PNG/WEBP container bytes */
-  encoded?:
+  /**
+   * Compressed container bytes -- image/jpeg, image/png, image/webp.
+   * Decoded by commons. Set media_type alongside. Same slot name and
+   * meaning as ChatAttachment.data and Anthropic source.data.
+   */
+  data?:
     | Uint8Array
     | undefined;
-  /** RAW_RGB or RAW_RGBA pixel buffer */
-  rawRgb?: Uint8Array | undefined;
-  base64?: string | undefined;
+  /** 3 bytes/px */
+  rawRgb?:
+    | Uint8Array
+    | undefined;
+  /** same container formats as `data`, base64-encoded */
+  base64?:
+    | string
+    | undefined;
+  /** 4 bytes/px; commons drops alpha */
+  rawRgba?:
+    | Uint8Array
+    | undefined;
+  /** required for raw_rgb / raw_rgba */
   width: number;
+  /** required for raw_rgb / raw_rgba */
   height: number;
-  format: VLMImageFormat;
-  mediaType?: string | undefined;
-  name?: string | undefined;
-  sizeBytes: number;
-  metadata: { [key: string]: string };
-}
-
-export interface VLMImage_MetadataEntry {
-  key: string;
-  value: string;
-}
-
-export interface VLMConfiguration {
-  modelId: string;
-  maxImageSizePx: number;
-  maxTokens: number;
-  contextLength: number;
-  temperature: number;
-  systemPrompt?: string | undefined;
-  streamingEnabled: boolean;
-  preferredFramework?: InferenceFramework | undefined;
-}
-
-export interface VLMGenerationOptions {
-  prompt: string;
-  maxOutputTokens: number;
-  temperature: number;
-  topP: number;
-  topK: number;
-  stopSequences: string[];
-  systemPrompt?: string | undefined;
-  maxImageSize: number;
-  nThreads: number;
-  useGpu: boolean;
-  modelFamily: VLMModelFamily;
   /**
-   * Commons does not convert this field on the VLM proto path, so the
-   * llama.cpp template support behind it is currently unreachable from here.
+   * MIME type of `data`/`base64`. Required when either is set. An open
+   * string, as everywhere in the industry, so adding HEIC is not a proto
+   * change.
    */
-  customChatTemplate?: VLMChatTemplate | undefined;
-  imageMarkerOverride?: string | undefined;
-  seed: number;
-  repetitionPenalty: number;
-  minP: number;
-  emitImageEmbeddings: boolean;
-  reasoning?: ReasoningOptions | undefined;
+  mediaType: string;
 }
 
 export interface VLMGenerationRequest {
   requestId: string;
   images: VLMImage[];
-  options?: VLMGenerationOptions | undefined;
+  /**
+   * Ordered conversation. A follow-up question about the same picture is
+   * just another turn; images ride as ChatMessage.attachments.
+   */
+  messages: ChatMessage[];
+  /** The question about the image, for the single-turn quickstart path. */
+  prompt: string;
+  /**
+   * One options set for all text generation, image or not -- same names,
+   * same defaults, same validation as the text API. Carries
+   * structured_output, which is how OCR / field extraction / bounding
+   * boxes are expressed (deliberately no ocr() or detect() verb).
+   */
+  options?:
+    | LLMGenerationOptions
+    | undefined;
+  /** Only the knobs that have no text-generation meaning. */
+  vision?: VLMVisionOptions | undefined;
   modelId?: string | undefined;
-  metadata: { [key: string]: string };
 }
 
-export interface VLMGenerationRequest_MetadataEntry {
-  key: string;
-  value: string;
+/**
+ * The four genuinely vision-specific knobs. Everything else in the old
+ * VLMGenerationOptions was either a copy of LLMGenerationOptions or dead.
+ */
+export interface VLMVisionOptions {
+  modelFamily: VLMModelFamily;
+  /**
+   * Live end-to-end (commons converts it, llama.cpp applies it); it is
+   * simply not surfaced by the v3 facades yet.
+   */
+  customChatTemplate?: VLMChatTemplate | undefined;
+  imageMarkerOverride?:
+    | string
+    | undefined;
+  /**
+   * Per-image vision-token budget -- the unit that actually drives
+   * prefill (cf. llama.cpp --image-max-tokens, Gemini media_resolution).
+   * 0 = the bundle's compiled default. The value actually used is
+   * reported back as VLMResult.image_tokens.
+   */
+  maxImageTokens: number;
 }
 
 export interface VLMResult {
   text: string;
-  processingTimeMs: number;
+  /**
+   * Wall-clock for the whole call, image encode included. int64 ms is the
+   * unit for every duration on this surface; the _ms suffix stays explicit.
+   */
+  totalTimeMs: number;
   imageTokens: number;
-  timeToFirstTokenMs: number;
+  /** canonical spelling (usage = 15) */
   imageEncodeTimeMs: number;
-  hardwareUsed?: string | undefined;
+  /**
+   * Produced by commons on both the one-shot and the streaming path, with
+   * the LLM domain's vocabulary: "stop" | "length" | "stop_sequence".
+   */
   finishReason: string;
-  imagesProcessed: number;
   usage?: TokenUsage | undefined;
   error?: SDKError | undefined;
 }
@@ -297,22 +250,15 @@ export interface VLMResult {
 export interface VLMStreamEvent {
   timestampUs: number;
   requestId: string;
+  /** The single terminal discriminator: COMPLETED or ERROR ends the stream. */
   kind: VLMStreamEventKind;
   token: string;
   tokenIndex: number;
-  isFinal: boolean;
-  tokensPerSecond: number;
+  /**
+   * Rate comes from result.usage.tokens_per_second on the terminal event,
+   * in TokenUsage's own type. No second copy, no second scalar type.
+   */
   result?: VLMResult | undefined;
-  error?: SDKError | undefined;
-}
-
-export interface VLMServiceState {
-  isReady: boolean;
-  currentModel?: string | undefined;
-  contextLength: number;
-  supportsStreaming: boolean;
-  supportsMultipleImages: boolean;
-  visionEncoderType?: string | undefined;
   error?: SDKError | undefined;
 }
 
@@ -423,16 +369,13 @@ export const VLMChatTemplate: MessageFns<VLMChatTemplate> = {
 function createBaseVLMImage(): VLMImage {
   return {
     filePath: undefined,
-    encoded: undefined,
+    data: undefined,
     rawRgb: undefined,
     base64: undefined,
+    rawRgba: undefined,
     width: 0,
     height: 0,
-    format: 0,
-    mediaType: undefined,
-    name: undefined,
-    sizeBytes: 0,
-    metadata: {},
+    mediaType: "",
   };
 }
 
@@ -441,8 +384,8 @@ export const VLMImage: MessageFns<VLMImage> = {
     if (message.filePath !== undefined) {
       writer.uint32(10).string(message.filePath);
     }
-    if (message.encoded !== undefined) {
-      writer.uint32(18).bytes(message.encoded);
+    if (message.data !== undefined) {
+      writer.uint32(18).bytes(message.data);
     }
     if (message.rawRgb !== undefined) {
       writer.uint32(26).bytes(message.rawRgb);
@@ -450,27 +393,18 @@ export const VLMImage: MessageFns<VLMImage> = {
     if (message.base64 !== undefined) {
       writer.uint32(34).string(message.base64);
     }
+    if (message.rawRgba !== undefined) {
+      writer.uint32(98).bytes(message.rawRgba);
+    }
     if (message.width !== 0) {
       writer.uint32(40).int32(message.width);
     }
     if (message.height !== 0) {
       writer.uint32(48).int32(message.height);
     }
-    if (message.format !== 0) {
-      writer.uint32(56).int32(message.format);
-    }
-    if (message.mediaType !== undefined) {
+    if (message.mediaType !== "") {
       writer.uint32(66).string(message.mediaType);
     }
-    if (message.name !== undefined) {
-      writer.uint32(74).string(message.name);
-    }
-    if (message.sizeBytes !== 0) {
-      writer.uint32(80).int64(message.sizeBytes);
-    }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      VLMImage_MetadataEntry.encode({ key: key as any, value }, writer.uint32(90).fork()).join();
-    });
     return writer;
   },
 
@@ -494,7 +428,7 @@ export const VLMImage: MessageFns<VLMImage> = {
             break;
           }
 
-          message.encoded = reader.bytes();
+          message.data = reader.bytes();
           continue;
         }
         case 3: {
@@ -513,6 +447,14 @@ export const VLMImage: MessageFns<VLMImage> = {
           message.base64 = reader.string();
           continue;
         }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.rawRgba = reader.bytes();
+          continue;
+        }
         case 5: {
           if (tag !== 40) {
             break;
@@ -529,47 +471,12 @@ export const VLMImage: MessageFns<VLMImage> = {
           message.height = reader.int32();
           continue;
         }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.format = reader.int32() as any;
-          continue;
-        }
         case 8: {
           if (tag !== 66) {
             break;
           }
 
           message.mediaType = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.name = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.sizeBytes = longToNumber(reader.int64());
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          const entry11 = VLMImage_MetadataEntry.decode(reader, reader.uint32());
-          if (entry11.value !== undefined) {
-            message.metadata[entry11.key] = entry11.value;
-          }
           continue;
         }
       }
@@ -588,36 +495,25 @@ export const VLMImage: MessageFns<VLMImage> = {
         : isSet(object.file_path)
         ? globalThis.String(object.file_path)
         : undefined,
-      encoded: isSet(object.encoded) ? bytesFromBase64(object.encoded) : undefined,
+      data: isSet(object.data) ? bytesFromBase64(object.data) : undefined,
       rawRgb: isSet(object.rawRgb)
         ? bytesFromBase64(object.rawRgb)
         : isSet(object.raw_rgb)
         ? bytesFromBase64(object.raw_rgb)
         : undefined,
       base64: isSet(object.base64) ? globalThis.String(object.base64) : undefined,
+      rawRgba: isSet(object.rawRgba)
+        ? bytesFromBase64(object.rawRgba)
+        : isSet(object.raw_rgba)
+        ? bytesFromBase64(object.raw_rgba)
+        : undefined,
       width: isSet(object.width) ? globalThis.Number(object.width) : 0,
       height: isSet(object.height) ? globalThis.Number(object.height) : 0,
-      format: isSet(object.format) ? vLMImageFormatFromJSON(object.format) : 0,
       mediaType: isSet(object.mediaType)
         ? globalThis.String(object.mediaType)
         : isSet(object.media_type)
         ? globalThis.String(object.media_type)
-        : undefined,
-      name: isSet(object.name) ? globalThis.String(object.name) : undefined,
-      sizeBytes: isSet(object.sizeBytes)
-        ? globalThis.Number(object.sizeBytes)
-        : isSet(object.size_bytes)
-        ? globalThis.Number(object.size_bytes)
-        : 0,
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
+        : "",
     };
   },
 
@@ -626,8 +522,8 @@ export const VLMImage: MessageFns<VLMImage> = {
     if (message.filePath !== undefined) {
       obj.filePath = message.filePath;
     }
-    if (message.encoded !== undefined) {
-      obj.encoded = base64FromBytes(message.encoded);
+    if (message.data !== undefined) {
+      obj.data = base64FromBytes(message.data);
     }
     if (message.rawRgb !== undefined) {
       obj.rawRgb = base64FromBytes(message.rawRgb);
@@ -635,32 +531,17 @@ export const VLMImage: MessageFns<VLMImage> = {
     if (message.base64 !== undefined) {
       obj.base64 = message.base64;
     }
+    if (message.rawRgba !== undefined) {
+      obj.rawRgba = base64FromBytes(message.rawRgba);
+    }
     if (message.width !== 0) {
       obj.width = Math.round(message.width);
     }
     if (message.height !== 0) {
       obj.height = Math.round(message.height);
     }
-    if (message.format !== 0) {
-      obj.format = vLMImageFormatToJSON(message.format);
-    }
-    if (message.mediaType !== undefined) {
+    if (message.mediaType !== "") {
       obj.mediaType = message.mediaType;
-    }
-    if (message.name !== undefined) {
-      obj.name = message.name;
-    }
-    if (message.sizeBytes !== 0) {
-      obj.sizeBytes = Math.round(message.sizeBytes);
-    }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
     }
     return obj;
   },
@@ -671,726 +552,27 @@ export const VLMImage: MessageFns<VLMImage> = {
   fromPartial<I extends Exact<DeepPartial<VLMImage>, I>>(object: I): VLMImage {
     const message = createBaseVLMImage();
     message.filePath = object.filePath ?? undefined;
-    message.encoded = object.encoded ?? undefined;
+    message.data = object.data ?? undefined;
     message.rawRgb = object.rawRgb ?? undefined;
     message.base64 = object.base64 ?? undefined;
+    message.rawRgba = object.rawRgba ?? undefined;
     message.width = object.width ?? 0;
     message.height = object.height ?? 0;
-    message.format = object.format ?? 0;
-    message.mediaType = object.mediaType ?? undefined;
-    message.name = object.name ?? undefined;
-    message.sizeBytes = object.sizeBytes ?? 0;
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    return message;
-  },
-};
-
-function createBaseVLMImage_MetadataEntry(): VLMImage_MetadataEntry {
-  return { key: "", value: "" };
-}
-
-export const VLMImage_MetadataEntry: MessageFns<VLMImage_MetadataEntry> = {
-  encode(message: VLMImage_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): VLMImage_MetadataEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseVLMImage_MetadataEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): VLMImage_MetadataEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: VLMImage_MetadataEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<VLMImage_MetadataEntry>, I>>(base?: I): VLMImage_MetadataEntry {
-    return VLMImage_MetadataEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<VLMImage_MetadataEntry>, I>>(object: I): VLMImage_MetadataEntry {
-    const message = createBaseVLMImage_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
-    return message;
-  },
-};
-
-function createBaseVLMConfiguration(): VLMConfiguration {
-  return {
-    modelId: "",
-    maxImageSizePx: 0,
-    maxTokens: 0,
-    contextLength: 0,
-    temperature: 0,
-    systemPrompt: undefined,
-    streamingEnabled: false,
-    preferredFramework: undefined,
-  };
-}
-
-export const VLMConfiguration: MessageFns<VLMConfiguration> = {
-  encode(message: VLMConfiguration, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.modelId !== "") {
-      writer.uint32(10).string(message.modelId);
-    }
-    if (message.maxImageSizePx !== 0) {
-      writer.uint32(16).int32(message.maxImageSizePx);
-    }
-    if (message.maxTokens !== 0) {
-      writer.uint32(24).int32(message.maxTokens);
-    }
-    if (message.contextLength !== 0) {
-      writer.uint32(32).int32(message.contextLength);
-    }
-    if (message.temperature !== 0) {
-      writer.uint32(45).float(message.temperature);
-    }
-    if (message.systemPrompt !== undefined) {
-      writer.uint32(50).string(message.systemPrompt);
-    }
-    if (message.streamingEnabled !== false) {
-      writer.uint32(56).bool(message.streamingEnabled);
-    }
-    if (message.preferredFramework !== undefined) {
-      writer.uint32(64).int32(message.preferredFramework);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): VLMConfiguration {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseVLMConfiguration();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.modelId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.maxImageSizePx = reader.int32();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.maxTokens = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.contextLength = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.temperature = reader.float();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.systemPrompt = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.streamingEnabled = reader.bool();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.preferredFramework = reader.int32() as any;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): VLMConfiguration {
-    return {
-      modelId: isSet(object.modelId)
-        ? globalThis.String(object.modelId)
-        : isSet(object.model_id)
-        ? globalThis.String(object.model_id)
-        : "",
-      maxImageSizePx: isSet(object.maxImageSizePx)
-        ? globalThis.Number(object.maxImageSizePx)
-        : isSet(object.max_image_size_px)
-        ? globalThis.Number(object.max_image_size_px)
-        : 0,
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : 0,
-      contextLength: isSet(object.contextLength)
-        ? globalThis.Number(object.contextLength)
-        : isSet(object.context_length)
-        ? globalThis.Number(object.context_length)
-        : 0,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : undefined,
-      streamingEnabled: isSet(object.streamingEnabled)
-        ? globalThis.Boolean(object.streamingEnabled)
-        : isSet(object.streaming_enabled)
-        ? globalThis.Boolean(object.streaming_enabled)
-        : false,
-      preferredFramework: isSet(object.preferredFramework)
-        ? inferenceFrameworkFromJSON(object.preferredFramework)
-        : isSet(object.preferred_framework)
-        ? inferenceFrameworkFromJSON(object.preferred_framework)
-        : undefined,
-    };
-  },
-
-  toJSON(message: VLMConfiguration): unknown {
-    const obj: any = {};
-    if (message.modelId !== "") {
-      obj.modelId = message.modelId;
-    }
-    if (message.maxImageSizePx !== 0) {
-      obj.maxImageSizePx = Math.round(message.maxImageSizePx);
-    }
-    if (message.maxTokens !== 0) {
-      obj.maxTokens = Math.round(message.maxTokens);
-    }
-    if (message.contextLength !== 0) {
-      obj.contextLength = Math.round(message.contextLength);
-    }
-    if (message.temperature !== 0) {
-      obj.temperature = message.temperature;
-    }
-    if (message.systemPrompt !== undefined) {
-      obj.systemPrompt = message.systemPrompt;
-    }
-    if (message.streamingEnabled !== false) {
-      obj.streamingEnabled = message.streamingEnabled;
-    }
-    if (message.preferredFramework !== undefined) {
-      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<VLMConfiguration>, I>>(base?: I): VLMConfiguration {
-    return VLMConfiguration.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<VLMConfiguration>, I>>(object: I): VLMConfiguration {
-    const message = createBaseVLMConfiguration();
-    message.modelId = object.modelId ?? "";
-    message.maxImageSizePx = object.maxImageSizePx ?? 0;
-    message.maxTokens = object.maxTokens ?? 0;
-    message.contextLength = object.contextLength ?? 0;
-    message.temperature = object.temperature ?? 0;
-    message.systemPrompt = object.systemPrompt ?? undefined;
-    message.streamingEnabled = object.streamingEnabled ?? false;
-    message.preferredFramework = object.preferredFramework ?? undefined;
-    return message;
-  },
-};
-
-function createBaseVLMGenerationOptions(): VLMGenerationOptions {
-  return {
-    prompt: "",
-    maxOutputTokens: 0,
-    temperature: 0,
-    topP: 0,
-    topK: 0,
-    stopSequences: [],
-    systemPrompt: undefined,
-    maxImageSize: 0,
-    nThreads: 0,
-    useGpu: false,
-    modelFamily: 0,
-    customChatTemplate: undefined,
-    imageMarkerOverride: undefined,
-    seed: 0,
-    repetitionPenalty: 0,
-    minP: 0,
-    emitImageEmbeddings: false,
-    reasoning: undefined,
-  };
-}
-
-export const VLMGenerationOptions: MessageFns<VLMGenerationOptions> = {
-  encode(message: VLMGenerationOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.prompt !== "") {
-      writer.uint32(10).string(message.prompt);
-    }
-    if (message.maxOutputTokens !== 0) {
-      writer.uint32(16).int32(message.maxOutputTokens);
-    }
-    if (message.temperature !== 0) {
-      writer.uint32(29).float(message.temperature);
-    }
-    if (message.topP !== 0) {
-      writer.uint32(37).float(message.topP);
-    }
-    if (message.topK !== 0) {
-      writer.uint32(40).int32(message.topK);
-    }
-    for (const v of message.stopSequences) {
-      writer.uint32(50).string(v!);
-    }
-    if (message.systemPrompt !== undefined) {
-      writer.uint32(66).string(message.systemPrompt);
-    }
-    if (message.maxImageSize !== 0) {
-      writer.uint32(72).int32(message.maxImageSize);
-    }
-    if (message.nThreads !== 0) {
-      writer.uint32(80).int32(message.nThreads);
-    }
-    if (message.useGpu !== false) {
-      writer.uint32(88).bool(message.useGpu);
-    }
-    if (message.modelFamily !== 0) {
-      writer.uint32(96).int32(message.modelFamily);
-    }
-    if (message.customChatTemplate !== undefined) {
-      VLMChatTemplate.encode(message.customChatTemplate, writer.uint32(106).fork()).join();
-    }
-    if (message.imageMarkerOverride !== undefined) {
-      writer.uint32(114).string(message.imageMarkerOverride);
-    }
-    if (message.seed !== 0) {
-      writer.uint32(120).int64(message.seed);
-    }
-    if (message.repetitionPenalty !== 0) {
-      writer.uint32(133).float(message.repetitionPenalty);
-    }
-    if (message.minP !== 0) {
-      writer.uint32(141).float(message.minP);
-    }
-    if (message.emitImageEmbeddings !== false) {
-      writer.uint32(144).bool(message.emitImageEmbeddings);
-    }
-    if (message.reasoning !== undefined) {
-      ReasoningOptions.encode(message.reasoning, writer.uint32(154).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): VLMGenerationOptions {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseVLMGenerationOptions();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.prompt = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.maxOutputTokens = reader.int32();
-          continue;
-        }
-        case 3: {
-          if (tag !== 29) {
-            break;
-          }
-
-          message.temperature = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.topP = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.topK = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.stopSequences.push(reader.string());
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.systemPrompt = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.maxImageSize = reader.int32();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.nThreads = reader.int32();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.useGpu = reader.bool();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.modelFamily = reader.int32() as any;
-          continue;
-        }
-        case 13: {
-          if (tag !== 106) {
-            break;
-          }
-
-          message.customChatTemplate = VLMChatTemplate.decode(reader, reader.uint32());
-          continue;
-        }
-        case 14: {
-          if (tag !== 114) {
-            break;
-          }
-
-          message.imageMarkerOverride = reader.string();
-          continue;
-        }
-        case 15: {
-          if (tag !== 120) {
-            break;
-          }
-
-          message.seed = longToNumber(reader.int64());
-          continue;
-        }
-        case 16: {
-          if (tag !== 133) {
-            break;
-          }
-
-          message.repetitionPenalty = reader.float();
-          continue;
-        }
-        case 17: {
-          if (tag !== 141) {
-            break;
-          }
-
-          message.minP = reader.float();
-          continue;
-        }
-        case 18: {
-          if (tag !== 144) {
-            break;
-          }
-
-          message.emitImageEmbeddings = reader.bool();
-          continue;
-        }
-        case 19: {
-          if (tag !== 154) {
-            break;
-          }
-
-          message.reasoning = ReasoningOptions.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): VLMGenerationOptions {
-    return {
-      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-      maxOutputTokens: isSet(object.maxOutputTokens)
-        ? globalThis.Number(object.maxOutputTokens)
-        : isSet(object.max_output_tokens)
-        ? globalThis.Number(object.max_output_tokens)
-        : 0,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-      topP: isSet(object.topP)
-        ? globalThis.Number(object.topP)
-        : isSet(object.top_p)
-        ? globalThis.Number(object.top_p)
-        : 0,
-      topK: isSet(object.topK)
-        ? globalThis.Number(object.topK)
-        : isSet(object.top_k)
-        ? globalThis.Number(object.top_k)
-        : 0,
-      stopSequences: globalThis.Array.isArray(object?.stopSequences)
-        ? object.stopSequences.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.stop_sequences)
-        ? object.stop_sequences.map((e: any) => globalThis.String(e))
-        : [],
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : undefined,
-      maxImageSize: isSet(object.maxImageSize)
-        ? globalThis.Number(object.maxImageSize)
-        : isSet(object.max_image_size)
-        ? globalThis.Number(object.max_image_size)
-        : 0,
-      nThreads: isSet(object.nThreads)
-        ? globalThis.Number(object.nThreads)
-        : isSet(object.n_threads)
-        ? globalThis.Number(object.n_threads)
-        : 0,
-      useGpu: isSet(object.useGpu)
-        ? globalThis.Boolean(object.useGpu)
-        : isSet(object.use_gpu)
-        ? globalThis.Boolean(object.use_gpu)
-        : false,
-      modelFamily: isSet(object.modelFamily)
-        ? vLMModelFamilyFromJSON(object.modelFamily)
-        : isSet(object.model_family)
-        ? vLMModelFamilyFromJSON(object.model_family)
-        : 0,
-      customChatTemplate: isSet(object.customChatTemplate)
-        ? VLMChatTemplate.fromJSON(object.customChatTemplate)
-        : isSet(object.custom_chat_template)
-        ? VLMChatTemplate.fromJSON(object.custom_chat_template)
-        : undefined,
-      imageMarkerOverride: isSet(object.imageMarkerOverride)
-        ? globalThis.String(object.imageMarkerOverride)
-        : isSet(object.image_marker_override)
-        ? globalThis.String(object.image_marker_override)
-        : undefined,
-      seed: isSet(object.seed) ? globalThis.Number(object.seed) : 0,
-      repetitionPenalty: isSet(object.repetitionPenalty)
-        ? globalThis.Number(object.repetitionPenalty)
-        : isSet(object.repetition_penalty)
-        ? globalThis.Number(object.repetition_penalty)
-        : 0,
-      minP: isSet(object.minP)
-        ? globalThis.Number(object.minP)
-        : isSet(object.min_p)
-        ? globalThis.Number(object.min_p)
-        : 0,
-      emitImageEmbeddings: isSet(object.emitImageEmbeddings)
-        ? globalThis.Boolean(object.emitImageEmbeddings)
-        : isSet(object.emit_image_embeddings)
-        ? globalThis.Boolean(object.emit_image_embeddings)
-        : false,
-      reasoning: isSet(object.reasoning) ? ReasoningOptions.fromJSON(object.reasoning) : undefined,
-    };
-  },
-
-  toJSON(message: VLMGenerationOptions): unknown {
-    const obj: any = {};
-    if (message.prompt !== "") {
-      obj.prompt = message.prompt;
-    }
-    if (message.maxOutputTokens !== 0) {
-      obj.maxOutputTokens = Math.round(message.maxOutputTokens);
-    }
-    if (message.temperature !== 0) {
-      obj.temperature = message.temperature;
-    }
-    if (message.topP !== 0) {
-      obj.topP = message.topP;
-    }
-    if (message.topK !== 0) {
-      obj.topK = Math.round(message.topK);
-    }
-    if (message.stopSequences?.length) {
-      obj.stopSequences = message.stopSequences;
-    }
-    if (message.systemPrompt !== undefined) {
-      obj.systemPrompt = message.systemPrompt;
-    }
-    if (message.maxImageSize !== 0) {
-      obj.maxImageSize = Math.round(message.maxImageSize);
-    }
-    if (message.nThreads !== 0) {
-      obj.nThreads = Math.round(message.nThreads);
-    }
-    if (message.useGpu !== false) {
-      obj.useGpu = message.useGpu;
-    }
-    if (message.modelFamily !== 0) {
-      obj.modelFamily = vLMModelFamilyToJSON(message.modelFamily);
-    }
-    if (message.customChatTemplate !== undefined) {
-      obj.customChatTemplate = VLMChatTemplate.toJSON(message.customChatTemplate);
-    }
-    if (message.imageMarkerOverride !== undefined) {
-      obj.imageMarkerOverride = message.imageMarkerOverride;
-    }
-    if (message.seed !== 0) {
-      obj.seed = Math.round(message.seed);
-    }
-    if (message.repetitionPenalty !== 0) {
-      obj.repetitionPenalty = message.repetitionPenalty;
-    }
-    if (message.minP !== 0) {
-      obj.minP = message.minP;
-    }
-    if (message.emitImageEmbeddings !== false) {
-      obj.emitImageEmbeddings = message.emitImageEmbeddings;
-    }
-    if (message.reasoning !== undefined) {
-      obj.reasoning = ReasoningOptions.toJSON(message.reasoning);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<VLMGenerationOptions>, I>>(base?: I): VLMGenerationOptions {
-    return VLMGenerationOptions.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<VLMGenerationOptions>, I>>(object: I): VLMGenerationOptions {
-    const message = createBaseVLMGenerationOptions();
-    message.prompt = object.prompt ?? "";
-    message.maxOutputTokens = object.maxOutputTokens ?? 0;
-    message.temperature = object.temperature ?? 0;
-    message.topP = object.topP ?? 0;
-    message.topK = object.topK ?? 0;
-    message.stopSequences = object.stopSequences?.map((e) => e) || [];
-    message.systemPrompt = object.systemPrompt ?? undefined;
-    message.maxImageSize = object.maxImageSize ?? 0;
-    message.nThreads = object.nThreads ?? 0;
-    message.useGpu = object.useGpu ?? false;
-    message.modelFamily = object.modelFamily ?? 0;
-    message.customChatTemplate = (object.customChatTemplate !== undefined && object.customChatTemplate !== null)
-      ? VLMChatTemplate.fromPartial(object.customChatTemplate)
-      : undefined;
-    message.imageMarkerOverride = object.imageMarkerOverride ?? undefined;
-    message.seed = object.seed ?? 0;
-    message.repetitionPenalty = object.repetitionPenalty ?? 0;
-    message.minP = object.minP ?? 0;
-    message.emitImageEmbeddings = object.emitImageEmbeddings ?? false;
-    message.reasoning = (object.reasoning !== undefined && object.reasoning !== null)
-      ? ReasoningOptions.fromPartial(object.reasoning)
-      : undefined;
+    message.mediaType = object.mediaType ?? "";
     return message;
   },
 };
 
 function createBaseVLMGenerationRequest(): VLMGenerationRequest {
-  return { requestId: "", images: [], options: undefined, modelId: undefined, metadata: {} };
+  return {
+    requestId: "",
+    images: [],
+    messages: [],
+    prompt: "",
+    options: undefined,
+    vision: undefined,
+    modelId: undefined,
+  };
 }
 
 export const VLMGenerationRequest: MessageFns<VLMGenerationRequest> = {
@@ -1401,15 +583,21 @@ export const VLMGenerationRequest: MessageFns<VLMGenerationRequest> = {
     for (const v of message.images) {
       VLMImage.encode(v!, writer.uint32(18).fork()).join();
     }
+    for (const v of message.messages) {
+      ChatMessage.encode(v!, writer.uint32(66).fork()).join();
+    }
+    if (message.prompt !== "") {
+      writer.uint32(50).string(message.prompt);
+    }
     if (message.options !== undefined) {
-      VLMGenerationOptions.encode(message.options, writer.uint32(26).fork()).join();
+      LLMGenerationOptions.encode(message.options, writer.uint32(74).fork()).join();
+    }
+    if (message.vision !== undefined) {
+      VLMVisionOptions.encode(message.vision, writer.uint32(58).fork()).join();
     }
     if (message.modelId !== undefined) {
       writer.uint32(34).string(message.modelId);
     }
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      VLMGenerationRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).join();
-    });
     return writer;
   },
 
@@ -1436,12 +624,36 @@ export const VLMGenerationRequest: MessageFns<VLMGenerationRequest> = {
           message.images.push(VLMImage.decode(reader, reader.uint32()));
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
+        case 8: {
+          if (tag !== 66) {
             break;
           }
 
-          message.options = VLMGenerationOptions.decode(reader, reader.uint32());
+          message.messages.push(ChatMessage.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.prompt = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.options = LLMGenerationOptions.decode(reader, reader.uint32());
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.vision = VLMVisionOptions.decode(reader, reader.uint32());
           continue;
         }
         case 4: {
@@ -1450,17 +662,6 @@ export const VLMGenerationRequest: MessageFns<VLMGenerationRequest> = {
           }
 
           message.modelId = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          const entry5 = VLMGenerationRequest_MetadataEntry.decode(reader, reader.uint32());
-          if (entry5.value !== undefined) {
-            message.metadata[entry5.key] = entry5.value;
-          }
           continue;
         }
       }
@@ -1480,21 +681,17 @@ export const VLMGenerationRequest: MessageFns<VLMGenerationRequest> = {
         ? globalThis.String(object.request_id)
         : "",
       images: globalThis.Array.isArray(object?.images) ? object.images.map((e: any) => VLMImage.fromJSON(e)) : [],
-      options: isSet(object.options) ? VLMGenerationOptions.fromJSON(object.options) : undefined,
+      messages: globalThis.Array.isArray(object?.messages)
+        ? object.messages.map((e: any) => ChatMessage.fromJSON(e))
+        : [],
+      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
+      options: isSet(object.options) ? LLMGenerationOptions.fromJSON(object.options) : undefined,
+      vision: isSet(object.vision) ? VLMVisionOptions.fromJSON(object.vision) : undefined,
       modelId: isSet(object.modelId)
         ? globalThis.String(object.modelId)
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : undefined,
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
     };
   },
 
@@ -1506,20 +703,20 @@ export const VLMGenerationRequest: MessageFns<VLMGenerationRequest> = {
     if (message.images?.length) {
       obj.images = message.images.map((e) => VLMImage.toJSON(e));
     }
+    if (message.messages?.length) {
+      obj.messages = message.messages.map((e) => ChatMessage.toJSON(e));
+    }
+    if (message.prompt !== "") {
+      obj.prompt = message.prompt;
+    }
     if (message.options !== undefined) {
-      obj.options = VLMGenerationOptions.toJSON(message.options);
+      obj.options = LLMGenerationOptions.toJSON(message.options);
+    }
+    if (message.vision !== undefined) {
+      obj.vision = VLMVisionOptions.toJSON(message.vision);
     }
     if (message.modelId !== undefined) {
       obj.modelId = message.modelId;
-    }
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
     }
     return obj;
   },
@@ -1531,51 +728,53 @@ export const VLMGenerationRequest: MessageFns<VLMGenerationRequest> = {
     const message = createBaseVLMGenerationRequest();
     message.requestId = object.requestId ?? "";
     message.images = object.images?.map((e) => VLMImage.fromPartial(e)) || [];
+    message.messages = object.messages?.map((e) => ChatMessage.fromPartial(e)) || [];
+    message.prompt = object.prompt ?? "";
     message.options = (object.options !== undefined && object.options !== null)
-      ? VLMGenerationOptions.fromPartial(object.options)
+      ? LLMGenerationOptions.fromPartial(object.options)
+      : undefined;
+    message.vision = (object.vision !== undefined && object.vision !== null)
+      ? VLMVisionOptions.fromPartial(object.vision)
       : undefined;
     message.modelId = object.modelId ?? undefined;
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
     return message;
   },
 };
 
-function createBaseVLMGenerationRequest_MetadataEntry(): VLMGenerationRequest_MetadataEntry {
-  return { key: "", value: "" };
+function createBaseVLMVisionOptions(): VLMVisionOptions {
+  return { modelFamily: 0, customChatTemplate: undefined, imageMarkerOverride: undefined, maxImageTokens: 0 };
 }
 
-export const VLMGenerationRequest_MetadataEntry: MessageFns<VLMGenerationRequest_MetadataEntry> = {
-  encode(message: VLMGenerationRequest_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
+export const VLMVisionOptions: MessageFns<VLMVisionOptions> = {
+  encode(message: VLMVisionOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.modelFamily !== 0) {
+      writer.uint32(8).int32(message.modelFamily);
     }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
+    if (message.customChatTemplate !== undefined) {
+      VLMChatTemplate.encode(message.customChatTemplate, writer.uint32(18).fork()).join();
+    }
+    if (message.imageMarkerOverride !== undefined) {
+      writer.uint32(26).string(message.imageMarkerOverride);
+    }
+    if (message.maxImageTokens !== 0) {
+      writer.uint32(32).int32(message.maxImageTokens);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): VLMGenerationRequest_MetadataEntry {
+  decode(input: BinaryReader | Uint8Array, length?: number): VLMVisionOptions {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseVLMGenerationRequest_MetadataEntry();
+    const message = createBaseVLMVisionOptions();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
-          if (tag !== 10) {
+          if (tag !== 8) {
             break;
           }
 
-          message.key = reader.string();
+          message.modelFamily = reader.int32() as any;
           continue;
         }
         case 2: {
@@ -1583,7 +782,23 @@ export const VLMGenerationRequest_MetadataEntry: MessageFns<VLMGenerationRequest
             break;
           }
 
-          message.value = reader.string();
+          message.customChatTemplate = VLMChatTemplate.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.imageMarkerOverride = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.maxImageTokens = reader.int32();
           continue;
         }
       }
@@ -1595,35 +810,59 @@ export const VLMGenerationRequest_MetadataEntry: MessageFns<VLMGenerationRequest
     return message;
   },
 
-  fromJSON(object: any): VLMGenerationRequest_MetadataEntry {
+  fromJSON(object: any): VLMVisionOptions {
     return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
+      modelFamily: isSet(object.modelFamily)
+        ? vLMModelFamilyFromJSON(object.modelFamily)
+        : isSet(object.model_family)
+        ? vLMModelFamilyFromJSON(object.model_family)
+        : 0,
+      customChatTemplate: isSet(object.customChatTemplate)
+        ? VLMChatTemplate.fromJSON(object.customChatTemplate)
+        : isSet(object.custom_chat_template)
+        ? VLMChatTemplate.fromJSON(object.custom_chat_template)
+        : undefined,
+      imageMarkerOverride: isSet(object.imageMarkerOverride)
+        ? globalThis.String(object.imageMarkerOverride)
+        : isSet(object.image_marker_override)
+        ? globalThis.String(object.image_marker_override)
+        : undefined,
+      maxImageTokens: isSet(object.maxImageTokens)
+        ? globalThis.Number(object.maxImageTokens)
+        : isSet(object.max_image_tokens)
+        ? globalThis.Number(object.max_image_tokens)
+        : 0,
     };
   },
 
-  toJSON(message: VLMGenerationRequest_MetadataEntry): unknown {
+  toJSON(message: VLMVisionOptions): unknown {
     const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
+    if (message.modelFamily !== 0) {
+      obj.modelFamily = vLMModelFamilyToJSON(message.modelFamily);
     }
-    if (message.value !== "") {
-      obj.value = message.value;
+    if (message.customChatTemplate !== undefined) {
+      obj.customChatTemplate = VLMChatTemplate.toJSON(message.customChatTemplate);
+    }
+    if (message.imageMarkerOverride !== undefined) {
+      obj.imageMarkerOverride = message.imageMarkerOverride;
+    }
+    if (message.maxImageTokens !== 0) {
+      obj.maxImageTokens = Math.round(message.maxImageTokens);
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<VLMGenerationRequest_MetadataEntry>, I>>(
-    base?: I,
-  ): VLMGenerationRequest_MetadataEntry {
-    return VLMGenerationRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<VLMVisionOptions>, I>>(base?: I): VLMVisionOptions {
+    return VLMVisionOptions.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<VLMGenerationRequest_MetadataEntry>, I>>(
-    object: I,
-  ): VLMGenerationRequest_MetadataEntry {
-    const message = createBaseVLMGenerationRequest_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
+  fromPartial<I extends Exact<DeepPartial<VLMVisionOptions>, I>>(object: I): VLMVisionOptions {
+    const message = createBaseVLMVisionOptions();
+    message.modelFamily = object.modelFamily ?? 0;
+    message.customChatTemplate = (object.customChatTemplate !== undefined && object.customChatTemplate !== null)
+      ? VLMChatTemplate.fromPartial(object.customChatTemplate)
+      : undefined;
+    message.imageMarkerOverride = object.imageMarkerOverride ?? undefined;
+    message.maxImageTokens = object.maxImageTokens ?? 0;
     return message;
   },
 };
@@ -1631,13 +870,10 @@ export const VLMGenerationRequest_MetadataEntry: MessageFns<VLMGenerationRequest
 function createBaseVLMResult(): VLMResult {
   return {
     text: "",
-    processingTimeMs: 0,
+    totalTimeMs: 0,
     imageTokens: 0,
-    timeToFirstTokenMs: 0,
     imageEncodeTimeMs: 0,
-    hardwareUsed: undefined,
     finishReason: "",
-    imagesProcessed: 0,
     usage: undefined,
     error: undefined,
   };
@@ -1648,26 +884,17 @@ export const VLMResult: MessageFns<VLMResult> = {
     if (message.text !== "") {
       writer.uint32(10).string(message.text);
     }
-    if (message.processingTimeMs !== 0) {
-      writer.uint32(40).int64(message.processingTimeMs);
+    if (message.totalTimeMs !== 0) {
+      writer.uint32(40).int64(message.totalTimeMs);
     }
     if (message.imageTokens !== 0) {
       writer.uint32(56).int32(message.imageTokens);
     }
-    if (message.timeToFirstTokenMs !== 0) {
-      writer.uint32(64).int64(message.timeToFirstTokenMs);
-    }
     if (message.imageEncodeTimeMs !== 0) {
       writer.uint32(72).int64(message.imageEncodeTimeMs);
     }
-    if (message.hardwareUsed !== undefined) {
-      writer.uint32(82).string(message.hardwareUsed);
-    }
     if (message.finishReason !== "") {
       writer.uint32(106).string(message.finishReason);
-    }
-    if (message.imagesProcessed !== 0) {
-      writer.uint32(112).int32(message.imagesProcessed);
     }
     if (message.usage !== undefined) {
       TokenUsage.encode(message.usage, writer.uint32(122).fork()).join();
@@ -1698,7 +925,7 @@ export const VLMResult: MessageFns<VLMResult> = {
             break;
           }
 
-          message.processingTimeMs = longToNumber(reader.int64());
+          message.totalTimeMs = longToNumber(reader.int64());
           continue;
         }
         case 7: {
@@ -1709,14 +936,6 @@ export const VLMResult: MessageFns<VLMResult> = {
           message.imageTokens = reader.int32();
           continue;
         }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.timeToFirstTokenMs = longToNumber(reader.int64());
-          continue;
-        }
         case 9: {
           if (tag !== 72) {
             break;
@@ -1725,28 +944,12 @@ export const VLMResult: MessageFns<VLMResult> = {
           message.imageEncodeTimeMs = longToNumber(reader.int64());
           continue;
         }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.hardwareUsed = reader.string();
-          continue;
-        }
         case 13: {
           if (tag !== 106) {
             break;
           }
 
           message.finishReason = reader.string();
-          continue;
-        }
-        case 14: {
-          if (tag !== 112) {
-            break;
-          }
-
-          message.imagesProcessed = reader.int32();
           continue;
         }
         case 15: {
@@ -1777,41 +980,26 @@ export const VLMResult: MessageFns<VLMResult> = {
   fromJSON(object: any): VLMResult {
     return {
       text: isSet(object.text) ? globalThis.String(object.text) : "",
-      processingTimeMs: isSet(object.processingTimeMs)
-        ? globalThis.Number(object.processingTimeMs)
-        : isSet(object.processing_time_ms)
-        ? globalThis.Number(object.processing_time_ms)
+      totalTimeMs: isSet(object.totalTimeMs)
+        ? globalThis.Number(object.totalTimeMs)
+        : isSet(object.total_time_ms)
+        ? globalThis.Number(object.total_time_ms)
         : 0,
       imageTokens: isSet(object.imageTokens)
         ? globalThis.Number(object.imageTokens)
         : isSet(object.image_tokens)
         ? globalThis.Number(object.image_tokens)
         : 0,
-      timeToFirstTokenMs: isSet(object.timeToFirstTokenMs)
-        ? globalThis.Number(object.timeToFirstTokenMs)
-        : isSet(object.time_to_first_token_ms)
-        ? globalThis.Number(object.time_to_first_token_ms)
-        : 0,
       imageEncodeTimeMs: isSet(object.imageEncodeTimeMs)
         ? globalThis.Number(object.imageEncodeTimeMs)
         : isSet(object.image_encode_time_ms)
         ? globalThis.Number(object.image_encode_time_ms)
         : 0,
-      hardwareUsed: isSet(object.hardwareUsed)
-        ? globalThis.String(object.hardwareUsed)
-        : isSet(object.hardware_used)
-        ? globalThis.String(object.hardware_used)
-        : undefined,
       finishReason: isSet(object.finishReason)
         ? globalThis.String(object.finishReason)
         : isSet(object.finish_reason)
         ? globalThis.String(object.finish_reason)
         : "",
-      imagesProcessed: isSet(object.imagesProcessed)
-        ? globalThis.Number(object.imagesProcessed)
-        : isSet(object.images_processed)
-        ? globalThis.Number(object.images_processed)
-        : 0,
       usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
@@ -1822,26 +1010,17 @@ export const VLMResult: MessageFns<VLMResult> = {
     if (message.text !== "") {
       obj.text = message.text;
     }
-    if (message.processingTimeMs !== 0) {
-      obj.processingTimeMs = Math.round(message.processingTimeMs);
+    if (message.totalTimeMs !== 0) {
+      obj.totalTimeMs = Math.round(message.totalTimeMs);
     }
     if (message.imageTokens !== 0) {
       obj.imageTokens = Math.round(message.imageTokens);
     }
-    if (message.timeToFirstTokenMs !== 0) {
-      obj.timeToFirstTokenMs = Math.round(message.timeToFirstTokenMs);
-    }
     if (message.imageEncodeTimeMs !== 0) {
       obj.imageEncodeTimeMs = Math.round(message.imageEncodeTimeMs);
     }
-    if (message.hardwareUsed !== undefined) {
-      obj.hardwareUsed = message.hardwareUsed;
-    }
     if (message.finishReason !== "") {
       obj.finishReason = message.finishReason;
-    }
-    if (message.imagesProcessed !== 0) {
-      obj.imagesProcessed = Math.round(message.imagesProcessed);
     }
     if (message.usage !== undefined) {
       obj.usage = TokenUsage.toJSON(message.usage);
@@ -1858,13 +1037,10 @@ export const VLMResult: MessageFns<VLMResult> = {
   fromPartial<I extends Exact<DeepPartial<VLMResult>, I>>(object: I): VLMResult {
     const message = createBaseVLMResult();
     message.text = object.text ?? "";
-    message.processingTimeMs = object.processingTimeMs ?? 0;
+    message.totalTimeMs = object.totalTimeMs ?? 0;
     message.imageTokens = object.imageTokens ?? 0;
-    message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
     message.imageEncodeTimeMs = object.imageEncodeTimeMs ?? 0;
-    message.hardwareUsed = object.hardwareUsed ?? undefined;
     message.finishReason = object.finishReason ?? "";
-    message.imagesProcessed = object.imagesProcessed ?? 0;
     message.usage = (object.usage !== undefined && object.usage !== null)
       ? TokenUsage.fromPartial(object.usage)
       : undefined;
@@ -1876,17 +1052,7 @@ export const VLMResult: MessageFns<VLMResult> = {
 };
 
 function createBaseVLMStreamEvent(): VLMStreamEvent {
-  return {
-    timestampUs: 0,
-    requestId: "",
-    kind: 0,
-    token: "",
-    tokenIndex: 0,
-    isFinal: false,
-    tokensPerSecond: 0,
-    result: undefined,
-    error: undefined,
-  };
+  return { timestampUs: 0, requestId: "", kind: 0, token: "", tokenIndex: 0, result: undefined, error: undefined };
 }
 
 export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
@@ -1905,12 +1071,6 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
     }
     if (message.tokenIndex !== 0) {
       writer.uint32(48).int32(message.tokenIndex);
-    }
-    if (message.isFinal !== false) {
-      writer.uint32(56).bool(message.isFinal);
-    }
-    if (message.tokensPerSecond !== 0) {
-      writer.uint32(69).float(message.tokensPerSecond);
     }
     if (message.result !== undefined) {
       VLMResult.encode(message.result, writer.uint32(74).fork()).join();
@@ -1968,22 +1128,6 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
           message.tokenIndex = reader.int32();
           continue;
         }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.isFinal = reader.bool();
-          continue;
-        }
-        case 8: {
-          if (tag !== 69) {
-            break;
-          }
-
-          message.tokensPerSecond = reader.float();
-          continue;
-        }
         case 9: {
           if (tag !== 74) {
             break;
@@ -2028,16 +1172,6 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
         : isSet(object.token_index)
         ? globalThis.Number(object.token_index)
         : 0,
-      isFinal: isSet(object.isFinal)
-        ? globalThis.Boolean(object.isFinal)
-        : isSet(object.is_final)
-        ? globalThis.Boolean(object.is_final)
-        : false,
-      tokensPerSecond: isSet(object.tokensPerSecond)
-        ? globalThis.Number(object.tokensPerSecond)
-        : isSet(object.tokens_per_second)
-        ? globalThis.Number(object.tokens_per_second)
-        : 0,
       result: isSet(object.result) ? VLMResult.fromJSON(object.result) : undefined,
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
@@ -2060,12 +1194,6 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
     if (message.tokenIndex !== 0) {
       obj.tokenIndex = Math.round(message.tokenIndex);
     }
-    if (message.isFinal !== false) {
-      obj.isFinal = message.isFinal;
-    }
-    if (message.tokensPerSecond !== 0) {
-      obj.tokensPerSecond = message.tokensPerSecond;
-    }
     if (message.result !== undefined) {
       obj.result = VLMResult.toJSON(message.result);
     }
@@ -2085,201 +1213,9 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
     message.kind = object.kind ?? 0;
     message.token = object.token ?? "";
     message.tokenIndex = object.tokenIndex ?? 0;
-    message.isFinal = object.isFinal ?? false;
-    message.tokensPerSecond = object.tokensPerSecond ?? 0;
     message.result = (object.result !== undefined && object.result !== null)
       ? VLMResult.fromPartial(object.result)
       : undefined;
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseVLMServiceState(): VLMServiceState {
-  return {
-    isReady: false,
-    currentModel: undefined,
-    contextLength: 0,
-    supportsStreaming: false,
-    supportsMultipleImages: false,
-    visionEncoderType: undefined,
-    error: undefined,
-  };
-}
-
-export const VLMServiceState: MessageFns<VLMServiceState> = {
-  encode(message: VLMServiceState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.isReady !== false) {
-      writer.uint32(8).bool(message.isReady);
-    }
-    if (message.currentModel !== undefined) {
-      writer.uint32(18).string(message.currentModel);
-    }
-    if (message.contextLength !== 0) {
-      writer.uint32(24).int32(message.contextLength);
-    }
-    if (message.supportsStreaming !== false) {
-      writer.uint32(32).bool(message.supportsStreaming);
-    }
-    if (message.supportsMultipleImages !== false) {
-      writer.uint32(40).bool(message.supportsMultipleImages);
-    }
-    if (message.visionEncoderType !== undefined) {
-      writer.uint32(50).string(message.visionEncoderType);
-    }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(74).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): VLMServiceState {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseVLMServiceState();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.isReady = reader.bool();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.currentModel = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.contextLength = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.supportsStreaming = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.supportsMultipleImages = reader.bool();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.visionEncoderType = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.error = SDKError.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): VLMServiceState {
-    return {
-      isReady: isSet(object.isReady)
-        ? globalThis.Boolean(object.isReady)
-        : isSet(object.is_ready)
-        ? globalThis.Boolean(object.is_ready)
-        : false,
-      currentModel: isSet(object.currentModel)
-        ? globalThis.String(object.currentModel)
-        : isSet(object.current_model)
-        ? globalThis.String(object.current_model)
-        : undefined,
-      contextLength: isSet(object.contextLength)
-        ? globalThis.Number(object.contextLength)
-        : isSet(object.context_length)
-        ? globalThis.Number(object.context_length)
-        : 0,
-      supportsStreaming: isSet(object.supportsStreaming)
-        ? globalThis.Boolean(object.supportsStreaming)
-        : isSet(object.supports_streaming)
-        ? globalThis.Boolean(object.supports_streaming)
-        : false,
-      supportsMultipleImages: isSet(object.supportsMultipleImages)
-        ? globalThis.Boolean(object.supportsMultipleImages)
-        : isSet(object.supports_multiple_images)
-        ? globalThis.Boolean(object.supports_multiple_images)
-        : false,
-      visionEncoderType: isSet(object.visionEncoderType)
-        ? globalThis.String(object.visionEncoderType)
-        : isSet(object.vision_encoder_type)
-        ? globalThis.String(object.vision_encoder_type)
-        : undefined,
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
-    };
-  },
-
-  toJSON(message: VLMServiceState): unknown {
-    const obj: any = {};
-    if (message.isReady !== false) {
-      obj.isReady = message.isReady;
-    }
-    if (message.currentModel !== undefined) {
-      obj.currentModel = message.currentModel;
-    }
-    if (message.contextLength !== 0) {
-      obj.contextLength = Math.round(message.contextLength);
-    }
-    if (message.supportsStreaming !== false) {
-      obj.supportsStreaming = message.supportsStreaming;
-    }
-    if (message.supportsMultipleImages !== false) {
-      obj.supportsMultipleImages = message.supportsMultipleImages;
-    }
-    if (message.visionEncoderType !== undefined) {
-      obj.visionEncoderType = message.visionEncoderType;
-    }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<VLMServiceState>, I>>(base?: I): VLMServiceState {
-    return VLMServiceState.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<VLMServiceState>, I>>(object: I): VLMServiceState {
-    const message = createBaseVLMServiceState();
-    message.isReady = object.isReady ?? false;
-    message.currentModel = object.currentModel ?? undefined;
-    message.contextLength = object.contextLength ?? 0;
-    message.supportsStreaming = object.supportsStreaming ?? false;
-    message.supportsMultipleImages = object.supportsMultipleImages ?? false;
-    message.visionEncoderType = object.visionEncoderType ?? undefined;
     message.error = (object.error !== undefined && object.error !== null)
       ? SDKError.fromPartial(object.error)
       : undefined;
@@ -2325,10 +1261,6 @@ function longToNumber(int64: { toString(): string }): number {
     throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
   }
   return num;
-}
-
-function isObject(value: any): boolean {
-  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

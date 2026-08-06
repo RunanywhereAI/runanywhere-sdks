@@ -92,19 +92,11 @@ public class DownloadPlanResult(
   )
   public val storage_namespace: String = "",
   @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "resumeToken",
-    schemaIndex = 9,
-  )
-  public val resume_token: String = "",
-  @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requiredFreeBytesAfterDownload",
-    schemaIndex = 10,
+    schemaIndex = 9,
   )
   public val required_free_bytes_after_download: Long = 0L,
   /**
@@ -115,14 +107,14 @@ public class DownloadPlanResult(
     adapter = "ai.runanywhere.proto.v1.DownloadFailureReason#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "failureReason",
-    schemaIndex = 11,
+    schemaIndex = 10,
   )
   public val failure_reason:
       DownloadFailureReason = DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED,
   @field:WireField(
     tag = 14,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 12,
+    schemaIndex = 11,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -162,7 +154,6 @@ public class DownloadPlanResult(
     if (resume_from_bytes != other.resume_from_bytes) return false
     if (warnings != other.warnings) return false
     if (storage_namespace != other.storage_namespace) return false
-    if (resume_token != other.resume_token) return false
     if (required_free_bytes_after_download != other.required_free_bytes_after_download) return false
     if (failure_reason != other.failure_reason) return false
     if (error != other.error) return false
@@ -182,7 +173,6 @@ public class DownloadPlanResult(
       result = result * 37 + resume_from_bytes.hashCode()
       result = result * 37 + warnings.hashCode()
       result = result * 37 + storage_namespace.hashCode()
-      result = result * 37 + resume_token.hashCode()
       result = result * 37 + required_free_bytes_after_download.hashCode()
       result = result * 37 + failure_reason.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
@@ -202,7 +192,6 @@ public class DownloadPlanResult(
     result += """resume_from_bytes=$resume_from_bytes"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """storage_namespace=${sanitize(storage_namespace)}"""
-    result += """resume_token=${sanitize(resume_token)}"""
     result += """required_free_bytes_after_download=$required_free_bytes_after_download"""
     result += """failure_reason=$failure_reason"""
     if (error != null) result += """error=$error"""
@@ -219,12 +208,11 @@ public class DownloadPlanResult(
     resume_from_bytes: Long = this.resume_from_bytes,
     warnings: List<String> = this.warnings,
     storage_namespace: String = this.storage_namespace,
-    resume_token: String = this.resume_token,
     required_free_bytes_after_download: Long = this.required_free_bytes_after_download,
     failure_reason: DownloadFailureReason = this.failure_reason,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadPlanResult = DownloadPlanResult(can_start, model_id, files, total_bytes, requires_extraction, can_resume, resume_from_bytes, warnings, storage_namespace, resume_token, required_free_bytes_after_download, failure_reason, error, unknownFields)
+  ): DownloadPlanResult = DownloadPlanResult(can_start, model_id, files, total_bytes, requires_extraction, can_resume, resume_from_bytes, warnings, storage_namespace, required_free_bytes_after_download, failure_reason, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -262,9 +250,6 @@ public class DownloadPlanResult(
         if (value.storage_namespace != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.storage_namespace)
         }
-        if (value.resume_token != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.resume_token)
-        }
         if (value.required_free_bytes_after_download != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(12, value.required_free_bytes_after_download)
         }
@@ -299,9 +284,6 @@ public class DownloadPlanResult(
         if (value.storage_namespace != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.storage_namespace)
         }
-        if (value.resume_token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.resume_token)
-        }
         if (value.required_free_bytes_after_download != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 12, value.required_free_bytes_after_download)
         }
@@ -320,9 +302,6 @@ public class DownloadPlanResult(
         }
         if (value.required_free_bytes_after_download != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 12, value.required_free_bytes_after_download)
-        }
-        if (value.resume_token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.resume_token)
         }
         if (value.storage_namespace != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.storage_namespace)
@@ -359,7 +338,6 @@ public class DownloadPlanResult(
         var resume_from_bytes: Long = 0L
         val warnings = mutableListOf<String>()
         var storage_namespace: String = ""
-        var resume_token: String = ""
         var required_free_bytes_after_download: Long = 0L
         var failure_reason: DownloadFailureReason = DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED
         var error: SDKError? = null
@@ -374,7 +352,6 @@ public class DownloadPlanResult(
             7 -> resume_from_bytes = ProtoAdapter.INT64.decode(reader)
             8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             10 -> storage_namespace = ProtoAdapter.STRING.decode(reader)
-            11 -> resume_token = ProtoAdapter.STRING.decode(reader)
             12 -> required_free_bytes_after_download = ProtoAdapter.INT64.decode(reader)
             13 -> try {
               failure_reason = DownloadFailureReason.ADAPTER.decode(reader)
@@ -395,7 +372,6 @@ public class DownloadPlanResult(
           resume_from_bytes = resume_from_bytes,
           warnings = warnings,
           storage_namespace = storage_namespace,
-          resume_token = resume_token,
           required_free_bytes_after_download = required_free_bytes_after_download,
           failure_reason = failure_reason,
           error = error,

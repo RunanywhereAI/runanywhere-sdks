@@ -29,6 +29,13 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * message VLMGenerationOptions is deleted. Its sampling fields were
+ * name-for-name copies of LLMGenerationOptions (11 of them, with three
+ * drifted defaults); max_image_size and use_gpu were converted at the C
+ * boundary and read by no engine; emit_image_embeddings IS read by
+ * llama.cpp but is inert there.
+ */
 public class VLMResult(
   @field:WireField(
     tag = 1,
@@ -37,14 +44,18 @@ public class VLMResult(
     schemaIndex = 0,
   )
   public val text: String = "",
+  /**
+   * Wall-clock for the whole call, image encode included. int64 ms is the
+   * unit for every duration on this surface; the _ms suffix stays explicit.
+   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "processingTimeMs",
+    jsonName = "totalTimeMs",
     schemaIndex = 1,
   )
-  public val processing_time_ms: Long = 0L,
+  public val total_time_ms: Long = 0L,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -53,56 +64,40 @@ public class VLMResult(
     schemaIndex = 2,
   )
   public val image_tokens: Int = 0,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "timeToFirstTokenMs",
-    schemaIndex = 3,
-  )
-  public val time_to_first_token_ms: Long = 0L,
+  /**
+   * canonical spelling (usage = 15)
+   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "imageEncodeTimeMs",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val image_encode_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "hardwareUsed",
-    schemaIndex = 5,
-  )
-  public val hardware_used: String? = null,
+  /**
+   * Produced by commons on both the one-shot and the streaming path, with
+   * the LLM domain's vocabulary: "stop" | "length" | "stop_sequence".
+   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "finishReason",
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
   public val finish_reason: String = "",
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "imagesProcessed",
-    schemaIndex = 7,
-  )
-  public val images_processed: Int = 0,
   @field:WireField(
     tag = 15,
     adapter = "ai.runanywhere.proto.v1.TokenUsage#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 8,
+    schemaIndex = 5,
   )
   public val usage: TokenUsage? = null,
   @field:WireField(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 9,
+    schemaIndex = 6,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -118,13 +113,10 @@ public class VLMResult(
     if (other !is VLMResult) return false
     if (unknownFields != other.unknownFields) return false
     if (text != other.text) return false
-    if (processing_time_ms != other.processing_time_ms) return false
+    if (total_time_ms != other.total_time_ms) return false
     if (image_tokens != other.image_tokens) return false
-    if (time_to_first_token_ms != other.time_to_first_token_ms) return false
     if (image_encode_time_ms != other.image_encode_time_ms) return false
-    if (hardware_used != other.hardware_used) return false
     if (finish_reason != other.finish_reason) return false
-    if (images_processed != other.images_processed) return false
     if (usage != other.usage) return false
     if (error != other.error) return false
     return true
@@ -135,13 +127,10 @@ public class VLMResult(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + text.hashCode()
-      result = result * 37 + processing_time_ms.hashCode()
+      result = result * 37 + total_time_ms.hashCode()
       result = result * 37 + image_tokens.hashCode()
-      result = result * 37 + time_to_first_token_ms.hashCode()
       result = result * 37 + image_encode_time_ms.hashCode()
-      result = result * 37 + (hardware_used?.hashCode() ?: 0)
       result = result * 37 + finish_reason.hashCode()
-      result = result * 37 + images_processed.hashCode()
       result = result * 37 + (usage?.hashCode() ?: 0)
       result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
@@ -152,13 +141,10 @@ public class VLMResult(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """text=${sanitize(text)}"""
-    result += """processing_time_ms=$processing_time_ms"""
+    result += """total_time_ms=$total_time_ms"""
     result += """image_tokens=$image_tokens"""
-    result += """time_to_first_token_ms=$time_to_first_token_ms"""
     result += """image_encode_time_ms=$image_encode_time_ms"""
-    if (hardware_used != null) result += """hardware_used=${sanitize(hardware_used)}"""
     result += """finish_reason=${sanitize(finish_reason)}"""
-    result += """images_processed=$images_processed"""
     if (usage != null) result += """usage=$usage"""
     if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "VLMResult{", separator = ", ", postfix = "}")
@@ -166,17 +152,14 @@ public class VLMResult(
 
   public fun copy(
     text: String = this.text,
-    processing_time_ms: Long = this.processing_time_ms,
+    total_time_ms: Long = this.total_time_ms,
     image_tokens: Int = this.image_tokens,
-    time_to_first_token_ms: Long = this.time_to_first_token_ms,
     image_encode_time_ms: Long = this.image_encode_time_ms,
-    hardware_used: String? = this.hardware_used,
     finish_reason: String = this.finish_reason,
-    images_processed: Int = this.images_processed,
     usage: TokenUsage? = this.usage,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMResult = VLMResult(text, processing_time_ms, image_tokens, time_to_first_token_ms, image_encode_time_ms, hardware_used, finish_reason, images_processed, usage, error, unknownFields)
+  ): VLMResult = VLMResult(text, total_time_ms, image_tokens, image_encode_time_ms, finish_reason, usage, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -193,24 +176,17 @@ public class VLMResult(
         if (value.text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.text)
         }
-        if (value.processing_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.processing_time_ms)
+        if (value.total_time_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.total_time_ms)
         }
         if (value.image_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.image_tokens)
         }
-        if (value.time_to_first_token_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.time_to_first_token_ms)
-        }
         if (value.image_encode_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.image_encode_time_ms)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.hardware_used)
         if (value.finish_reason != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.finish_reason)
-        }
-        if (value.images_processed != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(14, value.images_processed)
         }
         if (value.usage != null) {
           size += TokenUsage.ADAPTER.encodedSizeWithTag(15, value.usage)
@@ -223,24 +199,17 @@ public class VLMResult(
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
         }
-        if (value.processing_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.processing_time_ms)
+        if (value.total_time_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.total_time_ms)
         }
         if (value.image_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.image_tokens)
         }
-        if (value.time_to_first_token_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.time_to_first_token_ms)
-        }
         if (value.image_encode_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.image_encode_time_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.hardware_used)
         if (value.finish_reason != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 13, value.finish_reason)
-        }
-        if (value.images_processed != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.images_processed)
         }
         if (value.usage != null) {
           TokenUsage.ADAPTER.encodeWithTag(writer, 15, value.usage)
@@ -255,24 +224,17 @@ public class VLMResult(
         if (value.usage != null) {
           TokenUsage.ADAPTER.encodeWithTag(writer, 15, value.usage)
         }
-        if (value.images_processed != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.images_processed)
-        }
         if (value.finish_reason != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 13, value.finish_reason)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.hardware_used)
         if (value.image_encode_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.image_encode_time_ms)
-        }
-        if (value.time_to_first_token_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.time_to_first_token_ms)
         }
         if (value.image_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.image_tokens)
         }
-        if (value.processing_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.processing_time_ms)
+        if (value.total_time_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.total_time_ms)
         }
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
@@ -281,25 +243,19 @@ public class VLMResult(
 
       override fun decode(reader: ProtoReader): VLMResult {
         var text: String = ""
-        var processing_time_ms: Long = 0L
+        var total_time_ms: Long = 0L
         var image_tokens: Int = 0
-        var time_to_first_token_ms: Long = 0L
         var image_encode_time_ms: Long = 0L
-        var hardware_used: String? = null
         var finish_reason: String = ""
-        var images_processed: Int = 0
         var usage: TokenUsage? = null
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
-            5 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
+            5 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
             7 -> image_tokens = ProtoAdapter.INT32.decode(reader)
-            8 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
             9 -> image_encode_time_ms = ProtoAdapter.INT64.decode(reader)
-            10 -> hardware_used = ProtoAdapter.STRING.decode(reader)
             13 -> finish_reason = ProtoAdapter.STRING.decode(reader)
-            14 -> images_processed = ProtoAdapter.INT32.decode(reader)
             15 -> usage = TokenUsage.ADAPTER.decode(reader)
             16 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -307,13 +263,10 @@ public class VLMResult(
         }
         return VLMResult(
           text = text,
-          processing_time_ms = processing_time_ms,
+          total_time_ms = total_time_ms,
           image_tokens = image_tokens,
-          time_to_first_token_ms = time_to_first_token_ms,
           image_encode_time_ms = image_encode_time_ms,
-          hardware_used = hardware_used,
           finish_reason = finish_reason,
-          images_processed = images_processed,
           usage = usage,
           error = error,
           unknownFields = unknownFields

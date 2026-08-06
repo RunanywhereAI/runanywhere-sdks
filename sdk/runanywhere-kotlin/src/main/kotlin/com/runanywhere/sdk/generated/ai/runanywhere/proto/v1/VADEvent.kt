@@ -44,21 +44,27 @@ public class VADEvent(
     schemaIndex = 0,
   )
   public val type: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED,
+  /**
+   * Position of the analyzed frame on the session timeline, in ms.
+   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "frameOffsetUs",
+    jsonName = "frameOffsetMs",
     schemaIndex = 1,
   )
-  public val frame_offset_us: Long = 0L,
+  public val frame_offset_ms: Long = 0L,
+  /**
+   * Same scale and caveats as VADResult.probability.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val confidence: Float = 0f,
+  public val probability: Float = 0f,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -69,20 +75,20 @@ public class VADEvent(
   public val is_speech: Boolean = false,
   @field:WireField(
     tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "speechDurationMs",
     schemaIndex = 4,
   )
-  public val speech_duration_ms: Double = 0.0,
+  public val speech_duration_ms: Int = 0,
   @field:WireField(
     tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "silenceDurationMs",
     schemaIndex = 5,
   )
-  public val silence_duration_ms: Double = 0.0,
+  public val silence_duration_ms: Int = 0,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
@@ -104,8 +110,8 @@ public class VADEvent(
     if (other !is VADEvent) return false
     if (unknownFields != other.unknownFields) return false
     if (type != other.type) return false
-    if (frame_offset_us != other.frame_offset_us) return false
-    if (confidence != other.confidence) return false
+    if (frame_offset_ms != other.frame_offset_ms) return false
+    if (probability != other.probability) return false
     if (is_speech != other.is_speech) return false
     if (speech_duration_ms != other.speech_duration_ms) return false
     if (silence_duration_ms != other.silence_duration_ms) return false
@@ -118,8 +124,8 @@ public class VADEvent(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + type.hashCode()
-      result = result * 37 + frame_offset_us.hashCode()
-      result = result * 37 + confidence.hashCode()
+      result = result * 37 + frame_offset_ms.hashCode()
+      result = result * 37 + probability.hashCode()
       result = result * 37 + is_speech.hashCode()
       result = result * 37 + speech_duration_ms.hashCode()
       result = result * 37 + silence_duration_ms.hashCode()
@@ -132,8 +138,8 @@ public class VADEvent(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """type=$type"""
-    result += """frame_offset_us=$frame_offset_us"""
-    result += """confidence=$confidence"""
+    result += """frame_offset_ms=$frame_offset_ms"""
+    result += """probability=$probability"""
     result += """is_speech=$is_speech"""
     result += """speech_duration_ms=$speech_duration_ms"""
     result += """silence_duration_ms=$silence_duration_ms"""
@@ -143,14 +149,14 @@ public class VADEvent(
 
   public fun copy(
     type: VADStreamEventKind = this.type,
-    frame_offset_us: Long = this.frame_offset_us,
-    confidence: Float = this.confidence,
+    frame_offset_ms: Long = this.frame_offset_ms,
+    probability: Float = this.probability,
     is_speech: Boolean = this.is_speech,
-    speech_duration_ms: Double = this.speech_duration_ms,
-    silence_duration_ms: Double = this.silence_duration_ms,
+    speech_duration_ms: Int = this.speech_duration_ms,
+    silence_duration_ms: Int = this.silence_duration_ms,
     noise_floor_db: Double = this.noise_floor_db,
     unknownFields: ByteString = this.unknownFields,
-  ): VADEvent = VADEvent(type, frame_offset_us, confidence, is_speech, speech_duration_ms, silence_duration_ms, noise_floor_db, unknownFields)
+  ): VADEvent = VADEvent(type, frame_offset_ms, probability, is_speech, speech_duration_ms, silence_duration_ms, noise_floor_db, unknownFields)
 
   public companion object {
     @JvmField
@@ -167,20 +173,20 @@ public class VADEvent(
         if (value.type != ai.runanywhere.proto.v1.VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED) {
           size += VADStreamEventKind.ADAPTER.encodedSizeWithTag(1, value.type)
         }
-        if (value.frame_offset_us != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.frame_offset_us)
+        if (value.frame_offset_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.frame_offset_ms)
         }
-        if (!value.confidence.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.confidence)
+        if (!value.probability.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.probability)
         }
         if (value.is_speech != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.is_speech)
         }
-        if (!value.speech_duration_ms.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(5, value.speech_duration_ms)
+        if (value.speech_duration_ms != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.speech_duration_ms)
         }
-        if (!value.silence_duration_ms.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(6, value.silence_duration_ms)
+        if (value.silence_duration_ms != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.silence_duration_ms)
         }
         if (!value.noise_floor_db.equals(0.0)) {
           size += ProtoAdapter.DOUBLE.encodedSizeWithTag(7, value.noise_floor_db)
@@ -192,20 +198,20 @@ public class VADEvent(
         if (value.type != ai.runanywhere.proto.v1.VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED) {
           VADStreamEventKind.ADAPTER.encodeWithTag(writer, 1, value.type)
         }
-        if (value.frame_offset_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.frame_offset_us)
+        if (value.frame_offset_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.frame_offset_ms)
         }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
+        if (!value.probability.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.probability)
         }
         if (value.is_speech != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_speech)
         }
-        if (!value.speech_duration_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 5, value.speech_duration_ms)
+        if (value.speech_duration_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.speech_duration_ms)
         }
-        if (!value.silence_duration_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.silence_duration_ms)
+        if (value.silence_duration_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.silence_duration_ms)
         }
         if (!value.noise_floor_db.equals(0.0)) {
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.noise_floor_db)
@@ -218,20 +224,20 @@ public class VADEvent(
         if (!value.noise_floor_db.equals(0.0)) {
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.noise_floor_db)
         }
-        if (!value.silence_duration_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.silence_duration_ms)
+        if (value.silence_duration_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.silence_duration_ms)
         }
-        if (!value.speech_duration_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 5, value.speech_duration_ms)
+        if (value.speech_duration_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.speech_duration_ms)
         }
         if (value.is_speech != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_speech)
         }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
+        if (!value.probability.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.probability)
         }
-        if (value.frame_offset_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.frame_offset_us)
+        if (value.frame_offset_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 2, value.frame_offset_ms)
         }
         if (value.type != ai.runanywhere.proto.v1.VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED) {
           VADStreamEventKind.ADAPTER.encodeWithTag(writer, 1, value.type)
@@ -240,11 +246,11 @@ public class VADEvent(
 
       override fun decode(reader: ProtoReader): VADEvent {
         var type: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED
-        var frame_offset_us: Long = 0L
-        var confidence: Float = 0f
+        var frame_offset_ms: Long = 0L
+        var probability: Float = 0f
         var is_speech: Boolean = false
-        var speech_duration_ms: Double = 0.0
-        var silence_duration_ms: Double = 0.0
+        var speech_duration_ms: Int = 0
+        var silence_duration_ms: Int = 0
         var noise_floor_db: Double = 0.0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -253,19 +259,19 @@ public class VADEvent(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            2 -> frame_offset_us = ProtoAdapter.INT64.decode(reader)
-            3 -> confidence = ProtoAdapter.FLOAT.decode(reader)
+            2 -> frame_offset_ms = ProtoAdapter.INT64.decode(reader)
+            3 -> probability = ProtoAdapter.FLOAT.decode(reader)
             4 -> is_speech = ProtoAdapter.BOOL.decode(reader)
-            5 -> speech_duration_ms = ProtoAdapter.DOUBLE.decode(reader)
-            6 -> silence_duration_ms = ProtoAdapter.DOUBLE.decode(reader)
+            5 -> speech_duration_ms = ProtoAdapter.INT32.decode(reader)
+            6 -> silence_duration_ms = ProtoAdapter.INT32.decode(reader)
             7 -> noise_floor_db = ProtoAdapter.DOUBLE.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADEvent(
           type = type,
-          frame_offset_us = frame_offset_us,
-          confidence = confidence,
+          frame_offset_ms = frame_offset_ms,
+          probability = probability,
           is_speech = is_speech,
           speech_duration_ms = speech_duration_ms,
           silence_duration_ms = silence_duration_ms,

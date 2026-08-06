@@ -27,52 +27,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-public nonisolated enum RADownloadStage: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case downloading // = 1
-  case extracting // = 2
-  case validating // = 3
-  case completed // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .downloading
-    case 2: self = .extracting
-    case 3: self = .validating
-    case 4: self = .completed
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .downloading: return 1
-    case .extracting: return 2
-    case .validating: return 3
-    case .completed: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RADownloadStage] = [
-    .unspecified,
-    .downloading,
-    .extracting,
-    .validating,
-    .completed,
-  ]
-
-}
-
 public nonisolated enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -85,6 +39,9 @@ public nonisolated enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable 
   case cancelled // = 7
   case paused // = 8
   case resuming // = 9
+
+  /// checksum / expected-files verification
+  case validating // = 10
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -103,6 +60,7 @@ public nonisolated enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable 
     case 7: self = .cancelled
     case 8: self = .paused
     case 9: self = .resuming
+    case 10: self = .validating
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -119,6 +77,7 @@ public nonisolated enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable 
     case .cancelled: return 7
     case .paused: return 8
     case .resuming: return 9
+    case .validating: return 10
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -135,6 +94,7 @@ public nonisolated enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable 
     .cancelled,
     .paused,
     .resuming,
+    .validating,
   ]
 
 }
@@ -312,11 +272,6 @@ public nonisolated struct RADownloadProgress: @unchecked Sendable {
     set {_uniqueStorage()._modelID = newValue}
   }
 
-  public var stage: RADownloadStage {
-    get {_storage._stage}
-    set {_uniqueStorage()._stage = newValue}
-  }
-
   public var bytesDownloaded: Int64 {
     get {_storage._bytesDownloaded}
     set {_uniqueStorage()._bytesDownloaded = newValue}
@@ -334,17 +289,24 @@ public nonisolated struct RADownloadProgress: @unchecked Sendable {
     set {_uniqueStorage()._stageProgress = newValue}
   }
 
-  public var overallSpeedBps: Float {
-    get {_storage._overallSpeedBps}
-    set {_uniqueStorage()._overallSpeedBps = newValue}
+  /// Bytes per second. Absent means unknown -- no sentinel that collides
+  /// with a real value.
+  public var bytesPerSecond: Float {
+    get {_storage._bytesPerSecond}
+    set {_uniqueStorage()._bytesPerSecond = newValue}
   }
 
-  /// -1 if unknown
   public var etaSeconds: Int64 {
-    get {_storage._etaSeconds}
+    get {_storage._etaSeconds ?? 0}
     set {_uniqueStorage()._etaSeconds = newValue}
   }
+  /// Returns true if `etaSeconds` has been explicitly set.
+  public var hasEtaSeconds: Bool {_storage._etaSeconds != nil}
+  /// Clears the value of `etaSeconds`. Subsequent reads from it will return its default value.
+  public mutating func clearEtaSeconds() {_uniqueStorage()._etaSeconds = nil}
 
+  /// The single phase of this transfer. `error` (21) is populated exactly
+  /// when state == DOWNLOAD_STATE_FAILED and is meaningless otherwise.
   public var state: RADownloadState {
     get {_storage._state}
     set {_uniqueStorage()._state = newValue}
@@ -405,13 +367,6 @@ public nonisolated struct RADownloadProgress: @unchecked Sendable {
     set {_uniqueStorage()._currentFileName = newValue}
   }
 
-  /// logical resume marker, not a native handle
-  public var resumeToken: String {
-    get {_storage._resumeToken}
-    set {_uniqueStorage()._resumeToken = newValue}
-  }
-
-  /// populated when state == FAILED
   public var error: RASDKError {
     get {_storage._error ?? RASDKError()}
     set {_uniqueStorage()._error = newValue}
@@ -444,8 +399,6 @@ public nonisolated struct RADownloadPlanRequest: Sendable {
   /// Clears the value of `model`. Subsequent reads from it will return its default value.
   public mutating func clearModel() {self._model = nil}
 
-  public var resumeExisting: Bool = false
-
   public var availableStorageBytes: Int64 = 0
 
   public var allowMeteredNetwork: Bool = false
@@ -454,7 +407,9 @@ public nonisolated struct RADownloadPlanRequest: Sendable {
 
   public var validateExistingBytes: Bool = false
 
-  public var verifyChecksums: Bool = false
+  /// Checksums are verified whenever the catalog has one; set this only to
+  /// opt OUT.
+  public var skipChecksumVerification: Bool = false
 
   public var requiredFreeBytesAfterDownload: Int64 = 0
 
@@ -548,11 +503,6 @@ public nonisolated struct RADownloadPlanResult: @unchecked Sendable {
     set {_uniqueStorage()._storageNamespace = newValue}
   }
 
-  public var resumeToken: String {
-    get {_storage._resumeToken}
-    set {_uniqueStorage()._resumeToken = newValue}
-  }
-
   public var requiredFreeBytesAfterDownload: Int64 {
     get {_storage._requiredFreeBytesAfterDownload}
     set {_uniqueStorage()._requiredFreeBytesAfterDownload = newValue}
@@ -587,6 +537,9 @@ public nonisolated struct RADownloadStartRequest: Sendable {
 
   public var modelID: String = String()
 
+  /// Optional. ABSENT (the common path) = plan internally and start, one
+  /// call. PRESENT = execute this exact previously-approved plan, for the
+  /// flow that showed the user a size and a metered-network warning first.
   public var plan: RADownloadPlanResult {
     get {_plan ?? RADownloadPlanResult()}
     set {_plan = newValue}
@@ -596,11 +549,9 @@ public nonisolated struct RADownloadStartRequest: Sendable {
   /// Clears the value of `plan`. Subsequent reads from it will return its default value.
   public mutating func clearPlan() {self._plan = nil}
 
-  public var resume: Bool = false
-
-  public var resumeToken: String = String()
-
-  public var updateRegistryOnCompletion: Bool = false
+  /// The registry is updated on completion; set this only to opt OUT
+  /// (staging flows).
+  public var skipRegistryUpdate: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -638,11 +589,6 @@ public nonisolated struct RADownloadStartResult: @unchecked Sendable {
   /// Clears the value of `initialProgress`. Subsequent reads from it will return its default value.
   public mutating func clearInitialProgress() {_uniqueStorage()._initialProgress = nil}
 
-  public var resumeToken: String {
-    get {_storage._resumeToken}
-    set {_uniqueStorage()._resumeToken = newValue}
-  }
-
   /// structured companion to error
   public var failureReason: RADownloadFailureReason {
     get {_storage._failureReason}
@@ -657,6 +603,17 @@ public nonisolated struct RADownloadStartResult: @unchecked Sendable {
   public var hasError: Bool {_storage._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   public mutating func clearError() {_uniqueStorage()._error = nil}
+
+  /// The plan that was executed, supplied or computed, so a one-call caller
+  /// still gets the byte numbers.
+  public var plan: RADownloadPlanResult {
+    get {_storage._plan ?? RADownloadPlanResult()}
+    set {_uniqueStorage()._plan = newValue}
+  }
+  /// Returns true if `plan` has been explicitly set.
+  public var hasPlan: Bool {_storage._plan != nil}
+  /// Clears the value of `plan`. Subsequent reads from it will return its default value.
+  public mutating func clearPlan() {_uniqueStorage()._plan = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -681,58 +638,7 @@ public nonisolated struct RADownloadCancelRequest: Sendable {
   public init() {}
 }
 
-public nonisolated struct RADownloadCancelResult: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var taskID: String {
-    get {_storage._taskID}
-    set {_uniqueStorage()._taskID = newValue}
-  }
-
-  public var modelID: String {
-    get {_storage._modelID}
-    set {_uniqueStorage()._modelID = newValue}
-  }
-
-  public var partialBytesDeleted: Int64 {
-    get {_storage._partialBytesDeleted}
-    set {_uniqueStorage()._partialBytesDeleted = newValue}
-  }
-
-  public var wasRunning: Bool {
-    get {_storage._wasRunning}
-    set {_uniqueStorage()._wasRunning = newValue}
-  }
-
-  public var partialBytesPreserved: Bool {
-    get {_storage._partialBytesPreserved}
-    set {_uniqueStorage()._partialBytesPreserved = newValue}
-  }
-
-  public var resumeToken: String {
-    get {_storage._resumeToken}
-    set {_uniqueStorage()._resumeToken = newValue}
-  }
-
-  public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-public nonisolated struct RADownloadResumeRequest: Sendable {
+public nonisolated struct RADownloadCancelResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -741,83 +647,34 @@ public nonisolated struct RADownloadResumeRequest: Sendable {
 
   public var modelID: String = String()
 
-  public var resumeFromBytes: Int64 = 0
+  public var partialBytesDeleted: Int64 = 0
 
-  public var resumeToken: String = String()
+  public var wasRunning: Bool = false
 
-  public var validatePartialBytes: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct RADownloadResumeResult: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var accepted: Bool {
-    get {_storage._accepted}
-    set {_uniqueStorage()._accepted = newValue}
-  }
-
-  public var taskID: String {
-    get {_storage._taskID}
-    set {_uniqueStorage()._taskID = newValue}
-  }
-
-  public var modelID: String {
-    get {_storage._modelID}
-    set {_uniqueStorage()._modelID = newValue}
-  }
-
-  public var initialProgress: RADownloadProgress {
-    get {_storage._initialProgress ?? RADownloadProgress()}
-    set {_uniqueStorage()._initialProgress = newValue}
-  }
-  /// Returns true if `initialProgress` has been explicitly set.
-  public var hasInitialProgress: Bool {_storage._initialProgress != nil}
-  /// Clears the value of `initialProgress`. Subsequent reads from it will return its default value.
-  public mutating func clearInitialProgress() {_uniqueStorage()._initialProgress = nil}
-
-  public var resumeToken: String {
-    get {_storage._resumeToken}
-    set {_uniqueStorage()._resumeToken = newValue}
-  }
-
-  /// structured companion to error
-  public var failureReason: RADownloadFailureReason {
-    get {_storage._failureReason}
-    set {_uniqueStorage()._failureReason = newValue}
-  }
+  public var partialBytesPreserved: Bool = false
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _error: RASDKError? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RADownloadStage: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_STAGE_UNSPECIFIED\0\u{1}DOWNLOAD_STAGE_DOWNLOADING\0\u{1}DOWNLOAD_STAGE_EXTRACTING\0\u{1}DOWNLOAD_STAGE_VALIDATING\0\u{1}DOWNLOAD_STAGE_COMPLETED\0")
-}
-
 nonisolated extension RADownloadState: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_STATE_UNSPECIFIED\0\u{1}DOWNLOAD_STATE_PENDING\0\u{1}DOWNLOAD_STATE_DOWNLOADING\0\u{1}DOWNLOAD_STATE_EXTRACTING\0\u{1}DOWNLOAD_STATE_RETRYING\0\u{1}DOWNLOAD_STATE_COMPLETED\0\u{1}DOWNLOAD_STATE_FAILED\0\u{1}DOWNLOAD_STATE_CANCELLED\0\u{1}DOWNLOAD_STATE_PAUSED\0\u{1}DOWNLOAD_STATE_RESUMING\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_STATE_UNSPECIFIED\0\u{1}DOWNLOAD_STATE_PENDING\0\u{1}DOWNLOAD_STATE_DOWNLOADING\0\u{1}DOWNLOAD_STATE_EXTRACTING\0\u{1}DOWNLOAD_STATE_RETRYING\0\u{1}DOWNLOAD_STATE_COMPLETED\0\u{1}DOWNLOAD_STATE_FAILED\0\u{1}DOWNLOAD_STATE_CANCELLED\0\u{1}DOWNLOAD_STATE_PAUSED\0\u{1}DOWNLOAD_STATE_RESUMING\0\u{1}DOWNLOAD_STATE_VALIDATING\0")
 }
 
 nonisolated extension RADownloadFailureReason: SwiftProtobuf._ProtoNameProviding {
@@ -865,16 +722,15 @@ nonisolated extension RADownloadSubscribeRequest: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadProgress"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}stage\0\u{3}bytes_downloaded\0\u{3}total_bytes\0\u{3}stage_progress\0\u{3}overall_speed_bps\0\u{3}eta_seconds\0\u{1}state\0\u{3}retry_attempt\0\u{4}\u{2}task_id\0\u{3}current_file_index\0\u{3}total_files\0\u{3}storage_key\0\u{3}local_path\0\u{3}overall_progress\0\u{3}started_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}current_file_name\0\u{3}resume_token\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{4}\u{2}bytes_downloaded\0\u{3}total_bytes\0\u{3}stage_progress\0\u{3}bytes_per_second\0\u{3}eta_seconds\0\u{1}state\0\u{3}retry_attempt\0\u{4}\u{2}task_id\0\u{3}current_file_index\0\u{3}total_files\0\u{3}storage_key\0\u{3}local_path\0\u{3}overall_progress\0\u{3}started_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}current_file_name\0\u{2}\u{2}error\0\u{b}stage\0\u{b}resume_token\0\u{c}\u{2}\u{1}\u{c}\u{14}\u{1}")
 
   fileprivate class _StorageClass {
     var _modelID: String = String()
-    var _stage: RADownloadStage = .unspecified
     var _bytesDownloaded: Int64 = 0
     var _totalBytes: Int64 = 0
     var _stageProgress: Float = 0
-    var _overallSpeedBps: Float = 0
-    var _etaSeconds: Int64 = 0
+    var _bytesPerSecond: Float = 0
+    var _etaSeconds: Int64? = nil
     var _state: RADownloadState = .unspecified
     var _retryAttempt: Int32 = 0
     var _taskID: String = String()
@@ -886,7 +742,6 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
     var _startedAtUnixMs: Int64 = 0
     var _updatedAtUnixMs: Int64 = 0
     var _currentFileName: String = String()
-    var _resumeToken: String = String()
     var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
@@ -899,11 +754,10 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
 
     init(copying source: _StorageClass) {
       _modelID = source._modelID
-      _stage = source._stage
       _bytesDownloaded = source._bytesDownloaded
       _totalBytes = source._totalBytes
       _stageProgress = source._stageProgress
-      _overallSpeedBps = source._overallSpeedBps
+      _bytesPerSecond = source._bytesPerSecond
       _etaSeconds = source._etaSeconds
       _state = source._state
       _retryAttempt = source._retryAttempt
@@ -916,7 +770,6 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
       _startedAtUnixMs = source._startedAtUnixMs
       _updatedAtUnixMs = source._updatedAtUnixMs
       _currentFileName = source._currentFileName
-      _resumeToken = source._resumeToken
       _error = source._error
     }
   }
@@ -937,11 +790,10 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
-        case 2: try { try decoder.decodeSingularEnumField(value: &_storage._stage) }()
         case 3: try { try decoder.decodeSingularInt64Field(value: &_storage._bytesDownloaded) }()
         case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._totalBytes) }()
         case 5: try { try decoder.decodeSingularFloatField(value: &_storage._stageProgress) }()
-        case 6: try { try decoder.decodeSingularFloatField(value: &_storage._overallSpeedBps) }()
+        case 6: try { try decoder.decodeSingularFloatField(value: &_storage._bytesPerSecond) }()
         case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._etaSeconds) }()
         case 8: try { try decoder.decodeSingularEnumField(value: &_storage._state) }()
         case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._retryAttempt) }()
@@ -954,7 +806,6 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
         case 17: try { try decoder.decodeSingularInt64Field(value: &_storage._startedAtUnixMs) }()
         case 18: try { try decoder.decodeSingularInt64Field(value: &_storage._updatedAtUnixMs) }()
         case 19: try { try decoder.decodeSingularStringField(value: &_storage._currentFileName) }()
-        case 20: try { try decoder.decodeSingularStringField(value: &_storage._resumeToken) }()
         case 21: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
@@ -971,9 +822,6 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
       if !_storage._modelID.isEmpty {
         try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 1)
       }
-      if _storage._stage != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._stage, fieldNumber: 2)
-      }
       if _storage._bytesDownloaded != 0 {
         try visitor.visitSingularInt64Field(value: _storage._bytesDownloaded, fieldNumber: 3)
       }
@@ -983,12 +831,12 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
       if _storage._stageProgress.bitPattern != 0 {
         try visitor.visitSingularFloatField(value: _storage._stageProgress, fieldNumber: 5)
       }
-      if _storage._overallSpeedBps.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._overallSpeedBps, fieldNumber: 6)
+      if _storage._bytesPerSecond.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._bytesPerSecond, fieldNumber: 6)
       }
-      if _storage._etaSeconds != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._etaSeconds, fieldNumber: 7)
-      }
+      try { if let v = _storage._etaSeconds {
+        try visitor.visitSingularInt64Field(value: v, fieldNumber: 7)
+      } }()
       if _storage._state != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._state, fieldNumber: 8)
       }
@@ -1022,9 +870,6 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
       if !_storage._currentFileName.isEmpty {
         try visitor.visitSingularStringField(value: _storage._currentFileName, fieldNumber: 19)
       }
-      if !_storage._resumeToken.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._resumeToken, fieldNumber: 20)
-      }
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
       } }()
@@ -1038,11 +883,10 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._modelID != rhs_storage._modelID {return false}
-        if _storage._stage != rhs_storage._stage {return false}
         if _storage._bytesDownloaded != rhs_storage._bytesDownloaded {return false}
         if _storage._totalBytes != rhs_storage._totalBytes {return false}
         if _storage._stageProgress != rhs_storage._stageProgress {return false}
-        if _storage._overallSpeedBps != rhs_storage._overallSpeedBps {return false}
+        if _storage._bytesPerSecond != rhs_storage._bytesPerSecond {return false}
         if _storage._etaSeconds != rhs_storage._etaSeconds {return false}
         if _storage._state != rhs_storage._state {return false}
         if _storage._retryAttempt != rhs_storage._retryAttempt {return false}
@@ -1055,7 +899,6 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
         if _storage._startedAtUnixMs != rhs_storage._startedAtUnixMs {return false}
         if _storage._updatedAtUnixMs != rhs_storage._updatedAtUnixMs {return false}
         if _storage._currentFileName != rhs_storage._currentFileName {return false}
-        if _storage._resumeToken != rhs_storage._resumeToken {return false}
         if _storage._error != rhs_storage._error {return false}
         return true
       }
@@ -1068,7 +911,7 @@ nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadPlanRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}model\0\u{3}resume_existing\0\u{3}available_storage_bytes\0\u{3}allow_metered_network\0\u{3}storage_namespace\0\u{3}validate_existing_bytes\0\u{3}verify_checksums\0\u{3}required_free_bytes_after_download\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}model\0\u{4}\u{2}available_storage_bytes\0\u{3}allow_metered_network\0\u{3}storage_namespace\0\u{3}validate_existing_bytes\0\u{3}skip_checksum_verification\0\u{3}required_free_bytes_after_download\0\u{b}resume_existing\0\u{c}\u{3}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1078,12 +921,11 @@ nonisolated extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobu
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._model) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.resumeExisting) }()
       case 4: try { try decoder.decodeSingularInt64Field(value: &self.availableStorageBytes) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.allowMeteredNetwork) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self.storageNamespace) }()
       case 7: try { try decoder.decodeSingularBoolField(value: &self.validateExistingBytes) }()
-      case 8: try { try decoder.decodeSingularBoolField(value: &self.verifyChecksums) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.skipChecksumVerification) }()
       case 9: try { try decoder.decodeSingularInt64Field(value: &self.requiredFreeBytesAfterDownload) }()
       default: break
       }
@@ -1101,9 +943,6 @@ nonisolated extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobu
     try { if let v = self._model {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    if self.resumeExisting != false {
-      try visitor.visitSingularBoolField(value: self.resumeExisting, fieldNumber: 3)
-    }
     if self.availableStorageBytes != 0 {
       try visitor.visitSingularInt64Field(value: self.availableStorageBytes, fieldNumber: 4)
     }
@@ -1116,8 +955,8 @@ nonisolated extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobu
     if self.validateExistingBytes != false {
       try visitor.visitSingularBoolField(value: self.validateExistingBytes, fieldNumber: 7)
     }
-    if self.verifyChecksums != false {
-      try visitor.visitSingularBoolField(value: self.verifyChecksums, fieldNumber: 8)
+    if self.skipChecksumVerification != false {
+      try visitor.visitSingularBoolField(value: self.skipChecksumVerification, fieldNumber: 8)
     }
     if self.requiredFreeBytesAfterDownload != 0 {
       try visitor.visitSingularInt64Field(value: self.requiredFreeBytesAfterDownload, fieldNumber: 9)
@@ -1128,12 +967,11 @@ nonisolated extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobu
   public static func ==(lhs: RADownloadPlanRequest, rhs: RADownloadPlanRequest) -> Bool {
     if lhs.modelID != rhs.modelID {return false}
     if lhs._model != rhs._model {return false}
-    if lhs.resumeExisting != rhs.resumeExisting {return false}
     if lhs.availableStorageBytes != rhs.availableStorageBytes {return false}
     if lhs.allowMeteredNetwork != rhs.allowMeteredNetwork {return false}
     if lhs.storageNamespace != rhs.storageNamespace {return false}
     if lhs.validateExistingBytes != rhs.validateExistingBytes {return false}
-    if lhs.verifyChecksums != rhs.verifyChecksums {return false}
+    if lhs.skipChecksumVerification != rhs.skipChecksumVerification {return false}
     if lhs.requiredFreeBytesAfterDownload != rhs.requiredFreeBytesAfterDownload {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -1206,7 +1044,7 @@ nonisolated extension RADownloadFilePlan: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadPlanResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}can_start\0\u{3}model_id\0\u{1}files\0\u{3}total_bytes\0\u{3}requires_extraction\0\u{3}can_resume\0\u{3}resume_from_bytes\0\u{1}warnings\0\u{4}\u{2}storage_namespace\0\u{3}resume_token\0\u{3}required_free_bytes_after_download\0\u{3}failure_reason\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}can_start\0\u{3}model_id\0\u{1}files\0\u{3}total_bytes\0\u{3}requires_extraction\0\u{3}can_resume\0\u{3}resume_from_bytes\0\u{1}warnings\0\u{4}\u{2}storage_namespace\0\u{4}\u{2}required_free_bytes_after_download\0\u{3}failure_reason\0\u{1}error\0\u{b}resume_token\0\u{c}\u{b}\u{1}")
 
   fileprivate class _StorageClass {
     var _canStart: Bool = false
@@ -1218,7 +1056,6 @@ nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf
     var _resumeFromBytes: Int64 = 0
     var _warnings: [String] = []
     var _storageNamespace: String = String()
-    var _resumeToken: String = String()
     var _requiredFreeBytesAfterDownload: Int64 = 0
     var _failureReason: RADownloadFailureReason = .unspecified
     var _error: RASDKError? = nil
@@ -1241,7 +1078,6 @@ nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf
       _resumeFromBytes = source._resumeFromBytes
       _warnings = source._warnings
       _storageNamespace = source._storageNamespace
-      _resumeToken = source._resumeToken
       _requiredFreeBytesAfterDownload = source._requiredFreeBytesAfterDownload
       _failureReason = source._failureReason
       _error = source._error
@@ -1272,7 +1108,6 @@ nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf
         case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._resumeFromBytes) }()
         case 8: try { try decoder.decodeRepeatedStringField(value: &_storage._warnings) }()
         case 10: try { try decoder.decodeSingularStringField(value: &_storage._storageNamespace) }()
-        case 11: try { try decoder.decodeSingularStringField(value: &_storage._resumeToken) }()
         case 12: try { try decoder.decodeSingularInt64Field(value: &_storage._requiredFreeBytesAfterDownload) }()
         case 13: try { try decoder.decodeSingularEnumField(value: &_storage._failureReason) }()
         case 14: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
@@ -1315,9 +1150,6 @@ nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf
       if !_storage._storageNamespace.isEmpty {
         try visitor.visitSingularStringField(value: _storage._storageNamespace, fieldNumber: 10)
       }
-      if !_storage._resumeToken.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._resumeToken, fieldNumber: 11)
-      }
       if _storage._requiredFreeBytesAfterDownload != 0 {
         try visitor.visitSingularInt64Field(value: _storage._requiredFreeBytesAfterDownload, fieldNumber: 12)
       }
@@ -1345,7 +1177,6 @@ nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf
         if _storage._resumeFromBytes != rhs_storage._resumeFromBytes {return false}
         if _storage._warnings != rhs_storage._warnings {return false}
         if _storage._storageNamespace != rhs_storage._storageNamespace {return false}
-        if _storage._resumeToken != rhs_storage._resumeToken {return false}
         if _storage._requiredFreeBytesAfterDownload != rhs_storage._requiredFreeBytesAfterDownload {return false}
         if _storage._failureReason != rhs_storage._failureReason {return false}
         if _storage._error != rhs_storage._error {return false}
@@ -1360,7 +1191,7 @@ nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadStartRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}plan\0\u{1}resume\0\u{3}resume_token\0\u{3}update_registry_on_completion\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}plan\0\u{4}\u{3}skip_registry_update\0\u{b}resume\0\u{b}resume_token\0\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1370,9 +1201,7 @@ nonisolated extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtob
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._plan) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.resume) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.resumeToken) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.updateRegistryOnCompletion) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.skipRegistryUpdate) }()
       default: break
       }
     }
@@ -1389,14 +1218,8 @@ nonisolated extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtob
     try { if let v = self._plan {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    if self.resume != false {
-      try visitor.visitSingularBoolField(value: self.resume, fieldNumber: 3)
-    }
-    if !self.resumeToken.isEmpty {
-      try visitor.visitSingularStringField(value: self.resumeToken, fieldNumber: 4)
-    }
-    if self.updateRegistryOnCompletion != false {
-      try visitor.visitSingularBoolField(value: self.updateRegistryOnCompletion, fieldNumber: 5)
+    if self.skipRegistryUpdate != false {
+      try visitor.visitSingularBoolField(value: self.skipRegistryUpdate, fieldNumber: 5)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1404,9 +1227,7 @@ nonisolated extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtob
   public static func ==(lhs: RADownloadStartRequest, rhs: RADownloadStartRequest) -> Bool {
     if lhs.modelID != rhs.modelID {return false}
     if lhs._plan != rhs._plan {return false}
-    if lhs.resume != rhs.resume {return false}
-    if lhs.resumeToken != rhs.resumeToken {return false}
-    if lhs.updateRegistryOnCompletion != rhs.updateRegistryOnCompletion {return false}
+    if lhs.skipRegistryUpdate != rhs.skipRegistryUpdate {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1414,16 +1235,16 @@ nonisolated extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadStartResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{3}task_id\0\u{3}model_id\0\u{3}initial_progress\0\u{4}\u{2}resume_token\0\u{3}failure_reason\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{3}task_id\0\u{3}model_id\0\u{3}initial_progress\0\u{4}\u{3}failure_reason\0\u{1}error\0\u{1}plan\0\u{b}resume_token\0\u{c}\u{6}\u{1}")
 
   fileprivate class _StorageClass {
     var _accepted: Bool = false
     var _taskID: String = String()
     var _modelID: String = String()
     var _initialProgress: RADownloadProgress? = nil
-    var _resumeToken: String = String()
     var _failureReason: RADownloadFailureReason = .unspecified
     var _error: RASDKError? = nil
+    var _plan: RADownloadPlanResult? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1438,9 +1259,9 @@ nonisolated extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobu
       _taskID = source._taskID
       _modelID = source._modelID
       _initialProgress = source._initialProgress
-      _resumeToken = source._resumeToken
       _failureReason = source._failureReason
       _error = source._error
+      _plan = source._plan
     }
   }
 
@@ -1463,9 +1284,9 @@ nonisolated extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobu
         case 2: try { try decoder.decodeSingularStringField(value: &_storage._taskID) }()
         case 3: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._initialProgress) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._resumeToken) }()
         case 7: try { try decoder.decodeSingularEnumField(value: &_storage._failureReason) }()
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._plan) }()
         default: break
         }
       }
@@ -1490,14 +1311,14 @@ nonisolated extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobu
       try { if let v = _storage._initialProgress {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
       } }()
-      if !_storage._resumeToken.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._resumeToken, fieldNumber: 6)
-      }
       if _storage._failureReason != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._failureReason, fieldNumber: 7)
       }
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._plan {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1512,9 +1333,9 @@ nonisolated extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobu
         if _storage._taskID != rhs_storage._taskID {return false}
         if _storage._modelID != rhs_storage._modelID {return false}
         if _storage._initialProgress != rhs_storage._initialProgress {return false}
-        if _storage._resumeToken != rhs_storage._resumeToken {return false}
         if _storage._failureReason != rhs_storage._failureReason {return false}
         if _storage._error != rhs_storage._error {return false}
+        if _storage._plan != rhs_storage._plan {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1566,119 +1387,7 @@ nonisolated extension RADownloadCancelRequest: SwiftProtobuf.Message, SwiftProto
 
 nonisolated extension RADownloadCancelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadCancelResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}task_id\0\u{3}model_id\0\u{3}partial_bytes_deleted\0\u{4}\u{2}was_running\0\u{3}partial_bytes_preserved\0\u{3}resume_token\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _taskID: String = String()
-    var _modelID: String = String()
-    var _partialBytesDeleted: Int64 = 0
-    var _wasRunning: Bool = false
-    var _partialBytesPreserved: Bool = false
-    var _resumeToken: String = String()
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _taskID = source._taskID
-      _modelID = source._modelID
-      _partialBytesDeleted = source._partialBytesDeleted
-      _wasRunning = source._wasRunning
-      _partialBytesPreserved = source._partialBytesPreserved
-      _resumeToken = source._resumeToken
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._taskID) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
-        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._partialBytesDeleted) }()
-        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._wasRunning) }()
-        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._partialBytesPreserved) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._resumeToken) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._taskID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._taskID, fieldNumber: 2)
-      }
-      if !_storage._modelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 3)
-      }
-      if _storage._partialBytesDeleted != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._partialBytesDeleted, fieldNumber: 4)
-      }
-      if _storage._wasRunning != false {
-        try visitor.visitSingularBoolField(value: _storage._wasRunning, fieldNumber: 6)
-      }
-      if _storage._partialBytesPreserved != false {
-        try visitor.visitSingularBoolField(value: _storage._partialBytesPreserved, fieldNumber: 7)
-      }
-      if !_storage._resumeToken.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._resumeToken, fieldNumber: 8)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RADownloadCancelResult, rhs: RADownloadCancelResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._taskID != rhs_storage._taskID {return false}
-        if _storage._modelID != rhs_storage._modelID {return false}
-        if _storage._partialBytesDeleted != rhs_storage._partialBytesDeleted {return false}
-        if _storage._wasRunning != rhs_storage._wasRunning {return false}
-        if _storage._partialBytesPreserved != rhs_storage._partialBytesPreserved {return false}
-        if _storage._resumeToken != rhs_storage._resumeToken {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RADownloadResumeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DownloadResumeRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}task_id\0\u{3}model_id\0\u{3}resume_from_bytes\0\u{3}resume_token\0\u{3}validate_partial_bytes\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}task_id\0\u{3}model_id\0\u{3}partial_bytes_deleted\0\u{4}\u{2}was_running\0\u{3}partial_bytes_preserved\0\u{2}\u{2}error\0\u{b}resume_token\0\u{c}\u{8}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1686,153 +1395,50 @@ nonisolated extension RADownloadResumeRequest: SwiftProtobuf.Message, SwiftProto
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.taskID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.resumeFromBytes) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.resumeToken) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.validatePartialBytes) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.taskID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.partialBytesDeleted) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.wasRunning) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.partialBytesPreserved) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._error) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.taskID.isEmpty {
-      try visitor.visitSingularStringField(value: self.taskID, fieldNumber: 1)
+      try visitor.visitSingularStringField(value: self.taskID, fieldNumber: 2)
     }
     if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 3)
     }
-    if self.resumeFromBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.resumeFromBytes, fieldNumber: 3)
+    if self.partialBytesDeleted != 0 {
+      try visitor.visitSingularInt64Field(value: self.partialBytesDeleted, fieldNumber: 4)
     }
-    if !self.resumeToken.isEmpty {
-      try visitor.visitSingularStringField(value: self.resumeToken, fieldNumber: 4)
+    if self.wasRunning != false {
+      try visitor.visitSingularBoolField(value: self.wasRunning, fieldNumber: 6)
     }
-    if self.validatePartialBytes != false {
-      try visitor.visitSingularBoolField(value: self.validatePartialBytes, fieldNumber: 5)
+    if self.partialBytesPreserved != false {
+      try visitor.visitSingularBoolField(value: self.partialBytesPreserved, fieldNumber: 7)
     }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RADownloadResumeRequest, rhs: RADownloadResumeRequest) -> Bool {
+  public static func ==(lhs: RADownloadCancelResult, rhs: RADownloadCancelResult) -> Bool {
     if lhs.taskID != rhs.taskID {return false}
     if lhs.modelID != rhs.modelID {return false}
-    if lhs.resumeFromBytes != rhs.resumeFromBytes {return false}
-    if lhs.resumeToken != rhs.resumeToken {return false}
-    if lhs.validatePartialBytes != rhs.validatePartialBytes {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RADownloadResumeResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DownloadResumeResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{3}task_id\0\u{3}model_id\0\u{3}initial_progress\0\u{4}\u{2}resume_token\0\u{3}failure_reason\0\u{1}error\0")
-
-  fileprivate class _StorageClass {
-    var _accepted: Bool = false
-    var _taskID: String = String()
-    var _modelID: String = String()
-    var _initialProgress: RADownloadProgress? = nil
-    var _resumeToken: String = String()
-    var _failureReason: RADownloadFailureReason = .unspecified
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _accepted = source._accepted
-      _taskID = source._taskID
-      _modelID = source._modelID
-      _initialProgress = source._initialProgress
-      _resumeToken = source._resumeToken
-      _failureReason = source._failureReason
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._accepted) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._taskID) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._initialProgress) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._resumeToken) }()
-        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._failureReason) }()
-        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._accepted != false {
-        try visitor.visitSingularBoolField(value: _storage._accepted, fieldNumber: 1)
-      }
-      if !_storage._taskID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._taskID, fieldNumber: 2)
-      }
-      if !_storage._modelID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 3)
-      }
-      try { if let v = _storage._initialProgress {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-      if !_storage._resumeToken.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._resumeToken, fieldNumber: 6)
-      }
-      if _storage._failureReason != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._failureReason, fieldNumber: 7)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RADownloadResumeResult, rhs: RADownloadResumeResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._accepted != rhs_storage._accepted {return false}
-        if _storage._taskID != rhs_storage._taskID {return false}
-        if _storage._modelID != rhs_storage._modelID {return false}
-        if _storage._initialProgress != rhs_storage._initialProgress {return false}
-        if _storage._resumeToken != rhs_storage._resumeToken {return false}
-        if _storage._failureReason != rhs_storage._failureReason {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.partialBytesDeleted != rhs.partialBytesDeleted {return false}
+    if lhs.wasRunning != rhs.wasRunning {return false}
+    if lhs.partialBytesPreserved != rhs.partialBytesPreserved {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

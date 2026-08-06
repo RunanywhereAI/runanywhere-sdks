@@ -14,21 +14,19 @@
 
 /* eslint-disable */
 
-import { LoRAAdapterConfig, LoraAdapterCatalogEntry } from '../lora_options';
+import { LoraAdapterCatalogEntry, LoraAdapterConfig } from '../lora_options';
 import { ValidationError } from './_errors';
 
-export const loRAAdapterConfigDefaults = (): LoRAAdapterConfig => ({
-  adapterPath: '',
+export const loraAdapterConfigDefaults = (): LoraAdapterConfig => ({
+  adapterId: '',
   scale: 1.0,
-  metadata: {},
-  targetModules: [],
 });
 
-export const validateLoRAAdapterConfig = (m: LoRAAdapterConfig): void => {
-  if (m.adapterPath === '') {
+export const validateLoraAdapterConfig = (m: LoraAdapterConfig): void => {
+  if (m.adapterId === '') {
     throw new ValidationError({
-      fieldPath: 'LoRAAdapterConfig.adapter_path',
-      message: 'adapter_path is required',
+      fieldPath: 'LoraAdapterConfig.adapter_id',
+      message: 'adapter_id is required',
     });
   }
 };
@@ -36,12 +34,7 @@ export const validateLoRAAdapterConfig = (m: LoRAAdapterConfig): void => {
 export const loraAdapterCatalogEntryDefaults = (): LoraAdapterCatalogEntry => ({
   id: '',
   name: '',
-  description: '',
-  url: '',
-  filename: '',
   compatibleModels: [],
-  sizeBytes: 0,
   defaultScale: 1.0,
   tags: [],
-  metadata: {},
 });

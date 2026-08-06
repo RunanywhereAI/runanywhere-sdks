@@ -16,7 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'errors.pb.dart' as $1;
-import 'hardware_profile.pb.dart' as $2;
+import 'hardware_profile.pbenum.dart' as $2;
 import 'model_types.pbenum.dart';
 import 'thinking_tag_pattern.pb.dart' as $0;
 
@@ -185,14 +185,7 @@ class ModelRuntimeCompatibility extends $pb.GeneratedMessage {
   $pb.PbList<ModelFormat> get compatibleFormats => $_getList(1);
 }
 
-enum ModelInfo_Artifact {
-  singleFile,
-  archive,
-  multiFile,
-  customStrategyId,
-  builtIn,
-  notSet
-}
+enum ModelInfo_Artifact { singleFile, archive, multiFile, builtIn, notSet }
 
 /// Core metadata for a model entry. This message is persisted verbatim to
 /// .rac-manifest.binpb, so field numbers here are permanent.
@@ -219,21 +212,14 @@ class ModelInfo extends $pb.GeneratedMessage {
     SingleFileArtifact? singleFile,
     ArchiveArtifact? archive,
     MultiFileArtifact? multiFile,
-    $core.String? customStrategyId,
     $core.bool? builtIn,
-    ModelArtifactType? artifactType,
-    ExpectedModelFiles? expectedFiles,
     $2.AccelerationPreference? accelerationPreference,
     RoutingPolicy? routingPolicy,
     ModelRuntimeCompatibility? compatibility,
     InferenceFramework? preferredFramework,
     ModelRegistryStatus? registryStatus,
-    $core.bool? isDownloaded,
     $core.bool? isAvailable,
     $fixnum.Int64? lastUsedAtUnixMs,
-    $core.int? usageCount,
-    $core.bool? syncPending,
-    $core.String? statusMessage,
     $core.String? cuaProfile,
   }) {
     final result = create();
@@ -259,10 +245,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     if (singleFile != null) result.singleFile = singleFile;
     if (archive != null) result.archive = archive;
     if (multiFile != null) result.multiFile = multiFile;
-    if (customStrategyId != null) result.customStrategyId = customStrategyId;
     if (builtIn != null) result.builtIn = builtIn;
-    if (artifactType != null) result.artifactType = artifactType;
-    if (expectedFiles != null) result.expectedFiles = expectedFiles;
     if (accelerationPreference != null)
       result.accelerationPreference = accelerationPreference;
     if (routingPolicy != null) result.routingPolicy = routingPolicy;
@@ -270,12 +253,8 @@ class ModelInfo extends $pb.GeneratedMessage {
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
     if (registryStatus != null) result.registryStatus = registryStatus;
-    if (isDownloaded != null) result.isDownloaded = isDownloaded;
     if (isAvailable != null) result.isAvailable = isAvailable;
     if (lastUsedAtUnixMs != null) result.lastUsedAtUnixMs = lastUsedAtUnixMs;
-    if (usageCount != null) result.usageCount = usageCount;
-    if (syncPending != null) result.syncPending = syncPending;
-    if (statusMessage != null) result.statusMessage = statusMessage;
     if (cuaProfile != null) result.cuaProfile = cuaProfile;
     return result;
   }
@@ -294,7 +273,6 @@ class ModelInfo extends $pb.GeneratedMessage {
     20: ModelInfo_Artifact.singleFile,
     21: ModelInfo_Artifact.archive,
     22: ModelInfo_Artifact.multiFile,
-    23: ModelInfo_Artifact.customStrategyId,
     24: ModelInfo_Artifact.builtIn,
     0: ModelInfo_Artifact.notSet
   };
@@ -302,7 +280,7 @@ class ModelInfo extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelInfo',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..oo(0, [20, 21, 22, 23, 24])
+    ..oo(0, [20, 21, 22, 24])
     ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aE<ModelCategory>(3, _omitFieldNames ? '' : 'category',
@@ -333,12 +311,7 @@ class ModelInfo extends $pb.GeneratedMessage {
         subBuilder: ArchiveArtifact.create)
     ..aOM<MultiFileArtifact>(22, _omitFieldNames ? '' : 'multiFile',
         subBuilder: MultiFileArtifact.create)
-    ..aOS(23, _omitFieldNames ? '' : 'customStrategyId')
     ..aOB(24, _omitFieldNames ? '' : 'builtIn')
-    ..aE<ModelArtifactType>(25, _omitFieldNames ? '' : 'artifactType',
-        enumValues: ModelArtifactType.values)
-    ..aOM<ExpectedModelFiles>(26, _omitFieldNames ? '' : 'expectedFiles',
-        subBuilder: ExpectedModelFiles.create)
     ..aE<$2.AccelerationPreference>(
         27, _omitFieldNames ? '' : 'accelerationPreference',
         enumValues: $2.AccelerationPreference.values)
@@ -350,12 +323,8 @@ class ModelInfo extends $pb.GeneratedMessage {
         enumValues: InferenceFramework.values)
     ..aE<ModelRegistryStatus>(31, _omitFieldNames ? '' : 'registryStatus',
         enumValues: ModelRegistryStatus.values)
-    ..aOB(32, _omitFieldNames ? '' : 'isDownloaded')
     ..aOB(33, _omitFieldNames ? '' : 'isAvailable')
     ..aInt64(34, _omitFieldNames ? '' : 'lastUsedAtUnixMs')
-    ..aI(35, _omitFieldNames ? '' : 'usageCount')
-    ..aOB(36, _omitFieldNames ? '' : 'syncPending')
-    ..aOS(37, _omitFieldNames ? '' : 'statusMessage')
     ..aOS(38, _omitFieldNames ? '' : 'cuaProfile')
     ..hasRequiredFields = false;
 
@@ -380,14 +349,12 @@ class ModelInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(20)
   @$pb.TagNumber(21)
   @$pb.TagNumber(22)
-  @$pb.TagNumber(23)
   @$pb.TagNumber(24)
   ModelInfo_Artifact whichArtifact() =>
       _ModelInfo_ArtifactByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(20)
   @$pb.TagNumber(21)
   @$pb.TagNumber(22)
-  @$pb.TagNumber(23)
   @$pb.TagNumber(24)
   void clearArtifact() => $_clearField($_whichOneof(0));
 
@@ -605,166 +572,99 @@ class ModelInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(22)
   MultiFileArtifact ensureMultiFile() => $_ensure(20);
 
-  @$pb.TagNumber(23)
-  $core.String get customStrategyId => $_getSZ(21);
-  @$pb.TagNumber(23)
-  set customStrategyId($core.String value) => $_setString(21, value);
-  @$pb.TagNumber(23)
-  $core.bool hasCustomStrategyId() => $_has(21);
-  @$pb.TagNumber(23)
-  void clearCustomStrategyId() => $_clearField(23);
-
   @$pb.TagNumber(24)
-  $core.bool get builtIn => $_getBF(22);
+  $core.bool get builtIn => $_getBF(21);
   @$pb.TagNumber(24)
-  set builtIn($core.bool value) => $_setBool(22, value);
+  set builtIn($core.bool value) => $_setBool(21, value);
   @$pb.TagNumber(24)
-  $core.bool hasBuiltIn() => $_has(22);
+  $core.bool hasBuiltIn() => $_has(21);
   @$pb.TagNumber(24)
   void clearBuiltIn() => $_clearField(24);
 
-  /// High-level artifact classification, complementary to the `artifact`
-  /// oneof above. Allows catalog entries to carry a coarse type tag without
-  /// resolving the full strategy variant.
-  @$pb.TagNumber(25)
-  ModelArtifactType get artifactType => $_getN(23);
-  @$pb.TagNumber(25)
-  set artifactType(ModelArtifactType value) => $_setField(25, value);
-  @$pb.TagNumber(25)
-  $core.bool hasArtifactType() => $_has(23);
-  @$pb.TagNumber(25)
-  void clearArtifactType() => $_clearField(25);
-
-  /// Manifest of files that are expected on disk after fetch/extraction.
-  @$pb.TagNumber(26)
-  ExpectedModelFiles get expectedFiles => $_getN(24);
-  @$pb.TagNumber(26)
-  set expectedFiles(ExpectedModelFiles value) => $_setField(26, value);
-  @$pb.TagNumber(26)
-  $core.bool hasExpectedFiles() => $_has(24);
-  @$pb.TagNumber(26)
-  void clearExpectedFiles() => $_clearField(26);
-  @$pb.TagNumber(26)
-  ExpectedModelFiles ensureExpectedFiles() => $_ensure(24);
-
   /// Preferred hardware acceleration backend for this model.
   @$pb.TagNumber(27)
-  $2.AccelerationPreference get accelerationPreference => $_getN(25);
+  $2.AccelerationPreference get accelerationPreference => $_getN(22);
   @$pb.TagNumber(27)
   set accelerationPreference($2.AccelerationPreference value) =>
       $_setField(27, value);
   @$pb.TagNumber(27)
-  $core.bool hasAccelerationPreference() => $_has(25);
+  $core.bool hasAccelerationPreference() => $_has(22);
   @$pb.TagNumber(27)
   void clearAccelerationPreference() => $_clearField(27);
 
   /// Hybrid (on-device vs cloud) routing policy for this entry.
   @$pb.TagNumber(28)
-  RoutingPolicy get routingPolicy => $_getN(26);
+  RoutingPolicy get routingPolicy => $_getN(23);
   @$pb.TagNumber(28)
   set routingPolicy(RoutingPolicy value) => $_setField(28, value);
   @$pb.TagNumber(28)
-  $core.bool hasRoutingPolicy() => $_has(26);
+  $core.bool hasRoutingPolicy() => $_has(23);
   @$pb.TagNumber(28)
   void clearRoutingPolicy() => $_clearField(28);
 
   /// Framework/format compatibility declarations. `framework` (field 5) is
   /// the canonical/preferred runtime when no explicit preferred_framework is set.
   @$pb.TagNumber(29)
-  ModelRuntimeCompatibility get compatibility => $_getN(27);
+  ModelRuntimeCompatibility get compatibility => $_getN(24);
   @$pb.TagNumber(29)
   set compatibility(ModelRuntimeCompatibility value) => $_setField(29, value);
   @$pb.TagNumber(29)
-  $core.bool hasCompatibility() => $_has(27);
+  $core.bool hasCompatibility() => $_has(24);
   @$pb.TagNumber(29)
   void clearCompatibility() => $_clearField(29);
   @$pb.TagNumber(29)
-  ModelRuntimeCompatibility ensureCompatibility() => $_ensure(27);
+  ModelRuntimeCompatibility ensureCompatibility() => $_ensure(24);
 
   @$pb.TagNumber(30)
-  InferenceFramework get preferredFramework => $_getN(28);
+  InferenceFramework get preferredFramework => $_getN(25);
   @$pb.TagNumber(30)
   set preferredFramework(InferenceFramework value) => $_setField(30, value);
   @$pb.TagNumber(30)
-  $core.bool hasPreferredFramework() => $_has(28);
+  $core.bool hasPreferredFramework() => $_has(25);
   @$pb.TagNumber(30)
   void clearPreferredFramework() => $_clearField(30);
 
-  /// Durable registry state. Live byte progress belongs to
-  /// download_service.DownloadProgress, not ModelInfo.
+  /// The single durable state of this entry, and the only downloaded-ness
+  /// signal. A non-empty local_path (7) is location data, NOT state: it
+  /// stays populated for an entry whose files were deleted. Live byte
+  /// progress belongs to download_service.DownloadProgress, not ModelInfo.
   @$pb.TagNumber(31)
-  ModelRegistryStatus get registryStatus => $_getN(29);
+  ModelRegistryStatus get registryStatus => $_getN(26);
   @$pb.TagNumber(31)
   set registryStatus(ModelRegistryStatus value) => $_setField(31, value);
   @$pb.TagNumber(31)
-  $core.bool hasRegistryStatus() => $_has(29);
+  $core.bool hasRegistryStatus() => $_has(26);
   @$pb.TagNumber(31)
   void clearRegistryStatus() => $_clearField(31);
 
-  @$pb.TagNumber(32)
-  $core.bool get isDownloaded => $_getBF(30);
-  @$pb.TagNumber(32)
-  set isDownloaded($core.bool value) => $_setBool(30, value);
-  @$pb.TagNumber(32)
-  $core.bool hasIsDownloaded() => $_has(30);
-  @$pb.TagNumber(32)
-  void clearIsDownloaded() => $_clearField(32);
-
   @$pb.TagNumber(33)
-  $core.bool get isAvailable => $_getBF(31);
+  $core.bool get isAvailable => $_getBF(27);
   @$pb.TagNumber(33)
-  set isAvailable($core.bool value) => $_setBool(31, value);
+  set isAvailable($core.bool value) => $_setBool(27, value);
   @$pb.TagNumber(33)
-  $core.bool hasIsAvailable() => $_has(31);
+  $core.bool hasIsAvailable() => $_has(27);
   @$pb.TagNumber(33)
   void clearIsAvailable() => $_clearField(33);
 
   @$pb.TagNumber(34)
-  $fixnum.Int64 get lastUsedAtUnixMs => $_getI64(32);
+  $fixnum.Int64 get lastUsedAtUnixMs => $_getI64(28);
   @$pb.TagNumber(34)
-  set lastUsedAtUnixMs($fixnum.Int64 value) => $_setInt64(32, value);
+  set lastUsedAtUnixMs($fixnum.Int64 value) => $_setInt64(28, value);
   @$pb.TagNumber(34)
-  $core.bool hasLastUsedAtUnixMs() => $_has(32);
+  $core.bool hasLastUsedAtUnixMs() => $_has(28);
   @$pb.TagNumber(34)
   void clearLastUsedAtUnixMs() => $_clearField(34);
-
-  @$pb.TagNumber(35)
-  $core.int get usageCount => $_getIZ(33);
-  @$pb.TagNumber(35)
-  set usageCount($core.int value) => $_setSignedInt32(33, value);
-  @$pb.TagNumber(35)
-  $core.bool hasUsageCount() => $_has(33);
-  @$pb.TagNumber(35)
-  void clearUsageCount() => $_clearField(35);
-
-  @$pb.TagNumber(36)
-  $core.bool get syncPending => $_getBF(34);
-  @$pb.TagNumber(36)
-  set syncPending($core.bool value) => $_setBool(34, value);
-  @$pb.TagNumber(36)
-  $core.bool hasSyncPending() => $_has(34);
-  @$pb.TagNumber(36)
-  void clearSyncPending() => $_clearField(36);
-
-  @$pb.TagNumber(37)
-  $core.String get statusMessage => $_getSZ(35);
-  @$pb.TagNumber(37)
-  set statusMessage($core.String value) => $_setString(35, value);
-  @$pb.TagNumber(37)
-  $core.bool hasStatusMessage() => $_has(35);
-  @$pb.TagNumber(37)
-  void clearStatusMessage() => $_clearField(37);
 
   /// Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
   /// this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
   /// models. Lets the catalog mark which models are drivable through
   /// RunAnywhere.CUA and with which profile, without hardcoding model ids.
   @$pb.TagNumber(38)
-  $core.String get cuaProfile => $_getSZ(36);
+  $core.String get cuaProfile => $_getSZ(29);
   @$pb.TagNumber(38)
-  set cuaProfile($core.String value) => $_setString(36, value);
+  set cuaProfile($core.String value) => $_setString(29, value);
   @$pb.TagNumber(38)
-  $core.bool hasCuaProfile() => $_has(36);
+  $core.bool hasCuaProfile() => $_has(29);
   @$pb.TagNumber(38)
   void clearCuaProfile() => $_clearField(38);
 }
@@ -822,15 +722,9 @@ class ModelInfoList extends $pb.GeneratedMessage {
 
 class SingleFileArtifact extends $pb.GeneratedMessage {
   factory SingleFileArtifact({
-    $core.Iterable<$core.String>? requiredPatterns,
-    $core.Iterable<$core.String>? optionalPatterns,
     ExpectedModelFiles? expectedFiles,
   }) {
     final result = create();
-    if (requiredPatterns != null)
-      result.requiredPatterns.addAll(requiredPatterns);
-    if (optionalPatterns != null)
-      result.optionalPatterns.addAll(optionalPatterns);
     if (expectedFiles != null) result.expectedFiles = expectedFiles;
     return result;
   }
@@ -848,8 +742,6 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'SingleFileArtifact',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..pPS(1, _omitFieldNames ? '' : 'requiredPatterns')
-    ..pPS(2, _omitFieldNames ? '' : 'optionalPatterns')
     ..aOM<ExpectedModelFiles>(3, _omitFieldNames ? '' : 'expectedFiles',
         subBuilder: ExpectedModelFiles.create)
     ..hasRequiredFields = false;
@@ -873,42 +765,27 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<SingleFileArtifact>(create);
   static SingleFileArtifact? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $pb.PbList<$core.String> get requiredPatterns => $_getList(0);
-
-  @$pb.TagNumber(2)
-  $pb.PbList<$core.String> get optionalPatterns => $_getList(1);
-
-  /// Full manifest form for SDK-local wrappers that attach expected files to
-  /// a single-file artifact. The pattern fields above remain for existing
-  /// generated consumers.
   @$pb.TagNumber(3)
-  ExpectedModelFiles get expectedFiles => $_getN(2);
+  ExpectedModelFiles get expectedFiles => $_getN(0);
   @$pb.TagNumber(3)
   set expectedFiles(ExpectedModelFiles value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasExpectedFiles() => $_has(2);
+  $core.bool hasExpectedFiles() => $_has(0);
   @$pb.TagNumber(3)
   void clearExpectedFiles() => $_clearField(3);
   @$pb.TagNumber(3)
-  ExpectedModelFiles ensureExpectedFiles() => $_ensure(2);
+  ExpectedModelFiles ensureExpectedFiles() => $_ensure(0);
 }
 
 class ArchiveArtifact extends $pb.GeneratedMessage {
   factory ArchiveArtifact({
     ArchiveType? type,
     ArchiveStructure? structure,
-    $core.Iterable<$core.String>? requiredPatterns,
-    $core.Iterable<$core.String>? optionalPatterns,
     ExpectedModelFiles? expectedFiles,
   }) {
     final result = create();
     if (type != null) result.type = type;
     if (structure != null) result.structure = structure;
-    if (requiredPatterns != null)
-      result.requiredPatterns.addAll(requiredPatterns);
-    if (optionalPatterns != null)
-      result.optionalPatterns.addAll(optionalPatterns);
     if (expectedFiles != null) result.expectedFiles = expectedFiles;
     return result;
   }
@@ -930,8 +807,6 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
         enumValues: ArchiveType.values)
     ..aE<ArchiveStructure>(2, _omitFieldNames ? '' : 'structure',
         enumValues: ArchiveStructure.values)
-    ..pPS(3, _omitFieldNames ? '' : 'requiredPatterns')
-    ..pPS(4, _omitFieldNames ? '' : 'optionalPatterns')
     ..aOM<ExpectedModelFiles>(5, _omitFieldNames ? '' : 'expectedFiles',
         subBuilder: ExpectedModelFiles.create)
     ..hasRequiredFields = false;
@@ -973,49 +848,43 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearStructure() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $pb.PbList<$core.String> get requiredPatterns => $_getList(2);
-
-  @$pb.TagNumber(4)
-  $pb.PbList<$core.String> get optionalPatterns => $_getList(3);
-
   /// Full manifest form for archive artifacts after extraction. Archive
   /// extraction policy is portable; native filesystem permissions and handles
   /// remain adapter-owned.
   @$pb.TagNumber(5)
-  ExpectedModelFiles get expectedFiles => $_getN(4);
+  ExpectedModelFiles get expectedFiles => $_getN(2);
   @$pb.TagNumber(5)
   set expectedFiles(ExpectedModelFiles value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasExpectedFiles() => $_has(4);
+  $core.bool hasExpectedFiles() => $_has(2);
   @$pb.TagNumber(5)
   void clearExpectedFiles() => $_clearField(5);
   @$pb.TagNumber(5)
-  ExpectedModelFiles ensureExpectedFiles() => $_ensure(4);
+  ExpectedModelFiles ensureExpectedFiles() => $_ensure(2);
 }
 
 class ModelFileDescriptor extends $pb.GeneratedMessage {
   factory ModelFileDescriptor({
     $core.String? url,
     $core.String? filename,
-    $core.bool? isRequired,
     $fixnum.Int64? sizeBytes,
     $core.String? relativePath,
     $core.String? destinationPath,
     ModelFileRole? role,
     $core.String? localPath,
     $core.String? checksumSha256,
+    $core.bool? isOptional,
   }) {
     final result = create();
     if (url != null) result.url = url;
     if (filename != null) result.filename = filename;
-    if (isRequired != null) result.isRequired = isRequired;
     if (sizeBytes != null) result.sizeBytes = sizeBytes;
     if (relativePath != null) result.relativePath = relativePath;
     if (destinationPath != null) result.destinationPath = destinationPath;
     if (role != null) result.role = role;
     if (localPath != null) result.localPath = localPath;
     if (checksumSha256 != null) result.checksumSha256 = checksumSha256;
+    if (isOptional != null) result.isOptional = isOptional;
     return result;
   }
 
@@ -1034,7 +903,6 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'url')
     ..aOS(2, _omitFieldNames ? '' : 'filename')
-    ..aOB(3, _omitFieldNames ? '' : 'isRequired')
     ..aInt64(4, _omitFieldNames ? '' : 'sizeBytes')
     ..aOS(6, _omitFieldNames ? '' : 'relativePath')
     ..aOS(7, _omitFieldNames ? '' : 'destinationPath')
@@ -1042,6 +910,7 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
         enumValues: ModelFileRole.values)
     ..aOS(9, _omitFieldNames ? '' : 'localPath')
     ..aOS(10, _omitFieldNames ? '' : 'checksumSha256')
+    ..aOB(12, _omitFieldNames ? '' : 'isOptional')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1081,26 +950,13 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearFilename() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.bool get isRequired => $_getBF(2);
-  @$pb.TagNumber(3)
-  set isRequired($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasIsRequired() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearIsRequired() => $_clearField(3);
-
-  /// Extended descriptor fields (Flutter model_types.dart:~350,
-  /// Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
-  /// canonical "required" flag — the documented `required` boolean from
-  /// newer SDK sources maps onto it (default true, mirrored in Swift).
   /// Exact on-disk artifact size, verified after download.
   @$pb.TagNumber(4)
-  $fixnum.Int64 get sizeBytes => $_getI64(3);
+  $fixnum.Int64 get sizeBytes => $_getI64(2);
   @$pb.TagNumber(4)
-  set sizeBytes($fixnum.Int64 value) => $_setInt64(3, value);
+  set sizeBytes($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasSizeBytes() => $_has(3);
+  $core.bool hasSizeBytes() => $_has(2);
   @$pb.TagNumber(4)
   void clearSizeBytes() => $_clearField(4);
 
@@ -1108,50 +964,59 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   /// storage name for simple cases; relative_path/destination_path preserve
   /// directory layouts for archive and multi-file artifacts.
   @$pb.TagNumber(6)
-  $core.String get relativePath => $_getSZ(4);
+  $core.String get relativePath => $_getSZ(3);
   @$pb.TagNumber(6)
-  set relativePath($core.String value) => $_setString(4, value);
+  set relativePath($core.String value) => $_setString(3, value);
   @$pb.TagNumber(6)
-  $core.bool hasRelativePath() => $_has(4);
+  $core.bool hasRelativePath() => $_has(3);
   @$pb.TagNumber(6)
   void clearRelativePath() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.String get destinationPath => $_getSZ(5);
+  $core.String get destinationPath => $_getSZ(4);
   @$pb.TagNumber(7)
-  set destinationPath($core.String value) => $_setString(5, value);
+  set destinationPath($core.String value) => $_setString(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasDestinationPath() => $_has(5);
+  $core.bool hasDestinationPath() => $_has(4);
   @$pb.TagNumber(7)
   void clearDestinationPath() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  ModelFileRole get role => $_getN(6);
+  ModelFileRole get role => $_getN(5);
   @$pb.TagNumber(8)
   set role(ModelFileRole value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasRole() => $_has(6);
+  $core.bool hasRole() => $_has(5);
   @$pb.TagNumber(8)
   void clearRole() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.String get localPath => $_getSZ(7);
+  $core.String get localPath => $_getSZ(6);
   @$pb.TagNumber(9)
-  set localPath($core.String value) => $_setString(7, value);
+  set localPath($core.String value) => $_setString(6, value);
   @$pb.TagNumber(9)
-  $core.bool hasLocalPath() => $_has(7);
+  $core.bool hasLocalPath() => $_has(6);
   @$pb.TagNumber(9)
   void clearLocalPath() => $_clearField(9);
 
   /// Exact on-disk artifact checksum, verified after download.
   @$pb.TagNumber(10)
-  $core.String get checksumSha256 => $_getSZ(8);
+  $core.String get checksumSha256 => $_getSZ(7);
   @$pb.TagNumber(10)
-  set checksumSha256($core.String value) => $_setString(8, value);
+  set checksumSha256($core.String value) => $_setString(7, value);
   @$pb.TagNumber(10)
-  $core.bool hasChecksumSha256() => $_has(8);
+  $core.bool hasChecksumSha256() => $_has(7);
   @$pb.TagNumber(10)
   void clearChecksumSha256() => $_clearField(10);
+
+  @$pb.TagNumber(12)
+  $core.bool get isOptional => $_getBF(8);
+  @$pb.TagNumber(12)
+  set isOptional($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(12)
+  $core.bool hasIsOptional() => $_has(8);
+  @$pb.TagNumber(12)
+  void clearIsOptional() => $_clearField(12);
 }
 
 class MultiFileArtifact extends $pb.GeneratedMessage {
@@ -1295,18 +1160,15 @@ class ExpectedModelFiles extends $pb.GeneratedMessage {
 /// Registry/query filters shared by SDK model-management APIs. UI-only
 /// presentation state and platform filesystem handles are intentionally not
 /// represented here.
+/// Filters only. Ordering is the client's -- a local catalog is tens of rows.
 class ModelQuery extends $pb.GeneratedMessage {
   factory ModelQuery({
     InferenceFramework? framework,
     ModelCategory? category,
     ModelFormat? format,
     $core.bool? downloadedOnly,
-    $core.bool? availableOnly,
     $fixnum.Int64? maxSizeBytes,
     $core.String? searchQuery,
-    ModelSource? source,
-    ModelQuerySortField? sortField,
-    $core.bool? descending,
     ModelRegistryStatus? registryStatus,
   }) {
     final result = create();
@@ -1314,12 +1176,8 @@ class ModelQuery extends $pb.GeneratedMessage {
     if (category != null) result.category = category;
     if (format != null) result.format = format;
     if (downloadedOnly != null) result.downloadedOnly = downloadedOnly;
-    if (availableOnly != null) result.availableOnly = availableOnly;
     if (maxSizeBytes != null) result.maxSizeBytes = maxSizeBytes;
     if (searchQuery != null) result.searchQuery = searchQuery;
-    if (source != null) result.source = source;
-    if (sortField != null) result.sortField = sortField;
-    if (descending != null) result.descending = descending;
     if (registryStatus != null) result.registryStatus = registryStatus;
     return result;
   }
@@ -1344,14 +1202,8 @@ class ModelQuery extends $pb.GeneratedMessage {
     ..aE<ModelFormat>(3, _omitFieldNames ? '' : 'format',
         enumValues: ModelFormat.values)
     ..aOB(4, _omitFieldNames ? '' : 'downloadedOnly')
-    ..aOB(5, _omitFieldNames ? '' : 'availableOnly')
     ..aInt64(6, _omitFieldNames ? '' : 'maxSizeBytes')
     ..aOS(7, _omitFieldNames ? '' : 'searchQuery')
-    ..aE<ModelSource>(8, _omitFieldNames ? '' : 'source',
-        enumValues: ModelSource.values)
-    ..aE<ModelQuerySortField>(9, _omitFieldNames ? '' : 'sortField',
-        enumValues: ModelQuerySortField.values)
-    ..aOB(10, _omitFieldNames ? '' : 'descending')
     ..aE<ModelRegistryStatus>(11, _omitFieldNames ? '' : 'registryStatus',
         enumValues: ModelRegistryStatus.values)
     ..hasRequiredFields = false;
@@ -1410,66 +1262,31 @@ class ModelQuery extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearDownloadedOnly() => $_clearField(4);
 
-  @$pb.TagNumber(5)
-  $core.bool get availableOnly => $_getBF(4);
-  @$pb.TagNumber(5)
-  set availableOnly($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasAvailableOnly() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearAvailableOnly() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $fixnum.Int64 get maxSizeBytes => $_getI64(5);
+  $fixnum.Int64 get maxSizeBytes => $_getI64(4);
   @$pb.TagNumber(6)
-  set maxSizeBytes($fixnum.Int64 value) => $_setInt64(5, value);
+  set maxSizeBytes($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasMaxSizeBytes() => $_has(5);
+  $core.bool hasMaxSizeBytes() => $_has(4);
   @$pb.TagNumber(6)
   void clearMaxSizeBytes() => $_clearField(6);
 
+  /// Optional so "no search" is expressible; empty string is not a filter.
   @$pb.TagNumber(7)
-  $core.String get searchQuery => $_getSZ(6);
+  $core.String get searchQuery => $_getSZ(5);
   @$pb.TagNumber(7)
-  set searchQuery($core.String value) => $_setString(6, value);
+  set searchQuery($core.String value) => $_setString(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasSearchQuery() => $_has(6);
+  $core.bool hasSearchQuery() => $_has(5);
   @$pb.TagNumber(7)
   void clearSearchQuery() => $_clearField(7);
 
-  @$pb.TagNumber(8)
-  ModelSource get source => $_getN(7);
-  @$pb.TagNumber(8)
-  set source(ModelSource value) => $_setField(8, value);
-  @$pb.TagNumber(8)
-  $core.bool hasSource() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearSource() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  ModelQuerySortField get sortField => $_getN(8);
-  @$pb.TagNumber(9)
-  set sortField(ModelQuerySortField value) => $_setField(9, value);
-  @$pb.TagNumber(9)
-  $core.bool hasSortField() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearSortField() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.bool get descending => $_getBF(9);
-  @$pb.TagNumber(10)
-  set descending($core.bool value) => $_setBool(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasDescending() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearDescending() => $_clearField(10);
-
   @$pb.TagNumber(11)
-  ModelRegistryStatus get registryStatus => $_getN(10);
+  ModelRegistryStatus get registryStatus => $_getN(6);
   @$pb.TagNumber(11)
   set registryStatus(ModelRegistryStatus value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasRegistryStatus() => $_has(10);
+  $core.bool hasRegistryStatus() => $_has(6);
   @$pb.TagNumber(11)
   void clearRegistryStatus() => $_clearField(11);
 }
@@ -1619,28 +1436,14 @@ class ModelRegistryRefreshRequest extends $pb.GeneratedMessage {
 class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
   factory ModelRegistryRefreshResult({
     ModelInfoList? models,
-    $core.int? registeredCount,
-    $core.int? updatedCount,
-    $core.int? discoveredCount,
-    $core.int? prunedCount,
     $fixnum.Int64? refreshedAtUnixMs,
     $core.Iterable<$core.String>? warnings,
-    $core.int? downloadedCount,
-    $core.int? availableCount,
-    $core.int? errorCount,
     $1.SDKError? error,
   }) {
     final result = create();
     if (models != null) result.models = models;
-    if (registeredCount != null) result.registeredCount = registeredCount;
-    if (updatedCount != null) result.updatedCount = updatedCount;
-    if (discoveredCount != null) result.discoveredCount = discoveredCount;
-    if (prunedCount != null) result.prunedCount = prunedCount;
     if (refreshedAtUnixMs != null) result.refreshedAtUnixMs = refreshedAtUnixMs;
     if (warnings != null) result.warnings.addAll(warnings);
-    if (downloadedCount != null) result.downloadedCount = downloadedCount;
-    if (availableCount != null) result.availableCount = availableCount;
-    if (errorCount != null) result.errorCount = errorCount;
     if (error != null) result.error = error;
     return result;
   }
@@ -1660,15 +1463,8 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOM<ModelInfoList>(2, _omitFieldNames ? '' : 'models',
         subBuilder: ModelInfoList.create)
-    ..aI(3, _omitFieldNames ? '' : 'registeredCount')
-    ..aI(4, _omitFieldNames ? '' : 'updatedCount')
-    ..aI(5, _omitFieldNames ? '' : 'discoveredCount')
-    ..aI(6, _omitFieldNames ? '' : 'prunedCount')
     ..aInt64(7, _omitFieldNames ? '' : 'refreshedAtUnixMs')
     ..pPS(8, _omitFieldNames ? '' : 'warnings')
-    ..aI(10, _omitFieldNames ? '' : 'downloadedCount')
-    ..aI(11, _omitFieldNames ? '' : 'availableCount')
-    ..aI(12, _omitFieldNames ? '' : 'errorCount')
     ..aOM<$1.SDKError>(13, _omitFieldNames ? '' : 'error',
         subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
@@ -1705,101 +1501,36 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   ModelInfoList ensureModels() => $_ensure(0);
 
-  @$pb.TagNumber(3)
-  $core.int get registeredCount => $_getIZ(1);
-  @$pb.TagNumber(3)
-  set registeredCount($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(3)
-  $core.bool hasRegisteredCount() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearRegisteredCount() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get updatedCount => $_getIZ(2);
-  @$pb.TagNumber(4)
-  set updatedCount($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(4)
-  $core.bool hasUpdatedCount() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearUpdatedCount() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get discoveredCount => $_getIZ(3);
-  @$pb.TagNumber(5)
-  set discoveredCount($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(5)
-  $core.bool hasDiscoveredCount() => $_has(3);
-  @$pb.TagNumber(5)
-  void clearDiscoveredCount() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get prunedCount => $_getIZ(4);
-  @$pb.TagNumber(6)
-  set prunedCount($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(6)
-  $core.bool hasPrunedCount() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearPrunedCount() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  $fixnum.Int64 get refreshedAtUnixMs => $_getI64(5);
+  $fixnum.Int64 get refreshedAtUnixMs => $_getI64(1);
   @$pb.TagNumber(7)
-  set refreshedAtUnixMs($fixnum.Int64 value) => $_setInt64(5, value);
+  set refreshedAtUnixMs($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(7)
-  $core.bool hasRefreshedAtUnixMs() => $_has(5);
+  $core.bool hasRefreshedAtUnixMs() => $_has(1);
   @$pb.TagNumber(7)
   void clearRefreshedAtUnixMs() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $pb.PbList<$core.String> get warnings => $_getList(6);
-
-  @$pb.TagNumber(10)
-  $core.int get downloadedCount => $_getIZ(7);
-  @$pb.TagNumber(10)
-  set downloadedCount($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(10)
-  $core.bool hasDownloadedCount() => $_has(7);
-  @$pb.TagNumber(10)
-  void clearDownloadedCount() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.int get availableCount => $_getIZ(8);
-  @$pb.TagNumber(11)
-  set availableCount($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(11)
-  $core.bool hasAvailableCount() => $_has(8);
-  @$pb.TagNumber(11)
-  void clearAvailableCount() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.int get errorCount => $_getIZ(9);
-  @$pb.TagNumber(12)
-  set errorCount($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(12)
-  $core.bool hasErrorCount() => $_has(9);
-  @$pb.TagNumber(12)
-  void clearErrorCount() => $_clearField(12);
+  $pb.PbList<$core.String> get warnings => $_getList(2);
 
   @$pb.TagNumber(13)
-  $1.SDKError get error => $_getN(10);
+  $1.SDKError get error => $_getN(3);
   @$pb.TagNumber(13)
   set error($1.SDKError value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasError() => $_has(10);
+  $core.bool hasError() => $_has(3);
   @$pb.TagNumber(13)
   void clearError() => $_clearField(13);
   @$pb.TagNumber(13)
-  $1.SDKError ensureError() => $_ensure(10);
+  $1.SDKError ensureError() => $_ensure(3);
 }
 
 class ModelListRequest extends $pb.GeneratedMessage {
   factory ModelListRequest({
     ModelQuery? query,
-    $core.bool? includeCounts,
   }) {
     final result = create();
     if (query != null) result.query = query;
-    if (includeCounts != null) result.includeCounts = includeCounts;
     return result;
   }
 
@@ -1818,7 +1549,6 @@ class ModelListRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOM<ModelQuery>(1, _omitFieldNames ? '' : 'query',
         subBuilder: ModelQuery.create)
-    ..aOB(2, _omitFieldNames ? '' : 'includeCounts')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1851,33 +1581,15 @@ class ModelListRequest extends $pb.GeneratedMessage {
   void clearQuery() => $_clearField(1);
   @$pb.TagNumber(1)
   ModelQuery ensureQuery() => $_ensure(0);
-
-  /// Include denormalized counts in ModelListResult.
-  @$pb.TagNumber(2)
-  $core.bool get includeCounts => $_getBF(1);
-  @$pb.TagNumber(2)
-  set includeCounts($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasIncludeCounts() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearIncludeCounts() => $_clearField(2);
 }
 
 class ModelListResult extends $pb.GeneratedMessage {
   factory ModelListResult({
     ModelInfoList? models,
-    $core.int? totalCount,
-    $core.int? downloadedCount,
-    $core.int? availableCount,
-    $core.int? filteredCount,
     $1.SDKError? error,
   }) {
     final result = create();
     if (models != null) result.models = models;
-    if (totalCount != null) result.totalCount = totalCount;
-    if (downloadedCount != null) result.downloadedCount = downloadedCount;
-    if (availableCount != null) result.availableCount = availableCount;
-    if (filteredCount != null) result.filteredCount = filteredCount;
     if (error != null) result.error = error;
     return result;
   }
@@ -1897,10 +1609,6 @@ class ModelListResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOM<ModelInfoList>(2, _omitFieldNames ? '' : 'models',
         subBuilder: ModelInfoList.create)
-    ..aI(4, _omitFieldNames ? '' : 'totalCount')
-    ..aI(5, _omitFieldNames ? '' : 'downloadedCount')
-    ..aI(6, _omitFieldNames ? '' : 'availableCount')
-    ..aI(7, _omitFieldNames ? '' : 'filteredCount')
     ..aOM<$1.SDKError>(8, _omitFieldNames ? '' : 'error',
         subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
@@ -1935,52 +1643,16 @@ class ModelListResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   ModelInfoList ensureModels() => $_ensure(0);
 
-  @$pb.TagNumber(4)
-  $core.int get totalCount => $_getIZ(1);
-  @$pb.TagNumber(4)
-  set totalCount($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(4)
-  $core.bool hasTotalCount() => $_has(1);
-  @$pb.TagNumber(4)
-  void clearTotalCount() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get downloadedCount => $_getIZ(2);
-  @$pb.TagNumber(5)
-  set downloadedCount($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(5)
-  $core.bool hasDownloadedCount() => $_has(2);
-  @$pb.TagNumber(5)
-  void clearDownloadedCount() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get availableCount => $_getIZ(3);
-  @$pb.TagNumber(6)
-  set availableCount($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(6)
-  $core.bool hasAvailableCount() => $_has(3);
-  @$pb.TagNumber(6)
-  void clearAvailableCount() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.int get filteredCount => $_getIZ(4);
-  @$pb.TagNumber(7)
-  set filteredCount($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(7)
-  $core.bool hasFilteredCount() => $_has(4);
-  @$pb.TagNumber(7)
-  void clearFilteredCount() => $_clearField(7);
-
   @$pb.TagNumber(8)
-  $1.SDKError get error => $_getN(5);
+  $1.SDKError get error => $_getN(1);
   @$pb.TagNumber(8)
   set error($1.SDKError value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasError() => $_has(5);
+  $core.bool hasError() => $_has(1);
   @$pb.TagNumber(8)
   void clearError() => $_clearField(8);
   @$pb.TagNumber(8)
-  $1.SDKError ensureError() => $_ensure(5);
+  $1.SDKError ensureError() => $_ensure(1);
 }
 
 class ModelGetRequest extends $pb.GeneratedMessage {
@@ -2609,21 +2281,13 @@ class DiscoveredModel extends $pb.GeneratedMessage {
 class ModelDiscoveryResult extends $pb.GeneratedMessage {
   factory ModelDiscoveryResult({
     $core.Iterable<DiscoveredModel>? discoveredModels,
-    $core.int? linkedCount,
-    $core.int? purgedCount,
     $core.Iterable<$core.String>? warnings,
-    $core.int? scannedCount,
-    $core.int? importedCount,
     $1.SDKError? error,
   }) {
     final result = create();
     if (discoveredModels != null)
       result.discoveredModels.addAll(discoveredModels);
-    if (linkedCount != null) result.linkedCount = linkedCount;
-    if (purgedCount != null) result.purgedCount = purgedCount;
     if (warnings != null) result.warnings.addAll(warnings);
-    if (scannedCount != null) result.scannedCount = scannedCount;
-    if (importedCount != null) result.importedCount = importedCount;
     if (error != null) result.error = error;
     return result;
   }
@@ -2643,11 +2307,7 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..pPM<DiscoveredModel>(2, _omitFieldNames ? '' : 'discoveredModels',
         subBuilder: DiscoveredModel.create)
-    ..aI(3, _omitFieldNames ? '' : 'linkedCount')
-    ..aI(4, _omitFieldNames ? '' : 'purgedCount')
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
-    ..aI(7, _omitFieldNames ? '' : 'scannedCount')
-    ..aI(8, _omitFieldNames ? '' : 'importedCount')
     ..aOM<$1.SDKError>(9, _omitFieldNames ? '' : 'error',
         subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
@@ -2674,55 +2334,19 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $pb.PbList<DiscoveredModel> get discoveredModels => $_getList(0);
 
-  @$pb.TagNumber(3)
-  $core.int get linkedCount => $_getIZ(1);
-  @$pb.TagNumber(3)
-  set linkedCount($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(3)
-  $core.bool hasLinkedCount() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearLinkedCount() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get purgedCount => $_getIZ(2);
-  @$pb.TagNumber(4)
-  set purgedCount($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(4)
-  $core.bool hasPurgedCount() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearPurgedCount() => $_clearField(4);
-
   @$pb.TagNumber(5)
-  $pb.PbList<$core.String> get warnings => $_getList(3);
-
-  @$pb.TagNumber(7)
-  $core.int get scannedCount => $_getIZ(4);
-  @$pb.TagNumber(7)
-  set scannedCount($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(7)
-  $core.bool hasScannedCount() => $_has(4);
-  @$pb.TagNumber(7)
-  void clearScannedCount() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.int get importedCount => $_getIZ(5);
-  @$pb.TagNumber(8)
-  set importedCount($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(8)
-  $core.bool hasImportedCount() => $_has(5);
-  @$pb.TagNumber(8)
-  void clearImportedCount() => $_clearField(8);
+  $pb.PbList<$core.String> get warnings => $_getList(1);
 
   @$pb.TagNumber(9)
-  $1.SDKError get error => $_getN(6);
+  $1.SDKError get error => $_getN(2);
   @$pb.TagNumber(9)
   set error($1.SDKError value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasError() => $_has(6);
+  $core.bool hasError() => $_has(2);
   @$pb.TagNumber(9)
   void clearError() => $_clearField(9);
   @$pb.TagNumber(9)
-  $1.SDKError ensureError() => $_ensure(6);
+  $1.SDKError ensureError() => $_ensure(2);
 }
 
 class ModelLoadRequest extends $pb.GeneratedMessage {
@@ -2733,10 +2357,9 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     $core.bool? forceReload,
     $core.bool? validateAvailability,
     $core.int? contextLength,
-    $core.int? threads,
     $core.bool? useGpu,
     $core.Iterable<InferenceFramework>? backendPreferences,
-    $core.int? acceleratorPolicy,
+    AcceleratorPolicy? acceleratorPolicy,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -2746,7 +2369,6 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     if (validateAvailability != null)
       result.validateAvailability = validateAvailability;
     if (contextLength != null) result.contextLength = contextLength;
-    if (threads != null) result.threads = threads;
     if (useGpu != null) result.useGpu = useGpu;
     if (backendPreferences != null)
       result.backendPreferences.addAll(backendPreferences);
@@ -2775,14 +2397,14 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     ..aOB(4, _omitFieldNames ? '' : 'forceReload')
     ..aOB(5, _omitFieldNames ? '' : 'validateAvailability')
     ..aI(6, _omitFieldNames ? '' : 'contextLength')
-    ..aI(7, _omitFieldNames ? '' : 'threads')
     ..aOB(8, _omitFieldNames ? '' : 'useGpu')
     ..pc<InferenceFramework>(
         9, _omitFieldNames ? '' : 'backendPreferences', $pb.PbFieldType.KE,
         valueOf: InferenceFramework.valueOf,
         enumValues: InferenceFramework.values,
         defaultEnumValue: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED)
-    ..aI(10, _omitFieldNames ? '' : 'acceleratorPolicy')
+    ..aE<AcceleratorPolicy>(10, _omitFieldNames ? '' : 'acceleratorPolicy',
+        enumValues: AcceleratorPolicy.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2851,7 +2473,9 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearValidateAvailability() => $_clearField(5);
 
-  /// v4 placement knobs (honored end-to-end; never silently dropped).
+  /// The one load knob every on-device runtime exposes. Unset or 0 means
+  /// "take it from the model" (llama.cpp --ctx-size semantics) -- never a
+  /// hardcoded small default. Carried by the native load ABI.
   @$pb.TagNumber(6)
   $core.int get contextLength => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -2861,35 +2485,25 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearContextLength() => $_clearField(6);
 
-  @$pb.TagNumber(7)
-  $core.int get threads => $_getIZ(6);
-  @$pb.TagNumber(7)
-  set threads($core.int value) => $_setSignedInt32(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasThreads() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearThreads() => $_clearField(7);
-
+  /// a hard runtime guarantee
   @$pb.TagNumber(8)
-  $core.bool get useGpu => $_getBF(7);
+  $core.bool get useGpu => $_getBF(6);
   @$pb.TagNumber(8)
-  set useGpu($core.bool value) => $_setBool(7, value);
+  set useGpu($core.bool value) => $_setBool(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasUseGpu() => $_has(7);
+  $core.bool hasUseGpu() => $_has(6);
   @$pb.TagNumber(8)
   void clearUseGpu() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $pb.PbList<InferenceFramework> get backendPreferences => $_getList(8);
+  $pb.PbList<InferenceFramework> get backendPreferences => $_getList(7);
 
-  /// AcceleratorPolicy values live in public_api_v4.proto; stored as int32
-  /// here to avoid a circular import with LoadedModelInfo helpers.
   @$pb.TagNumber(10)
-  $core.int get acceleratorPolicy => $_getIZ(9);
+  AcceleratorPolicy get acceleratorPolicy => $_getN(8);
   @$pb.TagNumber(10)
-  set acceleratorPolicy($core.int value) => $_setSignedInt32(9, value);
+  set acceleratorPolicy(AcceleratorPolicy value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasAcceleratorPolicy() => $_has(9);
+  $core.bool hasAcceleratorPolicy() => $_has(8);
   @$pb.TagNumber(10)
   void clearAcceleratorPolicy() => $_clearField(10);
 }
@@ -2912,6 +2526,7 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     $core.String? runtimeVersion,
     $core.String? abiVersion,
     $core.String? fallbackReason,
+    $core.int? allocatedContextLength,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -2931,6 +2546,8 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     if (runtimeVersion != null) result.runtimeVersion = runtimeVersion;
     if (abiVersion != null) result.abiVersion = abiVersion;
     if (fallbackReason != null) result.fallbackReason = fallbackReason;
+    if (allocatedContextLength != null)
+      result.allocatedContextLength = allocatedContextLength;
     return result;
   }
 
@@ -2968,6 +2585,7 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     ..aOS(16, _omitFieldNames ? '' : 'runtimeVersion')
     ..aOS(17, _omitFieldNames ? '' : 'abiVersion')
     ..aOS(18, _omitFieldNames ? '' : 'fallbackReason')
+    ..aI(19, _omitFieldNames ? '' : 'allocatedContextLength')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3127,6 +2745,17 @@ class ModelLoadResult extends $pb.GeneratedMessage {
   $core.bool hasFallbackReason() => $_has(15);
   @$pb.TagNumber(18)
   void clearFallbackReason() => $_clearField(18);
+
+  /// What context length the runtime actually allocated -- a request is
+  /// not a promise.
+  @$pb.TagNumber(19)
+  $core.int get allocatedContextLength => $_getIZ(16);
+  @$pb.TagNumber(19)
+  set allocatedContextLength($core.int value) => $_setSignedInt32(16, value);
+  @$pb.TagNumber(19)
+  $core.bool hasAllocatedContextLength() => $_has(16);
+  @$pb.TagNumber(19)
+  void clearAllocatedContextLength() => $_clearField(19);
 }
 
 class ModelUnloadRequest extends $pb.GeneratedMessage {
@@ -3538,23 +3167,19 @@ class CurrentModelResult extends $pb.GeneratedMessage {
   $1.SDKError ensureError() => $_ensure(8);
 }
 
+/// delete(model_id) frees DISK. It always unloads the model first if it is
+/// resident -- there is no flag, and no failure mode for "still loaded".
+/// Entries whose source is MODEL_SOURCE_BUILT_IN are never deletable and fail
+/// with an SDKError. Success is the absence of `error`.
 class ModelDeleteResult extends $pb.GeneratedMessage {
   factory ModelDeleteResult({
     $core.String? modelId,
     $fixnum.Int64? deletedBytes,
-    $core.bool? filesDeleted,
-    $core.bool? registryUpdated,
-    $core.bool? wasLoaded,
-    $core.Iterable<$core.String>? warnings,
     $1.SDKError? error,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
     if (deletedBytes != null) result.deletedBytes = deletedBytes;
-    if (filesDeleted != null) result.filesDeleted = filesDeleted;
-    if (registryUpdated != null) result.registryUpdated = registryUpdated;
-    if (wasLoaded != null) result.wasLoaded = wasLoaded;
-    if (warnings != null) result.warnings.addAll(warnings);
     if (error != null) result.error = error;
     return result;
   }
@@ -3574,10 +3199,6 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aInt64(3, _omitFieldNames ? '' : 'deletedBytes')
-    ..aOB(4, _omitFieldNames ? '' : 'filesDeleted')
-    ..aOB(5, _omitFieldNames ? '' : 'registryUpdated')
-    ..aOB(6, _omitFieldNames ? '' : 'wasLoaded')
-    ..pPS(8, _omitFieldNames ? '' : 'warnings')
     ..aOM<$1.SDKError>(9, _omitFieldNames ? '' : 'error',
         subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
@@ -3619,46 +3240,16 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearDeletedBytes() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  $core.bool get filesDeleted => $_getBF(2);
-  @$pb.TagNumber(4)
-  set filesDeleted($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(4)
-  $core.bool hasFilesDeleted() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearFilesDeleted() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.bool get registryUpdated => $_getBF(3);
-  @$pb.TagNumber(5)
-  set registryUpdated($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(5)
-  $core.bool hasRegistryUpdated() => $_has(3);
-  @$pb.TagNumber(5)
-  void clearRegistryUpdated() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.bool get wasLoaded => $_getBF(4);
-  @$pb.TagNumber(6)
-  set wasLoaded($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(6)
-  $core.bool hasWasLoaded() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearWasLoaded() => $_clearField(6);
-
-  @$pb.TagNumber(8)
-  $pb.PbList<$core.String> get warnings => $_getList(5);
-
   @$pb.TagNumber(9)
-  $1.SDKError get error => $_getN(6);
+  $1.SDKError get error => $_getN(2);
   @$pb.TagNumber(9)
   set error($1.SDKError value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasError() => $_has(6);
+  $core.bool hasError() => $_has(2);
   @$pb.TagNumber(9)
   void clearError() => $_clearField(9);
   @$pb.TagNumber(9)
-  $1.SDKError ensureError() => $_ensure(6);
+  $1.SDKError ensureError() => $_ensure(2);
 }
 
 /// ---------------------------------------------------------------------------
@@ -3672,7 +3263,6 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
 class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   factory ModelCompatibilityRequest({
     $core.String? modelId,
-    $2.HardwareProfile? hardwareProfile,
     $fixnum.Int64? availableRamBytes,
     $fixnum.Int64? availableStorageBytes,
     $2.AccelerationPreference? acceleratorPreference,
@@ -3680,7 +3270,6 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
-    if (hardwareProfile != null) result.hardwareProfile = hardwareProfile;
     if (availableRamBytes != null) result.availableRamBytes = availableRamBytes;
     if (availableStorageBytes != null)
       result.availableStorageBytes = availableStorageBytes;
@@ -3705,14 +3294,12 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOM<$2.HardwareProfile>(2, _omitFieldNames ? '' : 'hardwareProfile',
-        subBuilder: $2.HardwareProfile.create)
-    ..aInt64(3, _omitFieldNames ? '' : 'availableRamBytes')
-    ..aInt64(4, _omitFieldNames ? '' : 'availableStorageBytes')
+    ..aInt64(2, _omitFieldNames ? '' : 'availableRamBytes')
+    ..aInt64(3, _omitFieldNames ? '' : 'availableStorageBytes')
     ..aE<$2.AccelerationPreference>(
-        5, _omitFieldNames ? '' : 'acceleratorPreference',
+        4, _omitFieldNames ? '' : 'acceleratorPreference',
         enumValues: $2.AccelerationPreference.values)
-    ..aE<InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework',
+    ..aE<InferenceFramework>(5, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: InferenceFramework.values)
     ..hasRequiredFields = false;
 
@@ -3746,61 +3333,47 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearModelId() => $_clearField(1);
 
-  /// Optional cached hardware profile from the platform adapter. If
-  /// unset, commons will read whatever it has cached internally; the
-  /// RAM/storage values below remain authoritative for the verdict.
-  @$pb.TagNumber(2)
-  $2.HardwareProfile get hardwareProfile => $_getN(1);
-  @$pb.TagNumber(2)
-  set hardwareProfile($2.HardwareProfile value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasHardwareProfile() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearHardwareProfile() => $_clearField(2);
-  @$pb.TagNumber(2)
-  $2.HardwareProfile ensureHardwareProfile() => $_ensure(1);
-
   /// Available RAM in bytes (from device probe). 0 = unknown — commons
   /// will treat the requirement as satisfied.
-  @$pb.TagNumber(3)
-  $fixnum.Int64 get availableRamBytes => $_getI64(2);
-  @$pb.TagNumber(3)
-  set availableRamBytes($fixnum.Int64 value) => $_setInt64(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasAvailableRamBytes() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearAvailableRamBytes() => $_clearField(3);
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get availableRamBytes => $_getI64(1);
+  @$pb.TagNumber(2)
+  set availableRamBytes($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAvailableRamBytes() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAvailableRamBytes() => $_clearField(2);
 
   /// Available storage in bytes (from filesystem probe). 0 = unknown.
-  @$pb.TagNumber(4)
-  $fixnum.Int64 get availableStorageBytes => $_getI64(3);
-  @$pb.TagNumber(4)
-  set availableStorageBytes($fixnum.Int64 value) => $_setInt64(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasAvailableStorageBytes() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearAvailableStorageBytes() => $_clearField(4);
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get availableStorageBytes => $_getI64(2);
+  @$pb.TagNumber(3)
+  set availableStorageBytes($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAvailableStorageBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAvailableStorageBytes() => $_clearField(3);
 
   /// Optional caller preferences (acceleration, framework). Reserved for
   /// future use; today's verdict is based on memory/storage alone.
-  @$pb.TagNumber(5)
-  $2.AccelerationPreference get acceleratorPreference => $_getN(4);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
+  $2.AccelerationPreference get acceleratorPreference => $_getN(3);
+  @$pb.TagNumber(4)
   set acceleratorPreference($2.AccelerationPreference value) =>
-      $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasAcceleratorPreference() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearAcceleratorPreference() => $_clearField(5);
+      $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAcceleratorPreference() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAcceleratorPreference() => $_clearField(4);
 
-  @$pb.TagNumber(6)
-  InferenceFramework get preferredFramework => $_getN(5);
-  @$pb.TagNumber(6)
-  set preferredFramework(InferenceFramework value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasPreferredFramework() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearPreferredFramework() => $_clearField(6);
+  @$pb.TagNumber(5)
+  InferenceFramework get preferredFramework => $_getN(4);
+  @$pb.TagNumber(5)
+  set preferredFramework(InferenceFramework value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPreferredFramework() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPreferredFramework() => $_clearField(5);
 }
 
 class ModelCompatibilityResult extends $pb.GeneratedMessage {

@@ -45,186 +45,193 @@ public class DeviceInfo(
     schemaIndex = 0,
   )
   public val device_model: String = "",
-  /**
-   * User-facing device name.
-   */
   @field:WireField(
     tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.Platform#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "deviceName",
     schemaIndex = 1,
   )
-  public val device_name: String = "",
-  /**
-   * "ios" | "android" | "macos" | "web" | ...
-   */
+  public val platform: Platform = Platform.PLATFORM_UNSPECIFIED,
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "osVersion",
     schemaIndex = 2,
   )
-  public val platform: String = "",
+  public val os_version: String = "",
   @field:WireField(
     tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.FormFactor#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "osVersion",
+    jsonName = "formFactor",
     schemaIndex = 3,
   )
-  public val os_version: String = "",
+  public val form_factor: FormFactor = FormFactor.FORM_FACTOR_UNSPECIFIED,
   /**
-   * "phone" | "tablet" | "desktop" | ...
+   * ABI name as the OS reports it: Android sends Build.SUPPORTED_ABIS\[0\]
+   * ("arm64-v8a"), Apple "arm64", Web "wasm32". Kept a string because no
+   * industry API enumerates ABIs — but the spelling is the OS's, not ours.
    */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "formFactor",
     schemaIndex = 4,
-  )
-  public val form_factor: String = "",
-  /**
-   * "arm64" | "x86_64" | "wasm32" | ...
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
   )
   public val architecture: String = "",
   /**
    * e.g. "Apple A17 Pro".
    */
   @field:WireField(
-    tag = 7,
+    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "chipName",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val chip_name: String = "",
   /**
-   * Bytes.
+   * Physical RAM installed, in BYTES. Never the JVM heap cap — Android must
+   * read ActivityManager.MemoryInfo.totalMem, not Runtime.maxMemory().
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "totalMemoryBytes",
+    schemaIndex = 6,
+  )
+  public val total_memory_bytes: Long = 0L,
+  /**
+   * Free + reclaimable system RAM at snapshot time, in BYTES.
+   * 0 = UNKNOWN (the Web producer cannot read it). A consumer MUST NOT read
+   * 0 as "no memory left" and refuse to load.
    */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "totalMemory",
+    jsonName = "availableMemoryBytes",
     schemaIndex = 7,
   )
-  public val total_memory: Long = 0L,
+  public val available_memory_bytes: Long = 0L,
   /**
-   * Bytes.
+   * Dedicated neural accelerator present (ANE, Hexagon, APU, ...).
    */
   @field:WireField(
     tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "availableMemory",
-    schemaIndex = 8,
-  )
-  public val available_memory: Long = 0L,
-  @field:WireField(
-    tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "hasNeuralEngine",
-    schemaIndex = 9,
+    jsonName = "hasNpu",
+    schemaIndex = 8,
   )
-  public val has_neural_engine: Boolean = false,
+  public val has_npu: Boolean = false,
+  /**
+   * 0 = none OR present-but-unreported.
+   */
   @field:WireField(
-    tag = 11,
+    tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "neuralEngineCores",
-    schemaIndex = 10,
+    jsonName = "npuCores",
+    schemaIndex = 9,
   )
-  public val neural_engine_cores: Int = 0,
+  public val npu_cores: Int = 0,
   @field:WireField(
-    tag = 12,
+    tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "gpuFamily",
-    schemaIndex = 11,
+    schemaIndex = 10,
   )
   public val gpu_family: String = "",
   /**
-   * 0.0–1.0; unset when unavailable.
+   * Remaining charge as a fraction of full. ABSENT is the ONLY encoding of
+   * "unknown" — 0.0 means a flat battery, not an unreadable one. Producers
+   * bridging through rac_device_registration_info_t (which uses a negative
+   * sentinel) MUST map negative -> absent, never negative -> 0.
    */
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
-    tag = 13,
+    tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     jsonName = "batteryLevel",
-    schemaIndex = 12,
+    schemaIndex = 11,
   )
   public val battery_level: Float? = null,
   /**
-   * "charging" | "unplugged" | "full" | ...
+   * ABSENT when the platform reports no battery at all; UNSPECIFIED when a
+   * battery exists but its state could not be read. The C ABI member is
+   * documented NULL-if-unavailable, which is why this stays `optional`.
    */
   @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.BatteryState#ADAPTER",
     jsonName = "batteryState",
-    schemaIndex = 13,
+    schemaIndex = 12,
   )
-  public val battery_state: String? = null,
+  public val battery_state: BatteryState? = null,
   @field:WireField(
-    tag = 15,
+    tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isLowPowerMode",
-    schemaIndex = 14,
+    schemaIndex = 13,
   )
   public val is_low_power_mode: Boolean = false,
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "coreCount",
+    schemaIndex = 14,
+  )
+  public val core_count: Int = 0,
   @field:WireField(
     tag = 16,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "coreCount",
-    schemaIndex = 15,
-  )
-  public val core_count: Int = 0,
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "performanceCores",
-    schemaIndex = 16,
+    schemaIndex = 15,
   )
   public val performance_cores: Int = 0,
   @field:WireField(
-    tag = 18,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "efficiencyCores",
-    schemaIndex = 17,
-  )
-  public val efficiency_cores: Int = 0,
-  @field:WireField(
-    tag = 19,
+    tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "deviceFingerprint",
-    schemaIndex = 18,
+    schemaIndex = 16,
   )
   public val device_fingerprint: String? = null,
   platform_extras: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DeviceInfo, Nothing>(ADAPTER, unknownFields) {
   /**
-   * Platform-specific fields that are not part of the cross-SDK core
-   * (e.g. web: "has_webgpu", "has_shared_array_buffer"; android: "manufacturer",
-   * "android_api_level", "os_build_id", ...).
+   * Vendor escape hatch, CLOSED key set:
+   *   android: "manufacturer", "device_id", "os_build_id", "sdk_version",
+   *            "android_api_level", "locale", "timezone"
+   *   web:     "has_webgpu", "has_shared_array_buffer"
+   *
+   * "manufacturer" and "device_id" are the only two the native parser reads
+   * ("device_id" arrives as a promoted top-level JSON key). Keys not listed
+   * here are NOT dropped: the Kotlin serializer flattens them into the
+   * outbound registration body verbatim, where no client code reads them.
+   *
+   * A key that restates a typed field above MUST NOT be sent — "device_type",
+   * "os_name", "processor_count" and "is_simulator" were removed for exactly
+   * that reason, and "device_id" duplicates device_fingerprint and should
+   * follow once the native parser reads the typed field instead.
+   *
+   * Values are always strings. This map does not cross the C ABI on Apple
+   * platforms, so nothing load-bearing may live here.
    */
   @field:WireField(
-    tag = 20,
+    tag = 18,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "platformExtras",
-    schemaIndex = 19,
+    schemaIndex = 17,
   )
   public val platform_extras: Map<String, String> =
       immutableCopyOf("platform_extras", platform_extras)
@@ -240,23 +247,21 @@ public class DeviceInfo(
     if (other !is DeviceInfo) return false
     if (unknownFields != other.unknownFields) return false
     if (device_model != other.device_model) return false
-    if (device_name != other.device_name) return false
     if (platform != other.platform) return false
     if (os_version != other.os_version) return false
     if (form_factor != other.form_factor) return false
     if (architecture != other.architecture) return false
     if (chip_name != other.chip_name) return false
-    if (total_memory != other.total_memory) return false
-    if (available_memory != other.available_memory) return false
-    if (has_neural_engine != other.has_neural_engine) return false
-    if (neural_engine_cores != other.neural_engine_cores) return false
+    if (total_memory_bytes != other.total_memory_bytes) return false
+    if (available_memory_bytes != other.available_memory_bytes) return false
+    if (has_npu != other.has_npu) return false
+    if (npu_cores != other.npu_cores) return false
     if (gpu_family != other.gpu_family) return false
     if (battery_level != other.battery_level) return false
     if (battery_state != other.battery_state) return false
     if (is_low_power_mode != other.is_low_power_mode) return false
     if (core_count != other.core_count) return false
     if (performance_cores != other.performance_cores) return false
-    if (efficiency_cores != other.efficiency_cores) return false
     if (device_fingerprint != other.device_fingerprint) return false
     if (platform_extras != other.platform_extras) return false
     return true
@@ -267,23 +272,21 @@ public class DeviceInfo(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + device_model.hashCode()
-      result = result * 37 + device_name.hashCode()
       result = result * 37 + platform.hashCode()
       result = result * 37 + os_version.hashCode()
       result = result * 37 + form_factor.hashCode()
       result = result * 37 + architecture.hashCode()
       result = result * 37 + chip_name.hashCode()
-      result = result * 37 + total_memory.hashCode()
-      result = result * 37 + available_memory.hashCode()
-      result = result * 37 + has_neural_engine.hashCode()
-      result = result * 37 + neural_engine_cores.hashCode()
+      result = result * 37 + total_memory_bytes.hashCode()
+      result = result * 37 + available_memory_bytes.hashCode()
+      result = result * 37 + has_npu.hashCode()
+      result = result * 37 + npu_cores.hashCode()
       result = result * 37 + gpu_family.hashCode()
       result = result * 37 + (battery_level?.hashCode() ?: 0)
       result = result * 37 + (battery_state?.hashCode() ?: 0)
       result = result * 37 + is_low_power_mode.hashCode()
       result = result * 37 + core_count.hashCode()
       result = result * 37 + performance_cores.hashCode()
-      result = result * 37 + efficiency_cores.hashCode()
       result = result * 37 + (device_fingerprint?.hashCode() ?: 0)
       result = result * 37 + platform_extras.hashCode()
       super.hashCode = result
@@ -294,23 +297,21 @@ public class DeviceInfo(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """device_model=${sanitize(device_model)}"""
-    result += """device_name=${sanitize(device_name)}"""
-    result += """platform=${sanitize(platform)}"""
+    result += """platform=$platform"""
     result += """os_version=${sanitize(os_version)}"""
-    result += """form_factor=${sanitize(form_factor)}"""
+    result += """form_factor=$form_factor"""
     result += """architecture=${sanitize(architecture)}"""
     result += """chip_name=${sanitize(chip_name)}"""
-    result += """total_memory=$total_memory"""
-    result += """available_memory=$available_memory"""
-    result += """has_neural_engine=$has_neural_engine"""
-    result += """neural_engine_cores=$neural_engine_cores"""
+    result += """total_memory_bytes=$total_memory_bytes"""
+    result += """available_memory_bytes=$available_memory_bytes"""
+    result += """has_npu=$has_npu"""
+    result += """npu_cores=$npu_cores"""
     result += """gpu_family=${sanitize(gpu_family)}"""
     if (battery_level != null) result += """battery_level=$battery_level"""
-    if (battery_state != null) result += """battery_state=${sanitize(battery_state)}"""
+    if (battery_state != null) result += """battery_state=$battery_state"""
     result += """is_low_power_mode=$is_low_power_mode"""
     result += """core_count=$core_count"""
     result += """performance_cores=$performance_cores"""
-    result += """efficiency_cores=$efficiency_cores"""
     if (device_fingerprint != null) result += """device_fingerprint=${sanitize(device_fingerprint)}"""
     if (platform_extras.isNotEmpty()) result += """platform_extras=$platform_extras"""
     return result.joinToString(prefix = "DeviceInfo{", separator = ", ", postfix = "}")
@@ -318,27 +319,25 @@ public class DeviceInfo(
 
   public fun copy(
     device_model: String = this.device_model,
-    device_name: String = this.device_name,
-    platform: String = this.platform,
+    platform: Platform = this.platform,
     os_version: String = this.os_version,
-    form_factor: String = this.form_factor,
+    form_factor: FormFactor = this.form_factor,
     architecture: String = this.architecture,
     chip_name: String = this.chip_name,
-    total_memory: Long = this.total_memory,
-    available_memory: Long = this.available_memory,
-    has_neural_engine: Boolean = this.has_neural_engine,
-    neural_engine_cores: Int = this.neural_engine_cores,
+    total_memory_bytes: Long = this.total_memory_bytes,
+    available_memory_bytes: Long = this.available_memory_bytes,
+    has_npu: Boolean = this.has_npu,
+    npu_cores: Int = this.npu_cores,
     gpu_family: String = this.gpu_family,
     battery_level: Float? = this.battery_level,
-    battery_state: String? = this.battery_state,
+    battery_state: BatteryState? = this.battery_state,
     is_low_power_mode: Boolean = this.is_low_power_mode,
     core_count: Int = this.core_count,
     performance_cores: Int = this.performance_cores,
-    efficiency_cores: Int = this.efficiency_cores,
     device_fingerprint: String? = this.device_fingerprint,
     platform_extras: Map<String, String> = this.platform_extras,
     unknownFields: ByteString = this.unknownFields,
-  ): DeviceInfo = DeviceInfo(device_model, device_name, platform, os_version, form_factor, architecture, chip_name, total_memory, available_memory, has_neural_engine, neural_engine_cores, gpu_family, battery_level, battery_state, is_low_power_mode, core_count, performance_cores, efficiency_cores, device_fingerprint, platform_extras, unknownFields)
+  ): DeviceInfo = DeviceInfo(device_model, platform, os_version, form_factor, architecture, chip_name, total_memory_bytes, available_memory_bytes, has_npu, npu_cores, gpu_family, battery_level, battery_state, is_low_power_mode, core_count, performance_cores, device_fingerprint, platform_extras, unknownFields)
 
   public companion object {
     @JvmField
@@ -358,55 +357,49 @@ public class DeviceInfo(
         if (value.device_model != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.device_model)
         }
-        if (value.device_name != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.device_name)
-        }
-        if (value.platform != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.platform)
+        if (value.platform != ai.runanywhere.proto.v1.Platform.PLATFORM_UNSPECIFIED) {
+          size += Platform.ADAPTER.encodedSizeWithTag(2, value.platform)
         }
         if (value.os_version != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.os_version)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.os_version)
         }
-        if (value.form_factor != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.form_factor)
+        if (value.form_factor != ai.runanywhere.proto.v1.FormFactor.FORM_FACTOR_UNSPECIFIED) {
+          size += FormFactor.ADAPTER.encodedSizeWithTag(4, value.form_factor)
         }
         if (value.architecture != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.architecture)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.architecture)
         }
         if (value.chip_name != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.chip_name)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.chip_name)
         }
-        if (value.total_memory != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.total_memory)
+        if (value.total_memory_bytes != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.total_memory_bytes)
         }
-        if (value.available_memory != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.available_memory)
+        if (value.available_memory_bytes != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.available_memory_bytes)
         }
-        if (value.has_neural_engine != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.has_neural_engine)
+        if (value.has_npu != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.has_npu)
         }
-        if (value.neural_engine_cores != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.neural_engine_cores)
+        if (value.npu_cores != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.npu_cores)
         }
         if (value.gpu_family != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.gpu_family)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.gpu_family)
         }
-        size += ProtoAdapter.FLOAT.encodedSizeWithTag(13, value.battery_level)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.battery_state)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(12, value.battery_level)
+        size += BatteryState.ADAPTER.encodedSizeWithTag(13, value.battery_state)
         if (value.is_low_power_mode != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(15, value.is_low_power_mode)
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(14, value.is_low_power_mode)
         }
         if (value.core_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(16, value.core_count)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(15, value.core_count)
         }
         if (value.performance_cores != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(17, value.performance_cores)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(16, value.performance_cores)
         }
-        if (value.efficiency_cores != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(18, value.efficiency_cores)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.device_fingerprint)
-        size += platform_extrasAdapter.encodedSizeWithTag(20, value.platform_extras)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.device_fingerprint)
+        size += platform_extrasAdapter.encodedSizeWithTag(18, value.platform_extras)
         return size
       }
 
@@ -414,108 +407,96 @@ public class DeviceInfo(
         if (value.device_model != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.device_model)
         }
-        if (value.device_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.device_name)
-        }
-        if (value.platform != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.platform)
+        if (value.platform != ai.runanywhere.proto.v1.Platform.PLATFORM_UNSPECIFIED) {
+          Platform.ADAPTER.encodeWithTag(writer, 2, value.platform)
         }
         if (value.os_version != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.os_version)
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.os_version)
         }
-        if (value.form_factor != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.form_factor)
+        if (value.form_factor != ai.runanywhere.proto.v1.FormFactor.FORM_FACTOR_UNSPECIFIED) {
+          FormFactor.ADAPTER.encodeWithTag(writer, 4, value.form_factor)
         }
         if (value.architecture != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.architecture)
+          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.architecture)
         }
         if (value.chip_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.chip_name)
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.chip_name)
         }
-        if (value.total_memory != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.total_memory)
+        if (value.total_memory_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.total_memory_bytes)
         }
-        if (value.available_memory != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.available_memory)
+        if (value.available_memory_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.available_memory_bytes)
         }
-        if (value.has_neural_engine != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_neural_engine)
+        if (value.has_npu != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.has_npu)
         }
-        if (value.neural_engine_cores != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.neural_engine_cores)
+        if (value.npu_cores != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.npu_cores)
         }
         if (value.gpu_family != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.gpu_family)
+          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.gpu_family)
         }
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 13, value.battery_level)
-        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.battery_state)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.battery_level)
+        BatteryState.ADAPTER.encodeWithTag(writer, 13, value.battery_state)
         if (value.is_low_power_mode != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.is_low_power_mode)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.is_low_power_mode)
         }
         if (value.core_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.core_count)
+          ProtoAdapter.INT32.encodeWithTag(writer, 15, value.core_count)
         }
         if (value.performance_cores != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.performance_cores)
+          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.performance_cores)
         }
-        if (value.efficiency_cores != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 18, value.efficiency_cores)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 19, value.device_fingerprint)
-        platform_extrasAdapter.encodeWithTag(writer, 20, value.platform_extras)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.device_fingerprint)
+        platform_extrasAdapter.encodeWithTag(writer, 18, value.platform_extras)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DeviceInfo) {
         writer.writeBytes(value.unknownFields)
-        platform_extrasAdapter.encodeWithTag(writer, 20, value.platform_extras)
-        ProtoAdapter.STRING.encodeWithTag(writer, 19, value.device_fingerprint)
-        if (value.efficiency_cores != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 18, value.efficiency_cores)
-        }
+        platform_extrasAdapter.encodeWithTag(writer, 18, value.platform_extras)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.device_fingerprint)
         if (value.performance_cores != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.performance_cores)
+          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.performance_cores)
         }
         if (value.core_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.core_count)
+          ProtoAdapter.INT32.encodeWithTag(writer, 15, value.core_count)
         }
         if (value.is_low_power_mode != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.is_low_power_mode)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.is_low_power_mode)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.battery_state)
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 13, value.battery_level)
+        BatteryState.ADAPTER.encodeWithTag(writer, 13, value.battery_state)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.battery_level)
         if (value.gpu_family != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.gpu_family)
+          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.gpu_family)
         }
-        if (value.neural_engine_cores != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.neural_engine_cores)
+        if (value.npu_cores != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.npu_cores)
         }
-        if (value.has_neural_engine != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_neural_engine)
+        if (value.has_npu != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.has_npu)
         }
-        if (value.available_memory != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.available_memory)
+        if (value.available_memory_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.available_memory_bytes)
         }
-        if (value.total_memory != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 8, value.total_memory)
+        if (value.total_memory_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.total_memory_bytes)
         }
         if (value.chip_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.chip_name)
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.chip_name)
         }
         if (value.architecture != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.architecture)
+          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.architecture)
         }
-        if (value.form_factor != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.form_factor)
+        if (value.form_factor != ai.runanywhere.proto.v1.FormFactor.FORM_FACTOR_UNSPECIFIED) {
+          FormFactor.ADAPTER.encodeWithTag(writer, 4, value.form_factor)
         }
         if (value.os_version != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.os_version)
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.os_version)
         }
-        if (value.platform != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.platform)
-        }
-        if (value.device_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.device_name)
+        if (value.platform != ai.runanywhere.proto.v1.Platform.PLATFORM_UNSPECIFIED) {
+          Platform.ADAPTER.encodeWithTag(writer, 2, value.platform)
         }
         if (value.device_model != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.device_model)
@@ -524,69 +505,75 @@ public class DeviceInfo(
 
       override fun decode(reader: ProtoReader): DeviceInfo {
         var device_model: String = ""
-        var device_name: String = ""
-        var platform: String = ""
+        var platform: Platform = Platform.PLATFORM_UNSPECIFIED
         var os_version: String = ""
-        var form_factor: String = ""
+        var form_factor: FormFactor = FormFactor.FORM_FACTOR_UNSPECIFIED
         var architecture: String = ""
         var chip_name: String = ""
-        var total_memory: Long = 0L
-        var available_memory: Long = 0L
-        var has_neural_engine: Boolean = false
-        var neural_engine_cores: Int = 0
+        var total_memory_bytes: Long = 0L
+        var available_memory_bytes: Long = 0L
+        var has_npu: Boolean = false
+        var npu_cores: Int = 0
         var gpu_family: String = ""
         var battery_level: Float? = null
-        var battery_state: String? = null
+        var battery_state: BatteryState? = null
         var is_low_power_mode: Boolean = false
         var core_count: Int = 0
         var performance_cores: Int = 0
-        var efficiency_cores: Int = 0
         var device_fingerprint: String? = null
         val platform_extras = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> device_model = ProtoAdapter.STRING.decode(reader)
-            2 -> device_name = ProtoAdapter.STRING.decode(reader)
-            3 -> platform = ProtoAdapter.STRING.decode(reader)
-            4 -> os_version = ProtoAdapter.STRING.decode(reader)
-            5 -> form_factor = ProtoAdapter.STRING.decode(reader)
-            6 -> architecture = ProtoAdapter.STRING.decode(reader)
-            7 -> chip_name = ProtoAdapter.STRING.decode(reader)
-            8 -> total_memory = ProtoAdapter.INT64.decode(reader)
-            9 -> available_memory = ProtoAdapter.INT64.decode(reader)
-            10 -> has_neural_engine = ProtoAdapter.BOOL.decode(reader)
-            11 -> neural_engine_cores = ProtoAdapter.INT32.decode(reader)
-            12 -> gpu_family = ProtoAdapter.STRING.decode(reader)
-            13 -> battery_level = ProtoAdapter.FLOAT.decode(reader)
-            14 -> battery_state = ProtoAdapter.STRING.decode(reader)
-            15 -> is_low_power_mode = ProtoAdapter.BOOL.decode(reader)
-            16 -> core_count = ProtoAdapter.INT32.decode(reader)
-            17 -> performance_cores = ProtoAdapter.INT32.decode(reader)
-            18 -> efficiency_cores = ProtoAdapter.INT32.decode(reader)
-            19 -> device_fingerprint = ProtoAdapter.STRING.decode(reader)
-            20 -> platform_extras.putAll(platform_extrasAdapter.decode(reader))
+            2 -> try {
+              platform = Platform.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            3 -> os_version = ProtoAdapter.STRING.decode(reader)
+            4 -> try {
+              form_factor = FormFactor.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            5 -> architecture = ProtoAdapter.STRING.decode(reader)
+            6 -> chip_name = ProtoAdapter.STRING.decode(reader)
+            7 -> total_memory_bytes = ProtoAdapter.INT64.decode(reader)
+            8 -> available_memory_bytes = ProtoAdapter.INT64.decode(reader)
+            9 -> has_npu = ProtoAdapter.BOOL.decode(reader)
+            10 -> npu_cores = ProtoAdapter.INT32.decode(reader)
+            11 -> gpu_family = ProtoAdapter.STRING.decode(reader)
+            12 -> battery_level = ProtoAdapter.FLOAT.decode(reader)
+            13 -> try {
+              battery_state = BatteryState.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            14 -> is_low_power_mode = ProtoAdapter.BOOL.decode(reader)
+            15 -> core_count = ProtoAdapter.INT32.decode(reader)
+            16 -> performance_cores = ProtoAdapter.INT32.decode(reader)
+            17 -> device_fingerprint = ProtoAdapter.STRING.decode(reader)
+            18 -> platform_extras.putAll(platform_extrasAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
         return DeviceInfo(
           device_model = device_model,
-          device_name = device_name,
           platform = platform,
           os_version = os_version,
           form_factor = form_factor,
           architecture = architecture,
           chip_name = chip_name,
-          total_memory = total_memory,
-          available_memory = available_memory,
-          has_neural_engine = has_neural_engine,
-          neural_engine_cores = neural_engine_cores,
+          total_memory_bytes = total_memory_bytes,
+          available_memory_bytes = available_memory_bytes,
+          has_npu = has_npu,
+          npu_cores = npu_cores,
           gpu_family = gpu_family,
           battery_level = battery_level,
           battery_state = battery_state,
           is_low_power_mode = is_low_power_mode,
           core_count = core_count,
           performance_cores = performance_cores,
-          efficiency_cores = efficiency_cores,
           device_fingerprint = device_fingerprint,
           platform_extras = platform_extras,
           unknownFields = unknownFields

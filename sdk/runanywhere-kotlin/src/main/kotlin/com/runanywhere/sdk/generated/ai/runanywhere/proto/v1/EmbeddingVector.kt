@@ -17,7 +17,6 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -30,47 +29,22 @@ import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
 import kotlin.collections.List
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 public class EmbeddingVector(
   values: List<Float> = emptyList(),
   /**
-   * Populated when the backend computes it, letting consumers score
-   * similarity without recomputing.
+   * Zero-based position in the request batch. ALWAYS set, on every entry
+   * point, including index 0.
    */
   @field:WireField(
     tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    schemaIndex = 1,
-  )
-  public val norm: Float? = null,
-  /**
-   * Lets batch callers correlate vectors with inputs without tracking order.
-   */
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 2,
-  )
-  public val text: String? = null,
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val dimension: Int = 0,
-  @field:WireField(
-    tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "inputIndex",
-    schemaIndex = 4,
+    schemaIndex = 1,
   )
   public val input_index: Int = 0,
-  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingVector, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -84,14 +58,6 @@ public class EmbeddingVector(
   )
   public val values: List<Float> = immutableCopyOf("values", values)
 
-  @field:WireField(
-    tag = 6,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 5,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -103,11 +69,7 @@ public class EmbeddingVector(
     if (other !is EmbeddingVector) return false
     if (unknownFields != other.unknownFields) return false
     if (values != other.values) return false
-    if (norm != other.norm) return false
-    if (text != other.text) return false
-    if (dimension != other.dimension) return false
     if (input_index != other.input_index) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -116,11 +78,7 @@ public class EmbeddingVector(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + values.hashCode()
-      result = result * 37 + (norm?.hashCode() ?: 0)
-      result = result * 37 + (text?.hashCode() ?: 0)
-      result = result * 37 + dimension.hashCode()
       result = result * 37 + input_index.hashCode()
-      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -129,23 +87,15 @@ public class EmbeddingVector(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (values.isNotEmpty()) result += """values=$values"""
-    if (norm != null) result += """norm=$norm"""
-    if (text != null) result += """text=${sanitize(text)}"""
-    result += """dimension=$dimension"""
     result += """input_index=$input_index"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "EmbeddingVector{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     values: List<Float> = this.values,
-    norm: Float? = this.norm,
-    text: String? = this.text,
-    dimension: Int = this.dimension,
     input_index: Int = this.input_index,
-    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingVector = EmbeddingVector(values, norm, text, dimension, input_index, metadata, unknownFields)
+  ): EmbeddingVector = EmbeddingVector(values, input_index, unknownFields)
 
   public companion object {
     @JvmField
@@ -157,59 +107,34 @@ public class EmbeddingVector(
       null, 
       "embeddings_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: EmbeddingVector): Int {
         var size = value.unknownFields.size
         size += ProtoAdapter.FLOAT.asPacked().encodedSizeWithTag(1, value.values)
-        size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.norm)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.text)
-        if (value.dimension != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.dimension)
-        }
         if (value.input_index != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.input_index)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.input_index)
         }
-        size += metadataAdapter.encodedSizeWithTag(6, value.metadata)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: EmbeddingVector) {
         ProtoAdapter.FLOAT.asPacked().encodeWithTag(writer, 1, value.values)
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.norm)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.text)
-        if (value.dimension != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.dimension)
-        }
         if (value.input_index != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.input_index)
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.input_index)
         }
-        metadataAdapter.encodeWithTag(writer, 6, value.metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingVector) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 6, value.metadata)
         if (value.input_index != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.input_index)
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.input_index)
         }
-        if (value.dimension != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.dimension)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.text)
-        ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.norm)
         ProtoAdapter.FLOAT.asPacked().encodeWithTag(writer, 1, value.values)
       }
 
       override fun decode(reader: ProtoReader): EmbeddingVector {
         var values: MutableList<Float>? = null
-        var norm: Float? = null
-        var text: String? = null
-        var dimension: Int = 0
         var input_index: Int = 0
-        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> {
@@ -222,21 +147,13 @@ public class EmbeddingVector(
               }
               values!!.add(ProtoAdapter.FLOAT.decode(reader))
             }
-            2 -> norm = ProtoAdapter.FLOAT.decode(reader)
-            3 -> text = ProtoAdapter.STRING.decode(reader)
-            4 -> dimension = ProtoAdapter.INT32.decode(reader)
-            5 -> input_index = ProtoAdapter.INT32.decode(reader)
-            6 -> metadata.putAll(metadataAdapter.decode(reader))
+            2 -> input_index = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return EmbeddingVector(
           values = values ?: listOf(),
-          norm = norm,
-          text = text,
-          dimension = dimension,
           input_index = input_index,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }

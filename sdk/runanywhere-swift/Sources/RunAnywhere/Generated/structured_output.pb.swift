@@ -10,15 +10,15 @@
 
 // RunAnywhere IDL — structured output (JSON Schema, regex, grammar).
 //
-// Generation entry points are first-class C ABI calls, not service RPCs: they
-// consume StructuredOutputRequest and emit StructuredOutputResult or
-// StructuredOutputStreamEvent directly.
+// Structured GENERATION is LLMGenerationOptions.structured_output on the
+// ordinary LLM request (llm_options.proto), which already carries
+// max_output_tokens, temperature, stop_sequences and system_prompt.
+//
+// What remains here is the extract / validate / prepare-prompt surface. Those
+// entry points are first-class C ABI calls, not service RPCs: they consume
+// StructuredOutputParseRequest and emit StructuredOutputResult,
+// StructuredOutputValidation or StructuredOutputPromptResult directly.
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -31,508 +31,73 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-public nonisolated enum RAJSONSchemaType: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case object // = 1
-  case array // = 2
-  case string // = 3
-  case number // = 4
-  case integer // = 5
-  case boolean // = 6
-  case null // = 7
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .object
-    case 2: self = .array
-    case 3: self = .string
-    case 4: self = .number
-    case 5: self = .integer
-    case 6: self = .boolean
-    case 7: self = .null
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .object: return 1
-    case .array: return 2
-    case .string: return 3
-    case .number: return 4
-    case .integer: return 5
-    case .boolean: return 6
-    case .null: return 7
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAJSONSchemaType] = [
-    .unspecified,
-    .object,
-    .array,
-    .string,
-    .number,
-    .integer,
-    .boolean,
-    .null,
-  ]
-
-}
-
-public nonisolated enum RAStructuredOutputMode: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case jsonSchema // = 1
-  case jsonObject // = 2
-  case regex // = 3
-  case grammar // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .jsonSchema
-    case 2: self = .jsonObject
-    case 3: self = .regex
-    case 4: self = .grammar
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .jsonSchema: return 1
-    case .jsonObject: return 2
-    case .regex: return 3
-    case .grammar: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAStructuredOutputMode] = [
-    .unspecified,
-    .jsonSchema,
-    .jsonObject,
-    .regex,
-    .grammar,
-  ]
-
-}
-
-public nonisolated enum RAStructuredOutputStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case token // = 1
-  case partialJson // = 2
-  case validation // = 3
-  case completed // = 4
-  case error // = 5
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .token
-    case 2: self = .partialJson
-    case 3: self = .validation
-    case 4: self = .completed
-    case 5: self = .error
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .token: return 1
-    case .partialJson: return 2
-    case .validation: return 3
-    case .completed: return 4
-    case .error: return 5
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAStructuredOutputStreamEventKind] = [
-    .unspecified,
-    .token,
-    .partialJson,
-    .validation,
-    .completed,
-    .error,
-  ]
-
-}
-
-public nonisolated struct RAJSONSchemaProperty: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var type: RAJSONSchemaType {
-    get {_storage._type}
-    set {_uniqueStorage()._type = newValue}
-  }
-
-  public var description_p: String {
-    get {_storage._description_p ?? String()}
-    set {_uniqueStorage()._description_p = newValue}
-  }
-  /// Returns true if `description_p` has been explicitly set.
-  public var hasDescription_p: Bool {_storage._description_p != nil}
-  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
-  public mutating func clearDescription_p() {_uniqueStorage()._description_p = nil}
-
-  public var enumValues: [String] {
-    get {_storage._enumValues}
-    set {_uniqueStorage()._enumValues = newValue}
-  }
-
-  public var format: String {
-    get {_storage._format ?? String()}
-    set {_uniqueStorage()._format = newValue}
-  }
-  /// Returns true if `format` has been explicitly set.
-  public var hasFormat: Bool {_storage._format != nil}
-  /// Clears the value of `format`. Subsequent reads from it will return its default value.
-  public mutating func clearFormat() {_uniqueStorage()._format = nil}
-
-  /// items_schema for arrays, object_schema for nested objects.
-  public var itemsSchema: RAJSONSchema {
-    get {_storage._itemsSchema ?? RAJSONSchema()}
-    set {_uniqueStorage()._itemsSchema = newValue}
-  }
-  /// Returns true if `itemsSchema` has been explicitly set.
-  public var hasItemsSchema: Bool {_storage._itemsSchema != nil}
-  /// Clears the value of `itemsSchema`. Subsequent reads from it will return its default value.
-  public mutating func clearItemsSchema() {_uniqueStorage()._itemsSchema = nil}
-
-  public var objectSchema: RAJSONSchema {
-    get {_storage._objectSchema ?? RAJSONSchema()}
-    set {_uniqueStorage()._objectSchema = newValue}
-  }
-  /// Returns true if `objectSchema` has been explicitly set.
-  public var hasObjectSchema: Bool {_storage._objectSchema != nil}
-  /// Clears the value of `objectSchema`. Subsequent reads from it will return its default value.
-  public mutating func clearObjectSchema() {_uniqueStorage()._objectSchema = nil}
-
-  public var minimum: Double {
-    get {_storage._minimum ?? 0}
-    set {_uniqueStorage()._minimum = newValue}
-  }
-  /// Returns true if `minimum` has been explicitly set.
-  public var hasMinimum: Bool {_storage._minimum != nil}
-  /// Clears the value of `minimum`. Subsequent reads from it will return its default value.
-  public mutating func clearMinimum() {_uniqueStorage()._minimum = nil}
-
-  public var maximum: Double {
-    get {_storage._maximum ?? 0}
-    set {_uniqueStorage()._maximum = newValue}
-  }
-  /// Returns true if `maximum` has been explicitly set.
-  public var hasMaximum: Bool {_storage._maximum != nil}
-  /// Clears the value of `maximum`. Subsequent reads from it will return its default value.
-  public mutating func clearMaximum() {_uniqueStorage()._maximum = nil}
-
-  public var minLength: Int32 {
-    get {_storage._minLength ?? 0}
-    set {_uniqueStorage()._minLength = newValue}
-  }
-  /// Returns true if `minLength` has been explicitly set.
-  public var hasMinLength: Bool {_storage._minLength != nil}
-  /// Clears the value of `minLength`. Subsequent reads from it will return its default value.
-  public mutating func clearMinLength() {_uniqueStorage()._minLength = nil}
-
-  public var maxLength: Int32 {
-    get {_storage._maxLength ?? 0}
-    set {_uniqueStorage()._maxLength = newValue}
-  }
-  /// Returns true if `maxLength` has been explicitly set.
-  public var hasMaxLength: Bool {_storage._maxLength != nil}
-  /// Clears the value of `maxLength`. Subsequent reads from it will return its default value.
-  public mutating func clearMaxLength() {_uniqueStorage()._maxLength = nil}
-
-  public var pattern: String {
-    get {_storage._pattern ?? String()}
-    set {_uniqueStorage()._pattern = newValue}
-  }
-  /// Returns true if `pattern` has been explicitly set.
-  public var hasPattern: Bool {_storage._pattern != nil}
-  /// Clears the value of `pattern`. Subsequent reads from it will return its default value.
-  public mutating func clearPattern() {_uniqueStorage()._pattern = nil}
-
-  public var minItems: Int32 {
-    get {_storage._minItems ?? 0}
-    set {_uniqueStorage()._minItems = newValue}
-  }
-  /// Returns true if `minItems` has been explicitly set.
-  public var hasMinItems: Bool {_storage._minItems != nil}
-  /// Clears the value of `minItems`. Subsequent reads from it will return its default value.
-  public mutating func clearMinItems() {_uniqueStorage()._minItems = nil}
-
-  public var maxItems: Int32 {
-    get {_storage._maxItems ?? 0}
-    set {_uniqueStorage()._maxItems = newValue}
-  }
-  /// Returns true if `maxItems` has been explicitly set.
-  public var hasMaxItems: Bool {_storage._maxItems != nil}
-  /// Clears the value of `maxItems`. Subsequent reads from it will return its default value.
-  public mutating func clearMaxItems() {_uniqueStorage()._maxItems = nil}
-
-  public var defaultJson: String {
-    get {_storage._defaultJson ?? String()}
-    set {_uniqueStorage()._defaultJson = newValue}
-  }
-  /// Returns true if `defaultJson` has been explicitly set.
-  public var hasDefaultJson: Bool {_storage._defaultJson != nil}
-  /// Clears the value of `defaultJson`. Subsequent reads from it will return its default value.
-  public mutating func clearDefaultJson() {_uniqueStorage()._defaultJson = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-public nonisolated struct RAJSONSchema: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var type: RAJSONSchemaType {
-    get {_storage._type}
-    set {_uniqueStorage()._type = newValue}
-  }
-
-  public var properties: Dictionary<String,RAJSONSchemaProperty> {
-    get {_storage._properties}
-    set {_uniqueStorage()._properties = newValue}
-  }
-
-  public var required: [String] {
-    get {_storage._required}
-    set {_uniqueStorage()._required = newValue}
-  }
-
-  public var items: RAJSONSchemaProperty {
-    get {_storage._items ?? RAJSONSchemaProperty()}
-    set {_uniqueStorage()._items = newValue}
-  }
-  /// Returns true if `items` has been explicitly set.
-  public var hasItems: Bool {_storage._items != nil}
-  /// Clears the value of `items`. Subsequent reads from it will return its default value.
-  public mutating func clearItems() {_uniqueStorage()._items = nil}
-
-  public var additionalProperties: Bool {
-    get {_storage._additionalProperties ?? false}
-    set {_uniqueStorage()._additionalProperties = newValue}
-  }
-  /// Returns true if `additionalProperties` has been explicitly set.
-  public var hasAdditionalProperties: Bool {_storage._additionalProperties != nil}
-  /// Clears the value of `additionalProperties`. Subsequent reads from it will return its default value.
-  public mutating func clearAdditionalProperties() {_uniqueStorage()._additionalProperties = nil}
-
-  public var schemaUri: String {
-    get {_storage._schemaUri ?? String()}
-    set {_uniqueStorage()._schemaUri = newValue}
-  }
-  /// Returns true if `schemaUri` has been explicitly set.
-  public var hasSchemaUri: Bool {_storage._schemaUri != nil}
-  /// Clears the value of `schemaUri`. Subsequent reads from it will return its default value.
-  public mutating func clearSchemaUri() {_uniqueStorage()._schemaUri = nil}
-
-  public var idUri: String {
-    get {_storage._idUri ?? String()}
-    set {_uniqueStorage()._idUri = newValue}
-  }
-  /// Returns true if `idUri` has been explicitly set.
-  public var hasIDUri: Bool {_storage._idUri != nil}
-  /// Clears the value of `idUri`. Subsequent reads from it will return its default value.
-  public mutating func clearIDUri() {_uniqueStorage()._idUri = nil}
-
-  public var title: String {
-    get {_storage._title ?? String()}
-    set {_uniqueStorage()._title = newValue}
-  }
-  /// Returns true if `title` has been explicitly set.
-  public var hasTitle: Bool {_storage._title != nil}
-  /// Clears the value of `title`. Subsequent reads from it will return its default value.
-  public mutating func clearTitle() {_uniqueStorage()._title = nil}
-
-  public var description_p: String {
-    get {_storage._description_p ?? String()}
-    set {_uniqueStorage()._description_p = newValue}
-  }
-  /// Returns true if `description_p` has been explicitly set.
-  public var hasDescription_p: Bool {_storage._description_p != nil}
-  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
-  public mutating func clearDescription_p() {_uniqueStorage()._description_p = nil}
-
-  public var definitions: Dictionary<String,RAJSONSchema> {
-    get {_storage._definitions}
-    set {_uniqueStorage()._definitions = newValue}
-  }
-
-  public var ref: String {
-    get {_storage._ref ?? String()}
-    set {_uniqueStorage()._ref = newValue}
-  }
-  /// Returns true if `ref` has been explicitly set.
-  public var hasRef: Bool {_storage._ref != nil}
-  /// Clears the value of `ref`. Subsequent reads from it will return its default value.
-  public mutating func clearRef() {_uniqueStorage()._ref = nil}
-
-  public var allOf: [RAJSONSchema] {
-    get {_storage._allOf}
-    set {_uniqueStorage()._allOf = newValue}
-  }
-
-  public var anyOf: [RAJSONSchema] {
-    get {_storage._anyOf}
-    set {_uniqueStorage()._anyOf = newValue}
-  }
-
-  public var oneOf: [RAJSONSchema] {
-    get {_storage._oneOf}
-    set {_uniqueStorage()._oneOf = newValue}
-  }
-
-  public var notSchema: RAJSONSchema {
-    get {_storage._notSchema ?? RAJSONSchema()}
-    set {_uniqueStorage()._notSchema = newValue}
-  }
-  /// Returns true if `notSchema` has been explicitly set.
-  public var hasNotSchema: Bool {_storage._notSchema != nil}
-  /// Clears the value of `notSchema`. Subsequent reads from it will return its default value.
-  public mutating func clearNotSchema() {_uniqueStorage()._notSchema = nil}
-
-  /// Escape hatch for schemas the typed shape above cannot express.
-  public var rawJson: String {
-    get {_storage._rawJson ?? String()}
-    set {_uniqueStorage()._rawJson = newValue}
-  }
-  /// Returns true if `rawJson` has been explicitly set.
-  public var hasRawJson: Bool {_storage._rawJson != nil}
-  /// Clears the value of `rawJson`. Subsequent reads from it will return its default value.
-  public mutating func clearRawJson() {_uniqueStorage()._rawJson = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
 public nonisolated struct RAStructuredOutputOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var includeSchemaInPrompt: Bool = false
-
-  /// Not read by commons.
-  public var strictMode: Bool {
-    get {_strictMode ?? false}
-    set {_strictMode = newValue}
+  /// Also render the schema into the system prompt, not just constrain
+  /// decoding. Costs input tokens and invalidates the thread's prompt cache.
+  /// Default true (matches Apple FoundationModels includeSchemaInPrompt).
+  public var includeSchemaInPrompt: Bool {
+    get {_includeSchemaInPrompt ?? false}
+    set {_includeSchemaInPrompt = newValue}
   }
-  /// Returns true if `strictMode` has been explicitly set.
-  public var hasStrictMode: Bool {self._strictMode != nil}
-  /// Clears the value of `strictMode`. Subsequent reads from it will return its default value.
-  public mutating func clearStrictMode() {self._strictMode = nil}
+  /// Returns true if `includeSchemaInPrompt` has been explicitly set.
+  public var hasIncludeSchemaInPrompt: Bool {self._includeSchemaInPrompt != nil}
+  /// Clears the value of `includeSchemaInPrompt`. Subsequent reads from it will return its default value.
+  public mutating func clearIncludeSchemaInPrompt() {self._includeSchemaInPrompt = nil}
 
-  /// Exactly one arm. Commons prefers json_schema when both could be set, so
-  /// setting the typed `schema` and the string form together is an error.
-  public var schemaSource: RAStructuredOutputOptions.OneOf_SchemaSource? = nil
+  /// Exactly one arm; the arm selects the constraint kind. Absent = free text.
+  /// A present arm constrains the DECODER. An engine that cannot enforce the
+  /// arm it was given fails the call; it never degrades to free generation.
+  public var constraint: RAStructuredOutputOptions.OneOf_Constraint? = nil
 
-  public var schema: RAJSONSchema {
+  /// A JSON Schema document, verbatim. Unsupported keywords are rejected.
+  public var schema: String {
     get {
-      if case .schema(let v)? = schemaSource {return v}
-      return RAJSONSchema()
-    }
-    set {schemaSource = .schema(newValue)}
-  }
-
-  public var jsonSchema: String {
-    get {
-      if case .jsonSchema(let v)? = schemaSource {return v}
+      if case .schema(let v)? = constraint {return v}
       return String()
     }
-    set {schemaSource = .jsonSchema(newValue)}
+    set {constraint = .schema(newValue)}
   }
 
-  /// Matches OpenAI's json_schema.name.
-  public var name: String {
-    get {_name ?? String()}
-    set {_name = newValue}
-  }
-  /// Returns true if `name` has been explicitly set.
-  public var hasName: Bool {self._name != nil}
-  /// Clears the value of `name`. Subsequent reads from it will return its default value.
-  public mutating func clearName() {self._name = nil}
-
-  public var mode: RAStructuredOutputMode = .unspecified
-
-  public var regexPattern: String {
-    get {_regexPattern ?? String()}
-    set {_regexPattern = newValue}
-  }
-  /// Returns true if `regexPattern` has been explicitly set.
-  public var hasRegexPattern: Bool {self._regexPattern != nil}
-  /// Clears the value of `regexPattern`. Subsequent reads from it will return its default value.
-  public mutating func clearRegexPattern() {self._regexPattern = nil}
-
+  /// GBNF/EBNF grammar text. On-device only.
   public var grammar: String {
-    get {_grammar ?? String()}
-    set {_grammar = newValue}
+    get {
+      if case .grammar(let v)? = constraint {return v}
+      return String()
+    }
+    set {constraint = .grammar(newValue)}
   }
-  /// Returns true if `grammar` has been explicitly set.
-  public var hasGrammar: Bool {self._grammar != nil}
-  /// Clears the value of `grammar`. Subsequent reads from it will return its default value.
-  public mutating func clearGrammar() {self._grammar = nil}
 
-  /// Attempt to repair malformed JSON before failing.
-  public var repairJson: Bool = false
-
-  public var maxRetries: Int32 = 0
+  /// Regular expression the whole output must match. On-device only.
+  public var regex: String {
+    get {
+      if case .regex(let v)? = constraint {return v}
+      return String()
+    }
+    set {constraint = .regex(newValue)}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  /// Exactly one arm. Commons prefers json_schema when both could be set, so
-  /// setting the typed `schema` and the string form together is an error.
-  public nonisolated enum OneOf_SchemaSource: Equatable, Sendable {
-    case schema(RAJSONSchema)
-    case jsonSchema(String)
+  /// Exactly one arm; the arm selects the constraint kind. Absent = free text.
+  /// A present arm constrains the DECODER. An engine that cannot enforce the
+  /// arm it was given fails the call; it never degrades to free generation.
+  public nonisolated enum OneOf_Constraint: Equatable, Sendable {
+    /// A JSON Schema document, verbatim. Unsupported keywords are rejected.
+    case schema(String)
+    /// GBNF/EBNF grammar text. On-device only.
+    case grammar(String)
+    /// Regular expression the whole output must match. On-device only.
+    case regex(String)
 
   }
 
   public init() {}
 
-  fileprivate var _strictMode: Bool? = nil
-  fileprivate var _name: String? = nil
-  fileprivate var _regexPattern: String? = nil
-  fileprivate var _grammar: String? = nil
+  fileprivate var _includeSchemaInPrompt: Bool? = nil
 }
 
 public nonisolated struct RAStructuredOutputValidation: @unchecked Sendable {
@@ -594,48 +159,48 @@ public nonisolated struct RAStructuredOutputValidation: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RAStructuredOutputResult: @unchecked Sendable {
+public nonisolated struct RAStructuredOutputResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var parsedJson: Data {
-    get {_storage._parsedJson}
-    set {_uniqueStorage()._parsedJson = newValue}
-  }
+  /// The extracted JSON document, as UTF-8 text. Parse it client-side.
+  public var json: String = String()
 
   public var validation: RAStructuredOutputValidation {
-    get {_storage._validation ?? RAStructuredOutputValidation()}
-    set {_uniqueStorage()._validation = newValue}
+    get {_validation ?? RAStructuredOutputValidation()}
+    set {_validation = newValue}
   }
   /// Returns true if `validation` has been explicitly set.
-  public var hasValidation: Bool {_storage._validation != nil}
+  public var hasValidation: Bool {self._validation != nil}
   /// Clears the value of `validation`. Subsequent reads from it will return its default value.
-  public mutating func clearValidation() {_uniqueStorage()._validation = nil}
+  public mutating func clearValidation() {self._validation = nil}
 
   public var rawText: String {
-    get {_storage._rawText ?? String()}
-    set {_uniqueStorage()._rawText = newValue}
+    get {_rawText ?? String()}
+    set {_rawText = newValue}
   }
   /// Returns true if `rawText` has been explicitly set.
-  public var hasRawText: Bool {_storage._rawText != nil}
+  public var hasRawText: Bool {self._rawText != nil}
   /// Clears the value of `rawText`. Subsequent reads from it will return its default value.
-  public mutating func clearRawText() {_uniqueStorage()._rawText = nil}
+  public mutating func clearRawText() {self._rawText = nil}
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _validation: RAStructuredOutputValidation? = nil
+  fileprivate var _rawText: String? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 public nonisolated struct RAStructuredOutputParseRequest: Sendable {
@@ -665,562 +230,76 @@ public nonisolated struct RAStructuredOutputParseRequest: Sendable {
   fileprivate var _options: RAStructuredOutputOptions? = nil
 }
 
-public nonisolated struct RAStructuredOutputValidationRequest: Sendable {
+public nonisolated struct RAStructuredOutputPromptResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var text: String = String()
-
-  public var options: RAStructuredOutputOptions {
-    get {_options ?? RAStructuredOutputOptions()}
-    set {_options = newValue}
-  }
-  /// Returns true if `options` has been explicitly set.
-  public var hasOptions: Bool {self._options != nil}
-  /// Clears the value of `options`. Subsequent reads from it will return its default value.
-  public mutating func clearOptions() {self._options = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _options: RAStructuredOutputOptions? = nil
-}
-
-public nonisolated struct RAStructuredOutputPromptResult: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var preparedPrompt: String {
-    get {_storage._preparedPrompt}
-    set {_uniqueStorage()._preparedPrompt = newValue}
-  }
+  public var preparedPrompt: String = String()
 
   public var systemPrompt: String {
-    get {_storage._systemPrompt ?? String()}
-    set {_uniqueStorage()._systemPrompt = newValue}
+    get {_systemPrompt ?? String()}
+    set {_systemPrompt = newValue}
   }
   /// Returns true if `systemPrompt` has been explicitly set.
-  public var hasSystemPrompt: Bool {_storage._systemPrompt != nil}
+  public var hasSystemPrompt: Bool {self._systemPrompt != nil}
   /// Clears the value of `systemPrompt`. Subsequent reads from it will return its default value.
-  public mutating func clearSystemPrompt() {_uniqueStorage()._systemPrompt = nil}
+  public mutating func clearSystemPrompt() {self._systemPrompt = nil}
 
   public var jsonSchema: String {
-    get {_storage._jsonSchema ?? String()}
-    set {_uniqueStorage()._jsonSchema = newValue}
+    get {_jsonSchema ?? String()}
+    set {_jsonSchema = newValue}
   }
   /// Returns true if `jsonSchema` has been explicitly set.
-  public var hasJsonSchema: Bool {_storage._jsonSchema != nil}
+  public var hasJsonSchema: Bool {self._jsonSchema != nil}
   /// Clears the value of `jsonSchema`. Subsequent reads from it will return its default value.
-  public mutating func clearJsonSchema() {_uniqueStorage()._jsonSchema = nil}
+  public mutating func clearJsonSchema() {self._jsonSchema = nil}
 
   public var regexPattern: String {
-    get {_storage._regexPattern ?? String()}
-    set {_uniqueStorage()._regexPattern = newValue}
+    get {_regexPattern ?? String()}
+    set {_regexPattern = newValue}
   }
   /// Returns true if `regexPattern` has been explicitly set.
-  public var hasRegexPattern: Bool {_storage._regexPattern != nil}
+  public var hasRegexPattern: Bool {self._regexPattern != nil}
   /// Clears the value of `regexPattern`. Subsequent reads from it will return its default value.
-  public mutating func clearRegexPattern() {_uniqueStorage()._regexPattern = nil}
+  public mutating func clearRegexPattern() {self._regexPattern = nil}
 
   public var grammar: String {
-    get {_storage._grammar ?? String()}
-    set {_uniqueStorage()._grammar = newValue}
+    get {_grammar ?? String()}
+    set {_grammar = newValue}
   }
   /// Returns true if `grammar` has been explicitly set.
-  public var hasGrammar: Bool {_storage._grammar != nil}
+  public var hasGrammar: Bool {self._grammar != nil}
   /// Clears the value of `grammar`. Subsequent reads from it will return its default value.
-  public mutating func clearGrammar() {_uniqueStorage()._grammar = nil}
+  public mutating func clearGrammar() {self._grammar = nil}
 
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-public nonisolated struct RAStructuredOutputRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var requestID: String = String()
-
-  public var prompt: String = String()
-
-  public var options: RAStructuredOutputOptions {
-    get {_options ?? RAStructuredOutputOptions()}
-    set {_options = newValue}
-  }
-  /// Returns true if `options` has been explicitly set.
-  public var hasOptions: Bool {self._options != nil}
-  /// Clears the value of `options`. Subsequent reads from it will return its default value.
-  public mutating func clearOptions() {self._options = nil}
-
-  public var metadata: Dictionary<String,String> = [:]
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _options: RAStructuredOutputOptions? = nil
-}
-
-public nonisolated struct RAStructuredOutputStreamEvent: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var timestampUs: Int64 {
-    get {_storage._timestampUs}
-    set {_uniqueStorage()._timestampUs = newValue}
-  }
-
-  public var requestID: String {
-    get {_storage._requestID}
-    set {_uniqueStorage()._requestID = newValue}
-  }
-
-  public var kind: RAStructuredOutputStreamEventKind {
-    get {_storage._kind}
-    set {_uniqueStorage()._kind = newValue}
-  }
-
-  public var token: String {
-    get {_storage._token}
-    set {_uniqueStorage()._token = newValue}
-  }
-
-  public var partialJson: String {
-    get {_storage._partialJson ?? String()}
-    set {_uniqueStorage()._partialJson = newValue}
-  }
-  /// Returns true if `partialJson` has been explicitly set.
-  public var hasPartialJson: Bool {_storage._partialJson != nil}
-  /// Clears the value of `partialJson`. Subsequent reads from it will return its default value.
-  public mutating func clearPartialJson() {_uniqueStorage()._partialJson = nil}
-
-  public var validation: RAStructuredOutputValidation {
-    get {_storage._validation ?? RAStructuredOutputValidation()}
-    set {_uniqueStorage()._validation = newValue}
-  }
-  /// Returns true if `validation` has been explicitly set.
-  public var hasValidation: Bool {_storage._validation != nil}
-  /// Clears the value of `validation`. Subsequent reads from it will return its default value.
-  public mutating func clearValidation() {_uniqueStorage()._validation = nil}
-
-  public var result: RAStructuredOutputResult {
-    get {_storage._result ?? RAStructuredOutputResult()}
-    set {_uniqueStorage()._result = newValue}
-  }
-  /// Returns true if `result` has been explicitly set.
-  public var hasResult: Bool {_storage._result != nil}
-  /// Clears the value of `result`. Subsequent reads from it will return its default value.
-  public mutating func clearResult() {_uniqueStorage()._result = nil}
-
-  public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-/// Character offsets into the source text.
-public nonisolated struct RANamedEntity: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var text: String = String()
-
-  public var entityType: String = String()
-
-  public var startOffset: Int32 = 0
-
-  public var endOffset: Int32 = 0
-
-  public var confidence: Float = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
+  fileprivate var _systemPrompt: String? = nil
+  fileprivate var _jsonSchema: String? = nil
+  fileprivate var _regexPattern: String? = nil
+  fileprivate var _grammar: String? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RAJSONSchemaType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0JSON_SCHEMA_TYPE_UNSPECIFIED\0\u{1}JSON_SCHEMA_TYPE_OBJECT\0\u{1}JSON_SCHEMA_TYPE_ARRAY\0\u{1}JSON_SCHEMA_TYPE_STRING\0\u{1}JSON_SCHEMA_TYPE_NUMBER\0\u{1}JSON_SCHEMA_TYPE_INTEGER\0\u{1}JSON_SCHEMA_TYPE_BOOLEAN\0\u{1}JSON_SCHEMA_TYPE_NULL\0")
-}
-
-nonisolated extension RAStructuredOutputMode: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STRUCTURED_OUTPUT_MODE_UNSPECIFIED\0\u{1}STRUCTURED_OUTPUT_MODE_JSON_SCHEMA\0\u{1}STRUCTURED_OUTPUT_MODE_JSON_OBJECT\0\u{1}STRUCTURED_OUTPUT_MODE_REGEX\0\u{1}STRUCTURED_OUTPUT_MODE_GRAMMAR\0")
-}
-
-nonisolated extension RAStructuredOutputStreamEventKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR\0")
-}
-
-nonisolated extension RAJSONSchemaProperty: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".JSONSchemaProperty"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}description\0\u{3}enum_values\0\u{1}format\0\u{3}items_schema\0\u{3}object_schema\0\u{1}minimum\0\u{1}maximum\0\u{3}min_length\0\u{3}max_length\0\u{1}pattern\0\u{3}min_items\0\u{3}max_items\0\u{3}default_json\0")
-
-  fileprivate class _StorageClass {
-    var _type: RAJSONSchemaType = .unspecified
-    var _description_p: String? = nil
-    var _enumValues: [String] = []
-    var _format: String? = nil
-    var _itemsSchema: RAJSONSchema? = nil
-    var _objectSchema: RAJSONSchema? = nil
-    var _minimum: Double? = nil
-    var _maximum: Double? = nil
-    var _minLength: Int32? = nil
-    var _maxLength: Int32? = nil
-    var _pattern: String? = nil
-    var _minItems: Int32? = nil
-    var _maxItems: Int32? = nil
-    var _defaultJson: String? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _type = source._type
-      _description_p = source._description_p
-      _enumValues = source._enumValues
-      _format = source._format
-      _itemsSchema = source._itemsSchema
-      _objectSchema = source._objectSchema
-      _minimum = source._minimum
-      _maximum = source._maximum
-      _minLength = source._minLength
-      _maxLength = source._maxLength
-      _pattern = source._pattern
-      _minItems = source._minItems
-      _maxItems = source._maxItems
-      _defaultJson = source._defaultJson
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._type) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._description_p) }()
-        case 3: try { try decoder.decodeRepeatedStringField(value: &_storage._enumValues) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._format) }()
-        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._itemsSchema) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._objectSchema) }()
-        case 7: try { try decoder.decodeSingularDoubleField(value: &_storage._minimum) }()
-        case 8: try { try decoder.decodeSingularDoubleField(value: &_storage._maximum) }()
-        case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._minLength) }()
-        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._maxLength) }()
-        case 11: try { try decoder.decodeSingularStringField(value: &_storage._pattern) }()
-        case 12: try { try decoder.decodeSingularInt32Field(value: &_storage._minItems) }()
-        case 13: try { try decoder.decodeSingularInt32Field(value: &_storage._maxItems) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._defaultJson) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._type != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._type, fieldNumber: 1)
-      }
-      try { if let v = _storage._description_p {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      if !_storage._enumValues.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._enumValues, fieldNumber: 3)
-      }
-      try { if let v = _storage._format {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._itemsSchema {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._objectSchema {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._minimum {
-        try visitor.visitSingularDoubleField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._maximum {
-        try visitor.visitSingularDoubleField(value: v, fieldNumber: 8)
-      } }()
-      try { if let v = _storage._minLength {
-        try visitor.visitSingularInt32Field(value: v, fieldNumber: 9)
-      } }()
-      try { if let v = _storage._maxLength {
-        try visitor.visitSingularInt32Field(value: v, fieldNumber: 10)
-      } }()
-      try { if let v = _storage._pattern {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 11)
-      } }()
-      try { if let v = _storage._minItems {
-        try visitor.visitSingularInt32Field(value: v, fieldNumber: 12)
-      } }()
-      try { if let v = _storage._maxItems {
-        try visitor.visitSingularInt32Field(value: v, fieldNumber: 13)
-      } }()
-      try { if let v = _storage._defaultJson {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAJSONSchemaProperty, rhs: RAJSONSchemaProperty) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._type != rhs_storage._type {return false}
-        if _storage._description_p != rhs_storage._description_p {return false}
-        if _storage._enumValues != rhs_storage._enumValues {return false}
-        if _storage._format != rhs_storage._format {return false}
-        if _storage._itemsSchema != rhs_storage._itemsSchema {return false}
-        if _storage._objectSchema != rhs_storage._objectSchema {return false}
-        if _storage._minimum != rhs_storage._minimum {return false}
-        if _storage._maximum != rhs_storage._maximum {return false}
-        if _storage._minLength != rhs_storage._minLength {return false}
-        if _storage._maxLength != rhs_storage._maxLength {return false}
-        if _storage._pattern != rhs_storage._pattern {return false}
-        if _storage._minItems != rhs_storage._minItems {return false}
-        if _storage._maxItems != rhs_storage._maxItems {return false}
-        if _storage._defaultJson != rhs_storage._defaultJson {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".JSONSchema"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}properties\0\u{1}required\0\u{1}items\0\u{3}additional_properties\0\u{5}schema_uri\0$schema\0\u{5}id_uri\0$id\0\u{1}title\0\u{1}description\0\u{1}definitions\0\u{5}ref\0$ref\0\u{3}all_of\0\u{3}any_of\0\u{3}one_of\0\u{3}not_schema\0\u{3}raw_json\0")
-
-  fileprivate class _StorageClass {
-    var _type: RAJSONSchemaType = .unspecified
-    var _properties: Dictionary<String,RAJSONSchemaProperty> = [:]
-    var _required: [String] = []
-    var _items: RAJSONSchemaProperty? = nil
-    var _additionalProperties: Bool? = nil
-    var _schemaUri: String? = nil
-    var _idUri: String? = nil
-    var _title: String? = nil
-    var _description_p: String? = nil
-    var _definitions: Dictionary<String,RAJSONSchema> = [:]
-    var _ref: String? = nil
-    var _allOf: [RAJSONSchema] = []
-    var _anyOf: [RAJSONSchema] = []
-    var _oneOf: [RAJSONSchema] = []
-    var _notSchema: RAJSONSchema? = nil
-    var _rawJson: String? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _type = source._type
-      _properties = source._properties
-      _required = source._required
-      _items = source._items
-      _additionalProperties = source._additionalProperties
-      _schemaUri = source._schemaUri
-      _idUri = source._idUri
-      _title = source._title
-      _description_p = source._description_p
-      _definitions = source._definitions
-      _ref = source._ref
-      _allOf = source._allOf
-      _anyOf = source._anyOf
-      _oneOf = source._oneOf
-      _notSchema = source._notSchema
-      _rawJson = source._rawJson
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._type) }()
-        case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAJSONSchemaProperty>.self, value: &_storage._properties) }()
-        case 3: try { try decoder.decodeRepeatedStringField(value: &_storage._required) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._items) }()
-        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._additionalProperties) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._schemaUri) }()
-        case 7: try { try decoder.decodeSingularStringField(value: &_storage._idUri) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._title) }()
-        case 9: try { try decoder.decodeSingularStringField(value: &_storage._description_p) }()
-        case 10: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAJSONSchema>.self, value: &_storage._definitions) }()
-        case 11: try { try decoder.decodeSingularStringField(value: &_storage._ref) }()
-        case 12: try { try decoder.decodeRepeatedMessageField(value: &_storage._allOf) }()
-        case 13: try { try decoder.decodeRepeatedMessageField(value: &_storage._anyOf) }()
-        case 14: try { try decoder.decodeRepeatedMessageField(value: &_storage._oneOf) }()
-        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._notSchema) }()
-        case 16: try { try decoder.decodeSingularStringField(value: &_storage._rawJson) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._type != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._type, fieldNumber: 1)
-      }
-      if !_storage._properties.isEmpty {
-        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAJSONSchemaProperty>.self, value: _storage._properties, fieldNumber: 2)
-      }
-      if !_storage._required.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._required, fieldNumber: 3)
-      }
-      try { if let v = _storage._items {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._additionalProperties {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._schemaUri {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._idUri {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._title {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-      } }()
-      try { if let v = _storage._description_p {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-      } }()
-      if !_storage._definitions.isEmpty {
-        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAJSONSchema>.self, value: _storage._definitions, fieldNumber: 10)
-      }
-      try { if let v = _storage._ref {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 11)
-      } }()
-      if !_storage._allOf.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._allOf, fieldNumber: 12)
-      }
-      if !_storage._anyOf.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._anyOf, fieldNumber: 13)
-      }
-      if !_storage._oneOf.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._oneOf, fieldNumber: 14)
-      }
-      try { if let v = _storage._notSchema {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
-      } }()
-      try { if let v = _storage._rawJson {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAJSONSchema, rhs: RAJSONSchema) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._type != rhs_storage._type {return false}
-        if _storage._properties != rhs_storage._properties {return false}
-        if _storage._required != rhs_storage._required {return false}
-        if _storage._items != rhs_storage._items {return false}
-        if _storage._additionalProperties != rhs_storage._additionalProperties {return false}
-        if _storage._schemaUri != rhs_storage._schemaUri {return false}
-        if _storage._idUri != rhs_storage._idUri {return false}
-        if _storage._title != rhs_storage._title {return false}
-        if _storage._description_p != rhs_storage._description_p {return false}
-        if _storage._definitions != rhs_storage._definitions {return false}
-        if _storage._ref != rhs_storage._ref {return false}
-        if _storage._allOf != rhs_storage._allOf {return false}
-        if _storage._anyOf != rhs_storage._anyOf {return false}
-        if _storage._oneOf != rhs_storage._oneOf {return false}
-        if _storage._notSchema != rhs_storage._notSchema {return false}
-        if _storage._rawJson != rhs_storage._rawJson {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schema\0\u{3}include_schema_in_prompt\0\u{3}strict_mode\0\u{3}json_schema\0\u{2}\u{2}name\0\u{1}mode\0\u{3}regex_pattern\0\u{1}grammar\0\u{3}repair_json\0\u{3}max_retries\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_schema_in_prompt\0\u{1}schema\0\u{1}grammar\0\u{1}regex\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1228,35 +307,31 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try {
-        var v: RAJSONSchema?
-        var hadOneofValue = false
-        if let current = self.schemaSource {
-          hadOneofValue = true
-          if case .schema(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
+      case 1: try { try decoder.decodeSingularBoolField(value: &self._includeSchemaInPrompt) }()
+      case 2: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
         if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.schemaSource = .schema(v)
+          if self.constraint != nil {try decoder.handleConflictingOneOf()}
+          self.constraint = .schema(v)
         }
       }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeSchemaInPrompt) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self._strictMode) }()
+      case 3: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.constraint != nil {try decoder.handleConflictingOneOf()}
+          self.constraint = .grammar(v)
+        }
+      }()
       case 4: try {
         var v: String?
         try decoder.decodeSingularStringField(value: &v)
         if let v = v {
-          if self.schemaSource != nil {try decoder.handleConflictingOneOf()}
-          self.schemaSource = .jsonSchema(v)
+          if self.constraint != nil {try decoder.handleConflictingOneOf()}
+          self.constraint = .regex(v)
         }
       }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._name) }()
-      case 7: try { try decoder.decodeSingularEnumField(value: &self.mode) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._regexPattern) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._grammar) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self.repairJson) }()
-      case 11: try { try decoder.decodeSingularInt32Field(value: &self.maxRetries) }()
       default: break
       }
     }
@@ -1267,49 +342,30 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if case .schema(let v)? = self.schemaSource {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    try { if let v = self._includeSchemaInPrompt {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 1)
     } }()
-    if self.includeSchemaInPrompt != false {
-      try visitor.visitSingularBoolField(value: self.includeSchemaInPrompt, fieldNumber: 2)
-    }
-    try { if let v = self._strictMode {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
-    } }()
-    try { if case .jsonSchema(let v)? = self.schemaSource {
+    switch self.constraint {
+    case .schema?: try {
+      guard case .schema(let v)? = self.constraint else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    }()
+    case .grammar?: try {
+      guard case .grammar(let v)? = self.constraint else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    }()
+    case .regex?: try {
+      guard case .regex(let v)? = self.constraint else { preconditionFailure() }
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._name {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
-    if self.mode != .unspecified {
-      try visitor.visitSingularEnumField(value: self.mode, fieldNumber: 7)
-    }
-    try { if let v = self._regexPattern {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._grammar {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
-    if self.repairJson != false {
-      try visitor.visitSingularBoolField(value: self.repairJson, fieldNumber: 10)
-    }
-    if self.maxRetries != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxRetries, fieldNumber: 11)
+    }()
+    case nil: break
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAStructuredOutputOptions, rhs: RAStructuredOutputOptions) -> Bool {
-    if lhs.includeSchemaInPrompt != rhs.includeSchemaInPrompt {return false}
-    if lhs._strictMode != rhs._strictMode {return false}
-    if lhs.schemaSource != rhs.schemaSource {return false}
-    if lhs._name != rhs._name {return false}
-    if lhs.mode != rhs.mode {return false}
-    if lhs._regexPattern != rhs._regexPattern {return false}
-    if lhs._grammar != rhs._grammar {return false}
-    if lhs.repairJson != rhs.repairJson {return false}
-    if lhs.maxRetries != rhs.maxRetries {return false}
+    if lhs._includeSchemaInPrompt != rhs._includeSchemaInPrompt {return false}
+    if lhs.constraint != rhs.constraint {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1317,7 +373,7 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
 
 nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputValidation"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}contains_json\0\u{4}\u{2}raw_output\0\u{3}extracted_json\0\u{3}validation_errors\0\u{3}validation_time_ms\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}contains_json\0\u{3}raw_output\0\u{3}extracted_json\0\u{3}validation_errors\0\u{3}validation_time_ms\0\u{1}error\0")
 
   fileprivate class _StorageClass {
     var _isValid: Bool = false
@@ -1364,11 +420,11 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularBoolField(value: &_storage._isValid) }()
         case 2: try { try decoder.decodeSingularBoolField(value: &_storage._containsJson) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._rawOutput) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._extractedJson) }()
-        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._validationErrors) }()
-        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._validationTimeMs) }()
-        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._rawOutput) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._extractedJson) }()
+        case 5: try { try decoder.decodeRepeatedStringField(value: &_storage._validationErrors) }()
+        case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._validationTimeMs) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
       }
@@ -1388,19 +444,19 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
         try visitor.visitSingularBoolField(value: _storage._containsJson, fieldNumber: 2)
       }
       try { if let v = _storage._rawOutput {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
       } }()
       try { if let v = _storage._extractedJson {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
       } }()
       if !_storage._validationErrors.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._validationErrors, fieldNumber: 6)
+        try visitor.visitRepeatedStringField(value: _storage._validationErrors, fieldNumber: 5)
       }
       if _storage._validationTimeMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._validationTimeMs, fieldNumber: 7)
+        try visitor.visitSingularInt64Field(value: _storage._validationTimeMs, fieldNumber: 6)
       }
       try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1429,90 +485,48 @@ nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, Swift
 
 nonisolated extension RAStructuredOutputResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parsed_json\0\u{1}validation\0\u{3}raw_text\0\u{2}\u{3}error\0")
-
-  fileprivate class _StorageClass {
-    var _parsedJson: Data = Data()
-    var _validation: RAStructuredOutputValidation? = nil
-    var _rawText: String? = nil
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _parsedJson = source._parsedJson
-      _validation = source._validation
-      _rawText = source._rawText
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}json\0\u{1}validation\0\u{3}raw_text\0\u{1}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBytesField(value: &_storage._parsedJson) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._validation) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._rawText) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.json) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._validation) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._rawText) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._parsedJson.isEmpty {
-        try visitor.visitSingularBytesField(value: _storage._parsedJson, fieldNumber: 1)
-      }
-      try { if let v = _storage._validation {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._rawText {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.json.isEmpty {
+      try visitor.visitSingularStringField(value: self.json, fieldNumber: 1)
     }
+    try { if let v = self._validation {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._rawText {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAStructuredOutputResult, rhs: RAStructuredOutputResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._parsedJson != rhs_storage._parsedJson {return false}
-        if _storage._validation != rhs_storage._validation {return false}
-        if _storage._rawText != rhs_storage._rawText {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.json != rhs.json {return false}
+    if lhs._validation != rhs._validation {return false}
+    if lhs._rawText != rhs._rawText {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1567,9 +581,9 @@ nonisolated extension RAStructuredOutputParseRequest: SwiftProtobuf.Message, Swi
   }
 }
 
-nonisolated extension RAStructuredOutputValidationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".StructuredOutputValidationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}options\0")
+nonisolated extension RAStructuredOutputPromptResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StructuredOutputPromptResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}prepared_prompt\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}regex_pattern\0\u{1}grammar\0\u{1}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1577,8 +591,12 @@ nonisolated extension RAStructuredOutputValidationRequest: SwiftProtobuf.Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.preparedPrompt) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._systemPrompt) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._jsonSchema) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._regexPattern) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._grammar) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._error) }()
       default: break
       }
     }
@@ -1589,341 +607,34 @@ nonisolated extension RAStructuredOutputValidationRequest: SwiftProtobuf.Message
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.text.isEmpty {
-      try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
+    if !self.preparedPrompt.isEmpty {
+      try visitor.visitSingularStringField(value: self.preparedPrompt, fieldNumber: 1)
     }
-    try { if let v = self._options {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    try { if let v = self._systemPrompt {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAStructuredOutputValidationRequest, rhs: RAStructuredOutputValidationRequest) -> Bool {
-    if lhs.text != rhs.text {return false}
-    if lhs._options != rhs._options {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAStructuredOutputPromptResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".StructuredOutputPromptResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}prepared_prompt\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}regex_pattern\0\u{1}grammar\0\u{2}\u{3}error\0")
-
-  fileprivate class _StorageClass {
-    var _preparedPrompt: String = String()
-    var _systemPrompt: String? = nil
-    var _jsonSchema: String? = nil
-    var _regexPattern: String? = nil
-    var _grammar: String? = nil
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _preparedPrompt = source._preparedPrompt
-      _systemPrompt = source._systemPrompt
-      _jsonSchema = source._jsonSchema
-      _regexPattern = source._regexPattern
-      _grammar = source._grammar
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._preparedPrompt) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._systemPrompt) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._jsonSchema) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._regexPattern) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._grammar) }()
-        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._preparedPrompt.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._preparedPrompt, fieldNumber: 1)
-      }
-      try { if let v = _storage._systemPrompt {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._jsonSchema {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._regexPattern {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._grammar {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-      } }()
-    }
+    try { if let v = self._jsonSchema {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._regexPattern {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._grammar {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAStructuredOutputPromptResult, rhs: RAStructuredOutputPromptResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._preparedPrompt != rhs_storage._preparedPrompt {return false}
-        if _storage._systemPrompt != rhs_storage._systemPrompt {return false}
-        if _storage._jsonSchema != rhs_storage._jsonSchema {return false}
-        if _storage._regexPattern != rhs_storage._regexPattern {return false}
-        if _storage._grammar != rhs_storage._grammar {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAStructuredOutputRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".StructuredOutputRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}prompt\0\u{1}options\0\u{1}metadata\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._options) }()
-      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
-    }
-    if !self.prompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 2)
-    }
-    try { if let v = self._options {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 4)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAStructuredOutputRequest, rhs: RAStructuredOutputRequest) -> Bool {
-    if lhs.requestID != rhs.requestID {return false}
-    if lhs.prompt != rhs.prompt {return false}
-    if lhs._options != rhs._options {return false}
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAStructuredOutputStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".StructuredOutputStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}token\0\u{3}partial_json\0\u{1}validation\0\u{1}result\0\u{2}\u{3}error\0")
-
-  fileprivate class _StorageClass {
-    var _timestampUs: Int64 = 0
-    var _requestID: String = String()
-    var _kind: RAStructuredOutputStreamEventKind = .unspecified
-    var _token: String = String()
-    var _partialJson: String? = nil
-    var _validation: RAStructuredOutputValidation? = nil
-    var _result: RAStructuredOutputResult? = nil
-    var _error: RASDKError? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _timestampUs = source._timestampUs
-      _requestID = source._requestID
-      _kind = source._kind
-      _token = source._token
-      _partialJson = source._partialJson
-      _validation = source._validation
-      _result = source._result
-      _error = source._error
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
-        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._partialJson) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._validation) }()
-        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
-        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._timestampUs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
-      }
-      if !_storage._requestID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 3)
-      }
-      if _storage._kind != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 4)
-      }
-      if !_storage._token.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._token, fieldNumber: 5)
-      }
-      try { if let v = _storage._partialJson {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._validation {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._result {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-      } }()
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAStructuredOutputStreamEvent, rhs: RAStructuredOutputStreamEvent) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._timestampUs != rhs_storage._timestampUs {return false}
-        if _storage._requestID != rhs_storage._requestID {return false}
-        if _storage._kind != rhs_storage._kind {return false}
-        if _storage._token != rhs_storage._token {return false}
-        if _storage._partialJson != rhs_storage._partialJson {return false}
-        if _storage._validation != rhs_storage._validation {return false}
-        if _storage._result != rhs_storage._result {return false}
-        if _storage._error != rhs_storage._error {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RANamedEntity: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".NamedEntity"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}entity_type\0\u{3}start_offset\0\u{3}end_offset\0\u{1}confidence\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.entityType) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.startOffset) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.endOffset) }()
-      case 5: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.text.isEmpty {
-      try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
-    }
-    if !self.entityType.isEmpty {
-      try visitor.visitSingularStringField(value: self.entityType, fieldNumber: 2)
-    }
-    if self.startOffset != 0 {
-      try visitor.visitSingularInt32Field(value: self.startOffset, fieldNumber: 3)
-    }
-    if self.endOffset != 0 {
-      try visitor.visitSingularInt32Field(value: self.endOffset, fieldNumber: 4)
-    }
-    if self.confidence.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 5)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RANamedEntity, rhs: RANamedEntity) -> Bool {
-    if lhs.text != rhs.text {return false}
-    if lhs.entityType != rhs.entityType {return false}
-    if lhs.startOffset != rhs.startOffset {return false}
-    if lhs.endOffset != rhs.endOffset {return false}
-    if lhs.confidence != rhs.confidence {return false}
+    if lhs.preparedPrompt != rhs.preparedPrompt {return false}
+    if lhs._systemPrompt != rhs._systemPrompt {return false}
+    if lhs._jsonSchema != rhs._jsonSchema {return false}
+    if lhs._regexPattern != rhs._regexPattern {return false}
+    if lhs._grammar != rhs._grammar {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

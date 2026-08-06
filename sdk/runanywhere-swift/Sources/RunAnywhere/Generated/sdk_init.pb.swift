@@ -27,90 +27,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-
-  /// Synchronous core init, no network
-  case one // = 1
-
-  /// Async services init, network
-  case two // = 2
-
-  /// HTTP/auth retry after an offline init
-  case retryHTTP // = 3
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .one
-    case 2: self = .two
-    case 3: self = .retryHTTP
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .one: return 1
-    case .two: return 2
-    case .retryHTTP: return 3
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RASdkInitPhase] = [
-    .unspecified,
-    .one,
-    .two,
-    .retryHTTP,
-  ]
-
-}
-
-/// PRODUCTION is 2 because 1 was a staging value in shipped commons and
-/// xcframework builds. Do not renumber.
-public nonisolated enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case development // = 0
-  case production // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .development
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .development
-    case 2: self = .production
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .development: return 0
-    case .production: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RASdkInitEnvironment] = [
-    .development,
-    .production,
-  ]
-
-}
-
 /// The only platform-supplied values commons cannot derive itself. Platform
 /// adapter callbacks are registered separately through rac_platform_adapter_t
 /// before this call; this message is purely the data envelope.
@@ -119,7 +35,10 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var environment: RASdkInitEnvironment = .development
+  /// model_types.proto's SDKEnvironment is the single environment vocabulary.
+  /// Its zero is UNSPECIFIED, so an omitted field means unset, not
+  /// "development": commons must fail closed rather than pick an environment.
+  public var environment: RASDKEnvironment = .unspecified
 
   /// May be empty in development mode.
   public var apiKey: String = String()
@@ -134,13 +53,40 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
 
   public var sdkVersion: String = String()
 
+  /// Caller override for NetworkDefaults.request_timeout_ms. Unset = the pool
+  /// default (60000). openai-python / anthropic-python `timeout`.
+  public var requestTimeoutMs: Int32 {
+    get {_requestTimeoutMs ?? 0}
+    set {_requestTimeoutMs = newValue}
+  }
+  /// Returns true if `requestTimeoutMs` has been explicitly set.
+  public var hasRequestTimeoutMs: Bool {self._requestTimeoutMs != nil}
+  /// Clears the value of `requestTimeoutMs`. Subsequent reads from it will return its default value.
+  public mutating func clearRequestTimeoutMs() {self._requestTimeoutMs = nil}
+
+  /// Caller override for NetworkDefaults.max_retries. Unset = the pool
+  /// default (3). openai-python / anthropic-python `max_retries`; 0 disables
+  /// retries.
+  public var maxRetries: Int32 {
+    get {_maxRetries ?? 0}
+    set {_maxRetries = newValue}
+  }
+  /// Returns true if `maxRetries` has been explicitly set.
+  public var hasMaxRetries: Bool {self._maxRetries != nil}
+  /// Clears the value of `maxRetries`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxRetries() {self._maxRetries = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _requestTimeoutMs: Int32? = nil
+  fileprivate var _maxRetries: Int32? = nil
 }
 
-/// Most state is already resident in commons after Phase 1; these are the
-/// per-call hints that stay SDK-owned.
+/// The one value that legitimately varies between a dev build and a release.
+/// Telemetry flushing and registry/local-file reconciliation are commons
+/// behaviour, not per-call hints.
 public nonisolated struct RASdkInitPhase2Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -148,15 +94,6 @@ public nonisolated struct RASdkInitPhase2Request: Sendable {
 
   /// Dev-mode device registration token.
   public var buildToken: String = String()
-
-  public var forceRefreshAssignments: Bool = false
-
-  public var flushTelemetry: Bool = false
-
-  /// Reconcile registry rows with local files.
-  public var discoverDownloadedModels: Bool = false
-
-  public var rescanLocalModels: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -166,99 +103,50 @@ public nonisolated struct RASdkInitPhase2Request: Sendable {
 /// Returned by Phase 1, Phase 2, and retryHTTP.
 ///
 /// A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
-/// to fail in offline mode, in which case error is unset, http_configured=false,
-/// and warning holds the offline notice while the SDK continues on cached
-/// models.
-public nonisolated struct RASdkInitResult: @unchecked Sendable {
+/// to fail in offline mode, in which case error is unset and warning holds the
+/// offline notice while the SDK continues on cached models.
+public nonisolated struct RASdkInitResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var phase: RASdkInitPhase {
-    get {_storage._phase}
-    set {_uniqueStorage()._phase = newValue}
-  }
-
   public var error: RASDKError {
-    get {_storage._error ?? RASDKError()}
-    set {_uniqueStorage()._error = newValue}
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
   /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {_storage._error != nil}
+  public var hasError: Bool {self._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {_uniqueStorage()._error = nil}
-
-  /// HTTP transport wired at this call site.
-  public var httpConfigured: Bool {
-    get {_storage._httpConfigured}
-    set {_uniqueStorage()._httpConfigured = newValue}
-  }
-
-  public var deviceRegistered: Bool {
-    get {_storage._deviceRegistered}
-    set {_uniqueStorage()._deviceRegistered = newValue}
-  }
+  public mutating func clearError() {self._error = nil}
 
   /// Registry rows that linked to local files.
-  public var linkedModelsCount: UInt32 {
-    get {_storage._linkedModelsCount}
-    set {_uniqueStorage()._linkedModelsCount = newValue}
-  }
+  public var linkedModelsCount: UInt32 = 0
 
-  /// On-disk folders with no registry row.
-  public var discoveredOrphans: UInt32 {
-    get {_storage._discoveredOrphans}
-    set {_uniqueStorage()._discoveredOrphans = newValue}
-  }
+  public var warning: String = String()
 
-  public var warning: String {
-    get {_storage._warning}
-    set {_uniqueStorage()._warning = newValue}
-  }
-
-  public var durationMs: Int64 {
-    get {_storage._durationMs}
-    set {_uniqueStorage()._durationMs = newValue}
-  }
-
-  /// The cross-phase latched bit that survives between calls, as opposed to
-  /// http_configured, which describes only the calling phase. SDKs read this
+  /// The cross-phase latched bit that survives between calls. SDKs read this
   /// to decide whether an authenticated call can proceed without a retryHTTP.
-  public var hasCompletedHTTPSetup_p: Bool {
-    get {_storage._hasCompletedHTTPSetup_p}
-    set {_uniqueStorage()._hasCompletedHTTPSetup_p = newValue}
-  }
+  public var hasCompletedHTTPSetup_p: Bool = false
 
   /// Whether this configuration has a usable credential and URL pair at all.
   /// Local-only development builds set it false so platform SDKs stop
   /// retrying HTTP on every guarded call.
-  public var httpApplicable: Bool {
-    get {_storage._httpApplicable}
-    set {_uniqueStorage()._httpApplicable = newValue}
-  }
+  public var httpApplicable: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _error: RASDKError? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RASdkInitPhase: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_PHASE_UNSPECIFIED\0\u{1}SDK_INIT_PHASE_ONE\0\u{1}SDK_INIT_PHASE_TWO\0\u{1}SDK_INIT_PHASE_RETRY_HTTP\0")
-}
-
-nonisolated extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_ENVIRONMENT_DEVELOPMENT\0\u{2}\u{2}SDK_INIT_ENVIRONMENT_PRODUCTION\0")
-}
-
 nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase1Request"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}environment\0\u{3}api_key\0\u{3}base_url\0\u{3}device_id\0\u{1}platform\0\u{3}sdk_version\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}environment\0\u{3}api_key\0\u{3}base_url\0\u{3}device_id\0\u{1}platform\0\u{3}sdk_version\0\u{3}request_timeout_ms\0\u{3}max_retries\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -272,13 +160,19 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
       case 4: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.platform) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self.sdkVersion) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self._requestTimeoutMs) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self._maxRetries) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.environment != .development {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.environment != .unspecified {
       try visitor.visitSingularEnumField(value: self.environment, fieldNumber: 1)
     }
     if !self.apiKey.isEmpty {
@@ -296,6 +190,12 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
     if !self.sdkVersion.isEmpty {
       try visitor.visitSingularStringField(value: self.sdkVersion, fieldNumber: 6)
     }
+    try { if let v = self._requestTimeoutMs {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._maxRetries {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -306,6 +206,8 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
     if lhs.deviceID != rhs.deviceID {return false}
     if lhs.platform != rhs.platform {return false}
     if lhs.sdkVersion != rhs.sdkVersion {return false}
+    if lhs._requestTimeoutMs != rhs._requestTimeoutMs {return false}
+    if lhs._maxRetries != rhs._maxRetries {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -313,7 +215,7 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase2Request"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}build_token\0\u{3}force_refresh_assignments\0\u{3}flush_telemetry\0\u{3}discover_downloaded_models\0\u{3}rescan_local_models\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}build_token\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -322,10 +224,6 @@ nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtob
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.buildToken) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.forceRefreshAssignments) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.flushTelemetry) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.discoverDownloadedModels) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.rescanLocalModels) }()
       default: break
       }
     }
@@ -335,27 +233,11 @@ nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtob
     if !self.buildToken.isEmpty {
       try visitor.visitSingularStringField(value: self.buildToken, fieldNumber: 1)
     }
-    if self.forceRefreshAssignments != false {
-      try visitor.visitSingularBoolField(value: self.forceRefreshAssignments, fieldNumber: 2)
-    }
-    if self.flushTelemetry != false {
-      try visitor.visitSingularBoolField(value: self.flushTelemetry, fieldNumber: 3)
-    }
-    if self.discoverDownloadedModels != false {
-      try visitor.visitSingularBoolField(value: self.discoverDownloadedModels, fieldNumber: 4)
-    }
-    if self.rescanLocalModels != false {
-      try visitor.visitSingularBoolField(value: self.rescanLocalModels, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASdkInitPhase2Request, rhs: RASdkInitPhase2Request) -> Bool {
     if lhs.buildToken != rhs.buildToken {return false}
-    if lhs.forceRefreshAssignments != rhs.forceRefreshAssignments {return false}
-    if lhs.flushTelemetry != rhs.flushTelemetry {return false}
-    if lhs.discoverDownloadedModels != rhs.discoverDownloadedModels {return false}
-    if lhs.rescanLocalModels != rhs.rescanLocalModels {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -363,132 +245,53 @@ nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{2}\u{2}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0\u{3}has_completed_http_setup\0\u{3}http_applicable\0")
-
-  fileprivate class _StorageClass {
-    var _phase: RASdkInitPhase = .unspecified
-    var _error: RASDKError? = nil
-    var _httpConfigured: Bool = false
-    var _deviceRegistered: Bool = false
-    var _linkedModelsCount: UInt32 = 0
-    var _discoveredOrphans: UInt32 = 0
-    var _warning: String = String()
-    var _durationMs: Int64 = 0
-    var _hasCompletedHTTPSetup_p: Bool = false
-    var _httpApplicable: Bool = false
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _phase = source._phase
-      _error = source._error
-      _httpConfigured = source._httpConfigured
-      _deviceRegistered = source._deviceRegistered
-      _linkedModelsCount = source._linkedModelsCount
-      _discoveredOrphans = source._discoveredOrphans
-      _warning = source._warning
-      _durationMs = source._durationMs
-      _hasCompletedHTTPSetup_p = source._hasCompletedHTTPSetup_p
-      _httpApplicable = source._httpApplicable
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}error\0\u{3}linked_models_count\0\u{1}warning\0\u{3}has_completed_http_setup\0\u{3}http_applicable\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._phase) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
-        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._httpConfigured) }()
-        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._deviceRegistered) }()
-        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._linkedModelsCount) }()
-        case 7: try { try decoder.decodeSingularUInt32Field(value: &_storage._discoveredOrphans) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._warning) }()
-        case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._durationMs) }()
-        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._hasCompletedHTTPSetup_p) }()
-        case 11: try { try decoder.decodeSingularBoolField(value: &_storage._httpApplicable) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._error) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.linkedModelsCount) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.warning) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.hasCompletedHTTPSetup_p) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.httpApplicable) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._phase != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._phase, fieldNumber: 1)
-      }
-      try { if let v = _storage._error {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      if _storage._httpConfigured != false {
-        try visitor.visitSingularBoolField(value: _storage._httpConfigured, fieldNumber: 4)
-      }
-      if _storage._deviceRegistered != false {
-        try visitor.visitSingularBoolField(value: _storage._deviceRegistered, fieldNumber: 5)
-      }
-      if _storage._linkedModelsCount != 0 {
-        try visitor.visitSingularUInt32Field(value: _storage._linkedModelsCount, fieldNumber: 6)
-      }
-      if _storage._discoveredOrphans != 0 {
-        try visitor.visitSingularUInt32Field(value: _storage._discoveredOrphans, fieldNumber: 7)
-      }
-      if !_storage._warning.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._warning, fieldNumber: 8)
-      }
-      if _storage._durationMs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._durationMs, fieldNumber: 9)
-      }
-      if _storage._hasCompletedHTTPSetup_p != false {
-        try visitor.visitSingularBoolField(value: _storage._hasCompletedHTTPSetup_p, fieldNumber: 10)
-      }
-      if _storage._httpApplicable != false {
-        try visitor.visitSingularBoolField(value: _storage._httpApplicable, fieldNumber: 11)
-      }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if self.linkedModelsCount != 0 {
+      try visitor.visitSingularUInt32Field(value: self.linkedModelsCount, fieldNumber: 2)
+    }
+    if !self.warning.isEmpty {
+      try visitor.visitSingularStringField(value: self.warning, fieldNumber: 3)
+    }
+    if self.hasCompletedHTTPSetup_p != false {
+      try visitor.visitSingularBoolField(value: self.hasCompletedHTTPSetup_p, fieldNumber: 4)
+    }
+    if self.httpApplicable != false {
+      try visitor.visitSingularBoolField(value: self.httpApplicable, fieldNumber: 5)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASdkInitResult, rhs: RASdkInitResult) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._phase != rhs_storage._phase {return false}
-        if _storage._error != rhs_storage._error {return false}
-        if _storage._httpConfigured != rhs_storage._httpConfigured {return false}
-        if _storage._deviceRegistered != rhs_storage._deviceRegistered {return false}
-        if _storage._linkedModelsCount != rhs_storage._linkedModelsCount {return false}
-        if _storage._discoveredOrphans != rhs_storage._discoveredOrphans {return false}
-        if _storage._warning != rhs_storage._warning {return false}
-        if _storage._durationMs != rhs_storage._durationMs {return false}
-        if _storage._hasCompletedHTTPSetup_p != rhs_storage._hasCompletedHTTPSetup_p {return false}
-        if _storage._httpApplicable != rhs_storage._httpApplicable {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._error != rhs._error {return false}
+    if lhs.linkedModelsCount != rhs.linkedModelsCount {return false}
+    if lhs.warning != rhs.warning {return false}
+    if lhs.hasCompletedHTTPSetup_p != rhs.hasCompletedHTTPSetup_p {return false}
+    if lhs.httpApplicable != rhs.httpApplicable {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

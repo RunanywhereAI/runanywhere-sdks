@@ -16,6 +16,65 @@
 
 import Foundation
 
+extension RAToolCallingOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAToolCallingOptions {
+        var r = RAToolCallingOptions()
+        r.maxToolCalls = 5
+        return r
+    }
+}
+
+extension RAToolCallingOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        let effectiveMaxToolCalls = hasMaxToolCalls ? maxToolCalls : 5
+        if effectiveMaxToolCalls < 1 {
+            throw SDKException.validationFailed(
+                fieldPath: "ToolCallingOptions.max_tool_calls",
+                message: "max_tool_calls must be >= 1 (got \(effectiveMaxToolCalls))"
+            )
+        }
+    }
+}
+
+extension RAErrorCategory {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .network: return "network_error"
+        case .validation: return "invalid_request_error"
+        case .model: return "model_error"
+        case .component: return "component_error"
+        case .io: return "io_error"
+        case .auth: return "authentication_error"
+        case .internal: return "internal_error"
+        case .configuration: return "configuration_error"
+        default: return ""
+        }
+    }
+}
+
+extension RAErrorCategory {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RAErrorCategory? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "network_error": return .network
+        case "invalid_request_error": return .validation
+        case "model_error": return .model
+        case "component_error": return .component
+        case "io_error": return .io
+        case "authentication_error": return .auth
+        case "internal_error": return .internal
+        case "configuration_error": return .configuration
+        default: return nil
+        }
+    }
+}
+
 extension RAAudioFormat {
     /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
     public var wireString: String {
@@ -71,6 +130,7 @@ extension RAModelCategory {
         case .voiceActivityDetection: return "voice-activity-detection"
         case .speakerDiarization: return "speaker-diarization"
         case .semanticSegmentation: return "semantic-segmentation"
+        case .rerank: return "rerank"
         default: return ""
         }
     }
@@ -93,6 +153,7 @@ extension RAModelCategory {
         case "voice-activity-detection": return .voiceActivityDetection
         case "speaker-diarization": return .speakerDiarization
         case "semantic-segmentation": return .semanticSegmentation
+        case "rerank": return .rerank
         default: return nil
         }
     }
@@ -179,24 +240,41 @@ extension RAArchiveStructure {
     }
 }
 
-extension RAStructuredOutputOptions {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAStructuredOutputOptions {
-        var r = RAStructuredOutputOptions()
-        r.maxRetries = 0
-        return r
+extension RAAcceleratorPolicy {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .auto: return "auto"
+        case .cpu: return "cpu"
+        case .gpu: return "gpu"
+        case .npu: return "npu"
+        default: return ""
+        }
+    }
+}
+
+extension RAAcceleratorPolicy {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RAAcceleratorPolicy? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "auto": return .auto
+        case "cpu": return .cpu
+        case "gpu": return .gpu
+        case "npu": return .npu
+        default: return nil
+        }
     }
 }
 
 extension RAStructuredOutputOptions {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        if maxRetries < 0 {
-            throw SDKException.validationFailed(
-                fieldPath: "StructuredOutputOptions.max_retries",
-                message: "max_retries must be >= 0 (got \(maxRetries))"
-            )
-        }
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAStructuredOutputOptions {
+        var r = RAStructuredOutputOptions()
+        r.includeSchemaInPrompt = true
+        return r
     }
 }
 
@@ -207,14 +285,13 @@ extension RALLMGenerationOptions {
         r.maxOutputTokens = 512
         r.temperature = 0.7
         r.topP = 1.0
-        r.topK = 0
-        r.repetitionPenalty = 1.0
+        r.topK = 40
+        r.repeatPenalty = 1.1
         r.seed = 0
         r.frequencyPenalty = 0.0
         r.presencePenalty = 0.0
         r.repeatLastN = 0
-        r.minP = 0.0
-        r.nThreads = 0
+        r.minP = 0.05
         return r
     }
 }
@@ -222,34 +299,39 @@ extension RALLMGenerationOptions {
 extension RALLMGenerationOptions {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
-        if maxOutputTokens < 0 {
+        let effectiveMaxOutputTokens = hasMaxOutputTokens ? maxOutputTokens : 512
+        if effectiveMaxOutputTokens < 0 {
             throw SDKException.validationFailed(
                 fieldPath: "LLMGenerationOptions.max_output_tokens",
-                message: "max_output_tokens must be >= 0 (got \(maxOutputTokens))"
+                message: "max_output_tokens must be >= 0 (got \(effectiveMaxOutputTokens))"
             )
         }
-        if !temperature.isFinite || temperature < 0.0 || temperature > 2.0 {
+        let effectiveTemperature = hasTemperature ? temperature : 0.7
+        if !effectiveTemperature.isFinite || effectiveTemperature < 0.0 || effectiveTemperature > 2.0 {
             throw SDKException.validationFailed(
                 fieldPath: "LLMGenerationOptions.temperature",
-                message: "temperature must be in 0.0...2.0 (got \(temperature))"
+                message: "temperature must be in 0.0...2.0 (got \(effectiveTemperature))"
             )
         }
-        if !topP.isFinite || topP < 0.0 || topP > 1.0 {
+        let effectiveTopP = hasTopP ? topP : 1.0
+        if !effectiveTopP.isFinite || effectiveTopP < 0.0 || effectiveTopP > 1.0 {
             throw SDKException.validationFailed(
                 fieldPath: "LLMGenerationOptions.top_p",
-                message: "top_p must be in 0.0...1.0 (got \(topP))"
+                message: "top_p must be in 0.0...1.0 (got \(effectiveTopP))"
             )
         }
-        if topK < 0 {
+        let effectiveTopK = hasTopK ? topK : 40
+        if effectiveTopK < 0 {
             throw SDKException.validationFailed(
                 fieldPath: "LLMGenerationOptions.top_k",
-                message: "top_k must be >= 0 (got \(topK))"
+                message: "top_k must be >= 0 (got \(effectiveTopK))"
             )
         }
-        if !repetitionPenalty.isFinite || repetitionPenalty < 0.0 {
+        let effectiveRepeatPenalty = hasRepeatPenalty ? repeatPenalty : 1.1
+        if !effectiveRepeatPenalty.isFinite || effectiveRepeatPenalty < 0.0 {
             throw SDKException.validationFailed(
-                fieldPath: "LLMGenerationOptions.repetition_penalty",
-                message: "repetition_penalty must be >= 0.0 (got \(repetitionPenalty))"
+                fieldPath: "LLMGenerationOptions.repeat_penalty",
+                message: "repeat_penalty must be >= 0.0 (got \(effectiveRepeatPenalty))"
             )
         }
     }
@@ -264,67 +346,13 @@ extension RALLMConfiguration {
     }
 }
 
-extension RAVADConfiguration {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAVADConfiguration {
-        var r = RAVADConfiguration()
-        r.sampleRate = 16000
-        r.frameLengthMs = 100
-        r.activationThreshold = 0.015
-        r.calibrationMultiplier = 2.0
-        return r
-    }
-}
-
-extension RAVADConfiguration {
+extension RADeviceInfo {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
-        if sampleRate < 8000 || sampleRate > 48000 {
+        if hasBatteryLevel && (!batteryLevel.isFinite || batteryLevel < 0.0 || batteryLevel > 1.0) {
             throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.sample_rate",
-                message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
-            )
-        }
-        if frameLengthMs < 20 || frameLengthMs > 1000 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.frame_length_ms",
-                message: "frame_length_ms must be in 20...1000 (got \(frameLengthMs))"
-            )
-        }
-        if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.activation_threshold",
-                message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
-            )
-        }
-        if !calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.calibration_multiplier",
-                message: "calibration_multiplier must be in 1.2...4.0 (got \(calibrationMultiplier))"
-            )
-        }
-    }
-}
-
-extension RAVADOptions {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAVADOptions {
-        var r = RAVADOptions()
-        r.minSpeechDurationMs = 100
-        r.minSilenceDurationMs = 300
-        r.maxSpeechDurationMs = 0
-        r.prefixPaddingMs = 0
-        return r
-    }
-}
-
-extension RAVADOptions {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADOptions.activation_threshold",
-                message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
+                fieldPath: "DeviceInfo.battery_level",
+                message: "battery_level must be in 0.0...1.0 (got \(batteryLevel))"
             )
         }
     }
@@ -346,10 +374,10 @@ extension RADiarizationOptions {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         let effectiveSampleRate = hasSampleRate ? sampleRate : 16000
-        if effectiveSampleRate < 8000 || effectiveSampleRate > 48000 {
+        if effectiveSampleRate < 16000 || effectiveSampleRate > 16000 {
             throw SDKException.validationFailed(
                 fieldPath: "DiarizationOptions.sample_rate",
-                message: "sample_rate must be in 8000...48000 (got \(effectiveSampleRate))"
+                message: "sample_rate must be in 16000...16000 (got \(effectiveSampleRate))"
             )
         }
         let effectiveChannels = hasChannels ? channels : 1
@@ -378,6 +406,12 @@ extension RADiarizationOptions {
                 message: "merge_gap_ms must be >= 0 (got \(mergeGapMs))"
             )
         }
+        if hasMaxSpeakers && (maxSpeakers < 1) {
+            throw SDKException.validationFailed(
+                fieldPath: "DiarizationOptions.max_speakers",
+                message: "max_speakers must be >= 1 (got \(maxSpeakers))"
+            )
+        }
     }
 }
 
@@ -389,8 +423,9 @@ extension RADiffusionGenerationOptions {
         r.height = 0
         r.steps = 0
         r.guidanceScale = 0.0
-        r.seed = -1
-        r.denoiseStrength = 0.75
+        r.strength = 0.75
+        r.n = 1
+        r.outputFormat = .png
         return r
     }
 }
@@ -416,46 +451,17 @@ extension RADiffusionGenerationOptions {
                 message: "guidance_scale must be in 0.0...20.0 (got \(guidanceScale))"
             )
         }
-        if !denoiseStrength.isFinite || denoiseStrength < 0.0 || denoiseStrength > 1.0 {
+        if !strength.isFinite || strength < 0.0 || strength > 1.0 {
             throw SDKException.validationFailed(
-                fieldPath: "DiffusionGenerationOptions.denoise_strength",
-                message: "denoise_strength must be in 0.0...1.0 (got \(denoiseStrength))"
+                fieldPath: "DiffusionGenerationOptions.strength",
+                message: "strength must be in 0.0...1.0 (got \(strength))"
             )
         }
-    }
-}
-
-extension RAEmbeddingsConfiguration {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAEmbeddingsConfiguration {
-        var r = RAEmbeddingsConfiguration()
-        r.embeddingDimension = 384
-        r.maxSequenceLength = 512
-        r.normalize = true
-        r.pooling = .mean
-        return r
-    }
-}
-
-extension RAEmbeddingsConfiguration {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        if modelID.isEmpty {
+        let effectiveN = hasN ? n : 1
+        if effectiveN < 1 || effectiveN > 8 {
             throw SDKException.validationFailed(
-                fieldPath: "EmbeddingsConfiguration.model_id",
-                message: "model_id is required"
-            )
-        }
-        if embeddingDimension < 1 {
-            throw SDKException.validationFailed(
-                fieldPath: "EmbeddingsConfiguration.embedding_dimension",
-                message: "embedding_dimension must be >= 1 (got \(embeddingDimension))"
-            )
-        }
-        if maxSequenceLength < 1 {
-            throw SDKException.validationFailed(
-                fieldPath: "EmbeddingsConfiguration.max_sequence_length",
-                message: "max_sequence_length must be >= 1 (got \(maxSequenceLength))"
+                fieldPath: "DiffusionGenerationOptions.n",
+                message: "n must be in 1...8 (got \(effectiveN))"
             )
         }
     }
@@ -465,6 +471,7 @@ extension RAEmbeddingsOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RAEmbeddingsOptions {
         var r = RAEmbeddingsOptions()
+        r.normalize = true
         r.nThreads = 0
         return r
     }
@@ -477,6 +484,75 @@ extension RAEmbeddingsOptions {
             throw SDKException.validationFailed(
                 fieldPath: "EmbeddingsOptions.batch_size",
                 message: "batch_size must be in 1...8192 (got \(batchSize))"
+            )
+        }
+        if hasDimensions && (dimensions < 1) {
+            throw SDKException.validationFailed(
+                fieldPath: "EmbeddingsOptions.dimensions",
+                message: "dimensions must be >= 1 (got \(dimensions))"
+            )
+        }
+    }
+}
+
+extension RABatteryFilter {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RABatteryFilter {
+        var r = RABatteryFilter()
+        r.minBatteryPercent = 20
+        return r
+    }
+}
+
+extension RABatteryFilter {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if minBatteryPercent < 0 || minBatteryPercent > 100 {
+            throw SDKException.validationFailed(
+                fieldPath: "BatteryFilter.min_battery_percent",
+                message: "min_battery_percent must be in 0...100 (got \(minBatteryPercent))"
+            )
+        }
+    }
+}
+
+extension RAConfidenceCascade {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAConfidenceCascade {
+        var r = RAConfidenceCascade()
+        r.threshold = 0.5
+        return r
+    }
+}
+
+extension RAConfidenceCascade {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if !threshold.isFinite || threshold < 0.0 || threshold > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "ConfidenceCascade.threshold",
+                message: "threshold must be in 0.0...1.0 (got \(threshold))"
+            )
+        }
+    }
+}
+
+extension RAHybridRoutingPolicy {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAHybridRoutingPolicy {
+        var r = RAHybridRoutingPolicy()
+        r.attemptTimeoutMs = 0
+        return r
+    }
+}
+
+extension RAHybridRoutingPolicy {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if attemptTimeoutMs < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "HybridRoutingPolicy.attempt_timeout_ms",
+                message: "attempt_timeout_ms must be >= 0 (got \(attemptTimeoutMs))"
             )
         }
     }
@@ -537,22 +613,22 @@ extension RALoggingConfiguration {
     }
 }
 
-extension RALoRAAdapterConfig {
+extension RALoraAdapterConfig {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RALoRAAdapterConfig {
-        var r = RALoRAAdapterConfig()
+    public static func defaults() -> RALoraAdapterConfig {
+        var r = RALoraAdapterConfig()
         r.scale = 1.0
         return r
     }
 }
 
-extension RALoRAAdapterConfig {
+extension RALoraAdapterConfig {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
-        if adapterPath.isEmpty {
+        if adapterID.isEmpty {
             throw SDKException.validationFailed(
-                fieldPath: "LoRAAdapterConfig.adapter_path",
-                message: "adapter_path is required"
+                fieldPath: "LoraAdapterConfig.adapter_id",
+                message: "adapter_id is required"
             )
         }
     }
@@ -572,7 +648,7 @@ extension RARAGConfiguration {
     public static func defaults() -> RARAGConfiguration {
         var r = RARAGConfiguration()
         r.topK = 5
-        r.similarityThreshold = 0.0
+        r.scoreThreshold = 0.0
         r.chunkSize = 512
         r.chunkOverlap = 64
         return r
@@ -589,11 +665,11 @@ extension RARAGConfiguration {
                 message: "top_k must be >= 1 (got \(effectiveTopK))"
             )
         }
-        let effectiveSimilarityThreshold = hasSimilarityThreshold ? similarityThreshold : 0.0
-        if !effectiveSimilarityThreshold.isFinite || effectiveSimilarityThreshold < 0.0 || effectiveSimilarityThreshold > 1.0 {
+        let effectiveScoreThreshold = hasScoreThreshold ? scoreThreshold : 0.0
+        if !effectiveScoreThreshold.isFinite || effectiveScoreThreshold < 0.0 || effectiveScoreThreshold > 1.0 {
             throw SDKException.validationFailed(
-                fieldPath: "RAGConfiguration.similarity_threshold",
-                message: "similarity_threshold must be in 0.0...1.0 (got \(effectiveSimilarityThreshold))"
+                fieldPath: "RAGConfiguration.score_threshold",
+                message: "score_threshold must be in 0.0...1.0 (got \(effectiveScoreThreshold))"
             )
         }
         let effectiveChunkSize = hasChunkSize ? chunkSize : 512
@@ -613,57 +689,71 @@ extension RARAGConfiguration {
     }
 }
 
-extension RARAGQueryOptions {
+extension RARAGDeleteRequest {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if documentIds.isEmpty {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGDeleteRequest.document_ids",
+                message: "document_ids is required"
+            )
+        }
+    }
+}
+
+extension RARAGRetrievalOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RARAGQueryOptions {
-        var r = RARAGQueryOptions()
+    public static func defaults() -> RARAGRetrievalOptions {
+        var r = RARAGRetrievalOptions()
         r.multiQueryCount = 3
         return r
     }
 }
 
-extension RARAGQueryOptions {
+extension RARAGRetrievalOptions {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
-        if question.isEmpty {
+        if hasTopK && (topK < 1) {
             throw SDKException.validationFailed(
-                fieldPath: "RAGQueryOptions.question",
-                message: "question is required"
+                fieldPath: "RAGRetrievalOptions.top_k",
+                message: "top_k must be >= 1 (got \(topK))"
+            )
+        }
+        if hasScoreThreshold && (!scoreThreshold.isFinite || scoreThreshold < 0.0 || scoreThreshold > 1.0) {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGRetrievalOptions.score_threshold",
+                message: "score_threshold must be in 0.0...1.0 (got \(scoreThreshold))"
             )
         }
         let effectiveMultiQueryCount = hasMultiQueryCount ? multiQueryCount : 3
         if effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8 {
             throw SDKException.validationFailed(
-                fieldPath: "RAGQueryOptions.multi_query_count",
+                fieldPath: "RAGRetrievalOptions.multi_query_count",
                 message: "multi_query_count must be in 1...8 (got \(effectiveMultiQueryCount))"
             )
         }
     }
 }
 
-extension RARAGSearchRequest {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RARAGSearchRequest {
-        var r = RARAGSearchRequest()
-        r.multiQueryCount = 3
-        return r
+extension RARAGQueryOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if query.isEmpty {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGQueryOptions.query",
+                message: "query is required"
+            )
+        }
     }
 }
 
 extension RARAGSearchRequest {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
-        if question.isEmpty {
+        if query.isEmpty {
             throw SDKException.validationFailed(
-                fieldPath: "RAGSearchRequest.question",
-                message: "question is required"
-            )
-        }
-        let effectiveMultiQueryCount = hasMultiQueryCount ? multiQueryCount : 3
-        if effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8 {
-            throw SDKException.validationFailed(
-                fieldPath: "RAGSearchRequest.multi_query_count",
-                message: "multi_query_count must be in 1...8 (got \(effectiveMultiQueryCount))"
+                fieldPath: "RAGSearchRequest.query",
+                message: "query is required"
             )
         }
     }
@@ -674,6 +764,7 @@ extension RARerankOptions {
     public static func defaults() -> RARerankOptions {
         var r = RARerankOptions()
         r.topN = 0
+        r.maxTokensPerDoc = 0
         return r
     }
 }
@@ -690,12 +781,142 @@ extension RARerankRequest {
     }
 }
 
-extension RASegmentationImage {
+extension RAVADConfiguration {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RASegmentationImage {
-        var r = RASegmentationImage()
-        r.strideBytes = 0
+    public static func defaults() -> RAVADConfiguration {
+        var r = RAVADConfiguration()
+        r.sampleRate = 16000
+        r.frameLengthMs = 100
+        r.activationThreshold = 0.5
+        r.calibrationMultiplier = 2.0
         return r
+    }
+}
+
+extension RAVADConfiguration {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if sampleRate < 8000 || sampleRate > 48000 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.sample_rate",
+                message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
+            )
+        }
+        if frameLengthMs < 20 || frameLengthMs > 1000 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.frame_length_ms",
+                message: "frame_length_ms must be in 20...1000 (got \(frameLengthMs))"
+            )
+        }
+        if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.activation_threshold",
+                message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
+            )
+        }
+        if !calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.calibration_multiplier",
+                message: "calibration_multiplier must be in 1.2...4.0 (got \(calibrationMultiplier))"
+            )
+        }
+    }
+}
+
+extension RAVADOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAVADOptions {
+        var r = RAVADOptions()
+        r.activationThreshold = 0.5
+        r.minSpeechDurationMs = 250
+        r.minSilenceDurationMs = 500
+        r.prefixPaddingMs = 300
+        r.sampleRate = 16000
+        return r
+    }
+}
+
+extension RAVADOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        let effectiveActivationThreshold = hasActivationThreshold ? activationThreshold : 0.5
+        if !effectiveActivationThreshold.isFinite || effectiveActivationThreshold < 0.0 || effectiveActivationThreshold > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADOptions.activation_threshold",
+                message: "activation_threshold must be in 0.0...1.0 (got \(effectiveActivationThreshold))"
+            )
+        }
+        if sampleRate < 8000 || sampleRate > 48000 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADOptions.sample_rate",
+                message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
+            )
+        }
+    }
+}
+
+extension RASDKComponent {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .stt: return "stt"
+        case .tts: return "tts"
+        case .vad: return "vad"
+        case .llm: return "llm"
+        case .vlm: return "vlm"
+        case .diffusion: return "diffusion"
+        case .rag: return "rag"
+        case .embeddings: return "embeddings"
+        case .voiceAgent: return "voice_agent"
+        case .wakeword: return "wakeword"
+        case .speakerDiarization: return "speaker_diarization"
+        case .semanticSegmentation: return "semantic_segmentation"
+        case .rerank: return "rerank"
+        default: return ""
+        }
+    }
+}
+
+extension RASDKComponent {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RASDKComponent? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "stt": return .stt
+        case "tts": return .tts
+        case "vad": return .vad
+        case "llm": return .llm
+        case "vlm": return .vlm
+        case "diffusion": return .diffusion
+        case "rag": return .rag
+        case "embeddings": return .embeddings
+        case "voice_agent": return .voiceAgent
+        case "wakeword": return .wakeword
+        case "speaker_diarization": return .speakerDiarization
+        case "semantic_segmentation": return .semanticSegmentation
+        case "rerank": return .rerank
+        default: return nil
+        }
+    }
+}
+
+extension RASdkInitPhase1Request {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if hasRequestTimeoutMs && (requestTimeoutMs < 1000) {
+            throw SDKException.validationFailed(
+                fieldPath: "SdkInitPhase1Request.request_timeout_ms",
+                message: "request_timeout_ms must be >= 1000 (got \(requestTimeoutMs))"
+            )
+        }
+        if hasMaxRetries && (maxRetries < 0 || maxRetries > 10) {
+            throw SDKException.validationFailed(
+                fieldPath: "SdkInitPhase1Request.max_retries",
+                message: "max_retries must be in 0...10 (got \(maxRetries))"
+            )
+        }
     }
 }
 
@@ -708,10 +929,22 @@ extension RASegmentationImage {
                 message: "width is required"
             )
         }
+        if width < 1 || width > 4096 {
+            throw SDKException.validationFailed(
+                fieldPath: "SegmentationImage.width",
+                message: "width must be in 1...4096 (got \(width))"
+            )
+        }
         if height == 0 {
             throw SDKException.validationFailed(
                 fieldPath: "SegmentationImage.height",
                 message: "height is required"
+            )
+        }
+        if height < 1 || height > 4096 {
+            throw SDKException.validationFailed(
+                fieldPath: "SegmentationImage.height",
+                message: "height must be in 1...4096 (got \(height))"
             )
         }
     }
@@ -745,19 +978,8 @@ extension RASTTOptions {
     public static func defaults() -> RASTTOptions {
         var r = RASTTOptions()
         r.enablePunctuation = true
-        r.maxSpeakers = 0
         r.enableWordTimestamps = true
-        r.beamSize = 0
-        r.maxAlternatives = 0
-        return r
-    }
-}
-
-extension RATTSConfiguration {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RATTSConfiguration {
-        var r = RATTSConfiguration()
-        r.enableNeuralVoice = true
+        r.silenceDurationMs = 0
         return r
     }
 }
@@ -771,7 +993,7 @@ extension RATTSOptions {
         r.pitch = 1.0
         r.volume = 1.0
         r.audioFormat = .pcm
-        r.sampleRate = 22050
+        r.sampleRate = 0
         return r
     }
 }
@@ -785,55 +1007,10 @@ extension RATTSOptions {
                 message: "speed must be in 0.5...2.0 (got \(speed))"
             )
         }
-    }
-}
-
-extension RAVLMGenerationOptions {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAVLMGenerationOptions {
-        var r = RAVLMGenerationOptions()
-        r.maxOutputTokens = 2048
-        r.temperature = 0.7
-        r.topP = 0.9
-        r.topK = 0
-        r.useGpu = true
-        r.repetitionPenalty = 1.1
-        r.minP = 0.0
-        return r
-    }
-}
-
-extension RAVLMGenerationOptions {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        if maxOutputTokens < 0 {
+        if !pitch.isFinite || pitch < 0.5 || pitch > 2.0 {
             throw SDKException.validationFailed(
-                fieldPath: "VLMGenerationOptions.max_output_tokens",
-                message: "max_output_tokens must be >= 0 (got \(maxOutputTokens))"
-            )
-        }
-        if !temperature.isFinite || temperature < 0.0 || temperature > 2.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VLMGenerationOptions.temperature",
-                message: "temperature must be in 0.0...2.0 (got \(temperature))"
-            )
-        }
-        if !topP.isFinite || topP < 0.0 || topP > 1.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VLMGenerationOptions.top_p",
-                message: "top_p must be in 0.0...1.0 (got \(topP))"
-            )
-        }
-        if topK < 0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VLMGenerationOptions.top_k",
-                message: "top_k must be >= 0 (got \(topK))"
-            )
-        }
-        if !repetitionPenalty.isFinite || repetitionPenalty < 0.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VLMGenerationOptions.repetition_penalty",
-                message: "repetition_penalty must be >= 0.0 (got \(repetitionPenalty))"
+                fieldPath: "TTSOptions.pitch",
+                message: "pitch must be in 0.5...2.0 (got \(pitch))"
             )
         }
     }

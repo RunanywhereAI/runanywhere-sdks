@@ -18,44 +18,55 @@ import kotlin.Suppress
 
 /**
  * Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
- * into COMPONENT; the modality is recoverable from c_abi_code and
- * ErrorContext.operation, so it is not encoded twice.
+ * into COMPONENT; use SDKError.component to tell them apart.
+ *
+ * The rac_wire_string values are the one form every SDK prints, so a crash
+ * report written by Swift and one written by Web say the same word.
  */
 public enum class ErrorCategory(
   override val `value`: Int,
 ) : WireEnum {
+  @RacWireStringOption("unspecified")
   ERROR_CATEGORY_UNSPECIFIED(0),
   /**
    * wire, HTTP, download, server, timeout
    */
+  @RacWireStringOption("network_error")
   ERROR_CATEGORY_NETWORK(1),
   /**
    * invalid args, empty input, format
    */
+  @RacWireStringOption("invalid_request_error")
   ERROR_CATEGORY_VALIDATION(2),
   /**
    * not-found, load-failed, incompatible
    */
+  @RacWireStringOption("model_error")
   ERROR_CATEGORY_MODEL(3),
   /**
    * STT/TTS/LLM/VAD/VLM/etc. lifecycle
    */
+  @RacWireStringOption("component_error")
   ERROR_CATEGORY_COMPONENT(4),
   /**
    * file system, storage, audio buffers
    */
+  @RacWireStringOption("io_error")
   ERROR_CATEGORY_IO(5),
   /**
    * API key, unauthorized, forbidden
    */
+  @RacWireStringOption("authentication_error")
   ERROR_CATEGORY_AUTH(6),
   /**
    * unknown, not-implemented, internal
    */
+  @RacWireStringOption("internal_error")
   ERROR_CATEGORY_INTERNAL(7),
   /**
    * env mismatch, init not done, bad cfg
    */
+  @RacWireStringOption("configuration_error")
   ERROR_CATEGORY_CONFIGURATION(8),
   ;
 

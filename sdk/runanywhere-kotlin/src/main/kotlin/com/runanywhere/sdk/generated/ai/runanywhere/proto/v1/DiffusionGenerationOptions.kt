@@ -88,16 +88,15 @@ public class DiffusionGenerationOptions(
   )
   public val guidance_scale: Float = 0f,
   /**
-   * -1 = random.
+   * Absent = pick a fresh random seed. Any present value is literal,
+   * including 0. The seed actually used comes back on each result image.
    */
-  @RacDefaultOption("-1")
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 6,
   )
-  public val seed: Long = 0L,
+  public val seed: Long? = null,
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.DiffusionScheduler#ADAPTER",
@@ -105,106 +104,88 @@ public class DiffusionGenerationOptions(
     schemaIndex = 7,
   )
   public val scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED,
+  /**
+   * Mode is inferred, never declared: no image = text-to-image, image =
+   * image-to-image, image + mask_image = inpainting. The only invalid
+   * combination is a mask with no image.
+   * Source picture. Its presence promotes the request to image-to-image;
+   * adding `mask_image` promotes it to inpainting. Must be an encoded
+   * PNG or JPEG container.
+   */
   @field:WireField(
     tag = 9,
-    adapter = "ai.runanywhere.proto.v1.DiffusionMode#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
+    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
     schemaIndex = 8,
   )
-  public val mode: DiffusionMode = DiffusionMode.DIFFUSION_MODE_UNSPECIFIED,
+  public val image: ByteString? = null,
   /**
-   * For IMAGE_TO_IMAGE and INPAINTING.
+   * White = repaint. Same dimensions as `image`.
    */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
-    jsonName = "inputImage",
+    jsonName = "maskImage",
     schemaIndex = 9,
   )
-  public val input_image: ByteString? = null,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
-    jsonName = "maskImage",
-    schemaIndex = 10,
-  )
   public val mask_image: ByteString? = null,
+  /**
+   * How far from the source image to travel. Only meaningful with `image`.
+   * Effective steps = ceil(steps * strength), so a low value is
+   * proportionally cheaper -- on device that is battery.
+   */
   @RacDefaultOption("0.75")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
   @field:WireField(
-    tag = 12,
+    tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "denoiseStrength",
+    schemaIndex = 10,
+  )
+  public val strength: Float = 0f,
+  /**
+   * Container of the bytes above, as supplied by the caller. Request-side;
+   * the result carries its own media type per image.
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "imageMediaType",
     schemaIndex = 11,
   )
-  public val denoise_strength: Float = 0f,
+  public val image_media_type: String? = null,
   @field:WireField(
     tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "reportIntermediateImages",
-    schemaIndex = 12,
-  )
-  public val report_intermediate_images: Boolean = false,
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "progressStride",
-    schemaIndex = 13,
-  )
-  public val progress_stride: Int = 0,
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "inputImageWidth",
-    schemaIndex = 14,
-  )
-  public val input_image_width: Int = 0,
-  @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "inputImageHeight",
-    schemaIndex = 15,
-  )
-  public val input_image_height: Int = 0,
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "inputImageMediaType",
-    schemaIndex = 16,
-  )
-  public val input_image_media_type: String? = null,
-  @field:WireField(
-    tag = 18,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "maskImageMediaType",
-    schemaIndex = 17,
+    schemaIndex = 12,
   )
   public val mask_image_media_type: String? = null,
   /**
-   * 0 = one image.
+   * How many images to generate for this prompt. Absent = 1.
    */
+  @RacDefaultOption("1")
+  @RacMinOption(1)
+  @RacMaxOption(8)
   @field:WireField(
-    tag = 19,
+    tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "batchSize",
-    schemaIndex = 18,
+    schemaIndex = 13,
   )
-  public val batch_size: Int = 0,
+  public val n: Int? = null,
+  /**
+   * Encoding of the returned image bytes.
+   */
+  @RacDefaultOption("DIFFUSION_OUTPUT_FORMAT_PNG")
   @field:WireField(
-    tag = 20,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.DiffusionOutputFormat#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "returnLatents",
-    schemaIndex = 19,
+    jsonName = "outputFormat",
+    schemaIndex = 14,
   )
-  public val return_latents: Boolean = false,
+  public val output_format:
+      DiffusionOutputFormat = DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -225,18 +206,13 @@ public class DiffusionGenerationOptions(
     if (guidance_scale != other.guidance_scale) return false
     if (seed != other.seed) return false
     if (scheduler != other.scheduler) return false
-    if (mode != other.mode) return false
-    if (input_image != other.input_image) return false
+    if (image != other.image) return false
     if (mask_image != other.mask_image) return false
-    if (denoise_strength != other.denoise_strength) return false
-    if (report_intermediate_images != other.report_intermediate_images) return false
-    if (progress_stride != other.progress_stride) return false
-    if (input_image_width != other.input_image_width) return false
-    if (input_image_height != other.input_image_height) return false
-    if (input_image_media_type != other.input_image_media_type) return false
+    if (strength != other.strength) return false
+    if (image_media_type != other.image_media_type) return false
     if (mask_image_media_type != other.mask_image_media_type) return false
-    if (batch_size != other.batch_size) return false
-    if (return_latents != other.return_latents) return false
+    if (n != other.n) return false
+    if (output_format != other.output_format) return false
     return true
   }
 
@@ -250,20 +226,15 @@ public class DiffusionGenerationOptions(
       result = result * 37 + height.hashCode()
       result = result * 37 + steps.hashCode()
       result = result * 37 + guidance_scale.hashCode()
-      result = result * 37 + seed.hashCode()
+      result = result * 37 + (seed?.hashCode() ?: 0)
       result = result * 37 + scheduler.hashCode()
-      result = result * 37 + mode.hashCode()
-      result = result * 37 + (input_image?.hashCode() ?: 0)
+      result = result * 37 + (image?.hashCode() ?: 0)
       result = result * 37 + (mask_image?.hashCode() ?: 0)
-      result = result * 37 + denoise_strength.hashCode()
-      result = result * 37 + report_intermediate_images.hashCode()
-      result = result * 37 + progress_stride.hashCode()
-      result = result * 37 + input_image_width.hashCode()
-      result = result * 37 + input_image_height.hashCode()
-      result = result * 37 + (input_image_media_type?.hashCode() ?: 0)
+      result = result * 37 + strength.hashCode()
+      result = result * 37 + (image_media_type?.hashCode() ?: 0)
       result = result * 37 + (mask_image_media_type?.hashCode() ?: 0)
-      result = result * 37 + batch_size.hashCode()
-      result = result * 37 + return_latents.hashCode()
+      result = result * 37 + (n?.hashCode() ?: 0)
+      result = result * 37 + output_format.hashCode()
       super.hashCode = result
     }
     return result
@@ -277,20 +248,15 @@ public class DiffusionGenerationOptions(
     result += """height=$height"""
     result += """steps=$steps"""
     result += """guidance_scale=$guidance_scale"""
-    result += """seed=$seed"""
+    if (seed != null) result += """seed=$seed"""
     result += """scheduler=$scheduler"""
-    result += """mode=$mode"""
-    if (input_image != null) result += """input_image=$input_image"""
+    if (image != null) result += """image=$image"""
     if (mask_image != null) result += """mask_image=$mask_image"""
-    result += """denoise_strength=$denoise_strength"""
-    result += """report_intermediate_images=$report_intermediate_images"""
-    result += """progress_stride=$progress_stride"""
-    result += """input_image_width=$input_image_width"""
-    result += """input_image_height=$input_image_height"""
-    if (input_image_media_type != null) result += """input_image_media_type=${sanitize(input_image_media_type)}"""
+    result += """strength=$strength"""
+    if (image_media_type != null) result += """image_media_type=${sanitize(image_media_type)}"""
     if (mask_image_media_type != null) result += """mask_image_media_type=${sanitize(mask_image_media_type)}"""
-    result += """batch_size=$batch_size"""
-    result += """return_latents=$return_latents"""
+    if (n != null) result += """n=$n"""
+    result += """output_format=$output_format"""
     return result.joinToString(prefix = "DiffusionGenerationOptions{", separator = ", ", postfix = "}")
   }
 
@@ -301,22 +267,17 @@ public class DiffusionGenerationOptions(
     height: Int = this.height,
     steps: Int = this.steps,
     guidance_scale: Float = this.guidance_scale,
-    seed: Long = this.seed,
+    seed: Long? = this.seed,
     scheduler: DiffusionScheduler = this.scheduler,
-    mode: DiffusionMode = this.mode,
-    input_image: ByteString? = this.input_image,
+    image: ByteString? = this.image,
     mask_image: ByteString? = this.mask_image,
-    denoise_strength: Float = this.denoise_strength,
-    report_intermediate_images: Boolean = this.report_intermediate_images,
-    progress_stride: Int = this.progress_stride,
-    input_image_width: Int = this.input_image_width,
-    input_image_height: Int = this.input_image_height,
-    input_image_media_type: String? = this.input_image_media_type,
+    strength: Float = this.strength,
+    image_media_type: String? = this.image_media_type,
     mask_image_media_type: String? = this.mask_image_media_type,
-    batch_size: Int = this.batch_size,
-    return_latents: Boolean = this.return_latents,
+    n: Int? = this.n,
+    output_format: DiffusionOutputFormat = this.output_format,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionGenerationOptions = DiffusionGenerationOptions(prompt, negative_prompt, width, height, steps, guidance_scale, seed, scheduler, mode, input_image, mask_image, denoise_strength, report_intermediate_images, progress_stride, input_image_width, input_image_height, input_image_media_type, mask_image_media_type, batch_size, return_latents, unknownFields)
+  ): DiffusionGenerationOptions = DiffusionGenerationOptions(prompt, negative_prompt, width, height, steps, guidance_scale, seed, scheduler, image, mask_image, strength, image_media_type, mask_image_media_type, n, output_format, unknownFields)
 
   public companion object {
     @JvmField
@@ -349,39 +310,20 @@ public class DiffusionGenerationOptions(
         if (!value.guidance_scale.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.guidance_scale)
         }
-        if (value.seed != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.seed)
-        }
+        size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.seed)
         if (value.scheduler != ai.runanywhere.proto.v1.DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED) {
           size += DiffusionScheduler.ADAPTER.encodedSizeWithTag(8, value.scheduler)
         }
-        if (value.mode != ai.runanywhere.proto.v1.DiffusionMode.DIFFUSION_MODE_UNSPECIFIED) {
-          size += DiffusionMode.ADAPTER.encodedSizeWithTag(9, value.mode)
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(9, value.image)
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(10, value.mask_image)
+        if (!value.strength.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(11, value.strength)
         }
-        size += ProtoAdapter.BYTES.encodedSizeWithTag(10, value.input_image)
-        size += ProtoAdapter.BYTES.encodedSizeWithTag(11, value.mask_image)
-        if (!value.denoise_strength.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(12, value.denoise_strength)
-        }
-        if (value.report_intermediate_images != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(13, value.report_intermediate_images)
-        }
-        if (value.progress_stride != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(14, value.progress_stride)
-        }
-        if (value.input_image_width != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(15, value.input_image_width)
-        }
-        if (value.input_image_height != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(16, value.input_image_height)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.input_image_media_type)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.mask_image_media_type)
-        if (value.batch_size != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(19, value.batch_size)
-        }
-        if (value.return_latents != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(20, value.return_latents)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.image_media_type)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.mask_image_media_type)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(14, value.n)
+        if (value.output_format != ai.runanywhere.proto.v1.DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED) {
+          size += DiffusionOutputFormat.ADAPTER.encodedSizeWithTag(15, value.output_format)
         }
         return size
       }
@@ -405,79 +347,41 @@ public class DiffusionGenerationOptions(
         if (!value.guidance_scale.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.guidance_scale)
         }
-        if (value.seed != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.seed)
-        }
+        ProtoAdapter.INT64.encodeWithTag(writer, 7, value.seed)
         if (value.scheduler != ai.runanywhere.proto.v1.DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED) {
           DiffusionScheduler.ADAPTER.encodeWithTag(writer, 8, value.scheduler)
         }
-        if (value.mode != ai.runanywhere.proto.v1.DiffusionMode.DIFFUSION_MODE_UNSPECIFIED) {
-          DiffusionMode.ADAPTER.encodeWithTag(writer, 9, value.mode)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 9, value.image)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 10, value.mask_image)
+        if (!value.strength.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 11, value.strength)
         }
-        ProtoAdapter.BYTES.encodeWithTag(writer, 10, value.input_image)
-        ProtoAdapter.BYTES.encodeWithTag(writer, 11, value.mask_image)
-        if (!value.denoise_strength.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.denoise_strength)
-        }
-        if (value.report_intermediate_images != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.report_intermediate_images)
-        }
-        if (value.progress_stride != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.progress_stride)
-        }
-        if (value.input_image_width != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 15, value.input_image_width)
-        }
-        if (value.input_image_height != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.input_image_height)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.input_image_media_type)
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.mask_image_media_type)
-        if (value.batch_size != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 19, value.batch_size)
-        }
-        if (value.return_latents != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 20, value.return_latents)
+        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.image_media_type)
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.mask_image_media_type)
+        ProtoAdapter.INT32.encodeWithTag(writer, 14, value.n)
+        if (value.output_format != ai.runanywhere.proto.v1.DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED) {
+          DiffusionOutputFormat.ADAPTER.encodeWithTag(writer, 15, value.output_format)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionGenerationOptions) {
         writer.writeBytes(value.unknownFields)
-        if (value.return_latents != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 20, value.return_latents)
+        if (value.output_format != ai.runanywhere.proto.v1.DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED) {
+          DiffusionOutputFormat.ADAPTER.encodeWithTag(writer, 15, value.output_format)
         }
-        if (value.batch_size != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 19, value.batch_size)
+        ProtoAdapter.INT32.encodeWithTag(writer, 14, value.n)
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.mask_image_media_type)
+        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.image_media_type)
+        if (!value.strength.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 11, value.strength)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.mask_image_media_type)
-        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.input_image_media_type)
-        if (value.input_image_height != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.input_image_height)
-        }
-        if (value.input_image_width != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 15, value.input_image_width)
-        }
-        if (value.progress_stride != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.progress_stride)
-        }
-        if (value.report_intermediate_images != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.report_intermediate_images)
-        }
-        if (!value.denoise_strength.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.denoise_strength)
-        }
-        ProtoAdapter.BYTES.encodeWithTag(writer, 11, value.mask_image)
-        ProtoAdapter.BYTES.encodeWithTag(writer, 10, value.input_image)
-        if (value.mode != ai.runanywhere.proto.v1.DiffusionMode.DIFFUSION_MODE_UNSPECIFIED) {
-          DiffusionMode.ADAPTER.encodeWithTag(writer, 9, value.mode)
-        }
+        ProtoAdapter.BYTES.encodeWithTag(writer, 10, value.mask_image)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 9, value.image)
         if (value.scheduler != ai.runanywhere.proto.v1.DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED) {
           DiffusionScheduler.ADAPTER.encodeWithTag(writer, 8, value.scheduler)
         }
-        if (value.seed != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.seed)
-        }
+        ProtoAdapter.INT64.encodeWithTag(writer, 7, value.seed)
         if (!value.guidance_scale.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.guidance_scale)
         }
@@ -505,20 +409,15 @@ public class DiffusionGenerationOptions(
         var height: Int = 0
         var steps: Int = 0
         var guidance_scale: Float = 0f
-        var seed: Long = 0L
+        var seed: Long? = null
         var scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED
-        var mode: DiffusionMode = DiffusionMode.DIFFUSION_MODE_UNSPECIFIED
-        var input_image: ByteString? = null
+        var image: ByteString? = null
         var mask_image: ByteString? = null
-        var denoise_strength: Float = 0f
-        var report_intermediate_images: Boolean = false
-        var progress_stride: Int = 0
-        var input_image_width: Int = 0
-        var input_image_height: Int = 0
-        var input_image_media_type: String? = null
+        var strength: Float = 0f
+        var image_media_type: String? = null
         var mask_image_media_type: String? = null
-        var batch_size: Int = 0
-        var return_latents: Boolean = false
+        var n: Int? = null
+        var output_format: DiffusionOutputFormat = DiffusionOutputFormat.DIFFUSION_OUTPUT_FORMAT_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -533,22 +432,17 @@ public class DiffusionGenerationOptions(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            9 -> try {
-              mode = DiffusionMode.ADAPTER.decode(reader)
+            9 -> image = ProtoAdapter.BYTES.decode(reader)
+            10 -> mask_image = ProtoAdapter.BYTES.decode(reader)
+            11 -> strength = ProtoAdapter.FLOAT.decode(reader)
+            12 -> image_media_type = ProtoAdapter.STRING.decode(reader)
+            13 -> mask_image_media_type = ProtoAdapter.STRING.decode(reader)
+            14 -> n = ProtoAdapter.INT32.decode(reader)
+            15 -> try {
+              output_format = DiffusionOutputFormat.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            10 -> input_image = ProtoAdapter.BYTES.decode(reader)
-            11 -> mask_image = ProtoAdapter.BYTES.decode(reader)
-            12 -> denoise_strength = ProtoAdapter.FLOAT.decode(reader)
-            13 -> report_intermediate_images = ProtoAdapter.BOOL.decode(reader)
-            14 -> progress_stride = ProtoAdapter.INT32.decode(reader)
-            15 -> input_image_width = ProtoAdapter.INT32.decode(reader)
-            16 -> input_image_height = ProtoAdapter.INT32.decode(reader)
-            17 -> input_image_media_type = ProtoAdapter.STRING.decode(reader)
-            18 -> mask_image_media_type = ProtoAdapter.STRING.decode(reader)
-            19 -> batch_size = ProtoAdapter.INT32.decode(reader)
-            20 -> return_latents = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -561,18 +455,13 @@ public class DiffusionGenerationOptions(
           guidance_scale = guidance_scale,
           seed = seed,
           scheduler = scheduler,
-          mode = mode,
-          input_image = input_image,
+          image = image,
           mask_image = mask_image,
-          denoise_strength = denoise_strength,
-          report_intermediate_images = report_intermediate_images,
-          progress_stride = progress_stride,
-          input_image_width = input_image_width,
-          input_image_height = input_image_height,
-          input_image_media_type = input_image_media_type,
+          strength = strength,
+          image_media_type = image_media_type,
           mask_image_media_type = mask_image_media_type,
-          batch_size = batch_size,
-          return_latents = return_latents,
+          n = n,
+          output_format = output_format,
           unknownFields = unknownFields
         )
       }

@@ -66,7 +66,7 @@ public class StructuredOutputPromptResult(
   )
   public val grammar: String? = null,
   @field:WireField(
-    tag = 8,
+    tag = 6,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 5,
   )
@@ -148,7 +148,7 @@ public class StructuredOutputPromptResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.json_schema)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.regex_pattern)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.grammar)
-        size += SDKError.ADAPTER.encodedSizeWithTag(8, value.error)
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
@@ -160,13 +160,13 @@ public class StructuredOutputPromptResult(
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.json_schema)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.regex_pattern)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.grammar)
-        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputPromptResult) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.grammar)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.regex_pattern)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.json_schema)
@@ -190,7 +190,7 @@ public class StructuredOutputPromptResult(
             3 -> json_schema = ProtoAdapter.STRING.decode(reader)
             4 -> regex_pattern = ProtoAdapter.STRING.decode(reader)
             5 -> grammar = ProtoAdapter.STRING.decode(reader)
-            8 -> error = SDKError.ADAPTER.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }

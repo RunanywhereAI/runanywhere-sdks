@@ -16,8 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -29,9 +27,6 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -54,7 +49,20 @@ public class ToolDefinition(
     schemaIndex = 1,
   )
   public val description: String = "",
-  parameters: List<ToolParameter> = emptyList(),
+  /**
+   * OpenAI-compatible parameters schema: ONE JSON Schema object describing
+   * this tool's arguments — the same shape solutions.proto's ToolSpec
+   * already carries. One schema per tool is what OpenAI (`parameters`),
+   * Anthropic (`input_schema`) and MCP (`inputSchema`) each publish.
+   * "" or "{}" advertises a zero-argument tool.
+   */
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 2,
+  )
+  public val parameters: String = "",
   /**
    * Optional category for grouping tools in catalogs / UIs.
    */
@@ -64,32 +72,8 @@ public class ToolDefinition(
     schemaIndex = 3,
   )
   public val category: String? = null,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "jsonSchema",
-    schemaIndex = 4,
-  )
-  public val json_schema: String? = null,
-  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolDefinition, Nothing>(ADAPTER, unknownFields) {
-  @field:WireField(
-    tag = 3,
-    adapter = "ai.runanywhere.proto.v1.ToolParameter#ADAPTER",
-    label = WireField.Label.REPEATED,
-    schemaIndex = 2,
-  )
-  public val parameters: List<ToolParameter> = immutableCopyOf("parameters", parameters)
-
-  @field:WireField(
-    tag = 6,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 5,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -104,8 +88,6 @@ public class ToolDefinition(
     if (description != other.description) return false
     if (parameters != other.parameters) return false
     if (category != other.category) return false
-    if (json_schema != other.json_schema) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -117,8 +99,6 @@ public class ToolDefinition(
       result = result * 37 + description.hashCode()
       result = result * 37 + parameters.hashCode()
       result = result * 37 + (category?.hashCode() ?: 0)
-      result = result * 37 + (json_schema?.hashCode() ?: 0)
-      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -128,22 +108,18 @@ public class ToolDefinition(
     val result = mutableListOf<String>()
     result += """name=${sanitize(name)}"""
     result += """description=${sanitize(description)}"""
-    if (parameters.isNotEmpty()) result += """parameters=$parameters"""
+    result += """parameters=${sanitize(parameters)}"""
     if (category != null) result += """category=${sanitize(category)}"""
-    if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "ToolDefinition{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     name: String = this.name,
     description: String = this.description,
-    parameters: List<ToolParameter> = this.parameters,
+    parameters: String = this.parameters,
     category: String? = this.category,
-    json_schema: String? = this.json_schema,
-    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolDefinition = ToolDefinition(name, description, parameters, category, json_schema, metadata, unknownFields)
+  ): ToolDefinition = ToolDefinition(name, description, parameters, category, unknownFields)
 
   public companion object {
     @JvmField
@@ -155,9 +131,6 @@ public class ToolDefinition(
       null, 
       "tool_calling.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: ToolDefinition): Int {
         var size = value.unknownFields.size
         if (value.name != "") {
@@ -166,10 +139,10 @@ public class ToolDefinition(
         if (value.description != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.description)
         }
-        size += ToolParameter.ADAPTER.asRepeated().encodedSizeWithTag(3, value.parameters)
+        if (value.parameters != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.parameters)
+        }
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.category)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.json_schema)
-        size += metadataAdapter.encodedSizeWithTag(6, value.metadata)
         return size
       }
 
@@ -180,19 +153,19 @@ public class ToolDefinition(
         if (value.description != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.description)
         }
-        ToolParameter.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.parameters)
+        if (value.parameters != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.parameters)
+        }
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.category)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.json_schema)
-        metadataAdapter.encodeWithTag(writer, 6, value.metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolDefinition) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 6, value.metadata)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.json_schema)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.category)
-        ToolParameter.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.parameters)
+        if (value.parameters != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.parameters)
+        }
         if (value.description != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.description)
         }
@@ -204,18 +177,14 @@ public class ToolDefinition(
       override fun decode(reader: ProtoReader): ToolDefinition {
         var name: String = ""
         var description: String = ""
-        val parameters = mutableListOf<ToolParameter>()
+        var parameters: String = ""
         var category: String? = null
-        var json_schema: String? = null
-        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> name = ProtoAdapter.STRING.decode(reader)
             2 -> description = ProtoAdapter.STRING.decode(reader)
-            3 -> parameters.add(ToolParameter.ADAPTER.decode(reader))
+            3 -> parameters = ProtoAdapter.STRING.decode(reader)
             4 -> category = ProtoAdapter.STRING.decode(reader)
-            5 -> json_schema = ProtoAdapter.STRING.decode(reader)
-            6 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -224,14 +193,11 @@ public class ToolDefinition(
           description = description,
           parameters = parameters,
           category = category,
-          json_schema = json_schema,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolDefinition): ToolDefinition = value.copy(
-        parameters = value.parameters.redactElements(ToolParameter.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

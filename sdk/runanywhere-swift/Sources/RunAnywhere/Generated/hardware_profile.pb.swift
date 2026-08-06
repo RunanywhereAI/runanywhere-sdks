@@ -21,27 +21,31 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
 }
 
 /// ---------------------------------------------------------------------------
-/// Hardware acceleration preference for inference. Canonical single enum —
-/// previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
-/// file and `AccelerationPreference` in model_types.proto. Consolidated here
-/// because it is a pure hardware concept and
-/// hardware_profile.proto has no imports (model_types.proto already imports
-/// this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
-///   Web    enums.ts:165   (Auto / WebGPU / CPU)
-///   Swift  extensions     (CPU / GPU / NPU / Metal)
-///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
-/// Canonicalized union below.
+/// Hardware acceleration preference for inference. Device CLASS, not graphics
+/// API. A hint, never a hard requirement — the runtime may fall back.
+/// UNSPECIFIED means "you choose".
+///
+/// Canonical single enum. It lives in this file rather than model_types.proto
+/// because model_types.proto already imports this file; placing it here avoids
+/// a cyclic import.
 /// ---------------------------------------------------------------------------
 public nonisolated enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
+
+  /// let the runtime choose
   case unspecified // = 0
+
+  /// DEPRECATED: alias of UNSPECIFIED
   case auto // = 1
   case cpu // = 2
+
+  /// covers Metal / Vulkan / WebGPU
   case gpu // = 3
+
+  /// WEBGPU / METAL / VULKAN were removed: they are spellings of GPU, not
+  /// device classes. The concrete API is the runtime's choice; pass vendor
+  /// knobs as engine options instead.
   case npu // = 4
-  case webgpu // = 5
-  case metal // = 6
-  case vulkan // = 7
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -55,9 +59,6 @@ public nonisolated enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.Case
     case 2: self = .cpu
     case 3: self = .gpu
     case 4: self = .npu
-    case 5: self = .webgpu
-    case 6: self = .metal
-    case 7: self = .vulkan
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -69,9 +70,6 @@ public nonisolated enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.Case
     case .cpu: return 2
     case .gpu: return 3
     case .npu: return 4
-    case .webgpu: return 5
-    case .metal: return 6
-    case .vulkan: return 7
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -83,22 +81,10 @@ public nonisolated enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.Case
     .cpu,
     .gpu,
     .npu,
-    .webgpu,
-    .metal,
-    .vulkan,
   ]
 
 }
 
-/// Logical hardware service contract. Mirrors the C ABI in
-/// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
-///   - rac_hardware_profile_get → GetProfile
-///   - rac_hardware_get_accelerators → GetAccelerators
-///   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
-///
-/// Native device probes (chip detection, neural engine queries, GPU
-/// discovery, memory/cores) remain platform-adapter owned. C++ caches and
-/// serves the normalized HardwareProfile/AcceleratorInfo messages.
 /// Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
 /// (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
 /// rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number
@@ -157,79 +143,9 @@ public nonisolated enum RAHexagonArch: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public nonisolated struct RAHardwareProfile: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var chip: String = String()
-
-  public var hasNeuralEngine_p: Bool = false
-
-  /// "ane", "gpu", "cpu"
-  public var accelerationMode: String = String()
-
-  public var totalMemoryBytes: UInt64 = 0
-
-  public var coreCount: UInt32 = 0
-
-  public var performanceCores: UInt32 = 0
-
-  public var efficiencyCores: UInt32 = 0
-
-  /// "arm64", "x86_64"
-  public var architecture: String = String()
-
-  /// "ios", "android", "web", "macos", "linux", "windows"
-  public var platform: String = String()
-
-  /// resolved NPU vendor family (commons-classified)
-  public var npuChip: RANPUChip = .unspecified
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct RAAcceleratorInfo: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var name: String = String()
-
-  public var type: RAAccelerationPreference = .unspecified
-
-  public var available: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct RAHardwareProfileResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var profile: RAHardwareProfile {
-    get {_profile ?? RAHardwareProfile()}
-    set {_profile = newValue}
-  }
-  /// Returns true if `profile` has been explicitly set.
-  public var hasProfile: Bool {self._profile != nil}
-  /// Clears the value of `profile`. Subsequent reads from it will return its default value.
-  public mutating func clearProfile() {self._profile = nil}
-
-  public var accelerators: [RAAcceleratorInfo] = []
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _profile: RAHardwareProfile? = nil
-}
-
+/// The single NPU-capability description in this IDL. Static device
+/// description lives in exactly one other place: device_info.proto's
+/// DeviceInfo.
 public nonisolated struct RANpuCapability: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -238,22 +154,33 @@ public nonisolated struct RANpuCapability: Sendable {
   /// Vendor SoC model (e.g. "SM8750"); empty when unknown.
   public var socModel: String = String()
 
-  /// /sys/devices/soc0/soc_id value; -1 when unavailable.
-  public var socID: Int32 = 0
+  /// /sys/devices/soc0/soc_id value. ABSENT when unavailable — never a -1 or 0
+  /// sentinel; a default-constructed message is already "unavailable".
+  public var socID: Int32 {
+    get {_socID ?? 0}
+    set {_socID = newValue}
+  }
+  /// Returns true if `socID` has been explicitly set.
+  public var hasSocID: Bool {self._socID != nil}
+  /// Clears the value of `socID`. Subsequent reads from it will return its default value.
+  public mutating func clearSocID() {self._socID = nil}
 
   public var hexagonArch: RAHexagonArch = .unknown
 
-  /// True iff hexagon_arch is in the device-validated QHexRT-supported set
-  /// (v75, v79, or v81 today).
-  public var qhexrtSupported: Bool = false
+  /// True iff this accelerator generation is in the device-validated supported
+  /// set (Hexagon v75/v79/v81 today). Engine-agnostic on purpose: a second NPU
+  /// engine must not require a second boolean.
+  public var supported: Bool = false
 
-  /// rac_qhexrt_arch_name(): "v68" ... "v81", "unknown". Materialized so
-  /// SDKs never re-derive the display name from the enum.
-  public var archName: String = String()
+  /// NPU vendor family. Re-homed here so a non-Qualcomm device gets a
+  /// meaningful answer instead of an empty message.
+  public var npu: RANPUChip = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _socID: Int32? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -261,16 +188,16 @@ public nonisolated struct RANpuCapability: Sendable {
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATION_PREFERENCE_UNSPECIFIED\0\u{1}ACCELERATION_PREFERENCE_AUTO\0\u{1}ACCELERATION_PREFERENCE_CPU\0\u{1}ACCELERATION_PREFERENCE_GPU\0\u{1}ACCELERATION_PREFERENCE_NPU\0\u{1}ACCELERATION_PREFERENCE_WEBGPU\0\u{1}ACCELERATION_PREFERENCE_METAL\0\u{1}ACCELERATION_PREFERENCE_VULKAN\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATION_PREFERENCE_UNSPECIFIED\0\u{1}ACCELERATION_PREFERENCE_AUTO\0\u{1}ACCELERATION_PREFERENCE_CPU\0\u{1}ACCELERATION_PREFERENCE_GPU\0\u{1}ACCELERATION_PREFERENCE_NPU\0")
 }
 
 nonisolated extension RAHexagonArch: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HEXAGON_ARCH_UNKNOWN\0\u{2}D\u{1}HEXAGON_ARCH_V68\0\u{1}HEXAGON_ARCH_V69\0\u{2}\u{4}HEXAGON_ARCH_V73\0\u{2}\u{2}HEXAGON_ARCH_V75\0\u{2}\u{4}HEXAGON_ARCH_V79\0\u{2}\u{2}HEXAGON_ARCH_V81\0")
 }
 
-nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".HardwareProfile"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chip\0\u{3}has_neural_engine\0\u{3}acceleration_mode\0\u{3}total_memory_bytes\0\u{3}core_count\0\u{3}performance_cores\0\u{3}efficiency_cores\0\u{1}architecture\0\u{1}platform\0\u{3}npu_chip\0")
+nonisolated extension RANpuCapability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".NpuCapability"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}soc_model\0\u{3}soc_id\0\u{3}hexagon_arch\0\u{1}supported\0\u{1}npu\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -278,123 +205,11 @@ nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._M
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.chip) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.hasNeuralEngine_p) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.accelerationMode) }()
-      case 4: try { try decoder.decodeSingularUInt64Field(value: &self.totalMemoryBytes) }()
-      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.coreCount) }()
-      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.performanceCores) }()
-      case 7: try { try decoder.decodeSingularUInt32Field(value: &self.efficiencyCores) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self.architecture) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.platform) }()
-      case 10: try { try decoder.decodeSingularEnumField(value: &self.npuChip) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.chip.isEmpty {
-      try visitor.visitSingularStringField(value: self.chip, fieldNumber: 1)
-    }
-    if self.hasNeuralEngine_p != false {
-      try visitor.visitSingularBoolField(value: self.hasNeuralEngine_p, fieldNumber: 2)
-    }
-    if !self.accelerationMode.isEmpty {
-      try visitor.visitSingularStringField(value: self.accelerationMode, fieldNumber: 3)
-    }
-    if self.totalMemoryBytes != 0 {
-      try visitor.visitSingularUInt64Field(value: self.totalMemoryBytes, fieldNumber: 4)
-    }
-    if self.coreCount != 0 {
-      try visitor.visitSingularUInt32Field(value: self.coreCount, fieldNumber: 5)
-    }
-    if self.performanceCores != 0 {
-      try visitor.visitSingularUInt32Field(value: self.performanceCores, fieldNumber: 6)
-    }
-    if self.efficiencyCores != 0 {
-      try visitor.visitSingularUInt32Field(value: self.efficiencyCores, fieldNumber: 7)
-    }
-    if !self.architecture.isEmpty {
-      try visitor.visitSingularStringField(value: self.architecture, fieldNumber: 8)
-    }
-    if !self.platform.isEmpty {
-      try visitor.visitSingularStringField(value: self.platform, fieldNumber: 9)
-    }
-    if self.npuChip != .unspecified {
-      try visitor.visitSingularEnumField(value: self.npuChip, fieldNumber: 10)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAHardwareProfile, rhs: RAHardwareProfile) -> Bool {
-    if lhs.chip != rhs.chip {return false}
-    if lhs.hasNeuralEngine_p != rhs.hasNeuralEngine_p {return false}
-    if lhs.accelerationMode != rhs.accelerationMode {return false}
-    if lhs.totalMemoryBytes != rhs.totalMemoryBytes {return false}
-    if lhs.coreCount != rhs.coreCount {return false}
-    if lhs.performanceCores != rhs.performanceCores {return false}
-    if lhs.efficiencyCores != rhs.efficiencyCores {return false}
-    if lhs.architecture != rhs.architecture {return false}
-    if lhs.platform != rhs.platform {return false}
-    if lhs.npuChip != rhs.npuChip {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAAcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".AcceleratorInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}type\0\u{1}available\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.type) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.available) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    if self.type != .unspecified {
-      try visitor.visitSingularEnumField(value: self.type, fieldNumber: 2)
-    }
-    if self.available != false {
-      try visitor.visitSingularBoolField(value: self.available, fieldNumber: 3)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAAcceleratorInfo, rhs: RAAcceleratorInfo) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.type != rhs.type {return false}
-    if lhs.available != rhs.available {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAHardwareProfileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".HardwareProfileResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}profile\0\u{1}accelerators\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._profile) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.accelerators) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.socModel) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self._socID) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.hexagonArch) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.supported) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.npu) }()
       default: break
       }
     }
@@ -405,68 +220,30 @@ nonisolated extension RAHardwareProfileResult: SwiftProtobuf.Message, SwiftProto
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._profile {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if !self.accelerators.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.accelerators, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAHardwareProfileResult, rhs: RAHardwareProfileResult) -> Bool {
-    if lhs._profile != rhs._profile {return false}
-    if lhs.accelerators != rhs.accelerators {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RANpuCapability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".NpuCapability"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}soc_model\0\u{3}soc_id\0\u{3}hexagon_arch\0\u{3}qhexrt_supported\0\u{3}arch_name\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.socModel) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.socID) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self.hexagonArch) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.qhexrtSupported) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.archName) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.socModel.isEmpty {
       try visitor.visitSingularStringField(value: self.socModel, fieldNumber: 1)
     }
-    if self.socID != 0 {
-      try visitor.visitSingularInt32Field(value: self.socID, fieldNumber: 2)
-    }
+    try { if let v = self._socID {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 2)
+    } }()
     if self.hexagonArch != .unknown {
       try visitor.visitSingularEnumField(value: self.hexagonArch, fieldNumber: 3)
     }
-    if self.qhexrtSupported != false {
-      try visitor.visitSingularBoolField(value: self.qhexrtSupported, fieldNumber: 4)
+    if self.supported != false {
+      try visitor.visitSingularBoolField(value: self.supported, fieldNumber: 4)
     }
-    if !self.archName.isEmpty {
-      try visitor.visitSingularStringField(value: self.archName, fieldNumber: 5)
+    if self.npu != .unspecified {
+      try visitor.visitSingularEnumField(value: self.npu, fieldNumber: 5)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RANpuCapability, rhs: RANpuCapability) -> Bool {
     if lhs.socModel != rhs.socModel {return false}
-    if lhs.socID != rhs.socID {return false}
+    if lhs._socID != rhs._socID {return false}
     if lhs.hexagonArch != rhs.hexagonArch {return false}
-    if lhs.qhexrtSupported != rhs.qhexrtSupported {return false}
-    if lhs.archName != rhs.archName {return false}
+    if lhs.supported != rhs.supported {return false}
+    if lhs.npu != rhs.npu {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

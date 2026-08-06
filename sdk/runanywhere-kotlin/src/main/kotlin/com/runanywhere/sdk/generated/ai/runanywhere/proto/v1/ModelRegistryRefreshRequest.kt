@@ -30,6 +30,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * enum ModelQuerySortField: deleted.
  * Registry and lifecycle workflow contracts. Platform-owned inputs (Android
  * content URIs, iOS security-scoped bookmarks, browser FileSystemHandles, auth
  * cookies) stay outside this schema; adapters normalize them into paths, URLs,

@@ -83,6 +83,19 @@ public class SegmentationResult(
     schemaIndex = 6,
   )
   public val model_id: String = "",
+  /**
+   * Confidence of the class in class_mask_u16_le, one byte per pixel,
+   * 0..255 == probability 0.0..1.0. Same row-major order and dimensions as
+   * the class mask. Present iff SegmentationOptions.include_confidence was
+   * set, and then exactly width * height bytes.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    jsonName = "confidenceMaskU8",
+    schemaIndex = 7,
+  )
+  public val confidence_mask_u8: ByteString? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SegmentationResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -112,6 +125,7 @@ public class SegmentationResult(
     if (class_summaries != other.class_summaries) return false
     if (processing_time_ms != other.processing_time_ms) return false
     if (model_id != other.model_id) return false
+    if (confidence_mask_u8 != other.confidence_mask_u8) return false
     return true
   }
 
@@ -126,6 +140,7 @@ public class SegmentationResult(
       result = result * 37 + class_summaries.hashCode()
       result = result * 37 + processing_time_ms.hashCode()
       result = result * 37 + model_id.hashCode()
+      result = result * 37 + (confidence_mask_u8?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -140,6 +155,7 @@ public class SegmentationResult(
     if (class_summaries.isNotEmpty()) result += """class_summaries=$class_summaries"""
     result += """processing_time_ms=$processing_time_ms"""
     result += """model_id=${sanitize(model_id)}"""
+    if (confidence_mask_u8 != null) result += """confidence_mask_u8=$confidence_mask_u8"""
     return result.joinToString(prefix = "SegmentationResult{", separator = ", ", postfix = "}")
   }
 
@@ -151,8 +167,9 @@ public class SegmentationResult(
     class_summaries: List<SegmentationClassSummary> = this.class_summaries,
     processing_time_ms: Long = this.processing_time_ms,
     model_id: String = this.model_id,
+    confidence_mask_u8: ByteString? = this.confidence_mask_u8,
     unknownFields: ByteString = this.unknownFields,
-  ): SegmentationResult = SegmentationResult(width, height, class_mask_u16_le, diagnostic_rgba, class_summaries, processing_time_ms, model_id, unknownFields)
+  ): SegmentationResult = SegmentationResult(width, height, class_mask_u16_le, diagnostic_rgba, class_summaries, processing_time_ms, model_id, confidence_mask_u8, unknownFields)
 
   public companion object {
     @JvmField
@@ -184,6 +201,7 @@ public class SegmentationResult(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.model_id)
         }
+        size += ProtoAdapter.BYTES.encodedSizeWithTag(8, value.confidence_mask_u8)
         return size
       }
 
@@ -205,11 +223,13 @@ public class SegmentationResult(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 7, value.model_id)
         }
+        ProtoAdapter.BYTES.encodeWithTag(writer, 8, value.confidence_mask_u8)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SegmentationResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.BYTES.encodeWithTag(writer, 8, value.confidence_mask_u8)
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 7, value.model_id)
         }
@@ -237,6 +257,7 @@ public class SegmentationResult(
         val class_summaries = mutableListOf<SegmentationClassSummary>()
         var processing_time_ms: Long = 0L
         var model_id: String = ""
+        var confidence_mask_u8: ByteString? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> width = ProtoAdapter.UINT32.decode(reader)
@@ -246,6 +267,7 @@ public class SegmentationResult(
             5 -> class_summaries.add(SegmentationClassSummary.ADAPTER.decode(reader))
             6 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
             7 -> model_id = ProtoAdapter.STRING.decode(reader)
+            8 -> confidence_mask_u8 = ProtoAdapter.BYTES.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -257,6 +279,7 @@ public class SegmentationResult(
           class_summaries = class_summaries,
           processing_time_ms = processing_time_ms,
           model_id = model_id,
+          confidence_mask_u8 = confidence_mask_u8,
           unknownFields = unknownFields
         )
       }

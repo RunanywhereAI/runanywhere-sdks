@@ -9,16 +9,6 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * A single candidate document/passage to be scored against the query. The id is
- * caller-supplied and echoed back on the scored item so callers can correlate
- * results with their own records without relying on ordering.
- */
-export interface RerankCandidate {
-  id: string;
-  text: string;
-}
-
 export interface RerankOptions {
   /**
    * When > 0, only the top_n highest-scoring candidates are returned (every
@@ -26,30 +16,49 @@ export interface RerankOptions {
    * Industry name (Cohere rerank `top_n`).
    */
   topN: number;
+  /**
+   * Per-document token budget; longer documents are truncated (tail
+   * dropped) before scoring. 0 = the SDK default budget. This is the
+   * direct knob on peak memory and per-pair latency on device.
+   * Industry name (Cohere v2 / vLLM `max_tokens_per_doc`).
+   */
+  maxTokensPerDoc: number;
 }
 
 export interface RerankRequest {
   query: string;
-  candidates: RerankCandidate[];
-  options?: RerankOptions | undefined;
+  options?:
+    | RerankOptions
+    | undefined;
+  /**
+   * The passages to score, in caller order. Results point back at these by
+   * index. Cost is LINEAR (one model pass per document), so this is a
+   * second-stage reranker over a retriever's output, not a corpus scan;
+   * commons rejects more than 100,000 entries with
+   * RAC_ERROR_INVALID_PARAMETER. Industry name (Cohere/Voyage/Jina `documents`).
+   */
+  documents: string[];
+  /**
+   * Registry id of the reranker to score with. Unset = whatever model is
+   * already resident under the rerank component. Mirrors
+   * EmbeddingsRequest.model_id and the industry-universal `model` field.
+   */
+  modelId?: string | undefined;
 }
 
 export interface RerankScoredItem {
-  /** Echo of RerankCandidate.id for correlation. */
-  id: string;
   /**
-   * Relevance score from the reranker (higher = more relevant). Not
-   * normalized to a fixed range; comparable only within one result set.
+   * Relevance of this document to the query, normalized to [0, 1] (sigmoid
+   * of the cross-encoder logit). Ordinal, not cardinal: 0.9 is not "twice
+   * as relevant" as 0.45, and scores are not comparable across models.
    * Industry name (Cohere/Voyage `relevance_score`).
    */
   relevanceScore: number;
   /**
-   * Index of this candidate in the original RerankRequest.candidates list.
+   * Index of this document in the original RerankRequest.documents list.
    * Industry name (`index`).
    */
   index: number;
-  /** 0-based position after sorting by score descending (0 = most relevant). */
-  rank: number;
 }
 
 export interface RerankResult {
@@ -62,90 +71,17 @@ export interface RerankResult {
   modelId: string;
 }
 
-function createBaseRerankCandidate(): RerankCandidate {
-  return { id: "", text: "" };
-}
-
-export const RerankCandidate: MessageFns<RerankCandidate> = {
-  encode(message: RerankCandidate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.id !== "") {
-      writer.uint32(10).string(message.id);
-    }
-    if (message.text !== "") {
-      writer.uint32(18).string(message.text);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RerankCandidate {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRerankCandidate();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.id = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.text = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RerankCandidate {
-    return {
-      id: isSet(object.id) ? globalThis.String(object.id) : "",
-      text: isSet(object.text) ? globalThis.String(object.text) : "",
-    };
-  },
-
-  toJSON(message: RerankCandidate): unknown {
-    const obj: any = {};
-    if (message.id !== "") {
-      obj.id = message.id;
-    }
-    if (message.text !== "") {
-      obj.text = message.text;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<RerankCandidate>, I>>(base?: I): RerankCandidate {
-    return RerankCandidate.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RerankCandidate>, I>>(object: I): RerankCandidate {
-    const message = createBaseRerankCandidate();
-    message.id = object.id ?? "";
-    message.text = object.text ?? "";
-    return message;
-  },
-};
-
 function createBaseRerankOptions(): RerankOptions {
-  return { topN: 0 };
+  return { topN: 0, maxTokensPerDoc: 0 };
 }
 
 export const RerankOptions: MessageFns<RerankOptions> = {
   encode(message: RerankOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.topN !== 0) {
       writer.uint32(8).uint32(message.topN);
+    }
+    if (message.maxTokensPerDoc !== 0) {
+      writer.uint32(16).uint32(message.maxTokensPerDoc);
     }
     return writer;
   },
@@ -165,6 +101,14 @@ export const RerankOptions: MessageFns<RerankOptions> = {
           message.topN = reader.uint32();
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.maxTokensPerDoc = reader.uint32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -181,6 +125,11 @@ export const RerankOptions: MessageFns<RerankOptions> = {
         : isSet(object.top_n)
         ? globalThis.Number(object.top_n)
         : 0,
+      maxTokensPerDoc: isSet(object.maxTokensPerDoc)
+        ? globalThis.Number(object.maxTokensPerDoc)
+        : isSet(object.max_tokens_per_doc)
+        ? globalThis.Number(object.max_tokens_per_doc)
+        : 0,
     };
   },
 
@@ -188,6 +137,9 @@ export const RerankOptions: MessageFns<RerankOptions> = {
     const obj: any = {};
     if (message.topN !== 0) {
       obj.topN = Math.round(message.topN);
+    }
+    if (message.maxTokensPerDoc !== 0) {
+      obj.maxTokensPerDoc = Math.round(message.maxTokensPerDoc);
     }
     return obj;
   },
@@ -198,12 +150,13 @@ export const RerankOptions: MessageFns<RerankOptions> = {
   fromPartial<I extends Exact<DeepPartial<RerankOptions>, I>>(object: I): RerankOptions {
     const message = createBaseRerankOptions();
     message.topN = object.topN ?? 0;
+    message.maxTokensPerDoc = object.maxTokensPerDoc ?? 0;
     return message;
   },
 };
 
 function createBaseRerankRequest(): RerankRequest {
-  return { query: "", candidates: [], options: undefined };
+  return { query: "", options: undefined, documents: [], modelId: undefined };
 }
 
 export const RerankRequest: MessageFns<RerankRequest> = {
@@ -211,11 +164,14 @@ export const RerankRequest: MessageFns<RerankRequest> = {
     if (message.query !== "") {
       writer.uint32(10).string(message.query);
     }
-    for (const v of message.candidates) {
-      RerankCandidate.encode(v!, writer.uint32(18).fork()).join();
-    }
     if (message.options !== undefined) {
       RerankOptions.encode(message.options, writer.uint32(26).fork()).join();
+    }
+    for (const v of message.documents) {
+      writer.uint32(34).string(v!);
+    }
+    if (message.modelId !== undefined) {
+      writer.uint32(42).string(message.modelId);
     }
     return writer;
   },
@@ -235,20 +191,28 @@ export const RerankRequest: MessageFns<RerankRequest> = {
           message.query = reader.string();
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.candidates.push(RerankCandidate.decode(reader, reader.uint32()));
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
           }
 
           message.options = RerankOptions.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.documents.push(reader.string());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.modelId = reader.string();
           continue;
         }
       }
@@ -263,10 +227,15 @@ export const RerankRequest: MessageFns<RerankRequest> = {
   fromJSON(object: any): RerankRequest {
     return {
       query: isSet(object.query) ? globalThis.String(object.query) : "",
-      candidates: globalThis.Array.isArray(object?.candidates)
-        ? object.candidates.map((e: any) => RerankCandidate.fromJSON(e))
-        : [],
       options: isSet(object.options) ? RerankOptions.fromJSON(object.options) : undefined,
+      documents: globalThis.Array.isArray(object?.documents)
+        ? object.documents.map((e: any) => globalThis.String(e))
+        : [],
+      modelId: isSet(object.modelId)
+        ? globalThis.String(object.modelId)
+        : isSet(object.model_id)
+        ? globalThis.String(object.model_id)
+        : undefined,
     };
   },
 
@@ -275,11 +244,14 @@ export const RerankRequest: MessageFns<RerankRequest> = {
     if (message.query !== "") {
       obj.query = message.query;
     }
-    if (message.candidates?.length) {
-      obj.candidates = message.candidates.map((e) => RerankCandidate.toJSON(e));
-    }
     if (message.options !== undefined) {
       obj.options = RerankOptions.toJSON(message.options);
+    }
+    if (message.documents?.length) {
+      obj.documents = message.documents;
+    }
+    if (message.modelId !== undefined) {
+      obj.modelId = message.modelId;
     }
     return obj;
   },
@@ -290,31 +262,26 @@ export const RerankRequest: MessageFns<RerankRequest> = {
   fromPartial<I extends Exact<DeepPartial<RerankRequest>, I>>(object: I): RerankRequest {
     const message = createBaseRerankRequest();
     message.query = object.query ?? "";
-    message.candidates = object.candidates?.map((e) => RerankCandidate.fromPartial(e)) || [];
     message.options = (object.options !== undefined && object.options !== null)
       ? RerankOptions.fromPartial(object.options)
       : undefined;
+    message.documents = object.documents?.map((e) => e) || [];
+    message.modelId = object.modelId ?? undefined;
     return message;
   },
 };
 
 function createBaseRerankScoredItem(): RerankScoredItem {
-  return { id: "", relevanceScore: 0, index: 0, rank: 0 };
+  return { relevanceScore: 0, index: 0 };
 }
 
 export const RerankScoredItem: MessageFns<RerankScoredItem> = {
   encode(message: RerankScoredItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.id !== "") {
-      writer.uint32(10).string(message.id);
-    }
     if (message.relevanceScore !== 0) {
       writer.uint32(21).float(message.relevanceScore);
     }
     if (message.index !== 0) {
       writer.uint32(24).uint32(message.index);
-    }
-    if (message.rank !== 0) {
-      writer.uint32(32).uint32(message.rank);
     }
     return writer;
   },
@@ -326,14 +293,6 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.id = reader.string();
-          continue;
-        }
         case 2: {
           if (tag !== 21) {
             break;
@@ -350,14 +309,6 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
           message.index = reader.uint32();
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.rank = reader.uint32();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -369,30 +320,22 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
 
   fromJSON(object: any): RerankScoredItem {
     return {
-      id: isSet(object.id) ? globalThis.String(object.id) : "",
       relevanceScore: isSet(object.relevanceScore)
         ? globalThis.Number(object.relevanceScore)
         : isSet(object.relevance_score)
         ? globalThis.Number(object.relevance_score)
         : 0,
       index: isSet(object.index) ? globalThis.Number(object.index) : 0,
-      rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
     };
   },
 
   toJSON(message: RerankScoredItem): unknown {
     const obj: any = {};
-    if (message.id !== "") {
-      obj.id = message.id;
-    }
     if (message.relevanceScore !== 0) {
       obj.relevanceScore = message.relevanceScore;
     }
     if (message.index !== 0) {
       obj.index = Math.round(message.index);
-    }
-    if (message.rank !== 0) {
-      obj.rank = Math.round(message.rank);
     }
     return obj;
   },
@@ -402,10 +345,8 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
   },
   fromPartial<I extends Exact<DeepPartial<RerankScoredItem>, I>>(object: I): RerankScoredItem {
     const message = createBaseRerankScoredItem();
-    message.id = object.id ?? "";
     message.relevanceScore = object.relevanceScore ?? 0;
     message.index = object.index ?? 0;
-    message.rank = object.rank ?? 0;
     return message;
   },
 };

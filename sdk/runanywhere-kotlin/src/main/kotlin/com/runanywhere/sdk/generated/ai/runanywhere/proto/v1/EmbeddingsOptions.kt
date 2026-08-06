@@ -29,12 +29,14 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * Per-call overrides. Unset fields fall back to the component configuration.
+ * Per-call overrides. Unset fields fall back to the loaded bundle's defaults.
  */
 public class EmbeddingsOptions(
   /**
-   * Truncate over-long inputs instead of erroring. Unset = backend default,
-   * currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
+   * true  = clip an over-long input to the model's context and embed it.
+   * false = fail the call.
+   * Unset = true. A backend may instead aggregate over a sliding window,
+   * which embeds the whole document rather than discarding its tail.
    */
   @field:WireField(
     tag = 2,
@@ -54,13 +56,17 @@ public class EmbeddingsOptions(
     schemaIndex = 1,
   )
   public val batch_size: Int? = null,
+  /**
+   * L2-normalize every vector to unit length (what cosine search expects).
+   * Unset = true. false returns the raw pooled vector.
+   */
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val normalize: Boolean = false,
+  public val normalize: Boolean? = null,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy#ADAPTER",
@@ -81,6 +87,37 @@ public class EmbeddingsOptions(
     schemaIndex = 4,
   )
   public val n_threads: Int = 0,
+  /**
+   * What the vector will be used for. Asymmetric embedders (bge, e5,
+   * nomic-embed, gte, EmbeddingGemma) prepend a different prompt for a query
+   * than for a document. The prefix table must be added to the model manifest
+   * as part of honouring this field; it does not exist today. A bundle that
+   * declares no prompts ignores input_type and returns the identical vector
+   * for QUERY and DOCUMENT — it never errors.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.EmbeddingsInputType#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "inputType",
+    schemaIndex = 5,
+  )
+  public val input_type:
+      EmbeddingsInputType = EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED,
+  /**
+   * Matryoshka (MRL) output width: truncate each vector to this many floats
+   * and re-normalize. Unset = the model's native width. Accepts any width in
+   * \[1, the native width\]; a width the model was not MRL-trained at is
+   * silently worse. This is the request-side width — EmbeddingsResult.dimension
+   * reports the width actually produced.
+   */
+  @RacMinOption(1)
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    schemaIndex = 6,
+  )
+  public val dimensions: Int? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingsOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -98,6 +135,8 @@ public class EmbeddingsOptions(
     if (normalize != other.normalize) return false
     if (pooling != other.pooling) return false
     if (n_threads != other.n_threads) return false
+    if (input_type != other.input_type) return false
+    if (dimensions != other.dimensions) return false
     return true
   }
 
@@ -107,9 +146,11 @@ public class EmbeddingsOptions(
       result = unknownFields.hashCode()
       result = result * 37 + (truncate?.hashCode() ?: 0)
       result = result * 37 + (batch_size?.hashCode() ?: 0)
-      result = result * 37 + normalize.hashCode()
+      result = result * 37 + (normalize?.hashCode() ?: 0)
       result = result * 37 + pooling.hashCode()
       result = result * 37 + n_threads.hashCode()
+      result = result * 37 + input_type.hashCode()
+      result = result * 37 + (dimensions?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -119,20 +160,24 @@ public class EmbeddingsOptions(
     val result = mutableListOf<String>()
     if (truncate != null) result += """truncate=$truncate"""
     if (batch_size != null) result += """batch_size=$batch_size"""
-    result += """normalize=$normalize"""
+    if (normalize != null) result += """normalize=$normalize"""
     result += """pooling=$pooling"""
     result += """n_threads=$n_threads"""
+    result += """input_type=$input_type"""
+    if (dimensions != null) result += """dimensions=$dimensions"""
     return result.joinToString(prefix = "EmbeddingsOptions{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     truncate: Boolean? = this.truncate,
     batch_size: Int? = this.batch_size,
-    normalize: Boolean = this.normalize,
+    normalize: Boolean? = this.normalize,
     pooling: EmbeddingsPoolingStrategy = this.pooling,
     n_threads: Int = this.n_threads,
+    input_type: EmbeddingsInputType = this.input_type,
+    dimensions: Int? = this.dimensions,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsOptions = EmbeddingsOptions(truncate, batch_size, normalize, pooling, n_threads, unknownFields)
+  ): EmbeddingsOptions = EmbeddingsOptions(truncate, batch_size, normalize, pooling, n_threads, input_type, dimensions, unknownFields)
 
   public companion object {
     @JvmField
@@ -148,44 +193,50 @@ public class EmbeddingsOptions(
         var size = value.unknownFields.size
         size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.truncate)
         size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.batch_size)
-        if (value.normalize != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.normalize)
-        }
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.normalize)
         if (value.pooling != ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
           size += EmbeddingsPoolingStrategy.ADAPTER.encodedSizeWithTag(5, value.pooling)
         }
         if (value.n_threads != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.n_threads)
         }
+        if (value.input_type != ai.runanywhere.proto.v1.EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED) {
+          size += EmbeddingsInputType.ADAPTER.encodedSizeWithTag(7, value.input_type)
+        }
+        size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.dimensions)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: EmbeddingsOptions) {
         ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.truncate)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.batch_size)
-        if (value.normalize != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.normalize)
-        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.normalize)
         if (value.pooling != ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
           EmbeddingsPoolingStrategy.ADAPTER.encodeWithTag(writer, 5, value.pooling)
         }
         if (value.n_threads != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.n_threads)
         }
+        if (value.input_type != ai.runanywhere.proto.v1.EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED) {
+          EmbeddingsInputType.ADAPTER.encodeWithTag(writer, 7, value.input_type)
+        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 8, value.dimensions)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingsOptions) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.INT32.encodeWithTag(writer, 8, value.dimensions)
+        if (value.input_type != ai.runanywhere.proto.v1.EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED) {
+          EmbeddingsInputType.ADAPTER.encodeWithTag(writer, 7, value.input_type)
+        }
         if (value.n_threads != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.n_threads)
         }
         if (value.pooling != ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
           EmbeddingsPoolingStrategy.ADAPTER.encodeWithTag(writer, 5, value.pooling)
         }
-        if (value.normalize != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.normalize)
-        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.normalize)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.batch_size)
         ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.truncate)
       }
@@ -193,9 +244,11 @@ public class EmbeddingsOptions(
       override fun decode(reader: ProtoReader): EmbeddingsOptions {
         var truncate: Boolean? = null
         var batch_size: Int? = null
-        var normalize: Boolean = false
+        var normalize: Boolean? = null
         var pooling: EmbeddingsPoolingStrategy = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED
         var n_threads: Int = 0
+        var input_type: EmbeddingsInputType = EmbeddingsInputType.EMBEDDINGS_INPUT_TYPE_UNSPECIFIED
+        var dimensions: Int? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             2 -> truncate = ProtoAdapter.BOOL.decode(reader)
@@ -207,6 +260,12 @@ public class EmbeddingsOptions(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             6 -> n_threads = ProtoAdapter.INT32.decode(reader)
+            7 -> try {
+              input_type = EmbeddingsInputType.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            8 -> dimensions = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -216,6 +275,8 @@ public class EmbeddingsOptions(
           normalize = normalize,
           pooling = pooling,
           n_threads = n_threads,
+          input_type = input_type,
+          dimensions = dimensions,
           unknownFields = unknownFields
         )
       }

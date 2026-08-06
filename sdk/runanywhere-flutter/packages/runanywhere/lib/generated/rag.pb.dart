@@ -15,8 +15,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'errors.pb.dart' as $1;
-import 'llm_options.pb.dart' as $0;
+import 'errors.pb.dart' as $0;
+import 'llm_options.pb.dart' as $1;
 import 'rag.pbenum.dart';
 import 'token_usage.pb.dart' as $2;
 
@@ -30,17 +30,13 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     $core.String? llmModelId,
     $core.int? embeddingDimension,
     $core.int? topK,
-    $core.double? similarityThreshold,
+    $core.double? scoreThreshold,
     $core.int? chunkSize,
     $core.int? chunkOverlap,
     $core.int? maxContextTokens,
     $core.String? promptTemplate,
     $core.String? embeddingConfigJson,
-    $core.String? llmConfigJson,
-    $core.String? indexPath,
-    $core.bool? persistIndex,
     $core.bool? rerankResults,
-    $core.String? rerankerModelId,
   }) {
     final result = create();
     if (embeddingModelId != null) result.embeddingModelId = embeddingModelId;
@@ -48,19 +44,14 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     if (embeddingDimension != null)
       result.embeddingDimension = embeddingDimension;
     if (topK != null) result.topK = topK;
-    if (similarityThreshold != null)
-      result.similarityThreshold = similarityThreshold;
+    if (scoreThreshold != null) result.scoreThreshold = scoreThreshold;
     if (chunkSize != null) result.chunkSize = chunkSize;
     if (chunkOverlap != null) result.chunkOverlap = chunkOverlap;
     if (maxContextTokens != null) result.maxContextTokens = maxContextTokens;
     if (promptTemplate != null) result.promptTemplate = promptTemplate;
     if (embeddingConfigJson != null)
       result.embeddingConfigJson = embeddingConfigJson;
-    if (llmConfigJson != null) result.llmConfigJson = llmConfigJson;
-    if (indexPath != null) result.indexPath = indexPath;
-    if (persistIndex != null) result.persistIndex = persistIndex;
     if (rerankResults != null) result.rerankResults = rerankResults;
-    if (rerankerModelId != null) result.rerankerModelId = rerankerModelId;
     return result;
   }
 
@@ -81,18 +72,14 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'llmModelId')
     ..aI(3, _omitFieldNames ? '' : 'embeddingDimension')
     ..aI(4, _omitFieldNames ? '' : 'topK')
-    ..aD(5, _omitFieldNames ? '' : 'similarityThreshold',
+    ..aD(5, _omitFieldNames ? '' : 'scoreThreshold',
         fieldType: $pb.PbFieldType.OF)
     ..aI(6, _omitFieldNames ? '' : 'chunkSize')
     ..aI(7, _omitFieldNames ? '' : 'chunkOverlap')
     ..aI(8, _omitFieldNames ? '' : 'maxContextTokens')
     ..aOS(9, _omitFieldNames ? '' : 'promptTemplate')
     ..aOS(10, _omitFieldNames ? '' : 'embeddingConfigJson')
-    ..aOS(11, _omitFieldNames ? '' : 'llmConfigJson')
-    ..aOS(12, _omitFieldNames ? '' : 'indexPath')
-    ..aOB(13, _omitFieldNames ? '' : 'persistIndex')
-    ..aOB(14, _omitFieldNames ? '' : 'rerankResults')
-    ..aOS(15, _omitFieldNames ? '' : 'rerankerModelId')
+    ..aOB(11, _omitFieldNames ? '' : 'rerankResults')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -151,14 +138,15 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearTopK() => $_clearField(4);
 
+  /// Drop hits scoring below this. 0.0 = no filtering.
   @$pb.TagNumber(5)
-  $core.double get similarityThreshold => $_getN(4);
+  $core.double get scoreThreshold => $_getN(4);
   @$pb.TagNumber(5)
-  set similarityThreshold($core.double value) => $_setFloat(4, value);
+  set scoreThreshold($core.double value) => $_setFloat(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasSimilarityThreshold() => $_has(4);
+  $core.bool hasScoreThreshold() => $_has(4);
   @$pb.TagNumber(5)
-  void clearSimilarityThreshold() => $_clearField(5);
+  void clearScoreThreshold() => $_clearField(5);
 
   /// Tokens per chunk, and the overlap carried between adjacent chunks.
   @$pb.TagNumber(6)
@@ -206,51 +194,15 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearEmbeddingConfigJson() => $_clearField(10);
 
+  /// Pointwise rerank of the retrieved chunks using the session LLM.
   @$pb.TagNumber(11)
-  $core.String get llmConfigJson => $_getSZ(10);
+  $core.bool get rerankResults => $_getBF(10);
   @$pb.TagNumber(11)
-  set llmConfigJson($core.String value) => $_setString(10, value);
+  set rerankResults($core.bool value) => $_setBool(10, value);
   @$pb.TagNumber(11)
-  $core.bool hasLlmConfigJson() => $_has(10);
+  $core.bool hasRerankResults() => $_has(10);
   @$pb.TagNumber(11)
-  void clearLlmConfigJson() => $_clearField(11);
-
-  /// Where the vector index lives, and whether it survives the session.
-  @$pb.TagNumber(12)
-  $core.String get indexPath => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set indexPath($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasIndexPath() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearIndexPath() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  $core.bool get persistIndex => $_getBF(12);
-  @$pb.TagNumber(13)
-  set persistIndex($core.bool value) => $_setBool(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasPersistIndex() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearPersistIndex() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $core.bool get rerankResults => $_getBF(13);
-  @$pb.TagNumber(14)
-  set rerankResults($core.bool value) => $_setBool(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasRerankResults() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearRerankResults() => $_clearField(14);
-
-  @$pb.TagNumber(15)
-  $core.String get rerankerModelId => $_getSZ(14);
-  @$pb.TagNumber(15)
-  set rerankerModelId($core.String value) => $_setString(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasRerankerModelId() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearRerankerModelId() => $_clearField(15);
+  void clearRerankResults() => $_clearField(11);
 }
 
 class RAGDocument extends $pb.GeneratedMessage {
@@ -259,18 +211,12 @@ class RAGDocument extends $pb.GeneratedMessage {
     $core.String? text,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
     $core.String? sourceUri,
-    $core.String? adapterHandle,
-    $core.String? mediaType,
-    $fixnum.Int64? sizeBytes,
   }) {
     final result = create();
     if (id != null) result.id = id;
     if (text != null) result.text = text;
     if (metadata != null) result.metadata.addEntries(metadata);
     if (sourceUri != null) result.sourceUri = sourceUri;
-    if (adapterHandle != null) result.adapterHandle = adapterHandle;
-    if (mediaType != null) result.mediaType = mediaType;
-    if (sizeBytes != null) result.sizeBytes = sizeBytes;
     return result;
   }
 
@@ -289,15 +235,12 @@ class RAGDocument extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aOS(2, _omitFieldNames ? '' : 'text')
-    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata',
+    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'metadata',
         entryClassName: 'RAGDocument.MetadataEntry',
         keyFieldType: $pb.PbFieldType.OS,
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('runanywhere.v1'))
-    ..aOS(5, _omitFieldNames ? '' : 'sourceUri')
-    ..aOS(6, _omitFieldNames ? '' : 'adapterHandle')
-    ..aOS(7, _omitFieldNames ? '' : 'mediaType')
-    ..aInt64(8, _omitFieldNames ? '' : 'sizeBytes')
+    ..aOS(4, _omitFieldNames ? '' : 'sourceUri')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -319,6 +262,7 @@ class RAGDocument extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<RAGDocument>(create);
   static RAGDocument? _defaultInstance;
 
+  /// Caller-owned stable id. Re-ingesting an existing id REPLACES its chunks.
   @$pb.TagNumber(1)
   $core.String get id => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -337,66 +281,265 @@ class RAGDocument extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearText() => $_clearField(2);
 
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(2);
 
-  @$pb.TagNumber(5)
+  /// Where this document came from. Copied into every chunk's metadata as
+  /// "source" and returned as RAGSearchResult.source_document.
+  @$pb.TagNumber(4)
   $core.String get sourceUri => $_getSZ(3);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   set sourceUri($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(5)
+  @$pb.TagNumber(4)
   $core.bool hasSourceUri() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSourceUri() => $_clearField(4);
+}
+
+/// Remove whole documents from the index for `rac_rag_delete_proto`.
+class RAGDeleteRequest extends $pb.GeneratedMessage {
+  factory RAGDeleteRequest({
+    $core.Iterable<$core.String>? documentIds,
+  }) {
+    final result = create();
+    if (documentIds != null) result.documentIds.addAll(documentIds);
+    return result;
+  }
+
+  RAGDeleteRequest._();
+
+  factory RAGDeleteRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RAGDeleteRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RAGDeleteRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..pPS(1, _omitFieldNames ? '' : 'documentIds')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RAGDeleteRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RAGDeleteRequest copyWith(void Function(RAGDeleteRequest) updates) =>
+      super.copyWith((message) => updates(message as RAGDeleteRequest))
+          as RAGDeleteRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGDeleteRequest create() => RAGDeleteRequest._();
+  @$core.override
+  RAGDeleteRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RAGDeleteRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RAGDeleteRequest>(create);
+  static RAGDeleteRequest? _defaultInstance;
+
+  /// RAGDocument.id values given at ingest. Empty is an error — use clear().
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.String> get documentIds => $_getList(0);
+}
+
+class RAGDeleteResponse extends $pb.GeneratedMessage {
+  factory RAGDeleteResponse({
+    $fixnum.Int64? deletedChunks,
+    $core.Iterable<$core.String>? missingIds,
+    $0.SDKError? error,
+  }) {
+    final result = create();
+    if (deletedChunks != null) result.deletedChunks = deletedChunks;
+    if (missingIds != null) result.missingIds.addAll(missingIds);
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  RAGDeleteResponse._();
+
+  factory RAGDeleteResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RAGDeleteResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RAGDeleteResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'deletedChunks')
+    ..pPS(2, _omitFieldNames ? '' : 'missingIds')
+    ..aOM<$0.SDKError>(3, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RAGDeleteResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RAGDeleteResponse copyWith(void Function(RAGDeleteResponse) updates) =>
+      super.copyWith((message) => updates(message as RAGDeleteResponse))
+          as RAGDeleteResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGDeleteResponse create() => RAGDeleteResponse._();
+  @$core.override
+  RAGDeleteResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RAGDeleteResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RAGDeleteResponse>(create);
+  static RAGDeleteResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get deletedChunks => $_getI64(0);
+  @$pb.TagNumber(1)
+  set deletedChunks($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDeletedChunks() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeletedChunks() => $_clearField(1);
+
+  /// Ids that were not in the index. Not an error.
+  @$pb.TagNumber(2)
+  $pb.PbList<$core.String> get missingIds => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $0.SDKError get error => $_getN(2);
+  @$pb.TagNumber(3)
+  set error($0.SDKError value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasError() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearError() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $0.SDKError ensureError() => $_ensure(2);
+}
+
+/// The retrieval knobs, declared once. Every field unset = inherit RAGConfiguration.
+class RAGRetrievalOptions extends $pb.GeneratedMessage {
+  factory RAGRetrievalOptions({
+    $core.int? topK,
+    $core.double? scoreThreshold,
+    $core.bool? enableMultiQuery,
+    $core.int? multiQueryCount,
+    $core.String? scopePrefix,
+  }) {
+    final result = create();
+    if (topK != null) result.topK = topK;
+    if (scoreThreshold != null) result.scoreThreshold = scoreThreshold;
+    if (enableMultiQuery != null) result.enableMultiQuery = enableMultiQuery;
+    if (multiQueryCount != null) result.multiQueryCount = multiQueryCount;
+    if (scopePrefix != null) result.scopePrefix = scopePrefix;
+    return result;
+  }
+
+  RAGRetrievalOptions._();
+
+  factory RAGRetrievalOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RAGRetrievalOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RAGRetrievalOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'topK')
+    ..aD(2, _omitFieldNames ? '' : 'scoreThreshold',
+        fieldType: $pb.PbFieldType.OF)
+    ..aOB(3, _omitFieldNames ? '' : 'enableMultiQuery')
+    ..aI(4, _omitFieldNames ? '' : 'multiQueryCount')
+    ..aOS(5, _omitFieldNames ? '' : 'scopePrefix')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RAGRetrievalOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RAGRetrievalOptions copyWith(void Function(RAGRetrievalOptions) updates) =>
+      super.copyWith((message) => updates(message as RAGRetrievalOptions))
+          as RAGRetrievalOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGRetrievalOptions create() => RAGRetrievalOptions._();
+  @$core.override
+  RAGRetrievalOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RAGRetrievalOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RAGRetrievalOptions>(create);
+  static RAGRetrievalOptions? _defaultInstance;
+
+  /// Retrieval depth for this call. Unset inherits RAGConfiguration.top_k.
+  @$pb.TagNumber(1)
+  $core.int get topK => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set topK($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTopK() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTopK() => $_clearField(1);
+
+  /// Drop hits scoring below this. Unset inherits RAGConfiguration.score_threshold.
+  @$pb.TagNumber(2)
+  $core.double get scoreThreshold => $_getN(1);
+  @$pb.TagNumber(2)
+  set scoreThreshold($core.double value) => $_setFloat(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasScoreThreshold() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearScoreThreshold() => $_clearField(2);
+
+  /// Expand the query into several phrasings and merge the results.
+  /// Requires a session LLM.
+  @$pb.TagNumber(3)
+  $core.bool get enableMultiQuery => $_getBF(2);
+  @$pb.TagNumber(3)
+  set enableMultiQuery($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEnableMultiQuery() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEnableMultiQuery() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get multiQueryCount => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set multiQueryCount($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMultiQueryCount() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMultiQueryCount() => $_clearField(4);
+
+  /// Keep only chunks whose document id starts with this prefix.
   @$pb.TagNumber(5)
-  void clearSourceUri() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.String get adapterHandle => $_getSZ(4);
-  @$pb.TagNumber(6)
-  set adapterHandle($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(6)
-  $core.bool hasAdapterHandle() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearAdapterHandle() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.String get mediaType => $_getSZ(5);
-  @$pb.TagNumber(7)
-  set mediaType($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(7)
-  $core.bool hasMediaType() => $_has(5);
-  @$pb.TagNumber(7)
-  void clearMediaType() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $fixnum.Int64 get sizeBytes => $_getI64(6);
-  @$pb.TagNumber(8)
-  set sizeBytes($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(8)
-  $core.bool hasSizeBytes() => $_has(6);
-  @$pb.TagNumber(8)
-  void clearSizeBytes() => $_clearField(8);
+  $core.String get scopePrefix => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set scopePrefix($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasScopePrefix() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearScopePrefix() => $_clearField(5);
 }
 
 class RAGQueryOptions extends $pb.GeneratedMessage {
   factory RAGQueryOptions({
-    $core.String? question,
-    $core.int? retrievalTopK,
-    $core.double? similarityThreshold,
-    $core.bool? stream,
-    $core.bool? enableMultiQuery,
-    $core.int? multiQueryCount,
-    $core.String? scopePrefix,
-    $0.LLMGenerationOptions? generation,
+    $core.String? query,
+    RAGRetrievalOptions? retrieval,
+    $1.LLMGenerationOptions? generation,
   }) {
     final result = create();
-    if (question != null) result.question = question;
-    if (retrievalTopK != null) result.retrievalTopK = retrievalTopK;
-    if (similarityThreshold != null)
-      result.similarityThreshold = similarityThreshold;
-    if (stream != null) result.stream = stream;
-    if (enableMultiQuery != null) result.enableMultiQuery = enableMultiQuery;
-    if (multiQueryCount != null) result.multiQueryCount = multiQueryCount;
-    if (scopePrefix != null) result.scopePrefix = scopePrefix;
+    if (query != null) result.query = query;
+    if (retrieval != null) result.retrieval = retrieval;
     if (generation != null) result.generation = generation;
     return result;
   }
@@ -414,16 +557,11 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'RAGQueryOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'question')
-    ..aI(7, _omitFieldNames ? '' : 'retrievalTopK')
-    ..aD(8, _omitFieldNames ? '' : 'similarityThreshold',
-        fieldType: $pb.PbFieldType.OF)
-    ..aOB(9, _omitFieldNames ? '' : 'stream')
-    ..aOB(11, _omitFieldNames ? '' : 'enableMultiQuery')
-    ..aI(12, _omitFieldNames ? '' : 'multiQueryCount')
-    ..aOS(13, _omitFieldNames ? '' : 'scopePrefix')
-    ..aOM<$0.LLMGenerationOptions>(14, _omitFieldNames ? '' : 'generation',
-        subBuilder: $0.LLMGenerationOptions.create)
+    ..aOS(1, _omitFieldNames ? '' : 'query')
+    ..aOM<RAGRetrievalOptions>(2, _omitFieldNames ? '' : 'retrieval',
+        subBuilder: RAGRetrievalOptions.create)
+    ..aOM<$1.LLMGenerationOptions>(3, _omitFieldNames ? '' : 'generation',
+        subBuilder: $1.LLMGenerationOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -446,81 +584,35 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   static RAGQueryOptions? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get question => $_getSZ(0);
+  $core.String get query => $_getSZ(0);
   @$pb.TagNumber(1)
-  set question($core.String value) => $_setString(0, value);
+  set query($core.String value) => $_setString(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasQuestion() => $_has(0);
+  $core.bool hasQuery() => $_has(0);
   @$pb.TagNumber(1)
-  void clearQuestion() => $_clearField(1);
+  void clearQuery() => $_clearField(1);
 
-  /// Retrieval depth for this call, overriding RAGConfiguration.top_k.
-  @$pb.TagNumber(7)
-  $core.int get retrievalTopK => $_getIZ(1);
-  @$pb.TagNumber(7)
-  set retrievalTopK($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(7)
-  $core.bool hasRetrievalTopK() => $_has(1);
-  @$pb.TagNumber(7)
-  void clearRetrievalTopK() => $_clearField(7);
+  @$pb.TagNumber(2)
+  RAGRetrievalOptions get retrieval => $_getN(1);
+  @$pb.TagNumber(2)
+  set retrieval(RAGRetrievalOptions value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRetrieval() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRetrieval() => $_clearField(2);
+  @$pb.TagNumber(2)
+  RAGRetrievalOptions ensureRetrieval() => $_ensure(1);
 
-  @$pb.TagNumber(8)
-  $core.double get similarityThreshold => $_getN(2);
-  @$pb.TagNumber(8)
-  set similarityThreshold($core.double value) => $_setFloat(2, value);
-  @$pb.TagNumber(8)
-  $core.bool hasSimilarityThreshold() => $_has(2);
-  @$pb.TagNumber(8)
-  void clearSimilarityThreshold() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.bool get stream => $_getBF(3);
-  @$pb.TagNumber(9)
-  set stream($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(9)
-  $core.bool hasStream() => $_has(3);
-  @$pb.TagNumber(9)
-  void clearStream() => $_clearField(9);
-
-  /// Expand the question into several queries and merge the results.
-  @$pb.TagNumber(11)
-  $core.bool get enableMultiQuery => $_getBF(4);
-  @$pb.TagNumber(11)
-  set enableMultiQuery($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(11)
-  $core.bool hasEnableMultiQuery() => $_has(4);
-  @$pb.TagNumber(11)
-  void clearEnableMultiQuery() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.int get multiQueryCount => $_getIZ(5);
-  @$pb.TagNumber(12)
-  set multiQueryCount($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(12)
-  $core.bool hasMultiQueryCount() => $_has(5);
-  @$pb.TagNumber(12)
-  void clearMultiQueryCount() => $_clearField(12);
-
-  /// Restrict retrieval to chunks whose source matches this prefix.
-  @$pb.TagNumber(13)
-  $core.String get scopePrefix => $_getSZ(6);
-  @$pb.TagNumber(13)
-  set scopePrefix($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(13)
-  $core.bool hasScopePrefix() => $_has(6);
-  @$pb.TagNumber(13)
-  void clearScopePrefix() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $0.LLMGenerationOptions get generation => $_getN(7);
-  @$pb.TagNumber(14)
-  set generation($0.LLMGenerationOptions value) => $_setField(14, value);
-  @$pb.TagNumber(14)
-  $core.bool hasGeneration() => $_has(7);
-  @$pb.TagNumber(14)
-  void clearGeneration() => $_clearField(14);
-  @$pb.TagNumber(14)
-  $0.LLMGenerationOptions ensureGeneration() => $_ensure(7);
+  @$pb.TagNumber(3)
+  $1.LLMGenerationOptions get generation => $_getN(2);
+  @$pb.TagNumber(3)
+  set generation($1.LLMGenerationOptions value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGeneration() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGeneration() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $1.LLMGenerationOptions ensureGeneration() => $_ensure(2);
 }
 
 /// Retrieval-only request for `rac_rag_search_proto` / SDK `rag.search()`.
@@ -528,21 +620,12 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
 /// `rac_rag_query_proto` / SDK `rag.query()`.
 class RAGSearchRequest extends $pb.GeneratedMessage {
   factory RAGSearchRequest({
-    $core.String? question,
-    $core.int? retrievalTopK,
-    $core.double? similarityThreshold,
-    $core.bool? enableMultiQuery,
-    $core.int? multiQueryCount,
-    $core.String? scopePrefix,
+    $core.String? query,
+    RAGRetrievalOptions? retrieval,
   }) {
     final result = create();
-    if (question != null) result.question = question;
-    if (retrievalTopK != null) result.retrievalTopK = retrievalTopK;
-    if (similarityThreshold != null)
-      result.similarityThreshold = similarityThreshold;
-    if (enableMultiQuery != null) result.enableMultiQuery = enableMultiQuery;
-    if (multiQueryCount != null) result.multiQueryCount = multiQueryCount;
-    if (scopePrefix != null) result.scopePrefix = scopePrefix;
+    if (query != null) result.query = query;
+    if (retrieval != null) result.retrieval = retrieval;
     return result;
   }
 
@@ -559,13 +642,9 @@ class RAGSearchRequest extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'RAGSearchRequest',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'question')
-    ..aI(2, _omitFieldNames ? '' : 'retrievalTopK')
-    ..aD(3, _omitFieldNames ? '' : 'similarityThreshold',
-        fieldType: $pb.PbFieldType.OF)
-    ..aOB(4, _omitFieldNames ? '' : 'enableMultiQuery')
-    ..aI(5, _omitFieldNames ? '' : 'multiQueryCount')
-    ..aOS(6, _omitFieldNames ? '' : 'scopePrefix')
+    ..aOS(1, _omitFieldNames ? '' : 'query')
+    ..aOM<RAGRetrievalOptions>(2, _omitFieldNames ? '' : 'retrieval',
+        subBuilder: RAGRetrievalOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -588,73 +667,33 @@ class RAGSearchRequest extends $pb.GeneratedMessage {
   static RAGSearchRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get question => $_getSZ(0);
+  $core.String get query => $_getSZ(0);
   @$pb.TagNumber(1)
-  set question($core.String value) => $_setString(0, value);
+  set query($core.String value) => $_setString(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasQuestion() => $_has(0);
+  $core.bool hasQuery() => $_has(0);
   @$pb.TagNumber(1)
-  void clearQuestion() => $_clearField(1);
+  void clearQuery() => $_clearField(1);
 
-  /// Retrieval depth for this call, overriding RAGConfiguration.top_k.
-  /// Zero means "use the session default".
   @$pb.TagNumber(2)
-  $core.int get retrievalTopK => $_getIZ(1);
+  RAGRetrievalOptions get retrieval => $_getN(1);
   @$pb.TagNumber(2)
-  set retrievalTopK($core.int value) => $_setSignedInt32(1, value);
+  set retrieval(RAGRetrievalOptions value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasRetrievalTopK() => $_has(1);
+  $core.bool hasRetrieval() => $_has(1);
   @$pb.TagNumber(2)
-  void clearRetrievalTopK() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.double get similarityThreshold => $_getN(2);
-  @$pb.TagNumber(3)
-  set similarityThreshold($core.double value) => $_setFloat(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasSimilarityThreshold() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearSimilarityThreshold() => $_clearField(3);
-
-  /// Expand the question into several queries and merge the results.
-  /// Requires a session LLM (same as RAGQueryOptions.enable_multi_query).
-  @$pb.TagNumber(4)
-  $core.bool get enableMultiQuery => $_getBF(3);
-  @$pb.TagNumber(4)
-  set enableMultiQuery($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasEnableMultiQuery() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearEnableMultiQuery() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get multiQueryCount => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set multiQueryCount($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasMultiQueryCount() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearMultiQueryCount() => $_clearField(5);
-
-  /// Restrict retrieval to chunks whose source matches this prefix.
-  @$pb.TagNumber(6)
-  $core.String get scopePrefix => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set scopePrefix($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasScopePrefix() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearScopePrefix() => $_clearField(6);
+  void clearRetrieval() => $_clearField(2);
+  @$pb.TagNumber(2)
+  RAGRetrievalOptions ensureRetrieval() => $_ensure(1);
 }
 
 class RAGSearchResult extends $pb.GeneratedMessage {
   factory RAGSearchResult({
     $core.String? chunkId,
     $core.String? text,
-    $core.double? similarityScore,
+    $core.double? score,
     $core.String? sourceDocument,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
-    $core.int? rank,
     $core.int? startOffset,
     $core.int? endOffset,
     $core.int? tokenCount,
@@ -662,10 +701,9 @@ class RAGSearchResult extends $pb.GeneratedMessage {
     final result = create();
     if (chunkId != null) result.chunkId = chunkId;
     if (text != null) result.text = text;
-    if (similarityScore != null) result.similarityScore = similarityScore;
+    if (score != null) result.score = score;
     if (sourceDocument != null) result.sourceDocument = sourceDocument;
     if (metadata != null) result.metadata.addEntries(metadata);
-    if (rank != null) result.rank = rank;
     if (startOffset != null) result.startOffset = startOffset;
     if (endOffset != null) result.endOffset = endOffset;
     if (tokenCount != null) result.tokenCount = tokenCount;
@@ -687,18 +725,16 @@ class RAGSearchResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'chunkId')
     ..aOS(2, _omitFieldNames ? '' : 'text')
-    ..aD(3, _omitFieldNames ? '' : 'similarityScore',
-        fieldType: $pb.PbFieldType.OF)
+    ..aD(3, _omitFieldNames ? '' : 'score', fieldType: $pb.PbFieldType.OF)
     ..aOS(4, _omitFieldNames ? '' : 'sourceDocument')
     ..m<$core.String, $core.String>(5, _omitFieldNames ? '' : 'metadata',
         entryClassName: 'RAGSearchResult.MetadataEntry',
         keyFieldType: $pb.PbFieldType.OS,
         valueFieldType: $pb.PbFieldType.OS,
         packageName: const $pb.PackageName('runanywhere.v1'))
-    ..aI(7, _omitFieldNames ? '' : 'rank')
-    ..aI(8, _omitFieldNames ? '' : 'startOffset')
-    ..aI(9, _omitFieldNames ? '' : 'endOffset')
-    ..aI(10, _omitFieldNames ? '' : 'tokenCount')
+    ..aI(6, _omitFieldNames ? '' : 'startOffset')
+    ..aI(7, _omitFieldNames ? '' : 'endOffset')
+    ..aI(8, _omitFieldNames ? '' : 'tokenCount')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -738,14 +774,16 @@ class RAGSearchResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearText() => $_clearField(2);
 
+  /// Relevance, higher-is-better, normalised to 0..1. Fused dense + BM25 (RRF),
+  /// not a raw cosine similarity.
   @$pb.TagNumber(3)
-  $core.double get similarityScore => $_getN(2);
+  $core.double get score => $_getN(2);
   @$pb.TagNumber(3)
-  set similarityScore($core.double value) => $_setFloat(2, value);
+  set score($core.double value) => $_setFloat(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasSimilarityScore() => $_has(2);
+  $core.bool hasScore() => $_has(2);
   @$pb.TagNumber(3)
-  void clearSimilarityScore() => $_clearField(3);
+  void clearScore() => $_clearField(3);
 
   @$pb.TagNumber(4)
   $core.String get sourceDocument => $_getSZ(3);
@@ -759,42 +797,33 @@ class RAGSearchResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 
-  @$pb.TagNumber(7)
-  $core.int get rank => $_getIZ(5);
-  @$pb.TagNumber(7)
-  set rank($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(7)
-  $core.bool hasRank() => $_has(5);
-  @$pb.TagNumber(7)
-  void clearRank() => $_clearField(7);
-
   /// Character offsets into the source document.
-  @$pb.TagNumber(8)
-  $core.int get startOffset => $_getIZ(6);
-  @$pb.TagNumber(8)
-  set startOffset($core.int value) => $_setSignedInt32(6, value);
-  @$pb.TagNumber(8)
-  $core.bool hasStartOffset() => $_has(6);
-  @$pb.TagNumber(8)
-  void clearStartOffset() => $_clearField(8);
+  @$pb.TagNumber(6)
+  $core.int get startOffset => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set startOffset($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasStartOffset() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStartOffset() => $_clearField(6);
 
-  @$pb.TagNumber(9)
-  $core.int get endOffset => $_getIZ(7);
-  @$pb.TagNumber(9)
-  set endOffset($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(9)
-  $core.bool hasEndOffset() => $_has(7);
-  @$pb.TagNumber(9)
-  void clearEndOffset() => $_clearField(9);
+  @$pb.TagNumber(7)
+  $core.int get endOffset => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set endOffset($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasEndOffset() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearEndOffset() => $_clearField(7);
 
-  @$pb.TagNumber(10)
-  $core.int get tokenCount => $_getIZ(8);
-  @$pb.TagNumber(10)
-  set tokenCount($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(10)
-  $core.bool hasTokenCount() => $_has(8);
-  @$pb.TagNumber(10)
-  void clearTokenCount() => $_clearField(10);
+  @$pb.TagNumber(8)
+  $core.int get tokenCount => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set tokenCount($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasTokenCount() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTokenCount() => $_clearField(8);
 }
 
 /// Retrieval-only response for `rac_rag_search_proto`.
@@ -803,7 +832,7 @@ class RAGSearchResponse extends $pb.GeneratedMessage {
     $core.Iterable<RAGSearchResult>? chunks,
     $fixnum.Int64? retrievalTimeMs,
     $core.String? requestId,
-    $1.SDKError? error,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (chunks != null) result.chunks.addAll(chunks);
@@ -830,8 +859,8 @@ class RAGSearchResponse extends $pb.GeneratedMessage {
         subBuilder: RAGSearchResult.create)
     ..aInt64(2, _omitFieldNames ? '' : 'retrievalTimeMs')
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
-    ..aOM<$1.SDKError>(4, _omitFieldNames ? '' : 'error',
-        subBuilder: $1.SDKError.create)
+    ..aOM<$0.SDKError>(4, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -875,15 +904,15 @@ class RAGSearchResponse extends $pb.GeneratedMessage {
   void clearRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $1.SDKError get error => $_getN(3);
+  $0.SDKError get error => $_getN(3);
   @$pb.TagNumber(4)
-  set error($1.SDKError value) => $_setField(4, value);
+  set error($0.SDKError value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasError() => $_has(3);
   @$pb.TagNumber(4)
   void clearError() => $_clearField(4);
   @$pb.TagNumber(4)
-  $1.SDKError ensureError() => $_ensure(3);
+  $0.SDKError ensureError() => $_ensure(3);
 }
 
 class RAGResult extends $pb.GeneratedMessage {
@@ -893,11 +922,10 @@ class RAGResult extends $pb.GeneratedMessage {
     $core.String? contextUsed,
     $fixnum.Int64? retrievalTimeMs,
     $fixnum.Int64? generationTimeMs,
-    $fixnum.Int64? totalTimeMs,
     $core.String? requestId,
     $core.String? thinkingContent,
     $2.TokenUsage? usage,
-    $1.SDKError? error,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (answer != null) result.answer = answer;
@@ -905,7 +933,6 @@ class RAGResult extends $pb.GeneratedMessage {
     if (contextUsed != null) result.contextUsed = contextUsed;
     if (retrievalTimeMs != null) result.retrievalTimeMs = retrievalTimeMs;
     if (generationTimeMs != null) result.generationTimeMs = generationTimeMs;
-    if (totalTimeMs != null) result.totalTimeMs = totalTimeMs;
     if (requestId != null) result.requestId = requestId;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
     if (usage != null) result.usage = usage;
@@ -932,13 +959,12 @@ class RAGResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'contextUsed')
     ..aInt64(4, _omitFieldNames ? '' : 'retrievalTimeMs')
     ..aInt64(5, _omitFieldNames ? '' : 'generationTimeMs')
-    ..aInt64(6, _omitFieldNames ? '' : 'totalTimeMs')
-    ..aOS(12, _omitFieldNames ? '' : 'requestId')
-    ..aOS(13, _omitFieldNames ? '' : 'thinkingContent')
-    ..aOM<$2.TokenUsage>(14, _omitFieldNames ? '' : 'usage',
+    ..aOS(6, _omitFieldNames ? '' : 'requestId')
+    ..aOS(7, _omitFieldNames ? '' : 'thinkingContent')
+    ..aOM<$2.TokenUsage>(8, _omitFieldNames ? '' : 'usage',
         subBuilder: $2.TokenUsage.create)
-    ..aOM<$1.SDKError>(15, _omitFieldNames ? '' : 'error',
-        subBuilder: $1.SDKError.create)
+    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -980,6 +1006,7 @@ class RAGResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearContextUsed() => $_clearField(3);
 
+  /// Measured directly, not by subtraction: embed the query + search + fuse.
   @$pb.TagNumber(4)
   $fixnum.Int64 get retrievalTimeMs => $_getI64(3);
   @$pb.TagNumber(4)
@@ -998,54 +1025,47 @@ class RAGResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearGenerationTimeMs() => $_clearField(5);
 
+  /// MUST be set by rac_rag_proto_abi (event_id()).
   @$pb.TagNumber(6)
-  $fixnum.Int64 get totalTimeMs => $_getI64(5);
+  $core.String get requestId => $_getSZ(5);
   @$pb.TagNumber(6)
-  set totalTimeMs($fixnum.Int64 value) => $_setInt64(5, value);
+  set requestId($core.String value) => $_setString(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasTotalTimeMs() => $_has(5);
+  $core.bool hasRequestId() => $_has(5);
   @$pb.TagNumber(6)
-  void clearTotalTimeMs() => $_clearField(6);
+  void clearRequestId() => $_clearField(6);
 
-  @$pb.TagNumber(12)
-  $core.String get requestId => $_getSZ(6);
-  @$pb.TagNumber(12)
-  set requestId($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(12)
-  $core.bool hasRequestId() => $_has(6);
-  @$pb.TagNumber(12)
-  void clearRequestId() => $_clearField(12);
+  @$pb.TagNumber(7)
+  $core.String get thinkingContent => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set thinkingContent($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasThinkingContent() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearThinkingContent() => $_clearField(7);
 
-  @$pb.TagNumber(13)
-  $core.String get thinkingContent => $_getSZ(7);
-  @$pb.TagNumber(13)
-  set thinkingContent($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(13)
-  $core.bool hasThinkingContent() => $_has(7);
-  @$pb.TagNumber(13)
-  void clearThinkingContent() => $_clearField(13);
+  /// MUST be copied from the LLM result the pipeline already holds.
+  @$pb.TagNumber(8)
+  $2.TokenUsage get usage => $_getN(7);
+  @$pb.TagNumber(8)
+  set usage($2.TokenUsage value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasUsage() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearUsage() => $_clearField(8);
+  @$pb.TagNumber(8)
+  $2.TokenUsage ensureUsage() => $_ensure(7);
 
-  @$pb.TagNumber(14)
-  $2.TokenUsage get usage => $_getN(8);
-  @$pb.TagNumber(14)
-  set usage($2.TokenUsage value) => $_setField(14, value);
-  @$pb.TagNumber(14)
-  $core.bool hasUsage() => $_has(8);
-  @$pb.TagNumber(14)
-  void clearUsage() => $_clearField(14);
-  @$pb.TagNumber(14)
-  $2.TokenUsage ensureUsage() => $_ensure(8);
-
-  @$pb.TagNumber(15)
-  $1.SDKError get error => $_getN(9);
-  @$pb.TagNumber(15)
-  set error($1.SDKError value) => $_setField(15, value);
-  @$pb.TagNumber(15)
-  $core.bool hasError() => $_has(9);
-  @$pb.TagNumber(15)
-  void clearError() => $_clearField(15);
-  @$pb.TagNumber(15)
-  $1.SDKError ensureError() => $_ensure(9);
+  @$pb.TagNumber(9)
+  $0.SDKError get error => $_getN(8);
+  @$pb.TagNumber(9)
+  set error($0.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $0.SDKError ensureError() => $_ensure(8);
 }
 
 class RAGStatistics extends $pb.GeneratedMessage {
@@ -1054,12 +1074,8 @@ class RAGStatistics extends $pb.GeneratedMessage {
     $fixnum.Int64? indexedChunks,
     $fixnum.Int64? totalTokensIndexed,
     $fixnum.Int64? lastUpdatedMs,
-    $core.String? indexPath,
-    $core.String? statsJson,
     $fixnum.Int64? vectorStoreSizeBytes,
-    $core.bool? isPersistent,
-    $fixnum.Int64? lastQueryMs,
-    $1.SDKError? error,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (indexedDocuments != null) result.indexedDocuments = indexedDocuments;
@@ -1067,12 +1083,8 @@ class RAGStatistics extends $pb.GeneratedMessage {
     if (totalTokensIndexed != null)
       result.totalTokensIndexed = totalTokensIndexed;
     if (lastUpdatedMs != null) result.lastUpdatedMs = lastUpdatedMs;
-    if (indexPath != null) result.indexPath = indexPath;
-    if (statsJson != null) result.statsJson = statsJson;
     if (vectorStoreSizeBytes != null)
       result.vectorStoreSizeBytes = vectorStoreSizeBytes;
-    if (isPersistent != null) result.isPersistent = isPersistent;
-    if (lastQueryMs != null) result.lastQueryMs = lastQueryMs;
     if (error != null) result.error = error;
     return result;
   }
@@ -1094,13 +1106,9 @@ class RAGStatistics extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'indexedChunks')
     ..aInt64(3, _omitFieldNames ? '' : 'totalTokensIndexed')
     ..aInt64(4, _omitFieldNames ? '' : 'lastUpdatedMs')
-    ..aOS(5, _omitFieldNames ? '' : 'indexPath')
-    ..aOS(6, _omitFieldNames ? '' : 'statsJson')
-    ..aInt64(7, _omitFieldNames ? '' : 'vectorStoreSizeBytes')
-    ..aOB(8, _omitFieldNames ? '' : 'isPersistent')
-    ..aInt64(9, _omitFieldNames ? '' : 'lastQueryMs')
-    ..aOM<$1.SDKError>(12, _omitFieldNames ? '' : 'error',
-        subBuilder: $1.SDKError.create)
+    ..aInt64(5, _omitFieldNames ? '' : 'vectorStoreSizeBytes')
+    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1149,6 +1157,7 @@ class RAGStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearTotalTokensIndexed() => $_clearField(3);
 
+  /// Milliseconds since the Unix epoch when the index last changed.
   @$pb.TagNumber(4)
   $fixnum.Int64 get lastUpdatedMs => $_getI64(3);
   @$pb.TagNumber(4)
@@ -1158,61 +1167,27 @@ class RAGStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearLastUpdatedMs() => $_clearField(4);
 
+  /// Bytes the index occupies (industry: VectorStore.usage_bytes).
+  /// MUST be populated by make_stats() — it is surfaced as RagStats.indexSizeBytes.
   @$pb.TagNumber(5)
-  $core.String get indexPath => $_getSZ(4);
+  $fixnum.Int64 get vectorStoreSizeBytes => $_getI64(4);
   @$pb.TagNumber(5)
-  set indexPath($core.String value) => $_setString(4, value);
+  set vectorStoreSizeBytes($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasIndexPath() => $_has(4);
+  $core.bool hasVectorStoreSizeBytes() => $_has(4);
   @$pb.TagNumber(5)
-  void clearIndexPath() => $_clearField(5);
+  void clearVectorStoreSizeBytes() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.String get statsJson => $_getSZ(5);
+  $0.SDKError get error => $_getN(5);
   @$pb.TagNumber(6)
-  set statsJson($core.String value) => $_setString(5, value);
+  set error($0.SDKError value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasStatsJson() => $_has(5);
+  $core.bool hasError() => $_has(5);
   @$pb.TagNumber(6)
-  void clearStatsJson() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $fixnum.Int64 get vectorStoreSizeBytes => $_getI64(6);
-  @$pb.TagNumber(7)
-  set vectorStoreSizeBytes($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasVectorStoreSizeBytes() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearVectorStoreSizeBytes() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.bool get isPersistent => $_getBF(7);
-  @$pb.TagNumber(8)
-  set isPersistent($core.bool value) => $_setBool(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasIsPersistent() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearIsPersistent() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $fixnum.Int64 get lastQueryMs => $_getI64(8);
-  @$pb.TagNumber(9)
-  set lastQueryMs($fixnum.Int64 value) => $_setInt64(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasLastQueryMs() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearLastQueryMs() => $_clearField(9);
-
-  @$pb.TagNumber(12)
-  $1.SDKError get error => $_getN(9);
-  @$pb.TagNumber(12)
-  set error($1.SDKError value) => $_setField(12, value);
-  @$pb.TagNumber(12)
-  $core.bool hasError() => $_has(9);
-  @$pb.TagNumber(12)
-  void clearError() => $_clearField(12);
-  @$pb.TagNumber(12)
-  $1.SDKError ensureError() => $_ensure(9);
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.SDKError ensureError() => $_ensure(5);
 }
 
 class RAGStreamEvent extends $pb.GeneratedMessage {
@@ -1220,16 +1195,14 @@ class RAGStreamEvent extends $pb.GeneratedMessage {
     $fixnum.Int64? timestampUs,
     $core.String? requestId,
     RAGStreamEventKind? kind,
-    RAGSearchResult? chunk,
     $core.String? token,
     RAGResult? result,
-    $1.SDKError? error,
+    $0.SDKError? error,
   }) {
     final result$ = create();
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (requestId != null) result$.requestId = requestId;
     if (kind != null) result$.kind = kind;
-    if (chunk != null) result$.chunk = chunk;
     if (token != null) result$.token = token;
     if (result != null) result$.result = result;
     if (error != null) result$.error = error;
@@ -1249,17 +1222,15 @@ class RAGStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'RAGStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
-    ..aOS(3, _omitFieldNames ? '' : 'requestId')
-    ..aE<RAGStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
+    ..aInt64(1, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
+    ..aE<RAGStreamEventKind>(3, _omitFieldNames ? '' : 'kind',
         enumValues: RAGStreamEventKind.values)
-    ..aOM<RAGSearchResult>(5, _omitFieldNames ? '' : 'chunk',
-        subBuilder: RAGSearchResult.create)
-    ..aOS(6, _omitFieldNames ? '' : 'token')
-    ..aOM<RAGResult>(7, _omitFieldNames ? '' : 'result',
+    ..aOS(4, _omitFieldNames ? '' : 'token')
+    ..aOM<RAGResult>(5, _omitFieldNames ? '' : 'result',
         subBuilder: RAGResult.create)
-    ..aOM<$1.SDKError>(10, _omitFieldNames ? '' : 'error',
-        subBuilder: $1.SDKError.create)
+    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1281,74 +1252,64 @@ class RAGStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<RAGStreamEvent>(create);
   static RAGStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(2)
+  /// Microseconds since the Unix epoch, matching every other modality.
+  @$pb.TagNumber(1)
   $fixnum.Int64 get timestampUs => $_getI64(0);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(2)
+  @$pb.TagNumber(1)
   $core.bool hasTimestampUs() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTimestampUs() => $_clearField(1);
+
   @$pb.TagNumber(2)
-  void clearTimestampUs() => $_clearField(2);
-
-  @$pb.TagNumber(3)
   $core.String get requestId => $_getSZ(1);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   set requestId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(3)
+  @$pb.TagNumber(2)
   $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => $_clearField(2);
+
   @$pb.TagNumber(3)
-  void clearRequestId() => $_clearField(3);
-
-  @$pb.TagNumber(4)
   RAGStreamEventKind get kind => $_getN(2);
-  @$pb.TagNumber(4)
-  set kind(RAGStreamEventKind value) => $_setField(4, value);
-  @$pb.TagNumber(4)
+  @$pb.TagNumber(3)
+  set kind(RAGStreamEventKind value) => $_setField(3, value);
+  @$pb.TagNumber(3)
   $core.bool hasKind() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearKind() => $_clearField(3);
+
   @$pb.TagNumber(4)
-  void clearKind() => $_clearField(4);
+  $core.String get token => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set token($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearToken() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  RAGSearchResult get chunk => $_getN(3);
+  RAGResult get result => $_getN(4);
   @$pb.TagNumber(5)
-  set chunk(RAGSearchResult value) => $_setField(5, value);
+  set result(RAGResult value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasChunk() => $_has(3);
+  $core.bool hasResult() => $_has(4);
   @$pb.TagNumber(5)
-  void clearChunk() => $_clearField(5);
+  void clearResult() => $_clearField(5);
   @$pb.TagNumber(5)
-  RAGSearchResult ensureChunk() => $_ensure(3);
+  RAGResult ensureResult() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  $core.String get token => $_getSZ(4);
+  $0.SDKError get error => $_getN(5);
   @$pb.TagNumber(6)
-  set token($core.String value) => $_setString(4, value);
+  set error($0.SDKError value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasToken() => $_has(4);
+  $core.bool hasError() => $_has(5);
   @$pb.TagNumber(6)
-  void clearToken() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  RAGResult get result => $_getN(5);
-  @$pb.TagNumber(7)
-  set result(RAGResult value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasResult() => $_has(5);
-  @$pb.TagNumber(7)
-  void clearResult() => $_clearField(7);
-  @$pb.TagNumber(7)
-  RAGResult ensureResult() => $_ensure(5);
-
-  @$pb.TagNumber(10)
-  $1.SDKError get error => $_getN(6);
-  @$pb.TagNumber(10)
-  set error($1.SDKError value) => $_setField(10, value);
-  @$pb.TagNumber(10)
-  $core.bool hasError() => $_has(6);
-  @$pb.TagNumber(10)
-  void clearError() => $_clearField(10);
-  @$pb.TagNumber(10)
-  $1.SDKError ensureError() => $_ensure(6);
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.SDKError ensureError() => $_ensure(5);
 }
 
 const $core.bool _omitFieldNames =

@@ -79,17 +79,9 @@ public class StorageDeletePlan(
   )
   public val requires_platform_delete: Boolean = false,
   @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "candidateCount",
-    schemaIndex = 7,
-  )
-  public val candidate_count: Int = 0,
-  @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -127,7 +119,6 @@ public class StorageDeletePlan(
     if (warnings != other.warnings) return false
     if (requires_unload != other.requires_unload) return false
     if (requires_platform_delete != other.requires_platform_delete) return false
-    if (candidate_count != other.candidate_count) return false
     if (error != other.error) return false
     return true
   }
@@ -143,7 +134,6 @@ public class StorageDeletePlan(
       result = result * 37 + warnings.hashCode()
       result = result * 37 + requires_unload.hashCode()
       result = result * 37 + requires_platform_delete.hashCode()
-      result = result * 37 + candidate_count.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -159,7 +149,6 @@ public class StorageDeletePlan(
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """requires_unload=$requires_unload"""
     result += """requires_platform_delete=$requires_platform_delete"""
-    result += """candidate_count=$candidate_count"""
     if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "StorageDeletePlan{", separator = ", ", postfix = "}")
   }
@@ -172,10 +161,9 @@ public class StorageDeletePlan(
     warnings: List<String> = this.warnings,
     requires_unload: Boolean = this.requires_unload,
     requires_platform_delete: Boolean = this.requires_platform_delete,
-    candidate_count: Int = this.candidate_count,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageDeletePlan = StorageDeletePlan(can_reclaim_required_bytes, required_bytes, reclaimable_bytes, candidates, warnings, requires_unload, requires_platform_delete, candidate_count, error, unknownFields)
+  ): StorageDeletePlan = StorageDeletePlan(can_reclaim_required_bytes, required_bytes, reclaimable_bytes, candidates, warnings, requires_unload, requires_platform_delete, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -206,9 +194,6 @@ public class StorageDeletePlan(
         if (value.requires_platform_delete != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.requires_platform_delete)
         }
-        if (value.candidate_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.candidate_count)
-        }
         size += SDKError.ADAPTER.encodedSizeWithTag(10, value.error)
         return size
       }
@@ -231,9 +216,6 @@ public class StorageDeletePlan(
         if (value.requires_platform_delete != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.requires_platform_delete)
         }
-        if (value.candidate_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.candidate_count)
-        }
         SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
         writer.writeBytes(value.unknownFields)
       }
@@ -241,9 +223,6 @@ public class StorageDeletePlan(
       override fun encode(writer: ReverseProtoWriter, `value`: StorageDeletePlan) {
         writer.writeBytes(value.unknownFields)
         SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
-        if (value.candidate_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.candidate_count)
-        }
         if (value.requires_platform_delete != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.requires_platform_delete)
         }
@@ -271,7 +250,6 @@ public class StorageDeletePlan(
         val warnings = mutableListOf<String>()
         var requires_unload: Boolean = false
         var requires_platform_delete: Boolean = false
-        var candidate_count: Int = 0
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -282,7 +260,6 @@ public class StorageDeletePlan(
             5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             7 -> requires_unload = ProtoAdapter.BOOL.decode(reader)
             8 -> requires_platform_delete = ProtoAdapter.BOOL.decode(reader)
-            9 -> candidate_count = ProtoAdapter.INT32.decode(reader)
             10 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -295,7 +272,6 @@ public class StorageDeletePlan(
           warnings = warnings,
           requires_unload = requires_unload,
           requires_platform_delete = requires_platform_delete,
-          candidate_count = candidate_count,
           error = error,
           unknownFields = unknownFields
         )

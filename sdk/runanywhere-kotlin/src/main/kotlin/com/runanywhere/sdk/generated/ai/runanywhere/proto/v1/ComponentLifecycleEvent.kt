@@ -17,30 +17,42 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.countNonNull
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
  * Operation-aware lifecycle event. The oneof arms intentionally reference the
  * operation result/progress protos from this contract slice instead of adding
- * another broad event taxonomy.
+ * another broad event taxonomy. Covers both component bring-up (absorbed from
+ * ComponentInitializationEvent) and steady-state model lifecycle.
  */
 public class ComponentLifecycleEvent(
+  @field:WireField(
+    tag = 19,
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleEventKind#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 0,
+  )
+  public val kind:
+      ComponentLifecycleEventKind = ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.SDKComponent#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
+    schemaIndex = 1,
   )
   public val component: SDKComponent = SDKComponent.SDK_COMPONENT_UNSPECIFIED,
   @field:WireField(
@@ -48,7 +60,7 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "previousState",
-    schemaIndex = 1,
+    schemaIndex = 2,
   )
   public val previous_state:
       ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
@@ -57,7 +69,7 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.ComponentLifecycleState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "currentState",
-    schemaIndex = 2,
+    schemaIndex = 3,
   )
   public val current_state:
       ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
@@ -66,7 +78,7 @@ public class ComponentLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 3,
+    schemaIndex = 4,
   )
   public val model_id: String = "",
   @field:WireField(
@@ -74,15 +86,65 @@ public class ComponentLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampMs",
-    schemaIndex = 4,
+    schemaIndex = 5,
   )
   public val timestamp_ms: Long = 0L,
+  /**
+   * Absorbed from ComponentInitializationEvent.
+   * COMPONENT_DOWNLOAD_REQUIRED
+   */
+  @field:WireField(
+    tag = 20,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sizeBytes",
+    schemaIndex = 6,
+  )
+  public val size_bytes: Long = 0L,
+  /**
+   * COMPONENT_DOWNLOAD_PROGRESS
+   */
+  @field:WireField(
+    tag = 21,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 7,
+  )
+  public val progress: Float = 0f,
+  components: List<SDKComponent> = emptyList(),
+  ready_components: List<SDKComponent> = emptyList(),
+  pending_components: List<SDKComponent> = emptyList(),
+  /**
+   * INITIALIZATION_COMPLETED summary
+   */
+  @field:WireField(
+    tag = 25,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "readyCount",
+    schemaIndex = 11,
+  )
+  public val ready_count: Int = 0,
+  @field:WireField(
+    tag = 26,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "failedCount",
+    schemaIndex = 12,
+  )
+  public val failed_count: Int = 0,
+  @field:WireField(
+    tag = 27,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 13,
+  )
+  public val error: SDKError? = null,
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.ModelLoadResult#ADAPTER",
     jsonName = "modelLoadResult",
     oneofName = "payload",
-    schemaIndex = 5,
+    schemaIndex = 14,
   )
   public val model_load_result: ModelLoadResult? = null,
   @field:WireField(
@@ -90,7 +152,7 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.ModelUnloadResult#ADAPTER",
     jsonName = "modelUnloadResult",
     oneofName = "payload",
-    schemaIndex = 6,
+    schemaIndex = 15,
   )
   public val model_unload_result: ModelUnloadResult? = null,
   @field:WireField(
@@ -98,7 +160,7 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.ModelDeleteResult#ADAPTER",
     jsonName = "modelDeleteResult",
     oneofName = "payload",
-    schemaIndex = 7,
+    schemaIndex = 16,
   )
   public val model_delete_result: ModelDeleteResult? = null,
   @field:WireField(
@@ -106,7 +168,7 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.DownloadProgress#ADAPTER",
     jsonName = "downloadProgress",
     oneofName = "payload",
-    schemaIndex = 8,
+    schemaIndex = 17,
   )
   public val download_progress: DownloadProgress? = null,
   @field:WireField(
@@ -114,7 +176,7 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.StorageAvailabilityResult#ADAPTER",
     jsonName = "storageAvailability",
     oneofName = "payload",
-    schemaIndex = 9,
+    schemaIndex = 18,
   )
   public val storage_availability: StorageAvailabilityResult? = null,
   @field:WireField(
@@ -122,14 +184,14 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.StorageDeleteResult#ADAPTER",
     jsonName = "storageDeleteResult",
     oneofName = "payload",
-    schemaIndex = 10,
+    schemaIndex = 19,
   )
   public val storage_delete_result: StorageDeleteResult? = null,
   @field:WireField(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.ComponentLifecycleSnapshot#ADAPTER",
     oneofName = "payload",
-    schemaIndex = 11,
+    schemaIndex = 20,
   )
   public val snapshot: ComponentLifecycleSnapshot? = null,
   @field:WireField(
@@ -137,7 +199,7 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.ComponentLifecycleSnapshotResult#ADAPTER",
     jsonName = "snapshotResult",
     oneofName = "payload",
-    schemaIndex = 12,
+    schemaIndex = 21,
   )
   public val snapshot_result: ComponentLifecycleSnapshotResult? = null,
   @field:WireField(
@@ -145,11 +207,42 @@ public class ComponentLifecycleEvent(
     adapter = "ai.runanywhere.proto.v1.StorageDeletePlan#ADAPTER",
     jsonName = "storageDeletePlan",
     oneofName = "payload",
-    schemaIndex = 13,
+    schemaIndex = 22,
   )
   public val storage_delete_plan: StorageDeletePlan? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ComponentLifecycleEvent, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * multi-component events
+   */
+  @field:WireField(
+    tag = 22,
+    adapter = "ai.runanywhere.proto.v1.SDKComponent#ADAPTER",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 8,
+  )
+  public val components: List<SDKComponent> = immutableCopyOf("components", components)
+
+  @field:WireField(
+    tag = 23,
+    adapter = "ai.runanywhere.proto.v1.SDKComponent#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "readyComponents",
+    schemaIndex = 9,
+  )
+  public val ready_components: List<SDKComponent> =
+      immutableCopyOf("ready_components", ready_components)
+
+  @field:WireField(
+    tag = 24,
+    adapter = "ai.runanywhere.proto.v1.SDKComponent#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "pendingComponents",
+    schemaIndex = 10,
+  )
+  public val pending_components: List<SDKComponent> =
+      immutableCopyOf("pending_components", pending_components)
+
   init {
     require(countNonNull(model_load_result, model_unload_result, model_delete_result, download_progress, storage_availability, storage_delete_result, snapshot, snapshot_result, storage_delete_plan) <= 1) {
       "At most one of model_load_result, model_unload_result, model_delete_result, download_progress, storage_availability, storage_delete_result, snapshot, snapshot_result, storage_delete_plan may be non-null"
@@ -166,11 +259,20 @@ public class ComponentLifecycleEvent(
     if (other === this) return true
     if (other !is ComponentLifecycleEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (kind != other.kind) return false
     if (component != other.component) return false
     if (previous_state != other.previous_state) return false
     if (current_state != other.current_state) return false
     if (model_id != other.model_id) return false
     if (timestamp_ms != other.timestamp_ms) return false
+    if (size_bytes != other.size_bytes) return false
+    if (progress != other.progress) return false
+    if (components != other.components) return false
+    if (ready_components != other.ready_components) return false
+    if (pending_components != other.pending_components) return false
+    if (ready_count != other.ready_count) return false
+    if (failed_count != other.failed_count) return false
+    if (error != other.error) return false
     if (model_load_result != other.model_load_result) return false
     if (model_unload_result != other.model_unload_result) return false
     if (model_delete_result != other.model_delete_result) return false
@@ -187,11 +289,20 @@ public class ComponentLifecycleEvent(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
+      result = result * 37 + kind.hashCode()
       result = result * 37 + component.hashCode()
       result = result * 37 + previous_state.hashCode()
       result = result * 37 + current_state.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + size_bytes.hashCode()
+      result = result * 37 + progress.hashCode()
+      result = result * 37 + components.hashCode()
+      result = result * 37 + ready_components.hashCode()
+      result = result * 37 + pending_components.hashCode()
+      result = result * 37 + ready_count.hashCode()
+      result = result * 37 + failed_count.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       result = result * 37 + (model_load_result?.hashCode() ?: 0)
       result = result * 37 + (model_unload_result?.hashCode() ?: 0)
       result = result * 37 + (model_delete_result?.hashCode() ?: 0)
@@ -208,11 +319,20 @@ public class ComponentLifecycleEvent(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
+    result += """kind=$kind"""
     result += """component=$component"""
     result += """previous_state=$previous_state"""
     result += """current_state=$current_state"""
     result += """model_id=${sanitize(model_id)}"""
     result += """timestamp_ms=$timestamp_ms"""
+    result += """size_bytes=$size_bytes"""
+    result += """progress=$progress"""
+    if (components.isNotEmpty()) result += """components=$components"""
+    if (ready_components.isNotEmpty()) result += """ready_components=$ready_components"""
+    if (pending_components.isNotEmpty()) result += """pending_components=$pending_components"""
+    result += """ready_count=$ready_count"""
+    result += """failed_count=$failed_count"""
+    if (error != null) result += """error=$error"""
     if (model_load_result != null) result += """model_load_result=$model_load_result"""
     if (model_unload_result != null) result += """model_unload_result=$model_unload_result"""
     if (model_delete_result != null) result += """model_delete_result=$model_delete_result"""
@@ -226,11 +346,20 @@ public class ComponentLifecycleEvent(
   }
 
   public fun copy(
+    kind: ComponentLifecycleEventKind = this.kind,
     component: SDKComponent = this.component,
     previous_state: ComponentLifecycleState = this.previous_state,
     current_state: ComponentLifecycleState = this.current_state,
     model_id: String = this.model_id,
     timestamp_ms: Long = this.timestamp_ms,
+    size_bytes: Long = this.size_bytes,
+    progress: Float = this.progress,
+    components: List<SDKComponent> = this.components,
+    ready_components: List<SDKComponent> = this.ready_components,
+    pending_components: List<SDKComponent> = this.pending_components,
+    ready_count: Int = this.ready_count,
+    failed_count: Int = this.failed_count,
+    error: SDKError? = this.error,
     model_load_result: ModelLoadResult? = this.model_load_result,
     model_unload_result: ModelUnloadResult? = this.model_unload_result,
     model_delete_result: ModelDeleteResult? = this.model_delete_result,
@@ -241,7 +370,7 @@ public class ComponentLifecycleEvent(
     snapshot_result: ComponentLifecycleSnapshotResult? = this.snapshot_result,
     storage_delete_plan: StorageDeletePlan? = this.storage_delete_plan,
     unknownFields: ByteString = this.unknownFields,
-  ): ComponentLifecycleEvent = ComponentLifecycleEvent(component, previous_state, current_state, model_id, timestamp_ms, model_load_result, model_unload_result, model_delete_result, download_progress, storage_availability, storage_delete_result, snapshot, snapshot_result, storage_delete_plan, unknownFields)
+  ): ComponentLifecycleEvent = ComponentLifecycleEvent(kind, component, previous_state, current_state, model_id, timestamp_ms, size_bytes, progress, components, ready_components, pending_components, ready_count, failed_count, error, model_load_result, model_unload_result, model_delete_result, download_progress, storage_availability, storage_delete_result, snapshot, snapshot_result, storage_delete_plan, unknownFields)
 
   public companion object {
     @JvmField
@@ -256,6 +385,9 @@ public class ComponentLifecycleEvent(
     ) {
       override fun encodedSize(`value`: ComponentLifecycleEvent): Int {
         var size = value.unknownFields.size
+        if (value.kind != ai.runanywhere.proto.v1.ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED) {
+          size += ComponentLifecycleEventKind.ADAPTER.encodedSizeWithTag(19, value.kind)
+        }
         if (value.component != ai.runanywhere.proto.v1.SDKComponent.SDK_COMPONENT_UNSPECIFIED) {
           size += SDKComponent.ADAPTER.encodedSizeWithTag(1, value.component)
         }
@@ -271,6 +403,22 @@ public class ComponentLifecycleEvent(
         if (value.timestamp_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.timestamp_ms)
         }
+        if (value.size_bytes != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(20, value.size_bytes)
+        }
+        if (!value.progress.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(21, value.progress)
+        }
+        size += SDKComponent.ADAPTER.asRepeated().encodedSizeWithTag(22, value.components)
+        size += SDKComponent.ADAPTER.asRepeated().encodedSizeWithTag(23, value.ready_components)
+        size += SDKComponent.ADAPTER.asRepeated().encodedSizeWithTag(24, value.pending_components)
+        if (value.ready_count != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(25, value.ready_count)
+        }
+        if (value.failed_count != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(26, value.failed_count)
+        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(27, value.error)
         size += ModelLoadResult.ADAPTER.encodedSizeWithTag(10, value.model_load_result)
         size += ModelUnloadResult.ADAPTER.encodedSizeWithTag(11, value.model_unload_result)
         size += ModelDeleteResult.ADAPTER.encodedSizeWithTag(12, value.model_delete_result)
@@ -284,6 +432,9 @@ public class ComponentLifecycleEvent(
       }
 
       override fun encode(writer: ProtoWriter, `value`: ComponentLifecycleEvent) {
+        if (value.kind != ai.runanywhere.proto.v1.ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED) {
+          ComponentLifecycleEventKind.ADAPTER.encodeWithTag(writer, 19, value.kind)
+        }
         if (value.component != ai.runanywhere.proto.v1.SDKComponent.SDK_COMPONENT_UNSPECIFIED) {
           SDKComponent.ADAPTER.encodeWithTag(writer, 1, value.component)
         }
@@ -299,6 +450,22 @@ public class ComponentLifecycleEvent(
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.timestamp_ms)
         }
+        if (value.size_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 20, value.size_bytes)
+        }
+        if (!value.progress.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 21, value.progress)
+        }
+        SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 22, value.components)
+        SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 23, value.ready_components)
+        SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 24, value.pending_components)
+        if (value.ready_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 25, value.ready_count)
+        }
+        if (value.failed_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 26, value.failed_count)
+        }
+        SDKError.ADAPTER.encodeWithTag(writer, 27, value.error)
         ModelLoadResult.ADAPTER.encodeWithTag(writer, 10, value.model_load_result)
         ModelUnloadResult.ADAPTER.encodeWithTag(writer, 11, value.model_unload_result)
         ModelDeleteResult.ADAPTER.encodeWithTag(writer, 12, value.model_delete_result)
@@ -322,6 +489,22 @@ public class ComponentLifecycleEvent(
         ModelDeleteResult.ADAPTER.encodeWithTag(writer, 12, value.model_delete_result)
         ModelUnloadResult.ADAPTER.encodeWithTag(writer, 11, value.model_unload_result)
         ModelLoadResult.ADAPTER.encodeWithTag(writer, 10, value.model_load_result)
+        SDKError.ADAPTER.encodeWithTag(writer, 27, value.error)
+        if (value.failed_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 26, value.failed_count)
+        }
+        if (value.ready_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 25, value.ready_count)
+        }
+        SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 24, value.pending_components)
+        SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 23, value.ready_components)
+        SDKComponent.ADAPTER.asRepeated().encodeWithTag(writer, 22, value.components)
+        if (!value.progress.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 21, value.progress)
+        }
+        if (value.size_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 20, value.size_bytes)
+        }
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.timestamp_ms)
         }
@@ -337,14 +520,26 @@ public class ComponentLifecycleEvent(
         if (value.component != ai.runanywhere.proto.v1.SDKComponent.SDK_COMPONENT_UNSPECIFIED) {
           SDKComponent.ADAPTER.encodeWithTag(writer, 1, value.component)
         }
+        if (value.kind != ai.runanywhere.proto.v1.ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED) {
+          ComponentLifecycleEventKind.ADAPTER.encodeWithTag(writer, 19, value.kind)
+        }
       }
 
       override fun decode(reader: ProtoReader): ComponentLifecycleEvent {
+        var kind: ComponentLifecycleEventKind = ComponentLifecycleEventKind.COMPONENT_LIFECYCLE_EVENT_KIND_UNSPECIFIED
         var component: SDKComponent = SDKComponent.SDK_COMPONENT_UNSPECIFIED
         var previous_state: ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
         var current_state: ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
         var model_id: String = ""
         var timestamp_ms: Long = 0L
+        var size_bytes: Long = 0L
+        var progress: Float = 0f
+        val components = mutableListOf<SDKComponent>()
+        val ready_components = mutableListOf<SDKComponent>()
+        val pending_components = mutableListOf<SDKComponent>()
+        var ready_count: Int = 0
+        var failed_count: Int = 0
+        var error: SDKError? = null
         var model_load_result: ModelLoadResult? = null
         var model_unload_result: ModelUnloadResult? = null
         var model_delete_result: ModelDeleteResult? = null
@@ -356,6 +551,11 @@ public class ComponentLifecycleEvent(
         var storage_delete_plan: StorageDeletePlan? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
+            19 -> try {
+              kind = ComponentLifecycleEventKind.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             1 -> try {
               component = SDKComponent.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -373,6 +573,26 @@ public class ComponentLifecycleEvent(
             }
             4 -> model_id = ProtoAdapter.STRING.decode(reader)
             5 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            20 -> size_bytes = ProtoAdapter.INT64.decode(reader)
+            21 -> progress = ProtoAdapter.FLOAT.decode(reader)
+            22 -> try {
+              SDKComponent.ADAPTER.tryDecode(reader, components)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            23 -> try {
+              SDKComponent.ADAPTER.tryDecode(reader, ready_components)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            24 -> try {
+              SDKComponent.ADAPTER.tryDecode(reader, pending_components)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            25 -> ready_count = ProtoAdapter.INT32.decode(reader)
+            26 -> failed_count = ProtoAdapter.INT32.decode(reader)
+            27 -> error = SDKError.ADAPTER.decode(reader)
             10 -> model_load_result = ModelLoadResult.ADAPTER.decode(reader)
             11 -> model_unload_result = ModelUnloadResult.ADAPTER.decode(reader)
             12 -> model_delete_result = ModelDeleteResult.ADAPTER.decode(reader)
@@ -386,11 +606,20 @@ public class ComponentLifecycleEvent(
           }
         }
         return ComponentLifecycleEvent(
+          kind = kind,
           component = component,
           previous_state = previous_state,
           current_state = current_state,
           model_id = model_id,
           timestamp_ms = timestamp_ms,
+          size_bytes = size_bytes,
+          progress = progress,
+          components = components,
+          ready_components = ready_components,
+          pending_components = pending_components,
+          ready_count = ready_count,
+          failed_count = failed_count,
+          error = error,
           model_load_result = model_load_result,
           model_unload_result = model_unload_result,
           model_delete_result = model_delete_result,
@@ -405,6 +634,7 @@ public class ComponentLifecycleEvent(
       }
 
       override fun redact(`value`: ComponentLifecycleEvent): ComponentLifecycleEvent = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         model_load_result = value.model_load_result?.let(ModelLoadResult.ADAPTER::redact),
         model_unload_result = value.model_unload_result?.let(ModelUnloadResult.ADAPTER::redact),
         model_delete_result = value.model_delete_result?.let(ModelDeleteResult.ADAPTER::redact),

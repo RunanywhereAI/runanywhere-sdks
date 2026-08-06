@@ -86,7 +86,7 @@ public class GenerationEvent(
   )
   public val token: String = "",
   /**
-   * For STREAMING_UPDATE — the running response text and token count.
+   * For STREAMING_UPDATE — the running response text.
    */
   @field:WireField(
     tag = 5,
@@ -96,16 +96,19 @@ public class GenerationEvent(
     schemaIndex = 4,
   )
   public val streaming_text: String = "",
+  /**
+   * Output tokens so far on STREAMING_UPDATE; the final count on COMPLETED.
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokensCount",
+    jsonName = "outputTokens",
     schemaIndex = 5,
   )
-  public val tokens_count: Int = 0,
+  public val output_tokens: Int = 0,
   /**
-   * For COMPLETED — full response, usage stats, latency.
+   * For COMPLETED — full response.
    */
   @field:WireField(
     tag = 7,
@@ -114,260 +117,227 @@ public class GenerationEvent(
     schemaIndex = 6,
   )
   public val response: String = "",
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokensUsed",
-    schemaIndex = 7,
-  )
-  public val tokens_used: Int = 0,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "latencyMs",
-    schemaIndex = 8,
-  )
-  public val latency_ms: Long = 0L,
-  /**
-   * For FIRST_TOKEN_GENERATED — TTFT in ms (RN events.ts:76).
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "firstTokenLatencyMs",
-    schemaIndex = 9,
-  )
-  public val first_token_latency_ms: Long = 0L,
   /**
    * For FAILED.
    */
   @field:WireField(
-    tag = 11,
+    tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 10,
+    schemaIndex = 7,
   )
   public val error: String = "",
   /**
    * For MODEL_LOADED / MODEL_UNLOADED — bound model.
    */
   @field:WireField(
-    tag = 12,
+    tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 11,
+    schemaIndex = 8,
   )
   public val model_id: String = "",
   /**
-   * For COST_CALCULATED — RN events.ts:88, Dart SDKGenerationCostCalculated.
+   * For COST_CALCULATED — Dart SDKGenerationCostCalculated.
    */
   @field:WireField(
-    tag = 13,
+    tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "costAmount",
-    schemaIndex = 12,
+    schemaIndex = 9,
   )
   public val cost_amount: Double = 0.0,
   @field:WireField(
-    tag = 14,
+    tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "costSavedAmount",
-    schemaIndex = 13,
+    schemaIndex = 10,
   )
   public val cost_saved_amount: Double = 0.0,
   /**
-   * For ROUTING_DECISION — RN events.ts:89.
+   * For ROUTING_DECISION.
    */
   @field:WireField(
-    tag = 15,
+    tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "routingTarget",
-    schemaIndex = 14,
+    schemaIndex = 11,
   )
   public val routing_target: String = "",
   @field:WireField(
-    tag = 16,
+    tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "routingReason",
-    schemaIndex = 15,
+    schemaIndex = 12,
   )
   public val routing_reason: String = "",
   /**
    * For cancellation / tool / structured-output / thinking events.
    */
   @field:WireField(
-    tag = 17,
+    tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "cancelReason",
-    schemaIndex = 16,
+    schemaIndex = 13,
   )
   public val cancel_reason: String = "",
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "toolCallId",
+    schemaIndex = 14,
+  )
+  public val tool_call_id: String = "",
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "toolName",
+    schemaIndex = 15,
+  )
+  public val tool_name: String = "",
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "toolPayloadJson",
+    schemaIndex = 16,
+  )
+  public val tool_payload_json: String = "",
   @field:WireField(
     tag = 18,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "toolCallId",
+    jsonName = "structuredSchemaJson",
     schemaIndex = 17,
   )
-  public val tool_call_id: String = "",
+  public val structured_schema_json: String = "",
   @field:WireField(
     tag = 19,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "toolName",
+    jsonName = "structuredOutputJson",
     schemaIndex = 18,
   )
-  public val tool_name: String = "",
+  public val structured_output_json: String = "",
   @field:WireField(
     tag = 20,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "toolPayloadJson",
-    schemaIndex = 19,
-  )
-  public val tool_payload_json: String = "",
-  @field:WireField(
-    tag = 21,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "structuredSchemaJson",
-    schemaIndex = 20,
-  )
-  public val structured_schema_json: String = "",
-  @field:WireField(
-    tag = 22,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "structuredOutputJson",
-    schemaIndex = 21,
-  )
-  public val structured_output_json: String = "",
-  @field:WireField(
-    tag = 23,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "thinkingText",
-    schemaIndex = 22,
+    schemaIndex = 19,
   )
   public val thinking_text: String = "",
   /**
-   * For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-   * Enables totalTokens = input_tokens + tokens_used analytics
-   * from the event stream alone.
+   * Prompt-token count on COMPLETED. Total = input_tokens + output_tokens.
    */
   @field:WireField(
-    tag = 24,
+    tag = 21,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "inputTokens",
-    schemaIndex = 23,
+    schemaIndex = 20,
   )
   public val input_tokens: Int = 0,
   /**
    * Telemetry metrics carried on the canonical event stream so the C++
    * destination router can derive the full telemetry payload from the
-   * proto SDKEvent alone (no parallel struct path). `framework` is the
-   * InferenceFramework enum stored as int32 (matches FrameworkEvent.framework).
+   * proto SDKEvent alone (no parallel struct path).
    */
   @field:WireField(
-    tag = 25,
+    tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "tokensPerSecond",
-    schemaIndex = 24,
+    schemaIndex = 21,
   )
   public val tokens_per_second: Double = 0.0,
   /**
-   * completion TTFT (FIRST_TOKEN uses first_token_latency_ms)
+   * Time to first token, whichever kind reports it.
    */
   @field:WireField(
-    tag = 26,
+    tag = 23,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timeToFirstTokenMs",
-    schemaIndex = 25,
+    schemaIndex = 22,
   )
   public val time_to_first_token_ms: Long = 0L,
   @field:WireField(
-    tag = 27,
+    tag = 24,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isStreaming",
-    schemaIndex = 26,
+    schemaIndex = 23,
   )
   public val is_streaming: Boolean = false,
   @field:WireField(
-    tag = 28,
+    tag = 25,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 27,
+    schemaIndex = 24,
   )
   public val temperature: Float = 0f,
   @field:WireField(
-    tag = 29,
+    tag = 26,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "maxTokens",
-    schemaIndex = 28,
+    schemaIndex = 25,
   )
   public val max_tokens: Int = 0,
   @field:WireField(
-    tag = 30,
+    tag = 27,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "contextLength",
-    schemaIndex = 29,
+    schemaIndex = 26,
   )
   public val context_length: Int = 0,
   @field:WireField(
-    tag = 31,
+    tag = 28,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelName",
-    schemaIndex = 30,
+    schemaIndex = 27,
   )
   public val model_name: String = "",
   /**
-   * wall-clock generation duration
+   * Whole-generation wall clock.
    */
   @field:WireField(
-    tag = 32,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "durationMs",
-    schemaIndex = 31,
-  )
-  public val duration_ms: Double = 0.0,
-  /**
-   * InferenceFramework enum int
-   */
-  @field:WireField(
-    tag = 33,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 32,
-  )
-  public val framework: Int = 0,
-  /**
-   * prompt eval (prefill) duration
-   */
-  @field:WireField(
-    tag = 34,
+    tag = 29,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "promptEvalTimeMs",
-    schemaIndex = 33,
+    jsonName = "totalDurationMs",
+    schemaIndex = 28,
   )
-  public val prompt_eval_time_ms: Long = 0L,
+  public val total_duration_ms: Long = 0L,
+  @field:WireField(
+    tag = 30,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 29,
+  )
+  public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
+  /**
+   * Prefill (prompt eval) wall clock.
+   */
+  @field:WireField(
+    tag = 31,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "prefillDurationMs",
+    schemaIndex = 30,
+  )
+  public val prefill_duration_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<GenerationEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -385,11 +355,8 @@ public class GenerationEvent(
     if (prompt != other.prompt) return false
     if (token != other.token) return false
     if (streaming_text != other.streaming_text) return false
-    if (tokens_count != other.tokens_count) return false
+    if (output_tokens != other.output_tokens) return false
     if (response != other.response) return false
-    if (tokens_used != other.tokens_used) return false
-    if (latency_ms != other.latency_ms) return false
-    if (first_token_latency_ms != other.first_token_latency_ms) return false
     if (error != other.error) return false
     if (model_id != other.model_id) return false
     if (cost_amount != other.cost_amount) return false
@@ -411,9 +378,9 @@ public class GenerationEvent(
     if (max_tokens != other.max_tokens) return false
     if (context_length != other.context_length) return false
     if (model_name != other.model_name) return false
-    if (duration_ms != other.duration_ms) return false
+    if (total_duration_ms != other.total_duration_ms) return false
     if (framework != other.framework) return false
-    if (prompt_eval_time_ms != other.prompt_eval_time_ms) return false
+    if (prefill_duration_ms != other.prefill_duration_ms) return false
     return true
   }
 
@@ -426,11 +393,8 @@ public class GenerationEvent(
       result = result * 37 + prompt.hashCode()
       result = result * 37 + token.hashCode()
       result = result * 37 + streaming_text.hashCode()
-      result = result * 37 + tokens_count.hashCode()
+      result = result * 37 + output_tokens.hashCode()
       result = result * 37 + response.hashCode()
-      result = result * 37 + tokens_used.hashCode()
-      result = result * 37 + latency_ms.hashCode()
-      result = result * 37 + first_token_latency_ms.hashCode()
       result = result * 37 + error.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + cost_amount.hashCode()
@@ -452,9 +416,9 @@ public class GenerationEvent(
       result = result * 37 + max_tokens.hashCode()
       result = result * 37 + context_length.hashCode()
       result = result * 37 + model_name.hashCode()
-      result = result * 37 + duration_ms.hashCode()
+      result = result * 37 + total_duration_ms.hashCode()
       result = result * 37 + framework.hashCode()
-      result = result * 37 + prompt_eval_time_ms.hashCode()
+      result = result * 37 + prefill_duration_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -467,11 +431,8 @@ public class GenerationEvent(
     result += """prompt=${sanitize(prompt)}"""
     result += """token=${sanitize(token)}"""
     result += """streaming_text=${sanitize(streaming_text)}"""
-    result += """tokens_count=$tokens_count"""
+    result += """output_tokens=$output_tokens"""
     result += """response=${sanitize(response)}"""
-    result += """tokens_used=$tokens_used"""
-    result += """latency_ms=$latency_ms"""
-    result += """first_token_latency_ms=$first_token_latency_ms"""
     result += """error=${sanitize(error)}"""
     result += """model_id=${sanitize(model_id)}"""
     result += """cost_amount=$cost_amount"""
@@ -493,9 +454,9 @@ public class GenerationEvent(
     result += """max_tokens=$max_tokens"""
     result += """context_length=$context_length"""
     result += """model_name=${sanitize(model_name)}"""
-    result += """duration_ms=$duration_ms"""
+    result += """total_duration_ms=$total_duration_ms"""
     result += """framework=$framework"""
-    result += """prompt_eval_time_ms=$prompt_eval_time_ms"""
+    result += """prefill_duration_ms=$prefill_duration_ms"""
     return result.joinToString(prefix = "GenerationEvent{", separator = ", ", postfix = "}")
   }
 
@@ -505,11 +466,8 @@ public class GenerationEvent(
     prompt: String = this.prompt,
     token: String = this.token,
     streaming_text: String = this.streaming_text,
-    tokens_count: Int = this.tokens_count,
+    output_tokens: Int = this.output_tokens,
     response: String = this.response,
-    tokens_used: Int = this.tokens_used,
-    latency_ms: Long = this.latency_ms,
-    first_token_latency_ms: Long = this.first_token_latency_ms,
     error: String = this.error,
     model_id: String = this.model_id,
     cost_amount: Double = this.cost_amount,
@@ -531,11 +489,11 @@ public class GenerationEvent(
     max_tokens: Int = this.max_tokens,
     context_length: Int = this.context_length,
     model_name: String = this.model_name,
-    duration_ms: Double = this.duration_ms,
-    framework: Int = this.framework,
-    prompt_eval_time_ms: Long = this.prompt_eval_time_ms,
+    total_duration_ms: Long = this.total_duration_ms,
+    framework: InferenceFramework = this.framework,
+    prefill_duration_ms: Long = this.prefill_duration_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, tokens_count, response, tokens_used, latency_ms, first_token_latency_ms, error, model_id, cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, tokens_per_second, time_to_first_token_ms, is_streaming, temperature, max_tokens, context_length, model_name, duration_ms, framework, prompt_eval_time_ms, unknownFields)
+  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, output_tokens, response, error, model_id, cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, tokens_per_second, time_to_first_token_ms, is_streaming, temperature, max_tokens, context_length, model_name, total_duration_ms, framework, prefill_duration_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -564,92 +522,83 @@ public class GenerationEvent(
         if (value.streaming_text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.streaming_text)
         }
-        if (value.tokens_count != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.tokens_count)
+        if (value.output_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.output_tokens)
         }
         if (value.response != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.response)
         }
-        if (value.tokens_used != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.tokens_used)
-        }
-        if (value.latency_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.latency_ms)
-        }
-        if (value.first_token_latency_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(10, value.first_token_latency_ms)
-        }
         if (value.error != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.error)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error)
         }
         if (value.model_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.model_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.model_id)
         }
         if (!value.cost_amount.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(13, value.cost_amount)
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(10, value.cost_amount)
         }
         if (!value.cost_saved_amount.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(14, value.cost_saved_amount)
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(11, value.cost_saved_amount)
         }
         if (value.routing_target != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.routing_target)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.routing_target)
         }
         if (value.routing_reason != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.routing_reason)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.routing_reason)
         }
         if (value.cancel_reason != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.cancel_reason)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.cancel_reason)
         }
         if (value.tool_call_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.tool_call_id)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.tool_call_id)
         }
         if (value.tool_name != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.tool_name)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.tool_name)
         }
         if (value.tool_payload_json != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(20, value.tool_payload_json)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.tool_payload_json)
         }
         if (value.structured_schema_json != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(21, value.structured_schema_json)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.structured_schema_json)
         }
         if (value.structured_output_json != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(22, value.structured_output_json)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.structured_output_json)
         }
         if (value.thinking_text != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(23, value.thinking_text)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(20, value.thinking_text)
         }
         if (value.input_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(24, value.input_tokens)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(21, value.input_tokens)
         }
         if (!value.tokens_per_second.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(25, value.tokens_per_second)
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(22, value.tokens_per_second)
         }
         if (value.time_to_first_token_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(26, value.time_to_first_token_ms)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(23, value.time_to_first_token_ms)
         }
         if (value.is_streaming != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(27, value.is_streaming)
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(24, value.is_streaming)
         }
         if (!value.temperature.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(28, value.temperature)
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(25, value.temperature)
         }
         if (value.max_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(29, value.max_tokens)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(26, value.max_tokens)
         }
         if (value.context_length != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(30, value.context_length)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(27, value.context_length)
         }
         if (value.model_name != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(31, value.model_name)
+          size += ProtoAdapter.STRING.encodedSizeWithTag(28, value.model_name)
         }
-        if (!value.duration_ms.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(32, value.duration_ms)
+        if (value.total_duration_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(29, value.total_duration_ms)
         }
-        if (value.framework != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(33, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          size += InferenceFramework.ADAPTER.encodedSizeWithTag(30, value.framework)
         }
-        if (value.prompt_eval_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(34, value.prompt_eval_time_ms)
+        if (value.prefill_duration_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(31, value.prefill_duration_ms)
         }
         return size
       }
@@ -670,184 +619,166 @@ public class GenerationEvent(
         if (value.streaming_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.streaming_text)
         }
-        if (value.tokens_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.tokens_count)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.output_tokens)
         }
         if (value.response != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 7, value.response)
         }
-        if (value.tokens_used != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.tokens_used)
-        }
-        if (value.latency_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.latency_ms)
-        }
-        if (value.first_token_latency_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.first_token_latency_ms)
-        }
         if (value.error != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error)
+          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error)
         }
         if (value.model_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.model_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.model_id)
         }
         if (!value.cost_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 13, value.cost_amount)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.cost_amount)
         }
         if (!value.cost_saved_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 14, value.cost_saved_amount)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.cost_saved_amount)
         }
         if (value.routing_target != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 15, value.routing_target)
+          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.routing_target)
         }
         if (value.routing_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 16, value.routing_reason)
+          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.routing_reason)
         }
         if (value.cancel_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 17, value.cancel_reason)
+          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.cancel_reason)
         }
         if (value.tool_call_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 18, value.tool_call_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 15, value.tool_call_id)
         }
         if (value.tool_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.tool_name)
+          ProtoAdapter.STRING.encodeWithTag(writer, 16, value.tool_name)
         }
         if (value.tool_payload_json != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.tool_payload_json)
+          ProtoAdapter.STRING.encodeWithTag(writer, 17, value.tool_payload_json)
         }
         if (value.structured_schema_json != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 21, value.structured_schema_json)
+          ProtoAdapter.STRING.encodeWithTag(writer, 18, value.structured_schema_json)
         }
         if (value.structured_output_json != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 22, value.structured_output_json)
+          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.structured_output_json)
         }
         if (value.thinking_text != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 23, value.thinking_text)
+          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.thinking_text)
         }
         if (value.input_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 24, value.input_tokens)
+          ProtoAdapter.INT32.encodeWithTag(writer, 21, value.input_tokens)
         }
         if (!value.tokens_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 25, value.tokens_per_second)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 22, value.tokens_per_second)
         }
         if (value.time_to_first_token_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 26, value.time_to_first_token_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 23, value.time_to_first_token_ms)
         }
         if (value.is_streaming != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 27, value.is_streaming)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 24, value.is_streaming)
         }
         if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 28, value.temperature)
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 25, value.temperature)
         }
         if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 29, value.max_tokens)
+          ProtoAdapter.INT32.encodeWithTag(writer, 26, value.max_tokens)
         }
         if (value.context_length != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 30, value.context_length)
+          ProtoAdapter.INT32.encodeWithTag(writer, 27, value.context_length)
         }
         if (value.model_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 31, value.model_name)
+          ProtoAdapter.STRING.encodeWithTag(writer, 28, value.model_name)
         }
-        if (!value.duration_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 32, value.duration_ms)
+        if (value.total_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 29, value.total_duration_ms)
         }
-        if (value.framework != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 33, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 30, value.framework)
         }
-        if (value.prompt_eval_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 34, value.prompt_eval_time_ms)
+        if (value.prefill_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 31, value.prefill_duration_ms)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: GenerationEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.prompt_eval_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 34, value.prompt_eval_time_ms)
+        if (value.prefill_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 31, value.prefill_duration_ms)
         }
-        if (value.framework != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 33, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 30, value.framework)
         }
-        if (!value.duration_ms.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 32, value.duration_ms)
+        if (value.total_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 29, value.total_duration_ms)
         }
         if (value.model_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 31, value.model_name)
+          ProtoAdapter.STRING.encodeWithTag(writer, 28, value.model_name)
         }
         if (value.context_length != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 30, value.context_length)
+          ProtoAdapter.INT32.encodeWithTag(writer, 27, value.context_length)
         }
         if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 29, value.max_tokens)
+          ProtoAdapter.INT32.encodeWithTag(writer, 26, value.max_tokens)
         }
         if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 28, value.temperature)
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 25, value.temperature)
         }
         if (value.is_streaming != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 27, value.is_streaming)
+          ProtoAdapter.BOOL.encodeWithTag(writer, 24, value.is_streaming)
         }
         if (value.time_to_first_token_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 26, value.time_to_first_token_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 23, value.time_to_first_token_ms)
         }
         if (!value.tokens_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 25, value.tokens_per_second)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 22, value.tokens_per_second)
         }
         if (value.input_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 24, value.input_tokens)
+          ProtoAdapter.INT32.encodeWithTag(writer, 21, value.input_tokens)
         }
         if (value.thinking_text != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 23, value.thinking_text)
+          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.thinking_text)
         }
         if (value.structured_output_json != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 22, value.structured_output_json)
+          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.structured_output_json)
         }
         if (value.structured_schema_json != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 21, value.structured_schema_json)
+          ProtoAdapter.STRING.encodeWithTag(writer, 18, value.structured_schema_json)
         }
         if (value.tool_payload_json != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.tool_payload_json)
+          ProtoAdapter.STRING.encodeWithTag(writer, 17, value.tool_payload_json)
         }
         if (value.tool_name != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.tool_name)
+          ProtoAdapter.STRING.encodeWithTag(writer, 16, value.tool_name)
         }
         if (value.tool_call_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 18, value.tool_call_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 15, value.tool_call_id)
         }
         if (value.cancel_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 17, value.cancel_reason)
+          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.cancel_reason)
         }
         if (value.routing_reason != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 16, value.routing_reason)
+          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.routing_reason)
         }
         if (value.routing_target != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 15, value.routing_target)
+          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.routing_target)
         }
         if (!value.cost_saved_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 14, value.cost_saved_amount)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 11, value.cost_saved_amount)
         }
         if (!value.cost_amount.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 13, value.cost_amount)
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 10, value.cost_amount)
         }
         if (value.model_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.model_id)
+          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.model_id)
         }
         if (value.error != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error)
-        }
-        if (value.first_token_latency_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.first_token_latency_ms)
-        }
-        if (value.latency_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 9, value.latency_ms)
-        }
-        if (value.tokens_used != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.tokens_used)
+          ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error)
         }
         if (value.response != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 7, value.response)
         }
-        if (value.tokens_count != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.tokens_count)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.output_tokens)
         }
         if (value.streaming_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.streaming_text)
@@ -872,11 +803,8 @@ public class GenerationEvent(
         var prompt: String = ""
         var token: String = ""
         var streaming_text: String = ""
-        var tokens_count: Int = 0
+        var output_tokens: Int = 0
         var response: String = ""
-        var tokens_used: Int = 0
-        var latency_ms: Long = 0L
-        var first_token_latency_ms: Long = 0L
         var error: String = ""
         var model_id: String = ""
         var cost_amount: Double = 0.0
@@ -898,9 +826,9 @@ public class GenerationEvent(
         var max_tokens: Int = 0
         var context_length: Int = 0
         var model_name: String = ""
-        var duration_ms: Double = 0.0
-        var framework: Int = 0
-        var prompt_eval_time_ms: Long = 0L
+        var total_duration_ms: Long = 0L
+        var framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
+        var prefill_duration_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -912,35 +840,36 @@ public class GenerationEvent(
             3 -> prompt = ProtoAdapter.STRING.decode(reader)
             4 -> token = ProtoAdapter.STRING.decode(reader)
             5 -> streaming_text = ProtoAdapter.STRING.decode(reader)
-            6 -> tokens_count = ProtoAdapter.INT32.decode(reader)
+            6 -> output_tokens = ProtoAdapter.INT32.decode(reader)
             7 -> response = ProtoAdapter.STRING.decode(reader)
-            8 -> tokens_used = ProtoAdapter.INT32.decode(reader)
-            9 -> latency_ms = ProtoAdapter.INT64.decode(reader)
-            10 -> first_token_latency_ms = ProtoAdapter.INT64.decode(reader)
-            11 -> error = ProtoAdapter.STRING.decode(reader)
-            12 -> model_id = ProtoAdapter.STRING.decode(reader)
-            13 -> cost_amount = ProtoAdapter.DOUBLE.decode(reader)
-            14 -> cost_saved_amount = ProtoAdapter.DOUBLE.decode(reader)
-            15 -> routing_target = ProtoAdapter.STRING.decode(reader)
-            16 -> routing_reason = ProtoAdapter.STRING.decode(reader)
-            17 -> cancel_reason = ProtoAdapter.STRING.decode(reader)
-            18 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
-            19 -> tool_name = ProtoAdapter.STRING.decode(reader)
-            20 -> tool_payload_json = ProtoAdapter.STRING.decode(reader)
-            21 -> structured_schema_json = ProtoAdapter.STRING.decode(reader)
-            22 -> structured_output_json = ProtoAdapter.STRING.decode(reader)
-            23 -> thinking_text = ProtoAdapter.STRING.decode(reader)
-            24 -> input_tokens = ProtoAdapter.INT32.decode(reader)
-            25 -> tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
-            26 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
-            27 -> is_streaming = ProtoAdapter.BOOL.decode(reader)
-            28 -> temperature = ProtoAdapter.FLOAT.decode(reader)
-            29 -> max_tokens = ProtoAdapter.INT32.decode(reader)
-            30 -> context_length = ProtoAdapter.INT32.decode(reader)
-            31 -> model_name = ProtoAdapter.STRING.decode(reader)
-            32 -> duration_ms = ProtoAdapter.DOUBLE.decode(reader)
-            33 -> framework = ProtoAdapter.INT32.decode(reader)
-            34 -> prompt_eval_time_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> error = ProtoAdapter.STRING.decode(reader)
+            9 -> model_id = ProtoAdapter.STRING.decode(reader)
+            10 -> cost_amount = ProtoAdapter.DOUBLE.decode(reader)
+            11 -> cost_saved_amount = ProtoAdapter.DOUBLE.decode(reader)
+            12 -> routing_target = ProtoAdapter.STRING.decode(reader)
+            13 -> routing_reason = ProtoAdapter.STRING.decode(reader)
+            14 -> cancel_reason = ProtoAdapter.STRING.decode(reader)
+            15 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
+            16 -> tool_name = ProtoAdapter.STRING.decode(reader)
+            17 -> tool_payload_json = ProtoAdapter.STRING.decode(reader)
+            18 -> structured_schema_json = ProtoAdapter.STRING.decode(reader)
+            19 -> structured_output_json = ProtoAdapter.STRING.decode(reader)
+            20 -> thinking_text = ProtoAdapter.STRING.decode(reader)
+            21 -> input_tokens = ProtoAdapter.INT32.decode(reader)
+            22 -> tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
+            23 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
+            24 -> is_streaming = ProtoAdapter.BOOL.decode(reader)
+            25 -> temperature = ProtoAdapter.FLOAT.decode(reader)
+            26 -> max_tokens = ProtoAdapter.INT32.decode(reader)
+            27 -> context_length = ProtoAdapter.INT32.decode(reader)
+            28 -> model_name = ProtoAdapter.STRING.decode(reader)
+            29 -> total_duration_ms = ProtoAdapter.INT64.decode(reader)
+            30 -> try {
+              framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            31 -> prefill_duration_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -950,11 +879,8 @@ public class GenerationEvent(
           prompt = prompt,
           token = token,
           streaming_text = streaming_text,
-          tokens_count = tokens_count,
+          output_tokens = output_tokens,
           response = response,
-          tokens_used = tokens_used,
-          latency_ms = latency_ms,
-          first_token_latency_ms = first_token_latency_ms,
           error = error,
           model_id = model_id,
           cost_amount = cost_amount,
@@ -976,9 +902,9 @@ public class GenerationEvent(
           max_tokens = max_tokens,
           context_length = context_length,
           model_name = model_name,
-          duration_ms = duration_ms,
+          total_duration_ms = total_duration_ms,
           framework = framework,
-          prompt_eval_time_ms = prompt_eval_time_ms,
+          prefill_duration_ms = prefill_duration_ms,
           unknownFields = unknownFields
         )
       }

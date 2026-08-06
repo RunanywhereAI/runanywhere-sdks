@@ -18,37 +18,25 @@ class RAGStreamEventKind extends $pb.ProtobufEnum {
   static const RAGStreamEventKind RAG_STREAM_EVENT_KIND_UNSPECIFIED =
       RAGStreamEventKind._(
           0, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_UNSPECIFIED');
-  static const RAGStreamEventKind RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED =
-      RAGStreamEventKind._(
-          1, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED');
-  static const RAGStreamEventKind RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED =
-      RAGStreamEventKind._(
-          2, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED');
-  static const RAGStreamEventKind RAG_STREAM_EVENT_KIND_CONTEXT_READY =
-      RAGStreamEventKind._(
-          3, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_CONTEXT_READY');
   static const RAGStreamEventKind RAG_STREAM_EVENT_KIND_TOKEN =
       RAGStreamEventKind._(
-          4, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_TOKEN');
+          1, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_TOKEN');
   static const RAGStreamEventKind RAG_STREAM_EVENT_KIND_COMPLETED =
       RAGStreamEventKind._(
-          5, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_COMPLETED');
+          2, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_COMPLETED');
   static const RAGStreamEventKind RAG_STREAM_EVENT_KIND_ERROR =
       RAGStreamEventKind._(
-          6, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_ERROR');
+          3, _omitEnumNames ? '' : 'RAG_STREAM_EVENT_KIND_ERROR');
 
   static const $core.List<RAGStreamEventKind> values = <RAGStreamEventKind>[
     RAG_STREAM_EVENT_KIND_UNSPECIFIED,
-    RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED,
-    RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED,
-    RAG_STREAM_EVENT_KIND_CONTEXT_READY,
     RAG_STREAM_EVENT_KIND_TOKEN,
     RAG_STREAM_EVENT_KIND_COMPLETED,
     RAG_STREAM_EVENT_KIND_ERROR,
   ];
 
   static final $core.List<RAGStreamEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static RAGStreamEventKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

@@ -73,13 +73,6 @@ public class TimeSeriesConfig(
     schemaIndex = 4,
   )
   public val anomaly_threshold: Float = 0f,
-  @field:WireField(
-    tag = 6,
-    adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",
-    jsonName = "typeKind",
-    schemaIndex = 5,
-  )
-  public val type_kind: SolutionType? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TimeSeriesConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -97,7 +90,6 @@ public class TimeSeriesConfig(
     if (window_size != other.window_size) return false
     if (stride != other.stride) return false
     if (anomaly_threshold != other.anomaly_threshold) return false
-    if (type_kind != other.type_kind) return false
     return true
   }
 
@@ -110,7 +102,6 @@ public class TimeSeriesConfig(
       result = result * 37 + window_size.hashCode()
       result = result * 37 + stride.hashCode()
       result = result * 37 + anomaly_threshold.hashCode()
-      result = result * 37 + (type_kind?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -123,7 +114,6 @@ public class TimeSeriesConfig(
     result += """window_size=$window_size"""
     result += """stride=$stride"""
     result += """anomaly_threshold=$anomaly_threshold"""
-    if (type_kind != null) result += """type_kind=$type_kind"""
     return result.joinToString(prefix = "TimeSeriesConfig{", separator = ", ", postfix = "}")
   }
 
@@ -133,9 +123,8 @@ public class TimeSeriesConfig(
     window_size: Int = this.window_size,
     stride: Int = this.stride,
     anomaly_threshold: Float = this.anomaly_threshold,
-    type_kind: SolutionType? = this.type_kind,
     unknownFields: ByteString = this.unknownFields,
-  ): TimeSeriesConfig = TimeSeriesConfig(anomaly_model_id, llm_model_id, window_size, stride, anomaly_threshold, type_kind, unknownFields)
+  ): TimeSeriesConfig = TimeSeriesConfig(anomaly_model_id, llm_model_id, window_size, stride, anomaly_threshold, unknownFields)
 
   public companion object {
     @JvmField
@@ -164,7 +153,6 @@ public class TimeSeriesConfig(
         if (!value.anomaly_threshold.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.anomaly_threshold)
         }
-        size += SolutionType.ADAPTER.encodedSizeWithTag(6, value.type_kind)
         return size
       }
 
@@ -184,13 +172,11 @@ public class TimeSeriesConfig(
         if (!value.anomaly_threshold.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.anomaly_threshold)
         }
-        SolutionType.ADAPTER.encodeWithTag(writer, 6, value.type_kind)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TimeSeriesConfig) {
         writer.writeBytes(value.unknownFields)
-        SolutionType.ADAPTER.encodeWithTag(writer, 6, value.type_kind)
         if (!value.anomaly_threshold.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.anomaly_threshold)
         }
@@ -214,7 +200,6 @@ public class TimeSeriesConfig(
         var window_size: Int = 0
         var stride: Int = 0
         var anomaly_threshold: Float = 0f
-        var type_kind: SolutionType? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> anomaly_model_id = ProtoAdapter.STRING.decode(reader)
@@ -222,11 +207,6 @@ public class TimeSeriesConfig(
             3 -> window_size = ProtoAdapter.INT32.decode(reader)
             4 -> stride = ProtoAdapter.INT32.decode(reader)
             5 -> anomaly_threshold = ProtoAdapter.FLOAT.decode(reader)
-            6 -> try {
-              type_kind = SolutionType.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -236,7 +216,6 @@ public class TimeSeriesConfig(
           window_size = window_size,
           stride = stride,
           anomaly_threshold = anomaly_threshold,
-          type_kind = type_kind,
           unknownFields = unknownFields
         )
       }

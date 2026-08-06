@@ -24,7 +24,9 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
 
 /// One token-accounting shape embedded by every result and metrics message,
 /// replacing the input/output/total/throughput quadruple that was copied inline
-/// across LLM, VLM, and RAG results. Names follow the OpenAI Responses API.
+/// across LLM, VLM, and RAG results. Names follow the OpenAI Responses API; the
+/// timing fields follow llama.cpp's `timings` object, which names the phase it
+/// measures.
 public nonisolated struct RATokenUsage: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -36,7 +38,20 @@ public nonisolated struct RATokenUsage: Sendable {
 
   public var totalTokens: Int32 = 0
 
-  public var tokensPerSecond: Double = 0
+  /// Decode-phase throughput only: output_tokens / decode_ms. Excludes
+  /// prefill. cf. llama.cpp timings.predicted_per_second.
+  public var decodeTokensPerSecond: Double = 0
+
+  /// Prefill (prompt eval) wall time. cf. llama.cpp timings.prompt_ms,
+  /// Ollama prompt_eval_duration. 0 when the backend does not report it.
+  public var prefillMs: Int64 = 0
+
+  /// Request start to first output token. The canonical spelling for every
+  /// result type: LLMGenerationResult, LLMStreamFinalResult and VLMResult all
+  /// report TTFT here and nowhere else. SDKEvent's own telemetry fields
+  /// (GenerationEvent.time_to_first_token_ms, first_token_latency_ms) keep
+  /// their separate event-stream spelling.
+  public var ttftMs: Int64 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -49,7 +64,7 @@ fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RATokenUsage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TokenUsage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}input_tokens\0\u{3}output_tokens\0\u{3}total_tokens\0\u{3}tokens_per_second\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}input_tokens\0\u{3}output_tokens\0\u{3}total_tokens\0\u{3}decode_tokens_per_second\0\u{3}prefill_ms\0\u{3}ttft_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -60,7 +75,9 @@ nonisolated extension RATokenUsage: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 1: try { try decoder.decodeSingularInt32Field(value: &self.inputTokens) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.outputTokens) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.totalTokens) }()
-      case 4: try { try decoder.decodeSingularDoubleField(value: &self.tokensPerSecond) }()
+      case 4: try { try decoder.decodeSingularDoubleField(value: &self.decodeTokensPerSecond) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.prefillMs) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.ttftMs) }()
       default: break
       }
     }
@@ -76,8 +93,14 @@ nonisolated extension RATokenUsage: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.totalTokens != 0 {
       try visitor.visitSingularInt32Field(value: self.totalTokens, fieldNumber: 3)
     }
-    if self.tokensPerSecond.bitPattern != 0 {
-      try visitor.visitSingularDoubleField(value: self.tokensPerSecond, fieldNumber: 4)
+    if self.decodeTokensPerSecond.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.decodeTokensPerSecond, fieldNumber: 4)
+    }
+    if self.prefillMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.prefillMs, fieldNumber: 5)
+    }
+    if self.ttftMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.ttftMs, fieldNumber: 6)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -86,7 +109,9 @@ nonisolated extension RATokenUsage: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs.inputTokens != rhs.inputTokens {return false}
     if lhs.outputTokens != rhs.outputTokens {return false}
     if lhs.totalTokens != rhs.totalTokens {return false}
-    if lhs.tokensPerSecond != rhs.tokensPerSecond {return false}
+    if lhs.decodeTokensPerSecond != rhs.decodeTokensPerSecond {return false}
+    if lhs.prefillMs != rhs.prefillMs {return false}
+    if lhs.ttftMs != rhs.ttftMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

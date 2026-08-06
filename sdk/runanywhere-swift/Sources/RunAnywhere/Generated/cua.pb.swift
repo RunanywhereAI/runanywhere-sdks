@@ -140,6 +140,24 @@ public nonisolated enum RACuaActionType: SwiftProtobuf.Enum, Swift.CaseIterable 
 /// TYPE->text, VISIT_URL->url, WEB_SEARCH->query, TERMINATE->answer,
 /// ASK_USER/READ_PAGE_ANSWER->question, PAUSE_MEMORIZE->fact, KEY->space-joined
 /// keys. `reasoning` holds any chain-of-thought preceding the tool_call.
+///
+/// COORDINATE CONTRACT: x/y are integers in the SAME pixel space as the
+/// viewport you passed to parse_action, origin at the TOP-LEFT. That viewport
+/// must be the pixel dimensions of the exact image you handed to the VLM — if
+/// you downscaled the screenshot before sending it, pass the downscaled
+/// dimensions. On a DPR-2/3/4 display, passing logical points while sending a
+/// physical-pixel screenshot offsets every click by that factor, silently (see
+/// examples/ios/.../ComputerUseAgentViewModel.swift for the correct
+/// computation). parse_action has already rescaled out of the profile's own
+/// space (1000x1000 for `fara`), so no further scaling is ever correct.
+///
+/// LEFT_CLICK_DRAG: x/y are the drag DESTINATION only. Fara emits no origin (it
+/// drags from the current cursor), and a touch screen has no cursor, so the
+/// HOST must supply the press point — typically the last MOUSE_MOVE target.
+///
+/// LENGTH: `text` and `reasoning` are TRUNCATED at 2047 bytes on a UTF-8 lead
+/// byte by the fixed C buffers behind them (rac_cua_action_t.text[2048]); no
+/// field records that truncation happened. This also caps a TERMINATE answer.
 public nonisolated struct RACuaAction: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -147,18 +165,38 @@ public nonisolated struct RACuaAction: Sendable {
 
   public var type: RACuaActionType = .unspecified
 
-  /// true if x/y are valid
-  public var coordinateValid: Bool = false
+  /// viewport pixels from the LEFT edge; presence = "has a coordinate"
+  public var x: Int32 {
+    get {_x ?? 0}
+    set {_x = newValue}
+  }
+  /// Returns true if `x` has been explicitly set.
+  public var hasX: Bool {self._x != nil}
+  /// Clears the value of `x`. Subsequent reads from it will return its default value.
+  public mutating func clearX() {self._x = nil}
 
-  /// viewport-scaled pixels
-  public var x: Int32 = 0
+  /// viewport pixels from the TOP edge
+  public var y: Int32 {
+    get {_y ?? 0}
+    set {_y = newValue}
+  }
+  /// Returns true if `y` has been explicitly set.
+  public var hasY: Bool {self._y != nil}
+  /// Clears the value of `y`. Subsequent reads from it will return its default value.
+  public mutating func clearY() {self._y = nil}
 
-  public var y: Int32 = 0
+  /// HSCROLL/SCROLL axis split. Value is the model's raw `pixels` output,
+  /// copied verbatim per axis — the sign is UNVERIFIED against any real
+  /// device trace, so no direction convention is asserted here.
+  public var scrollX: Int32 = 0
 
-  /// SCROLL/HSCROLL: +up / -down
-  public var scrollPixels: Int32 = 0
+  /// SCROLL
+  public var scrollY: Int32 = 0
 
-  /// WAIT
+  /// WAIT: fractional seconds. Clamped by commons to [0, 100] because the
+  /// value comes from untrusted model output; an unbounded parse would wedge
+  /// the agent loop. 100s is a RunAnywhere-chosen ceiling, not inherited from
+  /// any vendor API.
   public var waitSeconds: Double = 0
 
   /// primary string arg (see above)
@@ -168,11 +206,14 @@ public nonisolated struct RACuaAction: Sendable {
   public var reasoning: String = String()
 
   /// true if a valid tool_call was found
-  public var parseOk: Bool = false
+  public var isValid: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _x: Int32? = nil
+  fileprivate var _y: Int32? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -185,7 +226,7 @@ nonisolated extension RACuaActionType: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RACuaAction: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CuaAction"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{3}coordinate_valid\0\u{1}x\0\u{1}y\0\u{3}scroll_pixels\0\u{3}wait_seconds\0\u{1}text\0\u{1}reasoning\0\u{3}parse_ok\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}x\0\u{1}y\0\u{3}scroll_x\0\u{3}scroll_y\0\u{3}wait_seconds\0\u{1}text\0\u{1}reasoning\0\u{3}is_valid\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -194,34 +235,38 @@ nonisolated extension RACuaAction: SwiftProtobuf.Message, SwiftProtobuf._Message
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.coordinateValid) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.x) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.y) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.scrollPixels) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self._x) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self._y) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.scrollX) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.scrollY) }()
       case 6: try { try decoder.decodeSingularDoubleField(value: &self.waitSeconds) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self.text) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self.reasoning) }()
-      case 9: try { try decoder.decodeSingularBoolField(value: &self.parseOk) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.isValid) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if self.type != .unspecified {
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
-    if self.coordinateValid != false {
-      try visitor.visitSingularBoolField(value: self.coordinateValid, fieldNumber: 2)
+    try { if let v = self._x {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._y {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
+    } }()
+    if self.scrollX != 0 {
+      try visitor.visitSingularInt32Field(value: self.scrollX, fieldNumber: 4)
     }
-    if self.x != 0 {
-      try visitor.visitSingularInt32Field(value: self.x, fieldNumber: 3)
-    }
-    if self.y != 0 {
-      try visitor.visitSingularInt32Field(value: self.y, fieldNumber: 4)
-    }
-    if self.scrollPixels != 0 {
-      try visitor.visitSingularInt32Field(value: self.scrollPixels, fieldNumber: 5)
+    if self.scrollY != 0 {
+      try visitor.visitSingularInt32Field(value: self.scrollY, fieldNumber: 5)
     }
     if self.waitSeconds.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.waitSeconds, fieldNumber: 6)
@@ -232,22 +277,22 @@ nonisolated extension RACuaAction: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.reasoning.isEmpty {
       try visitor.visitSingularStringField(value: self.reasoning, fieldNumber: 8)
     }
-    if self.parseOk != false {
-      try visitor.visitSingularBoolField(value: self.parseOk, fieldNumber: 9)
+    if self.isValid != false {
+      try visitor.visitSingularBoolField(value: self.isValid, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RACuaAction, rhs: RACuaAction) -> Bool {
     if lhs.type != rhs.type {return false}
-    if lhs.coordinateValid != rhs.coordinateValid {return false}
-    if lhs.x != rhs.x {return false}
-    if lhs.y != rhs.y {return false}
-    if lhs.scrollPixels != rhs.scrollPixels {return false}
+    if lhs._x != rhs._x {return false}
+    if lhs._y != rhs._y {return false}
+    if lhs.scrollX != rhs.scrollX {return false}
+    if lhs.scrollY != rhs.scrollY {return false}
     if lhs.waitSeconds != rhs.waitSeconds {return false}
     if lhs.text != rhs.text {return false}
     if lhs.reasoning != rhs.reasoning {return false}
-    if lhs.parseOk != rhs.parseOk {return false}
+    if lhs.isValid != rhs.isValid {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
