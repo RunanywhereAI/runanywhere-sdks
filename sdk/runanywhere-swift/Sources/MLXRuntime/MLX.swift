@@ -1403,7 +1403,7 @@ private func generateParameters(from options: MLXVLMOptionsSnapshot) -> Generate
     // RAC_VLM_OPTIONS_DEFAULT.
     let repetitionPenalty = options.repetitionPenalty > 0.0
         ? options.repetitionPenalty
-        : RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY
+        : RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPEAT_PENALTY
     return GenerateParameters(
         maxTokens: options.maxTokens > 0 ? Int(options.maxTokens) : nil,
         temperature: options.temperature,
