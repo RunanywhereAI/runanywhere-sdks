@@ -127,13 +127,17 @@ class TtsApi {
 
   /// Voices the loaded model offers.
   ///
+  /// `TTSServiceState.voices` was deleted outright
+  /// (idl/tts_options.proto: "use the list-voices verb") — this now calls
+  /// the dedicated `rac_tts_component_list_voices_proto` ABI directly.
+  ///
   /// Throws [SDKException] when the SDK is not initialized.
   Future<List<Voice>> voices() async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final state = DartBridgeTTS.shared.stateLifecycleProto();
-    return List<Voice>.unmodifiable(state.voices.map(Voice.fromProto));
+    final voices = await DartBridgeTTS.shared.listVoicesProto();
+    return List<Voice>.unmodifiable(voices.map(Voice.fromProto));
   }
 
   Future<TTSSynthesisRequest> _request(
@@ -145,10 +149,12 @@ class TtsApi {
     if (voiceModelId == null) {
       throw SDKException.componentNotReady('TTS');
     }
+    // `metadata` was deleted outright from `TTSSynthesisRequest`
+    // (idl/tts_options.proto) — the lifecycle-owned ABI resolves the voice
+    // internally.
     return TTSSynthesisRequest(
       text: text,
       options: (options ?? TtsOptions()).toProto(),
-      metadata: <String, String>{'voice_id': voiceModelId}.entries,
     );
   }
 }

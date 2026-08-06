@@ -33,7 +33,6 @@ import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/diffusion_options.pb.dart'
     show
-        DiffusionConfiguration,
         DiffusionGenerationOptions,
         DiffusionGenerationRequest,
         DiffusionResult,
@@ -89,7 +88,10 @@ class RunAnywhereDiffusion {
   ///
   /// Reuses the canonical `RunAnywhere.loadModel` path with the image-generation
   /// component, exactly like every other modality (VLM/embeddings/…).
-  Future<void> load(String modelId, [DiffusionConfiguration? config]) async {
+  ///
+  /// `DiffusionConfiguration` was deleted outright (idl/diffusion_options.proto)
+  /// — there is no load-time configuration message left to accept.
+  Future<void> load(String modelId) async {
     _ensureInitialized();
     _ensureApplePlatform();
 
@@ -219,10 +221,12 @@ class RunAnywhereDiffusion {
     DiffusionGenerationOptions options,
     String modelId,
   ) {
+    // `request_id`/`metadata` were deleted outright
+    // (idl/diffusion_options.proto) — `options`/`model_id` are the only
+    // fields left.
     return DiffusionGenerationRequest(
       modelId: modelId,
       options: options,
-      metadata: <String, String>{'model_id': modelId}.entries,
     );
   }
 

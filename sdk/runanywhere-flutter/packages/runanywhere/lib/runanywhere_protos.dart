@@ -43,8 +43,6 @@ export 'generated/rac_options.pb.dart';
 export 'generated/rac_options.pbenum.dart';
 export 'generated/rag.pb.dart';
 export 'generated/rag.pbenum.dart';
-export 'generated/router.pb.dart';
-export 'generated/router.pbenum.dart';
 export 'generated/sdk_events.pb.dart';
 export 'generated/sdk_events.pbenum.dart';
 export 'generated/sdk_init.pb.dart';

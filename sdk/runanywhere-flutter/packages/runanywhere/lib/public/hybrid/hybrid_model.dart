@@ -10,9 +10,6 @@
 // per-provider Dart class. The generic cloud backend ("cloud") selects the
 // concrete HTTP provider (Sarvam first) from this string.
 
-import 'package:runanywhere/generated/hybrid_router.pbenum.dart'
-    show HybridBackendKind;
-
 /// Default cloud STT provider when a caller omits one. Carried into the
 /// descriptor's `provider` field + the create config so the cloud engine
 /// selects the right HTTP backend.
@@ -89,24 +86,28 @@ class HybridModel {
       );
 }
 
-/// Backend identity for a hybrid candidate. Wire values match
-/// `HybridBackendKind` in hybrid_router.proto / `rac_hybrid_backend_kind_t`.
-/// Carries the engine name `rac_plugin_find_for_engine` pins on for service
-/// creation.
+/// Backend identity for a hybrid candidate.
+///
+/// `HybridBackendKind` was deleted outright (idl/hybrid_router.proto): the
+/// offline/online pair was replaced by `HybridRoutingPolicy.models`, an
+/// ordered `repeated HybridModelDescriptor`, each candidate identified by a
+/// plain `engine` string (`rac_plugin_find_for_engine`'s registry key)
+/// rather than a closed wire enum — "sherpa", "llamacpp", "onnx", "qhexrt",
+/// "mlx", "cloud", or any name passed to `registerCloudProvider()". This
+/// enum keeps the same Dart-side identity shape; [engineHint] is now the
+/// only wire value, carried directly into `HybridModelDescriptor.engine`.
 enum HybridBackend {
   /// On-device speech (sherpa-onnx Whisper / Zipformer / Paraformer).
-  sherpa(HybridBackendKind.HYBRID_BACKEND_SHERPA, 'sherpa'),
+  sherpa('sherpa'),
 
   /// Generic cloud speech (the "cloud" engine). The concrete HTTP provider
   /// (Sarvam first) is carried in the descriptor's `provider` field.
-  cloud(HybridBackendKind.HYBRID_BACKEND_CLOUD, 'cloud');
+  cloud('cloud');
 
-  const HybridBackend(this.proto, this.engineHint);
+  const HybridBackend(this.engineHint);
 
-  /// The generated proto enum this maps to on the wire.
-  final HybridBackendKind proto;
-
-  /// The plugin name `rac_plugin_find_for_engine` hard-pins for this backend.
+  /// The plugin-registry engine name carried into
+  /// `HybridModelDescriptor.engine`.
   final String engineHint;
 }
 

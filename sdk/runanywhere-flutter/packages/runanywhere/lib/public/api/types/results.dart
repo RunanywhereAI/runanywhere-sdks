@@ -10,6 +10,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
@@ -18,8 +19,9 @@ import 'package:runanywhere/generated/diffusion_options.pb.dart' as diff_pb;
 import 'package:runanywhere/generated/embeddings_options.pb.dart' as embed_pb;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationResult;
-import 'package:runanywhere/generated/llm_service.pb.dart'
-    show LLMStreamFinalResult;
+import 'package:runanywhere/generated/llm_options.pbenum.dart'
+    as llm_enum
+    show FinishReason;
 import 'package:runanywhere/generated/lora_options.pb.dart' as lora_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
@@ -54,7 +56,36 @@ enum FinishReason {
   cancelled,
 }
 
-FinishReason _finishReason(String wire, {bool hasToolCalls = false}) {
+/// Maps the generated `FinishReason` enum (llm_options.proto) onto the
+/// public v3 [FinishReason]. [hasToolCalls] backstops the UNSPECIFIED /
+/// STOP wire values the way the string-based converter used to (a model
+/// that made tool calls but whose backend never set the enum still reports
+/// `toolCalls`).
+FinishReason _finishReason(
+  llm_enum.FinishReason wire, {
+  bool hasToolCalls = false,
+}) {
+  switch (wire) {
+    case llm_enum.FinishReason.FINISH_REASON_LENGTH:
+    case llm_enum.FinishReason.FINISH_REASON_CONTEXT_OVERFLOW:
+      return FinishReason.length;
+    case llm_enum.FinishReason.FINISH_REASON_CANCELLED:
+      return FinishReason.cancelled;
+    case llm_enum.FinishReason.FINISH_REASON_TOOL_CALLS:
+      return FinishReason.toolCalls;
+    case llm_enum.FinishReason.FINISH_REASON_STOP:
+    case llm_enum.FinishReason.FINISH_REASON_STOP_SEQUENCE:
+    case llm_enum.FinishReason.FINISH_REASON_ERROR:
+    case llm_enum.FinishReason.FINISH_REASON_UNSPECIFIED:
+    default:
+      return hasToolCalls ? FinishReason.toolCalls : FinishReason.stop;
+  }
+}
+
+/// `VLMResult.finishReason` (vlm_options.proto) is still a raw wire string
+/// (VLM never migrated to the shared `FinishReason` enum) — parse it the
+/// same way the pre-migration string converter did.
+FinishReason _finishReasonFromString(String wire, {bool hasToolCalls = false}) {
   switch (wire.toLowerCase()) {
     case 'length':
     case 'max_tokens':
@@ -103,35 +134,19 @@ class GenerationResult {
     ),
     inputTokens: proto.usage.inputTokens,
     outputTokens: proto.usage.outputTokens,
-    timeToFirstTokenMs: proto.hasTtftMs() ? proto.ttftMs.round() : 0,
-    tokensPerSecond: proto.usage.tokensPerSecond,
+    timeToFirstTokenMs: proto.usage.hasTtftMs()
+        ? proto.usage.ttftMs.toInt()
+        : 0,
+    tokensPerSecond: proto.usage.decodeTokensPerSecond,
     requestId: requestId,
     model: proto.modelUsed,
   );
 
-  /// Build from the generated terminal streaming aggregate.
-  factory GenerationResult.fromStreamFinal(
-    LLMStreamFinalResult proto, {
-    String requestId = '',
-    String model = '',
-  }) => GenerationResult(
-    text: proto.text,
-    thinkingText: proto.hasThinkingContent() && proto.thinkingContent.isNotEmpty
-        ? proto.thinkingContent
-        : null,
-    toolCalls: List<ToolCall>.unmodifiable(proto.toolCalls),
-    toolResults: List<ToolResult>.unmodifiable(proto.toolResults),
-    finishReason: _finishReason(
-      proto.finishReason,
-      hasToolCalls: proto.toolCalls.isNotEmpty,
-    ),
-    inputTokens: proto.usage.inputTokens,
-    outputTokens: proto.usage.outputTokens,
-    timeToFirstTokenMs: proto.timeToFirstTokenMs.toInt(),
-    tokensPerSecond: proto.usage.tokensPerSecond,
-    requestId: requestId,
-    model: model,
-  );
+  // `GenerationResult.fromStreamFinal` is deleted: `LLMStreamFinalResult` was
+  // removed outright (idl/llm_service.proto — "the stream terminates with
+  // the same [result]"). The stream now terminates with
+  // `LLMStreamEvent.result` (an `LLMGenerationResult`), so callers use
+  // `GenerationResult.fromLlm` directly against that field.
 
   /// Build from the generated VLM result.
   factory GenerationResult.fromVlm(
@@ -141,11 +156,13 @@ class GenerationResult {
   }) => GenerationResult(
     text: proto.text,
     toolCalls: const <ToolCall>[],
-    finishReason: _finishReason(proto.finishReason),
+    finishReason: _finishReasonFromString(proto.finishReason),
     inputTokens: proto.usage.inputTokens,
     outputTokens: proto.usage.outputTokens,
-    timeToFirstTokenMs: proto.timeToFirstTokenMs.toInt(),
-    tokensPerSecond: proto.usage.tokensPerSecond,
+    timeToFirstTokenMs: proto.usage.hasTtftMs()
+        ? proto.usage.ttftMs.toInt()
+        : 0,
+    tokensPerSecond: proto.usage.decodeTokensPerSecond,
     requestId: requestId,
     model: model,
   );
@@ -196,11 +213,14 @@ class StructuredResult {
   });
 
   /// Build from the generated structured-output result.
+  ///
+  /// `StructuredOutputResult.parsedJson` (bytes) was renamed `json` (a plain
+  /// UTF-8 string; idl/structured_output.proto: "Parse it client-side").
   factory StructuredResult.fromProto(
     StructuredOutputResult proto,
     GenerationResult metrics,
   ) => StructuredResult(
-    value: Uint8List.fromList(proto.parsedJson),
+    value: Uint8List.fromList(utf8.encode(proto.json)),
     raw: proto.hasRawText() ? proto.rawText : metrics.text,
     valid: proto.validation.isValid,
     metrics: metrics,
@@ -375,17 +395,13 @@ class VadResult {
   });
 
   /// Build from the generated VAD result.
+  ///
+  /// `confidence` was renamed `probability`, and `start_time_ms`/
+  /// `end_time_ms` were deleted outright (idl/vad_options.proto) — this
+  /// result no longer carries a span, only the per-frame verdict.
   factory VadResult.fromProto(vad_pb.VADResult proto) => VadResult(
     isSpeech: proto.isSpeech,
-    probability: proto.confidence,
-    segments: proto.startTimeMs > proto.endTimeMs
-        ? const <Segment>[]
-        : List<Segment>.unmodifiable(<Segment>[
-            Segment(
-              startMs: proto.startTimeMs.toInt(),
-              endMs: proto.endTimeMs.toInt(),
-            ),
-          ]),
+    probability: proto.probability,
   );
 
   /// True when the buffer contains speech.
@@ -465,30 +481,28 @@ class ImageResult {
   });
 
   /// Build from the generated diffusion result.
+  ///
+  /// The flat single-image `DiffusionResult` (`image_data`/`width`/`height`/
+  /// `seed_used`/`image_media_type`/`batch_images`) was restructured into
+  /// `repeated DiffusionImage images` (idl/diffusion_options.proto), each
+  /// entry carrying its own `data`/`width`/`height`/`seedUsed`/`mediaType`
+  /// per-image — commons still emits exactly one entry until the C ABI grows
+  /// a real batch, but the shape now supports N.
   factory ImageResult.fromProto(
     diff_pb.DiffusionResult proto, {
     required int steps,
   }) {
-    final images = <ImageData>[
-      if (proto.imageData.isNotEmpty)
-        ImageData(
-          bytes: Uint8List.fromList(proto.imageData),
-          width: proto.width,
-          height: proto.height,
-          mediaType: proto.hasImageMediaType() ? proto.imageMediaType : null,
-        ),
-      ...proto.batchImages.map(
-        (bytes) => ImageData(
-          bytes: Uint8List.fromList(bytes),
-          width: proto.width,
-          height: proto.height,
-          mediaType: proto.hasImageMediaType() ? proto.imageMediaType : null,
-        ),
+    final images = proto.images.map(
+      (image) => ImageData(
+        bytes: Uint8List.fromList(image.data),
+        width: image.width,
+        height: image.height,
+        mediaType: image.mediaType.isNotEmpty ? image.mediaType : null,
       ),
-    ];
+    );
     return ImageResult(
       images: List<ImageData>.unmodifiable(images),
-      seed: proto.seedUsed.toInt(),
+      seed: proto.images.isNotEmpty ? proto.images.first.seedUsed.toInt() : 0,
       steps: steps,
     );
   }
@@ -589,27 +603,33 @@ class SegmentationResult {
   });
 
   /// Build from the generated segmentation result.
-  factory SegmentationResult.fromProto(seg_pb.SegmentationResult proto) =>
-      SegmentationResult(
-        classMask: Uint16List.sublistView(
-          Uint8List.fromList(proto.classMaskU16Le),
-        ),
-        width: proto.width,
-        height: proto.height,
-        classes: List<ClassInfo>.unmodifiable(
-          proto.classSummaries.map(
-            (c) => ClassInfo(
-              classId: c.classId,
-              label: c.label,
-              pixelCount: c.pixelCount.toInt(),
-              fraction: c.fraction,
-            ),
+  ///
+  /// `SegmentationClassSummary.fraction` was deleted outright
+  /// (idl/segmentation.proto) — [ClassInfo.fraction] is derived here from
+  /// `pixelCount / (width * height)` instead of trusting a wire value.
+  factory SegmentationResult.fromProto(seg_pb.SegmentationResult proto) {
+    final totalPixels = proto.width * proto.height;
+    return SegmentationResult(
+      classMask: Uint16List.sublistView(
+        Uint8List.fromList(proto.classMaskU16Le),
+      ),
+      width: proto.width,
+      height: proto.height,
+      classes: List<ClassInfo>.unmodifiable(
+        proto.classSummaries.map(
+          (c) => ClassInfo(
+            classId: c.classId,
+            label: c.label,
+            pixelCount: c.pixelCount.toInt(),
+            fraction: totalPixels > 0 ? c.pixelCount.toInt() / totalPixels : 0,
           ),
         ),
-        diagnosticImage: proto.hasDiagnosticRgba()
-            ? Uint8List.fromList(proto.diagnosticRgba)
-            : null,
-      );
+      ),
+      diagnosticImage: proto.hasDiagnosticRgba()
+          ? Uint8List.fromList(proto.diagnosticRgba)
+          : null,
+    );
+  }
 
   /// One class id per pixel, row-major at source dimensions.
   final Uint16List classMask;
@@ -639,7 +659,7 @@ class Match {
   /// Build from the generated search result.
   factory Match.fromProto(rag_pb.RAGSearchResult proto) => Match(
     text: proto.text,
-    score: proto.similarityScore,
+    score: proto.score,
     metadata: Map<String, String>.unmodifiable(proto.metadata),
   );
 
@@ -801,7 +821,7 @@ class LoraState {
   const LoraState({required this.applied});
 
   /// Build from the generated LoRA state.
-  factory LoraState.fromProto(lora_pb.LoRAState proto) => LoraState(
+  factory LoraState.fromProto(lora_pb.LoraState proto) => LoraState(
     applied: List<AppliedAdapter>.unmodifiable(
       proto.loadedAdapters.map(
         (a) => AppliedAdapter(

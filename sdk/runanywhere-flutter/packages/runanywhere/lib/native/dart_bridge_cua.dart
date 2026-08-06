@@ -113,17 +113,28 @@ class DartBridgeCua {
         decode: pb.CuaAction.fromBuffer,
         symbol: 'rac_cua_parse_action_proto',
       );
-      final coordinate = proto.coordinateValid
+      // `coordinate_valid` and `parse_ok` were renamed: `x`/`y` are now
+      // `optional int32` on the proto (presence = "has a coordinate"), and
+      // the parse-succeeded flag is `is_valid` (idl/cua.proto:72-73,86).
+      final coordinate = (proto.hasX() && proto.hasY())
           ? (x: proto.x, y: proto.y)
           : null;
+      // scroll_pixels split into per-axis scrollX (HSCROLL) / scrollY
+      // (SCROLL) fields (idl/cua.proto:74-79). `CuaAction.scrollPixels` (this
+      // bridge's public field) carries whichever axis matches the parsed
+      // action kind; the other axis is always 0 for a single-axis action.
+      final scrollPixels =
+          proto.type == pb.CuaActionType.CUA_ACTION_TYPE_HSCROLL
+          ? proto.scrollX
+          : proto.scrollY;
       return CuaAction(
         kind: CuaActionKind.fromValue(proto.type.value),
         coordinate: coordinate,
         text: proto.text,
         reasoning: proto.reasoning,
-        scrollPixels: proto.scrollPixels,
+        scrollPixels: scrollPixels,
         waitSeconds: proto.waitSeconds,
-        isValid: proto.parseOk,
+        isValid: proto.isValid,
       );
     } on SDKException {
       // Unknown profile — commons returns an error buffer. Match Swift (nil).

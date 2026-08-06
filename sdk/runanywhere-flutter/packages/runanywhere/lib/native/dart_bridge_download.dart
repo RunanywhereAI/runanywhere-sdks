@@ -267,29 +267,12 @@ class DartBridgeDownload {
         );
   }
 
-  Future<download_pb.DownloadResumeResult> resumeProto(
-    download_pb.DownloadResumeRequest request,
-  ) async {
-    _ensureProgressCallbackRegistered();
-    final result = await _callDownloadProto(
-      request,
-      RacNative.bindings.rac_download_resume_proto,
-      download_pb.DownloadResumeResult.fromBuffer,
-      'rac_download_resume_proto',
-    );
-    if (result != null && result.accepted) {
-      _trackActive(result.taskId, result.modelId);
-    }
-    return result ??
-        download_pb.DownloadResumeResult(
-          accepted: false,
-          taskId: request.taskId,
-          modelId: request.modelId,
-          error: SDKException.serviceUnavailable(
-            'Download resume proto API is unavailable',
-          ).error,
-        );
-  }
+  // DownloadResumeRequest/Result and rac_download_resume_proto were deleted
+  // outright (idl/download_service.proto): starting a download IS resuming
+  // it — DownloadStartRequest{model_id} continues from any valid partial on
+  // disk automatically, and commons' own rac_download_resume_proto is now a
+  // permanently-retired stub (download_orchestrator.cpp) that always returns
+  // RAC_ERROR_NOT_IMPLEMENTED. There is no resume verb left to bridge.
 
   Future<download_pb.DownloadProgress?> pollProgressProto(
     download_pb.DownloadSubscribeRequest request,

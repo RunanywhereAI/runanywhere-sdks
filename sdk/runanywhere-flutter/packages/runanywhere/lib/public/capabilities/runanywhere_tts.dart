@@ -145,14 +145,14 @@ class RunAnywhereTTS {
       throw SDKException.notInitialized();
     }
     await DartBridge.ensureServicesReady();
-    final voiceId = await _requireLoadedVoiceId();
+    await _requireLoadedVoiceId();
+    // `ssml`/`metadata` on the request and `enable_ssml` on `TTSOptions` were
+    // both deleted outright (idl/tts_options.proto: "no backend parses
+    // SSML" / "engines spoke the markup aloud") — `text` is the only input
+    // channel left; the lifecycle-owned ABI resolves the voice internally,
+    // same as `metadata['voice_id']` used to advertise.
     final opts = _effectiveOptions(options ?? TTSOptions());
-    final request = TTSSynthesisRequest(
-      text: opts.enableSsml ? null : text,
-      ssml: opts.enableSsml ? text : null,
-      options: opts,
-      metadata: <String, String>{'voice_id': voiceId}.entries,
-    );
+    final request = TTSSynthesisRequest(text: text, options: opts);
     return DartBridgeTTS.shared.synthesizeLifecycleProtoAsync(request);
   }
 
@@ -181,14 +181,10 @@ class RunAnywhereTTS {
     if (!current.found || current.modelId.isEmpty) {
       return; // Silent finish (Swift parity).
     }
-    final voiceId = current.modelId;
+    // `ssml`/`metadata` on the request and `enable_ssml` on `TTSOptions` were
+    // both deleted outright (idl/tts_options.proto) — see [synthesize].
     final opts = _effectiveOptions(options ?? TTSOptions());
-    final request = TTSSynthesisRequest(
-      text: opts.enableSsml ? null : text,
-      ssml: opts.enableSsml ? text : null,
-      options: opts,
-      metadata: <String, String>{'voice_id': voiceId}.entries,
-    );
+    final request = TTSSynthesisRequest(text: text, options: opts);
     Stream<TTSStreamEvent> events;
     try {
       events = DartBridgeTTS.shared.synthesizeStreamLifecycleProto(request);
@@ -282,17 +278,20 @@ class RunAnywhereTTS {
     return DartBridgeTTS.shared.stateLifecycleProto();
   }
 
-  /// List available TTS voice ids. Prefers the lifecycle-owned service state
-  /// (populated once a voice engine is up); falls back to the registry when
-  /// the state carries no voices.
+  /// List available TTS voice ids.
+  ///
+  /// `TTSServiceState.voices` was deleted outright (idl/tts_options.proto:
+  /// "use the list-voices verb") — prefers the dedicated
+  /// `rac_tts_component_list_voices_proto` ABI (`DartBridgeTTS.listVoicesProto`);
+  /// falls back to the model registry when that ABI is unavailable.
   Future<List<String>> availableVoices() async {
     try {
-      final state = await ttsState();
-      if (state.voices.isNotEmpty) {
-        return state.voices.map((v) => v.id).toList(growable: false);
+      final voices = await DartBridgeTTS.shared.listVoicesProto();
+      if (voices.isNotEmpty) {
+        return voices.map((v) => v.id).toList(growable: false);
       }
     } catch (_) {
-      // Older commons binaries without the state ABI fall through.
+      // Older commons binaries without the list-voices ABI fall through.
     }
     final result = await RunAnywhereModels.shared.list(
       query: model_pb.ModelQuery(category: _ttsCategory),

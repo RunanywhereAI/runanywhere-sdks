@@ -7,6 +7,8 @@ import 'dart:async';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/vlm_options.pb.dart'
     show VLMGenerationRequest, VLMStreamEvent;
+import 'package:runanywhere/generated/vlm_options.pbenum.dart'
+    show VLMStreamEventKind;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/api/internal/model_gate.dart';
 import 'package:runanywhere/public/api/types/events.dart';
@@ -107,7 +109,11 @@ class VlmApi {
           buffer.write(event.token);
           controller.add(GenerationTextDelta(event.token, requestId: requestId));
         }
-        if (event.isFinal) {
+        // `kind` is the single terminal discriminator now (`isFinal` was
+        // deleted — idl/vlm_options.proto): COMPLETED or ERROR ends the
+        // stream.
+        if (event.kind == VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED ||
+            event.kind == VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR) {
           terminal = event;
           break;
         }
@@ -187,11 +193,12 @@ class VlmApi {
     if (modelId == null) {
       throw SDKException.vlmNotInitialized();
     }
-    return VLMGenerationRequest(
-      requestId: 'vlm-${DateTime.now().microsecondsSinceEpoch}',
+    final request = (options ?? LlmOptions()).toVlmRequest(
+      prompt: prompt,
       images: [image.toVlmImage()],
-      options: (options ?? LlmOptions()).toVlmProto(prompt),
-      modelId: modelId,
     );
+    request.requestId = 'vlm-${DateTime.now().microsecondsSinceEpoch}';
+    request.modelId = modelId;
+    return request;
   }
 }

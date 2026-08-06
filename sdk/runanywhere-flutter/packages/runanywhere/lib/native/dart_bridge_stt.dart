@@ -335,16 +335,15 @@ class DartBridgeSTT {
                 case STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL:
                   // `event` is a local decode of copied bytes; mutating its
                   // submessage in place is safe.
+                  //
+                  // `STTPartialResult.finalOutput` was deleted outright
+                  // (idl/stt_options.proto): the message trimmed to
+                  // `text`/`isFinal`/`language` — there is no longer a
+                  // separate final-output submessage to fold in.
                   final partial = event.hasPartial()
                       ? event.partial
                       : STTPartialResult();
                   partial.isFinal = true;
-                  if (event.hasFinalOutput()) {
-                    partial.finalOutput = event.finalOutput;
-                    if (partial.text.isEmpty) {
-                      partial.text = event.finalOutput.text;
-                    }
-                  }
                   controller.add(partial);
                 case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
                   emitFailure(
@@ -476,9 +475,11 @@ class DartBridgeSTT {
         }
         return;
       case STTAudioSource_Source.fileUri:
-      case STTAudioSource_Source.adapterHandle:
+        // `adapter_handle` was deleted from `STTAudioSource`'s oneof
+        // (idl/stt_options.proto) — `file_uri` is the only non-inline-bytes
+        // source left, and it still requires a platform adapter.
         throw UnsupportedError(
-          'STT audio file_uri/adapter_handle requires a platform adapter',
+          'STT audio file_uri requires a platform adapter',
         );
       case STTAudioSource_Source.notSet:
         throw ArgumentError(

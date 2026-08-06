@@ -614,9 +614,11 @@ class DartBridgeTTS {
   }
 
   void _validateLifecycleRequest(TTSSynthesisRequest request) {
-    if (request.text.isEmpty && (!request.hasSsml() || request.ssml.isEmpty)) {
+    // `TTSSynthesisRequest.ssml` was deleted outright (idl/tts_options.
+    // proto) — `text` is the only input left.
+    if (request.text.isEmpty) {
       throw ArgumentError(
-        'TTSSynthesisRequest.text or ssml is required for lifecycle TTS',
+        'TTSSynthesisRequest.text is required for lifecycle TTS',
       );
     }
   }

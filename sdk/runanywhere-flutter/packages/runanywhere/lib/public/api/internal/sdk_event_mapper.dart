@@ -63,14 +63,11 @@ abstract final class SdkEventMapper {
           return null;
       }
     }
-    if (event.hasFailure()) {
-      return SdkError(
-        event.failure.error.message,
-        recoverable: event.failure.recoverable,
-      );
-    }
+    // `FailureEvent` was deleted outright (idl/sdk_events.proto): every
+    // field already existed on the envelope — `error` -> `SDKEvent.error`,
+    // `recoverable` -> `SDKError.retryable`.
     if (event.hasError()) {
-      return SdkError(event.error.message, recoverable: true);
+      return SdkError(event.error.message, recoverable: event.error.retryable);
     }
     return null;
   }

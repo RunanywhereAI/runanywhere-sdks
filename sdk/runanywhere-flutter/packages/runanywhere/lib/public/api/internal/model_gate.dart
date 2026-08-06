@@ -150,9 +150,7 @@ abstract final class ModelGate {
       throw SDKException.modelNotFound(modelId);
     }
     final info = model.model;
-    final present = info.hasIsDownloaded()
-        ? info.isDownloaded
-        : info.localPath.isNotEmpty;
+    final present = info.localPath.isNotEmpty;
     if (present) return;
 
     await for (final progress in RunAnywhereDownloads.shared.start(modelId)) {

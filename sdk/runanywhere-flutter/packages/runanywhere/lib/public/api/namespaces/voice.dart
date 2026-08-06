@@ -9,7 +9,9 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
-    show VoiceAgentComposeConfig, VoiceSessionConfig;
+    show TurnDetection, VoiceAgentComposeConfig;
+import 'package:runanywhere/generated/voice_agent_service.pbenum.dart'
+    show TurnDetection_Type;
 import 'package:runanywhere/generated/voice_events.pb.dart' as voice_pb;
 import 'package:runanywhere/generated/voice_events.pbenum.dart'
     show PipelineState;
@@ -72,11 +74,16 @@ class VoiceApi {
       llmModelId: llm.id,
       ttsVoiceId: tts.voice ?? '',
     );
+    // `VoiceAgentComposeConfig.sessionConfig` (`VoiceSessionConfig`) was
+    // deleted outright and replaced by `turnDetection` (`TurnDetection`)
+    // (idl/voice_agent_service.proto): `autoPlayTts`/`continuousMode` have
+    // no wire home anymore (the compose entry point always plays TTS and
+    // runs continuously), and `silenceDurationMs` moved onto the new
+    // message alongside the VAD-driven turn-detection knobs.
     final turns = turnHandling ?? const TurnHandlingOptions();
-    config.sessionConfig = VoiceSessionConfig(
+    config.turnDetection = TurnDetection(
+      type: TurnDetection_Type.TURN_DETECTION_TYPE_VAD,
       silenceDurationMs: turns.endpointing.minDelayMs,
-      autoPlayTts: true,
-      continuousMode: true,
     );
     if (generation != null) {
       config.llmGeneration = generation.toProto();
@@ -216,11 +223,14 @@ class VoiceSession {
       if (mapped != null) _events.add(VoiceAgentStateChanged(mapped));
       return;
     }
-    if (event.hasError()) {
+    // `VoiceEvent.error` was renamed `session_error` (of type
+    // `VoiceSessionError`, whose own `is_recoverable` was renamed
+    // `recoverable`) (idl/voice_events.proto).
+    if (event.hasSessionError()) {
       _events.add(
         VoiceError(
-          event.error.message,
-          recoverable: event.error.isRecoverable,
+          event.sessionError.message,
+          recoverable: event.sessionError.recoverable,
         ),
       );
     }

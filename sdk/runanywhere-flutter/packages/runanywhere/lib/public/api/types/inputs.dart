@@ -144,6 +144,9 @@ class AudioInput {
   final AudioFormatSpec format;
 
   /// Build the generated STT audio source for this input.
+  ///
+  /// `bits_per_sample` was deleted outright (idl/stt_options.proto) — it is
+  /// implied by `encoding` now, so this no longer sets it.
   STTAudioSource toSttSource() => STTAudioSource(
     audioData: bytes,
     encoding: _sttEncoding,
@@ -151,7 +154,6 @@ class AudioInput {
         ? format.sampleRate
         : RADefaultsAudioCapture.micSampleRateHz,
     channels: format.channels,
-    bitsPerSample: _bitsPerSample,
   );
 
   /// Build the generated VAD audio source for this input.
@@ -177,16 +179,6 @@ class AudioInput {
     }
   }
 
-  int get _bitsPerSample {
-    switch (format.encoding) {
-      case AudioEncoding.pcm16:
-        return 16;
-      case AudioEncoding.float32:
-        return 32;
-      case AudioEncoding.container:
-        return 0;
-    }
-  }
 }
 
 /// Image handed to `vlm` and `segmentation`.
@@ -197,14 +189,22 @@ class ImageInput {
     this.width = 0,
     this.height = 0,
     this.isRawRgb = false,
+    this.mediaType = 'image/png',
   });
 
   /// Reference an encoded image file on disk.
   factory ImageInput.file(String path) =>
       ImageInput._(bytes: Uint8List(0), path: path);
 
-  /// Wrap encoded image bytes (PNG, JPEG, …).
-  factory ImageInput.bytes(Uint8List data) => ImageInput._(bytes: data);
+  /// Wrap encoded image bytes (PNG, JPEG, WebP, …).
+  ///
+  /// `VLMImage.format` (an enum) was deleted outright — [mediaType] (a plain
+  /// MIME string, e.g. `"image/jpeg"`) replaces the closed format enum
+  /// entirely so a new container type is not a proto change
+  /// (idl/vlm_options.proto). Defaults to `"image/png"`; pass the true MIME
+  /// type when [data] is not PNG.
+  factory ImageInput.bytes(Uint8List data, {String mediaType = 'image/png'}) =>
+      ImageInput._(bytes: data, mediaType: mediaType);
 
   /// Wrap tightly packed 8-bit RGB pixels.
   factory ImageInput.rawRgb(Uint8List data, int width, int height) =>
@@ -230,7 +230,17 @@ class ImageInput {
   /// True when [bytes] holds packed RGB8 pixels rather than an encoded file.
   final bool isRawRgb;
 
+  /// MIME type of [bytes] when it holds a compressed container (PNG/JPEG/
+  /// WebP). Unused for [path] or raw-RGB inputs.
+  final String mediaType;
+
   /// Build the generated VLM image for this input.
+  ///
+  /// `VLMImage.format` (an enum) was deleted outright — the `source` oneof
+  /// (`filePath`/`data`/`rawRgb`/`base64`/`rawRgba`) is now the sole
+  /// declaration of the image's shape, and the compressed-container arm was
+  /// renamed `encoded` -> `data` (idl/vlm_options.proto). `media_type` is
+  /// required alongside `data`.
   vlm_pb.VLMImage toVlmImage() {
     final image = vlm_pb.VLMImage();
     final filePath = path;
@@ -240,10 +250,11 @@ class ImageInput {
       image
         ..rawRgb = bytes
         ..width = width
-        ..height = height
-        ..format = vlm_pb.VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB;
+        ..height = height;
     } else {
-      image.encoded = bytes;
+      image
+        ..data = bytes
+        ..mediaType = mediaType;
     }
     return image;
   }
