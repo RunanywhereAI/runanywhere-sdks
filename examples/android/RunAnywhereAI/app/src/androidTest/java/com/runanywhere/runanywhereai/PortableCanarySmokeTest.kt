@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai
 
-import ai.runanywhere.proto.v1.DownloadStage
 import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelUnloadRequest
@@ -72,17 +71,18 @@ class PortableCanarySmokeTest {
                                 lastLoggedPercent = percent
                                 Log.i(
                                     tag,
-                                    "DOWNLOAD state=${progress.state} stage=${progress.stage} " +
+                                    "DOWNLOAD state=${progress.state} " +
                                         "percent=$percent bytes=${progress.bytes_downloaded}/${progress.total_bytes}",
                                 )
                             }
                         }
                     }
                 val downloadMs = System.currentTimeMillis() - downloadStarted
+                // DownloadStage was deleted outright; DownloadProgress.state (DownloadState)
+                // is the sole discriminator now.
                 assertTrue(
-                    "download did not complete: state=${terminal.state} stage=${terminal.stage}",
-                    terminal.state == DownloadState.DOWNLOAD_STATE_COMPLETED ||
-                        terminal.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED,
+                    "download did not complete: state=${terminal.state}",
+                    terminal.state == DownloadState.DOWNLOAD_STATE_COMPLETED,
                 )
                 assertEquals(EXPECTED_BUNDLE_BYTES, terminal.total_bytes)
 

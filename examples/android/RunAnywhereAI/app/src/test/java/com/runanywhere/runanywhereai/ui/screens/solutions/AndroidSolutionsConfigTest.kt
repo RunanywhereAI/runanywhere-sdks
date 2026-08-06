@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.ui.screens.solutions
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelRegistryStatus
 import com.runanywhere.runanywhereai.data.ModelCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -158,7 +159,13 @@ class AndroidSolutionsConfigTest {
         name = id,
         category = category,
         framework = framework,
-        is_downloaded = downloaded,
+        // ModelInfo.is_downloaded was deleted outright ("a bool cannot express
+        // DOWNLOADING"); registry_status is the durable-state signal isDownloadedOnDisk reads now.
+        registry_status = if (downloaded) {
+            ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED
+        } else {
+            ModelRegistryStatus.MODEL_REGISTRY_STATUS_REGISTERED
+        },
     )
 
     private val canonicalCpuIds = listOf(

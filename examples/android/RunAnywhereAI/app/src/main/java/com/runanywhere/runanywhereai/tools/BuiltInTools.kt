@@ -1,16 +1,16 @@
 package com.runanywhere.runanywhereai.tools
 
-import ai.runanywhere.proto.v1.ToolParameter
-import ai.runanywhere.proto.v1.ToolParameterType
 import android.content.Context
 import android.os.BatteryManager
 import android.os.Build
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
+import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
+import com.runanywhere.sdk.public.extensions.LLM.ToolParameter
+import com.runanywhere.sdk.public.extensions.LLM.ToolParameterType
 import com.runanywhere.sdk.public.extensions.LLM.string
 import com.runanywhere.sdk.public.api.llm
-import com.runanywhere.sdk.public.types.RAToolDefinition
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -22,7 +22,7 @@ object BuiltInTools {
         val app = context.applicationContext
         runCatching {
             RunAnywhere.llm.tools.register(
-                RAToolDefinition(
+                ToolDefinition(
                     name = "get_current_time",
                     description = "Returns the current date, time and timezone on the device.",
                     parameters = emptyList(),
@@ -31,7 +31,7 @@ object BuiltInTools {
             ) { currentTime() }
 
             RunAnywhere.llm.tools.register(
-                RAToolDefinition(
+                ToolDefinition(
                     name = "get_device_info",
                     description = "Returns details about the device: manufacturer, model and Android version.",
                     parameters = emptyList(),
@@ -40,7 +40,7 @@ object BuiltInTools {
             ) { deviceInfo() }
 
             RunAnywhere.llm.tools.register(
-                RAToolDefinition(
+                ToolDefinition(
                     name = "get_battery_level",
                     description = "Returns the current battery charge level as a percentage.",
                     parameters = emptyList(),
@@ -49,13 +49,13 @@ object BuiltInTools {
             ) { batteryLevel(app) }
 
             RunAnywhere.llm.tools.register(
-                RAToolDefinition(
+                ToolDefinition(
                     name = "calculate",
                     description = "Evaluates a math expression with + - * / and parentheses.",
                     parameters = listOf(
                         ToolParameter(
                             name = "expression",
-                            type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+                            type = ToolParameterType.STRING,
                             description = "The expression to evaluate, e.g. '(3 + 4) * 2'.",
                             required = true,
                         ),

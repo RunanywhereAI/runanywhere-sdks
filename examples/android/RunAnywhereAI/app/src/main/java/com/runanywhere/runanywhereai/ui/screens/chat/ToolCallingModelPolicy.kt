@@ -121,7 +121,7 @@ internal object ToolCallingExecutionPolicy {
         val generation = generationOptions(base)
         return ToolCallingExecutionPlan(
             generationOptions = generation,
-            toolOptions = toolOptions(registeredTools, generation.max_output_tokens),
+            toolOptions = toolOptions(registeredTools),
             // Commons recognizes an unambiguous explicit tool name in the
             // prompt and narrows the native decision there, so every SDK gets
             // the same behavior without app-side routing heuristics.
@@ -130,14 +130,16 @@ internal object ToolCallingExecutionPolicy {
         )
     }
 
+    // ToolCallingOptions.max_tokens/temperature were deleted outright
+    // (idl/tool_calling.proto): "the enclosing LLMGenerationOptions.temperature /
+    // max_output_tokens are the one value for both" -- generationOptions() above
+    // already sets both on the enclosing envelope, so there is nothing left to
+    // duplicate here.
     private fun toolOptions(
         tools: List<RAToolDefinition>,
-        finalResponseMaxTokens: Int,
     ): RAToolCallingOptions = RAToolCallingOptions(
         tools = tools,
         max_tool_calls = MAX_TOOL_CALLS,
-        max_tokens = finalResponseMaxTokens,
-        temperature = 0f,
         auto_execute = true,
         keep_tools_available = false,
         disable_thinking = true,

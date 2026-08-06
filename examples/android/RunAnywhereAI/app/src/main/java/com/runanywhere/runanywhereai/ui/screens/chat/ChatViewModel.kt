@@ -571,7 +571,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val sources = result.retrieved_chunks.map {
                     ChatSource(
                         text = it.text.trim(),
-                        score = it.similarity_score,
+                        score = it.score,
                         document = it.source_document.orEmpty(),
                     )
                 }
@@ -583,7 +583,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             tokens = 0,
                             tokensPerSecond = 0.0,
                             timeToFirstTokenMs = null,
-                            totalTimeMs = result.total_time_ms,
+                            // RAGResult.total_time_ms was deleted outright; generation_time_ms is the
+                            // remaining canonical duration field.
+                            totalTimeMs = result.generation_time_ms,
                             modelName = answer.name,
                             mode = GenerationMode.NON_STREAMING,
                         ),
@@ -607,20 +609,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Mirrors iOS LLMViewModel+Events.handleGenerationEvent: record TTFT on
-    // FIRST_TOKEN_GENERATED and completion metrics on COMPLETED/STREAM_COMPLETED.
+    // FIRST_TOKEN_GENERATED and completion metrics on COMPLETED (both unary and
+    // streaming terminate on COMPLETED now -- STREAM_COMPLETED was retired,
+    // "read is_streaming" per idl/sdk_events.proto).
     private fun handleGenerationEvent(event: SDKEvent) {
         val generation = event.generation ?: return
         val generationId = generation.session_id.ifEmpty { event.operation_id }
         when (generation.kind) {
             GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED -> {
-                firstTokenLatencies[generationId] = generation.first_token_latency_ms
-                activeGenerationTTFTMs = generation.first_token_latency_ms
+                firstTokenLatencies[generationId] = generation.time_to_first_token_ms
+                activeGenerationTTFTMs = generation.time_to_first_token_ms
             }
-            GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED,
-            GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED,
-            -> {
-                val outputTokens = generation.tokens_used
-                val durationMs = generation.latency_ms
+            GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
+                val outputTokens = generation.output_tokens
+                val durationMs = generation.total_duration_ms
                 val tps = if (durationMs > 0 && outputTokens > 0) {
                     outputTokens * 1000.0 / durationMs
                 } else {
@@ -703,7 +705,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         hostedToken: Long,
     ) {
         val events = session.generateStream(llmRequest)
-        val result = RunAnywhere.aggregateStream(llmRequest.prompt, events) { accumulated ->
+        val prompt = llmRequest.messages.lastOrNull()?.content.orEmpty()
+        val result = RunAnywhere.aggregateStream(prompt, events) { accumulated ->
             if (hostedToken != hostedConversationToken) return@aggregateStream
             if (streamUpdates) updateReply(request, index) { it.copy(text = accumulated) }
         }
@@ -718,7 +721,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens ?: 0
-        val tps = result.usage?.tokens_per_second?.takeIf { it > 0 }
+        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
+        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
             ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
@@ -727,7 +731,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 stats = GenerationStats(
                     tokens = tokens,
                     tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 },
+                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
+                    // TokenUsage.ttft_ms is the sole canonical spelling now.
+                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
                     totalTimeMs = totalMs,
                     inputTokens = result.usage?.input_tokens ?: 0,
                     modelName = model.displayName,
@@ -763,7 +769,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val outputTokens = result.usage?.output_tokens ?: 0
-        val tps = result.usage?.tokens_per_second?.takeIf { it > 0 }
+        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
+        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
             ?: if (totalMs > 0 && outputTokens > 0) outputTokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
@@ -775,7 +782,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 stats = GenerationStats(
                     tokens = outputTokens,
                     tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
+                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
+                    // TokenUsage.ttft_ms is the sole canonical spelling now.
+                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 }
                         ?: activeGenerationTTFTMs,
                     totalTimeMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
@@ -800,7 +809,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val events = RunAnywhere.generateStream(llmRequest)
         val result =
             RunAnywhere.aggregateStream(
-                prompt = llmRequest.prompt,
+                prompt = llmRequest.messages.lastOrNull()?.content.orEmpty(),
                 events = events,
                 onThinking = { accumulated ->
                     updateReply(request, index) { it.copy(thinking = accumulated) }
@@ -825,7 +834,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens?.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
-        val tps = result.usage?.tokens_per_second?.takeIf { it > 0 }
+        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
+        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
             ?: sdkMetrics?.tokensPerSecond?.takeIf { it > 0 }
             ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
@@ -835,7 +845,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 stats = GenerationStats(
                     tokens = tokens,
                     tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
+                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
+                    // TokenUsage.ttft_ms is the sole canonical spelling now.
+                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 }
                         ?: activeGenerationTTFTMs
                         ?: sdkMetrics?.timeToFirstTokenMs,
                     totalTimeMs = totalMs,

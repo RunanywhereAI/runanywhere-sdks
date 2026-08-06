@@ -41,7 +41,6 @@ class ChatToolResultNormalizerTest {
                     ToolResult(
                         name = "calculate",
                         result_json = """{"result":"396"}""",
-                        success = true,
                     ),
                 ),
             ),
@@ -53,16 +52,17 @@ class ChatToolResultNormalizerTest {
     }
 
     @Test
-    fun `unclosed raw text is recovered without displaying reasoning`() {
+    fun `unclosed reasoning-only text is recovered without displaying reasoning`() {
+        // ToolCallingResult.raw_text was deleted outright; `text` is the sole
+        // final-response field now, so this exercises the same unclosed-tag
+        // recovery path through it directly.
         val normalized = ChatToolResultNormalizer.normalize(
             ToolCallingResult(
-                text = "",
-                raw_text = "<think>still reasoning",
+                text = "<think>still reasoning",
                 tool_results = listOf(
                     ToolResult(
                         name = "search_web",
                         result_json = """{"summary":"A concise sourced answer.","source_url":"https://example.com"}""",
-                        success = true,
                     ),
                 ),
             ),

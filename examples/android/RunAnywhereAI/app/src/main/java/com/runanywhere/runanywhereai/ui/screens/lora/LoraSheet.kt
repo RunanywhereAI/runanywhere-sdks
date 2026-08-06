@@ -39,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
@@ -130,7 +129,7 @@ private fun LoraRow(
 ) {
     val dimens = LocalDimens.current
     var scale by rememberSaveable(entry.id) {
-        mutableFloatStateOf(entry.default_scale.takeIf { it > 0f } ?: 1f)
+        mutableFloatStateOf(entry.default_scale?.takeIf { it > 0f } ?: 1f)
     }
     Box(
         modifier = Modifier
@@ -148,24 +147,10 @@ private fun LoraRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (entry.description.isNotBlank()) {
-                        Text(
-                            text = entry.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = dimens.spacingXs),
-                        )
-                    }
-                    if (entry.size_bytes > 0) {
-                        Text(
-                            text = formatModelSize(entry.size_bytes),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = dimens.spacingXs),
-                        )
-                    }
+                    // LoraAdapterCatalogEntry.description/size_bytes were deleted outright
+                    // (idl/lora_options.proto: "everything generic about the artifact ...
+                    // lives on the ModelInfo record for this adapter" now) -- the catalog
+                    // entry itself no longer carries display/size metadata to show here.
                 }
 
                 Spacer(Modifier.size(dimens.spacingMd))
