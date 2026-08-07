@@ -31,8 +31,33 @@ import { getGenerationSettings } from './settings';
 
 const TOP_K = 3;
 
+/**
+ * What this view can ingest.
+ *
+ * Named once and used for three things that must agree: the file input's
+ * `accept`, the hint that tells the user what to drop, and the validation that
+ * rejects a dropped file — because a drop bypasses `accept` entirely, so
+ * without the check an unsupported binary would be read as text and indexed as
+ * mojibake.
+ */
+const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.json'] as const;
+
+/**
+ * Why a corpus session could not be opened.
+ *
+ * A plain `null` return conflated "the user has not chosen models" with
+ * "`rag.open` threw", so the caller had to guess — and the guess it made was
+ * printed as fact next to the real error, telling the user to select models that
+ * were visibly already selected. The reason travels with the failure now.
+ */
+type SessionOutcome =
+  | { ok: true; session: RagSession }
+  | { ok: false; reason: 'models-not-selected' | 'open-failed'; message: string };
+
 let container: HTMLElement;
 let isBusy = false;
+/** Numbers the pasted snippets, which arrive without a filename of their own. */
+let pastedNoteCount = 0;
 
 /** User-selected pipeline models (iOS parity: DocumentRAGView.swift:79-91
  * embedding + LLM model picker rows). */
@@ -78,16 +103,30 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
       </div>
       <div class="docs-section">
         <h3>Indexed documents</h3>
-        <p class="text-secondary">Upload <code>.txt</code>, <code>.md</code>, or <code>.json</code> files to index through the core RAG facade.
-        A native RAG provider or WASM RAG session is required. The current Web
-        RAG index is session-only and is not restored after a page reload.</p>
+        <p class="text-secondary">Answers are grounded in the files you index here.
+        The index lives in this tab only — it is cleared when you reload the page.</p>
+        <!-- A real drop zone, not a hidden input behind a button. It is a
+             <button> so the keyboard path is the same control as the pointer
+             path, rather than a separate affordance to discover. -->
+        <input type="file" id="docs-file" accept="${ACCEPTED_EXTENSIONS.join(',')}" multiple hidden />
+        <button type="button" class="docs-dropzone" id="docs-dropzone"
+          aria-describedby="docs-dropzone-hint">
+          <svg class="docs-dropzone-glyph" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span class="docs-dropzone-title">Drop files here, or click to choose</span>
+          <span class="docs-dropzone-hint" id="docs-dropzone-hint">
+            ${ACCEPTED_EXTENSIONS.join(', ')} — or paste text straight onto this page
+          </span>
+        </button>
         <div class="docs-actions">
-          <input type="file" id="docs-file" accept=".txt,.md,.json" multiple style="display:none" />
-          <button class="btn btn-primary" id="docs-upload-btn">Upload</button>
           <button class="btn btn-secondary" id="docs-clear-btn">Clear all</button>
         </div>
         <ul class="docs-list" id="docs-list"></ul>
-        <div id="docs-status" class="docs-status"></div>
+        <div id="docs-status" class="docs-status" role="status" aria-live="polite"></div>
       </div>
       <div class="docs-section">
         <h3>Ask a question</h3>
@@ -102,12 +141,11 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   populateModelPickers();
   void renderDocList();
 
-  container.querySelector('#docs-upload-btn')!.addEventListener('click', () => {
-    (container.querySelector('#docs-file') as HTMLInputElement).click();
-  });
   container.querySelector('#docs-file')!.addEventListener('change', (event) => {
     void onFilePicked(event);
   });
+  setupDropZone();
+  setupPasteToIndex();
   container.querySelector('#docs-clear-btn')!.addEventListener('click', () => {
     void clearAllDocs();
   });
@@ -124,12 +162,18 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
 
   return {
     onActivate: () => {
+      // Re-arm: init runs once, but every deactivate detaches the paste listener.
+      if (!detachPaste) setupPasteToIndex();
       refreshModelButtons();
       void renderDocList();
     },
     // Settings can reinitialize every backend while this view stays mounted;
     // the session holds the process-wide RAG index, so release it on exit.
     onDeactivate: () => {
+      // The paste listener is on `document`, so leaving the tab has to detach it
+      // — otherwise pasting in Chat would quietly index the clipboard here.
+      detachPaste?.();
+      detachPaste = null;
       void closeRAGSession();
     },
   };
@@ -247,69 +291,248 @@ function selectedLlmSupportsThinking(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Drop zone & paste
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire the drop zone.
+ *
+ * `dragover` must be cancelled on both the zone and the surrounding section, or
+ * the browser navigates away to the dropped file — the default that makes naive
+ * drop handling look broken. The highlight uses a counter because `dragleave`
+ * fires when the pointer crosses onto a *child* element, which would otherwise
+ * flicker the state off while the pointer is still inside the zone.
+ */
+function setupDropZone(): void {
+  const zone = container.querySelector<HTMLElement>('#docs-dropzone');
+  const input = container.querySelector<HTMLInputElement>('#docs-file');
+  if (!zone || !input) return;
+
+  zone.addEventListener('click', () => input.click());
+
+  let depth = 0;
+  const setActive = (active: boolean): void => {
+    zone.classList.toggle('docs-dropzone--active', active);
+  };
+
+  zone.addEventListener('dragenter', (event) => {
+    event.preventDefault();
+    depth += 1;
+    setActive(true);
+  });
+  zone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+  });
+  zone.addEventListener('dragleave', () => {
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) setActive(false);
+  });
+  zone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    depth = 0;
+    setActive(false);
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    void ingestFiles(files);
+  });
+
+  // Dropping just outside the zone is a miss, not a request to leave the app.
+  const section = zone.closest('.docs-section');
+  section?.addEventListener('dragover', (event) => event.preventDefault());
+  section?.addEventListener('drop', (event) => event.preventDefault());
+}
+
+/** Removes the document-level paste listener when the tab is left. */
+let detachPaste: (() => void) | null = null;
+
+/**
+ * Paste text anywhere on the page to index it.
+ *
+ * Scoped away from the question box and any other field: pasting a passage in
+ * order to *ask about it* must not also index it, and pasting into an input is
+ * unambiguously editing that input.
+ */
+function setupPasteToIndex(): void {
+  const onPaste = (event: ClipboardEvent): void => {
+    const target = event.target;
+    if (target instanceof HTMLElement
+      && (target.isContentEditable
+        || target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (files.length > 0) {
+      event.preventDefault();
+      void ingestFiles(files);
+      return;
+    }
+    const text = event.clipboardData?.getData('text/plain')?.trim();
+    if (!text) return;
+    event.preventDefault();
+    void ingestPastedText(text);
+  };
+  document.addEventListener('paste', onPaste);
+  detachPaste = () => document.removeEventListener('paste', onPaste);
+}
+
+// ---------------------------------------------------------------------------
 // File ingestion
 // ---------------------------------------------------------------------------
 
 async function onFilePicked(e: Event): Promise<void> {
   const target = e.target as HTMLInputElement;
   if (!target.files || target.files.length === 0) return;
-  if (isBusy) return;
-
-  isBusy = true;
   try {
-    const session = await ensureRAGSession();
-    if (!session) return;
-    for (const file of Array.from(target.files)) {
-      await ingestFile(session, file);
-    }
-    await renderDocList();
-  } catch (err) {
-    setStatus(`Indexing failed: ${formatError(err)}`);
+    await ingestFiles(Array.from(target.files));
   } finally {
-    isBusy = false;
     target.value = '';
   }
 }
 
-async function ingestFile(session: RagSession, file: File): Promise<void> {
-  setStatus(`Reading ${file.name}...`);
-  // .txt/.md/.json are all read as plain text and ingested as-is — same as
-  // iOS, where JSON documents flow through text extraction before ingest
-  // (DocumentRAGView.swift:50 allows [.pdf, .json]).
+/**
+ * Index a batch of files, whichever way the user supplied them.
+ *
+ * Shared by the file picker and the drop zone. Unsupported files are named and
+ * skipped rather than silently ignored: a drop bypasses the input's `accept`
+ * filter, so this is the only place the rule can be enforced, and dropping a
+ * folder of mixed content should still index what it can.
+ */
+async function ingestFiles(files: File[]): Promise<void> {
+  if (isBusy || files.length === 0) return;
+
+  const supported = files.filter((file) => isSupportedFile(file));
+  const rejected = files.filter((file) => !isSupportedFile(file));
+
+  if (supported.length === 0) {
+    setStatus(
+      `${describeFileList(rejected)} can't be indexed — this demo reads ${ACCEPTED_EXTENSIONS.join(', ')}.`,
+      'error',
+    );
+    return;
+  }
+
+  isBusy = true;
+  try {
+    const outcome = await ensureRAGSession();
+    if (!outcome.ok) return; // ensureRAGSession already reported why
+    for (const file of supported) {
+      await ingestText(outcome.session, {
+        text: await file.text(),
+        name: file.name,
+        sourceUri: `web-file:${file.name}`,
+        mediaType: file.type || 'text/plain',
+        sizeBytes: file.size,
+      });
+    }
+    await renderDocList();
+    if (rejected.length > 0) {
+      setStatus(
+        `Indexed ${supported.length} file${supported.length === 1 ? '' : 's'}. Skipped ${describeFileList(rejected)} — this demo reads ${ACCEPTED_EXTENSIONS.join(', ')}.`,
+        'error',
+      );
+    }
+  } catch (err) {
+    setStatus(`Indexing failed: ${formatError(err)}`, 'error');
+  } finally {
+    isBusy = false;
+  }
+}
+
+/** Extension check, because a dropped file never passes through `accept`. */
+function isSupportedFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return ACCEPTED_EXTENSIONS.some((extension) => name.endsWith(extension));
+}
+
+function describeFileList(files: File[]): string {
+  const names = files.map((file) => file.name);
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+}
+
+interface IngestPayload {
+  text: string;
+  name: string;
+  sourceUri: string;
+  mediaType: string;
+  sizeBytes: number;
+}
+
+/**
+ * Ingest already-read text.
+ *
+ * Text rather than a `File` because pasted content has no file behind it —
+ * .txt/.md/.json are all read as plain text and ingested as-is anyway, same as
+ * iOS, where JSON documents flow through text extraction before ingest
+ * (DocumentRAGView.swift:50 allows [.pdf, .json]).
+ */
+async function ingestText(session: RagSession, payload: IngestPayload): Promise<void> {
   const before = await session.stats();
 
-  setStatus(`Indexing ${file.name}...`);
+  setStatus(`Indexing ${payload.name}...`);
   await session.ingest({
-    text: await file.text(),
-    name: file.name,
+    text: payload.text,
+    name: payload.name,
     metadata: {
       docId: createDocumentId(),
-      sourceUri: `web-file:${file.name}`,
-      mediaType: file.type || 'text/plain',
-      sizeBytes: String(file.size),
+      sourceUri: payload.sourceUri,
+      mediaType: payload.mediaType,
+      sizeBytes: String(payload.sizeBytes),
     },
   });
 
   const stats = await session.stats();
   ingestedDocuments.push({
-    name: file.name,
+    name: payload.name,
     chunkCount: Math.max(0, stats.chunkCount - before.chunkCount),
   });
-  setStatus(`Indexed ${file.name}. ${stats.chunkCount} chunks total.`);
+  setStatus(`Indexed ${payload.name}. ${stats.chunkCount} chunks total.`);
+}
+
+/**
+ * Index pasted text as a document.
+ *
+ * Pasting a passage is the fastest way to try RAG — it skips picking, saving and
+ * uploading a file just to ask one question about a paragraph.
+ */
+async function ingestPastedText(text: string): Promise<void> {
+  if (isBusy) return;
+  isBusy = true;
+  try {
+    const outcome = await ensureRAGSession();
+    if (!outcome.ok) return;
+    pastedNoteCount += 1;
+    const name = `Pasted text ${pastedNoteCount}`;
+    await ingestText(outcome.session, {
+      text,
+      name,
+      sourceUri: 'web-paste:',
+      mediaType: 'text/plain',
+      sizeBytes: new Blob([text]).size,
+    });
+    await renderDocList();
+  } catch (err) {
+    setStatus(`Indexing failed: ${formatError(err)}`, 'error');
+  } finally {
+    isBusy = false;
+  }
 }
 
 async function clearAllDocs(): Promise<void> {
   if (isBusy) return;
   isBusy = true;
   try {
-    const session = await ensureRAGSession();
-    if (!session) return;
-    await session.clear();
+    const outcome = await ensureRAGSession();
+    if (!outcome.ok) return;
+    await outcome.session.clear();
     ingestedDocuments.length = 0;
+    pastedNoteCount = 0;
     await renderDocList();
     setStatus('All documents cleared.');
   } catch (err) {
-    setStatus(`Clear failed: ${formatError(err)}`);
+    setStatus(`Clear failed: ${formatError(err)}`, 'error');
   } finally {
     isBusy = false;
   }
@@ -323,18 +546,31 @@ async function askQuestion(): Promise<void> {
   if (isBusy) return;
   const queryEl = container.querySelector('#docs-query') as HTMLTextAreaElement;
   const question = queryEl.value.trim();
-  if (!question) return;
+  if (!question) {
+    // Was a bare `return`: clicking Ask with an empty box did nothing at all, so
+    // the button read as broken rather than as waiting for input.
+    setAnswerText('Type a question first.');
+    queryEl.focus();
+    return;
+  }
 
   isBusy = true;
   setAnswerText('Searching...');
   try {
-    const session = await ensureRAGSession();
-    if (!session) {
-      setAnswerText('Select an embedding model and an LLM model first.');
+    const outcome = await ensureRAGSession();
+    if (!outcome.ok) {
+      // The failure already said what went wrong, in the ingest section's status
+      // line. Point at it rather than restating it here in different words —
+      // this is where the false "select models first" used to appear beside the
+      // real error, with both selects visibly populated.
+      setAnswerText(outcome.reason === 'models-not-selected'
+        ? outcome.message
+        : `${outcome.message} Fix that above, then ask again.`);
       return;
     }
+    const session = outcome.session;
     if ((await session.stats()).documentCount === 0) {
-      setAnswerText('Upload a document first.');
+      setAnswerText('Upload a document first — answers are grounded in what you index here.');
       return;
     }
 
@@ -407,9 +643,18 @@ async function renderDocList(): Promise<void> {
   }
 }
 
-function setStatus(msg: string): void {
+/**
+ * Report progress or a problem in the ingest section.
+ *
+ * The `error` tone is what makes a failure look like one — `.docs-status.error`
+ * already exists for exactly this, and without it a failure rendered in the same
+ * grey as an idle hint.
+ */
+function setStatus(msg: string, tone: 'info' | 'error' = 'info'): void {
   const el = container.querySelector('#docs-status');
-  if (el) el.textContent = msg;
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('error', tone === 'error');
 }
 
 function answerElement(): HTMLElement | null {
@@ -431,13 +676,14 @@ function setAnswerHtml(html: string): void {
  * Open (or reuse) the corpus session for the selected model pair. `rag.open`
  * loads and downloads both models itself, so nothing is pre-staged here.
  */
-async function ensureRAGSession(): Promise<RagSession | null> {
+async function ensureRAGSession(): Promise<SessionOutcome> {
   if (!selectedEmbeddingModelId || !selectedLlmModelId) {
-    setStatus('Select an embedding model and an LLM model first.');
-    return null;
+    const message = 'Select an embedding model and an LLM model first.';
+    setStatus(message, 'error');
+    return { ok: false, reason: 'models-not-selected', message };
   }
   const key = `${selectedEmbeddingModelId}|${selectedLlmModelId}`;
-  if (ragSession && openedPipelineKey === key) return ragSession;
+  if (ragSession && openedPipelineKey === key) return { ok: true, session: ragSession };
 
   await closeRAGSession();
   try {
@@ -449,11 +695,14 @@ async function ensureRAGSession(): Promise<RagSession | null> {
     );
     openedPipelineKey = key;
     setStatus('RAG session ready.');
-    return ragSession;
+    return { ok: true, session: ragSession };
   } catch (err) {
     await closeRAGSession();
-    setStatus(`RAG init failed: ${formatError(err)}`);
-    return null;
+    // Report the actual failure. This used to be paraphrased by the caller as
+    // "select models first" — advice the user had already followed.
+    const message = `Couldn't start the document pipeline: ${formatError(err)}`;
+    setStatus(message, 'error');
+    return { ok: false, reason: 'open-failed', message };
   }
 }
 
