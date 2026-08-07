@@ -36,6 +36,7 @@ import { onEngineStateChange } from '../services/engine-availability';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import { formatFramework } from '../services/model-display';
+import { renderMarkdown } from '../services/markdown';
 import { getGenerationSettings } from './settings';
 
 const TOP_K = 3;
@@ -839,7 +840,13 @@ function formatAnswer(text: string, sources: Match[]): string {
       <pre>${escapeHtml(source.text.slice(0, 400))}${source.text.length > 400 ? '...' : ''}</pre>
     </div>
   `).join('');
-  return `${thinkingHtml}<div class="docs-answer-text">${escapeHtml(split.answer)}</div><div class="docs-sources">${sourcesHtml}</div>`;
+  // The answer is model output, so it is markdown — the same renderer the chat
+  // bubble uses. It was `escapeHtml`'d straight into a div, which meant a RAG
+  // answer with numbered steps or a heading showed its `1.` and `###` markers
+  // as literal characters while the identical text rendered properly one tab
+  // over in Chat. `renderMarkdown` escapes every span itself.
+  return `${thinkingHtml}<div class="docs-answer-text">${renderMarkdown(split.answer)}</div>`
+    + `<div class="docs-sources">${sourcesHtml}</div>`;
 }
 
 function createDocumentId(): string {

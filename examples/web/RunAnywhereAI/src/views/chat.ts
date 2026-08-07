@@ -51,6 +51,7 @@ import {
   validateChatAttachmentFile,
 } from '../services/chat-attachments';
 import { escapeHtml } from '../services/escape-html';
+import { renderMarkdown } from '../services/markdown';
 import { formatError } from '../services/format-error';
 import {
   ConversationsStore,
@@ -344,6 +345,21 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         label.textContent = 'Copied';
         setTimeout(() => { label.textContent = 'Copy'; }, 1500);
       }
+    }).catch(() => showToast('Could not copy to clipboard', 'warning', 2600));
+  }, listenerOptions);
+  // Copy a fenced code block. Delegated for the same reason as the reply copy
+  // above — every streamed token re-renders the bubble, so a listener bound to
+  // the button itself would be discarded on the next token. The code rides in
+  // the attribute rather than being read from the DOM so what lands on the
+  // clipboard is exactly what the model wrote.
+  messagesEl.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-md-code]');
+    if (!button) return;
+    const code = button.dataset.mdCode;
+    if (!code) return;
+    void navigator.clipboard.writeText(code).then(() => {
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = 'Copy'; }, 1500);
     }).catch(() => showToast('Could not copy to clipboard', 'warning', 2600));
   }, listenerOptions);
   inputEl.addEventListener('keydown', (event) => {
@@ -1460,7 +1476,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
     ? '<span class="chat-cursor" aria-hidden="true"></span>'
     : '';
   const body = msg.content
-    ? renderMarkdownLite(msg.content) + cursor
+    ? renderMarkdown(msg.content) + cursor
     : (streaming
       ? (thinking
         ? `<span class="chat-bubble-typing">Thinking&hellip;</span>${cursor}`
@@ -1468,26 +1484,6 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
       : '<span class="chat-bubble-typing">No final answer was generated.</span>');
 
   return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${body}${sourcesSection}</div>`;
-}
-
-/**
- * Minimal markdown rendering on top of escapeHtml (kept dependency-free):
- * fenced code blocks, inline code, and bold. Everything passes through
- * escapeHtml first, so model output can never inject markup.
- */
-function renderMarkdownLite(text: string): string {
-  const codeBlocks: string[] = [];
-  const escaped = escapeHtml(text);
-  // Fenced code blocks (tolerates an unterminated fence while streaming).
-  let html = escaped.replace(/```[^\n`]*\n?([\s\S]*?)(?:```|$)/g, (_match, code: string) => {
-    codeBlocks.push(`<pre class="chat-code"><code>${code.replace(/\n$/, '')}</code></pre>`);
-    return `\uE000${codeBlocks.length - 1}\uE000`;
-  });
-  html = html
-    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>');
-  return html.replace(/\uE000(\d+)\uE000/g, (_match, i: string) => codeBlocks[Number(i)]);
 }
 
 export function formatChatError(error: unknown): string {
