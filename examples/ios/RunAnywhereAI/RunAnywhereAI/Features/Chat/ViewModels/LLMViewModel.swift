@@ -377,9 +377,14 @@ final class LLMViewModel {
         }
     }
 
-    private func prepareMessagesForSending() -> (prompt: String, messageIndex: Int) {
-        let prompt = currentInput
-        currentInput = ""
+    /// The prologue every turn shares: clear the last error, claim the chat, and
+    /// mint this generation's identity.
+    ///
+    /// Extracted so a regenerated turn (`LLMViewModel+MessageActions`) claims the
+    /// chat through exactly the same path as a typed one. Two copies of this
+    /// drifted in every previous chat app in this repo: one forgot to reset
+    /// `activeGenerationTTFTMs`, so the second reply reported the first's TTFT.
+    func beginGeneration() {
         isGenerating = true
         error = nil
         activeGenerationTTFTMs = nil
@@ -394,6 +399,12 @@ final class LLMViewModel {
         // and give it an identity (lets a superseded finalize no-op).
         generatingConversationId = currentConversation?.id
         activeGenerationID = UUID()
+    }
+
+    private func prepareMessagesForSending() -> (prompt: String, messageIndex: Int) {
+        let prompt = currentInput
+        currentInput = ""
+        beginGeneration()
 
         // Add user message
         let userMessage = Message(role: .user, content: prompt)
@@ -410,7 +421,10 @@ final class LLMViewModel {
         return (prompt, messages.count - 1)
     }
 
-    private func executeGeneration(prompt: String, messageIndex: Int, generationID: UUID?) async {
+    /// Internal, not private: `LLMViewModel+MessageActions` re-enters this exact
+    /// path to regenerate a reply, so a regenerated turn goes through the same
+    /// preflight, tool routing, error handling, and finalization as a typed one.
+    func executeGeneration(prompt: String, messageIndex: Int, generationID: UUID?) async {
         do {
             try await ensureModelIsLoaded()
 

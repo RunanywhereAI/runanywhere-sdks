@@ -144,11 +144,12 @@ struct ChatMessageListView: View {
             ForEach(viewModel.messages) { message in
                 MessageBubbleView(
                     message: message,
-                    isGenerating: viewModel.isGenerating,
                     isStreamingTail: viewModel.isGenerating
                         && message.role == .assistant
                         && message.id == viewModel.messages.last?.id,
-                    loadedModelSupportsThinking: viewModel.loadedModelSupportsThinking
+                    isLatestTurn: message.id == viewModel.messages.last?.id,
+                    loadedModelSupportsThinking: viewModel.loadedModelSupportsThinking,
+                    actions: actions(for: message)
                 )
                 .id(message.id)
                 .transition(.messageInsert)
@@ -168,6 +169,40 @@ struct ChatMessageListView: View {
 
     private func scrollToTail(_ proxy: ScrollViewProxy) {
         proxy.scrollTo(Self.tailAnchor, anchor: .bottom)
+    }
+
+    /// Which actions a turn offers.
+    ///
+    /// Everything is withheld while a generation is running: regenerating or
+    /// deleting a message the in-flight turn is indexed against would leave that
+    /// turn writing into the wrong slot. Copy always stays, since the bubble owns
+    /// it and it mutates nothing.
+    private func actions(for message: Message) -> MessageActions {
+        guard !viewModel.isGenerating else { return .none }
+
+        switch message.role {
+        case .assistant:
+            // An error bubble is UI feedback, not a reply — retrying the question
+            // is the useful action, so it keeps Regenerate.
+            return MessageActions(
+                regenerate: { viewModel.regenerateReply(messageID: message.id) },
+                edit: nil,
+                delete: { viewModel.deleteMessage(id: message.id) }
+            )
+        case .user:
+            return MessageActions(
+                regenerate: nil,
+                edit: {
+                    viewModel.editQuestion(messageID: message.id)
+                    // The question lands in the composer; taking focus with it is
+                    // what makes this an edit rather than a puzzle.
+                    isTextFieldFocused = true
+                },
+                delete: { viewModel.deleteMessage(id: message.id) }
+            )
+        case .system:
+            return .none
+        }
     }
 }
 
