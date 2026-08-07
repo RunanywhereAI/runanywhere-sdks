@@ -177,10 +177,10 @@ class RunAnywhereTextGenerationStreamTest {
         }
 
     @Test
-    fun `batch buffered maple metrics use wall throughput and clear fake ttft`() {
+    fun `batch buffered maple metrics use wall throughput and keep first-token ttft`() {
         // 182 tokens, 13685 ms wall, "TTFT" 13680 ms, flush window 5 ms →
         // naive decode rate ≈ 36400 tok/s. Sanitizer must report ~13.3 tok/s
-        // and drop the stream-derived TTFT (it is not prefill).
+        // and keep TTFT as time to first streamed token (thinking or answer).
         val metrics =
             sanitizeStreamMetrics(
                 totalMs = 13_685.0,
@@ -188,7 +188,7 @@ class RunAnywhereTextGenerationStreamTest {
                 reportedTps = 36_400.0,
                 reportedTtftMs = 13_680L,
             )
-        assertEquals(0L, metrics.ttftMs)
+        assertEquals(13_680L, metrics.ttftMs)
         assertEquals(182 * 1000.0 / 13_685.0, metrics.decodeTokensPerSecond, 0.05)
     }
 
@@ -246,7 +246,7 @@ class RunAnywhereTextGenerationStreamTest {
                     nowMillis = { tick++ },
                 )
             val usage = result.usage!!
-            assertEquals(0L, usage.ttft_ms)
+            assertEquals(13_680L, usage.ttft_ms)
             assertEquals(182 * 1000.0 / 13_685.0, usage.decode_tokens_per_second, 0.05)
             assertEquals(13_685.0, result.generation_time_ms, 0.0)
         }

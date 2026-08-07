@@ -281,6 +281,12 @@ internal fun sanitizeStreamMetrics(
         if (totalMs > 0.0 && outputTokens > 0) outputTokens / (totalMs / 1000.0) else 0.0
     val ttft = reportedTtftMs?.takeIf { it > 0L }
     val decodeWindowMs = if (ttft != null) totalMs - ttft.toDouble() else totalMs
+    val steadyTps =
+        if (ttft != null && decodeWindowMs > 0.0 && outputTokens > 1) {
+            (outputTokens - 1) / (decodeWindowMs / 1000.0)
+        } else {
+            wallTps
+        }
     // Batch-buffered: first stream token arrives only after the full generate
     // (Maple/Bonsai), so post-TTFT decode collapses to a few ms. Also catch
     // absurd reported rates even when TTFT was already cleared/zeroed.
@@ -289,12 +295,12 @@ internal fun sanitizeStreamMetrics(
             (reportedTps != null && reportedTps > maxOf(2_000.0, wallTps * 5.0) && wallTps > 0.0) ||
             (ttft != null && totalMs > 0.0 && ttft.toDouble() >= totalMs * 0.95)
     return if (batchBuffered) {
-        // No meaningful stream TTFT for batch backends — wall-to-first equals
-        // full generate (incl. thinking), which is not prefill.
-        SanitizedStreamMetrics(decodeTokensPerSecond = wallTps, ttftMs = 0L)
+        // Keep TTFT: for Maple/Bonsai it is time to the first streamed token
+        // (first thinking token when reasoning is on). Only tok/s must use wall.
+        SanitizedStreamMetrics(decodeTokensPerSecond = wallTps, ttftMs = ttft ?: 0L)
     } else {
         SanitizedStreamMetrics(
-            decodeTokensPerSecond = reportedTps?.takeIf { it > 0.0 } ?: wallTps,
+            decodeTokensPerSecond = reportedTps?.takeIf { it > 0.0 } ?: steadyTps,
             ttftMs = ttft ?: 0L,
         )
     }

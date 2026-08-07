@@ -123,8 +123,8 @@ struct rac_llm_component {
 // Batch-style backends (Maple/Bonsai FastRPC, some remote hosts) finish the
 // whole generate before dumping stream chunks. Wall-to-first-token then ≈ total
 // time, so "decode = total − ttft" collapses to a few ms → absurd five-digit
-// tok/s, and TTFT looks like a 15s prefill when generation was running the
-// whole time. Detect that and report wall throughput with no stream-TTFT.
+// tok/s. Keep TTFT: for these backends it is time to the first streamed token
+// (first thinking token when reasoning is on), not a fake prefill figure.
 struct StreamTimingMetrics {
     int64_t ttft_ms = 0;
     int64_t prompt_eval_ms = 0;
@@ -141,15 +141,20 @@ static StreamTimingMetrics compute_stream_timing_metrics(int64_t total_ms, int64
         (raw_ttft_ms > 0 && raw_ttft_ms < total_ms) ? (total_ms - raw_ttft_ms) : total_ms;
     const bool batch_buffered =
         raw_ttft_ms > 0 && decode_window < std::max<int64_t>(50, total_ms / 20);
+    m.ttft_ms = raw_ttft_ms > 0 ? raw_ttft_ms : 0;
+    m.prompt_eval_ms = m.ttft_ms;
     if (batch_buffered) {
         m.tokens_per_second = static_cast<double>(completion_tokens) /
                               (static_cast<double>(total_ms) / 1000.0);
         return m;
     }
-    m.ttft_ms = raw_ttft_ms > 0 ? raw_ttft_ms : 0;
-    m.prompt_eval_ms = m.ttft_ms;
-    m.tokens_per_second = static_cast<double>(completion_tokens) /
-                          (static_cast<double>(decode_window) / 1000.0);
+    // TTFT ends when token 1 is delivered. Steady decode therefore measures
+    // tokens 2..N over the first-to-last interval, not all N tokens.
+    const int32_t steady_tokens = std::max<int32_t>(0, completion_tokens - 1);
+    m.tokens_per_second = decode_window > 0
+                              ? static_cast<double>(steady_tokens) /
+                                    (static_cast<double>(decode_window) / 1000.0)
+                              : 0.0;
     return m;
 }
 
