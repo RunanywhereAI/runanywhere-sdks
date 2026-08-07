@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.screens.models.brand
 import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
-import com.runanywhere.runanywhereai.ui.screens.models.shortLabel
+import com.runanywhere.runanywhereai.ui.screens.models.consumerBackendShortLabel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
@@ -148,7 +148,7 @@ private fun ModelCard(
     val backendStatusText = if (hostedModel != null && !generating) {
         "Host · $statusText"
     } else if (model != null && !generating) {
-        "${model.framework.shortLabel()} · $statusText"
+        "${model.framework.consumerBackendShortLabel()} · $statusText"
     } else {
         statusText
     }
