@@ -2742,6 +2742,69 @@
 .setting-label { font-size: var(--font-size-base); }
 .setting-value { font-size: var(--font-size-base); color: var(--text-secondary); }
 
+/*
+ * Explanatory text under a setting.
+ *
+ * Used eight times — including the API-key disclaimer about the browser sending
+ * the key directly — but it had no rule at all, so every hint rendered at full
+ * body size in primary text and competed with the setting it was explaining.
+ */
+.setting-hint {
+  margin: 0;
+  padding: 0 var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+/*
+ * A hint that follows its card instead of sitting inside one.
+ *
+ * The section is an even 10 px stack, which left each of these floating exactly
+ * halfway between the row it explains and the row below — so it read as an
+ * introduction to the *next* setting. Pull it up against its own card and inset
+ * it to the card's text, so proximity and alignment both point at the right
+ * control. `+` rather than a class on the element: the relationship is "this
+ * hint follows that row", which is precisely what the selector says.
+ */
+.setting-row + .setting-hint {
+  margin-top: calc(-1 * var(--space-sm));
+  padding-left: var(--space-lg);
+  padding-right: var(--space-lg);
+}
+.setting-hint a { color: var(--color-primary); }
+.setting-hint code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+/*
+ * "Saved" confirmation for the generation preferences.
+ *
+ * These persist on change and used to do it in complete silence. Reserving the
+ * line's height keeps the section from jumping when the notice appears and goes.
+ */
+.setting-saved {
+  margin: 0;
+  padding: 0 var(--space-xs);
+  color: var(--color-green);
+  font-size: var(--font-size-sm);
+  /*
+   * `line-height` and `min-height` are deliberately the same number: the reserved
+   * empty height has to equal the height of one filled line, or the section still
+   * nudges when the notice appears — which is the jump this line exists to absorb.
+   * (The failure message wraps past one line, and growing for a real problem is
+   * fine; silently shifting for a routine "Saved" is not.)
+   */
+  line-height: var(--line-height-normal);
+  min-height: 1.5em;
+  opacity: 0;
+  transition: opacity var(--duration-fast);
+}
+.setting-saved--visible { opacity: 1; }
+/* Storage was blocked, so the preference did not persist — never dressed as a
+   success. */
+.setting-saved--error { color: var(--color-yellow); }
+
 /** Stacked variant for form field rows (API key, URL, etc.) */
 .setting-row--stacked {
   flex-direction: column;
@@ -2769,15 +2832,35 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* Toggle */
+/*
+ * Switch. Now a real `<button role="switch">` rather than a styled `<div>`, so
+ * these rules also have to undo the UA button defaults (border, padding, and the
+ * platform background) that a div never had.
+ */
 .toggle {
   width: 48px;
   height: 28px;
+  /* `flex: none` because a `.setting-row` is a flex container and a button, unlike
+     the previous div, would otherwise be squeezed by a long label beside it. */
+  flex: none;
+  padding: 0;
+  border: none;
   border-radius: var(--radius-full);
-  background: var(--bg-gray5);
+  /* Not a surface grey: see --switch-track-off. An off switch has to be visible
+     as a control before it is touched. */
+  background: var(--switch-track-off);
   position: relative;
   cursor: pointer;
   transition: background var(--duration-fast);
 }
+/* Keyboard users need to see where they are: the switch is reachable now, so it
+   must also be visibly focused. */
+.toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* `aria-checked` is the state of record; `.on` is kept as its visual echo so the
+   two can never disagree about what the user is being shown. */
 .toggle.on { background: var(--color-primary); }
 .toggle::after {
   content: '';
@@ -2788,6 +2871,10 @@ input[type="range"]::-webkit-slider-thumb {
   height: 24px;
   border-radius: var(--radius-full);
   background: white;
+  /* White on brand orange is only 2.89:1, so the knob needs its own edge to stay
+     a distinct shape in the on state — the same 3:1 boundary rule as the track
+     (4.1:1 against orange, and it also reads on both off-tracks). */
+  box-shadow: 0 0 0 1px #3A3733;
   transition: transform var(--duration-fast);
 }
 .toggle.on::after { transform: translateX(20px); }
