@@ -191,6 +191,7 @@ class Runtime:
 
         try:
             from ._proto import sdk_init_pb2 as sdk_init
+            from ._proto import model_types_pb2 as model_types
         except ImportError:
             _LOG.warning(
                 "runanywhere: telemetry/auth needs protobuf — install the 'rag' extra "
@@ -200,9 +201,9 @@ class Runtime:
 
         env_int = self._RAC_ENV.get(environment, 0)
         proto_env = (
-            sdk_init.SDK_INIT_ENVIRONMENT_PRODUCTION
+            model_types.SDK_ENVIRONMENT_PRODUCTION
             if not is_dev
-            else sdk_init.SDK_INIT_ENVIRONMENT_DEVELOPMENT
+            else model_types.SDK_ENVIRONMENT_DEVELOPMENT
         )
         version = str(core.version())  # type: ignore[attr-defined]
         device_id = core.device_persistent_id()  # type: ignore[attr-defined]
@@ -218,11 +219,7 @@ class Runtime:
         )
         if device_id:
             phase1.device_id = device_id
-        phase2 = sdk_init.SdkInitPhase2Request(
-            flush_telemetry=True,
-            discover_downloaded_models=True,
-            rescan_local_models=True,
-        )
+        phase2 = sdk_init.SdkInitPhase2Request()
         try:
             core.configure_control_plane(  # type: ignore[attr-defined]
                 _http_post,
