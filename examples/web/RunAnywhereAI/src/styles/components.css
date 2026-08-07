@@ -893,6 +893,21 @@
   flex-shrink: 0;
 }
 
+/*
+ * A file is being dragged over the composer.
+ *
+ * The cue goes on the input area rather than the shell so it outlines the target
+ * the user is aiming at. Brand-coloured because "you may drop here" is an
+ * affirmative invitation, and dashed to say the boundary is a drop zone rather
+ * than a focus ring — a solid brand outline is what focus-visible uses, and the
+ * two must not be confusable.
+ */
+.chat-composer-shell--dropping .chat-input-area {
+  border-color: var(--color-primary);
+  border-style: dashed;
+  background: var(--bg-tertiary);
+}
+
 .chat-panel-consumer .chat-input-area {
   display: flex;
   align-items: flex-end;
