@@ -23,6 +23,17 @@ let container: HTMLElement;
 
 const STORAGE_KEY = 'runanywhere-settings';
 
+/**
+ * Max-token bounds, named because they are enforced in three places that must
+ * agree: the stepper's clamp, the persisted-value validator, and the hint that
+ * tells the user what the range is. They were previously literals in the first
+ * two and absent from the third, so the ceiling was invisible until generation
+ * time.
+ */
+const TOKENS_MIN = 500;
+const TOKENS_MAX = 20_000;
+const TOKENS_STEP = 500;
+
 // Generation defaults mirror iOS. A persisted explicit preference still wins
 // in loadSettings().
 const DEFAULT_SYSTEM_PROMPT = 'You are a helpful, concise AI assistant.';
@@ -65,9 +76,9 @@ function decodePersistedSettings(value: unknown): PersistedAppSettings | null {
   if (
     typeof value.maxTokens === 'number'
     && Number.isInteger(value.maxTokens)
-    && value.maxTokens >= 500
-    && value.maxTokens <= 20000
-    && value.maxTokens % 500 === 0
+    && value.maxTokens >= TOKENS_MIN
+    && value.maxTokens <= TOKENS_MAX
+    && value.maxTokens % TOKENS_STEP === 0
   ) {
     decoded.maxTokens = value.maxTokens;
   }
@@ -184,33 +195,54 @@ export function initSettingsTab(el: HTMLElement): void {
       <div class="settings-section">
         <div class="settings-section-title">Generation</div>
         <div class="setting-row">
-          <span class="setting-label">Temperature</span>
+          <label class="setting-label" for="settings-temp">Temperature</label>
           <div class="flex items-center gap-sm">
-            <span class="setting-value" id="settings-temp-val">${settings.temperature.toFixed(1)}</span>
-            <input type="range" id="settings-temp" min="0" max="2" step="0.1" value="${settings.temperature}">
+            <span class="setting-value" id="settings-temp-val" aria-hidden="true">${settings.temperature.toFixed(1)}</span>
+            <input type="range" id="settings-temp" min="0" max="2" step="0.1" value="${settings.temperature}"
+              aria-describedby="settings-temp-hint">
           </div>
         </div>
+        <p class="setting-hint" id="settings-temp-hint">
+          0 is repeatable and literal, 2 is loose and inventive. The slider
+          reports its own value, so the number beside it is decorative.
+        </p>
         <div class="setting-row">
-          <span class="setting-label">Max Tokens</span>
+          <span class="setting-label" id="settings-tokens-label">Max Tokens</span>
           <div class="flex items-center gap-sm">
-            <button class="btn btn-sm" id="settings-tokens-minus">-</button>
-            <span class="setting-value" id="settings-tokens-val">${settings.maxTokens}</span>
-            <button class="btn btn-sm" id="settings-tokens-plus">+</button>
+            <button type="button" class="btn btn-sm" id="settings-tokens-minus"
+              aria-label="Decrease max tokens by ${TOKENS_STEP}">&minus;</button>
+            <span class="setting-value" id="settings-tokens-val" role="status" aria-live="polite"
+              aria-labelledby="settings-tokens-label">${settings.maxTokens}</span>
+            <button type="button" class="btn btn-sm" id="settings-tokens-plus"
+              aria-label="Increase max tokens by ${TOKENS_STEP}">+</button>
           </div>
         </div>
+        <p class="setting-hint" id="settings-tokens-hint">
+          ${TOKENS_MIN.toLocaleString()}–${TOKENS_MAX.toLocaleString()}, in steps of
+          ${TOKENS_STEP}. A model still stops early at its own context limit.
+        </p>
         <div class="setting-row setting-row--stacked">
-          <label class="label">System Prompt</label>
+          <label class="label" for="settings-system-prompt">System Prompt</label>
           <textarea class="text-input w-full" id="settings-system-prompt" rows="3"
             placeholder="${escapeHtml(DEFAULT_SYSTEM_PROMPT)}">${escapeHtml(settings.systemPrompt)}</textarea>
         </div>
         <div class="setting-row">
-          <span class="setting-label">Thinking Mode</span>
-          <div class="toggle ${settings.thinkingModeEnabled ? 'on' : ''}" id="settings-thinking-toggle"></div>
+          <span class="setting-label" id="settings-thinking-label">Thinking Mode</span>
+          <!-- A real <button role="switch">, not a styled <div>: this was a
+               click-only element with tabIndex -1, no role and no state, so it
+               was unreachable by keyboard and silent to a screen reader — a fake
+               toggle by this app's own truthfulness rule, even though the value
+               it wrote was honoured at send time. -->
+          <button type="button" class="toggle" id="settings-thinking-toggle"
+            role="switch" aria-checked="${settings.thinkingModeEnabled ? 'true' : 'false'}"
+            aria-labelledby="settings-thinking-label"
+            aria-describedby="settings-thinking-hint"></button>
         </div>
-        <p class="setting-hint">
+        <p class="setting-hint" id="settings-thinking-hint">
           Off by default. Turn on for thinking-capable models (e.g. Qwen3)
           when you want a visible reasoning phase before the answer.
         </p>
+        <p class="setting-saved" id="settings-generation-saved" role="status" aria-live="polite"></p>
       </div>
 
       <!-- Optional direct-browser API configuration, applied explicitly by
@@ -300,21 +332,31 @@ export function initSettingsTab(el: HTMLElement): void {
   tempSlider.addEventListener('input', () => {
     settings.temperature = parseFloat(tempSlider.value);
     tempVal.textContent = settings.temperature.toFixed(1);
-    saveSettings();
+    // `input` fires per pixel of drag, so announce once the drag settles rather
+    // than shouting "Saved" a hundred times into the live region.
+    saveSettings({ announce: false });
   });
+  tempSlider.addEventListener('change', () => saveSettings());
 
   // Max tokens stepper
   const tokensVal = container.querySelector('#settings-tokens-val')!;
-  container.querySelector('#settings-tokens-minus')!.addEventListener('click', () => {
-    settings.maxTokens = Math.max(500, settings.maxTokens - 500);
+  const minusButton = container.querySelector('#settings-tokens-minus') as HTMLButtonElement;
+  const plusButton = container.querySelector('#settings-tokens-plus') as HTMLButtonElement;
+  const stepTokens = (delta: number): void => {
+    const next = Math.min(TOKENS_MAX, Math.max(TOKENS_MIN, settings.maxTokens + delta));
+    if (next === settings.maxTokens) return;
+    settings.maxTokens = next;
     tokensVal.textContent = String(settings.maxTokens);
+    // Disable at the ends instead of letting a live button do nothing — the
+    // ceiling was previously invisible until a model refused the request.
+    minusButton.disabled = settings.maxTokens <= TOKENS_MIN;
+    plusButton.disabled = settings.maxTokens >= TOKENS_MAX;
     saveSettings();
-  });
-  container.querySelector('#settings-tokens-plus')!.addEventListener('click', () => {
-    settings.maxTokens = Math.min(20000, settings.maxTokens + 500);
-    tokensVal.textContent = String(settings.maxTokens);
-    saveSettings();
-  });
+  };
+  minusButton.disabled = settings.maxTokens <= TOKENS_MIN;
+  plusButton.disabled = settings.maxTokens >= TOKENS_MAX;
+  minusButton.addEventListener('click', () => stepTokens(-TOKENS_STEP));
+  plusButton.addEventListener('click', () => stepTokens(TOKENS_STEP));
 
   // System prompt (iOS parity: SettingsViewModel.swift:251-254 saveSystemPrompt)
   const systemPromptInput = container.querySelector('#settings-system-prompt') as HTMLTextAreaElement;
@@ -474,15 +516,57 @@ function updateTelemetryState(environment: string, enabled: boolean): void {
   }
 }
 
+/**
+ * Wire a `role="switch"` button.
+ *
+ * `aria-checked` is the state of record and `.on` is only its visual echo, so
+ * the two cannot disagree — a screen reader reads the same value the eye sees.
+ * Space and Enter come free from using a real `<button>`.
+ */
 function setupToggle(id: string, onChange: (on: boolean) => void): void {
   const toggle = container.querySelector(`#${id}`)!;
+  const render = (on: boolean): void => {
+    toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+    toggle.classList.toggle('on', on);
+  };
+  // Sync once up front rather than writing the class in the template too: a
+  // switch restored from storage as on would otherwise render visually off,
+  // which is the exact disagreement this arrangement exists to rule out.
+  render(toggle.getAttribute('aria-checked') === 'true');
   toggle.addEventListener('click', () => {
-    toggle.classList.toggle('on');
-    onChange(toggle.classList.contains('on'));
+    const next = toggle.getAttribute('aria-checked') !== 'true';
+    render(next);
+    onChange(next);
   });
 }
 
-function saveSettings(): void {
+/**
+ * Confirm a preference was stored.
+ *
+ * Every generation setting writes to localStorage on change and previously did
+ * so in complete silence, leaving no way to tell a saved value from a dropped
+ * one. Announced through a polite live region so it is spoken as well as seen,
+ * and cleared afterwards so a stale "Saved" cannot outlive its edit.
+ */
+let savedNoticeTimer: number | null = null;
+
+function announceSaved(): void {
+  const notice = container?.querySelector('#settings-generation-saved');
+  if (!notice) return;
+  notice.textContent = 'Saved';
+  notice.classList.add('setting-saved--visible');
+  // Clears a previous storage failure: if writing works now, the warning it left
+  // behind is stale and must not stay on screen in its error colour.
+  notice.classList.remove('setting-saved--error');
+  if (savedNoticeTimer !== null) window.clearTimeout(savedNoticeTimer);
+  savedNoticeTimer = window.setTimeout(() => {
+    notice.textContent = '';
+    notice.classList.remove('setting-saved--visible');
+    savedNoticeTimer = null;
+  }, 2000);
+}
+
+function saveSettings(options: { announce?: boolean } = {}): void {
   try {
     // iOS parity stops at the Keychain: SettingsViewModel persists the API
     // key via KeychainService (SettingsViewModel.swift:65-72), and browsers
@@ -491,7 +575,30 @@ function saveSettings(): void {
     // so the key is session-only — every other setting round-trips.
     const { apiKey: _apiKey, ...persistable } = settings;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
-  } catch { /* storage may not be available */ }
+    if (options.announce !== false) announceSaved();
+  } catch {
+    // Storage can be unavailable (private mode, quota, blocked cookies). Say so
+    // rather than reporting a save that did not happen.
+    reportSaveFailed();
+  }
+}
+
+/**
+ * Report that the preference did *not* persist.
+ *
+ * The catch here used to swallow the failure entirely, which — now that the
+ * success path says "Saved" — would be the worse kind of dishonesty: a setting
+ * that silently reverts on reload while the UI claimed otherwise.
+ */
+function reportSaveFailed(): void {
+  const notice = container?.querySelector('#settings-generation-saved');
+  if (!notice) return;
+  if (savedNoticeTimer !== null) {
+    window.clearTimeout(savedNoticeTimer);
+    savedNoticeTimer = null;
+  }
+  notice.textContent = 'Not saved — this browser blocked local storage, so this applies to the current tab only.';
+  notice.classList.add('setting-saved--visible', 'setting-saved--error');
 }
 
 function loadSettings(): void {

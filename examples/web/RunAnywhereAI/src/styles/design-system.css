@@ -96,6 +96,16 @@
   --separator: #2E2B29;
   --divider: #2E2B29;
 
+  /* ---- Switch track (off) ----
+   * Its own token rather than a surface grey, because a switch's track is a
+   * *control boundary*: WCAG 1.4.11 asks 3:1 against the surface behind it, and
+   * the white knob asks the same against the track. The old --bg-gray5 measured
+   * 1.17:1 on the card and 14:1 against the knob, so an off switch read as a
+   * blank slab — nothing to see until you touched it. #7E766E is 3.69:1 on the
+   * card and 4.46:1 under the knob, so both edges of the control are visible in
+   * the off state. The on state stays brand orange (5.7:1 on the card). */
+  --switch-track-off: #7E766E;
+
   /* ---- Shadow Colors & Elevation ---- */
   --shadow-default: rgba(0, 0, 0, 0.25);
   --shadow-medium: rgba(0, 0, 0, 0.35);
@@ -227,6 +237,11 @@
   --border-strong: rgba(29, 27, 25, 0.14);
   --separator: #E5E1DC;
   --divider: #D6D1CA;
+
+  /* Darker than the dark theme's, not lighter: on paper the track has to stand
+   * *away* from a near-white card while still holding 3:1 under a white knob.
+   * 3.3:1 on the card, 3.62:1 under the knob. */
+  --switch-track-off: #8E857D;
 
   --shadow-default: rgba(29, 27, 25, 0.08);
   --shadow-medium: rgba(29, 27, 25, 0.12);
