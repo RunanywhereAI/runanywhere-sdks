@@ -3,31 +3,84 @@
  * ============================================================================= */
 
 /* =============================================================================
- * Acceleration Badge
+ * Runtime row (drawer footer) — "where is this running?"
+ *
+ * Previously a `position: fixed` three-line block in the bottom-right corner at
+ * `z-index: 140` with `pointer-events: none`, i.e. an un-clickable overlay
+ * sitting on the chat composer at narrow widths. It is now the last row of the
+ * drawer: a privacy statement first, the execution path second, and the
+ * accelerator as a one-word chip.
+ *
+ * `margin-top: auto` pins it to the bottom of the drawer's flex column so it
+ * stays a footer whether the recents list has two entries or forty.
  * ============================================================================= */
-.accel-badge {
-  position: fixed;
-  bottom: 14px;
-  right: 16px;
-  z-index: 140;
+.consumer-drawer__footer {
+  margin-top: auto;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-medium);
+}
+
+.consumer-runtime {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-md-lg);
+  border-radius: var(--radius-xl);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  /* `default`, not `help`: the tooltip is a diagnostic bonus, and a help cursor
+     on a whole row implies the row itself is the explanation of something. */
+  cursor: default;
+}
+
+.consumer-runtime__icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--color-green);
+}
+.consumer-runtime--unavailable .consumer-runtime__icon { color: var(--color-yellow); }
+
+.consumer-runtime__text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 5px 10px;
-  border-radius: var(--radius-md);
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.consumer-runtime__headline {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  line-height: var(--line-height-tight);
+}
+.consumer-runtime__detail {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  line-height: var(--line-height-tight);
+  /* One line, ellipsised: the full matrix is in the row's `title`, and a
+     wrapping second line here would push the drawer's footer height around
+     every time the accelerator changed. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The accelerator chip. One token — never a sentence — because it is the only
+   glanceable part of the row and it is what the release browser suite reads. */
+.accel-badge {
+  flex-shrink: 0;
+  padding: 3px var(--space-sm-md);
+  border-radius: var(--radius-full);
+  font-family: var(--font-family);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.02em;
-  pointer-events: none;
-  font-family: var(--font-family);
-  border: 1px solid var(--border-light);
-  line-height: 1.25;
-  text-align: right;
+  line-height: 1.4;
+  white-space: nowrap;
 }
-.accel-badge__line { display: block; white-space: nowrap; }
 .accel-badge--gpu { background: var(--badge-green); color: var(--color-green); }
-.accel-badge--cpu { background: var(--bg-tertiary); color: var(--text-tertiary); }
-/* No engine registered — the badge must not read like a live execution path. */
+.accel-badge--cpu { background: var(--bg-tertiary); color: var(--text-secondary); }
+/* No engine registered — the chip must not read like a live execution path. */
 .accel-badge--unavailable { background: var(--badge-yellow); color: var(--color-yellow); }
 
 /* =============================================================================

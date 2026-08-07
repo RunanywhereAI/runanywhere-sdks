@@ -32,6 +32,7 @@ import {
   setEngineRetryHandler,
 } from './services/engine-availability';
 import { escapeHtml } from './services/escape-html';
+import { icon, type IconName } from './components/icons';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
@@ -744,50 +745,101 @@ async function refreshSDKCatalogs(): Promise<void> {
 }
 
 /**
- * Multi-modality badge: LLM + Speech (+ note that full matrix is on
- * RunAnywhere.runtime.modalities). WebGPU on the LLM line does not imply
- * speech GPU.
+ * The runtime row in the drawer footer: where inference is actually running.
+ *
+ * WHERE IT LIVES, AND WHY IT MOVED. This was a `position: fixed` block pinned to
+ * the bottom-right corner at `z-index: 140`, three lines tall and
+ * `pointer-events: none` — so at a 390px viewport it sat *on top of* the chat
+ * composer, un-clickable and un-dismissable, over the one control the screen
+ * exists for. It now sits in the drawer footer, where it is a labelled fact
+ * about the session instead of an overlay on the conversation.
+ *
+ * WHAT IT SAYS. One consumer sentence ("Runs entirely on this device"), one
+ * detail line naming the execution path in words, and one chip carrying the
+ * accelerator token. `title` keeps the full per-modality matrix for diagnostics,
+ * which is where a build-log-shaped string belongs.
  *
  * `runtime.modalities` reports *where* a modality would execute (worker vs main
  * thread), not *whether* an engine registered — with no engine at all it still
  * answers `status: 'main'`. So the per-engine outcome this app tracked itself is
- * checked first; without it the badge would sit in the corner reporting a
- * running LLM path while the screen behind it says the engine never loaded.
+ * checked first; without it the row would report a running LLM path while the
+ * screen behind it says the engine never loaded.
  */
 function showAccelerationBadge(llmMode: string): void {
-  document.getElementById('accel-badge')?.remove();
-  const badge = document.createElement('div');
-  badge.id = 'accel-badge';
+  const slot = document.getElementById('consumer-runtime-slot');
+  if (!slot) return;
+
   const failures = engineFailures();
   if (failures.length > 0) {
-    badge.className = 'accel-badge accel-badge--unavailable';
-    badge.innerHTML = failures
-      .map((failure) => `<span class="accel-badge__line">${escapeHtml(failure.label)}: not loaded</span>`)
-      .join('');
-    badge.title = failureDiagnostics(failures);
-    document.body.appendChild(badge);
+    slot.innerHTML = runtimeRowMarkup({
+      variant: 'unavailable',
+      icon: 'warning',
+      headline: 'On-device engine unavailable',
+      detail: failures.map((failure) => failure.label).join(' · ') + ' did not load',
+      chip: 'None',
+      title: failureDiagnostics(failures),
+    });
     return;
   }
+
   const mods = RunAnywhere.runtime.modalities;
-  const llmGPU = llmMode === 'webgpu' || mods.llm.acceleration === 'webgpu';
   const speech = RunAnywhere.runtime.speech;
+  const llmGPU = llmMode === 'webgpu' || mods.llm.acceleration === 'webgpu';
   const speechGPU = speech.acceleration === 'webgpu';
-  const fmt = (id: keyof typeof mods) => {
-    const m = mods[id];
-    const accel = m.acceleration === 'webgpu' ? 'WebGPU' : m.acceleration === 'cpu' ? 'CPU' : '—';
-    return `${m.label}: ${m.status === 'unavailable' ? 'n/a' : `${accel} · ${m.status}`}`;
-  };
-  badge.innerHTML =
-    `<span class="accel-badge__line">${fmt('llm')}</span>`
-    + `<span class="accel-badge__line">${fmt('stt').replace('STT', 'Speech')}`
-    + `${speech.threads > 1 ? ` ×${speech.threads}` : ''}</span>`
-    + `<span class="accel-badge__line">${fmt('embeddings')}</span>`;
-  badge.title = Object.entries(mods)
-    .map(([id, m]) => `${id}=${m.status}/${m.acceleration ?? 'none'}${m.note ? ` (${m.note})` : ''}`)
-    .join('\n');
-  badge.className =
-    `accel-badge ${llmGPU || speechGPU ? 'accel-badge--gpu' : 'accel-badge--cpu'}`;
-  document.body.appendChild(badge);
+  const accelWord = (accel: string | null | undefined) =>
+    (accel === 'webgpu' ? 'WebGPU' : accel === 'cpu' ? 'CPU' : '—');
+
+  // Two paths, named in the words a user would use for them, and only split
+  // apart when they actually differ — "Chat and speech on CPU" is the common
+  // case and reads as one fact rather than a table with one row per engine.
+  const chatWord = accelWord(llmGPU ? 'webgpu' : mods.llm.acceleration ?? 'cpu');
+  const speechWord = mods.stt.status === 'unavailable'
+    ? null
+    : accelWord(speechGPU ? 'webgpu' : speech.acceleration ?? 'cpu');
+  const detail = speechWord === null
+    ? `Chat on ${chatWord}`
+    : chatWord === speechWord
+      ? `Chat and speech on ${chatWord}`
+      : `Chat on ${chatWord} · speech on ${speechWord}`;
+
+  slot.innerHTML = runtimeRowMarkup({
+    variant: llmGPU || speechGPU ? 'gpu' : 'cpu',
+    icon: 'lock',
+    headline: 'Runs entirely on this device',
+    detail,
+    chip: llmGPU || speechGPU ? 'WebGPU' : 'CPU',
+    title: Object.entries(mods)
+      .map(([id, m]) => `${id}=${m.status}/${m.acceleration ?? 'none'}${m.note ? ` (${m.note})` : ''}`)
+      .concat(speech.threads > 1 ? [`speech threads=${speech.threads}`] : [])
+      .join('\n'),
+  });
+}
+
+interface RuntimeRow {
+  variant: 'gpu' | 'cpu' | 'unavailable';
+  icon: IconName;
+  headline: string;
+  detail: string;
+  /**
+   * A single token, never a sentence. The chip is the one glanceable part of the
+   * row, and it is also what the release browser suite reads out of
+   * `#accel-badge` — so it stays one word per state.
+   */
+  chip: string;
+  title: string;
+}
+
+function runtimeRowMarkup(row: RuntimeRow): string {
+  return `
+    <div class="consumer-runtime consumer-runtime--${row.variant}" title="${escapeHtml(row.title)}">
+      <span class="consumer-runtime__icon">${icon(row.icon, { size: 16 })}</span>
+      <span class="consumer-runtime__text">
+        <span class="consumer-runtime__headline">${escapeHtml(row.headline)}</span>
+        <span class="consumer-runtime__detail">${escapeHtml(row.detail)}</span>
+      </span>
+      <span id="accel-badge" class="accel-badge accel-badge--${row.variant}">${escapeHtml(row.chip)}</span>
+    </div>
+  `;
 }
 
 // ---------------------------------------------------------------------------

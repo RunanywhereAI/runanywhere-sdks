@@ -348,6 +348,7 @@ export function buildAppShell(): void {
       <div class="consumer-recent-list" id="consumer-conversation-list"></div>
     </div>
     <nav class="tab-bar consumer-nav" id="consumer-nav" aria-label="Main navigation"></nav>
+    <div class="consumer-drawer__footer" id="consumer-runtime-slot"></div>
   `;
 
   const drawerScrim = document.createElement('button');
