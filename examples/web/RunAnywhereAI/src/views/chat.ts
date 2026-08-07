@@ -31,6 +31,7 @@ import {
 import type { ToolValue } from '@runanywhere/proto-ts/tool_calling';
 import {
   buildGetStartedOverlay,
+  setOverlaySuppressed,
   findLoadedModelForCategory,
   onModelStateChange,
   openSheet,
@@ -233,9 +234,13 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     CHAT_SHEET_OPTIONS,
     CHAT_CAPABLE_MODEL_CATEGORIES,
   );
-  container.appendChild(getStartedOverlay);
-
   const messagesEl = container.querySelector('#chat-messages') as HTMLElement;
+  // Inserted where the scroll region sits in the flex column, not appended after
+  // the composer: the card takes that region's place instead of covering the
+  // panel, so the composer below it stays visible rather than being hidden
+  // behind an opaque layer while remaining focusable.
+  container.insertBefore(getStartedOverlay, messagesEl.nextSibling);
+
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
   const sendBtn = container.querySelector('#chat-send-btn') as HTMLButtonElement;
   const toolsBtn = container.querySelector('#chat-tools-btn') as HTMLButtonElement;
@@ -410,10 +415,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   talkBtn.addEventListener('click', () => navigateTo('voice'), listenerOptions);
   const showConversation = (nextMessages: ChatMessage[]) => {
     messages = nextMessages;
-    getStartedOverlay.classList.toggle(
-      'chat-model-overlay--conversation-visible',
-      conversationSuppressesModelOverlay(nextMessages),
-    );
+    setOverlaySuppressed(conversationSuppressesModelOverlay(nextMessages));
     inputEl.value = '';
     inputEl.style.height = 'auto';
     pendingAttachment = null;
