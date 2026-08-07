@@ -43,7 +43,6 @@ import {
   failuresForEntries,
   isRetryingForEntries,
   onEngineStateChange,
-  retryEngines,
   type EngineFailure,
 } from '../services/engine-availability';
 import { escapeHtml } from '../services/escape-html';
@@ -70,6 +69,7 @@ import {
   type RecommendedSelection,
 } from '../services/model-recommendation';
 import { openModal, showToast } from './dialogs';
+import { runEngineRetry } from './engine-notice';
 import { appLogger } from '../services/app-logger';
 import { openAddFromHuggingFace } from './add-from-huggingface';
 
@@ -667,21 +667,11 @@ function renderEngineFailureBanner(
 }
 
 /**
- * Retry, then say what happened.
- *
- * "Nothing changed" is a real outcome and has to be reported: a retry that
- * silently re-renders the same banner is indistinguishable from a click that
- * did nothing at all, which is the failure mode this whole change exists to
- * remove.
+ * Re-exported so the views that already import it from here keep working while
+ * `engine-notice` owns the single implementation. One retry, one set of
+ * outcome messages — a second copy would be free to drift.
  */
-export async function runEngineRetry(): Promise<void> {
-  const outcome = await retryEngines();
-  if (outcome === 'recovered') {
-    showToast('On-device AI engine loaded.', 'success');
-  } else if (outcome === 'still-unavailable') {
-    showToast('The AI engine still could not load. See technical details.', 'warning');
-  }
-}
+export { runEngineRetry };
 
 function closeSheet(): void {
   // State is reset in the modal's `onClose`, so dismissing via Escape, the

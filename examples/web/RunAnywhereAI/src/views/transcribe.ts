@@ -29,6 +29,14 @@ import {
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
+import {
+  engineNoticeForCategories,
+  isEngineBlocked,
+  renderEngineNotice,
+  wireEngineNotice,
+} from '../components/engine-notice';
+import { renderFileDrop, wireFileDrop } from '../components/file-drop';
+import { onEngineStateChange } from '../services/engine-availability';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
@@ -48,12 +56,18 @@ let isProcessing = false;
 let selectedMode: STTMode = 'batch';
 let transcript = '';
 let unsubscribeState: (() => void) | null = null;
+let unsubscribeEngine: (() => void) | null = null;
 
 export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   container = el;
   unmounted = false;
   renderTranscribe();
   unsubscribeState = onModelStateChange(() => {
+    if (!unmounted) renderTranscribe();
+  });
+  // A successful engine retry must restore the recording controls without the
+  // user having to leave the tab and come back.
+  unsubscribeEngine = onEngineStateChange(() => {
     if (!unmounted) renderTranscribe();
   });
   return {
@@ -70,108 +84,134 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
       audioCapture?.stop();
       audioCapture = null;
       isCapturing = false;
-      if (!container.isConnected && unsubscribeState) {
-        unsubscribeState();
+      if (!container.isConnected) {
+        unsubscribeState?.();
         unsubscribeState = null;
+        unsubscribeEngine?.();
+        unsubscribeEngine = null;
       }
     },
   };
 }
 
+/** What each mode means, in the user's terms rather than the SDK verb's. */
+const MODE_COPY: Record<STTMode, { label: string; detail: string }> = {
+  batch: {
+    label: 'Record, then transcribe',
+    detail: 'Records everything first, then transcribes it in one pass. Most accurate.',
+  },
+  live: {
+    label: 'Transcribe as I speak',
+    detail: 'Shows words as they are recognised. Earlier guesses are corrected as it goes.',
+  },
+};
+
+/**
+ * Why this doesn't consult `RunAnywhere.runtime.modalities.stt`.
+ *
+ * That property answers *where* STT would run (worker vs main thread), not
+ * *whether* a speech engine registered — with no engine at all it still reports
+ * `'main'`. Gating on it meant this view rendered an enabled "Start recording"
+ * and the message "Load an STT model first" on a session where the ONNX/Sherpa
+ * WASM artifact had failed to load, so no STT model could ever appear in the
+ * picker. The registration outcome in `engine-availability` is the real signal.
+ */
 function renderTranscribe(): void {
-  const supportsProto = RunAnywhere.runtime.modalities.stt.status !== 'unavailable';
+  const notice = engineNoticeForCategories(STT_PICKER_FILTER);
+  const blocked = isEngineBlocked(notice);
   const loadedModel = findLoadedModelForCategory(
     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
   );
-  const modelLabel = loadedModel?.name ?? 'Select STT Model';
-  const canRunInference = supportsProto && Boolean(loadedModel);
+  const modelLabel = loadedModel?.name ?? 'Choose a model';
+  const canRunInference = !blocked && Boolean(loadedModel);
+  const busy = isCapturing || isProcessing;
 
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Transcribe</div>
       <div class="toolbar-actions">
-        <button class="btn btn-secondary" id="transcribe-model-btn">${escapeHtml(modelLabel)}</button>
+        <button class="btn btn-secondary" id="transcribe-model-btn" ${blocked ? 'disabled' : ''}>${escapeHtml(modelLabel)}</button>
       </div>
     </div>
     <div class="scroll-area">
-      ${supportsProto
-        ? `
-          <div class="docs-section">
-            <h3>Mode</h3>
-            <div class="toolbar-actions">
-              <button class="btn ${selectedMode === 'batch' ? 'btn-primary' : 'btn-secondary'}" id="mode-batch-btn" ${isCapturing || isProcessing ? 'disabled' : ''}>Batch</button>
-              <button class="btn ${selectedMode === 'live' ? 'btn-primary' : 'btn-secondary'}" id="mode-live-btn" ${isCapturing || isProcessing ? 'disabled' : ''}>Live</button>
-            </div>
-            <p class="text-secondary">${selectedMode === 'batch'
-              ? 'Record first, then transcribe.'
-              : 'Stream with live partial results — partials preview the utterance, the final result replaces them.'}</p>
-          </div>
-          <div class="docs-section">
-            <h3>Microphone</h3>
-            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>${selectedMode === 'live' ? 'RunAnywhere.stt.transcribeStream(...)' : 'RunAnywhere.stt.transcribe(...)'}</code>.</p>
-            <div class="toolbar-actions">
-              <button class="btn btn-primary" id="mic-toggle-btn" ${isProcessing || !canRunInference ? 'disabled' : ''}>
-                ${isCapturing ? 'Stop & transcribe' : 'Start recording'}
-              </button>
-              <button class="btn btn-secondary" id="clear-btn" ${isProcessing ? 'disabled' : ''}>Clear</button>
-            </div>
-            ${canRunInference ? '' : '<div class="docs-status">Load an STT model first.</div>'}
-          </div>
-          <div class="docs-section">
-            <h3>From file</h3>
-            <p class="text-secondary">Upload an audio file (wav, mp3, m4a, ogg, flac, etc.) — decoded via <code>AudioFileLoader</code>.</p>
-            <input type="file" id="file-input" accept="audio/*" ${isProcessing || !canRunInference ? 'disabled' : ''} />
-          </div>
-          <div class="docs-section">
-            <h3>Result</h3>
-            <div id="transcribe-status" class="docs-status">${isProcessing ? 'Transcribing...' : ''}</div>
-            <pre id="transcribe-output" class="docs-pre">${escapeHtml(transcript || '(no transcript yet)')}</pre>
-          </div>`
-        : `
-          <div class="docs-section">
-            <h3>Live transcription</h3>
-            <p class="text-secondary">
-              Once a speech-capable backend is registered against a WASM build
-              that includes <code>RAC_WASM_ONNX=ON</code>, this view dispatches
-              transcription through <code>RunAnywhere.stt.transcribeStream(chunks, options)</code>.
-            </p>
-            <ul class="feature-unavailable__list">
-              <li><code>RunAnywhere.models.load(id)</code></li>
-              <li><code>RunAnywhere.stt.transcribeStream(chunks)</code></li>
-            </ul>
-          </div>`}
+      ${renderEngineNotice(notice)}
+      <div class="docs-section">
+        <h3>How to listen</h3>
+        <div class="segmented" role="radiogroup" aria-label="Transcription mode">
+          ${(['batch', 'live'] as const).map((mode) => `
+            <button type="button" class="segmented__option" id="mode-${mode}-btn"
+              role="radio" aria-checked="${selectedMode === mode}"
+              ${busy || blocked ? 'disabled' : ''}>${MODE_COPY[mode].label}</button>
+          `).join('')}
+        </div>
+        <p class="text-secondary">${MODE_COPY[selectedMode].detail}</p>
+      </div>
+      <div class="docs-section">
+        <h3>Record</h3>
+        <div class="toolbar-actions">
+          <button class="btn ${isCapturing ? 'btn-secondary' : 'btn-primary'}" id="mic-toggle-btn" ${isProcessing || !canRunInference ? 'disabled' : ''}>
+            ${isCapturing ? 'Stop and transcribe' : 'Start recording'}
+          </button>
+          <button class="btn btn-secondary" id="clear-btn" ${isProcessing || !transcript ? 'disabled' : ''}>Clear</button>
+        </div>
+        ${!blocked && !loadedModel
+          ? '<div class="docs-status">Choose a model to start transcribing.</div>'
+          : ''}
+      </div>
+      <div class="docs-section">
+        <h3>Or use a recording</h3>
+        ${renderFileDrop({
+          id: 'transcribe-drop',
+          accept: 'audio/*',
+          title: 'Drop an audio file here, or click to choose',
+          hint: 'WAV, MP3, M4A, OGG, FLAC and other formats your browser can decode',
+          disabled: isProcessing || !canRunInference,
+        })}
+      </div>
+      <div class="docs-section">
+        <h3>Transcript</h3>
+        <div id="transcribe-status" class="docs-status" role="status" aria-live="polite">${isProcessing ? 'Transcribing…' : ''}</div>
+        ${transcript
+          ? `<pre id="transcribe-output" class="docs-pre">${escapeHtml(transcript)}</pre>`
+          : `<div class="surface-empty" id="transcribe-output">
+               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                 <line x1="12" y1="19" x2="12" y2="22"/>
+               </svg>
+               <p>Your transcript will appear here.</p>
+             </div>`}
+      </div>
     </div>
   `;
 
+  wireEngineNotice(container, notice);
+
   container.querySelector('#transcribe-model-btn')?.addEventListener('click', () => {
     openSheet({
-      title: 'Select Transcription Model',
+      title: 'Choose a transcription model',
       filterCategories: STT_PICKER_FILTER,
     });
   });
 
-  if (supportsProto) {
-    container.querySelector('#mode-batch-btn')?.addEventListener('click', () => {
-      selectedMode = 'batch';
+  for (const mode of ['batch', 'live'] as const) {
+    container.querySelector(`#mode-${mode}-btn`)?.addEventListener('click', () => {
+      selectedMode = mode;
       renderTranscribe();
-    });
-    container.querySelector('#mode-live-btn')?.addEventListener('click', () => {
-      selectedMode = 'live';
-      renderTranscribe();
-    });
-    container.querySelector('#mic-toggle-btn')?.addEventListener('click', () => {
-      void toggleMic();
-    });
-    container.querySelector('#clear-btn')?.addEventListener('click', () => {
-      transcript = '';
-      renderTranscribe();
-    });
-    const fileInput = container.querySelector<HTMLInputElement>('#file-input');
-    fileInput?.addEventListener('change', () => {
-      const file = fileInput.files?.[0];
-      if (file) void transcribeFile(file);
     });
   }
+  container.querySelector('#mic-toggle-btn')?.addEventListener('click', () => {
+    void toggleMic();
+  });
+  container.querySelector('#clear-btn')?.addEventListener('click', () => {
+    transcript = '';
+    renderTranscribe();
+  });
+  wireFileDrop(container, 'transcribe-drop', (files) => {
+    const file = files[0];
+    if (file) void transcribeFile(file);
+  });
 }
 
 async function toggleMic(): Promise<void> {
@@ -283,9 +323,22 @@ async function runTranscribeStream(samples: Float32Array): Promise<void> {
   }
 }
 
+/**
+ * Push a streaming partial into the transcript element.
+ *
+ * The empty state is a different element from the transcript, so the first
+ * partial has to swap them — writing `textContent` into the empty-state block
+ * would erase its icon and leave a bare line of text. Once a `<pre>` is on
+ * screen, later partials mutate it in place: a full re-render per token would
+ * rebuild the toolbar and the drop zone mid-utterance.
+ */
 function updateOutput(): void {
-  const pre = container.querySelector<HTMLPreElement>('#transcribe-output');
-  if (pre) pre.textContent = transcript || '(no transcript yet)';
+  const pre = container.querySelector<HTMLPreElement>('pre#transcribe-output');
+  if (pre) {
+    pre.textContent = transcript;
+    return;
+  }
+  renderTranscribe();
 }
 
 function setStatus(text: string): void {

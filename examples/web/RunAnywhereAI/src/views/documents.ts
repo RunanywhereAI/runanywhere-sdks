@@ -24,12 +24,34 @@ import {
   type ModelInfo,
   type RagSession,
 } from '@runanywhere/web';
+import {
+  engineNoticeForCategories,
+  isEngineBlocked,
+  renderEngineNotice,
+  wireEngineNotice,
+} from '../components/engine-notice';
+import { renderFileDrop, wireFileDrop } from '../components/file-drop';
+import { onEngineStateChange } from '../services/engine-availability';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import { formatFramework } from '../services/model-display';
 import { getGenerationSettings } from './settings';
 
 const TOP_K = 3;
+
+/**
+ * The model categories this view's pipeline needs.
+ *
+ * Documents is the one surface whose engine attribution is genuinely mixed: its
+ * embedding picker offers both llama.cpp entries (`nemotron-3-embed-1b-*`) and an
+ * ONNX one (`all-minilm-l6-v2`), and answer generation always needs llama.cpp.
+ * Scoping the notice to both categories is what lets it name whichever engine
+ * actually failed instead of asserting one.
+ */
+const DOCS_CATEGORIES: readonly ModelCategory[] = [
+  ModelCategory.MODEL_CATEGORY_EMBEDDING,
+  ModelCategory.MODEL_CATEGORY_LANGUAGE,
+];
 
 /**
  * What this view can ingest.
@@ -52,7 +74,11 @@ const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.json'] as const;
  */
 type SessionOutcome =
   | { ok: true; session: RagSession }
-  | { ok: false; reason: 'models-not-selected' | 'open-failed'; message: string };
+  | {
+      ok: false;
+      reason: 'engine-unavailable' | 'models-not-selected' | 'open-failed';
+      message: string;
+    };
 
 let container: HTMLElement;
 let isBusy = false;
@@ -68,6 +94,7 @@ let ragSession: RagSession | null = null;
 let openedPipelineKey: string | null = null;
 /** Documents ingested in this session, for the list the SDK does not enumerate. */
 const ingestedDocuments: Array<{ name: string; chunkCount: number }> = [];
+let unsubscribeEngine: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -84,20 +111,25 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
       <div class="toolbar-actions"></div>
     </div>
     <div class="scroll-area">
+      <div id="docs-engine-notice"></div>
       <div class="docs-section">
-        <h3>Pipeline models</h3>
-        <p class="text-secondary">Choose an embedding model and an LLM model from the registry; the RAG pipeline is created with this pair.</p>
-        <div class="docs-actions" style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
-          <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
-            Embedding model
-            <select id="docs-embedding-model" class="chat-input" style="min-width:220px"></select>
-          </label>
-          <button class="btn btn-secondary" id="docs-embedding-download-btn">Download</button>
-          <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
-            LLM model
-            <select id="docs-llm-model" class="chat-input" style="min-width:220px"></select>
-          </label>
-          <button class="btn btn-secondary" id="docs-llm-download-btn">Download</button>
+        <h3>Set up the pipeline</h3>
+        <p class="text-secondary">Two models work together: one to index your files, one to answer questions about them.</p>
+        <div class="model-pair">
+          <div class="model-pair__field">
+            <label class="model-pair__label" for="docs-embedding-model">Indexing model</label>
+            <div class="model-pair__row">
+              <select id="docs-embedding-model" class="model-pair__select"></select>
+              <button class="btn btn-secondary" id="docs-embedding-download-btn">Download</button>
+            </div>
+          </div>
+          <div class="model-pair__field">
+            <label class="model-pair__label" for="docs-llm-model">Answering model</label>
+            <div class="model-pair__row">
+              <select id="docs-llm-model" class="model-pair__select"></select>
+              <button class="btn btn-secondary" id="docs-llm-download-btn">Download</button>
+            </div>
+          </div>
         </div>
         <div id="docs-model-status" class="docs-status"></div>
       </div>
@@ -105,23 +137,13 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
         <h3>Indexed documents</h3>
         <p class="text-secondary">Answers are grounded in the files you index here.
         The index lives in this tab only — it is cleared when you reload the page.</p>
-        <!-- A real drop zone, not a hidden input behind a button. It is a
-             <button> so the keyboard path is the same control as the pointer
-             path, rather than a separate affordance to discover. -->
-        <input type="file" id="docs-file" accept="${ACCEPTED_EXTENSIONS.join(',')}" multiple hidden />
-        <button type="button" class="docs-dropzone" id="docs-dropzone"
-          aria-describedby="docs-dropzone-hint">
-          <svg class="docs-dropzone-glyph" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          <span class="docs-dropzone-title">Drop files here, or click to choose</span>
-          <span class="docs-dropzone-hint" id="docs-dropzone-hint">
-            ${ACCEPTED_EXTENSIONS.join(', ')} — or paste text straight onto this page
-          </span>
-        </button>
+        ${renderFileDrop({
+          id: 'docs-dropzone',
+          accept: ACCEPTED_EXTENSIONS.join(','),
+          title: 'Drop files here, or click to choose',
+          hint: `${ACCEPTED_EXTENSIONS.join(', ')} — or paste text straight onto this page`,
+          multiple: true,
+        })}
         <div class="docs-actions">
           <button class="btn btn-secondary" id="docs-clear-btn">Clear all</button>
         </div>
@@ -130,21 +152,24 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
       </div>
       <div class="docs-section">
         <h3>Ask a question</h3>
-        <p class="text-secondary">Queries the core RAG facade for retrieval and grounded answer generation.</p>
-        <textarea id="docs-query" class="docs-query" placeholder="Ask something about your uploaded docs..." rows="3"></textarea>
+        <p class="text-secondary">Answers cite the files above, so you can check where each one came from.</p>
+        <label class="sr-only" for="docs-query">Your question</label>
+        <textarea id="docs-query" class="docs-query" rows="3"
+          placeholder="What does the document say about…?"></textarea>
         <button class="btn btn-primary" id="docs-ask-btn">Ask</button>
         <div id="docs-answer" class="docs-answer"></div>
       </div>
     </div>
   `;
 
+  bindModelPickers();
   populateModelPickers();
   void renderDocList();
+  renderIdleAnswer();
 
-  container.querySelector('#docs-file')!.addEventListener('change', (event) => {
-    void onFilePicked(event);
+  wireFileDrop(container, 'docs-dropzone', (files) => {
+    void ingestFiles([...files]);
   });
-  setupDropZone();
   setupPasteToIndex();
   container.querySelector('#docs-clear-btn')!.addEventListener('click', () => {
     void clearAllDocs();
@@ -158,12 +183,24 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   container.querySelector('#docs-llm-download-btn')!.addEventListener('click', () => {
     void downloadSelectedModel(selectedLlmModelId, 'LLM');
   });
+  refreshEngineNotice();
   refreshModelButtons();
+
+  // A retry that succeeds has to restore this tab in place: the pickers are
+  // populated from the registry once, at init, so without this a recovered
+  // engine would leave "No embedding models registered" on screen forever.
+  unsubscribeEngine = onEngineStateChange(() => {
+    if (!container.isConnected) return;
+    populateModelPickers();
+    refreshEngineNotice();
+    refreshModelButtons();
+  });
 
   return {
     onActivate: () => {
       // Re-arm: init runs once, but every deactivate detaches the paste listener.
       if (!detachPaste) setupPasteToIndex();
+      refreshEngineNotice();
       refreshModelButtons();
       void renderDocList();
     },
@@ -175,8 +212,61 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
       detachPaste?.();
       detachPaste = null;
       void closeRAGSession();
+      if (!container.isConnected) {
+        unsubscribeEngine?.();
+        unsubscribeEngine = null;
+      }
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Engine availability
+// ---------------------------------------------------------------------------
+
+/**
+ * Say so when the engine this pipeline needs never loaded.
+ *
+ * Without this the tab was quietly the least honest surface in the app. Both
+ * `<select>`s populate from the model registry, which is empty when no engine
+ * registered, so they read "No embedding models registered" / "No LLM models
+ * registered" — phrasing that blames the *catalog* for an engine failure and
+ * offers nothing to do about it. Meanwhile Download, the drop zone and Ask all
+ * stayed enabled, so indexing a file got as far as `rag.open` before failing
+ * with a stack-shaped message.
+ *
+ * The notice is scoped to both categories (see `DOCS_CATEGORIES`) so it names
+ * whichever of the two artifacts actually failed.
+ */
+function refreshEngineNotice(): void {
+  const host = container.querySelector<HTMLElement>('#docs-engine-notice');
+  if (!host) return;
+  const notice = engineNoticeForCategories(DOCS_CATEGORIES);
+  host.innerHTML = renderEngineNotice(notice);
+  wireEngineNotice(host, notice);
+  setControlsBlocked(isEngineBlocked(notice));
+}
+
+/** True when an engine failure means nothing on this tab can succeed. */
+function enginesBlocked(): boolean {
+  return isEngineBlocked(engineNoticeForCategories(DOCS_CATEGORIES));
+}
+
+/**
+ * Disable what cannot work.
+ *
+ * A disabled drop zone still needs `disabled` on the button rather than
+ * `pointer-events: none`: the latter leaves a dashed target that accepts a drop
+ * and silently discards it.
+ */
+function setControlsBlocked(blocked: boolean): void {
+  const ids = ['#docs-dropzone', '#docs-clear-btn', '#docs-ask-btn'] as const;
+  for (const id of ids) {
+    const el = container.querySelector<HTMLButtonElement>(id);
+    if (el) el.disabled = blocked;
+  }
+  const query = container.querySelector<HTMLTextAreaElement>('#docs-query');
+  if (query) query.disabled = blocked;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,19 +337,10 @@ function registryModelsForCategory(category: ModelCategory): ModelInfo[] {
   return RunAnywhere.models.list({ category });
 }
 
-function populateModelPickers(): void {
+/** Bound once at init; `populateModelPickers` is called again on engine recovery. */
+function bindModelPickers(): void {
   const embeddingSelect = container.querySelector<HTMLSelectElement>('#docs-embedding-model')!;
   const llmSelect = container.querySelector<HTMLSelectElement>('#docs-llm-model')!;
-
-  const embeddingModels = registryModelsForCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING);
-  const llmModels = registryModelsForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
-
-  fillSelect(embeddingSelect, embeddingModels, 'No embedding models registered');
-  fillSelect(llmSelect, llmModels, 'No LLM models registered');
-
-  selectedEmbeddingModelId = embeddingSelect.value;
-  selectedLlmModelId = llmSelect.value;
-
   embeddingSelect.addEventListener('change', () => {
     selectedEmbeddingModelId = embeddingSelect.value;
     refreshModelButtons();
@@ -270,7 +351,41 @@ function populateModelPickers(): void {
   });
 }
 
-function fillSelect(select: HTMLSelectElement, models: ModelInfo[], emptyLabel: string): void {
+/**
+ * Fill both pickers from the registry, preserving the user's choice.
+ *
+ * Re-runnable, because a successful engine retry turns an empty registry into a
+ * populated one and this tab builds its DOM once. Preserving the selection
+ * matters for the same reason: re-filling must not silently repoint the pipeline
+ * at whatever model happens to sort first.
+ */
+function populateModelPickers(): void {
+  const embeddingSelect = container.querySelector<HTMLSelectElement>('#docs-embedding-model')!;
+  const llmSelect = container.querySelector<HTMLSelectElement>('#docs-llm-model')!;
+
+  fillSelect(
+    embeddingSelect,
+    registryModelsForCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING),
+    'No indexing models available',
+    selectedEmbeddingModelId,
+  );
+  fillSelect(
+    llmSelect,
+    registryModelsForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE),
+    'No answering models available',
+    selectedLlmModelId,
+  );
+
+  selectedEmbeddingModelId = embeddingSelect.value;
+  selectedLlmModelId = llmSelect.value;
+}
+
+function fillSelect(
+  select: HTMLSelectElement,
+  models: ModelInfo[],
+  emptyLabel: string,
+  preferredId: string,
+): void {
   if (models.length === 0) {
     select.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>`;
     select.disabled = true;
@@ -283,6 +398,9 @@ function fillSelect(select: HTMLSelectElement, models: ModelInfo[], emptyLabel: 
       return `<option value="${escapeHtml(model.id)}">${escapeHtml(label)}</option>`;
     })
     .join('');
+  if (preferredId && models.some((model) => model.id === preferredId)) {
+    select.value = preferredId;
+  }
 }
 
 function selectedLlmSupportsThinking(): boolean {
@@ -291,56 +409,8 @@ function selectedLlmSupportsThinking(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Drop zone & paste
+// Paste
 // ---------------------------------------------------------------------------
-
-/**
- * Wire the drop zone.
- *
- * `dragover` must be cancelled on both the zone and the surrounding section, or
- * the browser navigates away to the dropped file — the default that makes naive
- * drop handling look broken. The highlight uses a counter because `dragleave`
- * fires when the pointer crosses onto a *child* element, which would otherwise
- * flicker the state off while the pointer is still inside the zone.
- */
-function setupDropZone(): void {
-  const zone = container.querySelector<HTMLElement>('#docs-dropzone');
-  const input = container.querySelector<HTMLInputElement>('#docs-file');
-  if (!zone || !input) return;
-
-  zone.addEventListener('click', () => input.click());
-
-  let depth = 0;
-  const setActive = (active: boolean): void => {
-    zone.classList.toggle('docs-dropzone--active', active);
-  };
-
-  zone.addEventListener('dragenter', (event) => {
-    event.preventDefault();
-    depth += 1;
-    setActive(true);
-  });
-  zone.addEventListener('dragover', (event) => {
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-  });
-  zone.addEventListener('dragleave', () => {
-    depth = Math.max(0, depth - 1);
-    if (depth === 0) setActive(false);
-  });
-  zone.addEventListener('drop', (event) => {
-    event.preventDefault();
-    depth = 0;
-    setActive(false);
-    const files = Array.from(event.dataTransfer?.files ?? []);
-    void ingestFiles(files);
-  });
-
-  // Dropping just outside the zone is a miss, not a request to leave the app.
-  const section = zone.closest('.docs-section');
-  section?.addEventListener('dragover', (event) => event.preventDefault());
-  section?.addEventListener('drop', (event) => event.preventDefault());
-}
 
 /** Removes the document-level paste listener when the tab is left. */
 let detachPaste: (() => void) | null = null;
@@ -379,16 +449,6 @@ function setupPasteToIndex(): void {
 // ---------------------------------------------------------------------------
 // File ingestion
 // ---------------------------------------------------------------------------
-
-async function onFilePicked(e: Event): Promise<void> {
-  const target = e.target as HTMLInputElement;
-  if (!target.files || target.files.length === 0) return;
-  try {
-    await ingestFiles(Array.from(target.files));
-  } finally {
-    target.value = '';
-  }
-}
 
 /**
  * Index a batch of files, whichever way the user supplied them.
@@ -530,6 +590,9 @@ async function clearAllDocs(): Promise<void> {
     ingestedDocuments.length = 0;
     pastedNoteCount = 0;
     await renderDocList();
+    // The answer on screen cites passages that no longer exist. Leaving it would
+    // present a stale answer as if it still had sources behind it.
+    renderIdleAnswer();
     setStatus('All documents cleared.');
   } catch (err) {
     setStatus(`Clear failed: ${formatError(err)}`, 'error');
@@ -563,9 +626,9 @@ async function askQuestion(): Promise<void> {
       // line. Point at it rather than restating it here in different words —
       // this is where the false "select models first" used to appear beside the
       // real error, with both selects visibly populated.
-      setAnswerText(outcome.reason === 'models-not-selected'
-        ? outcome.message
-        : `${outcome.message} Fix that above, then ask again.`);
+      setAnswerText(outcome.reason === 'open-failed'
+        ? `${outcome.message} Fix that above, then ask again.`
+        : outcome.message);
       return;
     }
     const session = outcome.session;
@@ -661,6 +724,28 @@ function answerElement(): HTMLElement | null {
   return container.querySelector<HTMLElement>('#docs-answer');
 }
 
+/**
+ * The answer area before anything has been asked.
+ *
+ * It used to be an empty `<div>`, so the section ended on a bare "Ask" button
+ * with a void beneath it and no sign that an answer was ever going to appear
+ * there. Rendered once at init and re-rendered by Clear, so the pane always says
+ * what it is.
+ */
+function renderIdleAnswer(): void {
+  const el = answerElement();
+  if (!el) return;
+  el.innerHTML = `
+    <div class="surface-empty">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <p>Answers appear here, with the passages they came from.</p>
+    </div>
+  `;
+}
+
 function setAnswerText(message: string): void {
   const el = answerElement();
   if (el) el.textContent = message;
@@ -677,6 +762,13 @@ function setAnswerHtml(html: string): void {
  * loads and downloads both models itself, so nothing is pre-staged here.
  */
 async function ensureRAGSession(): Promise<SessionOutcome> {
+  // Belt and braces alongside the disabled controls: paste-to-index listens on
+  // `document`, so it can reach this without passing through a button.
+  if (enginesBlocked()) {
+    const message = 'The on-device AI engine did not load, so documents cannot be indexed yet.';
+    setStatus(message, 'error');
+    return { ok: false, reason: 'engine-unavailable', message };
+  }
   if (!selectedEmbeddingModelId || !selectedLlmModelId) {
     const message = 'Select an embedding model and an LLM model first.';
     setStatus(message, 'error');

@@ -2940,6 +2940,32 @@ input[type="range"]:focus-visible { outline: none; }
 input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
 input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
 
+/*
+ * Read-aloud speed row.
+ *
+ * Replaces three inline `style` attributes on the view's markup. The value is a
+ * fixed-width tabular column so dragging the slider doesn't shift the rail as
+ * the label goes 1.0× → 1.1× → 2.0×.
+ */
+.speak-rate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md-lg);
+  margin: var(--space-md-lg) 0;
+}
+.speak-rate__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+.speak-rate__slider { flex: 1; max-width: 240px; }
+.speak-rate__value {
+  min-width: 3.25rem;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
 /* Toggle */
 /*
  * Switch. Now a real `<button role="switch">` rather than a styled `<div>`, so
@@ -3766,43 +3792,13 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   height: 72px;
 }
 
-/** Drag-and-drop file zone for STT */
-.stt-drop-zone {
-  border: 2px dashed var(--border-color);
-  border-radius: 12px;
-  padding: 18px 16px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
-  margin-top: 16px;
-  color: var(--text-tertiary);
-  font-size: 13px;
-  line-height: 1.5;
-  user-select: none;
-}
-
-.stt-drop-zone:hover,
-.stt-drop-zone.drag-over {
-  border-color: var(--color-blue);
-  background: rgba(59, 130, 246, 0.06);
-  color: var(--color-blue);
-}
-
-.stt-drop-zone-icon {
-  font-size: 22px;
-  margin-bottom: 4px;
-}
-
-.stt-drop-zone-label {
-  font-weight: 500;
-  font-size: 13px;
-}
-
-.stt-drop-zone-hint {
-  font-size: 11px;
-  opacity: 0.7;
-  margin-top: 2px;
-}
+/*
+ * `.stt-drop-zone` used to live here: a full set of rules with no markup
+ * anywhere referencing them, styled in --color-blue rather than the brand
+ * orange. With no CSS module scoping an orphan like that is silent, so the
+ * affordance now lives in one place — `components/file-drop.ts` renders
+ * `.docs-dropzone` for every view that takes a file.
+ */
 
 /* =============================================================================
  * TTS (Speak) Sub-view Specifics
@@ -4214,6 +4210,179 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
 .docs-dropzone-hint {
   color: var(--text-tertiary);
   font-size: var(--font-size-sm);
+}
+/*
+ * A disabled drop zone must not read as an invitation. `pointer-events: none`
+ * alone would leave a dashed, hoverable-looking target that silently ignores a
+ * drop, which is worse than an obviously inert one.
+ */
+.docs-dropzone:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.docs-dropzone:disabled:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-strong);
+}
+
+/*
+ * Two labelled model pickers side by side (Documents' index + answer pair).
+ *
+ * Replaces three inline `style` attributes — `display:flex; gap:12px`,
+ * `min-width:220px` — and, more importantly, two `<select>`s that had no
+ * `<label>` at all. Their only description was the paragraph above the row, so a
+ * screen reader announced "combo box, nemotron-3-embed-1b-q4_k_m" twice with
+ * nothing to say which was which.
+ *
+ * `min-width: 0` on the field is what lets the row shrink: a grid/flex child
+ * defaults to `min-width: auto`, and a `<select>` holding a long model id would
+ * otherwise refuse to compress and push the Download button off the edge.
+ */
+.model-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md-lg);
+  margin: var(--space-md-lg) 0 0;
+}
+.model-pair__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.model-pair__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+.model-pair__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm-md);
+  min-width: 0;
+}
+/* No `min-height` here: the coarse-pointer block at the end of this file grows
+   it to --hit-touch for fingers, which is where this file draws that line. */
+.model-pair__select {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-sm-md) var(--space-md-lg);
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-regular);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  /* The native control truncates its own long option text; without this the
+     widest option would set the box width and break the row. */
+  text-overflow: ellipsis;
+}
+.model-pair__select:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.model-pair__select:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/*
+ * Segmented control — a real radio group, for picking one of a few modes.
+ *
+ * Previously these were two `.btn`s where the selected one became
+ * `.btn-primary`. That reads as two independent actions ("Batch" and "Live" both
+ * look pressable, and the orange one looks like the thing to click *next*),
+ * and it told assistive tech nothing about the choice. As a `radiogroup` with
+ * `aria-checked`, arrow-key semantics and the pressed state come for free.
+ */
+.segmented {
+  display: inline-flex;
+  gap: var(--space-xxs);
+  padding: 3px;
+  margin: 0 0 var(--space-md-lg);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.segmented__option {
+  flex: 1;
+  min-height: var(--hit-touch);
+  padding: var(--space-sm-md) var(--space-lg);
+  border: none;
+  border-radius: calc(var(--radius-lg) - 3px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.segmented__option:hover:not([aria-checked="true"]):not(:disabled) {
+  color: var(--text-primary);
+}
+.segmented__option[aria-checked="true"] {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px var(--shadow-default);
+}
+.segmented__option:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.segmented__option:disabled { cursor: not-allowed; opacity: 0.55; }
+
+/*
+ * Empty result state, for a panel whose content has not been produced yet.
+ *
+ * Distinct from an error and from a `<pre>` holding the literal string
+ * "(no transcript yet)" — which is what several of these panels used to show. A
+ * parenthetical placeholder inside a code block reads as *output*: the user
+ * cannot tell whether the model ran and returned nothing or never ran at all.
+ */
+.surface-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md-lg);
+  padding: var(--space-2xl) var(--space-lg);
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-lg);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.surface-empty svg { width: 26px; height: 26px; }
+.surface-empty p { margin: 0; font-size: var(--font-size-sm); }
+
+/*
+ * Live numeric readings — a `<dl>`, because each value has a name.
+ *
+ * These used to be `<li><strong>Confidence:</strong> <code>0.984</code></li>`
+ * inside `.feature-unavailable__list`, so live telemetry inherited the styling of
+ * a "this feature is missing" bullet list. Tabular numerals and a fixed cell
+ * width stop the row from reflowing as a value ticks between 0.9 and 0.95.
+ */
+.metric-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md-lg);
+  margin: var(--space-md-lg) 0 0;
+}
+.metric-grid__cell {
+  flex: 1 1 8rem;
+  padding: var(--space-md-lg) var(--space-regular);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+}
+.metric-grid dt {
+  margin: 0 0 var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.metric-grid dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-variant-numeric: tabular-nums;
 }
 
 .docs-list {
@@ -4705,6 +4874,7 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   .consumer-new-chat,
   .text-input,
   .model-search__input,
+  .model-pair__select,
   .chat-input,
   select.chat-input,
   /* Qualified to match .chat-panel-consumer's own (0,2,1) rule, which sets a

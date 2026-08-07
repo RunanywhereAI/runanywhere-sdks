@@ -343,3 +343,30 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
+
+/* =============================================================================
+ * Accessibility utilities
+ * ============================================================================= */
+/*
+ * Available to assistive tech, absent from the layout.
+ *
+ * For a control whose purpose is obvious from its surroundings to a sighted user
+ * but has no programmatic name — a question box under an "Ask a question"
+ * heading, say. Preferred over `aria-label` on a `<textarea>` because a real
+ * `<label for>` also makes the text a click target and survives translation.
+ *
+ * `clip-path` plus a 1px box rather than `display: none`, which would remove it
+ * from the accessibility tree entirely, and rather than a negative-offset box,
+ * which some browsers still read as an off-screen scroll target.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip-path: inset(50%);
+}
