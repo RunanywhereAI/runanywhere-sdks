@@ -385,7 +385,11 @@ async function initializeSDK(): Promise<void> {
     const hostedConfiguration = getHostedAPIConfiguration();
     const configuration: RuntimeConfiguration = hostedConfiguration
       ? {
-          ...hostedConfiguration,
+          apiKey: hostedConfiguration.apiKey,
+          // APIConfiguration exposes `baseURL`; the SDK's initialize() reads
+          // `baseUrl`. Map explicitly so the URL isn't silently dropped (which
+          // made production init fail with "URL required").
+          baseUrl: hostedConfiguration.baseURL,
           environment: 'production',
         }
       : { environment: 'development' };
@@ -544,7 +548,8 @@ function applyAPIConfiguration(
 
   runtimeReconfigurationPromise = (async () => {
     const next: RuntimeConfiguration = {
-      ...configuration,
+      apiKey: configuration.apiKey,
+      baseUrl: configuration.baseURL,
       environment: 'production',
     };
     const previous = activeRuntimeConfiguration;
