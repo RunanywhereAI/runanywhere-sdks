@@ -121,8 +121,8 @@ void ensure_default_vad_loaded() {
     if (rc == RAC_SUCCESS && load_out.status == RAC_SUCCESS && load_out.data) {
         runanywhere::v1::ModelLoadResult load_result;
         if (load_result.ParseFromArray(load_out.data, static_cast<int>(load_out.size))) {
-            loaded = load_result.success();
-            error_message = load_result.error_message();
+            loaded = !load_result.has_error();
+            error_message = load_result.error().message();
         }
     }
     rac_proto_buffer_free(&load_out);

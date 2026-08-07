@@ -9,20 +9,22 @@ text generation, VLM (vision-language) captioning, text embeddings, speech-to-te
 text-to-speech and voice-activity detection **entirely on the host** — no network is needed
 for inference (only for downloading models). All the AI work lives in the C++
 `runanywhere-commons` runtime, which is bound into a single pybind11 extension module
-(`runanywhere._core`). Everything else in the package is idiomatic pure Python: a thin,
-instantiable client over that core, model-handle wrappers, streaming bridges, a model
-catalog + downloader, options/results dataclasses, an event bus, an error type, and audio /
-grammar / structured-output helpers.
+(`runanywhere._core`). Everything else in the package is idiomatic pure Python: the public
+namespaces, an internal runtime + model-handle layer, streaming bridges, a model catalog +
+downloader, options/results dataclasses, an event bus, an error type, and audio / grammar /
+structured-output helpers.
+
+**The public surface is defined by `thoughts/shared/plans/public_api_spec.md` (v3)** — the
+same namespaces, verbs, option fields, defaults, event grammar and result fields as every
+other SDK, with Python casing (snake_case) and `a`-prefixed async twins. Swift is the
+cross-SDK reference when the spec is ambiguous.
 
 The **behavioral bridge reference is the Electron SDK** (`sdk/runanywhere-electron`,
-N-API `addon.cpp` + TypeScript facade) for handle maps, streaming, and secure-store
-shape. **Product / business-logic truth is C++ commons** (with Swift as the cross-SDK
-reference). The native `module.cpp` is an exact behavioral port of `addon.cpp`
-(same globals, handle maps, shutdown semantics, secure store) translated Node-API →
-pybind11 with snake_case names; the Python modules port the TypeScript facade
-(`RunAnywhere.ts`, `Chat.ts`, `VoiceAgent.ts`, `events.ts`, `errors.ts`)
-class-for-class when the surfaces intentionally mirror each other. When in doubt
-about AI semantics, match commons/Swift — not a stale Electron shortcut.
+N-API `addon.cpp`) for handle maps, streaming, and secure-store shape. **Product /
+business-logic truth is C++ commons.** The native `module.cpp` is an exact behavioral port
+of `addon.cpp` (same globals, handle maps, shutdown semantics, secure store) translated
+Node-API → pybind11 with snake_case names. When in doubt about AI semantics, match
+commons/Swift — not a stale Electron shortcut.
 
 ## Build Commands
 
@@ -61,23 +63,24 @@ it lands next to the lazy loader that imports it.
 ## Running Tests
 
 The test suite is **pure Python and needs no native build** — every test that touches the
-runtime substitutes a recording fake for `_core` (see `tests/test_client.py`'s `FakeCore`).
-This is possible because importing `runanywhere` never imports `_core` (see *Lazy-Load
-Design* below).
+runtime substitutes a recording fake for `_core` (`tests/fake_core.py`). This is possible
+because importing `runanywhere` never imports `_core` (see *Lazy-Load Design* below).
 
 ```bash
 # Run the whole suite
 pytest tests
 
 # One file / one test
-pytest tests/test_client.py
-pytest tests/test_client.py::test_context_manager_initializes_and_shuts_down -q
+pytest tests/test_llm.py
+pytest tests/test_llm.py::test_generate_returns_text_and_metrics -q
 ```
 
 The tests prepend the package parent to `sys.path` themselves, so they run regardless of the
-invocation cwd. They monkeypatch `runanywhere._native.get_core` to return the fake and reset
-the process-wide native-lifecycle globals (`client._init_count`, `client._native_up`) around
-each test so ordering never leaks between tests.
+invocation cwd. Two fixtures in `conftest.py` do the setup: `fake_core` monkeypatches
+`runanywhere._native.get_core` and resets the process-wide `runtime` + event bus around every
+test, and `sdk` layers `initialize()`/`reset()` with `RUNANYWHERE_HOME` inside `tmp_path` on
+top of it. `tests/test_smoke.py` is the only module that touches the real native core, and it
+skips itself unless the extension loads and the model it needs is already cached.
 
 ## Package Structure
 
@@ -90,23 +93,33 @@ sdk/runanywhere-python/
 │   ├── win32_platform_adapter.{h,cpp}   # host fs/secure-store/clock/memory adapter (Windows; DPAPI)
 │   └── posix_platform_adapter.{h,cpp}   # host fs/secure-store/clock/memory (POSIX; plaintext 0600)
 ├── runanywhere/              # the importable pure-Python package
-│   ├── __init__.py           # public surface; imports NO _core (direct or transitive)
-│   ├── client.py             # the instantiable RunAnywhere client
-│   ├── models.py             # LLMModel/VLMModel/Embedder/STTModel/TTSVoice/Vad handles
-│   ├── chat.py               # Chat / ChatMessage (multi-turn)
-│   ├── voice_agent.py        # VoiceAgent (STT → LLM → TTS)
+│   ├── __init__.py           # initialize/reset/is_ready + the namespaces; imports NO _core
+│   ├── api/                  # THE public surface — one module per namespace
+│   │   ├── __init__.py       # re-exports the namespace singletons
+│   │   ├── _common.py        # prompt/messages assembly shared by llm and vlm
+│   │   ├── llm.py            # llm.generate/generate_stream/generate_structured + llm.tools
+│   │   ├── vlm.py  stt.py  tts.py  vad.py  embeddings.py  rerank.py
+│   │   ├── images.py  diarization.py  segmentation.py  lora.py  voice.py
+│   │   ├── rag.py            # rag.open + RagSession
+│   │   └── models.py         # models.list/get/register/download/delete/load/unload/state
+│   ├── _runtime.py           # INTERNAL: native lifecycle + one resident model per category
+│   ├── _handles.py           # INTERNAL: LLMModel/VLMModel/Embedder/STTModel/TTSVoice/Vad
+│   ├── _generation.py        # INTERNAL: token stream → GenerationEvent grammar + metrics
+│   ├── _options_bridge.py    # INTERNAL: LlmOptions → native kwargs; refuse unbound fields
+│   ├── _rag_bridge.py        # INTERNAL: proto (de)serialization for the RAG C ABI
 │   ├── _streaming.py         # bridge native callback-per-token → sync/async iterators
-│   ├── options.py            # *Options dataclasses + generate_kwargs assembly
-│   ├── results.py            # result / value dataclasses (+ Synthesis NamedTuple)
+│   ├── inputs.py             # AudioInput/ImageInput/ChatMessage/ModelRef/RagDocument/…
+│   ├── options.py            # *Options dataclasses (v3 field names and defaults)
+│   ├── results.py            # result / value dataclasses with the shared metrics block
 │   ├── errors.py             # SDKException + ErrorCode/ErrorCategory
-│   ├── events.py             # EventBus + event dataclasses + the singleton `bus`
+│   ├── events.py             # EventBus + the event dataclasses + the singleton `bus`
 │   ├── catalog.py            # curated built-in model catalog
 │   ├── download.py           # stdlib-only (urllib) resolver/downloader
 │   ├── grammar.py            # JSON-schema → GBNF grammar
 │   ├── structured.py         # structured output + tool-call schema/prompt/parse
-│   ├── stream_metrics.py     # wrap a token stream in LLMStreamEvent + metrics
 │   ├── audio.py              # PCM/float/WAV helpers (numpy)
-│   ├── __main__.py           # `runanywhere` CLI (serve / models / --version)
+│   ├── cli/                  # the `runanywhere` CLI over the namespaces
+│   ├── __main__.py           # CLI entry shim (`python -m runanywhere`)
 │   ├── server/               # OpenAI-compatible HTTP server — OPTIONAL [server] extra
 │   │   ├── __init__.py       # create_app + serve (uvicorn lazy-imported)
 │   │   ├── schemas.py        # pydantic request models
@@ -132,11 +145,11 @@ itself with `pytest.importorskip("fastapi")`.
 ### Layered design
 
 ```text
-Public API (runanywhere.__init__ re-exports)
+Public API — runanywhere.initialize + the namespaces (runanywhere/api/*)
     ↓
-RunAnywhere client (client.py — instantiable, ref-counts the shared core)
+_runtime.Runtime (process-wide native lifecycle + one resident model per category)
     ↓
-Model handle wrappers (models.py: LLMModel/VLMModel/Embedder/STTModel/TTSVoice/Vad)
+_handles (LLMModel/VLMModel/Embedder/STTModel/TTSVoice/Vad — opaque int handles)
     ↓
 _native.get_core() → runanywhere._core (pybind11 extension)
     ↓
@@ -145,54 +158,76 @@ rac_* C ABI → runanywhere-commons (prebuilt/static-linked C++ runtime)
 
 All business logic lives in C++. The Python layer is adaptation: lifecycle bookkeeping,
 turning the blocking native token callback into Python iterators, host-side model download /
-resolution, and the ergonomic composition helpers (chat / structured / tools / voice).
+resolution, and the composition the spec puts behind one verb (messages → prompt, the tool
+loop, structured parsing).
 
-### Entry point — the instantiable client
+### Entry point — module-level, one call
 
-Unlike the Swift SDK (a static `enum` namespace), `RunAnywhere` here is an **instantiable
-class** (`client.py`), so tests and multi-tenant hosts can hold independent handles. A client
-is inert until `initialize()` and is usable as a context manager (`__enter__` → `initialize`,
-`__exit__` → `shutdown`). `initialize()` returns `self` so it can be chained
-(`RunAnywhere().initialize()`).
+`runanywhere.initialize(api_key=None, base_url=None, environment=PRODUCTION)` is the whole
+bring-up, and `reset()` the whole teardown; `is_ready()`, `version()`, `device_id()`,
+`backends()` and the `events` bus sit beside them. There is no client object to construct and
+no second init phase. The namespaces (`runanywhere.llm`, `.rag`, `.models`, …) are singletons
+created at import time; they hold no native state, so importing them costs nothing.
 
-### Shared-core ref-counting
+`api_key` and `base_url` drive the control plane: with both set, `initialize` runs the
+two-phase handshake — authenticate, then flush telemetry — via `configure_control_plane` in
+`native/module.cpp` (mirroring rcli's bootstrap). HTTP goes through a **stdlib-`urllib`
+transport** the module registers with commons (`rac_http_transport_register`), so there is no
+libcurl / third-party client in the wheel — the same pattern Swift (URLSession) and Kotlin
+(OkHttp) use to supply their own transport. Keyless, `initialize` does no network work. The
+transport/telemetry callbacks re-acquire the GIL to call the `urllib` poster.
 
-The native core is a **single process-wide runtime**, so multiple `RunAnywhere` clients share
-one instance. Module-level state in `client.py` — `_state_lock` (an `RLock`), `_init_count`,
-`_native_up` — coordinates this: the first client to `initialize()` calls
-`core.initialize(secure_dir, base_dir)` and emits `InitializedEvent` + `ServicesReadyEvent`;
-later clients only bump the ref-count. On `shutdown()`, a client unloads the models it loaded,
-decrements the ref-count, and only the last client down calls `core.shutdown()` and emits
-`ShutdownEvent`. Events are emitted **outside** the lock so a listener cannot deadlock the
-lifecycle. `initialize()`/`shutdown()` are idempotent per instance.
+### The process-wide runtime
 
-Default dirs: base = `~/.runanywhere`, secure = `<base>/secure` (mirrors the Electron facade
-default), both overridable via the constructor.
+`_runtime.Runtime` (the module-level `runtime` singleton) owns the native core and keeps **one
+resident model per `ModelCategory`**. Asking for a different id in the same category swaps it;
+that map is what `models.state()` reports and `models.unload()` clears. Generation verbs call
+`runtime.llm(options.model)` and get the resident handle back, loading (and downloading) only
+when the id differs. `initialize`/`reset` are idempotent and guarded by one `RLock`; events are
+emitted outside it so a listener cannot deadlock the lifecycle.
 
-### Model handles
+Default dirs: base = `~/.runanywhere` (override with `RUNANYWHERE_HOME`), secure =
+`<base>/secure`.
 
-Each `load_*` on the client resolves the model to concrete paths (downloading if needed),
-calls the matching `core.load_*` to get an **opaque integer handle**, wraps it in a handle
-class, weakly registers it (`WeakSet`) so client shutdown can unload it, and emits
-`ModelLoadedEvent`. Handle classes (`models.py`) hold `(core, handle)` and expose the domain
-API; each `unload()`/`close()` calls the matching `core.unload_*` and emits
-`ModelUnloadedEvent`.
+`runtime.resolve()` tolerates a local path that does not exist yet (`models.register` records
+models whose files arrive later); `runtime.resolve_for_load()` refuses one, so a bad path is a
+`MODEL_NOT_FOUND` instead of an opaque native failure.
 
-- `LLMModel` — `generate`/`agenerate` (token iterators), `cancel`, `generate_text`/
-  `agenerate_text`, `generate_stream`/`agenerate_stream` (LLMStreamEvent + metrics),
-  `generate_structured`, `generate_tool_call`, `generate_with_tools` (+ async twins).
-  Composition helpers build on the single token stream with **no extra native calls**.
-- `VLMModel` — `caption`/`acaption` (+ generation options) + `_text` twins; `cancel`.
+### Model handles (internal)
+
+`_handles.py` holds `(core, handle)` and exposes the primitive the namespaces build on —
+nothing here is public. Each `unload()` calls the matching `core.unload_*` and is idempotent;
+using a handle afterwards raises `invalid_state` rather than passing a dead handle to C.
+
+- `LLMModel` — `generate`/`agenerate` (raw token iterators), `cancel`.
+- `VLMModel` — `generate`/`agenerate` over `(image_path, prompt)`, `cancel`.
 - `Embedder` — `embed(text) -> np.ndarray`, `embed_batch(texts) -> list[np.ndarray]`.
 - `STTModel` — `transcribe(pcm16) -> str`; `atranscribe` runs it on the default executor.
 - `TTSVoice` — `synthesize(text) -> Synthesis`; `asynthesize` on the executor.
 - `Vad` — energy VAD by default; `load_model` upgrades to Silero/sherpa model VAD;
-  `detect`/`is_speech_active`/`set_threshold`/`reset`/`close`.
+  `process`/`set_threshold`/`reset`.
+
+Everything above the handles — the `started`/`token`/`completed` grammar, the metrics block,
+thinking splitting, stop-sequence truncation — lives in `_generation.py`, so `llm` and `vlm`
+share one implementation.
+
+### Namespace conventions
+
+- One module per namespace in `runanywhere/api/`, ending in the singleton the package
+  re-exports (`llm = Llm()`).
+- Sync verb plus an `a`-prefixed async twin. Streaming verbs return an iterator /
+  async-iterator of the event dataclass; one-shot verbs collect that same stream.
+- Options are always the second positional argument and always optional; a prompt is never a
+  field inside options.
+- Where the pybind11 bridge binds nothing (rerank, diarization, segmentation, images, lora,
+  the voice agent, streaming STT, TTS playback) the verb exists and raises
+  `SDKException.not_implemented` **naming the exact missing `rac_*` symbols**. Never stub a
+  plausible-looking result.
 
 ### Single in-flight generation
 
 `LLMModel`/`VLMModel` each hold a `_GenerationGuard` — a **non-blocking** lock. A second
-concurrent `generate`/`caption` on the same model raises `SDKException.invalid_state`
+concurrent `generate` on the same model raises `SDKException.invalid_state`
 immediately rather than deadlocking or queuing (a concurrent generate is a programming
 error). The guard is held for the whole stream lifetime and released when the stream is
 exhausted, broken out of, closed, or raises (`_guarded_iter` / `_aguarded_iter`).
@@ -220,28 +255,41 @@ the GIL held.
 
 ### Options → native kwargs
 
-`options.py` defines the `*Options` dataclasses. Only a fixed key set
-(`max_tokens`, `temperature`, `top_p`, `top_k`, `system_prompt`, `grammar`) is forwarded to
-`core.generate`; `generate_kwargs` keeps only those known keys whose value is non-`None`
-(a `None` means "unset" so the backend applies its own default). Generation options are
-passed as loose `**opts` kwargs through the handle methods.
+`options.py` defines the `*Options` dataclasses with the v3 spec's field names and defaults.
+`_options_bridge.llm_kwargs` maps `LlmOptions` onto the kwargs `native/module.cpp`'s
+`generate` actually accepts: `max_output_tokens` → `max_tokens`, `reasoning.mode == OFF` →
+`disable_thinking=True`, `structured_output.schema` → a compiled GBNF `grammar`; `temperature`
+/ `top_p` / `top_k` / `system_prompt` pass through verbatim.
+
+**A knob the bridge cannot carry is never silently dropped.** Setting `min_p`,
+`frequency_penalty`, `presence_penalty`, `repetition_penalty`, `seed`, `reasoning.pattern`,
+`structured_output.strict=False`, or structured output on `vlm` raises
+`not_implemented` naming the missing bridge parameter. `check_stt_options`,
+`check_tts_options` and `check_embed_options` do the same for the STT/TTS/embedding knobs that
+have no bound options struct. When `module.cpp` gains a parameter, delete the guard — do not
+start ignoring the field.
 
 ### Structured output, grammar & tools
 
 `grammar.py` compiles a JSON schema to a GBNF grammar (`json_schema_to_grammar`);
-`structured.py` builds `object_grammar`, the tool-call schema/prompt, parses model output
-(`parse_structured`), and defines `ToolSpec`/`ToolCall`/`ToolRun`. `generate_structured`
-constrains decoding to the schema's grammar and returns the parsed object;
-`generate_tool_call` forces a well-formed `{name, arguments}`; `generate_with_tools` also runs
-the selected tool's `execute` (awaited if it returns a coroutine, in the async variant).
+`structured.py` builds `object_grammar`, the tool-call schema/prompt, and parses model output
+(`parse_structured`). `llm.generate_structured` constrains decoding to the schema's grammar
+and returns a `StructuredResult` (`valid=False` with the raw text when parsing fails rather
+than raising). Tools go through `llm.tools.register(tool, executor)`: `llm.generate` runs the
+loop, executing the matched tool (awaiting a coroutine result) and feeding the observation
+back, up to `max_tool_calls`. The loop also stops early when the model repeats a call with
+identical arguments, since that makes no further progress. A call with no registered executor
+finishes the stream with `finish_reason=TOOL_CALLS` so the caller can run it.
 
 ### Event system
 
 `events.py` is a small typed pub/sub `EventBus` where a throwing listener never breaks an
-emit. Event types are frozen dataclasses (`InitializedEvent`, `ServicesReadyEvent`,
-`ShutdownEvent`, `ModelLoadedEvent`, `ModelUnloadedEvent`, `GenerationEvent`); the union is
-`RunAnywhereEvent`. A single process-wide singleton `bus` is exposed as
-`RunAnywhere.events`. Subscribe with `bus.on(listener) -> off` (or `once`).
+emit. Each event family is one dataclass carrying a `kind` (`GenerationEvent`,
+`TranscriptionEvent`, `VadEvent`, `RagEvent`, `ImageEvent`, `DownloadEvent`, `VoiceEvent`,
+`SdkEvent`), so consumers switch on `kind` instead of isinstance chains. The stream events are
+returned by the verbs; only `SdkEvent` (ready / model loaded / model unloaded / error) goes
+through the process-wide singleton `bus`, exposed as `runanywhere.events`. Subscribe with
+`bus.on(listener) -> off` (or `once`).
 
 ### Error system
 
@@ -342,14 +390,13 @@ every change; they are the bar for review.
 - **C++ commons owns truth** for inference, model lifecycle, registry, RAG, cancel, and
   error categories. Python must not re-implement those rules in the facade.
 - The Python layer owns: platform adapter I/O, pybind11 bridging, host download/catalog,
-  streaming fan-out (`_streaming.py`), composition helpers (chat / grammar / tools /
-  server), and honesty in docs/API surface.
-- Keep routers/handlers thin. `runanywhere/server/` is HTTP adaptation over SDK APIs —
-  no new AI business logic in FastAPI routes. If an endpoint needs multi-step AI
-  orchestration, push it down into the client or commons.
-- Prefer one SDK entry point per modality (`load_llm`, `create_rag`, `create_vad`, …).
-  Do not force callers to assemble register → download → load sequences that the SDK
-  should own.
+  streaming fan-out (`_streaming.py`), the composition the spec puts behind one verb
+  (messages, grammar, the tool loop), the CLI/server, and honesty in docs/API surface.
+- Keep routers/handlers thin. `runanywhere/server/` and `runanywhere/cli/` are adaptation
+  over the namespaces — no new AI business logic in a FastAPI route or a CLI handler. If a
+  command needs multi-step orchestration, push it into the namespace or into commons.
+- One verb per job. `llm.generate` loads and downloads what it needs; never make a caller
+  assemble register → download → load themselves.
 
 ### Typed contracts at every boundary
 
@@ -370,13 +417,14 @@ every change; they are the bar for review.
 - Document what is actually true today. Do not claim encryption, remote auth, or NPU
   support that is not wired.
   - Secure store: DPAPI on Windows; **plaintext mode-0600 files on POSIX**.
-  - Phase-2 `complete_services_initialization` is a **local-only lifecycle seam** (no
-    network auth). The HTTP server's optional Bearer `api_key` is separate and configured
-    on `serve()` / the CLI — not on `RunAnywhere()`.
+  - `initialize` runs the control plane only with credentials: authenticate + telemetry flush
+    over a stdlib-`urllib` transport (no libcurl). Keyless, it does no network work;
+    `api_key`/`base_url` map to that handshake. The HTTP server's optional Bearer `api_key`
+    is a separate thing, configured on `serve()` / the CLI.
   - Desktop wheels report CPU backends (llamacpp/onnx/sherpa). QHexRT/Windows Snapdragon
     HNPU is not available until packaging and runtime exist.
-- Prefer deleting dead API knobs (`api_key`/`base_url` on the client) over leaving
-  unused fields that imply capabilities.
+- A verb the bridge cannot serve raises `not_implemented` naming the exact missing `rac_*`
+  symbols. Never return a plausible empty result instead.
 - If a capability cannot be done properly (missing HTTP transport, lifecycle migration),
   document it as deferred — do not stub or mock it into the public surface.
 
@@ -450,16 +498,21 @@ every change; they are the bar for review.
 
 | File | Purpose |
 |------|---------|
-| `runanywhere/client.py` | The instantiable `RunAnywhere` client; shared-core ref-counting, lifecycle, load paths, registry CRUD |
+| `runanywhere/__init__.py` | `initialize`/`reset`/`is_ready`/`version`/`device_id` + every public re-export |
+| `runanywhere/api/` | The public namespaces, one module per modality |
+| `runanywhere/_runtime.py` | Native lifecycle + the resident model per category + resolution |
+| `runanywhere/_handles.py` | Loaded-model handle classes + `_GenerationGuard` |
+| `runanywhere/_generation.py` | Token stream → event grammar, metrics, thinking split, stop sequences |
+| `runanywhere/_options_bridge.py` | `LlmOptions` → native kwargs; refuses knobs the bridge lacks |
 | `runanywhere/_native/__init__.py` | `get_core()` — the single lazy door to the extension |
 | `runanywhere/_native/_core.pyi` | Hand-written stub mirroring `native/module.cpp` |
 | `native/module.cpp` | pybind11 bindings of the `rac_*` C ABI (port of Electron `addon.cpp`) |
 | `native/CMakeLists.txt` | `RAC_BUILD_PYTHON_MODULE`-gated `runanywhere_core` target |
-| `runanywhere/models.py` | Loaded-model handle classes + `_GenerationGuard` + cancel/embed_batch/VAD model load |
 | `runanywhere/_streaming.py` | Native callback-per-token → sync/async iterators (+ `on_stop` cancel hook) |
 | `runanywhere/download.py` | urllib resolver/downloader (catalog / URL / HF / local) |
 | `runanywhere/errors.py` | `SDKException`, exhaustive `ErrorCode`, `ErrorCategory`, `raise_for_rac` |
-| `runanywhere/events.py` | `EventBus` + event dataclasses + the singleton `bus` |
-| `runanywhere/rag.py` | RAG facade + C ABI registry framework/category constants |
+| `runanywhere/events.py` | Event dataclasses + `EventBus` + the singleton `bus` |
+| `runanywhere/_rag_bridge.py` | Proto (de)serialization for the RAG C ABI |
 | `pyproject.toml` | scikit-build-core build + project metadata |
-| `tests/test_client.py` | `FakeCore` pattern for native-free tests |
+| `tests/fake_core.py` | The recording `FakeCore` behind every native-free test |
+| `tests/conftest.py` | The `fake_core` / `sdk` fixtures + the native/model skip gates |

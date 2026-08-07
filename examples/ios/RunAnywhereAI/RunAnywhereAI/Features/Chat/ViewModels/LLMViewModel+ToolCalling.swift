@@ -13,21 +13,29 @@ extension LLMViewModel {
 
     func generateWithToolCalling(
         prompt: String,
-        options: RALLMGenerationOptions,
+        options: LlmOptions,
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
-        // The SDK derives the tool-calling format from the loaded model and
-        // orchestrates the tool call → execute → respond loop internally.
-        // parallelToolCalls: true lets one turn request multiple tools (e.g.
-        // weather + time) and get them all executed before one follow-up
-        // reply, instead of one round-trip per tool.
-        let result = try await RunAnywhere.generateWithTools(
+        // Mirror the Android example: run the loop through generateWithTools with
+        // an explicit RAToolCallingOptions whose autoExecute=true actually runs
+        // the registered tools (the v3 llm.generate path leaves autoExecute
+        // false, so it only leaks the raw tool call), with the final-response cap
+        // kept separate from the tool decision.
+        let loop = try await RunAnywhere.generateWithTools(
             prompt: prompt,
-            options: options,
-            parallelToolCalls: true
+            options: ToolCallingExecutionPolicy.generationOptions(from: options),
+            toolOptions: ToolCallingExecutionPolicy.toolOptions()
         )
-        let toolCallInfo = ToolCallInfo(from: result)
+        if loop.hasErrorMessage {
+            throw LLMError.custom(loop.errorMessage)
+        }
+        // A capable model returns a final answer here; guard against a blank
+        // bubble if a weak model finishes the loop without any prose.
+        let displayText = loop.text.isEmpty
+            ? "The model finished tool calling without a text answer."
+            : loop.text
+        let toolCallInfo = ToolCallInfo(from: loop)
 
         // Drop the write if this generation was superseded while awaiting.
         guard isCurrentGeneration(generationID) else { return }
@@ -35,8 +43,8 @@ extension LLMViewModel {
         // Update the message with the result
         await updateMessageWithToolResult(
             at: messageIndex,
-            text: result.text,
-            thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
+            text: displayText,
+            thinkingContent: loop.thinkingContent.isEmpty ? nil : loop.thinkingContent,
             toolCallInfo: toolCallInfo
         )
     }

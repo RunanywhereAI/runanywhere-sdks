@@ -9,6 +9,8 @@
 // table are replicated here — exactly as the RN and Web SDKs replicate them.
 // Keep them in sync with idl/errors.proto if the canonical mapping changes.
 
+import type { SDKError } from './proto/errors';
+
 export enum ErrorCode {
   UNSPECIFIED = 0,
   NOT_INITIALIZED = 100,
@@ -23,6 +25,7 @@ export enum ErrorCode {
   INVALID_ARGUMENT = 259,
   CANCELLED = 380,
   NOT_IMPLEMENTED = 800,
+  FEATURE_NOT_AVAILABLE = 801,
   UNKNOWN = 804,
 }
 
@@ -122,6 +125,18 @@ export class SDKException extends Error {
 
   static of(code: ErrorCode, message: string, options?: Omit<SDKErrorFields, 'code' | 'message'>): SDKException {
     return new SDKException({ code, message, ...options });
+  }
+
+  /** Build from a decoded proto `SDKError` payload (the D5 structured-error field). */
+  static fromProto(error: SDKError): SDKException {
+    return fromStructuredError({
+      code: error.code,
+      message: error.message,
+      category: error.category,
+      cAbiCode: error.cAbiCode,
+      nestedMessage: error.nestedMessage,
+      fieldPath: error.param,
+    });
   }
 
   static notInitialized(component?: string): SDKException {

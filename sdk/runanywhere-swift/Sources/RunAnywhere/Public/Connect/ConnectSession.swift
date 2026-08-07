@@ -1230,7 +1230,9 @@ private final class ConnectTransport: @unchecked Sendable {
                     var frame = RAConnectHostFrame()
                     frame.invocationEvent = envelope
                     try await self.sendFrameAsync(try frame.serializedData(), on: hosted.connection)
-                    if event.isFinal {
+                    // isFinal was deleted outright; .completed/.error are the
+                    // terminal event_kind values now (idl/llm_service.proto).
+                    if event.eventKind == .completed || event.eventKind == .error {
                         receivedTerminalEvent = true
                         break
                     }
@@ -1276,9 +1278,10 @@ private final class ConnectTransport: @unchecked Sendable {
     ) async throws {
         var event = RALLMStreamEvent()
         event.requestID = requestID
-        event.isFinal = true
-        event.finishReason = "error"
-        event.errorMessage = message
+        event.finishReason = .error
+        var sdkError = RASDKError()
+        sdkError.message = message
+        event.error = sdkError
         event.eventKind = .error
 
         var envelope = RAConnectInvocationEvent()
@@ -1303,7 +1306,8 @@ private final class ConnectTransport: @unchecked Sendable {
                         throw ConnectTransportError.malformedFrame
                     }
                     self.clientEventContinuation?.yield(envelope.event)
-                    if envelope.event.isFinal {
+                    let eventKind = envelope.event.eventKind
+                    if eventKind == .completed || eventKind == .error {
                         self.finishClientInvocation()
                     } else {
                         self.armClientGenerationTimeout(on: connection, requestID: requestID)
@@ -1420,9 +1424,14 @@ private final class ConnectTransport: @unchecked Sendable {
         if let error, emitError {
             var event = RALLMStreamEvent()
             event.requestID = activeClientRequestID ?? ""
-            event.isFinal = true
-            event.finishReason = "error"
-            event.errorMessage = error.localizedDescription
+            event.finishReason = .error
+            if let sdkError = error as? SDKException {
+                event.error = sdkError.proto
+            } else {
+                var sdkError = RASDKError()
+                sdkError.message = error.localizedDescription
+                event.error = sdkError
+            }
             event.eventKind = .error
             continuation.yield(event)
         }

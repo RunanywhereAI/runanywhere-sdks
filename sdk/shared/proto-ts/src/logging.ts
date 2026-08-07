@@ -6,16 +6,14 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
 
 /**
- * ---------------------------------------------------------------------------
- * Severity, mirroring the C ABI `rac_log_level_t`. Larger value = more severe.
- * 0 is TRACE (not UNSPECIFIED) to keep numeric parity with the C enum — the
- * same C-ABI-aligned convention used by HttpDownloadStatus (0=OK) and
- * SdkInitEnvironment (0=DEVELOPMENT).
- * ---------------------------------------------------------------------------
+ * Mirrors rac_log_level_t exactly so the generated enum round-trips with the
+ * platform-adapter log callback without a translation table. 0 is TRACE, not
+ * UNSPECIFIED, to keep numeric parity with the C enum.
  */
 export enum LogLevel {
   LOG_LEVEL_TRACE = 0,
@@ -74,51 +72,35 @@ export function logLevelToJSON(object: LogLevel): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * SDK logging configuration. Per-environment presets
- * (development/staging/production) stay in each SDK as factory helpers.
- * ---------------------------------------------------------------------------
- */
+/** Per-environment presets stay in each SDK as factory helpers. */
 export interface LoggingConfiguration {
-  /** Write logs to the platform-local sink (os_log / Logcat / console). */
+  /** The platform-local sink: os_log, Logcat, or console. */
   enableLocalLogging: boolean;
-  /** Minimum severity emitted. Messages below this level are dropped. */
+  /** Records below this level are dropped. */
   minLogLevel: LogLevel;
-  /** Attach file:line:function source location to each record. */
   includeSourceLocation: boolean;
-  /** Attach device/build metadata (model, os version, app build) to records. */
+  /** Device model, OS version, app build. */
   includeDeviceMetadata: boolean;
-  /** Forward records to the remote logging pipeline. */
   enableRemoteLogging: boolean;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * A single structured log record. Mirrors the per-SDK LogEntry shape.
- * ---------------------------------------------------------------------------
- */
 export interface LogEntry {
-  /** Wall-clock epoch milliseconds. */
   timestampUnixMs: number;
   level: LogLevel;
-  /** Subsystem/tag (e.g. "STT", "Download"). */
+  /** Subsystem tag, e.g. "STT". */
   category: string;
   message: string;
-  /** Optional structured context. */
   metadata: { [key: string]: string };
   /**
-   * Optional source location + context (Kotlin LogEntry carries these as
-   * first-class fields; other SDKs leave them empty). `line`/`error_code`
-   * use 0 as "unset".
+   * Kotlin carries these as first-class fields; other SDKs leave them empty.
+   * 0 means unset for line and error_code.
    */
   file: string;
   line: number;
   function: string;
-  /** SDKError code, when the record describes an error. */
   errorCode: number;
   modelId: string;
-  framework: string;
+  framework: InferenceFramework;
 }
 
 export interface LogEntry_MetadataEntry {
@@ -288,7 +270,7 @@ function createBaseLogEntry(): LogEntry {
     function: "",
     errorCode: 0,
     modelId: "",
-    framework: "",
+    framework: 0,
   };
 }
 
@@ -324,8 +306,8 @@ export const LogEntry: MessageFns<LogEntry> = {
     if (message.modelId !== "") {
       writer.uint32(82).string(message.modelId);
     }
-    if (message.framework !== "") {
-      writer.uint32(90).string(message.framework);
+    if (message.framework !== 0) {
+      writer.uint32(88).int32(message.framework);
     }
     return writer;
   },
@@ -421,11 +403,11 @@ export const LogEntry: MessageFns<LogEntry> = {
           continue;
         }
         case 11: {
-          if (tag !== 90) {
+          if (tag !== 88) {
             break;
           }
 
-          message.framework = reader.string();
+          message.framework = reader.int32() as any;
           continue;
         }
       }
@@ -469,7 +451,7 @@ export const LogEntry: MessageFns<LogEntry> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      framework: isSet(object.framework) ? globalThis.String(object.framework) : "",
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
     };
   },
 
@@ -511,8 +493,8 @@ export const LogEntry: MessageFns<LogEntry> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.framework !== "") {
-      obj.framework = message.framework;
+    if (message.framework !== 0) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
     }
     return obj;
   },
@@ -540,7 +522,7 @@ export const LogEntry: MessageFns<LogEntry> = {
     message.function = object.function ?? "";
     message.errorCode = object.errorCode ?? 0;
     message.modelId = object.modelId ?? "";
-    message.framework = object.framework ?? "";
+    message.framework = object.framework ?? 0;
     return message;
   },
 };

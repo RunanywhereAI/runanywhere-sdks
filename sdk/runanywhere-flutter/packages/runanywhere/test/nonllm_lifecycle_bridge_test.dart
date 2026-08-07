@@ -3,6 +3,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/generated/diffusion_options.pb.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show AudioEncoding;
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart';
@@ -32,17 +34,20 @@ void main() {
       STTTranscriptionRequest(
         audio: STTAudioSource(
           audioData: [1, 2, 3, 4],
-          encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+          encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
           sampleRate: 16000,
           channels: 1,
         ),
-        options: STTOptions(sampleRate: 16000),
+        // `STTOptions.beamSize` was deleted outright (idl/stt_options.
+        // proto) — the message trimmed to punctuation/diarization/word-
+        // timestamp/silence/language knobs.
+        options: STTOptions(enablePunctuation: true),
       ),
     );
 
     expect(result.text, 'hello');
     expect(seen.audio.audioData, [1, 2, 3, 4]);
-    expect(seen.options.sampleRate, 16000);
+    expect(seen.options.enablePunctuation, isTrue);
   });
 
   test('lifecycle TTS bridge forwards generated request and result', () {
@@ -68,33 +73,40 @@ void main() {
     late VADProcessRequest seen;
     DartBridgeVAD.setProcessLifecycleProtoForTesting((request) {
       seen = request;
-      return VADResult(isSpeech: true, confidence: 0.8, energy: 0.4);
+      // `VADResult.confidence` was renamed `probability` (idl/vad_options.
+      // proto).
+      return VADResult(isSpeech: true, probability: 0.8, energy: 0.4);
     });
 
     final result = DartBridgeVAD.shared.processLifecycleProto(
       VADProcessRequest(
+        // `VADAudioSource` is a plain message now, not a oneof
+        // (idl/vad_options.proto) — `audioData` is unconditional.
         audio: VADAudioSource(
           audioData: [0, 0, 1, 0],
-          encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE,
+          encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
           sampleRate: 16000,
           channels: 1,
         ),
-        options: VADOptions(threshold: 0.2),
+        options: VADOptions(activationThreshold: 0.2),
       ),
     );
 
     expect(result.isSpeech, isTrue);
     expect(seen.audio.audioData, [0, 0, 1, 0]);
-    expect(seen.options.threshold, 0.2);
+    expect(seen.options.activationThreshold, closeTo(0.2, 1e-6));
   });
 
   test('lifecycle diffusion bridge forwards generated request and result', () {
     late DiffusionGenerationRequest seen;
     DartBridgeDiffusion.setGenerateLifecycleProtoForTesting((request) {
       seen = request;
+      // The flat single-image `DiffusionResult` (`image_data`/`image_media_
+      // type`) was restructured into `repeated DiffusionImage images`
+      // (idl/diffusion_options.proto), each entry carrying its own
+      // `data`/`mediaType`.
       return DiffusionResult(
-        imageData: [1, 2, 3],
-        imageMediaType: 'image/png',
+        images: [DiffusionImage(data: [1, 2, 3], mediaType: 'image/png')],
       );
     });
 
@@ -105,7 +117,7 @@ void main() {
       ),
     );
 
-    expect(result.imageData, [1, 2, 3]);
+    expect(result.images.single.data, [1, 2, 3]);
     expect(seen.modelId, 'sdxl');
     expect(seen.options.prompt, 'mountain');
   });
@@ -127,6 +139,9 @@ void main() {
   });
 
   test('STT rejects platform-owned audio sources before FFI', () {
+    // `adapter_handle` was deleted from `STTAudioSource`'s oneof
+    // (idl/stt_options.proto); `file_uri` is the only non-inline-bytes
+    // source left and still requires a platform adapter.
     expect(
       () => DartBridgeSTT.shared.transcribeLifecycleProto(
         STTTranscriptionRequest(
@@ -141,31 +156,17 @@ void main() {
         ),
       ),
     );
-
-    expect(
-      () => DartBridgeSTT.shared.transcribeLifecycleProto(
-        STTTranscriptionRequest(
-          audio: STTAudioSource(adapterHandle: 'mic-session'),
-        ),
-      ),
-      throwsA(isA<UnsupportedError>()),
-    );
   });
 
-  test('VAD rejects platform-owned audio adapter handles before FFI', () {
+  test('VAD rejects empty audio_data before FFI', () {
+    // `VADAudioSource` is a plain message now, not a oneof
+    // (idl/vad_options.proto): `adapter_handle` is gone, so the only
+    // remaining pre-FFI rejection is empty `audio_data`.
     expect(
       () => DartBridgeVAD.shared.processLifecycleProto(
-        VADProcessRequest(
-          audio: VADAudioSource(adapterHandle: 'audio-stream'),
-        ),
+        VADProcessRequest(audio: VADAudioSource()),
       ),
-      throwsA(
-        isA<UnsupportedError>().having(
-          (e) => e.message,
-          'message',
-          contains('platform adapter'),
-        ),
-      ),
+      throwsA(isA<ArgumentError>()),
     );
   });
 }

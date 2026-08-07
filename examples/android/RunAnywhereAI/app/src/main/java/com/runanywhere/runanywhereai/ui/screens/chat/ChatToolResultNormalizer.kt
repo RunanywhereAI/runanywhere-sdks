@@ -42,10 +42,9 @@ internal object ChatToolResultNormalizer {
     )
 
     fun normalize(result: ToolCallingResult): NormalizedChatToolResult {
-        val rawText = result.text.ifBlank {
-            result.raw_text.takeIf { containsThinkingMarkup(it) }.orEmpty()
-        }
-        val split = splitThinking(rawText)
+        // ToolCallingResult.raw_text was deleted outright (idl/tool_calling.proto) —
+        // `text` is now the sole final-response field, so it is the only source here.
+        val split = splitThinking(result.text)
         val typedThinking = result.thinking_content
             ?.let(::sanitizeTypedThinking)
             ?.takeIf { it.isNotBlank() }
@@ -149,8 +148,9 @@ internal object ChatToolResultNormalizer {
 
     private fun successfulToolFallback(results: List<ToolResult>): String? =
         results.asReversed().firstNotNullOfOrNull { result ->
+            // Wire polarity: `success` -> `is_error` (inverted).
             val succeeded = result.result_json.isNotBlank() &&
-                (result.success || result.error.isNullOrBlank())
+                (!result.is_error || result.error.isNullOrBlank())
             if (succeeded) summarizeToolResult(result) else null
         }
 
@@ -195,9 +195,6 @@ internal object ChatToolResultNormalizer {
     }
 
     private fun visibleOnly(value: String): String = splitThinking(value).visibleText
-
-    private fun containsThinkingMarkup(value: String): Boolean =
-        thinkingTag.containsMatchIn(value) || incompleteThinkingTag.containsMatchIn(value)
 
     private fun removeThinkingMarkup(value: String): String =
         incompleteThinkingTag.replace(thinkingTag.replace(value, ""), "")

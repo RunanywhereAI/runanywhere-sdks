@@ -81,7 +81,10 @@ example/device workflows; a JavaScript unit pass is not native validation.
 
 ```
 Layer 1: TypeScript API
-  RunAnywhere singleton + Extension modules (TextGeneration, STT, TTS, VAD, VoiceAgent, VLM, RAG, Solutions, ToolCalling)
+  RunAnywhere facade + namespace modules in Public/Api/ (llm, vlm, stt, tts, vad, embeddings,
+  rerank, images, diarization, segmentation, voice, rag, models, lora) over the remaining
+  Public/Extensions/ bridge helpers (STT, TTS, VoiceAgent, RAG, LoRA, ToolCalling, Models,
+  Storage, Solutions, Hybrid)
   Proto adapters, SDK event subscriptions, ServiceContainer, SDKLogger
 
 Layer 2: Nitro Bridge (JSI — no serialization)
@@ -147,21 +150,21 @@ while (!result.done) {
 
 **Native module singletons**: `requireNativeModule()` / `isNativeModuleAvailable()` in `native/NativeRunAnywhereCore.ts` lazily create the `HybridRunAnywhereCore` instance via `createHybridObject('RunAnywhereCore')` and cache it module-level. These are the only exports from `packages/core/src/native`.
 
-**`RunAnywhere.initialize(options)` sequence** (`Public/RunAnywhere.ts:222`):
-1. Validate API key (non-dev environments)
-2. Check native module availability
-3. `native.configureHttp(baseURL, apiKey)`
-4. `native.initialize(configJson)` → C++ initialization
-5. Native services finish initialization through the C++/proto bridge
-6. `native.getPersistentDeviceUUID()` → cache device ID
-7. `TelemetryService.configure()`
-8. `_authenticateWithBackend()` → JWT tokens stored in secure storage
-9. `_registerDeviceIfNeeded()` (non-blocking)
-10. `ServiceContainer.shared.markInitialized()`
+**`RunAnywhere.initialize({ apiKey, baseUrl, environment })` sequence** (`Public/RunAnywhere.ts`):
+1. Join any in-flight `reset()`, then validate the base URL and (outside development) the API key
+2. Install NitroModules and check native module availability
+3. `native.initialize(configJson)` → commons Phase 1; the facade opens here, so `isReady` is true and local inference works
+4. Kick the network phase in the background (`completeServicesInitialization()` → `native.completeServicesInitialization()`): HTTP/auth setup, device registration, model assignments, downloaded-model discovery, telemetry flush
 
-### Extension Module Pattern
+Callers never await step 4. `ensureServicesReady()` joins it (or retries just the HTTP/auth half after an offline boot) before any call that needs the backend. A generation bump invalidates both phases when `reset()` runs mid-flight.
 
-Each AI capability is a standalone module in `Public/Extensions/` (e.g., `LLM/RunAnywhere+TextGeneration.ts`, `STT/RunAnywhere+STT.ts`). The `RunAnywhere` object imports these via namespace imports and delegates each property/method to the corresponding extension function. This keeps the facade thin while each extension manages its own state.
+### Namespace Module Pattern
+
+The public surface is the v3 API spec (`thoughts/shared/plans/public_api_spec.md`). Each namespace is one module in `Public/Api/` (`Llm.ts`, `Stt.ts`, `Voice.ts`, …) and the `RunAnywhere` facade only holds lifecycle plus those namespaces. Shared plumbing lives beside them: `Types.ts` (public options/results/events), `Options.ts` (public bag → proto message, defaults from the generated `*Defaults()` helpers), `Inputs.ts` (`AudioInputs` / `ImageInputs` and their proto converters), `Results.ts` (proto → public result), `Stream.ts` (`pushStream` / `mapStream` / `deferStream`), and `Bridge.ts` (preflight guards, proto encode/decode).
+
+Never write a default value in TypeScript. `Options.ts` merges caller options over the generated defaults so the IDL keeps the only declaration.
+
+Files under `Public/Extensions/` are now internal bridge helpers, not the public API. Some namespaces (`llm`, `vlm`, `vad`, `images`, `embeddings`) call the Nitro proto verbs directly and have no extension file.
 
 ### Type System
 
@@ -173,11 +176,11 @@ Each AI capability is a standalone module in `Public/Extensions/` (e.g., `LLM/Ru
 
 ### Event System
 
-`RunAnywhere.subscribeSDKEvents(...)` is the consumer event surface. Native events flow through `subscribeSDKEventsProto`, arrive as proto bytes, and are decoded into generated `SDKEvent` messages. There are no JS-side event sinks anymore — all SDK event observation goes through the native proto-byte stream.
+`RunAnywhere.events` (an `AsyncIterable<SdkEvent>` built in `Public/Api/Events.ts`) is the consumer event surface. Native events flow through `subscribeSDKEventsProto`, arrive as proto bytes, and are decoded into generated `SDKEvent` messages. There are no JS-side event sinks anymore — all SDK event observation goes through the native proto-byte stream.
 
 ### Logging
 
-`SDKLogger` (`Foundation/Logging/Logger/SDKLogger.ts`) delegates to `LoggingManager.shared`, which fans logs out to its registered `LogDestination`s. Default destination is the console; opt-in custom destinations are registered with `RunAnywhere.addLogDestination(...)`. Verbosity is controlled via `RunAnywhere.configureLogging(...)`, `setLogLevel(...)`, and `setLocalLoggingEnabled(...)`. Pre-built category instances live in `SDKLogger`: `.shared`, `.llm`, `.stt`, `.tts`, `.download`, `.models`, `.core`, `.vad`, `.network`, `.events`, `.archive`.
+`SDKLogger` (`Foundation/Logging/Logger/SDKLogger.ts`) delegates to `LoggingManager.shared`, which fans logs out to its registered `LogDestination`s. Default destination is the console; opt-in custom destinations are registered with `RunAnywhere.logging.addDestination(...)`. Verbosity is controlled via `RunAnywhere.logging.configure(...)`, `.setLevel(...)`, and `.setLocalEnabled(...)`. Pre-built category instances live in `SDKLogger`: `.shared`, `.llm`, `.stt`, `.tts`, `.download`, `.models`, `.core`, `.vad`, `.network`, `.events`, `.archive`.
 
 On iOS, Swift `SDKLogger` uses `OSLog` with subsystem `com.runanywhere.reactnative`. The ObjC `RNSDKLoggerBridge` lets C code route logs through Swift. SwiftLint rules (`.swiftlint.yml`) enforce that all logging goes through `SDKLogger` — `print()`, `NSLog()`, `os_log()` are banned at error severity.
 
@@ -243,7 +246,8 @@ The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (
 
 | File | Purpose |
 |------|---------|
-| `packages/core/src/Public/RunAnywhere.ts` | Main SDK facade (~100+ methods) |
+| `packages/core/src/Public/RunAnywhere.ts` | SDK facade: lifecycle + the v3 namespaces |
+| `packages/core/src/Public/Api/` | One module per v3 namespace, plus the shared type/option/result/stream layer |
 | `packages/core/src/specs/RunAnywhereCore.nitro.ts` | Complete native C++ interface contract (~60 methods) |
 | `packages/core/src/native/NitroModulesGlobalInit.ts` | NitroModules singleton installation guard |
 | `packages/core/src/native/NativeRunAnywhereCore.ts` | `requireNativeModule()` / `isNativeModuleAvailable()` accessors |

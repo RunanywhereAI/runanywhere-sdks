@@ -12,11 +12,12 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
+import 'package:runanywhere/generated/convenience/ra_convenience.dart'
+    show TTSOptionsConvenience;
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
-import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
@@ -98,13 +99,8 @@ class RunAnywhereTTS {
           validateAvailability: true,
         ),
       );
-      if (!result.success) {
-        throw SDKException.modelLoadFailed(
-          voiceId,
-          result.errorMessage.isNotEmpty
-              ? result.errorMessage
-              : 'TTS lifecycle load failed',
-        );
+      if (result.hasError()) {
+        throw SDKException(result.error);
       }
 
       logger.info('TTS voice loaded: $voiceId');
@@ -134,12 +130,8 @@ class RunAnywhereTTS {
         category: _ttsCategory,
       ),
     );
-    if (!result.success) {
-      throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'TTS lifecycle unload failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
     _isSpeaking = false;
   }
@@ -153,14 +145,14 @@ class RunAnywhereTTS {
       throw SDKException.notInitialized();
     }
     await DartBridge.ensureServicesReady();
-    final voiceId = await _requireLoadedVoiceId();
+    await _requireLoadedVoiceId();
+    // `ssml`/`metadata` on the request and `enable_ssml` on `TTSOptions` were
+    // both deleted outright (idl/tts_options.proto: "no backend parses
+    // SSML" / "engines spoke the markup aloud") — `text` is the only input
+    // channel left; the lifecycle-owned ABI resolves the voice internally,
+    // same as `metadata['voice_id']` used to advertise.
     final opts = _effectiveOptions(options ?? TTSOptions());
-    final request = TTSSynthesisRequest(
-      text: opts.enableSsml ? null : text,
-      ssml: opts.enableSsml ? text : null,
-      options: opts,
-      metadata: <String, String>{'voice_id': voiceId}.entries,
-    );
+    final request = TTSSynthesisRequest(text: text, options: opts);
     return DartBridgeTTS.shared.synthesizeLifecycleProtoAsync(request);
   }
 
@@ -189,14 +181,10 @@ class RunAnywhereTTS {
     if (!current.found || current.modelId.isEmpty) {
       return; // Silent finish (Swift parity).
     }
-    final voiceId = current.modelId;
+    // `ssml`/`metadata` on the request and `enable_ssml` on `TTSOptions` were
+    // both deleted outright (idl/tts_options.proto) — see [synthesize].
     final opts = _effectiveOptions(options ?? TTSOptions());
-    final request = TTSSynthesisRequest(
-      text: opts.enableSsml ? null : text,
-      ssml: opts.enableSsml ? text : null,
-      options: opts,
-      metadata: <String, String>{'voice_id': voiceId}.entries,
-    );
+    final request = TTSSynthesisRequest(text: text, options: opts);
     Stream<TTSStreamEvent> events;
     try {
       events = DartBridgeTTS.shared.synthesizeStreamLifecycleProto(request);
@@ -205,8 +193,7 @@ class RunAnywhereTTS {
       yield TTSOutput(
         timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
         isFinal: true,
-        errorMessage: 'TTS stream failed: $e',
-        errorCode: RacResultCodes.errorProcessingFailed,
+        error: SDKException.processingFailed('TTS stream failed: $e').error,
       );
       return;
     }
@@ -282,8 +269,30 @@ class RunAnywhereTTS {
     await stopSynthesis();
   }
 
-  /// List available TTS voice ids from the generated registry surface.
+  /// Read the lifecycle-owned TTS service state (readiness, current voice,
+  /// available voices, supported languages).
+  Future<TTSServiceState> ttsState() async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeTTS.shared.stateLifecycleProto();
+  }
+
+  /// List available TTS voice ids.
+  ///
+  /// `TTSServiceState.voices` was deleted outright (idl/tts_options.proto:
+  /// "use the list-voices verb") — prefers the dedicated
+  /// `rac_tts_component_list_voices_proto` ABI (`DartBridgeTTS.listVoicesProto`);
+  /// falls back to the model registry when that ABI is unavailable.
   Future<List<String>> availableVoices() async {
+    try {
+      final voices = await DartBridgeTTS.shared.listVoicesProto();
+      if (voices.isNotEmpty) {
+        return voices.map((v) => v.id).toList(growable: false);
+      }
+    } catch (_) {
+      // Older commons binaries without the list-voices ABI fall through.
+    }
     final result = await RunAnywhereModels.shared.list(
       query: model_pb.ModelQuery(category: _ttsCategory),
     );
@@ -310,24 +319,27 @@ class RunAnywhereTTS {
   }
 
   TTSOptions _effectiveOptions(TTSOptions options) {
+    // Fill unset fields from the generated defaults, which come from the
+    // rac_default annotations in idl/tts_options.proto.
+    final d = TTSOptionsConvenience.defaults();
     final opts = options.deepCopy();
     if (!opts.hasLanguageCode()) {
-      opts.languageCode = 'en-US';
+      opts.languageCode = d.languageCode;
     }
-    if (!opts.hasSpeakingRate()) {
-      opts.speakingRate = 1.0;
+    if (!opts.hasSpeed()) {
+      opts.speed = d.speed;
     }
     if (!opts.hasPitch()) {
-      opts.pitch = 1.0;
+      opts.pitch = d.pitch;
     }
     if (!opts.hasVolume()) {
-      opts.volume = 1.0;
+      opts.volume = d.volume;
     }
     if (!opts.hasAudioFormat()) {
-      opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_PCM;
+      opts.audioFormat = d.audioFormat;
     }
     if (!opts.hasSampleRate()) {
-      opts.sampleRate = RADefaultsAudioCapture.ttsSampleRateHz;
+      opts.sampleRate = d.sampleRate;
     }
     return opts;
   }

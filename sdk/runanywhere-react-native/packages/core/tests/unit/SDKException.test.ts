@@ -32,6 +32,14 @@ describe('SDKException', () => {
       expect(exception.message).toBe('Native module not available');
     });
 
+    it('featureNotAvailable uses FEATURE_NOT_AVAILABLE', () => {
+      const exception = SDKException.featureNotAvailable(
+        'rag.search (rac_rag_search_proto)'
+      );
+      expect(exception.code).toBe(ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE);
+      expect(exception.message).toContain('rac_rag_search_proto');
+    });
+
     it('modelNotFound surfaces the model id in the message', () => {
       const exception = SDKException.modelNotFound('llama-3-8b');
       expect(exception.code).toBe(ErrorCode.ERROR_CODE_MODEL_NOT_FOUND);

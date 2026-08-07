@@ -2,10 +2,12 @@
  * Documents Tab — RAG workflow through the public core facade.
  *
  * Mirrors iOS `RAGViewModel` (RAGViewModel.swift:80-115): the user picks an
- * embedding model and an LLM model from the registry, the pipeline is
- * created via `RunAnywhere.ragCreatePipeline(embeddingModelId, llmModelId)`,
- * and documents are ingested through `ragIngest`. The view owns browser
- * file selection/reading and rendering only.
+ * embedding model and an LLM model from the registry, `RunAnywhere.rag.open`
+ * returns a session that owns the corpus, and documents are ingested through
+ * `session.ingest`. The view owns browser file selection/reading and rendering.
+ *
+ * Per-document removal is not part of the v3 RAG session surface, so the list
+ * reports indexed counts and offers Clear All instead.
  *
  * PDF ingestion is iOS-only for now: iOS extracts text via PDFKit
  * (DocumentService.extractText), a platform framework with no dependency-free
@@ -18,10 +20,9 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
-  ragQueryOptionsWithQuestion,
+  type Match,
   type ModelInfo,
-  type RAGDocumentSummary,
-  type RAGSearchResult,
+  type RagSession,
 } from '@runanywhere/web';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
@@ -37,10 +38,11 @@ let isBusy = false;
  * embedding + LLM model picker rows). */
 let selectedEmbeddingModelId = '';
 let selectedLlmModelId = '';
-/** Model-id pair the currently live RAG provider was created with. */
-let createdPipelineKey: string | null = null;
-/** Facade generation captured with createdPipelineKey. */
-let createdPipelineGeneration: number | null = null;
+/** Live corpus session, and the model pair it was opened with. */
+let ragSession: RagSession | null = null;
+let openedPipelineKey: string | null = null;
+/** Documents ingested in this session, for the list the SDK does not enumerate. */
+const ingestedDocuments: Array<{ name: string; chunkCount: number }> = [];
 
 // ---------------------------------------------------------------------------
 // Init
@@ -122,12 +124,13 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
 
   return {
     onActivate: () => {
-      // Settings can reinitialize every backend while this view remains
-      // mounted. Treat the cached model pair as valid only while the SDK still
-      // reports a live provider; otherwise the next action must recreate it.
-      if (!createdPipelineIsLive(selectedPipelineKey())) resetCreatedPipeline();
       refreshModelButtons();
       void renderDocList();
+    },
+    // Settings can reinitialize every backend while this view stays mounted;
+    // the session holds the process-wide RAG index, so release it on exit.
+    onDeactivate: () => {
+      void closeRAGSession();
     },
   };
 }
@@ -150,8 +153,9 @@ function refreshModelButtons(): void {
   for (const [kind, modelId] of pairs) {
     const btn = container.querySelector<HTMLButtonElement>(`#docs-${kind}-download-btn`);
     if (!btn) continue;
-    const model = modelId ? RunAnywhere.getModel(modelId) : null;
-    const downloaded = !!(model?.isDownloaded || model?.localPath);
+    const downloaded = modelId
+      ? RunAnywhere.models.list({ downloadedOnly: true }).some((model) => model.id === modelId)
+      : false;
     btn.disabled = isBusy || !modelId || downloaded;
     btn.textContent = downloaded ? 'Downloaded' : 'Download';
   }
@@ -165,7 +169,7 @@ async function downloadSelectedModel(
     setModelStatus(`Select a ${label} model first.`);
     return;
   }
-  const model = RunAnywhere.getModel(modelId);
+  const model = RunAnywhere.models.get(modelId);
   if (!model) {
     setModelStatus(`${label} model '${modelId}' is not registered.`);
     return;
@@ -174,25 +178,14 @@ async function downloadSelectedModel(
   refreshModelButtons();
   setModelStatus(`Downloading ${label} model ${model.name || modelId}…`);
   try {
-    await RunAnywhere.downloadModel({
-      modelId,
-      model,
-      allowMeteredNetwork: true,
-      resumeExisting: true,
-      verifyChecksums: false,
-      validateExistingBytes: false,
-      updateRegistryOnCompletion: true,
-      storageNamespace: '',
-      availableStorageBytes: 0,
-      requiredFreeBytesAfterDownload: 0,
-      pollIntervalMs: 500,
-      onProgress: (next) => {
-        const pct = next.totalBytes > 0
-          ? Math.round((Number(next.bytesDownloaded) / Number(next.totalBytes)) * 100)
-          : 0;
-        setModelStatus(`Downloading ${label} model… ${pct}%`);
-      },
-    });
+    for await (const event of RunAnywhere.models.download(modelId)) {
+      if (event.type === 'progress') {
+        const percent = event.bytesTotal > 0 ? (event.bytesDone / event.bytesTotal) * 100 : 0;
+        setModelStatus(`Downloading ${label} model… ${Math.round(percent)}%`);
+      } else if (event.type === 'extracting') {
+        setModelStatus(`Extracting ${label} model…`);
+      }
+    }
     setModelStatus(`${label} model ready: ${model.name || modelId}.`);
   } catch (err) {
     setModelStatus(`${label} model download failed: ${formatError(err)}`);
@@ -207,12 +200,7 @@ async function downloadSelectedModel(
 // ---------------------------------------------------------------------------
 
 function registryModelsForCategory(category: ModelCategory): ModelInfo[] {
-  try {
-    const list = RunAnywhere.listModels();
-    return (list?.models ?? []).filter((model) => model.category === category);
-  } catch {
-    return [];
-  }
+  return RunAnywhere.models.list({ category });
 }
 
 function populateModelPickers(): void {
@@ -266,15 +254,13 @@ async function onFilePicked(e: Event): Promise<void> {
   const target = e.target as HTMLInputElement;
   if (!target.files || target.files.length === 0) return;
   if (isBusy) return;
-  if (!(await ensureRAGReady())) {
-    target.value = '';
-    return;
-  }
 
   isBusy = true;
   try {
+    const session = await ensureRAGSession();
+    if (!session) return;
     for (const file of Array.from(target.files)) {
-      await ingestFile(file);
+      await ingestFile(session, file);
     }
     await renderDocList();
   } catch (err) {
@@ -285,52 +271,45 @@ async function onFilePicked(e: Event): Promise<void> {
   }
 }
 
-async function ingestFile(file: File): Promise<void> {
+async function ingestFile(session: RagSession, file: File): Promise<void> {
   setStatus(`Reading ${file.name}...`);
   // .txt/.md/.json are all read as plain text and ingested as-is — same as
-  // iOS, where JSON documents flow through text extraction before ragIngest
+  // iOS, where JSON documents flow through text extraction before ingest
   // (DocumentRAGView.swift:50 allows [.pdf, .json]).
-  const text = await file.text();
-  const docId = createDocumentId();
+  const before = await session.stats();
 
   setStatus(`Indexing ${file.name}...`);
-  await RunAnywhere.ragIngest(text, JSON.stringify({
-    docId,
-    docName: file.name,
-    sourceUri: `web-file:${file.name}`,
-    mediaType: file.type || 'text/plain',
-    sizeBytes: String(file.size),
-  }));
+  await session.ingest({
+    text: await file.text(),
+    name: file.name,
+    metadata: {
+      docId: createDocumentId(),
+      sourceUri: `web-file:${file.name}`,
+      mediaType: file.type || 'text/plain',
+      sizeBytes: String(file.size),
+    },
+  });
 
-  const stats = await RunAnywhere.ragGetStatistics();
-  setStatus(`Indexed ${file.name}. ${stats.indexedChunks} chunks total.`);
+  const stats = await session.stats();
+  ingestedDocuments.push({
+    name: file.name,
+    chunkCount: Math.max(0, stats.chunkCount - before.chunkCount),
+  });
+  setStatus(`Indexed ${file.name}. ${stats.chunkCount} chunks total.`);
 }
 
 async function clearAllDocs(): Promise<void> {
   if (isBusy) return;
-  if (!(await ensureRAGReady())) return;
   isBusy = true;
   try {
-    await RunAnywhere.ragClearDocuments();
+    const session = await ensureRAGSession();
+    if (!session) return;
+    await session.clear();
+    ingestedDocuments.length = 0;
     await renderDocList();
     setStatus('All documents cleared.');
   } catch (err) {
     setStatus(`Clear failed: ${formatError(err)}`);
-  } finally {
-    isBusy = false;
-  }
-}
-
-async function removeDocument(id: string): Promise<void> {
-  if (isBusy) return;
-  if (!(await ensureRAGReady())) return;
-  isBusy = true;
-  try {
-    await RunAnywhere.rag.removeDocument(id);
-    await renderDocList();
-    setStatus('Document removed.');
-  } catch (err) {
-    setStatus(`Remove failed: ${formatError(err)}`);
   } finally {
     isBusy = false;
   }
@@ -345,44 +324,35 @@ async function askQuestion(): Promise<void> {
   const queryEl = container.querySelector('#docs-query') as HTMLTextAreaElement;
   const question = queryEl.value.trim();
   if (!question) return;
-  if (!(await ensureRAGReady())) return;
-
-  let documentCount = 0;
-  try {
-    documentCount = await RunAnywhere.ragGetDocumentCount();
-  } catch (err) {
-    setAnswerText(`Failed: ${formatError(err)}`);
-    return;
-  }
-  if (documentCount === 0) {
-    setAnswerText('Upload a document first.');
-    return;
-  }
 
   isBusy = true;
   setAnswerText('Searching...');
   try {
-    // Full-options overload (Swift parity: `ragQuery(_ options:)` with
-    // RARAGQueryOptions.defaults(question:) — RAGViewModel.swift:137-144).
-    const result = await RunAnywhere.ragQuery({
-      ...ragQueryOptionsWithQuestion(question),
-      retrievalTopK: TOP_K,
-      maxTokens: 512,
-      temperature: 0.4,
-      disableThinking: selectedLlmSupportsThinking() && !getGenerationSettings().thinkingModeEnabled,
-    });
-
-    if (result.errorCode !== 0) {
-      setAnswerText(`Failed: ${result.errorMessage ?? 'RAG query failed'}`);
+    const session = await ensureRAGSession();
+    if (!session) {
+      setAnswerText('Select an embedding model and an LLM model first.');
+      return;
+    }
+    if ((await session.stats()).documentCount === 0) {
+      setAnswerText('Upload a document first.');
       return;
     }
 
-    if (result.retrievedChunks.length === 0) {
+    const suppressThinking = selectedLlmSupportsThinking()
+      && !getGenerationSettings().thinkingModeEnabled;
+    const result = await session.query(question, {
+      generation: {
+        maxOutputTokens: 512,
+        temperature: 0.4,
+        reasoning: suppressThinking ? { mode: 'off' } : { mode: 'on', includeInOutput: true },
+      },
+    });
+
+    if (result.sources.length === 0) {
       setAnswerText('No relevant chunks found.');
       return;
     }
-
-    setAnswerHtml(formatAnswer(result.answer, result.retrievedChunks, result.thinkingContent));
+    setAnswerHtml(formatAnswer(result.answer, result.sources));
   } catch (err) {
     setAnswerText(`Failed: ${formatError(err)}`);
   } finally {
@@ -396,43 +366,31 @@ async function askQuestion(): Promise<void> {
 
 async function renderDocList(): Promise<void> {
   const listEl = container.querySelector('#docs-list')!;
-  const availability = RunAnywhere.rag.availability();
-  if (!availability.available) {
+  if (!ragSession) {
     listEl.innerHTML = '<li class="docs-empty">No documents indexed yet</li>';
-    setStatus(availability.reason);
     return;
   }
 
-  let documents: RAGDocumentSummary[];
+  let chunkCount = 0;
   try {
-    if (!RunAnywhere.rag.capabilities().documentListing) {
-      const stats = await RunAnywhere.ragGetStatistics();
-      listEl.innerHTML = stats.indexedDocuments === 0
-        ? '<li class="docs-empty">No documents indexed yet</li>'
-        : `<li class="docs-empty">${stats.indexedDocuments} document${stats.indexedDocuments === 1 ? '' : 's'} indexed. Document listing is not exposed by this RAG provider.</li>`;
-      if (stats.errorMessage) {
-        setStatus(stats.errorMessage);
-      }
-      return;
-    }
-    documents = await RunAnywhere.rag.listDocuments();
+    chunkCount = (await ragSession.stats()).chunkCount;
   } catch (err) {
     listEl.innerHTML = '<li class="docs-empty">No documents indexed yet</li>';
-    setStatus(`Unable to list documents: ${formatError(err)}`);
+    setStatus(`Unable to read index stats: ${formatError(err)}`);
     return;
   }
 
-  if (documents.length === 0) {
-    listEl.innerHTML = '<li class="docs-empty">No documents indexed yet</li>';
+  if (ingestedDocuments.length === 0) {
+    listEl.innerHTML = chunkCount === 0
+      ? '<li class="docs-empty">No documents indexed yet</li>'
+      : `<li class="docs-empty">${chunkCount} chunks indexed</li>`;
     return;
   }
 
-  const canRemoveDocuments = RunAnywhere.rag.capabilities().documentRemoval;
   listEl.innerHTML = '';
-  for (const doc of documents) {
+  for (const doc of ingestedDocuments) {
     const li = document.createElement('li');
     li.className = 'docs-item';
-    li.dataset.id = doc.id;
 
     const infoDiv = document.createElement('div');
     const titleDiv = document.createElement('div');
@@ -444,15 +402,6 @@ async function renderDocList(): Promise<void> {
     infoDiv.appendChild(titleDiv);
     infoDiv.appendChild(metaDiv);
     li.appendChild(infoDiv);
-
-    if (canRemoveDocuments) {
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-icon docs-item-delete';
-      btn.setAttribute('aria-label', 'Remove');
-      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>';
-      btn.addEventListener('click', () => { void removeDocument(doc.id); });
-      li.appendChild(btn);
-    }
 
     listEl.appendChild(li);
   }
@@ -479,49 +428,41 @@ function setAnswerHtml(html: string): void {
 }
 
 /**
- * Create the RAG pipeline for the user-selected model pair (iOS parity:
- * RAGViewModel.swift:100-103 `ragCreatePipeline(embeddingModel:llmModel:)`).
- * Recreates the provider whenever the selection changes or runtime teardown
- * invalidates the previously cached provider.
+ * Open (or reuse) the corpus session for the selected model pair. `rag.open`
+ * loads and downloads both models itself, so nothing is pre-staged here.
  */
-async function ensureRAGReady(): Promise<boolean> {
+async function ensureRAGSession(): Promise<RagSession | null> {
   if (!selectedEmbeddingModelId || !selectedLlmModelId) {
     setStatus('Select an embedding model and an LLM model first.');
-    return false;
+    return null;
   }
-  const key = selectedPipelineKey();
-  if (createdPipelineIsLive(key)) return true;
-  resetCreatedPipeline();
+  const key = `${selectedEmbeddingModelId}|${selectedLlmModelId}`;
+  if (ragSession && openedPipelineKey === key) return ragSession;
+
+  await closeRAGSession();
   try {
-    setStatus('Creating RAG pipeline...');
-    await RunAnywhere.ragCreatePipeline(selectedEmbeddingModelId, selectedLlmModelId);
-    createdPipelineGeneration = RunAnywhere.rag.pipelineState().generation;
-    createdPipelineKey = key;
-    setStatus('RAG pipeline ready.');
-    return true;
+    setStatus('Opening RAG session...');
+    ragSession = await RunAnywhere.rag.open(
+      { id: selectedEmbeddingModelId },
+      { id: selectedLlmModelId },
+      { topK: TOP_K },
+    );
+    openedPipelineKey = key;
+    setStatus('RAG session ready.');
+    return ragSession;
   } catch (err) {
-    resetCreatedPipeline();
+    await closeRAGSession();
     setStatus(`RAG init failed: ${formatError(err)}`);
-    return false;
+    return null;
   }
 }
 
-function selectedPipelineKey(): string {
-  return `${selectedEmbeddingModelId}|${selectedLlmModelId}`;
-}
-
-function createdPipelineIsLive(key: string): boolean {
-  if (createdPipelineKey !== key || createdPipelineGeneration === null) return false;
-  if (!RunAnywhere.rag.availability().available) return false;
-  const state = RunAnywhere.rag.pipelineState();
-  return state.generation === createdPipelineGeneration
-    && state.configuration?.embeddingModelId === selectedEmbeddingModelId
-    && state.configuration.llmModelId === selectedLlmModelId;
-}
-
-function resetCreatedPipeline(): void {
-  createdPipelineKey = null;
-  createdPipelineGeneration = null;
+async function closeRAGSession(): Promise<void> {
+  const previous = ragSession;
+  ragSession = null;
+  openedPipelineKey = null;
+  ingestedDocuments.length = 0;
+  await previous?.close().catch(() => undefined);
 }
 
 /**
@@ -544,13 +485,9 @@ function splitThinking(text: string): { answer: string; thinking: string | null 
   return { answer, thinking: thinking || null };
 }
 
-function formatAnswer(
-  text: string,
-  sources: RAGSearchResult[],
-  thinkingContent?: string,
-): string {
+function formatAnswer(text: string, sources: Match[]): string {
   const split = splitThinking(text);
-  const thinking = thinkingContent?.trim() || split.thinking;
+  const thinking = split.thinking;
   const thinkingHtml = thinking
     ? `<details class="docs-thinking" style="margin-bottom:8px;">
         <summary style="cursor:pointer; font-size:0.8rem; opacity:0.7;">Reasoning</summary>
@@ -559,7 +496,7 @@ function formatAnswer(
     : '';
   const sourcesHtml = sources.map((source, i) => `
     <div class="docs-source">
-      <strong>Source ${i + 1}: ${escapeHtml(source.sourceDocument ?? 'Document')}</strong>
+      <strong>Source ${i + 1}: ${escapeHtml(source.metadata.docName ?? 'Document')}</strong>
       <pre>${escapeHtml(source.text.slice(0, 400))}${source.text.length > 400 ? '...' : ''}</pre>
     </div>
   `).join('');

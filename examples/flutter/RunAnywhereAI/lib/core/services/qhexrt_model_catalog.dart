@@ -171,13 +171,15 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 3023821212,
       contextLength: 512,
     ),
+    // v81 ships the fully-on-NPU TRUE-TERNARY {-1,0,+1} decoder (no int8 fallback), not the older
+    // QNN W8A16 build — smaller download (~1.12 GB vs ~2.37 GB). v75/v79 are unchanged (W8A16).
     QHexRTCatalogModel(
       id: 'ternary_bonsai_1_7b',
       name: 'Ternary Bonsai 1.7B (HNPU)',
       url:
           'https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json',
       category: _language,
-      memoryBytes: 2367579370,
+      memoryBytes: 1117937842,
       contextLength: 1024,
     ),
     QHexRTCatalogModel(

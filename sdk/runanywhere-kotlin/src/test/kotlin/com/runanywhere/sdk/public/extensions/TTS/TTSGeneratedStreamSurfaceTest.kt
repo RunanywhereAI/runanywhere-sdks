@@ -10,9 +10,11 @@ import kotlin.test.assertEquals
 class TTSGeneratedStreamSurfaceTest {
     @Test
     fun `generated TTS output remains the public stream surface`() {
+        // `audio_size_bytes` is deleted outright (idl/tts_options.proto);
+        // derive it from the raw audio buffer length instead.
         val output = TTSOutput()
 
-        assertEquals(0L, output.audio_size_bytes)
+        assertEquals(0, output.audio_data.size)
     }
 }
 

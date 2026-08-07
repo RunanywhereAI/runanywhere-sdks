@@ -84,6 +84,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereCoreSpec::unloadSTTModel);
       prototype.registerHybridMethod("sttTranscribeProto", &HybridRunAnywhereCoreSpec::sttTranscribeProto);
       prototype.registerHybridMethod("sttTranscribeStreamProto", &HybridRunAnywhereCoreSpec::sttTranscribeStreamProto);
+      prototype.registerHybridMethod("sttStateProto", &HybridRunAnywhereCoreSpec::sttStateProto);
       prototype.registerHybridMethod("sttStreamLoadModel", &HybridRunAnywhereCoreSpec::sttStreamLoadModel);
       prototype.registerHybridMethod("sttStreamStart", &HybridRunAnywhereCoreSpec::sttStreamStart);
       prototype.registerHybridMethod("sttStreamFeed", &HybridRunAnywhereCoreSpec::sttStreamFeed);
@@ -113,6 +114,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("ttsSynthesizeProto", &HybridRunAnywhereCoreSpec::ttsSynthesizeProto);
       prototype.registerHybridMethod("ttsSynthesizeStreamProto", &HybridRunAnywhereCoreSpec::ttsSynthesizeStreamProto);
       prototype.registerHybridMethod("ttsStopProto", &HybridRunAnywhereCoreSpec::ttsStopProto);
+      prototype.registerHybridMethod("ttsStateProto", &HybridRunAnywhereCoreSpec::ttsStateProto);
       prototype.registerHybridMethod("isVADModelLoaded", &HybridRunAnywhereCoreSpec::isVADModelLoaded);
       prototype.registerHybridMethod("unloadVADModel", &HybridRunAnywhereCoreSpec::unloadVADModel);
       prototype.registerHybridMethod("resetVAD", &HybridRunAnywhereCoreSpec::resetVAD);
@@ -123,7 +125,12 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("vlmProcessProto", &HybridRunAnywhereCoreSpec::vlmProcessProto);
       prototype.registerHybridMethod("vlmProcessStreamProto", &HybridRunAnywhereCoreSpec::vlmProcessStreamProto);
       prototype.registerHybridMethod("vlmCancelProto", &HybridRunAnywhereCoreSpec::vlmCancelProto);
+      prototype.registerHybridMethod("cuaSystemPrompt", &HybridRunAnywhereCoreSpec::cuaSystemPrompt);
+      prototype.registerHybridMethod("cuaParseAction", &HybridRunAnywhereCoreSpec::cuaParseAction);
       prototype.registerHybridMethod("diffusionGenerateLifecycleProto", &HybridRunAnywhereCoreSpec::diffusionGenerateLifecycleProto);
+      prototype.registerHybridMethod("diarizationDiarizeLifecycleProto", &HybridRunAnywhereCoreSpec::diarizationDiarizeLifecycleProto);
+      prototype.registerHybridMethod("segmentationSegmentLifecycleProto", &HybridRunAnywhereCoreSpec::segmentationSegmentLifecycleProto);
+      prototype.registerHybridMethod("rerankProto", &HybridRunAnywhereCoreSpec::rerankProto);
       prototype.registerHybridMethod("getPersistentDeviceUUID", &HybridRunAnywhereCoreSpec::getPersistentDeviceUUID);
       prototype.registerHybridMethod("flushTelemetry", &HybridRunAnywhereCoreSpec::flushTelemetry);
       prototype.registerHybridMethod("isTelemetryInitialized", &HybridRunAnywhereCoreSpec::isTelemetryInitialized);
@@ -152,6 +159,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("ragDestroyPipelineProto", &HybridRunAnywhereCoreSpec::ragDestroyPipelineProto);
       prototype.registerHybridMethod("ragIngestProto", &HybridRunAnywhereCoreSpec::ragIngestProto);
       prototype.registerHybridMethod("ragQueryProto", &HybridRunAnywhereCoreSpec::ragQueryProto);
+      prototype.registerHybridMethod("ragSearchProto", &HybridRunAnywhereCoreSpec::ragSearchProto);
       prototype.registerHybridMethod("ragQueryStreamProto", &HybridRunAnywhereCoreSpec::ragQueryStreamProto);
       prototype.registerHybridMethod("ragCancelProto", &HybridRunAnywhereCoreSpec::ragCancelProto);
       prototype.registerHybridMethod("ragClearProto", &HybridRunAnywhereCoreSpec::ragClearProto);

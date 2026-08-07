@@ -5,241 +5,80 @@
 //   protoc               v7.35.1
 // source: hybrid_router.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.CloudSttBackendConfig = exports.HybridRoutingContext = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridRank = exports.HybridModelType = exports.HybridBackendKind = exports.HybridCapability = exports.protobufPackage = void 0;
-exports.hybridCapabilityFromJSON = hybridCapabilityFromJSON;
-exports.hybridCapabilityToJSON = hybridCapabilityToJSON;
-exports.hybridBackendKindFromJSON = hybridBackendKindFromJSON;
-exports.hybridBackendKindToJSON = hybridBackendKindToJSON;
-exports.hybridModelTypeFromJSON = hybridModelTypeFromJSON;
-exports.hybridModelTypeToJSON = hybridModelTypeToJSON;
-exports.hybridRankFromJSON = hybridRankFromJSON;
-exports.hybridRankToJSON = hybridRankToJSON;
+exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.CloudSttBackendConfig = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridInferenceMode = exports.protobufPackage = void 0;
+exports.hybridInferenceModeFromJSON = hybridInferenceModeFromJSON;
+exports.hybridInferenceModeToJSON = hybridInferenceModeToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
 /**
- * ---------------------------------------------------------------------------
- * Capability under hybrid routing. Only STT is wired today.
- * ---------------------------------------------------------------------------
+ * Firebase AI Logic / developer.android.com InferenceMode, verbatim.
+ * PREFER_* falls back silently across the boundary; ONLY_* fails instead.
  */
-var HybridCapability;
-(function (HybridCapability) {
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_UNSPECIFIED"] = 0] = "HYBRID_CAPABILITY_UNSPECIFIED";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_LLM"] = 1] = "HYBRID_CAPABILITY_LLM";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_VLM"] = 2] = "HYBRID_CAPABILITY_VLM";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_STT"] = 3] = "HYBRID_CAPABILITY_STT";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_TTS"] = 4] = "HYBRID_CAPABILITY_TTS";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_VAD"] = 5] = "HYBRID_CAPABILITY_VAD";
-    HybridCapability[HybridCapability["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(HybridCapability || (exports.HybridCapability = HybridCapability = {}));
-function hybridCapabilityFromJSON(object) {
+var HybridInferenceMode;
+(function (HybridInferenceMode) {
+    /** HYBRID_INFERENCE_MODE_UNSPECIFIED - Treated as PREFER_ON_DEVICE, so the proto3 zero is the private default. */
+    HybridInferenceMode[HybridInferenceMode["HYBRID_INFERENCE_MODE_UNSPECIFIED"] = 0] = "HYBRID_INFERENCE_MODE_UNSPECIFIED";
+    HybridInferenceMode[HybridInferenceMode["HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE"] = 1] = "HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE";
+    HybridInferenceMode[HybridInferenceMode["HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE"] = 2] = "HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE";
+    HybridInferenceMode[HybridInferenceMode["HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD"] = 3] = "HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD";
+    HybridInferenceMode[HybridInferenceMode["HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD"] = 4] = "HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD";
+    HybridInferenceMode[HybridInferenceMode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(HybridInferenceMode || (exports.HybridInferenceMode = HybridInferenceMode = {}));
+function hybridInferenceModeFromJSON(object) {
     switch (object) {
         case 0:
-        case "HYBRID_CAPABILITY_UNSPECIFIED":
-            return HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED;
+        case "HYBRID_INFERENCE_MODE_UNSPECIFIED":
+            return HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED;
         case 1:
-        case "HYBRID_CAPABILITY_LLM":
-            return HybridCapability.HYBRID_CAPABILITY_LLM;
+        case "HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE":
+            return HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE;
         case 2:
-        case "HYBRID_CAPABILITY_VLM":
-            return HybridCapability.HYBRID_CAPABILITY_VLM;
+        case "HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE":
+            return HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE;
         case 3:
-        case "HYBRID_CAPABILITY_STT":
-            return HybridCapability.HYBRID_CAPABILITY_STT;
+        case "HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD":
+            return HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD;
         case 4:
-        case "HYBRID_CAPABILITY_TTS":
-            return HybridCapability.HYBRID_CAPABILITY_TTS;
-        case 5:
-        case "HYBRID_CAPABILITY_VAD":
-            return HybridCapability.HYBRID_CAPABILITY_VAD;
+        case "HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD":
+            return HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD;
         case -1:
         case "UNRECOGNIZED":
         default:
-            return HybridCapability.UNRECOGNIZED;
+            return HybridInferenceMode.UNRECOGNIZED;
     }
 }
-function hybridCapabilityToJSON(object) {
+function hybridInferenceModeToJSON(object) {
     switch (object) {
-        case HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED:
-            return "HYBRID_CAPABILITY_UNSPECIFIED";
-        case HybridCapability.HYBRID_CAPABILITY_LLM:
-            return "HYBRID_CAPABILITY_LLM";
-        case HybridCapability.HYBRID_CAPABILITY_VLM:
-            return "HYBRID_CAPABILITY_VLM";
-        case HybridCapability.HYBRID_CAPABILITY_STT:
-            return "HYBRID_CAPABILITY_STT";
-        case HybridCapability.HYBRID_CAPABILITY_TTS:
-            return "HYBRID_CAPABILITY_TTS";
-        case HybridCapability.HYBRID_CAPABILITY_VAD:
-            return "HYBRID_CAPABILITY_VAD";
-        case HybridCapability.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-/**
- * ---------------------------------------------------------------------------
- * Backend identity. Matches the engines/ directory entry that registers
- * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
- * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
- * the descriptor's `provider` field, not from a distinct enum kind.
- * ---------------------------------------------------------------------------
- */
-var HybridBackendKind;
-(function (HybridBackendKind) {
-    HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_UNSPECIFIED"] = 0] = "HYBRID_BACKEND_UNSPECIFIED";
-    HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_LLAMACPP"] = 1] = "HYBRID_BACKEND_LLAMACPP";
-    HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_OPENROUTER"] = 2] = "HYBRID_BACKEND_OPENROUTER";
-    HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_SHERPA"] = 3] = "HYBRID_BACKEND_SHERPA";
-    /**
-     * HYBRID_BACKEND_CLOUD - Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
-     * the generic "cloud_stt" backend; the provider is carried out-of-band.
-     */
-    HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_CLOUD"] = 4] = "HYBRID_BACKEND_CLOUD";
-    HybridBackendKind[HybridBackendKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(HybridBackendKind || (exports.HybridBackendKind = HybridBackendKind = {}));
-function hybridBackendKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "HYBRID_BACKEND_UNSPECIFIED":
-            return HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED;
-        case 1:
-        case "HYBRID_BACKEND_LLAMACPP":
-            return HybridBackendKind.HYBRID_BACKEND_LLAMACPP;
-        case 2:
-        case "HYBRID_BACKEND_OPENROUTER":
-            return HybridBackendKind.HYBRID_BACKEND_OPENROUTER;
-        case 3:
-        case "HYBRID_BACKEND_SHERPA":
-            return HybridBackendKind.HYBRID_BACKEND_SHERPA;
-        case 4:
-        case "HYBRID_BACKEND_CLOUD":
-            return HybridBackendKind.HYBRID_BACKEND_CLOUD;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return HybridBackendKind.UNRECOGNIZED;
-    }
-}
-function hybridBackendKindToJSON(object) {
-    switch (object) {
-        case HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED:
-            return "HYBRID_BACKEND_UNSPECIFIED";
-        case HybridBackendKind.HYBRID_BACKEND_LLAMACPP:
-            return "HYBRID_BACKEND_LLAMACPP";
-        case HybridBackendKind.HYBRID_BACKEND_OPENROUTER:
-            return "HYBRID_BACKEND_OPENROUTER";
-        case HybridBackendKind.HYBRID_BACKEND_SHERPA:
-            return "HYBRID_BACKEND_SHERPA";
-        case HybridBackendKind.HYBRID_BACKEND_CLOUD:
-            return "HYBRID_BACKEND_CLOUD";
-        case HybridBackendKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-/**
- * ---------------------------------------------------------------------------
- * Whether a model runs on-device or in the cloud. The router decides which
- * of its two registered candidates to invoke based on policy.
- * ---------------------------------------------------------------------------
- */
-var HybridModelType;
-(function (HybridModelType) {
-    HybridModelType[HybridModelType["HYBRID_MODEL_TYPE_UNSPECIFIED"] = 0] = "HYBRID_MODEL_TYPE_UNSPECIFIED";
-    HybridModelType[HybridModelType["HYBRID_MODEL_TYPE_OFFLINE"] = 1] = "HYBRID_MODEL_TYPE_OFFLINE";
-    HybridModelType[HybridModelType["HYBRID_MODEL_TYPE_ONLINE"] = 2] = "HYBRID_MODEL_TYPE_ONLINE";
-    HybridModelType[HybridModelType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(HybridModelType || (exports.HybridModelType = HybridModelType = {}));
-function hybridModelTypeFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "HYBRID_MODEL_TYPE_UNSPECIFIED":
-            return HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED;
-        case 1:
-        case "HYBRID_MODEL_TYPE_OFFLINE":
-            return HybridModelType.HYBRID_MODEL_TYPE_OFFLINE;
-        case 2:
-        case "HYBRID_MODEL_TYPE_ONLINE":
-            return HybridModelType.HYBRID_MODEL_TYPE_ONLINE;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return HybridModelType.UNRECOGNIZED;
-    }
-}
-function hybridModelTypeToJSON(object) {
-    switch (object) {
-        case HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED:
-            return "HYBRID_MODEL_TYPE_UNSPECIFIED";
-        case HybridModelType.HYBRID_MODEL_TYPE_OFFLINE:
-            return "HYBRID_MODEL_TYPE_OFFLINE";
-        case HybridModelType.HYBRID_MODEL_TYPE_ONLINE:
-            return "HYBRID_MODEL_TYPE_ONLINE";
-        case HybridModelType.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-/**
- * ---------------------------------------------------------------------------
- * Rank — comparator used to sort eligible candidates. Exactly one rank
- * per policy.
- * ---------------------------------------------------------------------------
- */
-var HybridRank;
-(function (HybridRank) {
-    HybridRank[HybridRank["HYBRID_RANK_UNSPECIFIED"] = 0] = "HYBRID_RANK_UNSPECIFIED";
-    HybridRank[HybridRank["HYBRID_RANK_PREFER_LOCAL_FIRST"] = 1] = "HYBRID_RANK_PREFER_LOCAL_FIRST";
-    HybridRank[HybridRank["HYBRID_RANK_PREFER_ONLINE_FIRST"] = 2] = "HYBRID_RANK_PREFER_ONLINE_FIRST";
-    HybridRank[HybridRank["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(HybridRank || (exports.HybridRank = HybridRank = {}));
-function hybridRankFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "HYBRID_RANK_UNSPECIFIED":
-            return HybridRank.HYBRID_RANK_UNSPECIFIED;
-        case 1:
-        case "HYBRID_RANK_PREFER_LOCAL_FIRST":
-            return HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST;
-        case 2:
-        case "HYBRID_RANK_PREFER_ONLINE_FIRST":
-            return HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return HybridRank.UNRECOGNIZED;
-    }
-}
-function hybridRankToJSON(object) {
-    switch (object) {
-        case HybridRank.HYBRID_RANK_UNSPECIFIED:
-            return "HYBRID_RANK_UNSPECIFIED";
-        case HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST:
-            return "HYBRID_RANK_PREFER_LOCAL_FIRST";
-        case HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST:
-            return "HYBRID_RANK_PREFER_ONLINE_FIRST";
-        case HybridRank.UNRECOGNIZED:
+        case HybridInferenceMode.HYBRID_INFERENCE_MODE_UNSPECIFIED:
+            return "HYBRID_INFERENCE_MODE_UNSPECIFIED";
+        case HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE:
+            return "HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE";
+        case HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE:
+            return "HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE";
+        case HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD:
+            return "HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD";
+        case HybridInferenceMode.HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD:
+            return "HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD";
+        case HybridInferenceMode.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
 }
 function createBaseHybridFilter() {
-    return { network: undefined, qualityTier: undefined, battery: undefined, custom: undefined };
+    return { network: undefined, battery: undefined, custom: undefined };
 }
 exports.HybridFilter = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.network !== undefined) {
             writer.uint32(8).bool(message.network);
         }
-        if (message.qualityTier !== undefined) {
-            writer.uint32(24).int32(message.qualityTier);
-        }
         if (message.battery !== undefined) {
-            exports.BatteryFilter.encode(message.battery, writer.uint32(34).fork()).join();
+            exports.BatteryFilter.encode(message.battery, writer.uint32(18).fork()).join();
         }
         if (message.custom !== undefined) {
-            exports.CustomFilter.encode(message.custom, writer.uint32(42).fork()).join();
+            exports.CustomFilter.encode(message.custom, writer.uint32(26).fork()).join();
         }
         return writer;
     },
@@ -257,22 +96,15 @@ exports.HybridFilter = {
                     message.network = reader.bool();
                     continue;
                 }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.qualityTier = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
+                case 2: {
+                    if (tag !== 18) {
                         break;
                     }
                     message.battery = exports.BatteryFilter.decode(reader, reader.uint32());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
+                case 3: {
+                    if (tag !== 26) {
                         break;
                     }
                     message.custom = exports.CustomFilter.decode(reader, reader.uint32());
@@ -289,11 +121,6 @@ exports.HybridFilter = {
     fromJSON(object) {
         return {
             network: isSet(object.network) ? globalThis.Boolean(object.network) : undefined,
-            qualityTier: isSet(object.qualityTier)
-                ? globalThis.Number(object.qualityTier)
-                : isSet(object.quality_tier)
-                    ? globalThis.Number(object.quality_tier)
-                    : undefined,
             battery: isSet(object.battery) ? exports.BatteryFilter.fromJSON(object.battery) : undefined,
             custom: isSet(object.custom) ? exports.CustomFilter.fromJSON(object.custom) : undefined,
         };
@@ -302,9 +129,6 @@ exports.HybridFilter = {
         const obj = {};
         if (message.network !== undefined) {
             obj.network = message.network;
-        }
-        if (message.qualityTier !== undefined) {
-            obj.qualityTier = Math.round(message.qualityTier);
         }
         if (message.battery !== undefined) {
             obj.battery = exports.BatteryFilter.toJSON(message.battery);
@@ -320,7 +144,6 @@ exports.HybridFilter = {
     fromPartial(object) {
         const message = createBaseHybridFilter();
         message.network = object.network ?? undefined;
-        message.qualityTier = object.qualityTier ?? undefined;
         message.battery = (object.battery !== undefined && object.battery !== null)
             ? exports.BatteryFilter.fromPartial(object.battery)
             : undefined;
@@ -560,7 +383,7 @@ exports.ConfidenceCascade = {
     },
 };
 function createBaseHybridRoutingPolicy() {
-    return { hardFilters: [], cascade: undefined, rank: 0 };
+    return { hardFilters: [], cascade: undefined, mode: 0, attemptTimeoutMs: 0, models: [] };
 }
 exports.HybridRoutingPolicy = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -570,8 +393,14 @@ exports.HybridRoutingPolicy = {
         if (message.cascade !== undefined) {
             exports.HybridCascade.encode(message.cascade, writer.uint32(18).fork()).join();
         }
-        if (message.rank !== 0) {
-            writer.uint32(24).int32(message.rank);
+        if (message.mode !== 0) {
+            writer.uint32(24).int32(message.mode);
+        }
+        if (message.attemptTimeoutMs !== 0) {
+            writer.uint32(32).int32(message.attemptTimeoutMs);
+        }
+        for (const v of message.models) {
+            exports.HybridModelDescriptor.encode(v, writer.uint32(42).fork()).join();
         }
         return writer;
     },
@@ -600,7 +429,21 @@ exports.HybridRoutingPolicy = {
                     if (tag !== 24) {
                         break;
                     }
-                    message.rank = reader.int32();
+                    message.mode = reader.int32();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.attemptTimeoutMs = reader.int32();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.models.push(exports.HybridModelDescriptor.decode(reader, reader.uint32()));
                     continue;
                 }
             }
@@ -619,7 +462,15 @@ exports.HybridRoutingPolicy = {
                     ? object.hard_filters.map((e) => exports.HybridFilter.fromJSON(e))
                     : [],
             cascade: isSet(object.cascade) ? exports.HybridCascade.fromJSON(object.cascade) : undefined,
-            rank: isSet(object.rank) ? hybridRankFromJSON(object.rank) : 0,
+            mode: isSet(object.mode) ? hybridInferenceModeFromJSON(object.mode) : 0,
+            attemptTimeoutMs: isSet(object.attemptTimeoutMs)
+                ? globalThis.Number(object.attemptTimeoutMs)
+                : isSet(object.attempt_timeout_ms)
+                    ? globalThis.Number(object.attempt_timeout_ms)
+                    : 0,
+            models: globalThis.Array.isArray(object?.models)
+                ? object.models.map((e) => exports.HybridModelDescriptor.fromJSON(e))
+                : [],
         };
     },
     toJSON(message) {
@@ -630,8 +481,14 @@ exports.HybridRoutingPolicy = {
         if (message.cascade !== undefined) {
             obj.cascade = exports.HybridCascade.toJSON(message.cascade);
         }
-        if (message.rank !== 0) {
-            obj.rank = hybridRankToJSON(message.rank);
+        if (message.mode !== 0) {
+            obj.mode = hybridInferenceModeToJSON(message.mode);
+        }
+        if (message.attemptTimeoutMs !== 0) {
+            obj.attemptTimeoutMs = Math.round(message.attemptTimeoutMs);
+        }
+        if (message.models?.length) {
+            obj.models = message.models.map((e) => exports.HybridModelDescriptor.toJSON(e));
         }
         return obj;
     },
@@ -644,26 +501,25 @@ exports.HybridRoutingPolicy = {
         message.cascade = (object.cascade !== undefined && object.cascade !== null)
             ? exports.HybridCascade.fromPartial(object.cascade)
             : undefined;
-        message.rank = object.rank ?? 0;
+        message.mode = object.mode ?? 0;
+        message.attemptTimeoutMs = object.attemptTimeoutMs ?? 0;
+        message.models = object.models?.map((e) => exports.HybridModelDescriptor.fromPartial(e)) || [];
         return message;
     },
 };
 function createBaseHybridModelDescriptor() {
-    return { modelId: "", modelType: 0, backend: 0, provider: "" };
+    return { modelId: "", isOnDevice: false, engine: "" };
 }
 exports.HybridModelDescriptor = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.modelId !== "") {
             writer.uint32(10).string(message.modelId);
         }
-        if (message.modelType !== 0) {
-            writer.uint32(16).int32(message.modelType);
+        if (message.isOnDevice !== false) {
+            writer.uint32(16).bool(message.isOnDevice);
         }
-        if (message.backend !== 0) {
-            writer.uint32(24).int32(message.backend);
-        }
-        if (message.provider !== "") {
-            writer.uint32(34).string(message.provider);
+        if (message.engine !== "") {
+            writer.uint32(26).string(message.engine);
         }
         return writer;
     },
@@ -685,21 +541,14 @@ exports.HybridModelDescriptor = {
                     if (tag !== 16) {
                         break;
                     }
-                    message.modelType = reader.int32();
+                    message.isOnDevice = reader.bool();
                     continue;
                 }
                 case 3: {
-                    if (tag !== 24) {
+                    if (tag !== 26) {
                         break;
                     }
-                    message.backend = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.provider = reader.string();
+                    message.engine = reader.string();
                     continue;
                 }
             }
@@ -717,13 +566,12 @@ exports.HybridModelDescriptor = {
                 : isSet(object.model_id)
                     ? globalThis.String(object.model_id)
                     : "",
-            modelType: isSet(object.modelType)
-                ? hybridModelTypeFromJSON(object.modelType)
-                : isSet(object.model_type)
-                    ? hybridModelTypeFromJSON(object.model_type)
-                    : 0,
-            backend: isSet(object.backend) ? hybridBackendKindFromJSON(object.backend) : 0,
-            provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
+            isOnDevice: isSet(object.isOnDevice)
+                ? globalThis.Boolean(object.isOnDevice)
+                : isSet(object.is_on_device)
+                    ? globalThis.Boolean(object.is_on_device)
+                    : false,
+            engine: isSet(object.engine) ? globalThis.String(object.engine) : "",
         };
     },
     toJSON(message) {
@@ -731,14 +579,11 @@ exports.HybridModelDescriptor = {
         if (message.modelId !== "") {
             obj.modelId = message.modelId;
         }
-        if (message.modelType !== 0) {
-            obj.modelType = hybridModelTypeToJSON(message.modelType);
+        if (message.isOnDevice !== false) {
+            obj.isOnDevice = message.isOnDevice;
         }
-        if (message.backend !== 0) {
-            obj.backend = hybridBackendKindToJSON(message.backend);
-        }
-        if (message.provider !== "") {
-            obj.provider = message.provider;
+        if (message.engine !== "") {
+            obj.engine = message.engine;
         }
         return obj;
     },
@@ -748,9 +593,8 @@ exports.HybridModelDescriptor = {
     fromPartial(object) {
         const message = createBaseHybridModelDescriptor();
         message.modelId = object.modelId ?? "";
-        message.modelType = object.modelType ?? 0;
-        message.backend = object.backend ?? 0;
-        message.provider = object.provider ?? "";
+        message.isOnDevice = object.isOnDevice ?? false;
+        message.engine = object.engine ?? "";
         return message;
     },
 };
@@ -761,8 +605,9 @@ function createBaseHybridRoutedMetadata() {
         attemptCount: 0,
         primaryErrorCode: 0,
         primaryErrorMessage: "",
-        confidence: 0,
-        primaryConfidence: 0,
+        confidence: undefined,
+        primaryConfidence: undefined,
+        servedOnDevice: false,
     };
 }
 exports.HybridRoutedMetadata = {
@@ -782,11 +627,14 @@ exports.HybridRoutedMetadata = {
         if (message.primaryErrorMessage !== "") {
             writer.uint32(42).string(message.primaryErrorMessage);
         }
-        if (message.confidence !== 0) {
+        if (message.confidence !== undefined) {
             writer.uint32(53).float(message.confidence);
         }
-        if (message.primaryConfidence !== 0) {
+        if (message.primaryConfidence !== undefined) {
             writer.uint32(61).float(message.primaryConfidence);
+        }
+        if (message.servedOnDevice !== false) {
+            writer.uint32(64).bool(message.servedOnDevice);
         }
         return writer;
     },
@@ -846,6 +694,13 @@ exports.HybridRoutedMetadata = {
                     message.primaryConfidence = reader.float();
                     continue;
                 }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.servedOnDevice = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -881,12 +736,17 @@ exports.HybridRoutedMetadata = {
                 : isSet(object.primary_error_message)
                     ? globalThis.String(object.primary_error_message)
                     : "",
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : undefined,
             primaryConfidence: isSet(object.primaryConfidence)
                 ? globalThis.Number(object.primaryConfidence)
                 : isSet(object.primary_confidence)
                     ? globalThis.Number(object.primary_confidence)
-                    : 0,
+                    : undefined,
+            servedOnDevice: isSet(object.servedOnDevice)
+                ? globalThis.Boolean(object.servedOnDevice)
+                : isSet(object.served_on_device)
+                    ? globalThis.Boolean(object.served_on_device)
+                    : false,
         };
     },
     toJSON(message) {
@@ -906,11 +766,14 @@ exports.HybridRoutedMetadata = {
         if (message.primaryErrorMessage !== "") {
             obj.primaryErrorMessage = message.primaryErrorMessage;
         }
-        if (message.confidence !== 0) {
+        if (message.confidence !== undefined) {
             obj.confidence = message.confidence;
         }
-        if (message.primaryConfidence !== 0) {
+        if (message.primaryConfidence !== undefined) {
             obj.primaryConfidence = message.primaryConfidence;
+        }
+        if (message.servedOnDevice !== false) {
+            obj.servedOnDevice = message.servedOnDevice;
         }
         return obj;
     },
@@ -924,45 +787,9 @@ exports.HybridRoutedMetadata = {
         message.attemptCount = object.attemptCount ?? 0;
         message.primaryErrorCode = object.primaryErrorCode ?? 0;
         message.primaryErrorMessage = object.primaryErrorMessage ?? "";
-        message.confidence = object.confidence ?? 0;
-        message.primaryConfidence = object.primaryConfidence ?? 0;
-        return message;
-    },
-};
-function createBaseHybridRoutingContext() {
-    return {};
-}
-exports.HybridRoutingContext = {
-    encode(_, writer = new wire_1.BinaryWriter()) {
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseHybridRoutingContext();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(_) {
-        return {};
-    },
-    toJSON(_) {
-        const obj = {};
-        return obj;
-    },
-    create(base) {
-        return exports.HybridRoutingContext.fromPartial(base ?? {});
-    },
-    fromPartial(_) {
-        const message = createBaseHybridRoutingContext();
+        message.confidence = object.confidence ?? undefined;
+        message.primaryConfidence = object.primaryConfidence ?? undefined;
+        message.servedOnDevice = object.servedOnDevice ?? false;
         return message;
     },
 };
@@ -1171,9 +998,9 @@ exports.HybridSttTranscribeOptions = {
                     ? globalThis.Number(object.sample_rate)
                     : 0,
             audioFormat: isSet(object.audioFormat)
-                ? globalThis.Number(object.audioFormat)
+                ? (0, model_types_1.audioFormatFromJSON)(object.audioFormat)
                 : isSet(object.audio_format)
-                    ? globalThis.Number(object.audio_format)
+                    ? (0, model_types_1.audioFormatFromJSON)(object.audio_format)
                     : 0,
         };
     },
@@ -1186,7 +1013,7 @@ exports.HybridSttTranscribeOptions = {
             obj.sampleRate = Math.round(message.sampleRate);
         }
         if (message.audioFormat !== 0) {
-            obj.audioFormat = Math.round(message.audioFormat);
+            obj.audioFormat = (0, model_types_1.audioFormatToJSON)(message.audioFormat);
         }
         return obj;
     },
@@ -1202,18 +1029,15 @@ exports.HybridSttTranscribeOptions = {
     },
 };
 function createBaseHybridSttTranscribeRequest() {
-    return { audioBytes: new Uint8Array(0), context: undefined, options: undefined };
+    return { audioBytes: new Uint8Array(0), options: undefined };
 }
 exports.HybridSttTranscribeRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.audioBytes.length !== 0) {
             writer.uint32(10).bytes(message.audioBytes);
         }
-        if (message.context !== undefined) {
-            exports.HybridRoutingContext.encode(message.context, writer.uint32(18).fork()).join();
-        }
         if (message.options !== undefined) {
-            exports.HybridSttTranscribeOptions.encode(message.options, writer.uint32(26).fork()).join();
+            exports.HybridSttTranscribeOptions.encode(message.options, writer.uint32(18).fork()).join();
         }
         return writer;
     },
@@ -1235,13 +1059,6 @@ exports.HybridSttTranscribeRequest = {
                     if (tag !== 18) {
                         break;
                     }
-                    message.context = exports.HybridRoutingContext.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
                     message.options = exports.HybridSttTranscribeOptions.decode(reader, reader.uint32());
                     continue;
                 }
@@ -1260,7 +1077,6 @@ exports.HybridSttTranscribeRequest = {
                 : isSet(object.audio_bytes)
                     ? bytesFromBase64(object.audio_bytes)
                     : new Uint8Array(0),
-            context: isSet(object.context) ? exports.HybridRoutingContext.fromJSON(object.context) : undefined,
             options: isSet(object.options) ? exports.HybridSttTranscribeOptions.fromJSON(object.options) : undefined,
         };
     },
@@ -1268,9 +1084,6 @@ exports.HybridSttTranscribeRequest = {
         const obj = {};
         if (message.audioBytes.length !== 0) {
             obj.audioBytes = base64FromBytes(message.audioBytes);
-        }
-        if (message.context !== undefined) {
-            obj.context = exports.HybridRoutingContext.toJSON(message.context);
         }
         if (message.options !== undefined) {
             obj.options = exports.HybridSttTranscribeOptions.toJSON(message.options);
@@ -1283,9 +1096,6 @@ exports.HybridSttTranscribeRequest = {
     fromPartial(object) {
         const message = createBaseHybridSttTranscribeRequest();
         message.audioBytes = object.audioBytes ?? new Uint8Array(0);
-        message.context = (object.context !== undefined && object.context !== null)
-            ? exports.HybridRoutingContext.fromPartial(object.context)
-            : undefined;
         message.options = (object.options !== undefined && object.options !== null)
             ? exports.HybridSttTranscribeOptions.fromPartial(object.options)
             : undefined;
@@ -1293,7 +1103,7 @@ exports.HybridSttTranscribeRequest = {
     },
 };
 function createBaseHybridSttTranscribeResponse() {
-    return { rc: 0, text: "", detectedLanguage: "", routing: undefined, errorMsg: "" };
+    return { rc: 0, text: "", detectedLanguage: "", routing: undefined };
 }
 exports.HybridSttTranscribeResponse = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1308,9 +1118,6 @@ exports.HybridSttTranscribeResponse = {
         }
         if (message.routing !== undefined) {
             exports.HybridRoutedMetadata.encode(message.routing, writer.uint32(34).fork()).join();
-        }
-        if (message.errorMsg !== "") {
-            writer.uint32(42).string(message.errorMsg);
         }
         return writer;
     },
@@ -1349,13 +1156,6 @@ exports.HybridSttTranscribeResponse = {
                     message.routing = exports.HybridRoutedMetadata.decode(reader, reader.uint32());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMsg = reader.string();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1374,11 +1174,6 @@ exports.HybridSttTranscribeResponse = {
                     ? globalThis.String(object.detected_language)
                     : "",
             routing: isSet(object.routing) ? exports.HybridRoutedMetadata.fromJSON(object.routing) : undefined,
-            errorMsg: isSet(object.errorMsg)
-                ? globalThis.String(object.errorMsg)
-                : isSet(object.error_msg)
-                    ? globalThis.String(object.error_msg)
-                    : "",
         };
     },
     toJSON(message) {
@@ -1395,9 +1190,6 @@ exports.HybridSttTranscribeResponse = {
         if (message.routing !== undefined) {
             obj.routing = exports.HybridRoutedMetadata.toJSON(message.routing);
         }
-        if (message.errorMsg !== "") {
-            obj.errorMsg = message.errorMsg;
-        }
         return obj;
     },
     create(base) {
@@ -1411,7 +1203,6 @@ exports.HybridSttTranscribeResponse = {
         message.routing = (object.routing !== undefined && object.routing !== null)
             ? exports.HybridRoutedMetadata.fromPartial(object.routing)
             : undefined;
-        message.errorMsg = object.errorMsg ?? "";
         return message;
     },
 };

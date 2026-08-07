@@ -102,3 +102,53 @@ def requires_model(model_id: str) -> pytest.MarkDecorator:
 def models_root() -> str:
     """The models cache root (``~/.runanywhere/models``)."""
     return _models_root()
+
+
+# --------------------------------------------------------------------------- hermetic fixtures
+@pytest.fixture()
+def fake_core(monkeypatch: pytest.MonkeyPatch):
+    """Install a :class:`FakeCore` behind the lazy loader and reset the process-wide runtime.
+
+    The runtime and the event bus are process-global, so both are torn down before and after
+    every test — ordering never leaks between tests.
+    """
+    from fake_core import FakeCore
+
+    import runanywhere._native as _native
+    from runanywhere._runtime import runtime
+    from runanywhere.events import bus
+
+    core = FakeCore()
+    monkeypatch.setattr(_native, "get_core", lambda: core)
+    runtime._resident.clear()
+    runtime._core = None
+    runtime._device_id = None
+    bus.remove_all()
+    try:
+        yield core
+    finally:
+        runtime._resident.clear()
+        runtime._core = None
+        runtime._device_id = None
+        bus.remove_all()
+
+
+@pytest.fixture()
+def sdk(fake_core, monkeypatch: pytest.MonkeyPatch, tmp_path):
+    """An initialized SDK over the fake core, with its home directory inside ``tmp_path``."""
+    import runanywhere
+
+    monkeypatch.setenv("RUNANYWHERE_HOME", str(tmp_path / "home"))
+    runanywhere.initialize()
+    try:
+        yield fake_core
+    finally:
+        runanywhere.reset()
+
+
+@pytest.fixture()
+def gguf(tmp_path) -> str:
+    """A local ``.gguf`` path, which resolves without any download."""
+    path = tmp_path / "model.gguf"
+    path.write_bytes(b"gguf")
+    return str(path)

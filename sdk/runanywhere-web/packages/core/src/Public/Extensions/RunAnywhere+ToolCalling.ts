@@ -30,7 +30,6 @@ export type {
 export {
   ToolCallFormatName,
   ToolChoiceMode,
-  ToolParameterType,
 } from '@runanywhere/proto-ts/tool_calling';
 
 import {
@@ -47,6 +46,7 @@ import {
   ToolParseResult as ToolParseResultMessage,
   ToolPromptFormatRequest as ToolPromptFormatRequestMessage,
   ToolPromptFormatResult as ToolPromptFormatResultMessage,
+  ToolCallingRole,
   ToolResult as ToolResultMessage,
   ToolValue as ToolValueMessage,
   ToolValueJSON as ToolValueJSONMessage,
@@ -65,6 +65,7 @@ import {
   type ToolResult,
 } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { SDKError as SDKErrorMessage } from '@runanywhere/proto-ts/errors';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
@@ -121,7 +122,7 @@ export interface GenerateWithToolsOptions {
   llmOptions?: Partial<
     Pick<
       LLMGenerationOptions,
-      'maxTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'disableThinking'
+      'maxOutputTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'reasoning'
     >
   >;
   /**
@@ -170,12 +171,16 @@ function buildToolCallingOptions(
   options: ToolCallingGenerationOptions = {},
 ): ToolCallingOptions {
   const overrides = options.toolCalling ?? {};
+  // `temperature`/`maxTokens` were deleted outright from ToolCallingOptions
+  // (idl/tool_calling.proto, llm-tool-options-no-shadow): they duplicated
+  // the enclosing LLMGenerationOptions.temperature/maxOutputTokens, which is
+  // the sole channel for both now (`options.temperature`/
+  // `options.maxOutputTokens` on the enclosing LLMGenerationOptions this
+  // ToolCallingOptions gets embedded into).
   return ToolCallingOptionsMessage.fromPartial({
     tools: overrides.tools ?? tools,
     maxToolCalls: overrides.maxToolCalls ?? 5,
     autoExecute: overrides.autoExecute ?? true,
-    temperature: overrides.temperature ?? options.temperature,
-    maxTokens: overrides.maxTokens ?? options.maxTokens,
     systemPrompt: overrides.systemPrompt ?? options.systemPrompt,
     replaceSystemPrompt: overrides.replaceSystemPrompt ?? false,
     keepToolsAvailable: overrides.keepToolsAvailable ?? false,
@@ -386,6 +391,11 @@ function jsonStringFromObject(object: Record<string, ToolValue>): string {
  * Swift parity: `makeToolResult` (RunAnywhere+ToolCalling.swift:463) —
  * `resultJson` is the canonical wire shape; the typed result map is
  * serialized through commons.
+ *
+ * `ToolResult.success` was inverted to `isError` on the wire: the proto3
+ * zero value (false) is now the "good result" default. This helper's
+ * `success` parameter keeps its pre-inversion name/meaning; only the
+ * proto-building step below inverts: `isError = !success`.
  */
 function makeToolResult(params: {
   name: string;
@@ -397,7 +407,7 @@ function makeToolResult(params: {
 }): ToolResult {
   return ToolResultMessage.fromPartial({
     name: params.name,
-    success: params.success,
+    isError: !params.success,
     resultJson: jsonStringFromObject(params.result ?? {}),
     error: params.error,
     toolCallId: params.toolCallId,
@@ -410,10 +420,17 @@ function makeToolResult(params: {
  * Build the ToolCallingSessionCreateRequest proto consumed by
  * `_rac_tool_calling_session_create_proto`. Mirrors Swift's
  * `makeRunLoopRequest` (RunAnywhere+ToolCalling.swift:491-548) so the C++
- * loop receives identical input regardless of SDK: tool options take
- * precedence, unset values fall back to the LLM options channel, whose
- * defaults are Swift's `RALLMGenerationOptions.defaults()`
- * (maxTokens 100, temperature 0.8, topP 1.0).
+ * loop receives identical input regardless of SDK.
+ *
+ * `ToolCallingSessionCreateRequest` was collapsed to 3 fields (prompt,
+ * history, options) -- every knob that used to be re-published on this
+ * message now lives solely on the embedded `ToolCallingOptions`
+ * (idl/tool_calling.proto, tools-collapse-options-and-session-request).
+ * `temperature`/`max_output_tokens` have NO home anywhere in this session
+ * ABI anymore (deleted outright, not just moved) -- commons runs the tool
+ * loop's generations with its own model defaults; there is nothing to
+ * forward here. `history` is now `repeated ToolCallingHistoryTurn`
+ * (role + content) instead of a flat string list.
  */
 function buildSessionCreateRequest(
   prompt: string,
@@ -422,19 +439,14 @@ function buildSessionCreateRequest(
   extra: GenerateWithToolsOptions = {},
 ): Uint8Array {
   const llm = extra.llmOptions;
-  const toolMaxTokens = effectiveOptions.maxTokens;
-  const request = ToolCallingSessionCreateRequestMessage.fromPartial({
-    prompt,
-    maxTokens:
-      toolMaxTokens !== undefined && toolMaxTokens > 0
-        ? toolMaxTokens
-        : (llm?.maxTokens ?? 100),
-    temperature: effectiveOptions.temperature ?? llm?.temperature ?? 0.8,
-    // topP has no slot on ToolCallingOptions — Swift reads it from the LLM
-    // options channel exclusively (RunAnywhere+ToolCalling.swift:516).
+  const options = ToolCallingOptionsMessage.fromPartial({
+    ...effectiveOptions,
+    tools,
+    // topP has no slot on ToolCallingOptions from the caller's tool-options
+    // channel — Swift reads it from the LLM options channel exclusively
+    // (RunAnywhere+ToolCalling.swift:516).
     topP: llm?.topP ?? 1.0,
     systemPrompt: effectiveOptions.systemPrompt || llm?.systemPrompt || '',
-    tools,
     format:
       effectiveOptions.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
     maxToolCalls: Math.max(maxToolCallCount(effectiveOptions), 0),
@@ -444,9 +456,9 @@ function buildSessionCreateRequest(
     // parity with Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:528-537).
     validateCalls: extra.validateCalls,
     // pass2-syn-006-followup-web: thread the OpenAI-style tool_choice /
-    // forced_tool_name knobs into the canonical request envelope (idl
-    // fields 7/8). Commons build_options_snapshot copies them onto every
-    // synthesized ToolCallingOptions before format/validate proto calls.
+    // forced_tool_name knobs into the canonical request envelope. Commons
+    // build_options_snapshot copies them onto every synthesized
+    // ToolCallingOptions before format/validate proto calls.
     // TOOL_CHOICE_MODE_UNSPECIFIED = 0, so the truthy check excludes both
     // undefined and the explicit "unspecified" sentinel.
     toolChoice: effectiveOptions.toolChoice
@@ -460,19 +472,31 @@ function buildSessionCreateRequest(
     // `toolOptions.disableThinking || options.disableThinking`
     // (RunAnywhere+ToolCalling.swift:548).
     disableThinking:
-      (effectiveOptions.disableThinking ?? false) || (llm?.disableThinking ?? false),
+      (effectiveOptions.disableThinking ?? false) ||
+      llm?.reasoning?.mode === ReasoningMode.REASONING_MODE_OFF,
     autoExecute: effectiveOptions.autoExecute ?? true,
     replaceSystemPrompt: effectiveOptions.replaceSystemPrompt ?? false,
     requireJsonArguments: effectiveOptions.requireJsonArguments ?? false,
-    // Prior conversation turns as a flat alternating list [user0, asst0, ...],
-    // EXCLUDING the current turn (which travels as `prompt`). commons threads
-    // these into every generate in the session loop so multi-turn tool use keeps
-    // context — Kotlin parity (makeToolCallingRunLoopRequest history param).
-    history: extra.history ?? [],
-    // TC-2: mirror options onto request field 20 — commons reads parallel
-    // mode from the session/run-loop request, not from inline options alone.
+    // TC-2: mirror parallel-call mode onto the embedded options — the
+    // session/run-loop request has no top-level slot of its own anymore;
+    // `ToolCallingOptions.parallelToolCalls` is now the sole home.
     // Swift parity: RunAnywhere+ToolCalling.swift makeRunLoopRequest.
     parallelToolCalls: effectiveOptions.parallelToolCalls ?? false,
+  });
+  const request = ToolCallingSessionCreateRequestMessage.fromPartial({
+    prompt,
+    options,
+    // Prior conversation turns, EXCLUDING the current turn (which travels as
+    // `prompt`). `history` is now `ToolCallingHistoryTurn[]` (role/content)
+    // instead of a flat alternating string list; the caller-facing
+    // `GenerateWithToolsOptions.history` keeps its pre-realignment flat
+    // [user0, asst0, ...] shape and is converted once, here.
+    history: (extra.history ?? []).map((content, index) => ({
+      role: index % 2 === 0
+        ? ToolCallingRole.TOOL_CALLING_ROLE_USER
+        : ToolCallingRole.TOOL_CALLING_ROLE_ASSISTANT,
+      content,
+    })),
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }
@@ -620,7 +644,7 @@ async function generateWithToolsInBackendWorker(
           sessionHandle,
           toolCallId,
           toolResult.resultJson ?? '',
-          toolResult.success ? undefined : toolResult.error,
+          toolResult.isError ? toolResult.error : undefined,
         ),
       }) as WorkerToolSessionResponse;
       events = decodeWorkerSessionEvents(stepped.eventBytes);
@@ -1047,7 +1071,7 @@ export const ToolCalling = {
           sessionHandle,
           toolCallId,
           toolResult.resultJson ?? '',
-          toolResult.success ? undefined : toolResult.error,
+          toolResult.isError ? toolResult.error : undefined,
         );
         const stepRc = await bridge.withHeapBytesAsync(stepBytes, (ptr, size) => (
           callEmscriptenAsyncNumber(

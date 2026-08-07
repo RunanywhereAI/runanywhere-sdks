@@ -6,6 +6,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart' as download_pb;
 import 'package:runanywhere/generated/ra_result_codes.dart';
@@ -212,7 +213,9 @@ class DartBridgeDownload {
     return result ??
         download_pb.DownloadPlanResult(
           canStart: false,
-          errorMessage: 'Download plan proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Download plan proto API is unavailable',
+          ).error,
         );
   }
 
@@ -235,7 +238,9 @@ class DartBridgeDownload {
         download_pb.DownloadStartResult(
           accepted: false,
           modelId: request.modelId,
-          errorMessage: 'Download start proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Download start proto API is unavailable',
+          ).error,
         );
   }
 
@@ -254,34 +259,20 @@ class DartBridgeDownload {
     _untrackActive(request.taskId, request.modelId);
     return result ??
         download_pb.DownloadCancelResult(
-          success: false,
           taskId: request.taskId,
           modelId: request.modelId,
-          errorMessage: 'Download cancel proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Download cancel proto API is unavailable',
+          ).error,
         );
   }
 
-  Future<download_pb.DownloadResumeResult> resumeProto(
-    download_pb.DownloadResumeRequest request,
-  ) async {
-    _ensureProgressCallbackRegistered();
-    final result = await _callDownloadProto(
-      request,
-      RacNative.bindings.rac_download_resume_proto,
-      download_pb.DownloadResumeResult.fromBuffer,
-      'rac_download_resume_proto',
-    );
-    if (result != null && result.accepted) {
-      _trackActive(result.taskId, result.modelId);
-    }
-    return result ??
-        download_pb.DownloadResumeResult(
-          accepted: false,
-          taskId: request.taskId,
-          modelId: request.modelId,
-          errorMessage: 'Download resume proto API is unavailable',
-        );
-  }
+  // DownloadResumeRequest/Result and rac_download_resume_proto were deleted
+  // outright (idl/download_service.proto): starting a download IS resuming
+  // it — DownloadStartRequest{model_id} continues from any valid partial on
+  // disk automatically, and commons' own rac_download_resume_proto is now a
+  // permanently-retired stub (download_orchestrator.cpp) that always returns
+  // RAC_ERROR_NOT_IMPLEMENTED. There is no resume verb left to bridge.
 
   Future<download_pb.DownloadProgress?> pollProgressProto(
     download_pb.DownloadSubscribeRequest request,

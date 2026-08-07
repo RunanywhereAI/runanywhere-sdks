@@ -55,7 +55,7 @@ namespace margelo::nitro::runanywhere {
 class HybridRunAnywhereCore : public HybridRunAnywhereCoreSpec {
 public:
   using ToolRunLoopExecuteCallback = std::function<std::shared_ptr<
-      Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>(
+      Promise<std::shared_ptr<Promise<std::string>>>>(
       const std::shared_ptr<ArrayBuffer> &)>;
   using ToolRunLoopHandleCallback = std::function<void(double)>;
 
@@ -252,6 +252,7 @@ public:
       const std::shared_ptr<ArrayBuffer> &requestBytes,
       const std::function<void(const std::shared_ptr<ArrayBuffer> &)>
           &onEventBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttStateProto() override;
 
   // STT Streaming Session (rac_stt_stream.h) — mirrors Swift
   // CppBridge+STT.swift `transcribeSessionStream`. Single concurrent
@@ -347,6 +348,7 @@ public:
           &onEventBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ttsStopProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsStateProto() override;
 
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
@@ -381,6 +383,24 @@ public:
   vlmCancelProto() override;
 
   // ============================================================================
+  // Computer-Use Agent (CUA) — profile-driven prompt/parse scaffold.
+  // Stateless, sync thunks to rac_cua_system_prompt / rac_cua_parse_action
+  // (pure CPU string work, safe on the JS thread). Mirrors Swift RunAnywhere.CUA
+  // and the sync model-type lookups above. Implemented in
+  // HybridRunAnywhereCore+CUA.cpp.
+  // ============================================================================
+
+  std::string cuaSystemPrompt(const std::string &profileId, double displayWidth,
+                              double displayHeight) override;
+  // Returns serialized runanywhere.v1.CuaAction bytes; the TS facade decodes
+  // them. Must match HybridRunAnywhereCoreSpec exactly — this header is
+  // hand-written, so a spec change does not update it automatically.
+  std::shared_ptr<ArrayBuffer> cuaParseAction(const std::string &profileId,
+                                              const std::string &modelOutput,
+                                              double viewportWidth,
+                                              double viewportHeight) override;
+
+  // ============================================================================
   // Diffusion Capability (Image Generation — Apple / CoreML only)
   // Uses commons lifecycle-owned diffusion proto ABI
   // (rac_diffusion_generate_lifecycle_proto).
@@ -389,6 +409,24 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   diffusionGenerateLifecycleProto(
       const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+
+  // ============================================================================
+  // Diarization / Segmentation / Rerank Capabilities
+  // Diarization and segmentation use the handle-free
+  // `*_lifecycle_proto` verbs; rerank ships only the handle-scoped verb, so
+  // the bridge owns a rerank component handle.
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  diarizationDiarizeLifecycleProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  segmentationSegmentLifecycleProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  rerankProto(const std::string &modelPath, const std::string &modelId,
+              const std::string &modelName,
+              const std::shared_ptr<ArrayBuffer> &requestBytes) override;
 
   // ============================================================================
   // Device Identity
@@ -429,9 +467,8 @@ public:
   voiceAgentProcessTurnProto(
       const std::shared_ptr<ArrayBuffer> &audioBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-  voiceAgentFeedAudioProto(const std::shared_ptr<ArrayBuffer> &audioBytes,
-                           double sampleRateHz, double channels, double encoding,
-                           bool isFinal) override;
+  voiceAgentFeedAudioProto(
+      const std::shared_ptr<ArrayBuffer> &frameBytes) override;
 
   // ============================================================================
   // Tool Calling - delegates generated proto bytes to commons C ABI.
@@ -483,6 +520,8 @@ public:
   ragIngestProto(const std::shared_ptr<ArrayBuffer> &documentBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ragQueryProto(const std::shared_ptr<ArrayBuffer> &queryBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  ragSearchProto(const std::shared_ptr<ArrayBuffer> &requestBytes) override;
   std::shared_ptr<Promise<void>> ragQueryStreamProto(
       const std::shared_ptr<ArrayBuffer> &queryBytes,
       const std::function<void(const std::shared_ptr<ArrayBuffer> &)> &onEventBytes)

@@ -172,6 +172,55 @@ class ModelCatalogTest {
         assertEquals(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, model.category)
     }
 
+    /**
+     * Every catalog id must be unique across BOTH lists, because
+     * [com.runanywhere.runanywhereai.data.ModelBootstrap] registers `models` and
+     * `npuCatalog` into the same SDK registry keyed by id — a collision would make
+     * one row silently shadow the other.
+     *
+     * Note the near-miss pairs this is meant to protect: `lfm2_5_230m` (QHEXRT
+     * bundle) vs `lfm2.5-230m-q4_k_m` (llama.cpp GGUF) are deliberately DIFFERENT
+     * models with different ids, as are the `lfm2_5_350m` / `lfm2-350m-q4_k_m` and
+     * `lfm2_5_2_6b` / `lfm2.5-2.6b-q4_k_m` pairs.
+     */
+    @Test
+    fun catalogIdsAreUniqueAcrossModelsAndNpuCatalog() {
+        val ids = ModelCatalog.models.map { it.id } + ModelCatalog.npuCatalog.map { it.id }
+        val duplicates = ids.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+
+        assertEquals("duplicate catalog ids: $duplicates", emptySet<String>(), duplicates)
+        assertEquals(ids.size, ids.distinct().size)
+    }
+
+    /**
+     * One quantization per model on the llama.cpp rows: the Q8_0 siblings of the
+     * three LFM rows below were removed deliberately, so re-adding one should fail
+     * here rather than quietly restore a "which one do I pick?" duplicate.
+     */
+    @Test
+    fun lfmLlamaCppRowsShipExactlyOneQuantizationPerModel() {
+        val byId = ModelCatalog.models.associateBy { it.id }
+
+        val cpu230m = byId.getValue("lfm2.5-230m-q4_k_m") as SingleFileModel
+        assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, cpu230m.framework)
+        assertEquals(ModelCategory.MODEL_CATEGORY_LANGUAGE, cpu230m.category)
+        assertEquals(190_000_000L, cpu230m.memoryBytes)
+        assertEquals(
+            "https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/main/LFM2.5-230M-Q4_K_M.gguf",
+            cpu230m.url,
+        )
+
+        // The CPU 230M row and the HNPU 230M bundle are distinct models, not duplicates.
+        assertTrue(ModelCatalog.npuCatalog.any { it.id == "lfm2_5_230m" })
+
+        listOf("lfm2-350m-q4_k_m", "lfm2-1.2b-tool-q4_k_m", "lfm2.5-2.6b-q4_k_m").forEach { id ->
+            assertTrue("expected kept Q4_K_M row $id", byId.containsKey(id))
+        }
+        listOf("lfm2-350m-q8_0", "lfm2-1.2b-tool-q8_0", "lfm2.5-2.6b-q8_0").forEach { id ->
+            assertFalse("removed Q8_0 sibling $id came back", byId.containsKey(id))
+        }
+    }
+
     @Test
     fun pickerShowsOnlyQhexrtRowsReturnedByNativeRegistration() {
         val cpu = ModelInfo(

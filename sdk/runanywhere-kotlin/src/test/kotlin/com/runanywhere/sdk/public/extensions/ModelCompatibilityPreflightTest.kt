@@ -8,7 +8,8 @@ import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -80,11 +81,11 @@ class ModelCompatibilityPreflightTest {
                     resultProvider = { compatibilityResult(canRun = true, canFit = true) },
                 ) {
                     nativeLoadCalls += 1
-                    RAModelLoadResult(success = true, model_id = request.model_id)
+                    RAModelLoadResult(model_id = request.model_id)
                 }
 
             assertEquals(1, nativeLoadCalls)
-            assertTrue(result.success)
+            assertNull(result.error)
         }
 
     @Test
@@ -98,15 +99,16 @@ class ModelCompatibilityPreflightTest {
                     resultProvider = { compatibilityResult(canRun = false, canFit = true) },
                 ) {
                     nativeLoadCalls += 1
-                    RAModelLoadResult(success = true, model_id = request.model_id)
+                    RAModelLoadResult(model_id = request.model_id)
                 }
 
             assertEquals(0, nativeLoadCalls)
-            assertFalse(result.success)
+            assertNotNull(result.error)
             assertEquals(request.model_id, result.model_id)
             assertEquals(request.category, result.category)
             assertEquals(request.framework, result.framework)
-            assertTrue(result.error_message.contains("Unload the current model"))
+            val errorMessage = result.error?.message ?: ""
+            assertTrue(errorMessage.contains("Unload the current model"))
         }
 
     @Test
@@ -126,11 +128,11 @@ class ModelCompatibilityPreflightTest {
                     },
                 ) {
                     nativeLoadCalls += 1
-                    RAModelLoadResult(success = true, model_id = request.model_id)
+                    RAModelLoadResult(model_id = request.model_id)
                 }
 
             assertEquals(1, nativeLoadCalls)
-            assertTrue(result.success)
+            assertNull(result.error)
         }
 
     private suspend fun captureSdkException(block: suspend () -> Unit): SDKException =

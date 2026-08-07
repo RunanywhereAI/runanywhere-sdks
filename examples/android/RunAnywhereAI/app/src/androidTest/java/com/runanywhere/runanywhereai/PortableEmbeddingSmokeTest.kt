@@ -1,11 +1,13 @@
 package com.runanywhere.runanywhereai
 
+import ai.runanywhere.proto.v1.ModelCategory
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.embeddings
+import com.runanywhere.sdk.public.api.embeddings
+import com.runanywhere.sdk.public.api.models
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -42,12 +44,14 @@ class PortableEmbeddingSmokeTest {
             val positive = "passage: Mars is commonly called the Red Planet because of iron oxide on its surface."
             val negative = "passage: The Pacific Ocean is the largest ocean on Earth."
 
+            withTimeout(180_000) { RunAnywhere.models.load(modelId) }
+
             try {
                 val started = System.currentTimeMillis()
                 val vectors = listOf(query, positive, negative).map { text ->
                     withTimeout(180_000) {
-                        RunAnywhere.embeddings.embed(text, modelId)
-                    }.vectors.single().values.toFloatArray()
+                        RunAnywhere.embeddings.embed(listOf(text))
+                    }.single().vector
                 }
                 val elapsedMs = System.currentTimeMillis() - started
                 val norms = vectors.map(::l2Norm)
@@ -70,8 +74,13 @@ class PortableEmbeddingSmokeTest {
                         "positiveCosine=$positiveCosine negativeCosine=$negativeCosine elapsedMs=$elapsedMs",
                 )
             } finally {
-                withTimeout(180_000) { RunAnywhere.embeddings.unload() }
-                assertNull("embedding lifecycle must be empty after unload", RunAnywhere.embeddings.currentModelID())
+                withTimeout(180_000) {
+                    RunAnywhere.models.unload(ModelCategory.MODEL_CATEGORY_EMBEDDING)
+                }
+                assertNull(
+                    "embedding lifecycle must be empty after unload",
+                    RunAnywhere.models.state().loaded[ModelCategory.MODEL_CATEGORY_EMBEDDING],
+                )
             }
         }
     }

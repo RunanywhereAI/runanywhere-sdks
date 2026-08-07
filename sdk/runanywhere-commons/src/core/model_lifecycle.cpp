@@ -153,9 +153,18 @@ evict_other_qhexrt_models(runanywhere::v1::SDKComponent keep_component) {
 
 namespace {
 
+// AcceleratorPolicy wire values (idl/public_api_v4.proto). ModelLoadRequest
+// stores accelerator_policy as a bare int32 specifically to avoid a
+// circular import between model_types.proto and public_api_v4.proto (see
+// the field's proto comment); mirror the same integers here instead of
+// pulling in the generated public_api_v4 message types for one enum.
+constexpr int32_t kAcceleratorPolicyUnspecified = 0;
+constexpr int32_t kAcceleratorPolicyNpu = 4;
+
 rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t primitive,
                                  const std::string& resolved_path, const std::string& mmproj_path,
-                                 void** out_impl, std::function<void()>* out_destroy) {
+                                 const std::string& options_json, void** out_impl,
+                                 std::function<void()>* out_destroy) {
     if (!vt || !out_impl || !out_destroy) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -169,7 +178,14 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
         case RAC_PRIMITIVE_GENERATE_TEXT:
             if (!vt->llm_ops || !vt->llm_ops->create)
                 return RAC_ERROR_BACKEND_NOT_FOUND;
-            rc = vt->llm_ops->create(resolved_path.c_str(), nullptr, &impl);
+            // Forwards the v4 load knobs (context_length/threads/use_gpu/
+            // accelerator_policy) as advisory config_json. Per the ABI
+            // contract ("plugins that don't understand config_json MUST
+            // ignore it" — rac_llm_service.h) this does not itself guarantee
+            // any given engine honors a key; the caller-visible warning
+            // attached to a successful ModelLoadResult says so explicitly.
+            rc = vt->llm_ops->create(resolved_path.c_str(),
+                                     options_json.empty() ? nullptr : options_json.c_str(), &impl);
             if (rc == RAC_SUCCESS && impl && vt->llm_ops->initialize) {
                 rc = vt->llm_ops->initialize(impl, resolved_path.c_str());
             }
@@ -254,7 +270,8 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
             if (!vt->vlm_ops || !vt->vlm_ops->create)
                 return RAC_ERROR_BACKEND_NOT_FOUND;
             {
-                const std::string config_json = vlm_config_json(mmproj_path);
+                const std::string config_json =
+                    merge_json_objects(vlm_config_json(mmproj_path), options_json);
                 rc =
                     vt->vlm_ops->create(resolved_path.c_str(),
                                         config_json.empty() ? nullptr : config_json.c_str(), &impl);
@@ -525,7 +542,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                         request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+                                        result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -546,7 +563,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                         request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+                                        result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -573,7 +590,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                             request.model_id(), &result, nullptr,
-                                            result.error_message().c_str());
+                                            result.error().message().c_str());
             return detail::copy_proto(result, out_result);
         }
 
@@ -609,7 +626,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                         request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+                                        result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -620,6 +637,51 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     const detail::ModelArtifactResolution artifact_resolution =
         detail::resolve_model_artifacts(model);
     const std::string& resolved_path = artifact_resolution.resolved_path;
+
+    // v4 load knobs (context_length/threads/use_gpu/accelerator_policy) are
+    // LLM/VLM concepts: context window, CPU thread count, GPU/NPU offload
+    // for a text or vision-language model. Reject explicitly rather than
+    // silently drop them when the resolved primitive has no notion of any
+    // of this (STT/TTS/VAD/embeddings/diffusion/diarization/segmentation) —
+    // that is the exact "option fields that lie" failure mode this wiring
+    // exists to close.
+    if (primitive != RAC_PRIMITIVE_GENERATE_TEXT && primitive != RAC_PRIMITIVE_VLM) {
+        std::vector<std::string> unsupported;
+        if (request.has_context_length()) {
+            unsupported.push_back("context_length");
+        }
+        if (request.has_use_gpu()) {
+            unsupported.push_back("use_gpu");
+        }
+        if (request.has_accelerator_policy() &&
+            request.accelerator_policy() != detail::kAcceleratorPolicyUnspecified) {
+            unsupported.push_back("accelerator_policy");
+        }
+        if (!unsupported.empty()) {
+            std::string joined;
+            for (size_t i = 0; i < unsupported.size(); ++i) {
+                if (i > 0) {
+                    joined += ", ";
+                }
+                joined += unsupported[i];
+            }
+            const std::string message =
+                "ModelLoadRequest." + joined +
+                " only apply to text-generation/VLM loads and were rejected (not silently "
+                "ignored) for category " +
+                ModelCategory_Name(category);
+            ModelLoadResult result = detail::make_load_result(
+                false, request.model_id(), category, framework, resolved_path,
+                artifact_resolution.artifacts, 0, message,
+                detail::LoadPlacement{/*requested_backend=*/framework});
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                            request.model_id(), &result, nullptr,
+                                            result.error().message().c_str());
+            return detail::copy_proto(result, out_result);
+        }
+    }
 
     // Self-heal: lazy resolution recovered a real on-disk path for a registry
     // entry whose local_path was empty (cold-launch re-registration gap —
@@ -648,7 +710,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         detail::publish_component_event(
             component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
-            result.error_message().c_str());
+            result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -683,7 +745,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                 ModelLoadResult result = detail::make_load_result(
                     true, existing->second->model_id, existing->second->category,
                     existing->second->framework, existing->second->resolved_path,
-                    existing->second->resolved_artifacts, existing->second->loaded_at_ms, "");
+                    existing->second->resolved_artifacts, existing->second->loaded_at_ms, "",
+                    detail::placement_from_loaded(*existing->second));
                 return detail::copy_proto(result, out_result);
             }
             previous_state = existing->second->state;
@@ -735,22 +798,88 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     // Pin the engine the model was built for when its framework is known
     // (priority order alone cannot tell two backends serving the same primitive
     // apart — e.g. QHexRT at priority 150 would otherwise hijack every GGUF
-    // load meant for llamacpp). Fall back to plain priority selection when the
-    // framework is unspecified or its engine isn't registered.
-    const char* engine_hint = detail::engine_name_for_framework(framework);
-    const rac_engine_vtable_t* vt =
-        engine_hint ? rac_plugin_find_for_engine(primitive, engine_hint) : nullptr;
-    if (vt) {
-        RAC_LOG_INFO("model_lifecycle", "Pinned engine '%s' for framework %s", engine_hint,
-                     runanywhere::v1::InferenceFramework_Name(framework).c_str());
-    } else {
+    // load meant for llamacpp). Candidate order: the resolved framework
+    // (request.framework() / model's catalog framework) first, then each
+    // backend_preferences() entry in the caller's listed order — this is the
+    // field's actual wiring, not just wire storage. Fall back to plain
+    // priority selection only when NONE of the candidates have a registered
+    // engine, exactly as before this change.
+    std::vector<InferenceFramework> pin_candidates;
+    pin_candidates.push_back(framework);
+    for (int i = 0; i < request.backend_preferences_size(); ++i) {
+        pin_candidates.push_back(request.backend_preferences(i));
+    }
+
+    const rac_engine_vtable_t* vt = nullptr;
+    int pinned_candidate_index = -1;
+    for (size_t i = 0; i < pin_candidates.size(); ++i) {
+        const char* engine_hint = detail::engine_name_for_framework(pin_candidates[i]);
+        if (!engine_hint) {
+            continue;
+        }
+        vt = rac_plugin_find_for_engine(primitive, engine_hint);
+        if (vt) {
+            pinned_candidate_index = static_cast<int>(i);
+            RAC_LOG_INFO("model_lifecycle", "Pinned engine '%s' for framework %s", engine_hint,
+                         runanywhere::v1::InferenceFramework_Name(pin_candidates[i]).c_str());
+            break;
+        }
+    }
+    const bool used_priority_fallback = (vt == nullptr);
+    if (!vt) {
         vt = rac_plugin_find(primitive);
     }
+
+    // v4 placement truth, filled in below once an engine is known. Populated
+    // even on the "no backend found"/"create failed" error paths (minus the
+    // device_* fields, since no device ever ran) so callers can see what was
+    // requested even when the load did not succeed.
+    detail::LoadPlacement placement;
+    placement.requested_backend = framework;
+    if (vt) {
+        if (used_priority_fallback && framework != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+            placement.fallback_reason = "no registered engine for the requested/preferred "
+                                        "framework(s); used '" +
+                                        std::string(vt->metadata.name ? vt->metadata.name : "?") +
+                                        "' via plain priority order instead";
+        } else if (pinned_candidate_index > 0) {
+            placement.fallback_reason =
+                "primary framework '" + runanywhere::v1::InferenceFramework_Name(framework) +
+                "' has no registered engine; used backend_preferences[" +
+                std::to_string(pinned_candidate_index - 1) + "] ('" +
+                std::string(vt->metadata.name ? vt->metadata.name : "?") + "') instead";
+        }
+    }
+
+    // NPU placement is a hard capability boundary this build CAN verify:
+    // QHexRT is the only engine that ever executes on the Hexagon NPU. Every
+    // other accelerator_policy value is advisory (see load_options_json())
+    // because commons cannot prove today whether e.g. llama.cpp's GPU
+    // offload actually engaged for a given load.
+    if (vt && request.has_accelerator_policy() &&
+        request.accelerator_policy() == detail::kAcceleratorPolicyNpu &&
+        (!vt->metadata.name || std::string(vt->metadata.name) != RAC_ENGINE_ID_QHEXRT)) {
+        const std::string message =
+            "ModelLoadRequest.accelerator_policy=NPU was requested but the selected engine '" +
+            std::string(vt->metadata.name ? vt->metadata.name : "?") +
+            "' is not the NPU (QHexRT) engine; rejected rather than silently loading on a "
+            "different accelerator";
+        ModelLoadResult result = detail::make_load_result(
+            false, request.model_id(), category, framework, resolved_path,
+            artifact_resolution.artifacts, 0, message, placement);
+        detail::publish_component_event(component,
+                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                        request.model_id(), &result, nullptr,
+                                        result.error().message().c_str());
+        return detail::copy_proto(result, out_result);
+    }
+
     if (!vt) {
         std::string error = "no registered backend serves the requested primitive";
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
-                                     artifact_resolution.artifacts, 0, error);
+                                     artifact_resolution.artifacts, 0, error, placement);
         auto failed = std::make_shared<detail::LoadedModel>();
         failed->component = component;
         failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
@@ -761,6 +890,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         failed->category = category;
         failed->framework = framework;
         failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
+        failed->requested_backend = placement.requested_backend;
         failed->updated_at_ms = detail::now_ms();
         failed->error_message = error;
         std::shared_ptr<detail::LoadedModel> displaced;
@@ -778,7 +908,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             ModelLoadResult resident = detail::make_load_result(
                 true, swap_previous->model_id, swap_previous->category, swap_previous->framework,
                 swap_previous->resolved_path, swap_previous->resolved_artifacts,
-                swap_previous->loaded_at_ms, "");
+                swap_previous->loaded_at_ms, "", detail::placement_from_loaded(*swap_previous));
             detail::publish_component_event(component,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
@@ -787,15 +917,22 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             detail::publish_component_event(
                 component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                 runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result,
-                nullptr, result.error_message().c_str());
+                nullptr, result.error().message().c_str());
         }
         return detail::copy_proto(result, out_result);
     }
 
+    // Advisory config for the v4 load knobs (see load_options_json() /
+    // create_backend_impl()); "" when the request set none of them, in which
+    // case every currently-registered engine's create() behaves exactly as
+    // before this change.
+    const std::string options_json = detail::load_options_json(request);
+    const bool advisory_options_requested = !options_json.empty();
+
     void* impl = nullptr;
     std::function<void()> destroy;
     rc = detail::create_backend_impl(vt, primitive, resolved_path, artifact_resolution.mmproj_path,
-                                     &impl, &destroy);
+                                     options_json, &impl, &destroy);
     if (rc != RAC_SUCCESS) {
         // Compose the generic per-code message with the backend's "caused by"
         // detail (set via rac_error_set_details inside create/initialize, e.g.
@@ -809,7 +946,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         }
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
-                                     artifact_resolution.artifacts, 0, load_error);
+                                     artifact_resolution.artifacts, 0, load_error, placement);
         auto failed = std::make_shared<detail::LoadedModel>();
         failed->component = component;
         failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
@@ -820,8 +957,9 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         failed->category = category;
         failed->framework = framework;
         failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
+        failed->requested_backend = placement.requested_backend;
         failed->updated_at_ms = detail::now_ms();
-        failed->error_message = result.error_message();
+        failed->error_message = result.error().message();
         // Create-then-swap (A12): the previous READY backend was never torn down
         // for a different-model load, so a failed create keeps it resident
         // instead of stranding the slot.
@@ -840,7 +978,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             ModelLoadResult resident = detail::make_load_result(
                 true, swap_previous->model_id, swap_previous->category, swap_previous->framework,
                 swap_previous->resolved_path, swap_previous->resolved_artifacts,
-                swap_previous->loaded_at_ms, "");
+                swap_previous->loaded_at_ms, "", detail::placement_from_loaded(*swap_previous));
             detail::publish_component_event(component,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
@@ -849,9 +987,42 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             detail::publish_component_event(
                 component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                 runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result,
-                nullptr, result.error_message().c_str());
+                nullptr, result.error().message().c_str());
         }
         return detail::copy_proto(result, out_result);
+    }
+
+    // The framework the load ACTUALLY ran on. `framework` (preferred_framework_for)
+    // is the request/catalog pin; `vt` is the engine that really got selected,
+    // which — via backend_preferences fallback or plain priority order — can
+    // legitimately differ from it. Reverse-map through the engine name so the
+    // report reflects reality, not the request. Ambiguous/unrecognized engine
+    // names (e.g. the shared "platform" id) keep the preferred value rather
+    // than guessing.
+    const InferenceFramework actual_engine_framework =
+        detail::framework_for_engine_name(vt->metadata.name ? vt->metadata.name : "");
+    const InferenceFramework effective_framework =
+        actual_engine_framework != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED
+            ? actual_engine_framework
+            : framework;
+
+    placement.actual_device_id = vt->metadata.name ? vt->metadata.name : "";
+    placement.actual_device_name =
+        vt->metadata.display_name ? vt->metadata.display_name : placement.actual_device_id;
+    placement.actual_device_kind = detail::device_kind_for_vtable(vt);
+    placement.runtime_version = vt->metadata.engine_version ? vt->metadata.engine_version : "";
+    placement.abi_version = std::to_string(vt->metadata.abi_version);
+
+    std::vector<std::string> warnings;
+    if (advisory_options_requested) {
+        // Wired end-to-end (forwarded as config_json — see create_backend_impl),
+        // but honoring specific keys is per-engine and this build cannot verify
+        // it happened. Told explicitly rather than claimed silently.
+        warnings.push_back(
+            "context_length/threads/use_gpu/accelerator_policy were forwarded to engine '" +
+            placement.actual_device_id +
+            "' as advisory config; not every engine build honors every key today — inspect "
+            "actual_device_kind/runtime_version if precise placement matters");
     }
 
     int64_t loaded_at_ms = detail::now_ms();
@@ -862,8 +1033,15 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     loaded->resolved_path = resolved_path;
     loaded->mmproj_path = artifact_resolution.mmproj_path;
     loaded->resolved_artifacts = artifact_resolution.artifacts;
-    loaded->framework = framework;
-    loaded->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
+    loaded->framework = effective_framework;
+    loaded->framework_name = runanywhere::v1::InferenceFramework_Name(effective_framework);
+    loaded->requested_backend = placement.requested_backend;
+    loaded->actual_device_id = placement.actual_device_id;
+    loaded->actual_device_name = placement.actual_device_name;
+    loaded->actual_device_kind = placement.actual_device_kind;
+    loaded->runtime_version = placement.runtime_version;
+    loaded->abi_version = placement.abi_version;
+    loaded->fallback_reason = placement.fallback_reason;
     loaded->category = category;
     loaded->primitive = primitive;
     if (primitive == RAC_PRIMITIVE_GENERATE_TEXT) {
@@ -892,9 +1070,9 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     loaded->destroy = std::move(destroy);
     detail::destroy_loaded_model(install_loaded_entry(component, std::move(loaded)));
 
-    ModelLoadResult result =
-        detail::make_load_result(true, request.model_id(), category, framework, resolved_path,
-                                 artifact_resolution.artifacts, loaded_at_ms, "");
+    ModelLoadResult result = detail::make_load_result(
+        true, request.model_id(), category, effective_framework, resolved_path,
+        artifact_resolution.artifacts, loaded_at_ms, "", placement, warnings);
     load_admission_lock.unlock();
     publish_deferred_transitions(true);
     detail::publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
@@ -954,9 +1132,9 @@ rac_result_t rac_model_lifecycle_unload_proto(const uint8_t* request_proto_bytes
     }
 
     ModelUnloadResult result;
-    result.set_success(!unloaded.empty());
     if (unloaded.empty()) {
-        result.set_error_message("no loaded model matched unload request");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_MODEL_NOT_LOADED);
+        result.mutable_error()->set_message("no loaded model matched unload request");
     }
     for (const auto& model : unloaded) {
         result.add_unloaded_model_ids(model->model_id);

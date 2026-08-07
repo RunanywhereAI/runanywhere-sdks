@@ -191,6 +191,14 @@ rac_error_category_t rac_proto_to_category(::runanywhere::v1::ErrorCategory cate
 // rac_error_proto.cpp and event_publisher.cpp.
 ::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code);
 
+// Populate a `SDKError` submessage in place from a rac_result_t error code:
+// sets code/category/message/nested_message/c_abi_code/severity. This is the
+// canonical result->SDKError mapping shared by result envelopes (which embed
+// an `SDKError error` field) and by `rac_result_to_proto_error()` (which
+// serializes it). No-op-safe: pass a non-negative `code` to build a
+// default/"no error" SDKError.
+void populate_sdk_error(::runanywhere::v1::SDKError* out, rac_result_t code);
+
 }  // namespace rac::foundation
 
 #endif  // __cplusplus

@@ -4,28 +4,22 @@
  * Mirrors iOS VLMViewModel (Features/Vision/VLMViewModel.swift):
  *
  *   1. User downloads + loads any multimodal model via the shared model
- *      selection sheet (`RunAnywhere.downloadModel` + `loadModel`). Loading a
+ *      selection sheet (`RunAnywhere.models.download` + `models.load`). Loading a
  *      multimodal model syncs the Web vision-language provider inside the
  *      SDK — no app-side bridging.
  *   2. User starts the camera — `VideoCapture` attaches its `<video>` to
  *      the preview container.
  *   3. User clicks "Capture & analyze" — the latest frame streams through
- *      `RunAnywhere.processImageStream(image, options)`, rendering TOKEN
+ *      `RunAnywhere.vlm.generateStream(image, prompt)`, rendering token
  *      events as they arrive (iOS parity: VLMViewModel.swift:148-194
  *      consumeVLMStream/describeCurrentFrame), with cancel support.
  */
 
 import type { TabLifecycle } from '../app';
-import {
-  ModelCategory,
-  RunAnywhere,
-  VLMModelFamily,
-  VLMStreamEventKind,
-  vlmImageFromRawRGB,
-  type VLMGenerationOptions,
-} from '@runanywhere/web';
+import { ModelCategory, RunAnywhere } from '@runanywhere/web';
 import { VideoCapture } from '@runanywhere/web/browser';
 import {
+  findLoadedModelForCategory,
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
@@ -137,7 +131,7 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Analyze</h3>
         <p class="text-secondary">
-          Streams <code>RunAnywhere.processImageStream(image, options)</code>
+          Streams <code>RunAnywhere.vlm.generateStream(image, prompt)</code>
           on the last captured frame, rendering tokens as they arrive.
         </p>
         <label class="form-label" for="vision-prompt">Prompt</label>
@@ -387,66 +381,39 @@ async function onAnalyze(): Promise<void> {
   const promptEl = container.querySelector<HTMLTextAreaElement>('#vision-prompt');
   const prompt = (promptEl?.value ?? DEFAULT_PROMPT).trim() || DEFAULT_PROMPT;
 
-  const image = vlmImageFromRawRGB(frame.rgbPixels, frame.width, frame.height);
-
-  const options: VLMGenerationOptions = {
-    prompt,
-    maxTokens: 200,
-    temperature: 0.7,
-    topP: 0.9,
-    topK: 40,
-    stopSequences: [],
-    streamingEnabled: true,
-    systemPrompt: undefined,
-    maxImageSize: CAPTURE_DIMENSION,
-    nThreads: 0,
-    useGpu: false,
-    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
-    customChatTemplate: undefined,
-    imageMarkerOverride: undefined,
-    seed: 0,
-    repetitionPenalty: 1.1,
-    minP: 0.05,
-    emitImageEmbeddings: false,
-  };
-
-  // Cancel maps to the SDK's native cancel verb — iOS parity:
-  // VLMViewModel.swift:244-246 (`RunAnywhere.cancelVLMGeneration()`).
-  let cancellationRequested = false;
-  cancelAnalyze = () => {
-    cancellationRequested = true;
-    void RunAnywhere.visionLanguage.cancelVLMGeneration();
-  };
+  const image = RunAnywhere.ImageInput.rawRgb(frame.rgbPixels, frame.width, frame.height);
 
   isBusy = true;
   setStatus('Running VLM inference…');
   lastResult = '';
   renderView();
 
+  const events = RunAnywhere.vlm.generateStream(image, prompt, {
+    maxOutputTokens: 200,
+    temperature: 0.7,
+    topP: 0.9,
+    topK: 40,
+  });
+  const iterator = events[Symbol.asyncIterator]();
+  // Abandoning the iterator is the cancellation contract for every v3 stream.
+  let cancellationRequested = false;
+  cancelAnalyze = () => {
+    cancellationRequested = true;
+    void iterator.return?.();
+  };
+
   try {
-    // Typed stream: STARTED → TOKEN* → terminal COMPLETED/ERROR — iOS parity:
-    // VLMViewModel.swift:148-169 consumeVLMStream.
-    const stream = await RunAnywhere.visionLanguage.processImageStream(image, options);
-    for await (const event of stream) {
-      switch (event.kind) {
-        case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN:
-          if (event.token) {
-            lastResult = (lastResult ?? '') + event.token;
-            updateOutput(lastResult);
-          }
-          break;
-        case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED: {
-          const result = event.result;
-          const tokLine = result && result.tokensPerSecond > 0
-            ? ` — ${result.completionTokens} tokens in ${Math.round(result.processingTimeMs)}ms (${result.tokensPerSecond.toFixed(1)} tok/s)`
-            : '';
-          setStatus(`Done${tokLine}.`);
-          break;
-        }
-        case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR:
-          throw new Error(event.errorMessage || 'VLM stream failed');
-        default:
-          break;
+    for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
+      const event = step.value;
+      if (event.type === 'textDelta') {
+        lastResult = (lastResult ?? '') + event.text;
+        updateOutput(lastResult);
+      } else if (event.type === 'completed') {
+        const { result } = event;
+        const tokLine = result.tokensPerSecond > 0
+          ? ` — ${result.outputTokens} tokens (${result.tokensPerSecond.toFixed(1)} tok/s)`
+          : '';
+        setStatus(`Done${tokLine}.`);
       }
     }
     if (cancellationRequested) {
@@ -475,18 +442,7 @@ async function onAnalyze(): Promise<void> {
  * No model-id allowlist: any loaded vision-capable model enables Analyze.
  */
 function isVLMModelLoaded(): boolean {
-  try {
-    for (const category of VLM_PICKER_FILTER) {
-      const current = RunAnywhere.currentModel({
-        category,
-        includeModelMetadata: false,
-      });
-      if (current?.found || current?.modelId) return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  return VLM_PICKER_FILTER.some((category) => findLoadedModelForCategory(category) !== null);
 }
 
 function setStatus(text: string): void {

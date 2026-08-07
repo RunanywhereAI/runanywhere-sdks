@@ -20,6 +20,33 @@ def backends() -> list[str]: ...
 def initialize(secure_dir: str, base_dir: str | None = ...) -> None: ...
 def shutdown() -> None: ...
 
+# Control plane (telemetry + auth). Present when the protobuf runtime is built
+# (RAC_PY_CONTROL_PLANE); ``has_control_plane`` is the capability flag. HTTP is
+# performed by ``http_poster`` — a Python callable
+# ``(method, url, [(k, v), ...], body: bytes, timeout_ms: int) ->
+# (status: int, [(k, v), ...], body: bytes) | None`` — registered as the transport
+# (None => network error). ``environment`` is a rac_environment_t (0=dev, 2=prod);
+# ``phase1_bytes``/``phase2_bytes`` are serialized SdkInit{Phase1,Phase2}Request;
+# the return is a serialized SdkInitResult (empty on a phase failure).
+has_control_plane: bool
+def device_persistent_id() -> str: ...
+def dev_staging_base_url() -> str: ...
+def configure_control_plane(
+    http_poster: Callable[[str, str, list, bytes, int], "tuple | None"],
+    environment: int,
+    api_key: str,
+    base_url: str,
+    device_id: str,
+    platform: str,
+    sdk_version: str,
+    sdk_binding: str,
+    app_identifier: str,
+    app_name: str,
+    app_version: str,
+    phase1_bytes: bytes,
+    phase2_bytes: bytes,
+) -> bytes: ...
+
 # ---- LLM -------------------------------------------------------------------------------
 def load_model(path: str, id: str | None = ..., name: str | None = ...) -> int: ...
 def generate(
@@ -82,6 +109,69 @@ def load_vad_model(
 ) -> None: ...
 def unload_vad(handle: int) -> None: ...
 
+# ---- LoRA (LlamaCPP) -------------------------------------------------------------------
+def lora_apply(handle: int, adapter_path: str, scale: float | None = ...) -> None: ...
+def lora_remove(handle: int, adapter_path: str) -> None: ...
+def lora_remove_all(handle: int) -> None: ...
+
+# ---- Diarization (ONNX Sortformer) -----------------------------------------------------
+def load_diarization_model(model_path: str, id: str | None = ...) -> int: ...
+def diarize(
+    handle: int,
+    samples: npt.NDArray[np.float32],
+    sample_rate_hz: int | None = ...,
+    threshold: float | None = ...,
+    minimum_duration_ms: int | None = ...,
+    merge_gap_ms: int | None = ...,
+) -> dict[str, Any]: ...
+def unload_diarization_model(handle: int) -> None: ...
+
+# ---- Segmentation (ONNX) ---------------------------------------------------------------
+def load_segmentation_model(model_path: str, id: str | None = ...) -> int: ...
+def segment(
+    handle: int,
+    data: Union[bytes, bytearray, memoryview, npt.NDArray],
+    width: int,
+    height: int,
+    pixel_format: int | None = ...,
+    stride_bytes: int | None = ...,
+    include_diagnostic_rgba: bool | None = ...,
+) -> dict[str, Any]: ...
+def unload_segmentation_model(handle: int) -> None: ...
+
+# ---- Voice agent (file-PCM turn; STT→LLM→TTS) ------------------------------------------
+def create_voice_agent() -> int: ...
+def initialize_voice_agent(
+    handle: int,
+    stt_path: str,
+    llm_path: str,
+    tts_path: str,
+    stt_id: str | None = ...,
+    llm_id: str | None = ...,
+    tts_id: str | None = ...,
+    stt_name: str | None = ...,
+    llm_name: str | None = ...,
+    tts_name: str | None = ...,
+) -> None: ...
+def process_voice_turn(
+    handle: int, pcm16: Union[bytes, bytearray, memoryview, npt.NDArray]
+) -> dict[str, Any]: ...
+def destroy_voice_agent(handle: int) -> None: ...
+
+# ---- Diffusion (present only when built with RAC_HAVE_BACKEND_NEURT) ------------------
+def load_diffusion_model(model_path: str, id: str | None = ...) -> int: ...
+def generate_image(
+    handle: int,
+    prompt: str,
+    negative_prompt: str | None = ...,
+    width: int | None = ...,
+    height: int | None = ...,
+    steps: int | None = ...,
+    guidance_scale: float | None = ...,
+    seed: int | None = ...,
+) -> dict[str, Any]: ...
+def unload_diffusion_model(handle: int) -> None: ...
+
 # ---- Model registry --------------------------------------------------------------------
 # Register a model (id -> local_path + framework/category ints) into the global model
 # registry so the RAG session ABI can resolve embedding_model_id / llm_model_id to paths.
@@ -99,6 +189,7 @@ OnEvent = Callable[[bytes], "bool | None"]
 def rag_session_create(config_bytes: bytes) -> int: ...
 def rag_ingest(handle: int, document_bytes: bytes) -> bytes: ...
 def rag_query(handle: int, query_bytes: bytes) -> bytes: ...
+def rag_search(handle: int, request_bytes: bytes) -> bytes: ...
 def rag_query_stream(handle: int, query_bytes: bytes, on_event: OnEvent) -> None: ...
 def rag_cancel(handle: int) -> None: ...
 def rag_clear(handle: int) -> bytes: ...

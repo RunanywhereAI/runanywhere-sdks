@@ -18,14 +18,12 @@
  */
 
 import {
-  HybridRank,
+  HybridInferenceMode,
   HybridRoutingPolicy as HybridRoutingPolicyProto,
   type HybridFilter as HybridFilterProto,
 } from '@runanywhere/proto-ts/hybrid_router';
+import { confidenceCascadeDefaults } from '@runanywhere/proto-ts/convenience/hybrid_router_convenience';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
-import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
-
-export { HybridRank };
 
 /**
  * A caller-supplied eligibility predicate. Registered with commons under
@@ -52,15 +50,6 @@ export type HybridFilter =
       readonly kind: 'network';
     }
   | {
-      /**
-       * Requires the candidate to declare at least `tier`. Reserved: v1
-       * descriptors carry no quality tier, so commons treats this as a no-op
-       * today. Kept for wire/API parity.
-       */
-      readonly kind: 'quality';
-      readonly tier: number;
-    }
-  | {
       /** Drops the online candidate when the device battery is below `minPercent`. */
       readonly kind: 'battery';
       readonly minPercent: number;
@@ -73,15 +62,18 @@ export type HybridFilter =
       readonly check: CustomFilterCheck;
     };
 
-/** Filter constructors mirroring the Kotlin RoutingPolicy catalog. */
+/**
+ * Filter constructors mirroring the Kotlin RoutingPolicy catalog.
+ *
+ * `quality(tier)` is removed: `HybridFilter.quality_tier` (the reserved,
+ * always-no-op oneof arm it built) is deleted from `hybrid_router.proto`
+ * outright — there was never a wire slot to carry it, and now there is none
+ * left even for parity.
+ */
 export const Filters = {
   /** Drops online candidates when the device has no network. */
   network(): HybridFilter {
     return { kind: 'network' };
-  },
-  /** Requires the candidate to meet at least `tier` (reserved / no-op in v1). */
-  quality(tier = 1): HybridFilter {
-    return { kind: 'quality', tier };
   },
   /** Drops online candidates when the device is below `minPercent` battery. */
   battery(minPercent = 20): HybridFilter {
@@ -108,11 +100,15 @@ export type HybridCascade = {
 };
 
 /**
- * Suggested default confidence threshold for an STT confidence cascade. Mirrors
- * `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` — the router uses the threshold carried
- * in the installed policy; this is only the recommended value to build it with.
+ * Suggested default confidence threshold for an STT confidence cascade.
+ *
+ * `defaults/pool.ts`'s `hybridDefaults` is deleted outright — its one field
+ * duplicated `hybrid_router.ConfidenceCascade.threshold` — so this now reads
+ * that field's own generated default directly. The router uses the threshold
+ * carried in the installed policy; this is only the recommended value to
+ * build it with.
  */
-export const HYBRID_STT_CONFIDENCE_THRESHOLD = hybridDefaults.sttConfidenceThreshold;
+export const HYBRID_STT_CONFIDENCE_THRESHOLD = confidenceCascadeDefaults().threshold;
 
 /** Cascade constructor. */
 export const Cascades = {
@@ -123,13 +119,14 @@ export const Cascades = {
 
 /**
  * The full routing policy attached to a model pair: filters (AND-composed), an
- * optional cascade, and a rank. Defaults to "prefer local, fall back to online
- * on hard failure" (`preferLocalFirst`, no filters or cascade).
+ * optional cascade, and a rank preference. Defaults to "prefer local, fall back
+ * to online on hard failure" (`preferLocal: true`, no filters or cascade).
  */
 export interface HybridRoutingPolicy {
   hardFilters?: HybridFilter[];
   cascade?: HybridCascade;
-  rank?: HybridRank;
+  /** Prefer the local (offline) candidate first. Defaults to true. */
+  preferLocal?: boolean;
 }
 
 /** The custom filters in a policy, with their registered name + predicate. */
@@ -145,8 +142,6 @@ function filterToProto(filter: HybridFilter): HybridFilterProto {
   switch (filter.kind) {
     case 'network':
       return { network: true } as HybridFilterProto;
-    case 'quality':
-      return { qualityTier: filter.tier } as HybridFilterProto;
     case 'battery':
       return {
         battery: { minBatteryPercent: filter.minPercent },
@@ -163,15 +158,26 @@ function filterToProto(filter: HybridFilter): HybridFilterProto {
  * `rac_stt_hybrid_router_set_policy_proto`. Pure: no FFI, no state. The custom
  * filters' predicates are NOT encoded — only their name/description cross the
  * wire; the router resolves the predicate via the commons callback table.
+ *
+ * The boolean `preferLocal` is deleted from the wire outright, replaced by
+ * `HybridInferenceMode` (Firebase AI Logic / Android `InferenceMode`
+ * vocabulary): `PREFER_IN_CLOUD` ranks online first, everything else
+ * (including the proto3 zero, `UNSPECIFIED`) ranks on-device first — see
+ * `rac_stt_hybrid_router_proto.cpp`'s `parse_policy`. The public
+ * `preferLocal` knob and its `true` default are kept unchanged; only the
+ * internal wire mapping inverts through `mode`.
  */
 export function encodeHybridRoutingPolicy(policy: HybridRoutingPolicy): ArrayBuffer {
+  const preferLocal = policy.preferLocal ?? true;
   const message = HybridRoutingPolicyProto.fromPartial({
     hardFilters: (policy.hardFilters ?? []).map(filterToProto),
     cascade:
       policy.cascade != null
         ? { confidence: { threshold: policy.cascade.threshold } }
         : undefined,
-    rank: policy.rank ?? HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
+    mode: preferLocal
+      ? HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE
+      : HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD,
   });
   return encodeProtoMessage(message, HybridRoutingPolicyProto);
 }

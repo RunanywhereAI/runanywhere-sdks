@@ -12,83 +12,26 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-message HardwareProfile {
-  string chip = 1;
-  bool has_neural_engine = 2;
-  string acceleration_mode = 3; // "ane", "gpu", "cpu"
-  uint64 total_memory_bytes = 4;
-  uint32 core_count = 5;
-  uint32 performance_cores = 6;
-  uint32 efficiency_cores = 7;
-  string architecture = 8; // "arm64", "x86_64"
-  string platform = 9; // "ios", "android", "web", "macos", "linux", "windows"
-  NPUChip npu_chip = 10; // resolved NPU vendor family (commons-classified)
-}
-
 // ---------------------------------------------------------------------------
-// Hardware acceleration preference for inference. Canonical single enum —
-// previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
-// file and `AccelerationPreference` in model_types.proto. Consolidated here
-// because it is a pure hardware concept and
-// hardware_profile.proto has no imports (model_types.proto already imports
-// this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
-//   Web    enums.ts:165   (Auto / WebGPU / CPU)
-//   Swift  extensions     (CPU / GPU / NPU / Metal)
-//   Kotlin enum           (CPU / GPU / NPU / Vulkan)
-// Canonicalized union below.
+// Hardware acceleration preference for inference. Device CLASS, not graphics
+// API. A hint, never a hard requirement — the runtime may fall back.
+// UNSPECIFIED means "you choose".
+//
+// Canonical single enum. It lives in this file rather than model_types.proto
+// because model_types.proto already imports this file; placing it here avoids
+// a cyclic import.
 // ---------------------------------------------------------------------------
 enum AccelerationPreference {
-  ACCELERATION_PREFERENCE_UNSPECIFIED = 0;
-  ACCELERATION_PREFERENCE_AUTO        = 1;
+  ACCELERATION_PREFERENCE_UNSPECIFIED = 0;  // let the runtime choose
+  ACCELERATION_PREFERENCE_AUTO        = 1;  // DEPRECATED: alias of UNSPECIFIED
   ACCELERATION_PREFERENCE_CPU         = 2;
-  ACCELERATION_PREFERENCE_GPU         = 3;
+  ACCELERATION_PREFERENCE_GPU         = 3;  // covers Metal / Vulkan / WebGPU
   ACCELERATION_PREFERENCE_NPU         = 4;
-  ACCELERATION_PREFERENCE_WEBGPU      = 5;
-  ACCELERATION_PREFERENCE_METAL       = 6;
-  ACCELERATION_PREFERENCE_VULKAN      = 7;
+  // WEBGPU / METAL / VULKAN were removed: they are spellings of GPU, not
+  // device classes. The concrete API is the runtime's choice; pass vendor
+  // knobs as engine options instead.
 }
 
-message AcceleratorInfo {
-  string name = 1;
-  AccelerationPreference type = 2;
-  bool available = 3;
-}
-
-message HardwareProfileResult {
-  HardwareProfile profile = 1;
-  repeated AcceleratorInfo accelerators = 2;
-}
-
-// Empty request for the cached hardware profile. The native probe is owned by
-// platform adapters; this request carries no portable parameters today.
-message HardwareProfileRequest {
-}
-
-// Empty request for the accelerator list. Mirrors HardwareProfileRequest:
-// platform probes own all OS-level acceleration discovery.
-message HardwareAcceleratorsRequest {
-}
-
-// Result-shaped response for SetAcceleratorPreference so the service contract
-// stays consistent (every rpc returns a non-empty message).
-message HardwareAcceleratorPreferenceRequest {
-  AccelerationPreference preference = 1;
-}
-
-message HardwareAcceleratorPreferenceResult {
-  bool   success       = 1;
-  string error_message = 2;
-}
-
-// Logical hardware service contract. Mirrors the C ABI in
-// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
-//   - rac_hardware_profile_get → GetProfile
-//   - rac_hardware_get_accelerators → GetAccelerators
-//   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
-//
-// Native device probes (chip detection, neural engine queries, GPU
-// discovery, memory/cores) remain platform-adapter owned. C++ caches and
-// serves the normalized HardwareProfile/AcceleratorInfo messages.
 // Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
 // (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
 // rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number
@@ -103,29 +46,21 @@ enum HexagonArch {
   HEXAGON_ARCH_V81 = 81;
 }
 
+// The single NPU-capability description in this IDL. Static device
+// description lives in exactly one other place: device_info.proto's
+// DeviceInfo.
 message NpuCapability {
   // Vendor SoC model (e.g. "SM8750"); empty when unknown.
   string soc_model = 1;
-  // /sys/devices/soc0/soc_id value; -1 when unavailable.
-  int32 soc_id = 2;
+  // /sys/devices/soc0/soc_id value. ABSENT when unavailable — never a -1 or 0
+  // sentinel; a default-constructed message is already "unavailable".
+  optional int32 soc_id = 2;
   HexagonArch hexagon_arch = 3;
-  // True iff hexagon_arch is in the device-validated QHexRT-supported set
-  // (v75, v79, or v81 today).
-  bool qhexrt_supported = 4;
-  // rac_qhexrt_arch_name(): "v68" ... "v81", "unknown". Materialized so
-  // SDKs never re-derive the display name from the enum.
-  string arch_name = 5;
-}
-
-// Empty request for the NPU probe; mirrors HardwareProfileRequest.
-message NpuProbeRequest {
-}
-
-service Hardware {
-  rpc GetProfile(HardwareProfileRequest) returns (HardwareProfileResult);
-  rpc GetAccelerators(HardwareAcceleratorsRequest) returns (HardwareProfileResult);
-  rpc SetAcceleratorPreference(HardwareAcceleratorPreferenceRequest)
-      returns (HardwareAcceleratorPreferenceResult);
-  // Pre-flight Hexagon NPU capability (rac_qhexrt_probe_proto).
-  rpc ProbeNpu(NpuProbeRequest) returns (NpuCapability);
+  // True iff this accelerator generation is in the device-validated supported
+  // set (Hexagon v75/v79/v81 today). Engine-agnostic on purpose: a second NPU
+  // engine must not require a second boolean.
+  bool supported = 4;
+  // NPU vendor family. Re-homed here so a non-Qualcomm device gets a
+  // meaningful answer instead of an empty message.
+  NPUChip npu = 5;
 }

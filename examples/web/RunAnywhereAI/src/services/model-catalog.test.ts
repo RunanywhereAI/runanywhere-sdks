@@ -11,6 +11,70 @@ import {
   webSizeCompatibility,
 } from './model-catalog';
 
+describe('Web catalog integrity', () => {
+  it('registers every catalog id exactly once', () => {
+    // `registerModelCatalog()` iterates CATALOG and registers each entry, so a
+    // repeated id silently overwrites the earlier registration and makes the
+    // `registered === CATALOG.length` check meaningless. Four Bonsai rows were
+    // duplicated this way.
+    const ids = getCatalog().map(({ id }) => id);
+    const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
+
+    expect(duplicates).toEqual([]);
+    expect(new Set(ids).size).toBe(getCatalog().length);
+  });
+
+  it('keeps one quantization per llama.cpp model', () => {
+    // Two quants of the same model cost a catalog slot and a "which one?"
+    // decision without adding a capability. lfm2-350m-q8_0 is the row this
+    // rule drops (the file header documents the omission).
+    expect(getCatalog().some(({ id }) => id === 'lfm2-350m-q8_0')).toBe(false);
+    expect(getCatalog().some(({ id }) => id === 'lfm2-350m-q4_k_m')).toBe(true);
+  });
+
+  it('registers the LFM2.5 230M Q4_K_M row and clears the WASM32 gate', () => {
+    const model = getCatalog().find(({ id }) => id === 'lfm2.5-230m-q4_k_m');
+
+    expect(model).toMatchObject({
+      name: 'LiquidAI LFM2.5 230M Q4_K_M',
+      category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      format: ModelFormat.MODEL_FORMAT_GGUF,
+      downloadSizeBytes: 153_406_304,
+      memoryRequiredBytes: 190_000_000,
+      downloadUrl:
+        'https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/main/LFM2.5-230M-Q4_K_M.gguf',
+    });
+    expect(model && webModelCompatibility(model)).toEqual({ supported: true });
+  });
+
+  it('keeps the four PrismML Bonsai 1-bit rows with vendor-and-quant names', () => {
+    const bonsai = getCatalog().filter(({ id }) => id.startsWith('bonsai-'));
+
+    expect(bonsai.map(({ id }) => id)).toEqual([
+      'bonsai-1.7b-q1_0',
+      'bonsai-4b-q1_0',
+      'bonsai-8b-q1_0',
+      'bonsai-27b-q1_0',
+    ]);
+    for (const entry of bonsai) {
+      expect(entry.name).toMatch(/^PrismML Bonsai .* 1-bit Q1_0/);
+      expect(entry.supportsThinking).toBe(true);
+    }
+
+    // Only the 27B flagship is WASM32-gated; the other three run in-browser.
+    for (const entry of bonsai.filter(({ id }) => id !== 'bonsai-27b-q1_0')) {
+      expect(webModelCompatibility(entry)).toEqual({ supported: true });
+    }
+    const flagship = bonsai.find(({ id }) => id === 'bonsai-27b-q1_0');
+    expect(flagship && webModelCompatibility(flagship)).toMatchObject({
+      supported: false,
+      code: WebModelCompatibilityCode.WASM32_ADDRESS_SPACE,
+      actionLabel: 'Too large for Web WASM',
+    });
+  });
+});
+
 describe('NVIDIA Web catalog support', () => {
   it('catalogs but rejects Nemotron Mini before its simultaneous WASM32 footprint is downloaded', () => {
     const model = getCatalog().find(

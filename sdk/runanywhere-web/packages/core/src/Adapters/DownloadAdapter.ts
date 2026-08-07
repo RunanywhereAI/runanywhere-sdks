@@ -4,8 +4,6 @@ import {
   DownloadPlanRequest,
   DownloadPlanResult,
   DownloadProgress,
-  DownloadResumeRequest,
-  DownloadResumeResult,
   DownloadStartRequest,
   DownloadStartResult,
   DownloadSubscribeRequest,
@@ -14,8 +12,6 @@ import {
   type DownloadPlanRequest as ProtoDownloadPlanRequest,
   type DownloadPlanResult as ProtoDownloadPlanResult,
   type DownloadProgress as ProtoDownloadProgress,
-  type DownloadResumeRequest as ProtoDownloadResumeRequest,
-  type DownloadResumeResult as ProtoDownloadResumeResult,
   type DownloadStartRequest as ProtoDownloadStartRequest,
   type DownloadStartResult as ProtoDownloadStartResult,
   type DownloadSubscribeRequest as ProtoDownloadSubscribeRequest,
@@ -43,11 +39,6 @@ export interface DownloadModule extends ProtoWasmModule {
     outResult: number,
   ): number;
   _rac_download_cancel_proto?(
-    requestBytes: number,
-    requestSize: number,
-    outResult: number,
-  ): number;
-  _rac_download_resume_proto?(
     requestBytes: number,
     requestSize: number,
     outResult: number,
@@ -127,19 +118,6 @@ export class DownloadAdapter {
     );
   }
 
-  resume(request: ProtoDownloadResumeRequest): ProtoDownloadResumeResult | null {
-    if (!this.ensureExports('resume', ['_rac_download_resume_proto'])) return null;
-    return this.bridge().withEncodedRequest(
-      request,
-      DownloadResumeRequest,
-      DownloadResumeResult,
-      (requestPtr, requestSize, outResult) => (
-        this.module._rac_download_resume_proto!(requestPtr, requestSize, outResult)
-      ),
-      'rac_download_resume_proto',
-    );
-  }
-
   poll(request: ProtoDownloadSubscribeRequest): ProtoDownloadProgress | null {
     if (!this.ensureExports('poll', ['_rac_download_progress_poll_proto'])) return null;
     return this.bridge().withEncodedRequest(
@@ -197,7 +175,6 @@ export class DownloadAdapter {
       '_rac_download_plan_proto',
       '_rac_download_start_proto',
       '_rac_download_cancel_proto',
-      '_rac_download_resume_proto',
       '_rac_download_progress_poll_proto',
     ];
     return [

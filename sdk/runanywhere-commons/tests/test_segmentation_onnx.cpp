@@ -190,9 +190,13 @@ bool valid_fixture_result(const runanywhere::v1::SegmentationResult& result, uin
             return false;
         }
     }
+    // SegmentationClassSummary.fraction was deleted -- derivable as
+    // pixel_count / (width * height); commons no longer wires a setter.
     const auto& summary = result.class_summaries(0);
+    const float derived_fraction = static_cast<float>(summary.pixel_count()) /
+                                   static_cast<float>(pixels);
     return summary.class_id() == 149 && summary.pixel_count() == pixels &&
-           summary.fraction() == 1.0f && summary.label() == "class_149";
+           derived_fraction == 1.0f && summary.label() == "class_149";
 }
 
 struct OperationGate {
@@ -332,7 +336,7 @@ int main() {
         model.set_format(runanywhere::v1::MODEL_FORMAT_ONNX);
         model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_ONNX);
         model.set_local_path(RAC_SEGMENTATION_FIXTURE_DIR);
-        model.set_is_downloaded(true);
+        model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
         model.set_is_available(true);
         std::string model_bytes;
         CHECK(model.SerializeToString(&model_bytes) &&
@@ -354,7 +358,7 @@ int main() {
             load_rc == RAC_SUCCESS &&
             load_result.ParseFromArray(lifecycle_output.data,
                                        static_cast<int>(lifecycle_output.size)) &&
-            load_result.success() && load_result.model_id() == model.id();
+            !load_result.has_error() && load_result.model_id() == model.id();
         CHECK(lifecycle_loaded,
               "canonical model lifecycle loads the real ONNX segmentation fixture");
         rac_proto_buffer_free(&lifecycle_output);
@@ -393,7 +397,7 @@ int main() {
                       valid_fixture_result(in_flight_result, kWidth, kHeight, model.id().c_str()),
                   "admitted handle-free inference completes with the canonical model");
             CHECK(unload.wait_for(2s) == std::future_status::ready && unload.get() &&
-                      unload_rc == RAC_SUCCESS && unload_result.success() &&
+                      unload_rc == RAC_SUCCESS && !unload_result.has_error() &&
                       unload_result.unloaded_model_ids_size() == 1 &&
                       unload_result.unloaded_model_ids(0) == model.id(),
                   "canonical lifecycle unload completes after the global lease drains");

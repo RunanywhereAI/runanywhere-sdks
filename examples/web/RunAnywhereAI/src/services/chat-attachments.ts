@@ -1,14 +1,12 @@
 import {
   ModelCategory,
   RunAnywhere,
-  VLMModelFamily,
-  VLMStreamEventKind,
-  ragQueryOptionsWithQuestion,
+  type LlmOptions,
+  type Match,
   type ModelInfo,
-  type RAGSearchResult,
-  type VLMGenerationOptions,
-  vlmImageFromRawRGB,
+  type RagSession,
 } from '@runanywhere/web';
+import { findLoadedModelForCategory } from '../components/model-selection';
 
 export type ChatAttachmentKind = 'image' | 'document';
 
@@ -38,6 +36,8 @@ const DOCUMENT_TOP_K = 3;
 const MAX_IMAGE_ATTACHMENT_BYTES = 12 * 1024 * 1024;
 const MAX_DOCUMENT_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 let activeDocumentCancellation: AbortController | null = null;
+let activeImageStream: AsyncIterator<unknown> | null = null;
+let activeDocumentSession: RagSession | null = null;
 
 export function validateChatAttachmentFile(kind: ChatAttachmentKind, file: File): string | null {
   const limit = kind === 'image' ? MAX_IMAGE_ATTACHMENT_BYTES : MAX_DOCUMENT_ATTACHMENT_BYTES;
@@ -46,31 +46,20 @@ export function validateChatAttachmentFile(kind: ChatAttachmentKind, file: File)
 }
 
 export function canAnswerImageAttachment(): boolean {
-  try {
-    const categories = [
-      ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-      ModelCategory.MODEL_CATEGORY_VISION,
-    ];
-    return categories.some((category) => {
-      const current = RunAnywhere.currentModel({
-        category,
-        includeModelMetadata: false,
-      });
-      return Boolean(current?.found || current?.modelId);
-    });
-  } catch {
-    return false;
-  }
+  return findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_MULTIMODAL) !== null
+    || findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_VISION) !== null;
 }
 
 export function cancelActiveImageAttachmentAnswer(): void {
-  void RunAnywhere.visionLanguage.cancelVLMGeneration();
+  // Abandoning the iterator is the cancellation contract for every v3 stream.
+  void activeImageStream?.return?.();
+  activeImageStream = null;
 }
 
 export function cancelActiveDocumentAttachmentAnswer(): void {
   activeDocumentCancellation?.abort();
-  RunAnywhere.cancelGeneration();
-  void RunAnywhere.ragDestroyPipeline().catch(() => undefined);
+  void activeDocumentSession?.close().catch(() => undefined);
+  activeDocumentSession = null;
 }
 
 export async function answerImageAttachment(
@@ -83,44 +72,28 @@ export async function answerImageAttachment(
   onProgress({ content: 'Reading image...' });
 
   const frame = await decodeImageToRgbFrame(file, CAPTURE_DIMENSION);
-  const image = vlmImageFromRawRGB(frame.rgbPixels, frame.width, frame.height);
-  const options: VLMGenerationOptions = {
-    prompt,
-    maxTokens: 256,
-    temperature: settings.temperature,
-    topP: 0.9,
-    topK: 40,
-    stopSequences: [],
-    streamingEnabled: true,
-    systemPrompt: undefined,
-    maxImageSize: CAPTURE_DIMENSION,
-    nThreads: 0,
-    useGpu: false,
-    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
-    customChatTemplate: undefined,
-    imageMarkerOverride: undefined,
-    seed: 0,
-    repetitionPenalty: 1.1,
-    minP: 0.05,
-    emitImageEmbeddings: false,
-  };
+  const image = RunAnywhere.ImageInput.rawRgb(frame.rgbPixels, frame.width, frame.height);
 
   let content = '';
   onProgress({ content });
-  const stream = await RunAnywhere.visionLanguage.processImageStream(image, options);
-  for await (const event of stream) {
-    switch (event.kind) {
-      case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN:
-        if (event.token) {
-          content += event.token;
-          onProgress({ content });
-        }
-        break;
-      case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR:
-        throw new Error(event.errorMessage || 'Image analysis failed');
-      default:
-        break;
+  const events = RunAnywhere.vlm.generateStream(image, prompt, {
+    maxOutputTokens: 256,
+    temperature: settings.temperature,
+    topP: 0.9,
+    topK: 40,
+  });
+  const iterator = events[Symbol.asyncIterator]();
+  activeImageStream = iterator;
+  try {
+    for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
+      const event = step.value;
+      if (event.type === 'textDelta') {
+        content += event.text;
+        onProgress({ content });
+      }
     }
+  } finally {
+    if (activeImageStream === iterator) activeImageStream = null;
   }
 
   return { content: content || '(empty response)' };
@@ -149,37 +122,43 @@ export async function answerDocumentAttachment(
       throw new Error('The selected document does not contain readable text.');
     }
 
-    await RunAnywhere.ragCreatePipeline(models.embedding.id, models.llm.id);
+    await activeDocumentSession?.close().catch(() => undefined);
+    const session = await RunAnywhere.rag.open(
+      { id: models.embedding.id },
+      { id: models.llm.id },
+      { topK: DOCUMENT_TOP_K },
+    );
+    activeDocumentSession = session;
     throwIfDocumentCancelled(cancellation.signal);
-    await RunAnywhere.ragIngest(text, JSON.stringify({
-      docId: createDocumentId(),
-      docName: file.name || 'Document',
-      sourceUri: `web-file:${file.name || 'document'}`,
-      mediaType: file.type || 'text/plain',
-      sizeBytes: String(file.size),
-    }));
+    await session.ingest({
+      text,
+      name: file.name || 'Document',
+      metadata: {
+        docId: createDocumentId(),
+        sourceUri: `web-file:${file.name || 'document'}`,
+        mediaType: file.type || 'text/plain',
+        sizeBytes: String(file.size),
+      },
+    });
     throwIfDocumentCancelled(cancellation.signal);
 
     onProgress({ content: 'Searching document...' });
 
-    const result = await RunAnywhere.ragQuery({
-      ...ragQueryOptionsWithQuestion(question),
-      retrievalTopK: DOCUMENT_TOP_K,
-      maxTokens: Math.min(settings.maxTokens, 1024),
+    const generation: LlmOptions = {
+      maxOutputTokens: Math.min(settings.maxTokens, 1024),
       temperature: settings.temperature,
-      disableThinking: models.llm.supportsThinking && !settings.thinkingModeEnabled,
-    });
+      reasoning: models.llm.supportsThinking && !settings.thinkingModeEnabled
+        ? { mode: 'off' }
+        : { mode: 'on', includeInOutput: true },
+    };
+    const result = await session.query(question, { generation });
     throwIfDocumentCancelled(cancellation.signal);
-
-    if (result.errorCode !== 0) {
-      throw new Error(result.errorMessage || 'Document query failed');
-    }
 
     const split = splitThinking(result.answer);
     return {
       content: split.content || result.answer || '(no answer)',
-      thinking: result.thinkingContent || split.thinking || undefined,
-      sources: result.retrievedChunks.map(sourceFromRAGResult),
+      thinking: split.thinking || undefined,
+      sources: result.sources.map(sourceFromMatch),
     };
   } catch (error) {
     if (cancellation.signal.aborted) {
@@ -188,6 +167,10 @@ export async function answerDocumentAttachment(
     throw error;
   } finally {
     if (activeDocumentCancellation === cancellation) activeDocumentCancellation = null;
+    if (activeDocumentSession) {
+      await activeDocumentSession.close().catch(() => undefined);
+      activeDocumentSession = null;
+    }
   }
 }
 
@@ -201,38 +184,21 @@ function assertChatAttachmentFileSize(kind: ChatAttachmentKind, file: File): voi
 }
 
 function resolveRAGModels(): { embedding: ModelInfo | null; llm: ModelInfo | null } {
-  const embedding = firstModelForCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING);
-  const currentLlmId = currentModelIdForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
-  const llm = currentLlmId
-    ? (RunAnywhere.getModel(currentLlmId) ?? null)
-    : firstModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
-  return { embedding, llm };
+  return {
+    embedding: firstModelForCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING),
+    llm: findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)
+      ?? firstModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE),
+  };
 }
 
 function firstModelForCategory(category: ModelCategory): ModelInfo | null {
-  try {
-    return RunAnywhere.listModels()?.models.find((model) => model.category === category) ?? null;
-  } catch {
-    return null;
-  }
+  return RunAnywhere.models.list({ category })[0] ?? null;
 }
 
-function currentModelIdForCategory(category: ModelCategory): string | null {
-  try {
-    const current = RunAnywhere.currentModel({
-      category,
-      includeModelMetadata: false,
-    });
-    return current?.modelId || null;
-  } catch {
-    return null;
-  }
-}
-
-function sourceFromRAGResult(result: RAGSearchResult): ChatAttachmentSource {
+function sourceFromMatch(match: Match): ChatAttachmentSource {
   return {
-    document: result.sourceDocument || 'Document',
-    text: result.text,
+    document: match.metadata.docName || match.metadata.sourceUri || 'Document',
+    text: match.text,
   };
 }
 

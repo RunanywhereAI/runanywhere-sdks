@@ -196,11 +196,13 @@ Defined in `tsconfig.json`:
 
 ## Key SDK API Imports
 
-From `@runanywhere/core`: `RunAnywhere` and `SDKEnvironment`.
+From `@runanywhere/core`: `RunAnywhere`, `SDKEnvironment`, the v3 public types (`LlmOptions`, `GenerationResult`, `Transcription`, `DownloadEvent`, `VoiceEvent`, …), the input factories `AudioInputs` / `ImageInputs`, and the helpers `formatFramework`, `AudioConvert`, `AudioCaptureManager`, `AudioPlaybackManager`, `createPushableAudioStream`, `SDKException`.
 
-Generated DTOs/enums come directly from `@runanywhere/proto-ts/*`: `ModelCategory`, `InferenceFramework`, `ModelArtifactType`, `ModelLoadRequest`, `CurrentModelRequest`, `StorageDeleteRequest`, `STTLanguage`, `VLMImageFormat`, `ToolParameterType`, and related modality options.
+Every capability is reached through a namespace: `RunAnywhere.llm`, `.vlm`, `.stt`, `.tts`, `.vad`, `.embeddings`, `.rerank`, `.images`, `.diarization`, `.segmentation`, `.voice`, `.rag`, `.models`, `.lora`, plus the platform namespaces `.storage`, `.logging`, `.auth`, `.pluginLoader`, `.solutions`. Options and results use the spec names, so do not reach for the proto request/result messages in app code.
 
-Backend packages are optional registration adapters. Do not add new example code that imports deleted local framework/modality DTOs or backend-specific model-registration APIs. Register example models through `RunAnywhere.registerModel()` / `RunAnywhere.registerMultiFileModel()` using generated proto enum values.
+Generated enums still come from `@runanywhere/proto-ts/*`: `ModelCategory`, `InferenceFramework`, `ModelInfo`, `ToolDefinition`, `ToolParameterType`, `ModelArtifactType`.
+
+Backend packages are optional registration adapters. Register example models through `RunAnywhere.models.register()` (one builder for single-url, archive, and multi-file rows) using generated proto enum values.
 
 From `@runanywhere/llamacpp`: `LlamaCPP.register()` for optional backend registration.
 
@@ -208,16 +210,16 @@ From `@runanywhere/onnx`: `ONNX.register()`
 
 From `@runanywhere/qhexrt`: `QHexRT.register()` (optional, Android/Snapdragon only)
 
-From `@runanywhere/proto-ts`: `AudioFormat`, `PipelineState`, `VADStreamEventKind`, `VoiceEvent`
+Voice sessions are SDK-owned: `RunAnywhere.voice.createSession(...)` captures the microphone, segments turns, and plays replies, so the app no longer drives a mic driver or maps the proto `VoiceEvent` oneof.
 
 ## Platform-Specific Behavior
 
 - **iOS TTS**: Uses `NativeModules.NativeAudioModule` (AVSpeechSynthesizer) for system TTS, and ONNX synthesis + WAV file creation for model TTS
 - **Android TTS**: Uses lazy-loaded `react-native-tts` for system TTS, lazy-loaded `react-native-sound` for ONNX WAV playback
 - **iOS STT recording**: `NativeAudioModule.startRecording()` via AVFoundation
-- **Android STT recording**: native/example audio recorder plus `RunAnywhere.transcribe()`
-- **iOS streaming generation**: Manual async iteration of `RunAnywhere.generateStream()`
-- **Android streaming generation**: Falls back to non-streaming `RunAnywhere.generate()` in ChatScreen
+- **Android STT recording**: native/example audio recorder plus `RunAnywhere.stt.transcribe()`
+- **iOS streaming generation**: Manual async iteration of `RunAnywhere.llm.generateStream()`
+- **Android streaming generation**: Falls back to non-streaming `RunAnywhere.llm.generate()` in ChatScreen
 - **QHexRT NPU backend**: Android-only; model registration uses SDK QNN-context metadata and native arch resolution
 
 ## After Modifying the SDK

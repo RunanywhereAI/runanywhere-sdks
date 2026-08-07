@@ -15,14 +15,14 @@
  */
 
 import { streamFactory, type StreamTransport } from "./_streamFactory";
-import type { VoiceAgentRequest } from "../voice_agent_service";
+import type { VoiceAgentTurnRequest } from "../voice_agent_service";
 import type { VoiceEvent } from "../voice_events";
 
-export interface VoiceAgentStreamTransport extends StreamTransport<VoiceAgentRequest, VoiceEvent> {}
+export interface VoiceAgentStreamTransport extends StreamTransport<VoiceAgentTurnRequest, VoiceEvent> {}
 
 export function streamVoiceAgent(
     transport: VoiceAgentStreamTransport,
-    req: VoiceAgentRequest,
+    req: VoiceAgentTurnRequest,
 ): AsyncIterable<VoiceEvent> {
     return streamFactory(transport, req);
 }

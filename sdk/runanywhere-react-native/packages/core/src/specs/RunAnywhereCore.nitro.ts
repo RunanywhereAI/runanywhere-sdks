@@ -33,6 +33,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * - @runanywhere/mlx for Apple MLX inference
  * - @runanywhere/onnx for speech processing (STT, TTS, VAD)
  */
+
 export interface RunAnywhereCore extends HybridObject<{
   ios: 'c++';
   android: 'c++';
@@ -524,6 +525,14 @@ export interface RunAnywhereCore extends HybridObject<{
     onEventBytes: (eventBytes: ArrayBuffer) => void
   ): Promise<void>;
 
+  /**
+   * Report the lifecycle-loaded STT service's state
+   * (`rac_stt_state_lifecycle_proto`) as serialized
+   * `runanywhere.v1.STTServiceState` bytes. Succeeds with `isReady=false`
+   * when no STT model is loaded.
+   */
+  sttStateProto(): Promise<ArrayBuffer>;
+
   // ============================================================================
   // STT Streaming Session (live partials)
   // Mirrors Swift CppBridge+STT.swift `transcribeSessionStream`:
@@ -816,6 +825,14 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<void>;
   ttsStopProto(): Promise<ArrayBuffer>;
 
+  /**
+   * Report the lifecycle-loaded TTS service's state
+   * (`rac_tts_state_lifecycle_proto`) as serialized
+   * `runanywhere.v1.TTSServiceState` bytes. Succeeds with `isReady=false`
+   * when no voice is loaded.
+   */
+  ttsStateProto(): Promise<ArrayBuffer>;
+
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VAD.swift - calls lifecycle proto APIs.
@@ -871,6 +888,44 @@ export interface RunAnywhereCore extends HybridObject<{
   vlmCancelProto(): Promise<ArrayBuffer>;
 
   // ============================================================================
+  // Computer-Use Agent (CUA) — profile-driven prompt/parse scaffold.
+  // Stateless, I/O-free (no model handle): pairs with the VLM inference calls
+  // above. Backed by rac_cua_system_prompt / rac_cua_parse_action_proto. Pure
+  // CPU string work, so both are synchronous (mirrors Swift's sync
+  // RunAnywhere.CUA and the sync framework/model-role lookups above). "fara" is
+  // the only built-in profile today; adding models is a new commons profile,
+  // not new API.
+  // ============================================================================
+
+  /**
+   * Render `profileId`'s system prompt for a declared coordinate space
+   * (`displayWidth` x `displayHeight`). Returns the full prompt string, or an
+   * empty string when the profile is unknown. Backed by
+   * `rac_cua_system_prompt`.
+   */
+  cuaSystemPrompt(
+    profileId: string,
+    displayWidth: number,
+    displayHeight: number
+  ): string;
+
+  /**
+   * Parse a CUA model's raw output, rescaling coordinates from the profile's
+   * model space to `viewportWidth` x `viewportHeight`. Returns the serialized
+   * `runanywhere.v1.CuaAction` bytes (the TS facade decodes them — the same
+   * proto-byte bridging every other modality uses; inspect `parseOk` for
+   * whether a valid tool call was found). Throws for an unknown profile, which
+   * the TS facade maps to `null` (Swift returns nil). Backed by
+   * `rac_cua_parse_action_proto`.
+   */
+  cuaParseAction(
+    profileId: string,
+    modelOutput: string,
+    viewportWidth: number,
+    viewportHeight: number
+  ): ArrayBuffer;
+
+  // ============================================================================
   // Diffusion Capability (Image Generation — Apple / CoreML only)
   // Uses the commons lifecycle-owned diffusion proto ABI. The model is loaded
   // through the canonical lifecycle (modelLifecycleLoadProto with
@@ -889,6 +944,52 @@ export interface RunAnywhereCore extends HybridObject<{
    * `rac_diffusion_generate_lifecycle_proto`.
    */
   diffusionGenerateLifecycleProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // Diarization / Segmentation / Rerank Capabilities
+  //
+  // Diarization and segmentation publish handle-free `*_lifecycle_proto` verbs
+  // whose commons resolver reads the global loaded-model store, like VLM and
+  // diffusion. Rerank ships only the handle-scoped
+  // `rac_rerank_component_rerank_proto`, whose lifecycle acquire is
+  // owner-scoped, so the bridge owns a rerank component handle and loads the
+  // caller-resolved model into it before scoring. Mirrors Kotlin
+  // `CppBridgeDiarization` / `CppBridgeSegmentation` / `CppBridgeRerank`.
+  // ============================================================================
+
+  /**
+   * Diarize one buffer from serialized runanywhere.v1.DiarizationRequest bytes
+   * using the lifecycle-loaded speaker-diarization model. Returns serialized
+   * runanywhere.v1.DiarizationResult bytes. Backed by
+   * `rac_diarization_diarize_lifecycle_proto`.
+   */
+  diarizationDiarizeLifecycleProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Segment one image from serialized runanywhere.v1.SegmentationRequest bytes
+   * using the lifecycle-loaded segmentation model. Returns serialized
+   * runanywhere.v1.SegmentationResult bytes. Backed by
+   * `rac_segmentation_segment_lifecycle_proto`.
+   */
+  segmentationSegmentLifecycleProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Score candidates from serialized runanywhere.v1.RerankRequest bytes with
+   * the cross-encoder model at `modelPath`, returning serialized
+   * runanywhere.v1.RerankResult bytes. The bridge loads the model into its
+   * rerank component handle first (same-model re-load is a no-op), then calls
+   * `rac_rerank_component_rerank_proto`.
+   */
+  rerankProto(
+    modelPath: string,
+    modelId: string,
+    modelName: string,
     requestBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
 
@@ -970,21 +1071,16 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Stream raw mic frames into the in-core voice agent via the commons
-   * `rac_voice_agent_feed_audio_proto` ABI. The core performs energy-based
-   * utterance segmentation and runs the STT -> LLM -> TTS turn pipeline itself;
-   * there is NO SDK-side VAD. Each call returns a serialized
-   * `runanywhere.v1.VoiceAgentResult`: empty (zero-length) while the utterance
-   * is still open, non-empty (with `synthesizedAudio`) on the call that closes a
-   * turn. `isFinal` flushes the in-progress utterance. Mirrors the iOS Swift /
-   * Kotlin drivers' feed loop.
+   * `rac_voice_agent_feed_audio_proto` ABI. `frameBytes` is a serialized
+   * `runanywhere.v1.VoiceAgentAudioFrame` (audioData, sampleRate, channels,
+   * encoding, isFinal). The core performs energy-based utterance segmentation
+   * and runs the STT -> LLM -> TTS turn pipeline itself; there is NO SDK-side
+   * VAD. Each call returns a serialized `runanywhere.v1.VoiceAgentResult`:
+   * empty (zero-length) while the utterance is still open, non-empty (with
+   * `synthesizedAudio`) on the call that closes a turn. `isFinal` flushes the
+   * in-progress utterance. Mirrors the iOS Swift / Kotlin drivers' feed loop.
    */
-  voiceAgentFeedAudioProto(
-    audioBytes: ArrayBuffer,
-    sampleRateHz: number,
-    channels: number,
-    encoding: number,
-    isFinal: boolean
-  ): Promise<ArrayBuffer>;
+  voiceAgentFeedAudioProto(frameBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   // ============================================================================
   // Tool Calling Capability
@@ -1052,7 +1148,11 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   toolRunLoopProtoWithHandle(
     requestBytes: ArrayBuffer,
-    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>,
+    // The executor returns the ToolResult bytes as base64. A JS-created
+    // ArrayBuffer is thread-affine (its data() is JS-thread-only), but the
+    // native run loop reads the result on a background thread; a base64 string
+    // is value-copied across the bridge, so it is safe to decode off-thread.
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<string>,
     onHandle: (runLoopHandle: number) => void
   ): Promise<ArrayBuffer>;
 
@@ -1112,6 +1212,8 @@ export interface RunAnywhereCore extends HybridObject<{
   ragDestroyPipelineProto(): Promise<boolean>;
   ragIngestProto(documentBytes: ArrayBuffer): Promise<ArrayBuffer>;
   ragQueryProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  /** Retrieval-only: RAGSearchRequest bytes → RAGSearchResponse bytes. */
+  ragSearchProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   ragQueryStreamProto(
     queryBytes: ArrayBuffer,
     onEventBytes: (eventBytes: ArrayBuffer) => void

@@ -9,6 +9,9 @@ import SwiftUI
 import Foundation
 import RunAnywhere
 import os
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Tool Settings View Model
 
@@ -81,7 +84,7 @@ class ToolSettingsViewModel: ObservableObject {
                     name: "get_weather",
                     description: "Gets the current weather for a given location using Open-Meteo API",
                     parameters: [
-                        RAToolParameter(
+                        ToolParameter(
                             name: "location",
                             type: .string,
                             description: "City name (e.g., 'San Francisco', 'London', 'Tokyo')"
@@ -149,7 +152,7 @@ class ToolSettingsViewModel: ObservableObject {
                     name: "calculate",
                     description: "Performs math calculations. Supports +, -, *, /, and parentheses",
                     parameters: [
-                        RAToolParameter(
+                        ToolParameter(
                             name: "expression",
                             type: .string,
                             description: "Math expression (e.g., '2 + 2 * 3', '(10 + 5) / 3')"
@@ -202,6 +205,49 @@ class ToolSettingsViewModel: ObservableObject {
                         "expression": RAToolValue(expression)
                     ]
                 }
+            ),
+            // Device Info Tool - manufacturer, model and OS version.
+            (
+                definition: RAToolDefinition(
+                    name: "get_device_info",
+                    description: "Returns details about the device: manufacturer, model and OS version.",
+                    parameters: [],
+                    category: "Utility"
+                ),
+                executor: { _ in
+                    #if os(iOS)
+                    let model = UIDevice.current.model
+                    #elseif os(macOS)
+                    let model = "Mac"
+                    #endif
+                    return [
+                        "manufacturer": RAToolValue("Apple"),
+                        "model": RAToolValue(model),
+                        "os": RAToolValue(ProcessInfo.processInfo.operatingSystemVersionString)
+                    ]
+                }
+            ),
+            // Battery Level Tool - current charge as a percentage.
+            (
+                definition: RAToolDefinition(
+                    name: "get_battery_level",
+                    description: "Returns the current battery charge level as a percentage.",
+                    parameters: [],
+                    category: "Utility"
+                ),
+                executor: { _ in
+                    #if os(iOS)
+                    UIDevice.current.isBatteryMonitoringEnabled = true
+                    let level = UIDevice.current.batteryLevel
+                    return [
+                        "battery_percent": RAToolValue(
+                            level >= 0 ? "\(Int((level * 100).rounded()))%" : "unknown"
+                        )
+                    ]
+                    #else
+                    return ["battery_percent": RAToolValue("unknown")]
+                    #endif
+                }
             )
         ]
     }
@@ -218,7 +264,7 @@ class ToolSettingsViewModel: ObservableObject {
     }
 
     func refreshRegisteredTools() async {
-        registeredTools = await RunAnywhere.getRegisteredTools()
+        registeredTools = await RunAnywhere.llm.tools.list()
     }
 
     func registerBuiltInTools() async {
@@ -226,7 +272,7 @@ class ToolSettingsViewModel: ObservableObject {
         logger.info("Registered tool \(RunAnywhere.webSearchToolDefinition.name)")
 
         for tool in builtInTools {
-            await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
+            await RunAnywhere.llm.tools.register(tool.definition, executor: tool.executor)
             logger.info("Registered tool \(tool.definition.name)")
         }
         #if os(iOS)
@@ -241,7 +287,7 @@ class ToolSettingsViewModel: ObservableObject {
     }
 
     func clearAllTools() async {
-        await RunAnywhere.clearTools()
+        await RunAnywhere.llm.tools.clear()
         await refreshRegisteredTools()
     }
 
@@ -456,13 +502,14 @@ struct ToolRow: View {
                 .foregroundColor(AppColors.textSecondary)
                 .lineLimit(2)
 
-            if !tool.parameters.isEmpty {
+            let parameterNames = tool.parameterNames
+            if !parameterNames.isEmpty {
                 HStack(spacing: 4) {
                     Text("Params:")
                         .font(AppTypography.caption2)
                         .foregroundColor(AppColors.textSecondary)
-                    ForEach(tool.parameters, id: \.name) { param in
-                        Text(param.name)
+                    ForEach(parameterNames, id: \.self) { name in
+                        Text(name)
                             .font(AppTypography.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -473,6 +520,22 @@ struct ToolRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension RAToolDefinition {
+    /// `ToolDefinition.parameters` is now a single raw JSON-Schema object
+    /// string (idl/tool_calling.proto) rather than a typed parameter list --
+    /// read the `properties` object's keys for display, same as the JSON
+    /// Schema every OpenAI/Anthropic/MCP tool definition already publishes.
+    var parameterNames: [String] {
+        guard !parameters.isEmpty,
+              let data = parameters.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let properties = root["properties"] as? [String: Any] else {
+            return []
+        }
+        return properties.keys.sorted()
     }
 }
 

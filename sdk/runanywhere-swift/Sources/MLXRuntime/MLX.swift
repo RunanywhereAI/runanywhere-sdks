@@ -351,6 +351,11 @@ private struct MLXVLMOptionsSnapshot: Sendable {
     let minP: Float
     let repetitionPenalty: Float
     let seed: Int64
+    /// System prompt (options.system_prompt); nil when NULL/empty. MLX owns its
+    /// chat template, so — exactly like the LLM path — this must be rendered as
+    /// a `.system` message or it is silently lost. Computer-use agents carry
+    /// their whole contract (tool schema + output format) in here.
+    let systemPrompt: String?
 
     init(_ options: UnsafePointer<rac_vlm_options_t>?) {
         guard let options = options?.pointee else {
@@ -363,6 +368,7 @@ private struct MLXVLMOptionsSnapshot: Sendable {
             minP = defaults.min_p
             repetitionPenalty = defaults.repetition_penalty
             seed = defaults.seed
+            systemPrompt = nil
             return
         }
         maxTokens = options.max_tokens
@@ -372,6 +378,11 @@ private struct MLXVLMOptionsSnapshot: Sendable {
         minP = options.min_p
         repetitionPenalty = options.repetition_penalty
         seed = options.seed
+        if let sys = options.system_prompt.map({ String(cString: $0) }), !sys.isEmpty {
+            systemPrompt = sys
+        } else {
+            systemPrompt = nil
+        }
     }
 }
 
@@ -584,6 +595,9 @@ private final class MLXSession: @unchecked Sendable {
         var modelPath: String?
         var embeddingDimension = 0
         var isSynthesizing = false
+        /// Model's maximum context length (from `config.json`), read at load.
+        /// Drives the VLM image-resolution policy (`MLXVLMResolutionPolicy`).
+        var contextLength = 0
     }
 
     /// MLX's audio model protocols do not declare `Sendable`. The C++ MLX
@@ -657,12 +671,14 @@ private final class MLXSession: @unchecked Sendable {
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
         }
+        let modelContextLength = MLXModelConfig.contextLength(inDirectory: directory)
         lock.withLock {
             $0.isLoaded = true
             if resetCancellation {
                 $0.isCancelled = false
             }
             $0.modelPath = modelPath
+            $0.contextLength = modelContextLength
         }
         #endif
     }
@@ -682,10 +698,18 @@ private final class MLXSession: @unchecked Sendable {
     ) async throws -> MLXGenerationMetrics {
         let params = generateParameters(from: options)
         let input = llmUserInput(prompt: prompt, options: options)
-        return try await stream(input: input, parameters: params) { token in
+        let metrics = try await stream(input: input, parameters: params) { token in
             guard let callback else { return false }
-            return token.withCString { callback($0, userData.rawValue) == RAC_TRUE }
+            return token.withCString { callback($0, RAC_FALSE, nil, userData.rawValue) == RAC_TRUE }
         }
+        if let callback {
+            _ = "stop".withCString { reason in
+                "".withCString { empty in
+                    callback(empty, RAC_TRUE, reason, userData.rawValue)
+                }
+            }
+        }
+        return metrics
     }
 
     func process(
@@ -695,7 +719,12 @@ private final class MLXSession: @unchecked Sendable {
     ) async throws -> (String, MLXGenerationMetrics) {
         let image = try imageInput(from: image)
         let params = generateParameters(from: options)
-        return try await collectVLM(prompt: prompt, image: image, parameters: params)
+        return try await collectVLM(
+            prompt: prompt,
+            image: image,
+            parameters: params,
+            instructions: options.systemPrompt
+        )
     }
 
     func processStream(
@@ -707,7 +736,12 @@ private final class MLXSession: @unchecked Sendable {
     ) async throws -> MLXGenerationMetrics {
         let image = try imageInput(from: image)
         let params = generateParameters(from: options)
-        return try await streamVLM(prompt: prompt, image: image, parameters: params) { token in
+        return try await streamVLM(
+            prompt: prompt,
+            image: image,
+            parameters: params,
+            instructions: options.systemPrompt
+        ) { token in
             guard let callback else { return false }
             return token.withCString { callback($0, userData.rawValue) == RAC_TRUE }
         }
@@ -771,10 +805,16 @@ private final class MLXSession: @unchecked Sendable {
     private func collectVLM(
         prompt: String,
         image: UserInput.Image,
-        parameters: GenerateParameters
+        parameters: GenerateParameters,
+        instructions: String?
     ) async throws -> (String, MLXGenerationMetrics) {
         let text = OSAllocatedUnfairLock(initialState: "")
-        let metrics = try await streamVLM(prompt: prompt, image: image, parameters: parameters) { token in
+        let metrics = try await streamVLM(
+            prompt: prompt,
+            image: image,
+            parameters: parameters,
+            instructions: instructions
+        ) { token in
             text.withLock { $0 += token }
             return true
         }
@@ -785,6 +825,7 @@ private final class MLXSession: @unchecked Sendable {
         prompt: String,
         image: UserInput.Image,
         parameters: GenerateParameters,
+        instructions: String?,
         onToken: @escaping @Sendable (String) -> Bool
     ) async throws -> MLXGenerationMetrics {
         try await ensureResidentModelLoaded()
@@ -798,10 +839,33 @@ private final class MLXSession: @unchecked Sendable {
             restoreMemoryPolicy?()
         }
 
+        // Bound the image with a model-aware, aspect-preserving resize instead
+        // of forcing a fixed 512×512 square. The old square distorted aspect
+        // ratio and destroyed the fine detail screen/document/CUA models must
+        // read (Fara hallucinated from priors); conversely a full-resolution
+        // image overflows the non-windowed Qwen3.5-VL vision attention (~34 GB
+        // for a full screenshot). `resize` — the knob the processor honors,
+        // applied before patchification — caps the patch count. See
+        // MLXVLMResolutionPolicy.
+        let contextLength = lock.withLock { $0.contextLength }
+        let nativeSize = (try? image.asCIImage().extent.size) ?? CGSize(width: 1024, height: 1024)
+        let resizeTarget = MLXVLMResolutionPolicy.targetSize(
+            forContextLength: contextLength,
+            native: nativeSize
+        )
+        mlxRuntimeLogger.debug(
+            "MLX VLM image resize=\(resizeTarget) native=\(nativeSize) contextLength=\(contextLength) model=\(modelID)"
+        )
+        // MLX renders the chat template itself, so the system prompt has to be
+        // handed to the session as `instructions` — passing only `prompt` drops
+        // it. Computer-use agents ship their whole contract (the tool schema and
+        // the <tool_call> output format) in the system prompt, so losing it
+        // silently produces plain prose instead of a parseable action.
         let session = ChatSession(
             container,
+            instructions: instructions,
             generateParameters: parameters,
-            processing: UserInput.Processing(resize: CGSize(width: 512, height: 512))
+            processing: UserInput.Processing(resize: resizeTarget)
         )
         let events = session.streamDetails(to: prompt, images: [image])
         var metrics = MLXGenerationMetrics()
@@ -1339,7 +1403,7 @@ private func generateParameters(from options: MLXVLMOptionsSnapshot) -> Generate
     // RAC_VLM_OPTIONS_DEFAULT.
     let repetitionPenalty = options.repetitionPenalty > 0.0
         ? options.repetitionPenalty
-        : RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY
+        : RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPEAT_PENALTY
     return GenerateParameters(
         maxTokens: options.maxTokens > 0 ? Int(options.maxTokens) : nil,
         temperature: options.temperature,

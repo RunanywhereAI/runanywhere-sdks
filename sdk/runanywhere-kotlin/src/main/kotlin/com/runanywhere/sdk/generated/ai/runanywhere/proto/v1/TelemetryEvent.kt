@@ -33,6 +33,14 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
+/**
+ * PerformanceEvent was deleted (had zero producers and zero readers, per
+ * review): a memory/thermal/latency/throughput reading is a named number with
+ * a unit, which TelemetryEvent already models. `name` carries what
+ * PerformanceEventKind used to (e.g. "memory_warning", "thermal_state"),
+ * `value` + `unit` carry the number (bytes / celsius-state / ms /
+ * tokens_per_second), and `attributes` carries operation/thermal_state text.
+ */
 public class TelemetryEvent(
   @field:WireField(
     tag = 1,

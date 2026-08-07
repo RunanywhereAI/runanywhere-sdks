@@ -1,6 +1,6 @@
 /**
  * Segmentation Tab — semantic image segmentation over the canonical
- * `RunAnywhere.segment` facade (SegFormer / ADE20K-class models).
+ * `RunAnywhere.segmentation.segment` facade (SegFormer / ADE20K-class models).
  *
  * No browser segmentation engine or model ships in this build yet, so the shared
  * model sheet has nothing to offer and the run stays gated. This view is wired to
@@ -11,7 +11,7 @@
  *      `.semanticSegmentation` model. Model supply/load is delegated to the SDK's
  *      model management (the shared model sheet) rather than reimplemented here.
  *   2. Accepts a user-picked image, decodes it to tightly-packed RGBA8 pixels,
- *      and runs `RunAnywhere.segment(request)`.
+ *      and runs `RunAnywhere.segmentation.segment(image)`.
  *   3. Renders the returned diagnostic mask overlaid on the source image and a
  *      per-class pixel summary.
  *
@@ -23,10 +23,10 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
-  SegmentationPixelFormat,
-  type SegmentationClassSummary,
+  type ClassInfo,
   type SegmentationResult,
 } from '@runanywhere/web';
+import { findLoadedModelForCategory } from '../components/model-selection';
 import { onModelStateChange, openSheet } from '../components/model-selection';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
@@ -104,7 +104,7 @@ function renderView(): void {
         </ul>
         <p class="text-secondary">
           No browser segmentation engine or model ships in this build, so the picker
-          above stays empty and <code>RunAnywhere.segment</code> cannot be run here yet.
+          above stays empty and <code>RunAnywhere.segmentation.segment</code> cannot be run here yet.
           This flow lights up automatically once a browser engine registers a
           <code>.semanticSegmentation</code> model; until then, run segmentation from a
           native RunAnywhere app.
@@ -127,7 +127,7 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Segment</h3>
         <p class="text-secondary">
-          Runs <code>RunAnywhere.segment(request)</code> on the loaded
+          Runs <code>RunAnywhere.segmentation.segment(image)</code> on the loaded
           <code>.semanticSegmentation</code> model and overlays the returned class mask.
         </p>
         <div class="toolbar-actions">
@@ -273,18 +273,14 @@ async function onRun(): Promise<void> {
   renderView();
 
   try {
-    const result = await RunAnywhere.segment({
-      image: {
-        data: image.rgba,
-        width: image.width,
-        height: image.height,
-        pixelFormat: SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGBA8,
-      },
-      options: { includeDiagnosticRgba: true },
-    });
+    const startedAt = performance.now();
+    const result = await RunAnywhere.segmentation.segment(
+      RunAnywhere.ImageInput.rawRgba(image.rgba, image.width, image.height),
+      { includeDiagnosticImage: true },
+    );
     lastResult = result;
     setStatus(
-      `Done — ${result.classSummaries.length} classes in ${Math.round(result.processingTimeMs)}ms (${escapeHtml(result.modelId)}).`,
+      `Done — ${result.classes.length} classes in ${Math.round(performance.now() - startedAt)}ms.`,
     );
   } catch (err) {
     setStatus(`Segmentation failed: ${formatError(err)}`);
@@ -316,7 +312,7 @@ function buildOverlay(result: SegmentationResult, source: LoadedImage): HTMLElem
   base.src = source.previewUrl;
   base.onload = () => {
     ctx.drawImage(base, 0, 0, result.width, result.height);
-    const mask = result.diagnosticRgba;
+    const mask = result.diagnosticImage;
     if (mask && mask.byteLength === result.width * result.height * 4) {
       // Copy into a fresh ArrayBuffer-backed clamped array: the SDK bytes may
       // be backed by a SharedArrayBuffer (WASM heap), which ImageData rejects.
@@ -346,12 +342,12 @@ function buildClassSummary(result: SegmentationResult): HTMLElement {
 
   const list = document.createElement('ul');
   list.className = 'feature-unavailable__list';
-  const sorted = [...result.classSummaries].sort(
-    (a: SegmentationClassSummary, b: SegmentationClassSummary) => b.pixelCount - a.pixelCount,
+  const sorted = [...result.classes].sort(
+    (a: ClassInfo, b: ClassInfo) => b.pixelCount - a.pixelCount,
   );
   for (const summary of sorted) {
     const item = document.createElement('li');
-    const label = summary.label || `class ${summary.classId}`;
+    const label = summary.label || `class ${summary.id}`;
     const pct = (summary.fraction * 100).toFixed(1);
     item.innerHTML =
       `<strong>${escapeHtml(label)}</strong> — ${summary.pixelCount.toLocaleString()} px (${pct}%)`;
@@ -366,15 +362,7 @@ function buildClassSummary(result: SegmentationResult): HTMLElement {
 // ---------------------------------------------------------------------------
 
 function isSegmentationModelLoaded(): boolean {
-  try {
-    const current = RunAnywhere.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
-      includeModelMetadata: false,
-    });
-    return Boolean(current?.found || current?.modelId);
-  } catch {
-    return false;
-  }
+  return findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION) !== null;
 }
 
 function setStatus(text: string): void {

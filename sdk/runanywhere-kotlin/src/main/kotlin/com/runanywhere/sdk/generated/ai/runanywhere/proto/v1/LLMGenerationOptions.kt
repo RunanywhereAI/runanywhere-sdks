@@ -32,313 +32,170 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * The rac_default annotations on LLMGenerationOptions are the single
- * declaration of the LLM sampling defaults. RAC_LLM_OPTIONS_DEFAULT in
- * rac_llm_types.h is generated from them, and every SDK reads the generated
- * defaults() rather than keeping its own table (Swift, Kotlin, Flutter, and Web
- * each used to).
- *
- * On the wire, a proto3 zero still means "unset, let the engine decide". The
- * generated defaults() is for callers who want a populated options value; it
- * does not change how an unset field is interpreted.
- *
- * This block is deliberately separated from the message by a blank line. protoc
- * only attaches a comment that directly abuts an element, and notes about the
- * codegen pipeline should not be copied into the generated message in five
- * languages. Keep pipeline commentary here and wire semantics below.
- * ---------------------------------------------------------------------------
- * Options for a single text generation invocation.
- *
- * Field names match Swift LLMGenerationOptions exactly; consumers may treat
- * proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
- * represents optional reference fields explicitly via `optional` keyword).
- * ---------------------------------------------------------------------------
- */
 public class LLMGenerationOptions(
   /**
-   * Maximum number of tokens to generate. 0 (default) = unset → engine
-   * default (typically 100).
+   * Every knob below has explicit presence: ABSENT means the annotated
+   * default applies, and any value the caller sets -- including 0 -- is
+   * honoured verbatim. Nothing treats 0 as unset.
+   *
+   * Sampler chain order is fixed: repeat_penalty -> top_k -> top_p ->
+   * min_p -> temperature (llama.cpp order, minus the samplers we do not
+   * expose). top_k/min_p/repeat_penalty default ON to match llama.cpp and
+   * Ollama, which both ship these on because small quantized models loop
+   * without them.
    */
-  @RacDefaultOption("100")
+  @RacDefaultOption("512")
   @RacMinOption(0)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxTokens",
+    jsonName = "maxOutputTokens",
     schemaIndex = 0,
   )
-  public val max_tokens: Int = 0,
+  public val max_output_tokens: Int? = null,
   /**
-   * Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
+   * 0.0 = greedy decoding, and is honoured as an explicit request.
    */
-  @RacDefaultOption("0.8")
+  @RacDefaultOption("0.7")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(2.0)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 1,
   )
-  public val temperature: Float = 0f,
-  /**
-   * Nucleus sampling (top-p). 1.0 = no nucleus truncation.
-   */
+  public val temperature: Float? = null,
   @RacDefaultOption("1.0")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "topP",
     schemaIndex = 2,
   )
-  public val top_p: Float = 0f,
-  /**
-   * Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
-   */
-  @RacDefaultOption("0")
+  public val top_p: Float? = null,
+  @RacDefaultOption("40")
   @RacMinOption(0)
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "topK",
     schemaIndex = 3,
   )
-  public val top_k: Int = 0,
+  public val top_k: Int? = null,
   /**
-   * Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
+   * Industry name: llama.cpp and Ollama both spell this repeat_penalty.
    */
-  @RacDefaultOption("1.0")
+  @RacDefaultOption("1.1")
   @RacMinFloatOption(0.0)
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "repetitionPenalty",
+    jsonName = "repeatPenalty",
     schemaIndex = 4,
   )
-  public val repetition_penalty: Float = 0f,
+  public val repeat_penalty: Float? = null,
   stop_sequences: List<String> = emptyList(),
-  /**
-   * Whether to stream tokens vs return result at end (Swift field).
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "streamingEnabled",
-    schemaIndex = 6,
-  )
-  public val streaming_enabled: Boolean = false,
-  /**
-   * Preferred inference framework. UNSPECIFIED = pick automatically.
-   */
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "preferredFramework",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val preferred_framework:
       InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-  /**
-   * System prompt to define AI behavior and formatting rules.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "systemPrompt",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val system_prompt: String? = null,
-  /**
-   * Optional structured-output mode (JSON schema). Engine returns text
-   * that conforms to this schema. Swift wraps this in a StructuredOutputConfig
-   * struct with the Generatable.Type — proto carries just the schema string.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "jsonSchema",
-    schemaIndex = 9,
-  )
-  public val json_schema: String? = null,
-  /**
-   * Optional thinking-tag pattern for extracting reasoning content from
-   * models like Qwen3 / LFM2 that emit <think>...</think> blocks.
-   */
   @field:WireField(
     tag = 11,
-    adapter = "ai.runanywhere.proto.v1.ThinkingTagPattern#ADAPTER",
-    jsonName = "thinkingPattern",
-    schemaIndex = 10,
+    adapter = "ai.runanywhere.proto.v1.ReasoningOptions#ADAPTER",
+    schemaIndex = 8,
   )
-  public val thinking_pattern: ThinkingTagPattern? = null,
+  public val reasoning: ReasoningOptions? = null,
   /**
-   * Routing hint: where this generation should run (on-device, cloud, or
-   * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+   * No consumer reads this today.
    */
   @field:WireField(
     tag = 12,
     adapter = "ai.runanywhere.proto.v1.ExecutionTarget#ADAPTER",
     jsonName = "executionTarget",
-    schemaIndex = 11,
+    schemaIndex = 9,
   )
   public val execution_target: ExecutionTarget? = null,
-  /**
-   * Optional structured-output configuration. Detailed message lives in
-   * structured_output.proto so the schema/format details aren't duplicated
-   * here. When set, supersedes the simpler `json_schema` string above.
-   */
   @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputOptions#ADAPTER",
     jsonName = "structuredOutput",
-    schemaIndex = 12,
+    schemaIndex = 10,
   )
   public val structured_output: StructuredOutputOptions? = null,
-  /**
-   * Enable per-token/cost dashboard tracking for SDKs that surface live
-   * generation telemetry. No-op for backends without a telemetry sink.
-   */
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "enableRealTimeTracking",
-    schemaIndex = 13,
-  )
-  public val enable_real_time_tracking: Boolean = false,
-  /**
-   * Deterministic sampling seed. 0 = backend/default random seed.
-   */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 14,
+    schemaIndex = 11,
   )
-  public val seed: Long = 0L,
-  /**
-   * OpenAI-compatible sampling penalties. 0.0 = disabled.
-   */
+  public val seed: Long? = null,
+  @RacDefaultOption("0.0")
   @field:WireField(
     tag = 16,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "frequencyPenalty",
-    schemaIndex = 15,
+    schemaIndex = 12,
   )
-  public val frequency_penalty: Float = 0f,
+  public val frequency_penalty: Float? = null,
+  @RacDefaultOption("0.0")
   @field:WireField(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "presencePenalty",
-    schemaIndex = 16,
+    schemaIndex = 13,
   )
-  public val presence_penalty: Float = 0f,
+  public val presence_penalty: Float? = null,
   /**
-   * Repeat-penalty lookback window. 0 = backend default.
+   * No engine reads repeat_last_n or echo_prompt.
    */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 18,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "repeatLastN",
-    schemaIndex = 17,
+    schemaIndex = 14,
   )
   public val repeat_last_n: Int = 0,
-  /**
-   * Minimum probability sampling. 0.0 = disabled.
-   */
+  @RacDefaultOption("0.05")
   @field:WireField(
     tag = 19,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "minP",
-    schemaIndex = 18,
+    schemaIndex = 15,
   )
-  public val min_p: Float = 0f,
-  /**
-   * Grammar or constrained-decoding rule text (GBNF/regex/backend-specific).
-   */
-  @field:WireField(
-    tag = 20,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 19,
-  )
-  public val grammar: String? = null,
-  /**
-   * Caller-visible format hint: "text", "json_object", "json_schema", etc.
-   */
-  @field:WireField(
-    tag = 21,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "responseFormat",
-    schemaIndex = 20,
-  )
-  public val response_format: String? = null,
-  /**
-   * Include prompt text in the result/stream when the backend supports echo.
-   */
+  public val min_p: Float? = null,
   @field:WireField(
     tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "echoPrompt",
-    schemaIndex = 21,
+    schemaIndex = 16,
   )
   public val echo_prompt: Boolean = false,
-  /**
-   * Per-request backend thread hint. 0 = backend/runtime default.
-   */
-  @field:WireField(
-    tag = 23,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "nThreads",
-    schemaIndex = 22,
-  )
-  public val n_threads: Int = 0,
-  /**
-   * Tool-calling contract for this generation. The SDK owns executor
-   * functions; proto carries only definitions and parser options.
-   */
   @field:WireField(
     tag = 24,
     adapter = "ai.runanywhere.proto.v1.ToolCallingOptions#ADAPTER",
     jsonName = "toolCalling",
-    schemaIndex = 23,
+    schemaIndex = 17,
   )
   public val tool_calling: ToolCallingOptions? = null,
-  /**
-   * When true, suppress the model's thinking/reasoning phase for this
-   * generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
-   * model's no-think directive at the prompt level, so no app prepends
-   * "/no_think" by hand. Default false = the model's normal thinking
-   * behavior.
-   */
-  @field:WireField(
-    tag = 25,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "disableThinking",
-    schemaIndex = 24,
-  )
-  public val disable_thinking: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Stop sequences. Generation halts when any of these strings appears in
-   * the output stream.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -358,31 +215,24 @@ public class LLMGenerationOptions(
     if (other === this) return true
     if (other !is LLMGenerationOptions) return false
     if (unknownFields != other.unknownFields) return false
-    if (max_tokens != other.max_tokens) return false
+    if (max_output_tokens != other.max_output_tokens) return false
     if (temperature != other.temperature) return false
     if (top_p != other.top_p) return false
     if (top_k != other.top_k) return false
-    if (repetition_penalty != other.repetition_penalty) return false
+    if (repeat_penalty != other.repeat_penalty) return false
     if (stop_sequences != other.stop_sequences) return false
-    if (streaming_enabled != other.streaming_enabled) return false
     if (preferred_framework != other.preferred_framework) return false
     if (system_prompt != other.system_prompt) return false
-    if (json_schema != other.json_schema) return false
-    if (thinking_pattern != other.thinking_pattern) return false
+    if (reasoning != other.reasoning) return false
     if (execution_target != other.execution_target) return false
     if (structured_output != other.structured_output) return false
-    if (enable_real_time_tracking != other.enable_real_time_tracking) return false
     if (seed != other.seed) return false
     if (frequency_penalty != other.frequency_penalty) return false
     if (presence_penalty != other.presence_penalty) return false
     if (repeat_last_n != other.repeat_last_n) return false
     if (min_p != other.min_p) return false
-    if (grammar != other.grammar) return false
-    if (response_format != other.response_format) return false
     if (echo_prompt != other.echo_prompt) return false
-    if (n_threads != other.n_threads) return false
     if (tool_calling != other.tool_calling) return false
-    if (disable_thinking != other.disable_thinking) return false
     return true
   }
 
@@ -390,31 +240,24 @@ public class LLMGenerationOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + max_tokens.hashCode()
-      result = result * 37 + temperature.hashCode()
-      result = result * 37 + top_p.hashCode()
-      result = result * 37 + top_k.hashCode()
-      result = result * 37 + repetition_penalty.hashCode()
+      result = result * 37 + (max_output_tokens?.hashCode() ?: 0)
+      result = result * 37 + (temperature?.hashCode() ?: 0)
+      result = result * 37 + (top_p?.hashCode() ?: 0)
+      result = result * 37 + (top_k?.hashCode() ?: 0)
+      result = result * 37 + (repeat_penalty?.hashCode() ?: 0)
       result = result * 37 + stop_sequences.hashCode()
-      result = result * 37 + streaming_enabled.hashCode()
       result = result * 37 + preferred_framework.hashCode()
       result = result * 37 + (system_prompt?.hashCode() ?: 0)
-      result = result * 37 + (json_schema?.hashCode() ?: 0)
-      result = result * 37 + (thinking_pattern?.hashCode() ?: 0)
+      result = result * 37 + (reasoning?.hashCode() ?: 0)
       result = result * 37 + (execution_target?.hashCode() ?: 0)
       result = result * 37 + (structured_output?.hashCode() ?: 0)
-      result = result * 37 + enable_real_time_tracking.hashCode()
-      result = result * 37 + seed.hashCode()
-      result = result * 37 + frequency_penalty.hashCode()
-      result = result * 37 + presence_penalty.hashCode()
+      result = result * 37 + (seed?.hashCode() ?: 0)
+      result = result * 37 + (frequency_penalty?.hashCode() ?: 0)
+      result = result * 37 + (presence_penalty?.hashCode() ?: 0)
       result = result * 37 + repeat_last_n.hashCode()
-      result = result * 37 + min_p.hashCode()
-      result = result * 37 + (grammar?.hashCode() ?: 0)
-      result = result * 37 + (response_format?.hashCode() ?: 0)
+      result = result * 37 + (min_p?.hashCode() ?: 0)
       result = result * 37 + echo_prompt.hashCode()
-      result = result * 37 + n_threads.hashCode()
       result = result * 37 + (tool_calling?.hashCode() ?: 0)
-      result = result * 37 + disable_thinking.hashCode()
       super.hashCode = result
     }
     return result
@@ -422,62 +265,48 @@ public class LLMGenerationOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """max_tokens=$max_tokens"""
-    result += """temperature=$temperature"""
-    result += """top_p=$top_p"""
-    result += """top_k=$top_k"""
-    result += """repetition_penalty=$repetition_penalty"""
+    if (max_output_tokens != null) result += """max_output_tokens=$max_output_tokens"""
+    if (temperature != null) result += """temperature=$temperature"""
+    if (top_p != null) result += """top_p=$top_p"""
+    if (top_k != null) result += """top_k=$top_k"""
+    if (repeat_penalty != null) result += """repeat_penalty=$repeat_penalty"""
     if (stop_sequences.isNotEmpty()) result += """stop_sequences=${sanitize(stop_sequences)}"""
-    result += """streaming_enabled=$streaming_enabled"""
     result += """preferred_framework=$preferred_framework"""
     if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
-    if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
-    if (thinking_pattern != null) result += """thinking_pattern=$thinking_pattern"""
+    if (reasoning != null) result += """reasoning=$reasoning"""
     if (execution_target != null) result += """execution_target=$execution_target"""
     if (structured_output != null) result += """structured_output=$structured_output"""
-    result += """enable_real_time_tracking=$enable_real_time_tracking"""
-    result += """seed=$seed"""
-    result += """frequency_penalty=$frequency_penalty"""
-    result += """presence_penalty=$presence_penalty"""
+    if (seed != null) result += """seed=$seed"""
+    if (frequency_penalty != null) result += """frequency_penalty=$frequency_penalty"""
+    if (presence_penalty != null) result += """presence_penalty=$presence_penalty"""
     result += """repeat_last_n=$repeat_last_n"""
-    result += """min_p=$min_p"""
-    if (grammar != null) result += """grammar=${sanitize(grammar)}"""
-    if (response_format != null) result += """response_format=${sanitize(response_format)}"""
+    if (min_p != null) result += """min_p=$min_p"""
     result += """echo_prompt=$echo_prompt"""
-    result += """n_threads=$n_threads"""
     if (tool_calling != null) result += """tool_calling=$tool_calling"""
-    result += """disable_thinking=$disable_thinking"""
     return result.joinToString(prefix = "LLMGenerationOptions{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    max_tokens: Int = this.max_tokens,
-    temperature: Float = this.temperature,
-    top_p: Float = this.top_p,
-    top_k: Int = this.top_k,
-    repetition_penalty: Float = this.repetition_penalty,
+    max_output_tokens: Int? = this.max_output_tokens,
+    temperature: Float? = this.temperature,
+    top_p: Float? = this.top_p,
+    top_k: Int? = this.top_k,
+    repeat_penalty: Float? = this.repeat_penalty,
     stop_sequences: List<String> = this.stop_sequences,
-    streaming_enabled: Boolean = this.streaming_enabled,
     preferred_framework: InferenceFramework = this.preferred_framework,
     system_prompt: String? = this.system_prompt,
-    json_schema: String? = this.json_schema,
-    thinking_pattern: ThinkingTagPattern? = this.thinking_pattern,
+    reasoning: ReasoningOptions? = this.reasoning,
     execution_target: ExecutionTarget? = this.execution_target,
     structured_output: StructuredOutputOptions? = this.structured_output,
-    enable_real_time_tracking: Boolean = this.enable_real_time_tracking,
-    seed: Long = this.seed,
-    frequency_penalty: Float = this.frequency_penalty,
-    presence_penalty: Float = this.presence_penalty,
+    seed: Long? = this.seed,
+    frequency_penalty: Float? = this.frequency_penalty,
+    presence_penalty: Float? = this.presence_penalty,
     repeat_last_n: Int = this.repeat_last_n,
-    min_p: Float = this.min_p,
-    grammar: String? = this.grammar,
-    response_format: String? = this.response_format,
+    min_p: Float? = this.min_p,
     echo_prompt: Boolean = this.echo_prompt,
-    n_threads: Int = this.n_threads,
     tool_calling: ToolCallingOptions? = this.tool_calling,
-    disable_thinking: Boolean = this.disable_thinking,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerationOptions = LLMGenerationOptions(max_tokens, temperature, top_p, top_k, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, system_prompt, json_schema, thinking_pattern, execution_target, structured_output, enable_real_time_tracking, seed, frequency_penalty, presence_penalty, repeat_last_n, min_p, grammar, response_format, echo_prompt, n_threads, tool_calling, disable_thinking, unknownFields)
+  ): LLMGenerationOptions = LLMGenerationOptions(max_output_tokens, temperature, top_p, top_k, repeat_penalty, stop_sequences, preferred_framework, system_prompt, reasoning, execution_target, structured_output, seed, frequency_penalty, presence_penalty, repeat_last_n, min_p, echo_prompt, tool_calling, unknownFields)
 
   public companion object {
     @JvmField
@@ -492,284 +321,164 @@ public class LLMGenerationOptions(
     ) {
       override fun encodedSize(`value`: LLMGenerationOptions): Int {
         var size = value.unknownFields.size
-        if (value.max_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(1, value.max_tokens)
-        }
-        if (!value.temperature.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.top_p)
-        }
-        if (value.top_k != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.top_k)
-        }
-        if (!value.repetition_penalty.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.repetition_penalty)
-        }
+        size += ProtoAdapter.INT32.encodedSizeWithTag(1, value.max_output_tokens)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.temperature)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.top_p)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.top_k)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.repeat_penalty)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.stop_sequences)
-        if (value.streaming_enabled != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.streaming_enabled)
-        }
         if (value.preferred_framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
           size += InferenceFramework.ADAPTER.encodedSizeWithTag(8, value.preferred_framework)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.system_prompt)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.json_schema)
-        size += ThinkingTagPattern.ADAPTER.encodedSizeWithTag(11, value.thinking_pattern)
+        size += ReasoningOptions.ADAPTER.encodedSizeWithTag(11, value.reasoning)
         size += ExecutionTarget.ADAPTER.encodedSizeWithTag(12, value.execution_target)
         size += StructuredOutputOptions.ADAPTER.encodedSizeWithTag(13, value.structured_output)
-        if (value.enable_real_time_tracking != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(14, value.enable_real_time_tracking)
-        }
-        if (value.seed != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.seed)
-        }
-        if (!value.frequency_penalty.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(16, value.frequency_penalty)
-        }
-        if (!value.presence_penalty.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(17, value.presence_penalty)
-        }
+        size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.seed)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(16, value.frequency_penalty)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(17, value.presence_penalty)
         if (value.repeat_last_n != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(18, value.repeat_last_n)
         }
-        if (!value.min_p.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(19, value.min_p)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(20, value.grammar)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(21, value.response_format)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(19, value.min_p)
         if (value.echo_prompt != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(22, value.echo_prompt)
         }
-        if (value.n_threads != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(23, value.n_threads)
-        }
         size += ToolCallingOptions.ADAPTER.encodedSizeWithTag(24, value.tool_calling)
-        if (value.disable_thinking != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(25, value.disable_thinking)
-        }
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: LLMGenerationOptions) {
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 1, value.max_tokens)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.top_p)
-        }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
-        }
-        if (!value.repetition_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.repetition_penalty)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 1, value.max_output_tokens)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.temperature)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.top_p)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.repeat_penalty)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.stop_sequences)
-        if (value.streaming_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.streaming_enabled)
-        }
         if (value.preferred_framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
           InferenceFramework.ADAPTER.encodeWithTag(writer, 8, value.preferred_framework)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.system_prompt)
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.json_schema)
-        ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 11, value.thinking_pattern)
+        ReasoningOptions.ADAPTER.encodeWithTag(writer, 11, value.reasoning)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 12, value.execution_target)
         StructuredOutputOptions.ADAPTER.encodeWithTag(writer, 13, value.structured_output)
-        if (value.enable_real_time_tracking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.enable_real_time_tracking)
-        }
-        if (value.seed != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.seed)
-        }
-        if (!value.frequency_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 16, value.frequency_penalty)
-        }
-        if (!value.presence_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.presence_penalty)
-        }
+        ProtoAdapter.INT64.encodeWithTag(writer, 15, value.seed)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 16, value.frequency_penalty)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.presence_penalty)
         if (value.repeat_last_n != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 18, value.repeat_last_n)
         }
-        if (!value.min_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 19, value.min_p)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 20, value.grammar)
-        ProtoAdapter.STRING.encodeWithTag(writer, 21, value.response_format)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 19, value.min_p)
         if (value.echo_prompt != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 22, value.echo_prompt)
         }
-        if (value.n_threads != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 23, value.n_threads)
-        }
         ToolCallingOptions.ADAPTER.encodeWithTag(writer, 24, value.tool_calling)
-        if (value.disable_thinking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 25, value.disable_thinking)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerationOptions) {
         writer.writeBytes(value.unknownFields)
-        if (value.disable_thinking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 25, value.disable_thinking)
-        }
         ToolCallingOptions.ADAPTER.encodeWithTag(writer, 24, value.tool_calling)
-        if (value.n_threads != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 23, value.n_threads)
-        }
         if (value.echo_prompt != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 22, value.echo_prompt)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 21, value.response_format)
-        ProtoAdapter.STRING.encodeWithTag(writer, 20, value.grammar)
-        if (!value.min_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 19, value.min_p)
-        }
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 19, value.min_p)
         if (value.repeat_last_n != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 18, value.repeat_last_n)
         }
-        if (!value.presence_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.presence_penalty)
-        }
-        if (!value.frequency_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 16, value.frequency_penalty)
-        }
-        if (value.seed != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.seed)
-        }
-        if (value.enable_real_time_tracking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.enable_real_time_tracking)
-        }
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.presence_penalty)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 16, value.frequency_penalty)
+        ProtoAdapter.INT64.encodeWithTag(writer, 15, value.seed)
         StructuredOutputOptions.ADAPTER.encodeWithTag(writer, 13, value.structured_output)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 12, value.execution_target)
-        ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 11, value.thinking_pattern)
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.json_schema)
+        ReasoningOptions.ADAPTER.encodeWithTag(writer, 11, value.reasoning)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.system_prompt)
         if (value.preferred_framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
           InferenceFramework.ADAPTER.encodeWithTag(writer, 8, value.preferred_framework)
         }
-        if (value.streaming_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.streaming_enabled)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.stop_sequences)
-        if (!value.repetition_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.repetition_penalty)
-        }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.top_p)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.temperature)
-        }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 1, value.max_tokens)
-        }
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.repeat_penalty)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.top_p)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.temperature)
+        ProtoAdapter.INT32.encodeWithTag(writer, 1, value.max_output_tokens)
       }
 
       override fun decode(reader: ProtoReader): LLMGenerationOptions {
-        var max_tokens: Int = 0
-        var temperature: Float = 0f
-        var top_p: Float = 0f
-        var top_k: Int = 0
-        var repetition_penalty: Float = 0f
+        var max_output_tokens: Int? = null
+        var temperature: Float? = null
+        var top_p: Float? = null
+        var top_k: Int? = null
+        var repeat_penalty: Float? = null
         val stop_sequences = mutableListOf<String>()
-        var streaming_enabled: Boolean = false
         var preferred_framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         var system_prompt: String? = null
-        var json_schema: String? = null
-        var thinking_pattern: ThinkingTagPattern? = null
+        var reasoning: ReasoningOptions? = null
         var execution_target: ExecutionTarget? = null
         var structured_output: StructuredOutputOptions? = null
-        var enable_real_time_tracking: Boolean = false
-        var seed: Long = 0L
-        var frequency_penalty: Float = 0f
-        var presence_penalty: Float = 0f
+        var seed: Long? = null
+        var frequency_penalty: Float? = null
+        var presence_penalty: Float? = null
         var repeat_last_n: Int = 0
-        var min_p: Float = 0f
-        var grammar: String? = null
-        var response_format: String? = null
+        var min_p: Float? = null
         var echo_prompt: Boolean = false
-        var n_threads: Int = 0
         var tool_calling: ToolCallingOptions? = null
-        var disable_thinking: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> max_tokens = ProtoAdapter.INT32.decode(reader)
+            1 -> max_output_tokens = ProtoAdapter.INT32.decode(reader)
             2 -> temperature = ProtoAdapter.FLOAT.decode(reader)
             3 -> top_p = ProtoAdapter.FLOAT.decode(reader)
             4 -> top_k = ProtoAdapter.INT32.decode(reader)
-            5 -> repetition_penalty = ProtoAdapter.FLOAT.decode(reader)
+            5 -> repeat_penalty = ProtoAdapter.FLOAT.decode(reader)
             6 -> stop_sequences.add(ProtoAdapter.STRING.decode(reader))
-            7 -> streaming_enabled = ProtoAdapter.BOOL.decode(reader)
             8 -> try {
               preferred_framework = InferenceFramework.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             9 -> system_prompt = ProtoAdapter.STRING.decode(reader)
-            10 -> json_schema = ProtoAdapter.STRING.decode(reader)
-            11 -> thinking_pattern = ThinkingTagPattern.ADAPTER.decode(reader)
+            11 -> reasoning = ReasoningOptions.ADAPTER.decode(reader)
             12 -> try {
               execution_target = ExecutionTarget.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             13 -> structured_output = StructuredOutputOptions.ADAPTER.decode(reader)
-            14 -> enable_real_time_tracking = ProtoAdapter.BOOL.decode(reader)
             15 -> seed = ProtoAdapter.INT64.decode(reader)
             16 -> frequency_penalty = ProtoAdapter.FLOAT.decode(reader)
             17 -> presence_penalty = ProtoAdapter.FLOAT.decode(reader)
             18 -> repeat_last_n = ProtoAdapter.INT32.decode(reader)
             19 -> min_p = ProtoAdapter.FLOAT.decode(reader)
-            20 -> grammar = ProtoAdapter.STRING.decode(reader)
-            21 -> response_format = ProtoAdapter.STRING.decode(reader)
             22 -> echo_prompt = ProtoAdapter.BOOL.decode(reader)
-            23 -> n_threads = ProtoAdapter.INT32.decode(reader)
             24 -> tool_calling = ToolCallingOptions.ADAPTER.decode(reader)
-            25 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LLMGenerationOptions(
-          max_tokens = max_tokens,
+          max_output_tokens = max_output_tokens,
           temperature = temperature,
           top_p = top_p,
           top_k = top_k,
-          repetition_penalty = repetition_penalty,
+          repeat_penalty = repeat_penalty,
           stop_sequences = stop_sequences,
-          streaming_enabled = streaming_enabled,
           preferred_framework = preferred_framework,
           system_prompt = system_prompt,
-          json_schema = json_schema,
-          thinking_pattern = thinking_pattern,
+          reasoning = reasoning,
           execution_target = execution_target,
           structured_output = structured_output,
-          enable_real_time_tracking = enable_real_time_tracking,
           seed = seed,
           frequency_penalty = frequency_penalty,
           presence_penalty = presence_penalty,
           repeat_last_n = repeat_last_n,
           min_p = min_p,
-          grammar = grammar,
-          response_format = response_format,
           echo_prompt = echo_prompt,
-          n_threads = n_threads,
           tool_calling = tool_calling,
-          disable_thinking = disable_thinking,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMGenerationOptions): LLMGenerationOptions = value.copy(
-        thinking_pattern = value.thinking_pattern?.let(ThinkingTagPattern.ADAPTER::redact),
+        reasoning = value.reasoning?.let(ReasoningOptions.ADAPTER::redact),
         structured_output = value.structured_output?.let(StructuredOutputOptions.ADAPTER::redact),
         tool_calling = value.tool_calling?.let(ToolCallingOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY

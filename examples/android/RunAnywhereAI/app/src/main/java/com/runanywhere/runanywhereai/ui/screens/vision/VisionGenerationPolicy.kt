@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.vision
 
+import com.runanywhere.sdk.public.api.LlmOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 
 internal const val DEFAULT_VISION_PROMPT = "Describe this image in detail."
 
@@ -36,21 +36,19 @@ internal object VisionGenerationPolicy {
     }
 
     fun options(
-        prompt: String,
         model: RAModelInfo,
         mode: VisionAnswerMode,
         userLimit: Int? = null,
         systemPrompt: String? = null,
-    ): RAVLMGenerationOptions =
-        RAVLMGenerationOptions(
-            prompt = prompt,
-            max_tokens = maxTokens(model.context_length, mode, userLimit),
+    ): LlmOptions =
+        LlmOptions(
+            maxOutputTokens = maxTokens(model.context_length, mode, userLimit),
             // Pin the complete greedy configuration. Temperature alone is
             // sufficient today, but explicit top-p/top-k avoids default drift.
             temperature = 0f,
-            top_p = 0f,
-            top_k = 0,
-            system_prompt = systemPrompt?.takeIf { it.isNotBlank() },
+            topP = 0f,
+            topK = 0,
+            systemPrompt = systemPrompt?.takeIf { it.isNotBlank() },
         )
 
     private const val CONTEXT_OUTPUT_DIVISOR = 4

@@ -14,38 +14,10 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
-/// ---------------------------------------------------------------------------
-class EmbeddingsNormalizeMode extends $pb.ProtobufEnum {
-  static const EmbeddingsNormalizeMode EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED =
-      EmbeddingsNormalizeMode._(
-          0, _omitEnumNames ? '' : 'EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED');
-  static const EmbeddingsNormalizeMode EMBEDDINGS_NORMALIZE_MODE_NONE =
-      EmbeddingsNormalizeMode._(
-          1, _omitEnumNames ? '' : 'EMBEDDINGS_NORMALIZE_MODE_NONE');
-  static const EmbeddingsNormalizeMode EMBEDDINGS_NORMALIZE_MODE_L2 =
-      EmbeddingsNormalizeMode._(
-          2, _omitEnumNames ? '' : 'EMBEDDINGS_NORMALIZE_MODE_L2');
-
-  static const $core.List<EmbeddingsNormalizeMode> values =
-      <EmbeddingsNormalizeMode>[
-    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
-    EMBEDDINGS_NORMALIZE_MODE_NONE,
-    EMBEDDINGS_NORMALIZE_MODE_L2,
-  ];
-
-  static final $core.List<EmbeddingsNormalizeMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static EmbeddingsNormalizeMode? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const EmbeddingsNormalizeMode._(super.value, super.name);
-}
-
-/// ---------------------------------------------------------------------------
-/// Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
-/// ---------------------------------------------------------------------------
+/// The required public spelling in every SDK is exactly "mean" / "cls" / "last".
+/// LAST is the final token's hidden state (llama.cpp --pooling last), which
+/// decoder-style embedders require. It is NOT max-pooling; no SDK may expose
+/// it as "max".
 class EmbeddingsPoolingStrategy extends $pb.ProtobufEnum {
   static const EmbeddingsPoolingStrategy
       EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = EmbeddingsPoolingStrategy._(
@@ -74,6 +46,31 @@ class EmbeddingsPoolingStrategy extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const EmbeddingsPoolingStrategy._(super.value, super.name);
+}
+
+class EmbeddingsInputType extends $pb.ProtobufEnum {
+  static const EmbeddingsInputType EMBEDDINGS_INPUT_TYPE_UNSPECIFIED =
+      EmbeddingsInputType._(
+          0, _omitEnumNames ? '' : 'EMBEDDINGS_INPUT_TYPE_UNSPECIFIED');
+  static const EmbeddingsInputType EMBEDDINGS_INPUT_TYPE_QUERY =
+      EmbeddingsInputType._(
+          1, _omitEnumNames ? '' : 'EMBEDDINGS_INPUT_TYPE_QUERY');
+  static const EmbeddingsInputType EMBEDDINGS_INPUT_TYPE_DOCUMENT =
+      EmbeddingsInputType._(
+          2, _omitEnumNames ? '' : 'EMBEDDINGS_INPUT_TYPE_DOCUMENT');
+
+  static const $core.List<EmbeddingsInputType> values = <EmbeddingsInputType>[
+    EMBEDDINGS_INPUT_TYPE_UNSPECIFIED,
+    EMBEDDINGS_INPUT_TYPE_QUERY,
+    EMBEDDINGS_INPUT_TYPE_DOCUMENT,
+  ];
+
+  static final $core.List<EmbeddingsInputType?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static EmbeddingsInputType? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EmbeddingsInputType._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

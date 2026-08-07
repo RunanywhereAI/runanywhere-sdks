@@ -12,11 +12,16 @@
 import {
   SolutionConfig,
   SolutionHandle,
-  SolutionType,
   VoiceAgentConfig,
 } from '@runanywhere/proto-ts/solutions';
 
 describe('Solutions generated surface', () => {
+  // `VoiceAgentConfig` never had a `typeKind` field on the wire — this test
+  // previously set it anyway (ts-proto's `.create()` silently drops unknown
+  // keys), so dropping it here is a no-op for what was actually asserted.
+  // `SolutionConfig`'s oneof arm (`voiceAgent` being set) is itself the type
+  // discriminator; the standalone `SolutionType` enum lives on
+  // `SolutionHandle`-adjacent APIs, not on this message.
   it('SolutionConfig carries voice agent oneof fields', () => {
     const config = SolutionConfig.create({
       voiceAgent: {
@@ -27,7 +32,6 @@ describe('Solutions generated surface', () => {
         sampleRateHz: 16000,
         chunkMs: 20,
         maxContextTokens: 4096,
-        typeKind: SolutionType.SOLUTION_TYPE_VOICE_AGENT,
       },
     });
 
@@ -40,7 +44,6 @@ describe('Solutions generated surface', () => {
       sampleRateHz: 16000,
       chunkMs: 20,
       maxContextTokens: 4096,
-      typeKind: SolutionType.SOLUTION_TYPE_VOICE_AGENT,
     });
   });
 

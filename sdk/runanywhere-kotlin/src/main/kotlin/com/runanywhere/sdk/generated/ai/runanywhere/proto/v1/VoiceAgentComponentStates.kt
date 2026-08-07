@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -121,12 +120,11 @@ public class VoiceAgentComponentStates(
   public val wakeword_state:
       ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
   @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 7,
   )
-  public val error_message: String? = null,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentComponentStates, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -146,7 +144,7 @@ public class VoiceAgentComponentStates(
     if (ready != other.ready) return false
     if (any_loading != other.any_loading) return false
     if (wakeword_state != other.wakeword_state) return false
-    if (error_message != other.error_message) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -161,7 +159,7 @@ public class VoiceAgentComponentStates(
       result = result * 37 + ready.hashCode()
       result = result * 37 + any_loading.hashCode()
       result = result * 37 + wakeword_state.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -176,7 +174,7 @@ public class VoiceAgentComponentStates(
     result += """ready=$ready"""
     result += """any_loading=$any_loading"""
     result += """wakeword_state=$wakeword_state"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "VoiceAgentComponentStates{", separator = ", ", postfix = "}")
   }
 
@@ -188,9 +186,9 @@ public class VoiceAgentComponentStates(
     ready: Boolean = this.ready,
     any_loading: Boolean = this.any_loading,
     wakeword_state: ComponentLifecycleState = this.wakeword_state,
-    error_message: String? = this.error_message,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentComponentStates = VoiceAgentComponentStates(stt_state, llm_state, tts_state, vad_state, ready, any_loading, wakeword_state, error_message, unknownFields)
+  ): VoiceAgentComponentStates = VoiceAgentComponentStates(stt_state, llm_state, tts_state, vad_state, ready, any_loading, wakeword_state, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -226,7 +224,7 @@ public class VoiceAgentComponentStates(
         if (value.wakeword_state != ai.runanywhere.proto.v1.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED) {
           size += ComponentLifecycleState.ADAPTER.encodedSizeWithTag(7, value.wakeword_state)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error_message)
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
@@ -252,13 +250,13 @@ public class VoiceAgentComponentStates(
         if (value.wakeword_state != ai.runanywhere.proto.v1.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED) {
           ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 7, value.wakeword_state)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentComponentStates) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         if (value.wakeword_state != ai.runanywhere.proto.v1.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED) {
           ComponentLifecycleState.ADAPTER.encodeWithTag(writer, 7, value.wakeword_state)
         }
@@ -290,7 +288,7 @@ public class VoiceAgentComponentStates(
         var ready: Boolean = false
         var any_loading: Boolean = false
         var wakeword_state: ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
-        var error_message: String? = null
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -320,7 +318,7 @@ public class VoiceAgentComponentStates(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            8 -> error_message = ProtoAdapter.STRING.decode(reader)
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -332,12 +330,13 @@ public class VoiceAgentComponentStates(
           ready = ready,
           any_loading = any_loading,
           wakeword_state = wakeword_state,
-          error_message = error_message,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VoiceAgentComponentStates): VoiceAgentComponentStates = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

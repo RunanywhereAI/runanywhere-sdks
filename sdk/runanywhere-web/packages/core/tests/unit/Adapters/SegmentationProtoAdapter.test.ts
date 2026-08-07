@@ -11,7 +11,9 @@ import type { ModalityProtoModule } from '../../../src/Adapters/ProtoAdapterType
 import { ModalityProtoAdapter } from '../../../src/Adapters/ModalityProtoAdapter';
 import { segment } from '../../../src/Public/Extensions/RunAnywhere+Segmentation';
 import { WebModelLifecycle } from '../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
-import { RunAnywhere } from '../../../src/Public/RunAnywhere';
+import { SDKCore } from '../../../src/Public/SDKCore';
+import { ImageInput } from '../../../src/Public/API/Inputs';
+import { segmentation } from '../../../src/Public/API/Namespaces/segmentation';
 
 describe('Segmentation lifecycle bridge and public validation', () => {
   afterEach(() => {
@@ -46,7 +48,7 @@ describe('Segmentation lifecycle bridge and public validation', () => {
     const harness = fakeSegmentationModule();
     ModalityProtoAdapter.registerModuleCapabilities(['segmentation'], harness.module);
     vi.spyOn(WebModelLifecycle, 'supportsNativeLifecycle').mockReturnValue(true);
-    const servicesReady = vi.spyOn(RunAnywhere, 'ensureServicesReady').mockResolvedValue();
+    const servicesReady = vi.spyOn(SDKCore, 'ensureServicesReady').mockResolvedValue();
     vi.spyOn(WebModelLifecycle, 'currentModel').mockReturnValue(
       CurrentModelResult.create({
         found: true,
@@ -55,11 +57,14 @@ describe('Segmentation lifecycle bridge and public validation', () => {
       }),
     );
 
-    const result = await RunAnywhere.segment(validRequest());
+    // Through the public verb: readiness is gated in the namespace, not the bridge.
+    const result = await segmentation.segment(
+      ImageInput.rawRgb(new Uint8Array([1, 2, 3, 4, 5, 6]), 2, 1),
+      { includeDiagnosticImage: true },
+    );
 
     expect(servicesReady).toHaveBeenCalledOnce();
-    expect(result.classMaskU16Le).toEqual(new Uint8Array([7, 0, 7, 0]));
-    expect(result.diagnosticRgba).toHaveLength(8);
+    expect(result.classMask).toEqual(new Uint8Array([7, 0, 7, 0]));
     expect(harness.calls).toBe(1);
   });
 
@@ -196,7 +201,8 @@ function fakeSegmentationModule(): FakeSegmentationHarness {
           height: 1,
           classMaskU16Le: new Uint8Array([7, 0, 7, 0]),
           diagnosticRgba: new Uint8Array([1, 2, 3, 255, 1, 2, 3, 255]),
-          classSummaries: [{ classId: 7, pixelCount: 2, fraction: 1, label: 'road' }],
+          // `SegmentationClassSummary.fraction` was deleted outright.
+          classSummaries: [{ classId: 7, pixelCount: 2, label: 'road' }],
           processingTimeMs: 2,
           modelId: 'segformer-b0',
         })).finish(),

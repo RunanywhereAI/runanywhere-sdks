@@ -22,7 +22,7 @@ import {
   type ColorScheme,
 } from '../../theme/system';
 import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
-import { RunAnywhere } from '@runanywhere/core';
+import { formatFramework } from '@runanywhere/core';
 import { getFrameworkColor, getFrameworkIcon } from '../../utils/modelDisplay';
 
 interface ModelStatusBannerProps {
@@ -97,7 +97,7 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
   // Model loaded state
   const frameworkColor = getFrameworkColor(framework);
   const frameworkIcon = getFrameworkIcon(framework);
-  const frameworkName = RunAnywhere.formatFramework(framework);
+  const frameworkName = formatFramework(framework);
 
   return (
     <View style={styles.container}>

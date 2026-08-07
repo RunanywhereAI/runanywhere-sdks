@@ -30,7 +30,6 @@ public enum RADefaults {
         public static let micSampleRateHz: Int = 16000
         public static let micChannels: Int = 1
         public static let micChannelCapacity: Int = 128
-        public static let micTapBufferFrames: Int = 4096
         public static let ttsSampleRateHz: Int = 22050
     }
 

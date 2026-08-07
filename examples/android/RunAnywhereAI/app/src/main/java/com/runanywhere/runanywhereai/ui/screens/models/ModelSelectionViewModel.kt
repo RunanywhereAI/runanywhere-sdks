@@ -17,10 +17,8 @@ import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
-import com.runanywhere.sdk.public.extensions.deleteModel
-import com.runanywhere.sdk.public.extensions.downloadModelStream
-import com.runanywhere.sdk.public.extensions.listModels
-import com.runanywhere.sdk.public.extensions.loadModel
+import com.runanywhere.sdk.public.api.DownloadEvent
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
@@ -97,7 +95,7 @@ class ModelSelectionViewModel(
             // Union live QHexRT registration with what is already downloaded so an
             // on-disk NPU bundle stays selectable even when re-registration is
             // skipped offline (see isVisibleForNativeNpuCatalog).
-            val models = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+            val models = RunAnywhere.models.list()
                 .filter { context.accepts(it) }
                 // Native QHexRT registration is the source of truth. This also
                 // hides stale rows left by older app versions that registered
@@ -233,13 +231,18 @@ class ModelSelectionViewModel(
             // Same as ModelDownloadService: free resident weights so the RAM
             // preflight can pass when another STT/LLM is still loaded.
             RuntimeModelSelection.unloadAllForDownload()
-            RunAnywhere.downloadModelStream(model).collect { p ->
-                val pct = if (p.total_bytes > 0) {
-                    (p.bytes_downloaded * 100 / p.total_bytes).toInt()
-                } else {
-                    (p.stage_progress.coerceIn(0f, 1f) * 100).toInt()
+            RunAnywhere.models.download(model.id).collect { event ->
+                val pct = when (event) {
+                    is DownloadEvent.Progress ->
+                        if (event.bytesTotal > 0) {
+                            (event.bytesDone * 100 / event.bytesTotal).toInt()
+                        } else {
+                            null
+                        }
+                    is DownloadEvent.Completed -> 100
+                    else -> null
                 }
-                state = state.copy(progressPercent = pct)
+                if (pct != null) state = state.copy(progressPercent = pct)
             }
             state = state.copy(busyModelId = null, progressPercent = null, currentModelId = null)
             reload()
@@ -289,7 +292,7 @@ class ModelSelectionViewModel(
             state = state.copy(busyModelId = model.id, progressPercent = null, error = null)
             try {
                 if (isLlm) LlmModelChangeInterlock.awaitReadyForModelChange()
-                RunAnywhere.deleteModel(model.id)
+                RunAnywhere.models.delete(model.id)
                 RuntimeModelSelection.clearModelEverywhere(model.id)
                 reload()
             } catch (e: CancellationException) {
@@ -320,23 +323,18 @@ class ModelSelectionViewModel(
                     // request that still owns the old model before doing so.
                     LlmModelChangeInterlock.awaitReadyForModelChange()
                 }
-                val result = RunAnywhere.loadModel(model)
-                if (result.success) {
-                    val actual = RuntimeModelSelection.queryCurrent(context, state.models + model)
-                    if (actual?.id != model.id) {
-                        state = state.copy(
-                            busyModelId = null,
-                            error = "The runtime loaded ${actual?.id ?: "no model"} instead of ${model.id}.",
-                        )
-                        false
-                    } else {
-                        if (isLlm) GlobalState.lora.set(null)
-                        state = state.copy(currentModelId = actual.id, busyModelId = null)
-                        true
-                    }
-                } else {
-                    state = state.copy(busyModelId = null, error = result.error_message.ifBlank { "Load failed" })
+                RunAnywhere.models.load(model.id)
+                val actual = RuntimeModelSelection.queryCurrent(context, state.models + model)
+                if (actual?.id != model.id) {
+                    state = state.copy(
+                        busyModelId = null,
+                        error = "The runtime loaded ${actual?.id ?: "no model"} instead of ${model.id}.",
+                    )
                     false
+                } else {
+                    if (isLlm) GlobalState.lora.set(null)
+                    state = state.copy(currentModelId = actual.id, busyModelId = null)
+                    true
                 }
             }
         } catch (e: CancellationException) {
@@ -379,11 +377,9 @@ class ModelSelectionViewModel(
         val candidateId = ModelAutoLoadPolicy.preferredCandidateId(ready.map { it.id }) ?: return
         val candidate = ready.first { it.id == candidateId }
         runCatching {
-            val result = RunAnywhere.loadModel(candidate)
-            if (result.success) {
-                RuntimeModelSelection.queryCurrent(context, models)
-                GlobalState.lora.set(null)
-            }
+            RunAnywhere.models.load(candidate.id)
+            RuntimeModelSelection.queryCurrent(context, models)
+            GlobalState.lora.set(null)
         }.onFailure { RACLog.w("auto-load skipped: ${candidate.id}") }
     }
 

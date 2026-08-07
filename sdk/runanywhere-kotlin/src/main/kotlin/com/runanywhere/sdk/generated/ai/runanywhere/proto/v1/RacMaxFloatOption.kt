@@ -14,9 +14,6 @@ import kotlin.`annotation`.AnnotationTarget
 import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
-/**
- * Inclusive numeric maximum used by validate() for float/double fields.
- */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(
   AnnotationTarget.PROPERTY,

@@ -47,7 +47,11 @@ playground.xcworkspace
 # Package.pins
 # Package.resolved
 .build/
+.build-*/
 .swiftpm/
+
+# Local Ambient / on-device experiment caches (models, fixtures, run artifacts)
+.ambient-*/
 
 # CocoaPods
 #
@@ -150,8 +154,14 @@ sdk/runanywhere-kotlin/.idea/
 *.swo
 *~
 
-# Claude
-.claude/
+# Claude. Local session state stays ignored. The handoff README/scripts can
+# stay tracked, but plans and memory are local agent working notes.
+# Uses `.claude/*` rather than `.claude/` because git will not descend into
+# an excluded directory, which would make the negation below unreachable.
+.claude/*
+!.claude/handoff/
+.claude/handoff/plans/
+.claude/handoff/memory/
 
 # Playwright MCP
 .playwright-mcp/

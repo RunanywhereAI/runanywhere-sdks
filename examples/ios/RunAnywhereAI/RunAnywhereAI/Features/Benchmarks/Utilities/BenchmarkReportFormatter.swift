@@ -123,8 +123,6 @@ enum BenchmarkReportFormatter {
                         lines.append("- Audio duration: \(String(format: "%.1f", dur))s")
                     }
                     if let chars = metrics.charactersProcessed { lines.append("- Characters: \(chars)") }
-                    if let pt = metrics.promptTokens { lines.append("- Prompt tokens: \(pt)") }
-                    if let ct = metrics.completionTokens { lines.append("- Completion tokens: \(ct)") }
                     if let genMs = metrics.generationTimeMs {
                         lines.append("- Gen time: \(String(format: "%.0f", genMs))ms")
                     }
@@ -170,7 +168,7 @@ enum BenchmarkReportFormatter {
     static func writeCSV(run: BenchmarkRun) -> URL {
         var csv = "Category,Scenario,Model,Framework,Trials,LoadMs,WarmupMs,E2EMs,E2EMinMs,E2EMaxMs,"
             + "DecodeTPS,PrefillTPS,TPS,TPSMin,TPSMax,TTFT,TTFTMinMs,TTFTMaxMs,InTokens,OutTokens,"
-            + "RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,GenMs,MemDeltaBytes,Success,Error\n"
+            + "RTF,AudioLen,AudioDur,Chars,GenMs,MemDeltaBytes,Success,Error\n"
         for result in run.results {
             let metrics = result.metrics
             let variance = result.variance
@@ -199,8 +197,6 @@ enum BenchmarkReportFormatter {
             row.append(metrics.audioLengthSeconds.map { String(format: "%.1f", $0) } ?? "")
             row.append(metrics.audioDurationSeconds.map { String(format: "%.1f", $0) } ?? "")
             row.append(metrics.charactersProcessed.map { "\($0)" } ?? "")
-            row.append(metrics.promptTokens.map { "\($0)" } ?? "")
-            row.append(metrics.completionTokens.map { "\($0)" } ?? "")
             row.append(metrics.generationTimeMs.map { String(format: "%.0f", $0) } ?? "")
             row.append(String(metrics.memoryDeltaBytes))
             row.append(metrics.didSucceed ? "true" : "false")

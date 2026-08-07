@@ -40,7 +40,7 @@ class TTSBenchmarkProvider implements BenchmarkScenarioProvider {
 
     // Load
     final loadStopwatch = Stopwatch()..start();
-    await sdk.RunAnywhere.tts.loadVoice(model.id);
+    await sdk.RunAnywhere.models.load(model.id);
     metrics.loadTimeMs = loadStopwatch.elapsedMicroseconds / 1000.0;
 
     try {
@@ -49,23 +49,23 @@ class TTSBenchmarkProvider implements BenchmarkScenarioProvider {
       final result = await sdk.RunAnywhere.tts.synthesize(text);
       metrics.endToEndLatencyMs = benchStopwatch.elapsedMicroseconds / 1000.0;
 
-      final durationMs = result.durationMs.toInt();
+      final durationMs = result.durationMs;
       if (durationMs > 0) {
         metrics.audioDurationSeconds = durationMs / 1000.0;
-      } else if (result.sampleRate > 0 && result.audioData.isNotEmpty) {
+      } else if (result.sampleRate > 0 && result.data.isNotEmpty) {
         // Fallback: Float32 PCM — 4 bytes per sample.
         metrics.audioDurationSeconds =
-            (result.audioData.length / 4) / result.sampleRate;
+            (result.data.length / 4) / result.sampleRate;
       }
-      metrics.charactersProcessed = result.metadata.characterCount > 0
-          ? result.metadata.characterCount
-          : text.length;
+      metrics.charactersProcessed = text.length;
 
       // memoryDeltaBytes stays 0: no portable Dart available-memory probe.
       return metrics;
     } finally {
       try {
-        await sdk.RunAnywhere.tts.unloadVoice();
+        await sdk.RunAnywhere.models.unloadAll(
+          sdk.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        );
       } catch (_) {
         // Best-effort cleanup.
       }

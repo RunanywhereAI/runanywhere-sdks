@@ -3,14 +3,14 @@
  *
  * Speech-to-text namespace — mirrors Swift's `RunAnywhere+STT.swift`.
  * Provides `RunAnywhere.stt.*` capability surface for owning STT component
- * handles plus lifecycle-owned `transcribeAuto` / `transcribeStreamAuto`
- * shortcuts.
+ * handles plus the lifecycle-owned `transcribe` / `transcribeStream` entry
+ * points the public `RunAnywhere.stt` namespace builds on.
  *
  * The proto-byte adapters (`STTProtoAdapter`) take a numeric `handle` argument
  * — it comes from `_rac_stt_component_create()` followed by
  * `_rac_stt_component_load_model()`. This facade owns those calls so the
  * example app and external consumers never have to touch raw exports. The
- * auto shortcuts deliberately do not create component handles: they dispatch
+ * lifecycle-owned entry points deliberately do not create component handles: they dispatch
  * through commons' lifecycle-owned STT ABI so the currently loaded model is
  * never replaced as a side effect of inference.
  */
@@ -20,6 +20,7 @@ import {
   STTStreamEventKind,
   type STTOptions,
   type STTOutput,
+  type STTServiceState,
 } from '@runanywhere/proto-ts/stt_options';
 import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
 import { SDKException } from '../../Foundation/SDKException.js';
@@ -35,7 +36,7 @@ import {
 } from '../../runtime/SpeechBackendExports.js';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
 
-export type { STTOptions, STTOutput, STTPartialResult };
+export type { STTOptions, STTOutput, STTPartialResult, STTServiceState };
 
 const logger = new SDKLogger('STT');
 
@@ -182,9 +183,6 @@ function callLoadModel(
 export type TranscribeOptions = Partial<STTOptions>;
 
 export const STT = {
-  transcribeAuto: transcribe,
-  transcribeStreamAuto: transcribeStream,
-
   /**
    * Returns true when the WASM module is loaded with both the proto-byte
    * STT exports AND the component lifecycle exports (create / load_model /
@@ -290,6 +288,22 @@ export const STT = {
 };
 
 /**
+ * Snapshot of the lifecycle-owned STT service state.
+ */
+export async function sttState(): Promise<STTServiceState> {
+  requireSTTModule('RunAnywhere.sttState');
+  const adapter = STTProtoAdapter.tryDefault();
+  const state = adapter?.stateLifecycle();
+  if (!state) {
+    throw SDKException.backendNotAvailable(
+      'RunAnywhere.sttState',
+      'Loaded WASM module does not export rac_stt_state_lifecycle_proto.',
+    );
+  }
+  return state;
+}
+
+/**
  * Top-level ergonomic shortcut. Commons resolves and retains the STT model
  * already loaded by ModelLifecycle; this call never creates, loads, unloads,
  * or destroys a component handle.
@@ -298,11 +312,11 @@ export async function transcribe(
   audio: Uint8Array | Float32Array,
   options?: TranscribeOptions,
 ): Promise<STTOutput> {
-  requireSTTModule('RunAnywhere.stt.transcribeAuto');
+  requireSTTModule('RunAnywhere.stt.transcribe');
   const adapter = STTProtoAdapter.tryDefault();
   if (!adapter?.supportsLifecycleProtoSTT()) {
     throw SDKException.backendNotAvailable(
-      'RunAnywhere.stt.transcribeAuto',
+      'RunAnywhere.stt.transcribe',
       'Loaded WASM module does not export rac_stt_transcribe_lifecycle_proto.',
     );
   }
@@ -327,11 +341,11 @@ export function transcribeStream(
   audio: Uint8Array | Float32Array,
   options?: TranscribeOptions,
 ): AsyncIterable<STTPartialResult> {
-  requireSTTModule('RunAnywhere.stt.transcribeStreamAuto');
+  requireSTTModule('RunAnywhere.stt.transcribeStream');
   const adapter = STTProtoAdapter.tryDefault();
   if (!adapter?.supportsLifecycleProtoSTT()) {
     throw SDKException.backendNotAvailable(
-      'RunAnywhere.stt.transcribeStreamAuto',
+      'RunAnywhere.stt.transcribeStream',
       'Loaded WASM module does not export rac_stt_transcribe_stream_lifecycle_proto.',
     );
   }
@@ -342,23 +356,20 @@ export function transcribeStream(
   return (async function* (): AsyncIterable<STTPartialResult> {
     for await (const event of events) {
       if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
-        const detail = event.errorMessage || String(event.errorCode);
+        const detail = event.error?.message || String(event.error?.cAbiCode ?? '');
         yield STTPartialResult.fromPartial({
           text: detail.startsWith('STT stream failed')
             ? detail
             : `STT stream failed: ${detail}`,
           isFinal: true,
-          requestId: event.requestId,
         });
         return;
       }
       if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL) {
         yield STTPartialResult.fromPartial({
-          ...(event.partial ?? {}),
           text: event.partial?.text || event.finalOutput?.text || '',
           isFinal: true,
-          finalOutput: event.finalOutput ?? event.partial?.finalOutput,
-          requestId: event.requestId || event.partial?.requestId,
+          language: event.partial?.language ?? event.finalOutput?.language,
         });
         return;
       }

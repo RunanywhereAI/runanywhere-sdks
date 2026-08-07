@@ -2,7 +2,7 @@
 //  SegmentationView.swift
 //  RunAnywhereAI
 //
-//  UI for semantic image segmentation (SegFormer) over `RunAnywhere.segment`.
+//  UI for semantic image segmentation (SegFormer) over `RunAnywhere.segmentation`.
 //  Pure SwiftUI: model picker, image picker, and mask rendering — no inference
 //  or model logic lives here.
 //
@@ -82,7 +82,7 @@ struct SegmentationView: View {
                 }
             }
         }
-        .task { viewModel.refreshModelStatus() }
+        .task { await viewModel.refreshModelStatus() }
         .onChange(of: photoItem) { _, newValue in
             guard let newValue else { return }
             Task {
@@ -208,9 +208,9 @@ struct SegmentationView: View {
                         .foregroundColor(AppColors.textSecondary)
                 }
             }
-            ForEach(viewModel.classSummaries, id: \.classID) { summary in
+            ForEach(viewModel.classSummaries, id: \.classId) { summary in
                 HStack {
-                    Text(summary.label.isEmpty ? "class \(summary.classID)" : summary.label)
+                    Text(summary.label.isEmpty ? "class \(summary.classId)" : summary.label)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textPrimary)
                     Spacer()

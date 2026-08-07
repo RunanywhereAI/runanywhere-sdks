@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -30,32 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a single VAD pass over a chunk of PCM audio.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift —                 (no struct; bool returned from detectSpeech())
- *   Kotlin VADTypes.kt:152                  (isSpeech, confidence, energyLevel,
- *                                            statistics, timestamp)
- *   Dart   dart_bridge_vad.dart:290         (isSpeech, energy, speechProbability)
- *   RN     VADTypes.ts:26                   (isSpeech, probability, startTime, endTime)
- *   Web    VADTypes.ts —                    (no VADResult; only SpeechSegment)
- *   C ABI  rac_vad_types.h:151 (rac_vad_output_t)
- *                                           (is_speech_detected, energy_level, timestamp_ms)
- *
- * Drift notes:
- *   - Kotlin's `confidence` and Dart's `speechProbability` and RN's
- *     `probability` collapse onto the canonical `confidence` field.
- *   - Kotlin/RN/C all carry timing — we encode duration_ms (length of the
- *     analyzed frame). Wall-clock timestamps belong on the carrying envelope
- *     (e.g. VoiceEvent.timestamp_us in voice_events.proto).
- * ---------------------------------------------------------------------------
- */
 public class VADResult(
-  /**
-   * Whether speech was detected in this frame.
-   * Mirrors rac_vad_output_t::is_speech_detected.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -65,7 +39,11 @@ public class VADResult(
   )
   public val is_speech: Boolean = false,
   /**
-   * Confidence / probability in \[0.0, 1.0\]. Backend-dependent.
+   * \[0.0, 1.0\], backend- AND path-dependent. On the one-shot detect path the
+   * built-in energy VAD reports min(1.0, energy/threshold), which saturates
+   * at 1.0; on the streaming per-frame path it is binary 0.0/1.0. A model
+   * backend reports its own speech probability. Not comparable across
+   * backends — do not re-threshold on it.
    */
   @field:WireField(
     tag = 2,
@@ -73,10 +51,9 @@ public class VADResult(
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 1,
   )
-  public val confidence: Float = 0f,
+  public val probability: Float = 0f,
   /**
-   * RMS energy level of the analyzed frame.
-   * Mirrors rac_vad_output_t::energy_level.
+   * RMS energy of the analyzed frame.
    */
   @field:WireField(
     tag = 3,
@@ -86,7 +63,7 @@ public class VADResult(
   )
   public val energy: Float = 0f,
   /**
-   * Length of the analyzed frame in milliseconds.
+   * Length of the analyzed frame.
    */
   @field:WireField(
     tag = 4,
@@ -97,7 +74,7 @@ public class VADResult(
   )
   public val duration_ms: Int = 0,
   /**
-   * Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 5,
@@ -107,49 +84,12 @@ public class VADResult(
     schemaIndex = 4,
   )
   public val timestamp_ms: Long = 0L,
-  /**
-   * Optional detected segment start/end times, in milliseconds. 0 = unset.
-   */
   @field:WireField(
     tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "startTimeMs",
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 5,
   )
-  public val start_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "endTimeMs",
-    schemaIndex = 6,
-  )
-  public val end_time_ms: Long = 0L,
-  /**
-   * Optional statistics snapshot and result-envelope error details.
-   */
-  @field:WireField(
-    tag = 8,
-    adapter = "ai.runanywhere.proto.v1.VADStatistics#ADAPTER",
-    schemaIndex = 7,
-  )
-  public val statistics: VADStatistics? = null,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 8,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 9,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -163,15 +103,11 @@ public class VADResult(
     if (other !is VADResult) return false
     if (unknownFields != other.unknownFields) return false
     if (is_speech != other.is_speech) return false
-    if (confidence != other.confidence) return false
+    if (probability != other.probability) return false
     if (energy != other.energy) return false
     if (duration_ms != other.duration_ms) return false
     if (timestamp_ms != other.timestamp_ms) return false
-    if (start_time_ms != other.start_time_ms) return false
-    if (end_time_ms != other.end_time_ms) return false
-    if (statistics != other.statistics) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -180,15 +116,11 @@ public class VADResult(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + is_speech.hashCode()
-      result = result * 37 + confidence.hashCode()
+      result = result * 37 + probability.hashCode()
       result = result * 37 + energy.hashCode()
       result = result * 37 + duration_ms.hashCode()
       result = result * 37 + timestamp_ms.hashCode()
-      result = result * 37 + start_time_ms.hashCode()
-      result = result * 37 + end_time_ms.hashCode()
-      result = result * 37 + (statistics?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -197,31 +129,23 @@ public class VADResult(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """is_speech=$is_speech"""
-    result += """confidence=$confidence"""
+    result += """probability=$probability"""
     result += """energy=$energy"""
     result += """duration_ms=$duration_ms"""
     result += """timestamp_ms=$timestamp_ms"""
-    result += """start_time_ms=$start_time_ms"""
-    result += """end_time_ms=$end_time_ms"""
-    if (statistics != null) result += """statistics=$statistics"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "VADResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     is_speech: Boolean = this.is_speech,
-    confidence: Float = this.confidence,
+    probability: Float = this.probability,
     energy: Float = this.energy,
     duration_ms: Int = this.duration_ms,
     timestamp_ms: Long = this.timestamp_ms,
-    start_time_ms: Long = this.start_time_ms,
-    end_time_ms: Long = this.end_time_ms,
-    statistics: VADStatistics? = this.statistics,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VADResult = VADResult(is_speech, confidence, energy, duration_ms, timestamp_ms, start_time_ms, end_time_ms, statistics, error_message, error_code, unknownFields)
+  ): VADResult = VADResult(is_speech, probability, energy, duration_ms, timestamp_ms, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -238,8 +162,8 @@ public class VADResult(
         if (value.is_speech != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.is_speech)
         }
-        if (!value.confidence.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.confidence)
+        if (!value.probability.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.probability)
         }
         if (!value.energy.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.energy)
@@ -250,17 +174,7 @@ public class VADResult(
         if (value.timestamp_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.timestamp_ms)
         }
-        if (value.start_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.start_time_ms)
-        }
-        if (value.end_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.end_time_ms)
-        }
-        size += VADStatistics.ADAPTER.encodedSizeWithTag(8, value.statistics)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
@@ -268,8 +182,8 @@ public class VADResult(
         if (value.is_speech != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.is_speech)
         }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.confidence)
+        if (!value.probability.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.probability)
         }
         if (!value.energy.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.energy)
@@ -280,33 +194,13 @@ public class VADResult(
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.timestamp_ms)
         }
-        if (value.start_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.start_time_ms)
-        }
-        if (value.end_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.end_time_ms)
-        }
-        VADStatistics.ADAPTER.encodeWithTag(writer, 8, value.statistics)
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
-        VADStatistics.ADAPTER.encodeWithTag(writer, 8, value.statistics)
-        if (value.end_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.end_time_ms)
-        }
-        if (value.start_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.start_time_ms)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.timestamp_ms)
         }
@@ -316,8 +210,8 @@ public class VADResult(
         if (!value.energy.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.energy)
         }
-        if (!value.confidence.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.confidence)
+        if (!value.probability.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.probability)
         }
         if (value.is_speech != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.is_speech)
@@ -326,47 +220,35 @@ public class VADResult(
 
       override fun decode(reader: ProtoReader): VADResult {
         var is_speech: Boolean = false
-        var confidence: Float = 0f
+        var probability: Float = 0f
         var energy: Float = 0f
         var duration_ms: Int = 0
         var timestamp_ms: Long = 0L
-        var start_time_ms: Long = 0L
-        var end_time_ms: Long = 0L
-        var statistics: VADStatistics? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_speech = ProtoAdapter.BOOL.decode(reader)
-            2 -> confidence = ProtoAdapter.FLOAT.decode(reader)
+            2 -> probability = ProtoAdapter.FLOAT.decode(reader)
             3 -> energy = ProtoAdapter.FLOAT.decode(reader)
             4 -> duration_ms = ProtoAdapter.INT32.decode(reader)
             5 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
-            6 -> start_time_ms = ProtoAdapter.INT64.decode(reader)
-            7 -> end_time_ms = ProtoAdapter.INT64.decode(reader)
-            8 -> statistics = VADStatistics.ADAPTER.decode(reader)
-            9 -> error_message = ProtoAdapter.STRING.decode(reader)
-            10 -> error_code = ProtoAdapter.INT32.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADResult(
           is_speech = is_speech,
-          confidence = confidence,
+          probability = probability,
           energy = energy,
           duration_ms = duration_ms,
           timestamp_ms = timestamp_ms,
-          start_time_ms = start_time_ms,
-          end_time_ms = end_time_ms,
-          statistics = statistics,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VADResult): VADResult = value.copy(
-        statistics = value.statistics?.let(VADStatistics.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

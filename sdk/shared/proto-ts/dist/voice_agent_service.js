@@ -5,173 +5,57 @@
 //   protoc               v7.35.1
 // source: voice_agent_service.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VoiceAgentSynthesizeSpeechProtoRequest = exports.VoiceAgentTranscribeProtoRequest = exports.VoiceAgentComposeConfig = exports.AudioPipelineConfig = exports.VoiceSessionConfig = exports.VoiceAgentTurnRequest_MetadataEntry = exports.VoiceAgentTurnRequest = exports.VoiceAgentResult = exports.VoiceAgentRequest = exports.protobufPackage = void 0;
+exports.VoiceAgentSynthesizeSpeechProtoRequest = exports.VoiceAgentTranscribeProtoRequest = exports.VoiceAgentComposeConfig = exports.VoiceAgentAudioFrame = exports.VoiceAgentTurnRequest_MetadataEntry = exports.VoiceAgentTurnRequest = exports.TurnDetection = exports.VoiceAgentResult = exports.TurnDetection_Type = exports.protobufPackage = void 0;
+exports.turnDetection_TypeFromJSON = turnDetection_TypeFromJSON;
+exports.turnDetection_TypeToJSON = turnDetection_TypeToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
-const component_types_1 = require("./component_types");
-const errors_1 = require("./errors");
+const llm_options_1 = require("./llm_options");
+const model_types_1 = require("./model_types");
 const tts_options_1 = require("./tts_options");
+const vad_options_1 = require("./vad_options");
 const voice_events_1 = require("./voice_events");
 exports.protobufPackage = "runanywhere.v1";
-function createBaseVoiceAgentRequest() {
-    return { eventFilter: "", sessionId: "", categories: [], minSeverity: 0, replayFromSeq: 0, includeAudio: false };
+var TurnDetection_Type;
+(function (TurnDetection_Type) {
+    /** TURN_DETECTION_TYPE_UNSPECIFIED - treated as VAD */
+    TurnDetection_Type[TurnDetection_Type["TURN_DETECTION_TYPE_UNSPECIFIED"] = 0] = "TURN_DETECTION_TYPE_UNSPECIFIED";
+    /** TURN_DETECTION_TYPE_VAD - the VAD decides end-of-turn */
+    TurnDetection_Type[TurnDetection_Type["TURN_DETECTION_TYPE_VAD"] = 1] = "TURN_DETECTION_TYPE_VAD";
+    /** TURN_DETECTION_TYPE_MANUAL - push-to-talk: app closes the turn */
+    TurnDetection_Type[TurnDetection_Type["TURN_DETECTION_TYPE_MANUAL"] = 2] = "TURN_DETECTION_TYPE_MANUAL";
+    TurnDetection_Type[TurnDetection_Type["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(TurnDetection_Type || (exports.TurnDetection_Type = TurnDetection_Type = {}));
+function turnDetection_TypeFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "TURN_DETECTION_TYPE_UNSPECIFIED":
+            return TurnDetection_Type.TURN_DETECTION_TYPE_UNSPECIFIED;
+        case 1:
+        case "TURN_DETECTION_TYPE_VAD":
+            return TurnDetection_Type.TURN_DETECTION_TYPE_VAD;
+        case 2:
+        case "TURN_DETECTION_TYPE_MANUAL":
+            return TurnDetection_Type.TURN_DETECTION_TYPE_MANUAL;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return TurnDetection_Type.UNRECOGNIZED;
+    }
 }
-exports.VoiceAgentRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.eventFilter !== "") {
-            writer.uint32(10).string(message.eventFilter);
-        }
-        if (message.sessionId !== "") {
-            writer.uint32(18).string(message.sessionId);
-        }
-        writer.uint32(26).fork();
-        for (const v of message.categories) {
-            writer.int32(v);
-        }
-        writer.join();
-        if (message.minSeverity !== 0) {
-            writer.uint32(32).int32(message.minSeverity);
-        }
-        if (message.replayFromSeq !== 0) {
-            writer.uint32(40).uint64(message.replayFromSeq);
-        }
-        if (message.includeAudio !== false) {
-            writer.uint32(48).bool(message.includeAudio);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseVoiceAgentRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.eventFilter = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.sessionId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag === 24) {
-                        message.categories.push(reader.int32());
-                        continue;
-                    }
-                    if (tag === 26) {
-                        const end2 = reader.uint32() + reader.pos;
-                        while (reader.pos < end2) {
-                            message.categories.push(reader.int32());
-                        }
-                        continue;
-                    }
-                    break;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.minSeverity = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.replayFromSeq = longToNumber(reader.uint64());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.includeAudio = reader.bool();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            eventFilter: isSet(object.eventFilter)
-                ? globalThis.String(object.eventFilter)
-                : isSet(object.event_filter)
-                    ? globalThis.String(object.event_filter)
-                    : "",
-            sessionId: isSet(object.sessionId)
-                ? globalThis.String(object.sessionId)
-                : isSet(object.session_id)
-                    ? globalThis.String(object.session_id)
-                    : "",
-            categories: globalThis.Array.isArray(object?.categories)
-                ? object.categories.map((e) => (0, component_types_1.eventCategoryFromJSON)(e))
-                : [],
-            minSeverity: isSet(object.minSeverity)
-                ? (0, errors_1.errorSeverityFromJSON)(object.minSeverity)
-                : isSet(object.min_severity)
-                    ? (0, errors_1.errorSeverityFromJSON)(object.min_severity)
-                    : 0,
-            replayFromSeq: isSet(object.replayFromSeq)
-                ? globalThis.Number(object.replayFromSeq)
-                : isSet(object.replay_from_seq)
-                    ? globalThis.Number(object.replay_from_seq)
-                    : 0,
-            includeAudio: isSet(object.includeAudio)
-                ? globalThis.Boolean(object.includeAudio)
-                : isSet(object.include_audio)
-                    ? globalThis.Boolean(object.include_audio)
-                    : false,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.eventFilter !== "") {
-            obj.eventFilter = message.eventFilter;
-        }
-        if (message.sessionId !== "") {
-            obj.sessionId = message.sessionId;
-        }
-        if (message.categories?.length) {
-            obj.categories = message.categories.map((e) => (0, component_types_1.eventCategoryToJSON)(e));
-        }
-        if (message.minSeverity !== 0) {
-            obj.minSeverity = (0, errors_1.errorSeverityToJSON)(message.minSeverity);
-        }
-        if (message.replayFromSeq !== 0) {
-            obj.replayFromSeq = Math.round(message.replayFromSeq);
-        }
-        if (message.includeAudio !== false) {
-            obj.includeAudio = message.includeAudio;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.VoiceAgentRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseVoiceAgentRequest();
-        message.eventFilter = object.eventFilter ?? "";
-        message.sessionId = object.sessionId ?? "";
-        message.categories = object.categories?.map((e) => e) || [];
-        message.minSeverity = object.minSeverity ?? 0;
-        message.replayFromSeq = object.replayFromSeq ?? 0;
-        message.includeAudio = object.includeAudio ?? false;
-        return message;
-    },
-};
+function turnDetection_TypeToJSON(object) {
+    switch (object) {
+        case TurnDetection_Type.TURN_DETECTION_TYPE_UNSPECIFIED:
+            return "TURN_DETECTION_TYPE_UNSPECIFIED";
+        case TurnDetection_Type.TURN_DETECTION_TYPE_VAD:
+            return "TURN_DETECTION_TYPE_VAD";
+        case TurnDetection_Type.TURN_DETECTION_TYPE_MANUAL:
+            return "TURN_DETECTION_TYPE_MANUAL";
+        case TurnDetection_Type.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBaseVoiceAgentResult() {
     return {
         speechDetected: false,
@@ -180,17 +64,6 @@ function createBaseVoiceAgentResult() {
         thinkingContent: undefined,
         synthesizedAudio: undefined,
         finalState: undefined,
-        synthesizedAudioSampleRateHz: 0,
-        synthesizedAudioChannels: 0,
-        synthesizedAudioEncoding: 0,
-        sessionId: "",
-        turnId: "",
-        sttTimeMs: 0,
-        llmTimeMs: 0,
-        ttsTimeMs: 0,
-        totalTimeMs: 0,
-        errorMessage: undefined,
-        errorCode: 0,
     };
 }
 exports.VoiceAgentResult = {
@@ -212,39 +85,6 @@ exports.VoiceAgentResult = {
         }
         if (message.finalState !== undefined) {
             voice_events_1.VoiceAgentComponentStates.encode(message.finalState, writer.uint32(50).fork()).join();
-        }
-        if (message.synthesizedAudioSampleRateHz !== 0) {
-            writer.uint32(56).int32(message.synthesizedAudioSampleRateHz);
-        }
-        if (message.synthesizedAudioChannels !== 0) {
-            writer.uint32(64).int32(message.synthesizedAudioChannels);
-        }
-        if (message.synthesizedAudioEncoding !== 0) {
-            writer.uint32(72).int32(message.synthesizedAudioEncoding);
-        }
-        if (message.sessionId !== "") {
-            writer.uint32(82).string(message.sessionId);
-        }
-        if (message.turnId !== "") {
-            writer.uint32(90).string(message.turnId);
-        }
-        if (message.sttTimeMs !== 0) {
-            writer.uint32(96).int64(message.sttTimeMs);
-        }
-        if (message.llmTimeMs !== 0) {
-            writer.uint32(104).int64(message.llmTimeMs);
-        }
-        if (message.ttsTimeMs !== 0) {
-            writer.uint32(112).int64(message.ttsTimeMs);
-        }
-        if (message.totalTimeMs !== 0) {
-            writer.uint32(120).int64(message.totalTimeMs);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(130).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(136).int32(message.errorCode);
         }
         return writer;
     },
@@ -297,83 +137,6 @@ exports.VoiceAgentResult = {
                     message.finalState = voice_events_1.VoiceAgentComponentStates.decode(reader, reader.uint32());
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.synthesizedAudioSampleRateHz = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.synthesizedAudioChannels = reader.int32();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.synthesizedAudioEncoding = reader.int32();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.sessionId = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.turnId = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.sttTimeMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 104) {
-                        break;
-                    }
-                    message.llmTimeMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 112) {
-                        break;
-                    }
-                    message.ttsTimeMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 120) {
-                        break;
-                    }
-                    message.totalTimeMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 16: {
-                    if (tag !== 130) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 17: {
-                    if (tag !== 136) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -410,61 +173,6 @@ exports.VoiceAgentResult = {
                 : isSet(object.final_state)
                     ? voice_events_1.VoiceAgentComponentStates.fromJSON(object.final_state)
                     : undefined,
-            synthesizedAudioSampleRateHz: isSet(object.synthesizedAudioSampleRateHz)
-                ? globalThis.Number(object.synthesizedAudioSampleRateHz)
-                : isSet(object.synthesized_audio_sample_rate_hz)
-                    ? globalThis.Number(object.synthesized_audio_sample_rate_hz)
-                    : 0,
-            synthesizedAudioChannels: isSet(object.synthesizedAudioChannels)
-                ? globalThis.Number(object.synthesizedAudioChannels)
-                : isSet(object.synthesized_audio_channels)
-                    ? globalThis.Number(object.synthesized_audio_channels)
-                    : 0,
-            synthesizedAudioEncoding: isSet(object.synthesizedAudioEncoding)
-                ? (0, voice_events_1.audioEncodingFromJSON)(object.synthesizedAudioEncoding)
-                : isSet(object.synthesized_audio_encoding)
-                    ? (0, voice_events_1.audioEncodingFromJSON)(object.synthesized_audio_encoding)
-                    : 0,
-            sessionId: isSet(object.sessionId)
-                ? globalThis.String(object.sessionId)
-                : isSet(object.session_id)
-                    ? globalThis.String(object.session_id)
-                    : "",
-            turnId: isSet(object.turnId)
-                ? globalThis.String(object.turnId)
-                : isSet(object.turn_id)
-                    ? globalThis.String(object.turn_id)
-                    : "",
-            sttTimeMs: isSet(object.sttTimeMs)
-                ? globalThis.Number(object.sttTimeMs)
-                : isSet(object.stt_time_ms)
-                    ? globalThis.Number(object.stt_time_ms)
-                    : 0,
-            llmTimeMs: isSet(object.llmTimeMs)
-                ? globalThis.Number(object.llmTimeMs)
-                : isSet(object.llm_time_ms)
-                    ? globalThis.Number(object.llm_time_ms)
-                    : 0,
-            ttsTimeMs: isSet(object.ttsTimeMs)
-                ? globalThis.Number(object.ttsTimeMs)
-                : isSet(object.tts_time_ms)
-                    ? globalThis.Number(object.tts_time_ms)
-                    : 0,
-            totalTimeMs: isSet(object.totalTimeMs)
-                ? globalThis.Number(object.totalTimeMs)
-                : isSet(object.total_time_ms)
-                    ? globalThis.Number(object.total_time_ms)
-                    : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -487,39 +195,6 @@ exports.VoiceAgentResult = {
         if (message.finalState !== undefined) {
             obj.finalState = voice_events_1.VoiceAgentComponentStates.toJSON(message.finalState);
         }
-        if (message.synthesizedAudioSampleRateHz !== 0) {
-            obj.synthesizedAudioSampleRateHz = Math.round(message.synthesizedAudioSampleRateHz);
-        }
-        if (message.synthesizedAudioChannels !== 0) {
-            obj.synthesizedAudioChannels = Math.round(message.synthesizedAudioChannels);
-        }
-        if (message.synthesizedAudioEncoding !== 0) {
-            obj.synthesizedAudioEncoding = (0, voice_events_1.audioEncodingToJSON)(message.synthesizedAudioEncoding);
-        }
-        if (message.sessionId !== "") {
-            obj.sessionId = message.sessionId;
-        }
-        if (message.turnId !== "") {
-            obj.turnId = message.turnId;
-        }
-        if (message.sttTimeMs !== 0) {
-            obj.sttTimeMs = Math.round(message.sttTimeMs);
-        }
-        if (message.llmTimeMs !== 0) {
-            obj.llmTimeMs = Math.round(message.llmTimeMs);
-        }
-        if (message.ttsTimeMs !== 0) {
-            obj.ttsTimeMs = Math.round(message.ttsTimeMs);
-        }
-        if (message.totalTimeMs !== 0) {
-            obj.totalTimeMs = Math.round(message.totalTimeMs);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         return obj;
     },
     create(base) {
@@ -535,31 +210,162 @@ exports.VoiceAgentResult = {
         message.finalState = (object.finalState !== undefined && object.finalState !== null)
             ? voice_events_1.VoiceAgentComponentStates.fromPartial(object.finalState)
             : undefined;
-        message.synthesizedAudioSampleRateHz = object.synthesizedAudioSampleRateHz ?? 0;
-        message.synthesizedAudioChannels = object.synthesizedAudioChannels ?? 0;
-        message.synthesizedAudioEncoding = object.synthesizedAudioEncoding ?? 0;
-        message.sessionId = object.sessionId ?? "";
-        message.turnId = object.turnId ?? "";
-        message.sttTimeMs = object.sttTimeMs ?? 0;
-        message.llmTimeMs = object.llmTimeMs ?? 0;
-        message.ttsTimeMs = object.ttsTimeMs ?? 0;
-        message.totalTimeMs = object.totalTimeMs ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseTurnDetection() {
+    return {
+        type: 0,
+        threshold: 0,
+        silenceDurationMs: 0,
+        prefixPaddingMs: 0,
+        interruptResponse: undefined,
+        createResponse: undefined,
+    };
+}
+exports.TurnDetection = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.type !== 0) {
+            writer.uint32(8).int32(message.type);
+        }
+        if (message.threshold !== 0) {
+            writer.uint32(21).float(message.threshold);
+        }
+        if (message.silenceDurationMs !== 0) {
+            writer.uint32(24).int32(message.silenceDurationMs);
+        }
+        if (message.prefixPaddingMs !== 0) {
+            writer.uint32(32).int32(message.prefixPaddingMs);
+        }
+        if (message.interruptResponse !== undefined) {
+            writer.uint32(40).bool(message.interruptResponse);
+        }
+        if (message.createResponse !== undefined) {
+            writer.uint32(48).bool(message.createResponse);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseTurnDetection();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.type = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 21) {
+                        break;
+                    }
+                    message.threshold = reader.float();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.silenceDurationMs = reader.int32();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.prefixPaddingMs = reader.int32();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.interruptResponse = reader.bool();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.createResponse = reader.bool();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            type: isSet(object.type) ? turnDetection_TypeFromJSON(object.type) : 0,
+            threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+            silenceDurationMs: isSet(object.silenceDurationMs)
+                ? globalThis.Number(object.silenceDurationMs)
+                : isSet(object.silence_duration_ms)
+                    ? globalThis.Number(object.silence_duration_ms)
+                    : 0,
+            prefixPaddingMs: isSet(object.prefixPaddingMs)
+                ? globalThis.Number(object.prefixPaddingMs)
+                : isSet(object.prefix_padding_ms)
+                    ? globalThis.Number(object.prefix_padding_ms)
+                    : 0,
+            interruptResponse: isSet(object.interruptResponse)
+                ? globalThis.Boolean(object.interruptResponse)
+                : isSet(object.interrupt_response)
+                    ? globalThis.Boolean(object.interrupt_response)
+                    : undefined,
+            createResponse: isSet(object.createResponse)
+                ? globalThis.Boolean(object.createResponse)
+                : isSet(object.create_response)
+                    ? globalThis.Boolean(object.create_response)
+                    : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.type !== 0) {
+            obj.type = turnDetection_TypeToJSON(message.type);
+        }
+        if (message.threshold !== 0) {
+            obj.threshold = message.threshold;
+        }
+        if (message.silenceDurationMs !== 0) {
+            obj.silenceDurationMs = Math.round(message.silenceDurationMs);
+        }
+        if (message.prefixPaddingMs !== 0) {
+            obj.prefixPaddingMs = Math.round(message.prefixPaddingMs);
+        }
+        if (message.interruptResponse !== undefined) {
+            obj.interruptResponse = message.interruptResponse;
+        }
+        if (message.createResponse !== undefined) {
+            obj.createResponse = message.createResponse;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.TurnDetection.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseTurnDetection();
+        message.type = object.type ?? 0;
+        message.threshold = object.threshold ?? 0;
+        message.silenceDurationMs = object.silenceDurationMs ?? 0;
+        message.prefixPaddingMs = object.prefixPaddingMs ?? 0;
+        message.interruptResponse = object.interruptResponse ?? undefined;
+        message.createResponse = object.createResponse ?? undefined;
         return message;
     },
 };
 function createBaseVoiceAgentTurnRequest() {
-    return {
-        requestId: "",
-        sessionId: "",
-        audioData: new Uint8Array(0),
-        sampleRateHz: 0,
-        channels: 0,
-        encoding: 0,
-        sessionConfig: undefined,
-        metadata: {},
-    };
+    return { requestId: "", sessionId: "", audioData: new Uint8Array(0), language: undefined, metadata: {} };
 }
 exports.VoiceAgentTurnRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -572,20 +378,11 @@ exports.VoiceAgentTurnRequest = {
         if (message.audioData.length !== 0) {
             writer.uint32(26).bytes(message.audioData);
         }
-        if (message.sampleRateHz !== 0) {
-            writer.uint32(32).int32(message.sampleRateHz);
-        }
-        if (message.channels !== 0) {
-            writer.uint32(40).int32(message.channels);
-        }
-        if (message.encoding !== 0) {
-            writer.uint32(48).int32(message.encoding);
-        }
-        if (message.sessionConfig !== undefined) {
-            exports.VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(58).fork()).join();
+        if (message.language !== undefined) {
+            writer.uint32(34).string(message.language);
         }
         globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
-            exports.VoiceAgentTurnRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(66).fork()).join();
+            exports.VoiceAgentTurnRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(42).fork()).join();
         });
         return writer;
     },
@@ -618,40 +415,19 @@ exports.VoiceAgentTurnRequest = {
                     continue;
                 }
                 case 4: {
-                    if (tag !== 32) {
+                    if (tag !== 34) {
                         break;
                     }
-                    message.sampleRateHz = reader.int32();
+                    message.language = reader.string();
                     continue;
                 }
                 case 5: {
-                    if (tag !== 40) {
+                    if (tag !== 42) {
                         break;
                     }
-                    message.channels = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.encoding = reader.int32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.sessionConfig = exports.VoiceSessionConfig.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    const entry8 = exports.VoiceAgentTurnRequest_MetadataEntry.decode(reader, reader.uint32());
-                    if (entry8.value !== undefined) {
-                        message.metadata[entry8.key] = entry8.value;
+                    const entry5 = exports.VoiceAgentTurnRequest_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry5.value !== undefined) {
+                        message.metadata[entry5.key] = entry5.value;
                     }
                     continue;
                 }
@@ -680,18 +456,7 @@ exports.VoiceAgentTurnRequest = {
                 : isSet(object.audio_data)
                     ? bytesFromBase64(object.audio_data)
                     : new Uint8Array(0),
-            sampleRateHz: isSet(object.sampleRateHz)
-                ? globalThis.Number(object.sampleRateHz)
-                : isSet(object.sample_rate_hz)
-                    ? globalThis.Number(object.sample_rate_hz)
-                    : 0,
-            channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            encoding: isSet(object.encoding) ? (0, voice_events_1.audioEncodingFromJSON)(object.encoding) : 0,
-            sessionConfig: isSet(object.sessionConfig)
-                ? exports.VoiceSessionConfig.fromJSON(object.sessionConfig)
-                : isSet(object.session_config)
-                    ? exports.VoiceSessionConfig.fromJSON(object.session_config)
-                    : undefined,
+            language: isSet(object.language) ? globalThis.String(object.language) : undefined,
             metadata: isObject(object.metadata)
                 ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
                     acc[key] = globalThis.String(value);
@@ -711,17 +476,8 @@ exports.VoiceAgentTurnRequest = {
         if (message.audioData.length !== 0) {
             obj.audioData = base64FromBytes(message.audioData);
         }
-        if (message.sampleRateHz !== 0) {
-            obj.sampleRateHz = Math.round(message.sampleRateHz);
-        }
-        if (message.channels !== 0) {
-            obj.channels = Math.round(message.channels);
-        }
-        if (message.encoding !== 0) {
-            obj.encoding = (0, voice_events_1.audioEncodingToJSON)(message.encoding);
-        }
-        if (message.sessionConfig !== undefined) {
-            obj.sessionConfig = exports.VoiceSessionConfig.toJSON(message.sessionConfig);
+        if (message.language !== undefined) {
+            obj.language = message.language;
         }
         if (message.metadata) {
             const entries = globalThis.Object.entries(message.metadata);
@@ -742,12 +498,7 @@ exports.VoiceAgentTurnRequest = {
         message.requestId = object.requestId ?? "";
         message.sessionId = object.sessionId ?? "";
         message.audioData = object.audioData ?? new Uint8Array(0);
-        message.sampleRateHz = object.sampleRateHz ?? 0;
-        message.channels = object.channels ?? 0;
-        message.encoding = object.encoding ?? 0;
-        message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
-            ? exports.VoiceSessionConfig.fromPartial(object.sessionConfig)
-            : undefined;
+        message.language = object.language ?? undefined;
         message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
             if (value !== undefined) {
                 acc[key] = globalThis.String(value);
@@ -825,267 +576,68 @@ exports.VoiceAgentTurnRequest_MetadataEntry = {
         return message;
     },
 };
-function createBaseVoiceSessionConfig() {
-    return {
-        silenceDurationMs: 0,
-        speechThreshold: 0,
-        autoPlayTts: false,
-        continuousMode: false,
-        thinkingModeEnabled: false,
-        maxTokens: 0,
-        maxRecordingDurationMs: 0,
-        languageCode: undefined,
-        voiceId: undefined,
-    };
+function createBaseVoiceAgentAudioFrame() {
+    return { audioData: new Uint8Array(0), sampleRateHz: 0, channels: 0, encoding: 0, isFinal: false };
 }
-exports.VoiceSessionConfig = {
+exports.VoiceAgentAudioFrame = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.silenceDurationMs !== 0) {
-            writer.uint32(8).int32(message.silenceDurationMs);
+        if (message.audioData.length !== 0) {
+            writer.uint32(10).bytes(message.audioData);
         }
-        if (message.speechThreshold !== 0) {
-            writer.uint32(21).float(message.speechThreshold);
+        if (message.sampleRateHz !== 0) {
+            writer.uint32(16).int32(message.sampleRateHz);
         }
-        if (message.autoPlayTts !== false) {
-            writer.uint32(24).bool(message.autoPlayTts);
+        if (message.channels !== 0) {
+            writer.uint32(24).int32(message.channels);
         }
-        if (message.continuousMode !== false) {
-            writer.uint32(32).bool(message.continuousMode);
+        if (message.encoding !== 0) {
+            writer.uint32(32).int32(message.encoding);
         }
-        if (message.thinkingModeEnabled !== false) {
-            writer.uint32(40).bool(message.thinkingModeEnabled);
-        }
-        if (message.maxTokens !== 0) {
-            writer.uint32(48).int32(message.maxTokens);
-        }
-        if (message.maxRecordingDurationMs !== 0) {
-            writer.uint32(56).int32(message.maxRecordingDurationMs);
-        }
-        if (message.languageCode !== undefined) {
-            writer.uint32(66).string(message.languageCode);
-        }
-        if (message.voiceId !== undefined) {
-            writer.uint32(74).string(message.voiceId);
+        if (message.isFinal !== false) {
+            writer.uint32(40).bool(message.isFinal);
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseVoiceSessionConfig();
+        const message = createBaseVoiceAgentAudioFrame();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
                 case 1: {
-                    if (tag !== 8) {
+                    if (tag !== 10) {
                         break;
                     }
-                    message.silenceDurationMs = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 21) {
-                        break;
-                    }
-                    message.speechThreshold = reader.float();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.autoPlayTts = reader.bool();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.continuousMode = reader.bool();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.thinkingModeEnabled = reader.bool();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.maxTokens = reader.int32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.maxRecordingDurationMs = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.languageCode = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.voiceId = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            silenceDurationMs: isSet(object.silenceDurationMs)
-                ? globalThis.Number(object.silenceDurationMs)
-                : isSet(object.silence_duration_ms)
-                    ? globalThis.Number(object.silence_duration_ms)
-                    : 0,
-            speechThreshold: isSet(object.speechThreshold)
-                ? globalThis.Number(object.speechThreshold)
-                : isSet(object.speech_threshold)
-                    ? globalThis.Number(object.speech_threshold)
-                    : 0,
-            autoPlayTts: isSet(object.autoPlayTts)
-                ? globalThis.Boolean(object.autoPlayTts)
-                : isSet(object.auto_play_tts)
-                    ? globalThis.Boolean(object.auto_play_tts)
-                    : false,
-            continuousMode: isSet(object.continuousMode)
-                ? globalThis.Boolean(object.continuousMode)
-                : isSet(object.continuous_mode)
-                    ? globalThis.Boolean(object.continuous_mode)
-                    : false,
-            thinkingModeEnabled: isSet(object.thinkingModeEnabled)
-                ? globalThis.Boolean(object.thinkingModeEnabled)
-                : isSet(object.thinking_mode_enabled)
-                    ? globalThis.Boolean(object.thinking_mode_enabled)
-                    : false,
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            maxRecordingDurationMs: isSet(object.maxRecordingDurationMs)
-                ? globalThis.Number(object.maxRecordingDurationMs)
-                : isSet(object.max_recording_duration_ms)
-                    ? globalThis.Number(object.max_recording_duration_ms)
-                    : 0,
-            languageCode: isSet(object.languageCode)
-                ? globalThis.String(object.languageCode)
-                : isSet(object.language_code)
-                    ? globalThis.String(object.language_code)
-                    : undefined,
-            voiceId: isSet(object.voiceId)
-                ? globalThis.String(object.voiceId)
-                : isSet(object.voice_id)
-                    ? globalThis.String(object.voice_id)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.silenceDurationMs !== 0) {
-            obj.silenceDurationMs = Math.round(message.silenceDurationMs);
-        }
-        if (message.speechThreshold !== 0) {
-            obj.speechThreshold = message.speechThreshold;
-        }
-        if (message.autoPlayTts !== false) {
-            obj.autoPlayTts = message.autoPlayTts;
-        }
-        if (message.continuousMode !== false) {
-            obj.continuousMode = message.continuousMode;
-        }
-        if (message.thinkingModeEnabled !== false) {
-            obj.thinkingModeEnabled = message.thinkingModeEnabled;
-        }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
-        }
-        if (message.maxRecordingDurationMs !== 0) {
-            obj.maxRecordingDurationMs = Math.round(message.maxRecordingDurationMs);
-        }
-        if (message.languageCode !== undefined) {
-            obj.languageCode = message.languageCode;
-        }
-        if (message.voiceId !== undefined) {
-            obj.voiceId = message.voiceId;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.VoiceSessionConfig.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseVoiceSessionConfig();
-        message.silenceDurationMs = object.silenceDurationMs ?? 0;
-        message.speechThreshold = object.speechThreshold ?? 0;
-        message.autoPlayTts = object.autoPlayTts ?? false;
-        message.continuousMode = object.continuousMode ?? false;
-        message.thinkingModeEnabled = object.thinkingModeEnabled ?? false;
-        message.maxTokens = object.maxTokens ?? 0;
-        message.maxRecordingDurationMs = object.maxRecordingDurationMs ?? 0;
-        message.languageCode = object.languageCode ?? undefined;
-        message.voiceId = object.voiceId ?? undefined;
-        return message;
-    },
-};
-function createBaseAudioPipelineConfig() {
-    return { cooldownDurationMs: 0, strictTransitions: false, maxTtsDurationMs: 0 };
-}
-exports.AudioPipelineConfig = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.cooldownDurationMs !== 0) {
-            writer.uint32(8).int32(message.cooldownDurationMs);
-        }
-        if (message.strictTransitions !== false) {
-            writer.uint32(16).bool(message.strictTransitions);
-        }
-        if (message.maxTtsDurationMs !== 0) {
-            writer.uint32(24).int32(message.maxTtsDurationMs);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseAudioPipelineConfig();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.cooldownDurationMs = reader.int32();
+                    message.audioData = reader.bytes();
                     continue;
                 }
                 case 2: {
                     if (tag !== 16) {
                         break;
                     }
-                    message.strictTransitions = reader.bool();
+                    message.sampleRateHz = reader.int32();
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.maxTtsDurationMs = reader.int32();
+                    message.channels = reader.int32();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.encoding = reader.int32();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.isFinal = reader.bool();
                     continue;
                 }
             }
@@ -1098,44 +650,54 @@ exports.AudioPipelineConfig = {
     },
     fromJSON(object) {
         return {
-            cooldownDurationMs: isSet(object.cooldownDurationMs)
-                ? globalThis.Number(object.cooldownDurationMs)
-                : isSet(object.cooldown_duration_ms)
-                    ? globalThis.Number(object.cooldown_duration_ms)
+            audioData: isSet(object.audioData)
+                ? bytesFromBase64(object.audioData)
+                : isSet(object.audio_data)
+                    ? bytesFromBase64(object.audio_data)
+                    : new Uint8Array(0),
+            sampleRateHz: isSet(object.sampleRateHz)
+                ? globalThis.Number(object.sampleRateHz)
+                : isSet(object.sample_rate_hz)
+                    ? globalThis.Number(object.sample_rate_hz)
                     : 0,
-            strictTransitions: isSet(object.strictTransitions)
-                ? globalThis.Boolean(object.strictTransitions)
-                : isSet(object.strict_transitions)
-                    ? globalThis.Boolean(object.strict_transitions)
+            channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
+            isFinal: isSet(object.isFinal)
+                ? globalThis.Boolean(object.isFinal)
+                : isSet(object.is_final)
+                    ? globalThis.Boolean(object.is_final)
                     : false,
-            maxTtsDurationMs: isSet(object.maxTtsDurationMs)
-                ? globalThis.Number(object.maxTtsDurationMs)
-                : isSet(object.max_tts_duration_ms)
-                    ? globalThis.Number(object.max_tts_duration_ms)
-                    : 0,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.cooldownDurationMs !== 0) {
-            obj.cooldownDurationMs = Math.round(message.cooldownDurationMs);
+        if (message.audioData.length !== 0) {
+            obj.audioData = base64FromBytes(message.audioData);
         }
-        if (message.strictTransitions !== false) {
-            obj.strictTransitions = message.strictTransitions;
+        if (message.sampleRateHz !== 0) {
+            obj.sampleRateHz = Math.round(message.sampleRateHz);
         }
-        if (message.maxTtsDurationMs !== 0) {
-            obj.maxTtsDurationMs = Math.round(message.maxTtsDurationMs);
+        if (message.channels !== 0) {
+            obj.channels = Math.round(message.channels);
+        }
+        if (message.encoding !== 0) {
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
+        }
+        if (message.isFinal !== false) {
+            obj.isFinal = message.isFinal;
         }
         return obj;
     },
     create(base) {
-        return exports.AudioPipelineConfig.fromPartial(base ?? {});
+        return exports.VoiceAgentAudioFrame.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseAudioPipelineConfig();
-        message.cooldownDurationMs = object.cooldownDurationMs ?? 0;
-        message.strictTransitions = object.strictTransitions ?? false;
-        message.maxTtsDurationMs = object.maxTtsDurationMs ?? 0;
+        const message = createBaseVoiceAgentAudioFrame();
+        message.audioData = object.audioData ?? new Uint8Array(0);
+        message.sampleRateHz = object.sampleRateHz ?? 0;
+        message.channels = object.channels ?? 0;
+        message.encoding = object.encoding ?? 0;
+        message.isFinal = object.isFinal ?? false;
         return message;
     },
 };
@@ -1143,20 +705,15 @@ function createBaseVoiceAgentComposeConfig() {
     return {
         sttModelPath: undefined,
         sttModelId: undefined,
-        sttModelName: undefined,
         llmModelPath: undefined,
         llmModelId: undefined,
-        llmModelName: undefined,
         ttsVoicePath: undefined,
         ttsVoiceId: undefined,
-        ttsVoiceName: undefined,
-        vadSampleRate: 0,
-        vadFrameLength: 0,
-        vadEnergyThreshold: 0,
-        sessionConfig: undefined,
-        audioPipelineConfig: undefined,
-        sessionId: undefined,
-        defaultLanguageCode: undefined,
+        vadConfig: undefined,
+        llmGeneration: undefined,
+        instructions: undefined,
+        turnDetection: undefined,
+        language: undefined,
     };
 }
 exports.VoiceAgentComposeConfig = {
@@ -1167,47 +724,32 @@ exports.VoiceAgentComposeConfig = {
         if (message.sttModelId !== undefined) {
             writer.uint32(18).string(message.sttModelId);
         }
-        if (message.sttModelName !== undefined) {
-            writer.uint32(26).string(message.sttModelName);
-        }
         if (message.llmModelPath !== undefined) {
-            writer.uint32(34).string(message.llmModelPath);
+            writer.uint32(26).string(message.llmModelPath);
         }
         if (message.llmModelId !== undefined) {
-            writer.uint32(42).string(message.llmModelId);
-        }
-        if (message.llmModelName !== undefined) {
-            writer.uint32(50).string(message.llmModelName);
+            writer.uint32(34).string(message.llmModelId);
         }
         if (message.ttsVoicePath !== undefined) {
-            writer.uint32(58).string(message.ttsVoicePath);
+            writer.uint32(42).string(message.ttsVoicePath);
         }
         if (message.ttsVoiceId !== undefined) {
-            writer.uint32(66).string(message.ttsVoiceId);
+            writer.uint32(50).string(message.ttsVoiceId);
         }
-        if (message.ttsVoiceName !== undefined) {
-            writer.uint32(74).string(message.ttsVoiceName);
+        if (message.vadConfig !== undefined) {
+            vad_options_1.VADConfiguration.encode(message.vadConfig, writer.uint32(58).fork()).join();
         }
-        if (message.vadSampleRate !== 0) {
-            writer.uint32(80).int32(message.vadSampleRate);
+        if (message.llmGeneration !== undefined) {
+            llm_options_1.LLMGenerationOptions.encode(message.llmGeneration, writer.uint32(66).fork()).join();
         }
-        if (message.vadFrameLength !== 0) {
-            writer.uint32(93).float(message.vadFrameLength);
+        if (message.instructions !== undefined) {
+            writer.uint32(74).string(message.instructions);
         }
-        if (message.vadEnergyThreshold !== 0) {
-            writer.uint32(101).float(message.vadEnergyThreshold);
+        if (message.turnDetection !== undefined) {
+            exports.TurnDetection.encode(message.turnDetection, writer.uint32(82).fork()).join();
         }
-        if (message.sessionConfig !== undefined) {
-            exports.VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(162).fork()).join();
-        }
-        if (message.audioPipelineConfig !== undefined) {
-            exports.AudioPipelineConfig.encode(message.audioPipelineConfig, writer.uint32(170).fork()).join();
-        }
-        if (message.sessionId !== undefined) {
-            writer.uint32(178).string(message.sessionId);
-        }
-        if (message.defaultLanguageCode !== undefined) {
-            writer.uint32(186).string(message.defaultLanguageCode);
+        if (message.language !== undefined) {
+            writer.uint32(90).string(message.language);
         }
         return writer;
     },
@@ -1236,98 +778,63 @@ exports.VoiceAgentComposeConfig = {
                     if (tag !== 26) {
                         break;
                     }
-                    message.sttModelName = reader.string();
+                    message.llmModelPath = reader.string();
                     continue;
                 }
                 case 4: {
                     if (tag !== 34) {
                         break;
                     }
-                    message.llmModelPath = reader.string();
+                    message.llmModelId = reader.string();
                     continue;
                 }
                 case 5: {
                     if (tag !== 42) {
                         break;
                     }
-                    message.llmModelId = reader.string();
+                    message.ttsVoicePath = reader.string();
                     continue;
                 }
                 case 6: {
                     if (tag !== 50) {
                         break;
                     }
-                    message.llmModelName = reader.string();
+                    message.ttsVoiceId = reader.string();
                     continue;
                 }
                 case 7: {
                     if (tag !== 58) {
                         break;
                     }
-                    message.ttsVoicePath = reader.string();
+                    message.vadConfig = vad_options_1.VADConfiguration.decode(reader, reader.uint32());
                     continue;
                 }
                 case 8: {
                     if (tag !== 66) {
                         break;
                     }
-                    message.ttsVoiceId = reader.string();
+                    message.llmGeneration = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
                     continue;
                 }
                 case 9: {
                     if (tag !== 74) {
                         break;
                     }
-                    message.ttsVoiceName = reader.string();
+                    message.instructions = reader.string();
                     continue;
                 }
                 case 10: {
-                    if (tag !== 80) {
+                    if (tag !== 82) {
                         break;
                     }
-                    message.vadSampleRate = reader.int32();
+                    message.turnDetection = exports.TurnDetection.decode(reader, reader.uint32());
                     continue;
                 }
                 case 11: {
-                    if (tag !== 93) {
+                    if (tag !== 90) {
                         break;
                     }
-                    message.vadFrameLength = reader.float();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 101) {
-                        break;
-                    }
-                    message.vadEnergyThreshold = reader.float();
-                    continue;
-                }
-                case 20: {
-                    if (tag !== 162) {
-                        break;
-                    }
-                    message.sessionConfig = exports.VoiceSessionConfig.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 21: {
-                    if (tag !== 170) {
-                        break;
-                    }
-                    message.audioPipelineConfig = exports.AudioPipelineConfig.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 22: {
-                    if (tag !== 178) {
-                        break;
-                    }
-                    message.sessionId = reader.string();
-                    continue;
-                }
-                case 23: {
-                    if (tag !== 186) {
-                        break;
-                    }
-                    message.defaultLanguageCode = reader.string();
+                    message.language = reader.string();
                     continue;
                 }
             }
@@ -1350,11 +857,6 @@ exports.VoiceAgentComposeConfig = {
                 : isSet(object.stt_model_id)
                     ? globalThis.String(object.stt_model_id)
                     : undefined,
-            sttModelName: isSet(object.sttModelName)
-                ? globalThis.String(object.sttModelName)
-                : isSet(object.stt_model_name)
-                    ? globalThis.String(object.stt_model_name)
-                    : undefined,
             llmModelPath: isSet(object.llmModelPath)
                 ? globalThis.String(object.llmModelPath)
                 : isSet(object.llm_model_path)
@@ -1364,11 +866,6 @@ exports.VoiceAgentComposeConfig = {
                 ? globalThis.String(object.llmModelId)
                 : isSet(object.llm_model_id)
                     ? globalThis.String(object.llm_model_id)
-                    : undefined,
-            llmModelName: isSet(object.llmModelName)
-                ? globalThis.String(object.llmModelName)
-                : isSet(object.llm_model_name)
-                    ? globalThis.String(object.llm_model_name)
                     : undefined,
             ttsVoicePath: isSet(object.ttsVoicePath)
                 ? globalThis.String(object.ttsVoicePath)
@@ -1380,46 +877,23 @@ exports.VoiceAgentComposeConfig = {
                 : isSet(object.tts_voice_id)
                     ? globalThis.String(object.tts_voice_id)
                     : undefined,
-            ttsVoiceName: isSet(object.ttsVoiceName)
-                ? globalThis.String(object.ttsVoiceName)
-                : isSet(object.tts_voice_name)
-                    ? globalThis.String(object.tts_voice_name)
+            vadConfig: isSet(object.vadConfig)
+                ? vad_options_1.VADConfiguration.fromJSON(object.vadConfig)
+                : isSet(object.vad_config)
+                    ? vad_options_1.VADConfiguration.fromJSON(object.vad_config)
                     : undefined,
-            vadSampleRate: isSet(object.vadSampleRate)
-                ? globalThis.Number(object.vadSampleRate)
-                : isSet(object.vad_sample_rate)
-                    ? globalThis.Number(object.vad_sample_rate)
-                    : 0,
-            vadFrameLength: isSet(object.vadFrameLength)
-                ? globalThis.Number(object.vadFrameLength)
-                : isSet(object.vad_frame_length)
-                    ? globalThis.Number(object.vad_frame_length)
-                    : 0,
-            vadEnergyThreshold: isSet(object.vadEnergyThreshold)
-                ? globalThis.Number(object.vadEnergyThreshold)
-                : isSet(object.vad_energy_threshold)
-                    ? globalThis.Number(object.vad_energy_threshold)
-                    : 0,
-            sessionConfig: isSet(object.sessionConfig)
-                ? exports.VoiceSessionConfig.fromJSON(object.sessionConfig)
-                : isSet(object.session_config)
-                    ? exports.VoiceSessionConfig.fromJSON(object.session_config)
+            llmGeneration: isSet(object.llmGeneration)
+                ? llm_options_1.LLMGenerationOptions.fromJSON(object.llmGeneration)
+                : isSet(object.llm_generation)
+                    ? llm_options_1.LLMGenerationOptions.fromJSON(object.llm_generation)
                     : undefined,
-            audioPipelineConfig: isSet(object.audioPipelineConfig)
-                ? exports.AudioPipelineConfig.fromJSON(object.audioPipelineConfig)
-                : isSet(object.audio_pipeline_config)
-                    ? exports.AudioPipelineConfig.fromJSON(object.audio_pipeline_config)
+            instructions: isSet(object.instructions) ? globalThis.String(object.instructions) : undefined,
+            turnDetection: isSet(object.turnDetection)
+                ? exports.TurnDetection.fromJSON(object.turnDetection)
+                : isSet(object.turn_detection)
+                    ? exports.TurnDetection.fromJSON(object.turn_detection)
                     : undefined,
-            sessionId: isSet(object.sessionId)
-                ? globalThis.String(object.sessionId)
-                : isSet(object.session_id)
-                    ? globalThis.String(object.session_id)
-                    : undefined,
-            defaultLanguageCode: isSet(object.defaultLanguageCode)
-                ? globalThis.String(object.defaultLanguageCode)
-                : isSet(object.default_language_code)
-                    ? globalThis.String(object.default_language_code)
-                    : undefined,
+            language: isSet(object.language) ? globalThis.String(object.language) : undefined,
         };
     },
     toJSON(message) {
@@ -1430,17 +904,11 @@ exports.VoiceAgentComposeConfig = {
         if (message.sttModelId !== undefined) {
             obj.sttModelId = message.sttModelId;
         }
-        if (message.sttModelName !== undefined) {
-            obj.sttModelName = message.sttModelName;
-        }
         if (message.llmModelPath !== undefined) {
             obj.llmModelPath = message.llmModelPath;
         }
         if (message.llmModelId !== undefined) {
             obj.llmModelId = message.llmModelId;
-        }
-        if (message.llmModelName !== undefined) {
-            obj.llmModelName = message.llmModelName;
         }
         if (message.ttsVoicePath !== undefined) {
             obj.ttsVoicePath = message.ttsVoicePath;
@@ -1448,29 +916,20 @@ exports.VoiceAgentComposeConfig = {
         if (message.ttsVoiceId !== undefined) {
             obj.ttsVoiceId = message.ttsVoiceId;
         }
-        if (message.ttsVoiceName !== undefined) {
-            obj.ttsVoiceName = message.ttsVoiceName;
+        if (message.vadConfig !== undefined) {
+            obj.vadConfig = vad_options_1.VADConfiguration.toJSON(message.vadConfig);
         }
-        if (message.vadSampleRate !== 0) {
-            obj.vadSampleRate = Math.round(message.vadSampleRate);
+        if (message.llmGeneration !== undefined) {
+            obj.llmGeneration = llm_options_1.LLMGenerationOptions.toJSON(message.llmGeneration);
         }
-        if (message.vadFrameLength !== 0) {
-            obj.vadFrameLength = message.vadFrameLength;
+        if (message.instructions !== undefined) {
+            obj.instructions = message.instructions;
         }
-        if (message.vadEnergyThreshold !== 0) {
-            obj.vadEnergyThreshold = message.vadEnergyThreshold;
+        if (message.turnDetection !== undefined) {
+            obj.turnDetection = exports.TurnDetection.toJSON(message.turnDetection);
         }
-        if (message.sessionConfig !== undefined) {
-            obj.sessionConfig = exports.VoiceSessionConfig.toJSON(message.sessionConfig);
-        }
-        if (message.audioPipelineConfig !== undefined) {
-            obj.audioPipelineConfig = exports.AudioPipelineConfig.toJSON(message.audioPipelineConfig);
-        }
-        if (message.sessionId !== undefined) {
-            obj.sessionId = message.sessionId;
-        }
-        if (message.defaultLanguageCode !== undefined) {
-            obj.defaultLanguageCode = message.defaultLanguageCode;
+        if (message.language !== undefined) {
+            obj.language = message.language;
         }
         return obj;
     },
@@ -1481,29 +940,26 @@ exports.VoiceAgentComposeConfig = {
         const message = createBaseVoiceAgentComposeConfig();
         message.sttModelPath = object.sttModelPath ?? undefined;
         message.sttModelId = object.sttModelId ?? undefined;
-        message.sttModelName = object.sttModelName ?? undefined;
         message.llmModelPath = object.llmModelPath ?? undefined;
         message.llmModelId = object.llmModelId ?? undefined;
-        message.llmModelName = object.llmModelName ?? undefined;
         message.ttsVoicePath = object.ttsVoicePath ?? undefined;
         message.ttsVoiceId = object.ttsVoiceId ?? undefined;
-        message.ttsVoiceName = object.ttsVoiceName ?? undefined;
-        message.vadSampleRate = object.vadSampleRate ?? 0;
-        message.vadFrameLength = object.vadFrameLength ?? 0;
-        message.vadEnergyThreshold = object.vadEnergyThreshold ?? 0;
-        message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
-            ? exports.VoiceSessionConfig.fromPartial(object.sessionConfig)
+        message.vadConfig = (object.vadConfig !== undefined && object.vadConfig !== null)
+            ? vad_options_1.VADConfiguration.fromPartial(object.vadConfig)
             : undefined;
-        message.audioPipelineConfig = (object.audioPipelineConfig !== undefined && object.audioPipelineConfig !== null)
-            ? exports.AudioPipelineConfig.fromPartial(object.audioPipelineConfig)
+        message.llmGeneration = (object.llmGeneration !== undefined && object.llmGeneration !== null)
+            ? llm_options_1.LLMGenerationOptions.fromPartial(object.llmGeneration)
             : undefined;
-        message.sessionId = object.sessionId ?? undefined;
-        message.defaultLanguageCode = object.defaultLanguageCode ?? undefined;
+        message.instructions = object.instructions ?? undefined;
+        message.turnDetection = (object.turnDetection !== undefined && object.turnDetection !== null)
+            ? exports.TurnDetection.fromPartial(object.turnDetection)
+            : undefined;
+        message.language = object.language ?? undefined;
         return message;
     },
 };
 function createBaseVoiceAgentTranscribeProtoRequest() {
-    return { audioData: new Uint8Array(0), sessionId: "", sampleRate: 0, languageHint: "", channels: 0, encoding: 0 };
+    return { audioData: new Uint8Array(0), sessionId: "", language: "" };
 }
 exports.VoiceAgentTranscribeProtoRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1513,17 +969,8 @@ exports.VoiceAgentTranscribeProtoRequest = {
         if (message.sessionId !== "") {
             writer.uint32(18).string(message.sessionId);
         }
-        if (message.sampleRate !== 0) {
-            writer.uint32(24).int32(message.sampleRate);
-        }
-        if (message.languageHint !== "") {
-            writer.uint32(34).string(message.languageHint);
-        }
-        if (message.channels !== 0) {
-            writer.uint32(40).int32(message.channels);
-        }
-        if (message.encoding !== 0) {
-            writer.uint32(48).int32(message.encoding);
+        if (message.language !== "") {
+            writer.uint32(26).string(message.language);
         }
         return writer;
     },
@@ -1549,31 +996,10 @@ exports.VoiceAgentTranscribeProtoRequest = {
                     continue;
                 }
                 case 3: {
-                    if (tag !== 24) {
+                    if (tag !== 26) {
                         break;
                     }
-                    message.sampleRate = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.languageHint = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.channels = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.encoding = reader.int32();
+                    message.language = reader.string();
                     continue;
                 }
             }
@@ -1596,18 +1022,7 @@ exports.VoiceAgentTranscribeProtoRequest = {
                 : isSet(object.session_id)
                     ? globalThis.String(object.session_id)
                     : "",
-            sampleRate: isSet(object.sampleRate)
-                ? globalThis.Number(object.sampleRate)
-                : isSet(object.sample_rate)
-                    ? globalThis.Number(object.sample_rate)
-                    : 0,
-            languageHint: isSet(object.languageHint)
-                ? globalThis.String(object.languageHint)
-                : isSet(object.language_hint)
-                    ? globalThis.String(object.language_hint)
-                    : "",
-            channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            encoding: isSet(object.encoding) ? (0, voice_events_1.audioEncodingFromJSON)(object.encoding) : 0,
+            language: isSet(object.language) ? globalThis.String(object.language) : "",
         };
     },
     toJSON(message) {
@@ -1618,17 +1033,8 @@ exports.VoiceAgentTranscribeProtoRequest = {
         if (message.sessionId !== "") {
             obj.sessionId = message.sessionId;
         }
-        if (message.sampleRate !== 0) {
-            obj.sampleRate = Math.round(message.sampleRate);
-        }
-        if (message.languageHint !== "") {
-            obj.languageHint = message.languageHint;
-        }
-        if (message.channels !== 0) {
-            obj.channels = Math.round(message.channels);
-        }
-        if (message.encoding !== 0) {
-            obj.encoding = (0, voice_events_1.audioEncodingToJSON)(message.encoding);
+        if (message.language !== "") {
+            obj.language = message.language;
         }
         return obj;
     },
@@ -1639,10 +1045,7 @@ exports.VoiceAgentTranscribeProtoRequest = {
         const message = createBaseVoiceAgentTranscribeProtoRequest();
         message.audioData = object.audioData ?? new Uint8Array(0);
         message.sessionId = object.sessionId ?? "";
-        message.sampleRate = object.sampleRate ?? 0;
-        message.languageHint = object.languageHint ?? "";
-        message.channels = object.channels ?? 0;
-        message.encoding = object.encoding ?? 0;
+        message.language = object.language ?? "";
         return message;
     },
 };
@@ -1749,16 +1152,6 @@ function base64FromBytes(arr) {
         bin.push(globalThis.String.fromCharCode(byte));
     });
     return globalThis.btoa(bin.join(""));
-}
-function longToNumber(int64) {
-    const num = globalThis.Number(int64.toString());
-    if (num > globalThis.Number.MAX_SAFE_INTEGER) {
-        throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
-    }
-    if (num < globalThis.Number.MIN_SAFE_INTEGER) {
-        throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
-    }
-    return num;
 }
 function isObject(value) {
     return typeof value === "object" && value !== null;

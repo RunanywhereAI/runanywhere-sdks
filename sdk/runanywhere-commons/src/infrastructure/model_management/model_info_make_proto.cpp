@@ -285,21 +285,6 @@ runanywhere::v1::ArchiveType archive_type_to_proto(rac_archive_type_t t) {
     }
 }
 
-runanywhere::v1::ModelArtifactType artifact_type_from_archive(rac_archive_type_t t) {
-    switch (t) {
-        case RAC_ARCHIVE_TYPE_ZIP:
-            return runanywhere::v1::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE;
-        case RAC_ARCHIVE_TYPE_TAR_BZ2:
-            return runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE;
-        case RAC_ARCHIVE_TYPE_TAR_GZ:
-            return runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
-        case RAC_ARCHIVE_TYPE_TAR_XZ:
-            return runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE;
-        default:
-            return runanywhere::v1::MODEL_ARTIFACT_TYPE_ARCHIVE;
-    }
-}
-
 int64_t now_unix_ms() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
@@ -478,8 +463,9 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
 
     // -------------------------------------------------------------------------
     // 8) Artifact inference. Swift: ArchiveType.from(url:) → archive() else
-    //    singleFile(). artifact_type tracks the artifact branch for callers
-    //    that consume the coarse classification.
+    //    singleFile(). The artifact oneof below is the only declaration of
+    //    bundle shape now -- the top-level artifact_type field that used to
+    //    track the coarse classification in parallel was reserved.
     // -------------------------------------------------------------------------
     const rac_archive_type_t archive =
         url.empty() ? RAC_ARCHIVE_TYPE_NONE : archive_type_from_url(url);
@@ -487,10 +473,8 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
         runanywhere::v1::ArchiveArtifact* artifact = model.mutable_archive();
         artifact->set_type(archive_type_to_proto(archive));
         artifact->set_structure(runanywhere::v1::ARCHIVE_STRUCTURE_UNKNOWN);
-        model.set_artifact_type(artifact_type_from_archive(archive));
     } else {
         model.mutable_single_file();
-        model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_SINGLE_FILE);
     }
     // expected_files left unset: Swift only assigns when the manifest is
     // non-empty (`!expected.isEmptyManifest`). Default artifacts have empty
@@ -523,15 +507,18 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
             }
         }
     }
-    model.set_is_downloaded(is_downloaded);
+    // is_downloaded (tag 32) was deleted: registry_status is the one
+    // downloaded-ness signal now.
+    model.set_registry_status(is_downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+                                            : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
     model.set_is_available(is_downloaded);
 
     RAC_LOG_DEBUG(LOG_CAT,
                   "make: url=%s id=%s name=%s fw=%d cat=%d fmt=%d "
-                  "artifact_type=%d ctx=%d supports_thinking=%d",
+                  "artifact_case=%d ctx=%d supports_thinking=%d",
                   url.c_str(), id.c_str(), name.c_str(), static_cast<int>(framework),
                   static_cast<int>(category), static_cast<int>(format),
-                  static_cast<int>(model.artifact_type()), static_cast<int>(model.context_length()),
+                  static_cast<int>(model.artifact_case()), static_cast<int>(model.context_length()),
                   static_cast<int>(supports_thinking));
 
     return copy_proto(model, out_proto);

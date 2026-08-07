@@ -6,7 +6,7 @@ import { filterVisibleNativeNpuCatalog } from './NpuModelCatalog';
 export async function listVisibleCatalogModels(
   registeredNpuIds?: ReadonlySet<string>
 ): Promise<ModelInfo[]> {
-  const models = (await RunAnywhere.listModels()).models?.models ?? [];
+  const models = await RunAnywhere.models.list();
   return filterVisibleNativeNpuCatalog(models, registeredNpuIds);
 }
 
@@ -15,5 +15,5 @@ export async function listVisibleCatalogModels(
  * here so users can remove orphaned on-disk models after a device/catalog change.
  */
 export async function listDownloadedCatalogModels(): Promise<ModelInfo[]> {
-  return (await RunAnywhere.downloadedModels()).models?.models ?? [];
+  return RunAnywhere.models.list({ downloadedOnly: true });
 }

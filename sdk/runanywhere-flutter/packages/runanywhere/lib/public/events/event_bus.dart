@@ -65,9 +65,36 @@ class EventBus {
       .where((e) => e.hasVoicePipeline())
       .map((e) => e.voicePipeline);
 
-  /// `DownloadEvent` payloads (model download progress / lifecycle).
-  Stream<DownloadEvent> get downloadEventPayloads =>
-      allEvents.where((e) => e.hasDownload()).map((e) => e.download);
+  /// `ModelEvent` payloads (model load/download/registry lifecycle).
+  ///
+  /// `DownloadEvent` and `ModelRegistryEvent` were both absorbed into
+  /// `ModelEvent` (idl/sdk_events.proto: "+ model_registry, + download"),
+  /// so there is now one payload stream instead of three. [downloadEventPayloads]
+  /// and [modelRegistryEventPayloads] are narrowed views over the same stream,
+  /// kept for call-site compatibility.
+  Stream<ModelEvent> get modelEventPayloads =>
+      allEvents.where((e) => e.hasModel()).map((e) => e.model);
+
+  /// `ModelEvent` payloads carrying a download-specific kind. Narrowed view
+  /// of [modelEventPayloads] — see its doc for why `DownloadEvent` no longer
+  /// exists as a separate payload type.
+  Stream<ModelEvent> get downloadEventPayloads => modelEventPayloads.where(
+    (m) => const {
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PROGRESS,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCELLED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_STARTED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_COMPLETED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PLAN_FAILED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCEL_REQUESTED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_RESUME_REQUESTED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_RESUMED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PAUSED,
+      ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PARTIAL_BYTES_DELETED,
+    }.contains(m.kind),
+  );
 
   /// `ComponentLifecycleEvent` payloads.
   Stream<ComponentLifecycleEvent> get componentLifecycleEventPayloads =>
@@ -75,9 +102,23 @@ class EventBus {
           .where((e) => e.hasComponentLifecycle())
           .map((e) => e.componentLifecycle);
 
-  /// `ModelRegistryEvent` payloads.
-  Stream<ModelRegistryEvent> get modelRegistryEventPayloads =>
-      allEvents.where((e) => e.hasModelRegistry()).map((e) => e.modelRegistry);
+  /// `ModelEvent` payloads carrying a registry-specific kind. Narrowed view
+  /// of [modelEventPayloads] — see its doc for why `ModelRegistryEvent` no
+  /// longer exists as a separate payload type.
+  Stream<ModelEvent> get modelRegistryEventPayloads => modelEventPayloads.where(
+    (m) => const {
+      ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_STARTED,
+      ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_COMPLETED,
+      ModelEventKind.MODEL_EVENT_KIND_REGISTRY_REFRESH_FAILED,
+      ModelEventKind.MODEL_EVENT_KIND_REGISTRY_GET_COMPLETED,
+      ModelEventKind.MODEL_EVENT_KIND_REGISTRY_GET_FAILED,
+      ModelEventKind.MODEL_EVENT_KIND_REGISTRY_LIST_COMPLETED,
+      ModelEventKind.MODEL_EVENT_KIND_REGISTRY_LIST_FAILED,
+      ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_STARTED,
+      ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_COMPLETED,
+      ModelEventKind.MODEL_EVENT_KIND_ASSIGNMENT_FAILED,
+    }.contains(m.kind),
+  );
 
   // --- Unified model-lifecycle stream (Swift EventBus+ModelLifecycle.swift) -
 
@@ -192,16 +233,13 @@ ModelLifecycleChange? modelLifecycleChange(SDKEvent event) {
     }
   }
 
-  // Channels 2 + 3: model events and LLM generation events.
-  final modelId = event.model.modelId.isNotEmpty
-      ? event.model.modelId
-      : event.generation.modelId;
+  // Channel 2: model events. `GENERATION_EVENT_KIND_MODEL_LOADED`/
+  // `_MODEL_UNLOADED` were deleted from GenerationEventKind
+  // (idl/sdk_events.proto) — model load/unload is reported exclusively
+  // through component-lifecycle (channel 1, above) and ModelEvent now.
+  final modelId = event.model.modelId;
 
-  final loaded = event.model.kind ==
-          ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED ||
-      event.generation.kind ==
-          GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED;
-  if (loaded) {
+  if (event.model.kind == ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED) {
     return ModelLifecycleChange(
       kind: ModelLifecycleChangeKind.loaded,
       modelId: modelId,
@@ -209,11 +247,7 @@ ModelLifecycleChange? modelLifecycleChange(SDKEvent event) {
       event: event,
     );
   }
-  final unloaded = event.model.kind ==
-          ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED ||
-      event.generation.kind ==
-          GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED;
-  if (unloaded) {
+  if (event.model.kind == ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED) {
     return ModelLifecycleChange(
       kind: ModelLifecycleChangeKind.unloaded,
       modelId: modelId,

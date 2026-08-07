@@ -289,19 +289,18 @@ extension CppBridge {
         /// Query models using the canonical generated proto request shape.
         public func query(_ query: RAModelQuery) -> RAModelListResult {
             guard let handle = handle else {
-                return modelListResult(success: false, errorMessage: "Registry not initialized")
+                return modelListResult(errorMessage: "Registry not initialized")
             }
 
             guard let queryProto = RegistryProtoABI.queryProto,
                   let freeProto = RegistryProtoABI.freeProto else {
                 return modelListResult(
-                    success: false,
                     errorMessage: NativeProtoABI.missingSymbolMessage("rac_model_registry_query_proto")
                 )
             }
 
             guard let data = try? query.serializedData() else {
-                return modelListResult(success: false, errorMessage: "Failed to serialize model query")
+                return modelListResult(errorMessage: "Failed to serialize model query")
             }
 
             var bytesPtr: UnsafeMutablePointer<UInt8>?
@@ -312,7 +311,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS, let bytesPtr else {
-                return modelListResult(success: false, errorMessage: "Model registry query failed")
+                return modelListResult(errorMessage: "Model registry query failed")
             }
             defer { freeProto(bytesPtr) }
 
@@ -320,7 +319,7 @@ extension CppBridge {
                 let list = try RAModelInfoList(serializedBytes: Data(bytes: bytesPtr, count: byteCount))
                 return modelListResult(models: list.models)
             } catch {
-                return modelListResult(success: false, errorMessage: "Failed to decode model registry query result")
+                return modelListResult(errorMessage: "Failed to decode model registry query result")
             }
         }
 
@@ -336,12 +335,20 @@ extension CppBridge {
             var result = RAModelGetResult()
             guard !request.modelID.isEmpty else {
                 result.found = false
-                result.errorMessage = "model_id is required"
+                result.error = RASDKError.make(
+                    code: .invalidParameter,
+                    message: "model_id is required",
+                    category: .validation
+                )
                 return result
             }
             guard let model = get(modelId: request.modelID) else {
                 result.found = false
-                result.errorMessage = "Model not found: \(request.modelID)"
+                result.error = RASDKError.make(
+                    code: .modelNotFound,
+                    message: "Model not found: \(request.modelID)",
+                    category: .model
+                )
                 return result
             }
             result.found = true
@@ -376,8 +383,11 @@ extension CppBridge {
                 throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
             }
 
+            // usageCount (tag 35) was reserved off the wire outright
+            // (idl/model_types.proto / model_registry_convert.cpp) — the C
+            // struct field has no proto source to read from or write to
+            // anymore, so lastUsedAtUnixMs alone now records "last used".
             model.lastUsedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-            model.usageCount += 1
             try update(model)
         }
 
@@ -425,13 +435,20 @@ extension CppBridge {
                     symbolName: "rac_model_registry_discover_proto",
                     responseType: RAModelDiscoveryResult.self
                 )
-                logger.info("Discovery complete via proto: \(result.linkedCount) models linked, \(result.scannedCount) scanned")
+                // linkedCount/scannedCount were deleted outright
+                // (idl/model_types.proto): RAModelDiscoveryResult now only
+                // carries discoveredModels/warnings/error, so the discovered
+                // count is read from the array directly.
+                logger.info("Discovery complete via proto: \(result.discoveredModels.count) models discovered")
                 return result
             } catch {
                 logger.warning("Discovery proto failed: \(error)")
                 var result = RAModelDiscoveryResult()
-                result.success = false
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }
@@ -453,8 +470,11 @@ extension CppBridge {
             } catch {
                 logger.warning("Refresh proto failed: \(error)")
                 var result = RAModelRegistryRefreshResult()
-                result.success = false
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }
@@ -498,16 +518,20 @@ extension CppBridge {
         }
 
         private func modelListResult(
-            success: Bool = true,
             models: [RAModelInfo] = [],
             errorMessage: String = ""
         ) -> RAModelListResult {
             var result = RAModelListResult()
-            result.success = success
             var list = RAModelInfoList()
             list.models = models
             result.models = list
-            result.errorMessage = errorMessage
+            if !errorMessage.isEmpty {
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: errorMessage,
+                    category: .internal
+                )
+            }
             return result
         }
 

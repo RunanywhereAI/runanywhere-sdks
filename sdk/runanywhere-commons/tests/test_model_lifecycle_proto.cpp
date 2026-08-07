@@ -248,7 +248,7 @@ runanywhere::v1::ModelInfo build_llm_model() {
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/lifecycle-test.gguf");
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
     return model;
 }
@@ -261,7 +261,7 @@ runanywhere::v1::ModelInfo build_llm_model_alt() {
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/lifecycle-test-alt.gguf");
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
     return model;
 }
@@ -275,7 +275,7 @@ runanywhere::v1::ModelInfo build_foundation_model() {
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS);
     model.set_local_path("builtin://foundation-models");
     model.set_built_in(true);
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
     return model;
 }
@@ -304,19 +304,19 @@ runanywhere::v1::ModelInfo build_vlm_model(const std::filesystem::path& root) {
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path(root.string());
-    model.set_is_downloaded(true);
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);  // is_downloaded reserved; registry_status is the single downloaded-ness signal
     model.set_is_available(true);
 
     auto* primary = model.mutable_multi_file()->add_files();
     primary->set_filename("vision.gguf");
     primary->set_destination_path("vision.gguf");
-    primary->set_is_required(true);
+    primary->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
     primary->set_role(runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
 
     auto* projector = model.mutable_multi_file()->add_files();
     projector->set_filename("projector.gguf");
     projector->set_destination_path("projector.gguf");
-    projector->set_is_required(true);
+    projector->set_is_optional(false);  // required (is_required polarity inverted to is_optional)
     projector->set_role(runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
     return model;
 }
@@ -406,8 +406,8 @@ int test_model_missing(rac_model_registry_handle_t registry) {
     runanywhere::v1::ModelLoadResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "missing model returns parsable ModelLoadResult");
-    CHECK(!result.success(), "missing model reports success=false");
-    CHECK(result.error_message().find("not found") != std::string::npos,
+    CHECK(!result.has_error() == false, "missing model reports success=false");
+    CHECK(result.error().message().find("not found") != std::string::npos,
           "missing model carries error message");
     rac_proto_buffer_free(&out);
     return 0;
@@ -429,11 +429,11 @@ int test_unsupported_route(rac_model_registry_handle_t registry) {
     runanywhere::v1::ModelLoadResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "unsupported route returns parsable ModelLoadResult");
-    CHECK(!result.success(), "unsupported route reports success=false");
+    CHECK(!result.has_error() == false, "unsupported route reports success=false");
     // W1 removed the routing scorer: an unserviceable primitive now fails in
     // rac_plugin_find (no registered backend) rather than the old route scorer,
     // so the error names the missing backend instead of a "route".
-    CHECK(result.error_message().find("backend") != std::string::npos,
+    CHECK(result.error().message().find("backend") != std::string::npos,
           "unsupported route carries no-backend error");
     rac_proto_buffer_free(&out);
     rac_model_lifecycle_reset();
@@ -468,7 +468,7 @@ int test_success_current_snapshot_unload_events(rac_model_registry_handle_t regi
     runanywhere::v1::ModelLoadResult load_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result),
           "successful load returns parsable ModelLoadResult");
-    CHECK(load_result.success(), "successful load reports success=true");
+    CHECK(load_result.has_error() == false, "successful load reports success=true");
     CHECK(load_result.model_id() == "lifecycle.llm", "successful load preserves model id");
     CHECK(load_result.resolved_path() == "/tmp/lifecycle-test.gguf",
           "successful load resolves registry local path");
@@ -511,7 +511,7 @@ int test_success_current_snapshot_unload_events(rac_model_registry_handle_t regi
     runanywhere::v1::ModelUnloadResult unload_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &unload_result),
           "unload returns parsable ModelUnloadResult");
-    CHECK(unload_result.success(), "unload reports success=true");
+    CHECK(unload_result.has_error() == false, "unload reports success=true");
     CHECK(unload_result.unloaded_model_ids_size() == 1 &&
               unload_result.unloaded_model_ids(0) == "lifecycle.llm",
           "unload reports unloaded id");
@@ -571,7 +571,7 @@ int test_foundation_model_pins_platform_over_mlx(rac_model_registry_handle_t reg
     runanywhere::v1::ModelLoadResult load_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result),
           "Foundation Models load returns parsable ModelLoadResult");
-    CHECK(load_result.success(), "Foundation Models load reports success=true");
+    CHECK(load_result.has_error() == false, "Foundation Models load reports success=true");
     CHECK(g_last_llm_engine == "platform",
           "Foundation Models load pins platform instead of priority-selected MLX");
     CHECK(g_create_count == 1 && g_initialize_count == 1,
@@ -588,7 +588,7 @@ int test_foundation_model_pins_platform_over_mlx(rac_model_registry_handle_t reg
     runanywhere::v1::ModelUnloadResult unload_result;
     CHECK(unload_rc == RAC_SUCCESS && parse_buffer(out, &unload_result),
           "Foundation Models unload returns parsable ModelUnloadResult");
-    CHECK(unload_result.success(), "Foundation Models unload reports success=true");
+    CHECK(unload_result.has_error() == false, "Foundation Models unload reports success=true");
     rac_proto_buffer_free(&out);
 
     rac_plugin_unregister("platform");
@@ -636,7 +636,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
     runanywhere::v1::ModelLoadResult load_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result),
           "VLM load returns parsable ModelLoadResult");
-    CHECK(load_result.success(), "VLM load reports success=true");
+    CHECK(load_result.has_error() == false, "VLM load reports success=true");
     CHECK(load_result.resolved_path() == primary_path.string(),
           "VLM load resolved_path selects primary artifact");
     CHECK(has_artifact_role(load_result.resolved_artifacts(),
@@ -682,7 +682,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
     runanywhere::v1::ModelUnloadResult unload_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &unload_result),
           "VLM unload returns parsable ModelUnloadResult");
-    CHECK(unload_result.success(), "VLM unload reports success=true");
+    CHECK(unload_result.has_error() == false, "VLM unload reports success=true");
     CHECK(g_vlm_cleanup_count == 1 && g_vlm_destroy_count == 1,
           "VLM unload calls cleanup and destroy");
     rac_proto_buffer_free(&out);
@@ -729,7 +729,7 @@ int test_load_replaces_previous_model(rac_model_registry_handle_t registry) {
     runanywhere::v1::ModelLoadResult first_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &first_result),
           "first load returns parsable ModelLoadResult");
-    CHECK(first_result.success() && first_result.model_id() == "lifecycle.llm",
+    CHECK(first_result.has_error() == false && first_result.model_id() == "lifecycle.llm",
           "first load reports success for primary model");
     CHECK(g_create_count == 1 && g_initialize_count == 1 && g_destroy_count == 0,
           "first load triggers exactly one create+initialize and zero destroys");
@@ -749,7 +749,7 @@ int test_load_replaces_previous_model(rac_model_registry_handle_t registry) {
     runanywhere::v1::ModelLoadResult second_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &second_result),
           "replacing load returns parsable ModelLoadResult");
-    CHECK(second_result.success() && second_result.model_id() == "lifecycle.llm.alt",
+    CHECK(second_result.has_error() == false && second_result.model_id() == "lifecycle.llm.alt",
           "replacing load swaps to the alternate model");
     CHECK(g_destroy_count == 1, "replacing load destroys exactly one previously-loaded impl");
     CHECK(g_cleanup_count == 1, "replacing load cleans up previously-loaded impl");
@@ -806,7 +806,7 @@ int test_shutdown_resets_lifecycle_for_reinitialize(rac_model_registry_handle_t 
     rac_result_t rc =
         rac_model_lifecycle_load_proto(registry, load_bytes.data(), load_bytes.size(), &out);
     runanywhere::v1::ModelLoadResult load_result;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result) && load_result.success(),
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result) && load_result.has_error() == false,
           "first Commons lifetime loads a model");
     rac_proto_buffer_free(&out);
 
@@ -839,7 +839,7 @@ int test_shutdown_resets_lifecycle_for_reinitialize(rac_model_registry_handle_t 
     rac_proto_buffer_init(&out);
     rc = rac_model_lifecycle_load_proto(registry, load_bytes.data(), load_bytes.size(), &out);
     load_result.Clear();
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result) && load_result.success(),
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result) && load_result.has_error() == false,
           "reinitialized Commons lifetime can load the model again");
     rac_proto_buffer_free(&out);
     rac_shutdown();

@@ -46,59 +46,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
 }
 
 /// ---------------------------------------------------------------------------
-/// Supported parameter types.
-/// ---------------------------------------------------------------------------
-public nonisolated enum RAToolParameterType: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case string // = 1
-  case number // = 2
-  case boolean // = 3
-  case object // = 4
-  case array // = 5
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .string
-    case 2: self = .number
-    case 3: self = .boolean
-    case 4: self = .object
-    case 5: self = .array
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .string: return 1
-    case .number: return 2
-    case .boolean: return 3
-    case .object: return 4
-    case .array: return 5
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAToolParameterType] = [
-    .unspecified,
-    .string,
-    .number,
-    .boolean,
-    .object,
-    .array,
-  ]
-
-}
-
-/// ---------------------------------------------------------------------------
 /// Tool-call wire formats various LLM families emit. This enum is the single
 /// portable format selector across commons and every generated SDK binding.
 /// ---------------------------------------------------------------------------
@@ -186,15 +133,13 @@ public nonisolated enum RAToolChoiceMode: SwiftProtobuf.Enum, Swift.CaseIterable
 
 }
 
-public nonisolated enum RAToolCallingStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+/// Conversational role of one prior turn in `history`.
+public nonisolated enum RAToolCallingRole: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
-  case modelToken // = 1
-  case toolCallParsed // = 2
-  case toolExecutionStarted // = 3
-  case toolExecutionCompleted // = 4
-  case completed // = 5
-  case error // = 6
+  case user // = 1
+  case assistant // = 2
+  case system // = 3
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -204,12 +149,9 @@ public nonisolated enum RAToolCallingStreamEventKind: SwiftProtobuf.Enum, Swift.
   public init?(rawValue: Int) {
     switch rawValue {
     case 0: self = .unspecified
-    case 1: self = .modelToken
-    case 2: self = .toolCallParsed
-    case 3: self = .toolExecutionStarted
-    case 4: self = .toolExecutionCompleted
-    case 5: self = .completed
-    case 6: self = .error
+    case 1: self = .user
+    case 2: self = .assistant
+    case 3: self = .system
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -217,25 +159,19 @@ public nonisolated enum RAToolCallingStreamEventKind: SwiftProtobuf.Enum, Swift.
   public var rawValue: Int {
     switch self {
     case .unspecified: return 0
-    case .modelToken: return 1
-    case .toolCallParsed: return 2
-    case .toolExecutionStarted: return 3
-    case .toolExecutionCompleted: return 4
-    case .completed: return 5
-    case .error: return 6
+    case .user: return 1
+    case .assistant: return 2
+    case .system: return 3
     case .UNRECOGNIZED(let i): return i
     }
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAToolCallingStreamEventKind] = [
+  public static let allCases: [RAToolCallingRole] = [
     .unspecified,
-    .modelToken,
-    .toolCallParsed,
-    .toolExecutionStarted,
-    .toolExecutionCompleted,
-    .completed,
-    .error,
+    .user,
+    .assistant,
+    .system,
   ]
 
 }
@@ -243,9 +179,8 @@ public nonisolated enum RAToolCallingStreamEventKind: SwiftProtobuf.Enum, Swift.
 /// ---------------------------------------------------------------------------
 /// JSON-typed scalar / composite carrier for tool arguments and results.
 /// Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
-/// TypeScript discriminated union. Used inside ToolParameter.enum_values
-/// (string-only) and as the canonical wire shape when consumers want
-/// strongly-typed arguments rather than raw JSON.
+/// TypeScript discriminated union. Used as the canonical wire shape when
+/// consumers want strongly-typed arguments rather than raw JSON.
 /// ---------------------------------------------------------------------------
 public nonisolated struct RAToolValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -363,51 +298,6 @@ public nonisolated struct RAToolValueJSON: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// A single parameter definition for a tool.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RAToolParameter: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var name: String = String()
-
-  public var type: RAToolParameterType = .unspecified
-
-  public var description_p: String = String()
-
-  public var required: Bool = false
-
-  /// Allowed values for enum-like parameters. Empty = unconstrained.
-  public var enumValues: [String] = []
-
-  public var jsonSchema: String {
-    get {_jsonSchema ?? String()}
-    set {_jsonSchema = newValue}
-  }
-  /// Returns true if `jsonSchema` has been explicitly set.
-  public var hasJsonSchema: Bool {self._jsonSchema != nil}
-  /// Clears the value of `jsonSchema`. Subsequent reads from it will return its default value.
-  public mutating func clearJsonSchema() {self._jsonSchema = nil}
-
-  public var defaultValue: RAToolValue {
-    get {_defaultValue ?? RAToolValue()}
-    set {_defaultValue = newValue}
-  }
-  /// Returns true if `defaultValue` has been explicitly set.
-  public var hasDefaultValue: Bool {self._defaultValue != nil}
-  /// Clears the value of `defaultValue`. Subsequent reads from it will return its default value.
-  public mutating func clearDefaultValue() {self._defaultValue = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _jsonSchema: String? = nil
-  fileprivate var _defaultValue: RAToolValue? = nil
-}
-
-/// ---------------------------------------------------------------------------
 /// Definition of a tool that the LLM can call.
 /// ---------------------------------------------------------------------------
 public nonisolated struct RAToolDefinition: Sendable {
@@ -419,7 +309,12 @@ public nonisolated struct RAToolDefinition: Sendable {
 
   public var description_p: String = String()
 
-  public var parameters: [RAToolParameter] = []
+  /// OpenAI-compatible parameters schema: ONE JSON Schema object describing
+  /// this tool's arguments — the same shape solutions.proto's ToolSpec
+  /// already carries. One schema per tool is what OpenAI (`parameters`),
+  /// Anthropic (`input_schema`) and MCP (`inputSchema`) each publish.
+  /// "" or "{}" advertises a zero-argument tool.
+  public var parameters: String = String()
 
   /// Optional category for grouping tools in catalogs / UIs.
   public var category: String {
@@ -431,23 +326,11 @@ public nonisolated struct RAToolDefinition: Sendable {
   /// Clears the value of `category`. Subsequent reads from it will return its default value.
   public mutating func clearCategory() {self._category = nil}
 
-  public var jsonSchema: String {
-    get {_jsonSchema ?? String()}
-    set {_jsonSchema = newValue}
-  }
-  /// Returns true if `jsonSchema` has been explicitly set.
-  public var hasJsonSchema: Bool {self._jsonSchema != nil}
-  /// Clears the value of `jsonSchema`. Subsequent reads from it will return its default value.
-  public mutating func clearJsonSchema() {self._jsonSchema = nil}
-
-  public var metadata: Dictionary<String,String> = [:]
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _category: String? = nil
-  fileprivate var _jsonSchema: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -459,7 +342,9 @@ public nonisolated struct RAToolCall: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Unique ID (caller-supplied or generated). Empty = unset.
+  /// Correlation id, echoed back on ToolResult.tool_call_id. Caller-supplied
+  /// or generated; carried through parse AND validate unchanged. Never
+  /// derived from created_at_ms. Empty = unset.
   public var id: String = String()
 
   /// Tool name (matches ToolDefinition.name).
@@ -473,12 +358,14 @@ public nonisolated struct RAToolCall: Sendable {
   /// canonical wire shape for the prompt-formatting path.
   public var argumentsJson: String = String()
 
-  /// Discriminator for OpenAI-compatible flows ("function" is the only
-  /// value at the moment). Empty = unset.
-  public var type: String = String()
-
+  /// Wall-clock parse time, ms since epoch (second resolution today).
+  /// Diagnostic ONLY — never an identity, never used to correlate a call
+  /// with its result.
   public var createdAtMs: Int64 = 0
 
+  /// The exact model text this call was extracted FROM, including the tool
+  /// envelope. Diagnostic. Not the envelope-stripped text — that is
+  /// ToolParseResult.remaining_text.
   public var rawText: String {
     get {_rawText ?? String()}
     set {_rawText = newValue}
@@ -525,9 +412,12 @@ public nonisolated struct RAToolResult: Sendable {
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   public mutating func clearError() {self._error = nil}
 
-  /// Whether execution succeeded. If unset/false and error is empty,
-  /// consumers should fall back to result_json/error semantics.
-  public var success: Bool = false
+  /// True when the tool failed, so commons tells the model the call errored
+  /// instead of feeding result_json back as data and the model can
+  /// self-correct. The proto3 zero value (false) is the correct default: a
+  /// ToolResult nobody touched reads as a good result, not a failed one.
+  /// Industry: Anthropic `is_error`, MCP `isError`.
+  public var isError: Bool = false
 
   public var startedAtMs: Int64 = 0
 
@@ -552,30 +442,23 @@ public nonisolated struct RAToolCallingOptions: Sendable {
   /// its registered tools (per-SDK convention).
   public var tools: [RAToolDefinition] = []
 
-  /// Whether to auto-execute tools or hand them back to the caller.
-  public var autoExecute: Bool = false
-
-  /// Sampling temperature override (Swift: optional Float).
-  public var temperature: Float {
-    get {_temperature ?? 0}
-    set {_temperature = newValue}
+  /// Unset = true: the SDK runs your registered executor and closes the
+  /// loop. Explicit false returns the parsed ToolCall without invoking it.
+  /// Presence-tracked so "unset" is never confused with "explicitly false".
+  public var autoExecute: Bool {
+    get {_autoExecute ?? false}
+    set {_autoExecute = newValue}
   }
-  /// Returns true if `temperature` has been explicitly set.
-  public var hasTemperature: Bool {self._temperature != nil}
-  /// Clears the value of `temperature`. Subsequent reads from it will return its default value.
-  public mutating func clearTemperature() {self._temperature = nil}
+  /// Returns true if `autoExecute` has been explicitly set.
+  public var hasAutoExecute: Bool {self._autoExecute != nil}
+  /// Clears the value of `autoExecute`. Subsequent reads from it will return its default value.
+  public mutating func clearAutoExecute() {self._autoExecute = nil}
 
-  /// Maximum tokens override.
-  public var maxTokens: Int32 {
-    get {_maxTokens ?? 0}
-    set {_maxTokens = newValue}
-  }
-  /// Returns true if `maxTokens` has been explicitly set.
-  public var hasMaxTokens: Bool {self._maxTokens != nil}
-  /// Clears the value of `maxTokens`. Subsequent reads from it will return its default value.
-  public mutating func clearMaxTokens() {self._maxTokens = nil}
-
-  /// System prompt to use during tool-enabled generation.
+  /// System prompt for tool-enabled generation. This is the ONLY channel
+  /// ToolPromptFormatRequest (a standalone verb with no enclosing
+  /// LLMGenerationOptions) has for a system prompt; when ToolCallingOptions
+  /// is embedded in LLMGenerationOptions, the child value wins when present
+  /// and options.system_prompt is the fallback.
   public var systemPrompt: String {
     get {_systemPrompt ?? String()}
     set {_systemPrompt = newValue}
@@ -606,12 +489,17 @@ public nonisolated struct RAToolCallingOptions: Sendable {
   /// When true, one model turn may emit multiple tool-call envelopes;
   /// commons parses and executes all of them before building a single
   /// follow-up prompt. Default false preserves the historical
-  /// one-call-per-turn behavior. (Reclaims the field number that
-  /// originally carried this flag before it was reserved.)
+  /// one-call-per-turn behavior.
+  ///
+  /// Wire history: field 15 originally carried this same bool flag, was
+  /// briefly reserved during a cleanup pass, then restored with identical
+  /// type and meaning. Do not reuse 15 for any other type. Schema-skew
+  /// fixtures under idl/codegen/tests cover old-writer/new-reader for this
+  /// field.
   public var parallelToolCalls: Bool = false
 
-  /// Maximum tool calls in one conversation turn. Unset/0 = SDK default
-  /// (typically 5).
+  /// Maximum tool calls in one conversation turn. Unset/0 = the annotated
+  /// default applies.
   public var maxToolCalls: Int32 {
     get {_maxToolCalls ?? 0}
     set {_maxToolCalls = newValue}
@@ -647,17 +535,41 @@ public nonisolated struct RAToolCallingOptions: Sendable {
   /// Clears the value of `disableThinking`. Subsequent reads from it will return its default value.
   public mutating func clearDisableThinking() {self._disableThinking = nil}
 
+  /// Moved here from ToolCallingSessionCreateRequest so one message carries
+  /// the whole tool-generation policy.
+  public var topP: Float {
+    get {_topP ?? 0}
+    set {_topP = newValue}
+  }
+  /// Returns true if `topP` has been explicitly set.
+  public var hasTopP: Bool {self._topP != nil}
+  /// Clears the value of `topP`. Subsequent reads from it will return its default value.
+  public mutating func clearTopP() {self._topP = nil}
+
+  /// Unset = true: unknown tool calls short-circuit before host execution.
+  /// Callers that delegate validation/authorization to their executor or
+  /// use dynamic tool registries must explicitly set validate_calls=false.
+  public var validateCalls: Bool {
+    get {_validateCalls ?? false}
+    set {_validateCalls = newValue}
+  }
+  /// Returns true if `validateCalls` has been explicitly set.
+  public var hasValidateCalls: Bool {self._validateCalls != nil}
+  /// Clears the value of `validateCalls`. Subsequent reads from it will return its default value.
+  public mutating func clearValidateCalls() {self._validateCalls = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _temperature: Float? = nil
-  fileprivate var _maxTokens: Int32? = nil
+  fileprivate var _autoExecute: Bool? = nil
   fileprivate var _systemPrompt: String? = nil
   fileprivate var _format: RAToolCallFormatName? = nil
   fileprivate var _maxToolCalls: Int32? = nil
   fileprivate var _forcedToolName: String? = nil
   fileprivate var _disableThinking: Bool? = nil
+  fileprivate var _topP: Float? = nil
+  fileprivate var _validateCalls: Bool? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -680,16 +592,6 @@ public nonisolated struct RAToolCallingResult: Sendable {
   /// Whether the response is complete or waiting for more tool results.
   public var isComplete: Bool = false
 
-  /// Conversation ID for continuing with tool results.
-  public var conversationID: String {
-    get {_conversationID ?? String()}
-    set {_conversationID = newValue}
-  }
-  /// Returns true if `conversationID` has been explicitly set.
-  public var hasConversationID: Bool {self._conversationID != nil}
-  /// Clears the value of `conversationID`. Subsequent reads from it will return its default value.
-  public mutating func clearConversationID() {self._conversationID = nil}
-
   /// Number of LLM generation turns used, including the final synthesis turn.
   public var iterationsUsed: Int32 = 0
 
@@ -704,8 +606,6 @@ public nonisolated struct RAToolCallingResult: Sendable {
 
   public var errorCode: Int32 = 0
 
-  public var rawText: String = String()
-
   /// Optional thinking/reasoning content extracted from the final response.
   public var thinkingContent: String {
     get {_thinkingContent ?? String()}
@@ -716,13 +616,25 @@ public nonisolated struct RAToolCallingResult: Sendable {
   /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
   public mutating func clearThinkingContent() {self._thinkingContent = nil}
 
+  /// Token usage aggregated across every LLM generation turn in the loop
+  /// (including the final synthesis turn). Lets a plain generate() that routed
+  /// through the tool loop report the same usage a non-tool generate would.
+  public var usage: RATokenUsage {
+    get {_usage ?? RATokenUsage()}
+    set {_usage = newValue}
+  }
+  /// Returns true if `usage` has been explicitly set.
+  public var hasUsage: Bool {self._usage != nil}
+  /// Clears the value of `usage`. Subsequent reads from it will return its default value.
+  public mutating func clearUsage() {self._usage = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _conversationID: String? = nil
   fileprivate var _errorMessage: String? = nil
   fileprivate var _thinkingContent: String? = nil
+  fileprivate var _usage: RATokenUsage? = nil
 }
 
 public nonisolated struct RAToolParseRequest: Sendable {
@@ -777,50 +689,34 @@ public nonisolated struct RAToolParseResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public nonisolated struct RAToolPromptFormatRequest: @unchecked Sendable {
+public nonisolated struct RAToolPromptFormatRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// User prompt to merge with tool instructions. Empty means return only
   /// the tool-instruction block for the selected format.
-  public var userPrompt: String {
-    get {_storage._userPrompt}
-    set {_uniqueStorage()._userPrompt = newValue}
-  }
+  public var userPrompt: String = String()
 
   /// Carries available tools plus format/choice/iteration constraints.
   public var options: RAToolCallingOptions {
-    get {_storage._options ?? RAToolCallingOptions()}
-    set {_uniqueStorage()._options = newValue}
+    get {_options ?? RAToolCallingOptions()}
+    set {_options = newValue}
   }
   /// Returns true if `options` has been explicitly set.
-  public var hasOptions: Bool {_storage._options != nil}
+  public var hasOptions: Bool {self._options != nil}
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
-  public mutating func clearOptions() {_uniqueStorage()._options = nil}
+  public mutating func clearOptions() {self._options = nil}
 
   /// Tool results to include when formatting a follow-up prompt after host
   /// execution. Empty means an initial tool-enabled prompt.
-  public var toolResults: [RAToolResult] {
-    get {_storage._toolResults}
-    set {_uniqueStorage()._toolResults = newValue}
-  }
-
-  /// Assistant text emitted before tool execution, when available.
-  public var assistantText: String {
-    get {_storage._assistantText ?? String()}
-    set {_uniqueStorage()._assistantText = newValue}
-  }
-  /// Returns true if `assistantText` has been explicitly set.
-  public var hasAssistantText: Bool {_storage._assistantText != nil}
-  /// Clears the value of `assistantText`. Subsequent reads from it will return its default value.
-  public mutating func clearAssistantText() {_uniqueStorage()._assistantText = nil}
+  public var toolResults: [RAToolResult] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _options: RAToolCallingOptions? = nil
 }
 
 public nonisolated struct RAToolPromptFormatResult: Sendable {
@@ -921,252 +817,65 @@ public nonisolated struct RAToolCallValidationResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public nonisolated struct RAToolCallingStreamEvent: @unchecked Sendable {
+/// One prior conversation turn, with its speaker stated rather than inferred
+/// from list position.
+///
+/// Declared here rather than importing chat.proto's ChatMessage/MessageRole:
+/// chat.proto already imports tool_calling.proto, so that import would cycle.
+/// Extracting ChatMessage + MessageRole into a leaf proto was considered and
+/// rejected as a larger change than this surface warrants.
+///
+/// Mapping from chat.proto: MESSAGE_ROLE_USER -> TOOL_CALLING_ROLE_USER,
+/// MESSAGE_ROLE_ASSISTANT -> TOOL_CALLING_ROLE_ASSISTANT,
+/// MESSAGE_ROLE_SYSTEM -> TOOL_CALLING_ROLE_SYSTEM. Tool calls and tool
+/// results do NOT round-trip through history — only role + content do.
+public nonisolated struct RAToolCallingHistoryTurn: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var seq: UInt64 {
-    get {_storage._seq}
-    set {_uniqueStorage()._seq = newValue}
-  }
+  public var role: RAToolCallingRole = .unspecified
 
-  public var timestampUs: Int64 {
-    get {_storage._timestampUs}
-    set {_uniqueStorage()._timestampUs = newValue}
-  }
-
-  public var conversationID: String {
-    get {_storage._conversationID}
-    set {_uniqueStorage()._conversationID = newValue}
-  }
-
-  public var kind: RAToolCallingStreamEventKind {
-    get {_storage._kind}
-    set {_uniqueStorage()._kind = newValue}
-  }
-
-  public var token: String {
-    get {_storage._token}
-    set {_uniqueStorage()._token = newValue}
-  }
-
-  public var toolCall: RAToolCall {
-    get {_storage._toolCall ?? RAToolCall()}
-    set {_uniqueStorage()._toolCall = newValue}
-  }
-  /// Returns true if `toolCall` has been explicitly set.
-  public var hasToolCall: Bool {_storage._toolCall != nil}
-  /// Clears the value of `toolCall`. Subsequent reads from it will return its default value.
-  public mutating func clearToolCall() {_uniqueStorage()._toolCall = nil}
-
-  public var toolResult: RAToolResult {
-    get {_storage._toolResult ?? RAToolResult()}
-    set {_uniqueStorage()._toolResult = newValue}
-  }
-  /// Returns true if `toolResult` has been explicitly set.
-  public var hasToolResult: Bool {_storage._toolResult != nil}
-  /// Clears the value of `toolResult`. Subsequent reads from it will return its default value.
-  public mutating func clearToolResult() {_uniqueStorage()._toolResult = nil}
-
-  public var result: RAToolCallingResult {
-    get {_storage._result ?? RAToolCallingResult()}
-    set {_uniqueStorage()._result = newValue}
-  }
-  /// Returns true if `result` has been explicitly set.
-  public var hasResult: Bool {_storage._result != nil}
-  /// Clears the value of `result`. Subsequent reads from it will return its default value.
-  public mutating func clearResult() {_uniqueStorage()._result = nil}
-
-  public var errorMessage: String {
-    get {_storage._errorMessage ?? String()}
-    set {_uniqueStorage()._errorMessage = newValue}
-  }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
-
-  public var errorCode: Int32 {
-    get {_storage._errorCode}
-    set {_uniqueStorage()._errorCode = newValue}
-  }
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-public nonisolated struct RAToolRegistrySnapshot: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var tools: [RAToolDefinition] = []
-
-  public var updatedAtMs: Int64 = 0
+  public var content: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct RAToolCallingSessionCreateRequest: @unchecked Sendable {
+public nonisolated struct RAToolCallingSessionCreateRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Prompt + LLM generation options inline (avoids cross-proto import cycle).
-  public var prompt: String {
-    get {_storage._prompt}
-    set {_uniqueStorage()._prompt = newValue}
-  }
+  /// The current turn's user prompt.
+  public var prompt: String = String()
 
-  public var maxTokens: Int32 {
-    get {_storage._maxTokens}
-    set {_uniqueStorage()._maxTokens = newValue}
-  }
+  /// Prior turns, EXCLUDING the current turn (which is `prompt`). commons
+  /// threads these into every generate in the loop so multi-turn tool use
+  /// keeps context.
+  public var history: [RAToolCallingHistoryTurn] = []
 
-  public var temperature: Float {
-    get {_storage._temperature}
-    set {_uniqueStorage()._temperature = newValue}
+  /// THE single home for tool policy + sampling. No re-published copies:
+  /// every knob that used to be duplicated on this message (tools, format,
+  /// max_tool_calls, keep_tools_available, validate_calls, tool_choice,
+  /// forced_tool_name, max_output_tokens, temperature, top_p, system_prompt,
+  /// disable_thinking, auto_execute, replace_system_prompt,
+  /// require_json_arguments, parallel_tool_calls) lives on ToolCallingOptions.
+  public var options: RAToolCallingOptions {
+    get {_options ?? RAToolCallingOptions()}
+    set {_options = newValue}
   }
-
-  public var topP: Float {
-    get {_storage._topP}
-    set {_uniqueStorage()._topP = newValue}
-  }
-
-  public var systemPrompt: String {
-    get {_storage._systemPrompt}
-    set {_uniqueStorage()._systemPrompt = newValue}
-  }
-
-  public var tools: [RAToolDefinition] {
-    get {_storage._tools}
-    set {_uniqueStorage()._tools = newValue}
-  }
-
-  public var format: RAToolCallFormatName {
-    get {_storage._format}
-    set {_uniqueStorage()._format = newValue}
-  }
-
-  public var maxToolCalls: UInt32 {
-    get {_storage._maxToolCalls}
-    set {_uniqueStorage()._maxToolCalls = newValue}
-  }
-
-  public var keepToolsAvailable: Bool {
-    get {_storage._keepToolsAvailable}
-    set {_uniqueStorage()._keepToolsAvailable = newValue}
-  }
-
-  /// proto3 `optional` enables presence detection (has_validate_calls()).
-  /// When unset, commons defaults to validate_calls=true so unknown tool
-  /// calls short-circuit before host execution.
-  /// Callers that delegate validation/authorization to their executor or
-  /// use dynamic tool registries must explicitly set validate_calls=false.
-  public var validateCalls: Bool {
-    get {_storage._validateCalls ?? false}
-    set {_uniqueStorage()._validateCalls = newValue}
-  }
-  /// Returns true if `validateCalls` has been explicitly set.
-  public var hasValidateCalls: Bool {_storage._validateCalls != nil}
-  /// Clears the value of `validateCalls`. Subsequent reads from it will return its default value.
-  public mutating func clearValidateCalls() {_uniqueStorage()._validateCalls = nil}
-
-  /// OpenAI-style tool_choice override surfaced through the high-level
-  /// run-loop / session APIs. The same fields exist on ToolCallingOptions
-  /// (fields 13/14); we re-publish them here so the canonical request
-  /// envelope can carry the policy without forcing callers to pass an
-  /// inline ToolCallingOptions. commons honors these on every
-  /// format/validate primitive via build_options_snapshot.
-  public var toolChoice: RAToolChoiceMode {
-    get {_storage._toolChoice ?? .unspecified}
-    set {_uniqueStorage()._toolChoice = newValue}
-  }
-  /// Returns true if `toolChoice` has been explicitly set.
-  public var hasToolChoice: Bool {_storage._toolChoice != nil}
-  /// Clears the value of `toolChoice`. Subsequent reads from it will return its default value.
-  public mutating func clearToolChoice() {_uniqueStorage()._toolChoice = nil}
-
-  public var forcedToolName: String {
-    get {_storage._forcedToolName ?? String()}
-    set {_uniqueStorage()._forcedToolName = newValue}
-  }
-  /// Returns true if `forcedToolName` has been explicitly set.
-  public var hasForcedToolName: Bool {_storage._forcedToolName != nil}
-  /// Clears the value of `forcedToolName`. Subsequent reads from it will return its default value.
-  public mutating func clearForcedToolName() {_uniqueStorage()._forcedToolName = nil}
-
-  /// When true, suppress the model's thinking phase for every generate in
-  /// the loop/session (maps from ToolCallingOptions.disable_thinking; same
-  /// contract as LLMGenerationOptions.disable_thinking). Default false.
-  public var disableThinking: Bool {
-    get {_storage._disableThinking}
-    set {_uniqueStorage()._disableThinking = newValue}
-  }
-
-  /// Default true when absent. False returns the parsed ToolCall without
-  /// invoking the host executor.
-  public var autoExecute: Bool {
-    get {_storage._autoExecute ?? false}
-    set {_uniqueStorage()._autoExecute = newValue}
-  }
-  /// Returns true if `autoExecute` has been explicitly set.
-  public var hasAutoExecute: Bool {_storage._autoExecute != nil}
-  /// Clears the value of `autoExecute`. Subsequent reads from it will return its default value.
-  public mutating func clearAutoExecute() {_uniqueStorage()._autoExecute = nil}
-
-  public var replaceSystemPrompt: Bool {
-    get {_storage._replaceSystemPrompt}
-    set {_uniqueStorage()._replaceSystemPrompt = newValue}
-  }
-
-  public var requireJsonArguments: Bool {
-    get {_storage._requireJsonArguments}
-    set {_uniqueStorage()._requireJsonArguments = newValue}
-  }
-
-  /// Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
-  /// EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
-  /// in the loop so multi-turn tool use keeps context. Same contract as the standard path's
-  /// ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
-  /// cross-proto import cycle.
-  public var history: [String] {
-    get {_storage._history}
-    set {_uniqueStorage()._history = newValue}
-  }
-
-  /// Mirrors ToolCallingOptions.parallel_tool_calls for the run-loop /
-  /// session envelope: when true, one model turn may emit multiple
-  /// tool-call envelopes and commons executes all of them before one
-  /// follow-up prompt. Default false = historical single-call behavior.
-  public var parallelToolCalls: Bool {
-    get {_storage._parallelToolCalls}
-    set {_uniqueStorage()._parallelToolCalls = newValue}
-  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {self._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {self._options = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-public nonisolated struct RAToolCallingSessionCreateResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var sessionHandle: UInt64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
+  fileprivate var _options: RAToolCallingOptions? = nil
 }
 
 public nonisolated struct RAToolCallingSessionEvent: Sendable {
@@ -1254,25 +963,9 @@ public nonisolated struct RAToolCallingSessionStepWithResultRequest: Sendable {
   fileprivate var _error: String? = nil
 }
 
-public nonisolated struct RAToolCallingSessionDestroyRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var sessionHandle: UInt64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
-
-nonisolated extension RAToolParameterType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_PARAMETER_TYPE_UNSPECIFIED\0\u{1}TOOL_PARAMETER_TYPE_STRING\0\u{1}TOOL_PARAMETER_TYPE_NUMBER\0\u{1}TOOL_PARAMETER_TYPE_BOOLEAN\0\u{1}TOOL_PARAMETER_TYPE_OBJECT\0\u{1}TOOL_PARAMETER_TYPE_ARRAY\0")
-}
 
 nonisolated extension RAToolCallFormatName: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CALL_FORMAT_NAME_UNSPECIFIED\0\u{1}TOOL_CALL_FORMAT_NAME_JSON\0\u{2}\u{6}TOOL_CALL_FORMAT_NAME_LFM2\0")
@@ -1282,8 +975,8 @@ nonisolated extension RAToolChoiceMode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CHOICE_MODE_UNSPECIFIED\0\u{1}TOOL_CHOICE_MODE_AUTO\0\u{1}TOOL_CHOICE_MODE_NONE\0\u{1}TOOL_CHOICE_MODE_REQUIRED\0\u{1}TOOL_CHOICE_MODE_SPECIFIC\0")
 }
 
-nonisolated extension RAToolCallingStreamEventKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_ERROR\0")
+nonisolated extension RAToolCallingRole: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CALLING_ROLE_UNSPECIFIED\0\u{1}TOOL_CALLING_ROLE_USER\0\u{1}TOOL_CALLING_ROLE_ASSISTANT\0\u{1}TOOL_CALLING_ROLE_SYSTEM\0")
 }
 
 nonisolated extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -1491,73 +1184,9 @@ nonisolated extension RAToolValueJSON: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-nonisolated extension RAToolParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolParameter"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}type\0\u{1}description\0\u{1}required\0\u{3}enum_values\0\u{3}json_schema\0\u{3}default_value\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.type) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.required) }()
-      case 5: try { try decoder.decodeRepeatedStringField(value: &self.enumValues) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._jsonSchema) }()
-      case 7: try { try decoder.decodeSingularMessageField(value: &self._defaultValue) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
-    }
-    if self.type != .unspecified {
-      try visitor.visitSingularEnumField(value: self.type, fieldNumber: 2)
-    }
-    if !self.description_p.isEmpty {
-      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 3)
-    }
-    if self.required != false {
-      try visitor.visitSingularBoolField(value: self.required, fieldNumber: 4)
-    }
-    if !self.enumValues.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.enumValues, fieldNumber: 5)
-    }
-    try { if let v = self._jsonSchema {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._defaultValue {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAToolParameter, rhs: RAToolParameter) -> Bool {
-    if lhs.name != rhs.name {return false}
-    if lhs.type != rhs.type {return false}
-    if lhs.description_p != rhs.description_p {return false}
-    if lhs.required != rhs.required {return false}
-    if lhs.enumValues != rhs.enumValues {return false}
-    if lhs._jsonSchema != rhs._jsonSchema {return false}
-    if lhs._defaultValue != rhs._defaultValue {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolDefinition"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}description\0\u{1}parameters\0\u{1}category\0\u{3}json_schema\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}description\0\u{1}parameters\0\u{1}category\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1567,10 +1196,8 @@ nonisolated extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._Me
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
-      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.parameters) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.parameters) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._category) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._jsonSchema) }()
-      case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       default: break
       }
     }
@@ -1588,17 +1215,11 @@ nonisolated extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._Me
       try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 2)
     }
     if !self.parameters.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.parameters, fieldNumber: 3)
+      try visitor.visitSingularStringField(value: self.parameters, fieldNumber: 3)
     }
     try { if let v = self._category {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
-    try { if let v = self._jsonSchema {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 6)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1607,8 +1228,6 @@ nonisolated extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._Me
     if lhs.description_p != rhs.description_p {return false}
     if lhs.parameters != rhs.parameters {return false}
     if lhs._category != rhs._category {return false}
-    if lhs._jsonSchema != rhs._jsonSchema {return false}
-    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1616,7 +1235,7 @@ nonisolated extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 nonisolated extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCall"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}arguments_json\0\u{1}type\0\u{4}\u{3}created_at_ms\0\u{3}raw_text\0\u{c}\u{5}\u{1}\u{c}\u{6}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}arguments_json\0\u{3}created_at_ms\0\u{3}raw_text\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1627,9 +1246,8 @@ nonisolated extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.argumentsJson) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.type) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.createdAtMs) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._rawText) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.createdAtMs) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._rawText) }()
       default: break
       }
     }
@@ -1649,14 +1267,11 @@ nonisolated extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.argumentsJson.isEmpty {
       try visitor.visitSingularStringField(value: self.argumentsJson, fieldNumber: 3)
     }
-    if !self.type.isEmpty {
-      try visitor.visitSingularStringField(value: self.type, fieldNumber: 4)
-    }
     if self.createdAtMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.createdAtMs, fieldNumber: 7)
+      try visitor.visitSingularInt64Field(value: self.createdAtMs, fieldNumber: 4)
     }
     try { if let v = self._rawText {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1665,7 +1280,6 @@ nonisolated extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.id != rhs.id {return false}
     if lhs.name != rhs.name {return false}
     if lhs.argumentsJson != rhs.argumentsJson {return false}
-    if lhs.type != rhs.type {return false}
     if lhs.createdAtMs != rhs.createdAtMs {return false}
     if lhs._rawText != rhs._rawText {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1675,7 +1289,7 @@ nonisolated extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 nonisolated extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}name\0\u{3}result_json\0\u{1}error\0\u{1}success\0\u{4}\u{3}started_at_ms\0\u{3}completed_at_ms\0\u{c}\u{6}\u{1}\u{c}\u{7}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}name\0\u{3}result_json\0\u{1}error\0\u{3}is_error\0\u{3}started_at_ms\0\u{3}completed_at_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1687,9 +1301,9 @@ nonisolated extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.resultJson) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._error) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.success) }()
-      case 8: try { try decoder.decodeSingularInt64Field(value: &self.startedAtMs) }()
-      case 9: try { try decoder.decodeSingularInt64Field(value: &self.completedAtMs) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.isError) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.startedAtMs) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.completedAtMs) }()
       default: break
       }
     }
@@ -1712,14 +1326,14 @@ nonisolated extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._Messag
     try { if let v = self._error {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
-    if self.success != false {
-      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 5)
+    if self.isError != false {
+      try visitor.visitSingularBoolField(value: self.isError, fieldNumber: 5)
     }
     if self.startedAtMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.startedAtMs, fieldNumber: 8)
+      try visitor.visitSingularInt64Field(value: self.startedAtMs, fieldNumber: 6)
     }
     if self.completedAtMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.completedAtMs, fieldNumber: 9)
+      try visitor.visitSingularInt64Field(value: self.completedAtMs, fieldNumber: 7)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1729,7 +1343,7 @@ nonisolated extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs.name != rhs.name {return false}
     if lhs.resultJson != rhs.resultJson {return false}
     if lhs._error != rhs._error {return false}
-    if lhs.success != rhs.success {return false}
+    if lhs.isError != rhs.isError {return false}
     if lhs.startedAtMs != rhs.startedAtMs {return false}
     if lhs.completedAtMs != rhs.completedAtMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -1739,7 +1353,7 @@ nonisolated extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
 nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{4}\u{2}auto_execute\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_prompt\0\u{3}replace_system_prompt\0\u{3}keep_tools_available\0\u{2}\u{2}format\0\u{4}\u{2}max_tool_calls\0\u{3}tool_choice\0\u{3}forced_tool_name\0\u{3}parallel_tool_calls\0\u{3}require_json_arguments\0\u{3}disable_thinking\0\u{c}\u{2}\u{1}\u{c}\u{9}\u{1}\u{c}\u{b}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{4}\u{2}auto_execute\0\u{4}\u{3}system_prompt\0\u{3}replace_system_prompt\0\u{3}keep_tools_available\0\u{2}\u{2}format\0\u{4}\u{2}max_tool_calls\0\u{3}tool_choice\0\u{3}forced_tool_name\0\u{3}parallel_tool_calls\0\u{3}require_json_arguments\0\u{3}disable_thinking\0\u{3}top_p\0\u{3}validate_calls\0\u{b}temperature\0\u{b}max_output_tokens\0\u{c}\u{2}\u{1}\u{c}\u{9}\u{1}\u{c}\u{b}\u{1}\u{c}\u{4}\u{1}\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1748,9 +1362,7 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.tools) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.autoExecute) }()
-      case 4: try { try decoder.decodeSingularFloatField(value: &self._temperature) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self._maxTokens) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self._autoExecute) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._systemPrompt) }()
       case 7: try { try decoder.decodeSingularBoolField(value: &self.replaceSystemPrompt) }()
       case 8: try { try decoder.decodeSingularBoolField(value: &self.keepToolsAvailable) }()
@@ -1761,6 +1373,8 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
       case 15: try { try decoder.decodeSingularBoolField(value: &self.parallelToolCalls) }()
       case 16: try { try decoder.decodeSingularBoolField(value: &self.requireJsonArguments) }()
       case 17: try { try decoder.decodeSingularBoolField(value: &self._disableThinking) }()
+      case 18: try { try decoder.decodeSingularFloatField(value: &self._topP) }()
+      case 19: try { try decoder.decodeSingularBoolField(value: &self._validateCalls) }()
       default: break
       }
     }
@@ -1774,14 +1388,8 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
     if !self.tools.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.tools, fieldNumber: 1)
     }
-    if self.autoExecute != false {
-      try visitor.visitSingularBoolField(value: self.autoExecute, fieldNumber: 3)
-    }
-    try { if let v = self._temperature {
-      try visitor.visitSingularFloatField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._maxTokens {
-      try visitor.visitSingularInt32Field(value: v, fieldNumber: 5)
+    try { if let v = self._autoExecute {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
     } }()
     try { if let v = self._systemPrompt {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
@@ -1813,14 +1421,18 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
     try { if let v = self._disableThinking {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 17)
     } }()
+    try { if let v = self._topP {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 18)
+    } }()
+    try { if let v = self._validateCalls {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 19)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAToolCallingOptions, rhs: RAToolCallingOptions) -> Bool {
     if lhs.tools != rhs.tools {return false}
-    if lhs.autoExecute != rhs.autoExecute {return false}
-    if lhs._temperature != rhs._temperature {return false}
-    if lhs._maxTokens != rhs._maxTokens {return false}
+    if lhs._autoExecute != rhs._autoExecute {return false}
     if lhs._systemPrompt != rhs._systemPrompt {return false}
     if lhs.replaceSystemPrompt != rhs.replaceSystemPrompt {return false}
     if lhs.keepToolsAvailable != rhs.keepToolsAvailable {return false}
@@ -1831,6 +1443,8 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
     if lhs._forcedToolName != rhs._forcedToolName {return false}
     if lhs.requireJsonArguments != rhs.requireJsonArguments {return false}
     if lhs._disableThinking != rhs._disableThinking {return false}
+    if lhs._topP != rhs._topP {return false}
+    if lhs._validateCalls != rhs._validateCalls {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1838,7 +1452,7 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}is_complete\0\u{3}conversation_id\0\u{3}iterations_used\0\u{3}error_message\0\u{3}error_code\0\u{3}raw_text\0\u{3}thinking_content\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}is_complete\0\u{3}iterations_used\0\u{3}error_message\0\u{3}error_code\0\u{3}thinking_content\0\u{1}usage\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1850,12 +1464,11 @@ nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf.
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.toolCalls) }()
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.toolResults) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.isComplete) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._conversationID) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.iterationsUsed) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 8: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.rawText) }()
-      case 10: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.iterationsUsed) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._usage) }()
       default: break
       }
     }
@@ -1878,23 +1491,20 @@ nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf.
     if self.isComplete != false {
       try visitor.visitSingularBoolField(value: self.isComplete, fieldNumber: 4)
     }
-    try { if let v = self._conversationID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
     if self.iterationsUsed != 0 {
-      try visitor.visitSingularInt32Field(value: self.iterationsUsed, fieldNumber: 6)
+      try visitor.visitSingularInt32Field(value: self.iterationsUsed, fieldNumber: 5)
     }
     try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
     if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 8)
-    }
-    if !self.rawText.isEmpty {
-      try visitor.visitSingularStringField(value: self.rawText, fieldNumber: 9)
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 7)
     }
     try { if let v = self._thinkingContent {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    try { if let v = self._usage {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1904,12 +1514,11 @@ nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs.toolCalls != rhs.toolCalls {return false}
     if lhs.toolResults != rhs.toolResults {return false}
     if lhs.isComplete != rhs.isComplete {return false}
-    if lhs._conversationID != rhs._conversationID {return false}
     if lhs.iterationsUsed != rhs.iterationsUsed {return false}
     if lhs._errorMessage != rhs._errorMessage {return false}
     if lhs.errorCode != rhs.errorCode {return false}
-    if lhs.rawText != rhs.rawText {return false}
     if lhs._thinkingContent != rhs._thinkingContent {return false}
+    if lhs._usage != rhs._usage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2010,90 +1619,43 @@ nonisolated extension RAToolParseResult: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAToolPromptFormatRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolPromptFormatRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_prompt\0\u{1}options\0\u{3}tool_results\0\u{3}assistant_text\0")
-
-  fileprivate class _StorageClass {
-    var _userPrompt: String = String()
-    var _options: RAToolCallingOptions? = nil
-    var _toolResults: [RAToolResult] = []
-    var _assistantText: String? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _userPrompt = source._userPrompt
-      _options = source._options
-      _toolResults = source._toolResults
-      _assistantText = source._assistantText
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_prompt\0\u{1}options\0\u{3}tool_results\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._userPrompt) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._options) }()
-        case 3: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolResults) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._assistantText) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.userPrompt) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.toolResults) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._userPrompt.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._userPrompt, fieldNumber: 1)
-      }
-      try { if let v = _storage._options {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      if !_storage._toolResults.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._toolResults, fieldNumber: 3)
-      }
-      try { if let v = _storage._assistantText {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.userPrompt.isEmpty {
+      try visitor.visitSingularStringField(value: self.userPrompt, fieldNumber: 1)
+    }
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if !self.toolResults.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.toolResults, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAToolPromptFormatRequest, rhs: RAToolPromptFormatRequest) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._userPrompt != rhs_storage._userPrompt {return false}
-        if _storage._options != rhs_storage._options {return false}
-        if _storage._toolResults != rhs_storage._toolResults {return false}
-        if _storage._assistantText != rhs_storage._assistantText {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.userPrompt != rhs.userPrompt {return false}
+    if lhs._options != rhs._options {return false}
+    if lhs.toolResults != rhs.toolResults {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2284,142 +1846,9 @@ nonisolated extension RAToolCallValidationResult: SwiftProtobuf.Message, SwiftPr
   }
 }
 
-nonisolated extension RAToolCallingStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolCallingStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}conversation_id\0\u{1}kind\0\u{1}token\0\u{3}tool_call\0\u{3}tool_result\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
-
-  fileprivate class _StorageClass {
-    var _seq: UInt64 = 0
-    var _timestampUs: Int64 = 0
-    var _conversationID: String = String()
-    var _kind: RAToolCallingStreamEventKind = .unspecified
-    var _token: String = String()
-    var _toolCall: RAToolCall? = nil
-    var _toolResult: RAToolResult? = nil
-    var _result: RAToolCallingResult? = nil
-    var _errorMessage: String? = nil
-    var _errorCode: Int32 = 0
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _seq = source._seq
-      _timestampUs = source._timestampUs
-      _conversationID = source._conversationID
-      _kind = source._kind
-      _token = source._token
-      _toolCall = source._toolCall
-      _toolResult = source._toolResult
-      _result = source._result
-      _errorMessage = source._errorMessage
-      _errorCode = source._errorCode
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
-        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._conversationID) }()
-        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._toolCall) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._toolResult) }()
-        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
-        case 9: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
-        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._seq != 0 {
-        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
-      }
-      if _storage._timestampUs != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
-      }
-      if !_storage._conversationID.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._conversationID, fieldNumber: 3)
-      }
-      if _storage._kind != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 4)
-      }
-      if !_storage._token.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._token, fieldNumber: 5)
-      }
-      try { if let v = _storage._toolCall {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._toolResult {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._result {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-      } }()
-      try { if let v = _storage._errorMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-      } }()
-      if _storage._errorCode != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 10)
-      }
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAToolCallingStreamEvent, rhs: RAToolCallingStreamEvent) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._seq != rhs_storage._seq {return false}
-        if _storage._timestampUs != rhs_storage._timestampUs {return false}
-        if _storage._conversationID != rhs_storage._conversationID {return false}
-        if _storage._kind != rhs_storage._kind {return false}
-        if _storage._token != rhs_storage._token {return false}
-        if _storage._toolCall != rhs_storage._toolCall {return false}
-        if _storage._toolResult != rhs_storage._toolResult {return false}
-        if _storage._result != rhs_storage._result {return false}
-        if _storage._errorMessage != rhs_storage._errorMessage {return false}
-        if _storage._errorCode != rhs_storage._errorCode {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolRegistrySnapshot"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{3}updated_at_ms\0")
+nonisolated extension RAToolCallingHistoryTurn: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolCallingHistoryTurn"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}role\0\u{1}content\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2427,26 +1856,26 @@ nonisolated extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtob
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.tools) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.updatedAtMs) }()
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.role) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.content) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.tools.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.tools, fieldNumber: 1)
+    if self.role != .unspecified {
+      try visitor.visitSingularEnumField(value: self.role, fieldNumber: 1)
     }
-    if self.updatedAtMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.updatedAtMs, fieldNumber: 2)
+    if !self.content.isEmpty {
+      try visitor.visitSingularStringField(value: self.content, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RAToolRegistrySnapshot, rhs: RAToolRegistrySnapshot) -> Bool {
-    if lhs.tools != rhs.tools {return false}
-    if lhs.updatedAtMs != rhs.updatedAtMs {return false}
+  public static func ==(lhs: RAToolCallingHistoryTurn, rhs: RAToolCallingHistoryTurn) -> Bool {
+    if lhs.role != rhs.role {return false}
+    if lhs.content != rhs.content {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2454,196 +1883,7 @@ nonisolated extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}tools\0\u{1}format\0\u{3}max_tool_calls\0\u{3}keep_tools_available\0\u{3}validate_calls\0\u{3}tool_choice\0\u{3}forced_tool_name\0\u{4}\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}system_prompt\0\u{3}disable_thinking\0\u{3}auto_execute\0\u{3}replace_system_prompt\0\u{3}require_json_arguments\0\u{1}history\0\u{3}parallel_tool_calls\0\u{c}\u{9}\u{2}")
-
-  fileprivate class _StorageClass {
-    var _prompt: String = String()
-    var _maxTokens: Int32 = 0
-    var _temperature: Float = 0
-    var _topP: Float = 0
-    var _systemPrompt: String = String()
-    var _tools: [RAToolDefinition] = []
-    var _format: RAToolCallFormatName = .unspecified
-    var _maxToolCalls: UInt32 = 0
-    var _keepToolsAvailable: Bool = false
-    var _validateCalls: Bool? = nil
-    var _toolChoice: RAToolChoiceMode? = nil
-    var _forcedToolName: String? = nil
-    var _disableThinking: Bool = false
-    var _autoExecute: Bool? = nil
-    var _replaceSystemPrompt: Bool = false
-    var _requireJsonArguments: Bool = false
-    var _history: [String] = []
-    var _parallelToolCalls: Bool = false
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _prompt = source._prompt
-      _maxTokens = source._maxTokens
-      _temperature = source._temperature
-      _topP = source._topP
-      _systemPrompt = source._systemPrompt
-      _tools = source._tools
-      _format = source._format
-      _maxToolCalls = source._maxToolCalls
-      _keepToolsAvailable = source._keepToolsAvailable
-      _validateCalls = source._validateCalls
-      _toolChoice = source._toolChoice
-      _forcedToolName = source._forcedToolName
-      _disableThinking = source._disableThinking
-      _autoExecute = source._autoExecute
-      _replaceSystemPrompt = source._replaceSystemPrompt
-      _requireJsonArguments = source._requireJsonArguments
-      _history = source._history
-      _parallelToolCalls = source._parallelToolCalls
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._prompt) }()
-        case 2: try { try decoder.decodeRepeatedMessageField(value: &_storage._tools) }()
-        case 3: try { try decoder.decodeSingularEnumField(value: &_storage._format) }()
-        case 4: try { try decoder.decodeSingularUInt32Field(value: &_storage._maxToolCalls) }()
-        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._keepToolsAvailable) }()
-        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._validateCalls) }()
-        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._toolChoice) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._forcedToolName) }()
-        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._maxTokens) }()
-        case 12: try { try decoder.decodeSingularFloatField(value: &_storage._temperature) }()
-        case 13: try { try decoder.decodeSingularFloatField(value: &_storage._topP) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._systemPrompt) }()
-        case 15: try { try decoder.decodeSingularBoolField(value: &_storage._disableThinking) }()
-        case 16: try { try decoder.decodeSingularBoolField(value: &_storage._autoExecute) }()
-        case 17: try { try decoder.decodeSingularBoolField(value: &_storage._replaceSystemPrompt) }()
-        case 18: try { try decoder.decodeSingularBoolField(value: &_storage._requireJsonArguments) }()
-        case 19: try { try decoder.decodeRepeatedStringField(value: &_storage._history) }()
-        case 20: try { try decoder.decodeSingularBoolField(value: &_storage._parallelToolCalls) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._prompt.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._prompt, fieldNumber: 1)
-      }
-      if !_storage._tools.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._tools, fieldNumber: 2)
-      }
-      if _storage._format != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._format, fieldNumber: 3)
-      }
-      if _storage._maxToolCalls != 0 {
-        try visitor.visitSingularUInt32Field(value: _storage._maxToolCalls, fieldNumber: 4)
-      }
-      if _storage._keepToolsAvailable != false {
-        try visitor.visitSingularBoolField(value: _storage._keepToolsAvailable, fieldNumber: 5)
-      }
-      try { if let v = _storage._validateCalls {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._toolChoice {
-        try visitor.visitSingularEnumField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._forcedToolName {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-      } }()
-      if _storage._maxTokens != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._maxTokens, fieldNumber: 11)
-      }
-      if _storage._temperature.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._temperature, fieldNumber: 12)
-      }
-      if _storage._topP.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._topP, fieldNumber: 13)
-      }
-      if !_storage._systemPrompt.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._systemPrompt, fieldNumber: 14)
-      }
-      if _storage._disableThinking != false {
-        try visitor.visitSingularBoolField(value: _storage._disableThinking, fieldNumber: 15)
-      }
-      try { if let v = _storage._autoExecute {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 16)
-      } }()
-      if _storage._replaceSystemPrompt != false {
-        try visitor.visitSingularBoolField(value: _storage._replaceSystemPrompt, fieldNumber: 17)
-      }
-      if _storage._requireJsonArguments != false {
-        try visitor.visitSingularBoolField(value: _storage._requireJsonArguments, fieldNumber: 18)
-      }
-      if !_storage._history.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._history, fieldNumber: 19)
-      }
-      if _storage._parallelToolCalls != false {
-        try visitor.visitSingularBoolField(value: _storage._parallelToolCalls, fieldNumber: 20)
-      }
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAToolCallingSessionCreateRequest, rhs: RAToolCallingSessionCreateRequest) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._prompt != rhs_storage._prompt {return false}
-        if _storage._maxTokens != rhs_storage._maxTokens {return false}
-        if _storage._temperature != rhs_storage._temperature {return false}
-        if _storage._topP != rhs_storage._topP {return false}
-        if _storage._systemPrompt != rhs_storage._systemPrompt {return false}
-        if _storage._tools != rhs_storage._tools {return false}
-        if _storage._format != rhs_storage._format {return false}
-        if _storage._maxToolCalls != rhs_storage._maxToolCalls {return false}
-        if _storage._keepToolsAvailable != rhs_storage._keepToolsAvailable {return false}
-        if _storage._validateCalls != rhs_storage._validateCalls {return false}
-        if _storage._toolChoice != rhs_storage._toolChoice {return false}
-        if _storage._forcedToolName != rhs_storage._forcedToolName {return false}
-        if _storage._disableThinking != rhs_storage._disableThinking {return false}
-        if _storage._autoExecute != rhs_storage._autoExecute {return false}
-        if _storage._replaceSystemPrompt != rhs_storage._replaceSystemPrompt {return false}
-        if _storage._requireJsonArguments != rhs_storage._requireJsonArguments {return false}
-        if _storage._history != rhs_storage._history {return false}
-        if _storage._parallelToolCalls != rhs_storage._parallelToolCalls {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAToolCallingSessionCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}history\0\u{1}options\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2651,21 +1891,35 @@ nonisolated extension RAToolCallingSessionCreateResult: SwiftProtobuf.Message, S
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.sessionHandle) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.history) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._options) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.sessionHandle != 0 {
-      try visitor.visitSingularUInt64Field(value: self.sessionHandle, fieldNumber: 1)
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.prompt.isEmpty {
+      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
     }
+    if !self.history.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.history, fieldNumber: 2)
+    }
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RAToolCallingSessionCreateResult, rhs: RAToolCallingSessionCreateResult) -> Bool {
-    if lhs.sessionHandle != rhs.sessionHandle {return false}
+  public static func ==(lhs: RAToolCallingSessionCreateRequest, rhs: RAToolCallingSessionCreateRequest) -> Bool {
+    if lhs.prompt != rhs.prompt {return false}
+    if lhs.history != rhs.history {return false}
+    if lhs._options != rhs._options {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2811,36 +2065,6 @@ nonisolated extension RAToolCallingSessionStepWithResultRequest: SwiftProtobuf.M
     if lhs.toolCallID != rhs.toolCallID {return false}
     if lhs.resultJson != rhs.resultJson {return false}
     if lhs._error != rhs._error {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAToolCallingSessionDestroyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionDestroyRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.sessionHandle) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.sessionHandle != 0 {
-      try visitor.visitSingularUInt64Field(value: self.sessionHandle, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAToolCallingSessionDestroyRequest, rhs: RAToolCallingSessionDestroyRequest) -> Bool {
-    if lhs.sessionHandle != rhs.sessionHandle {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

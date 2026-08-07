@@ -419,7 +419,7 @@ rac_result_t login(LoginSummary* out, std::string* error) {
         }
         return phase2_rc != RAC_SUCCESS ? phase2_rc : RAC_ERROR_INVALID_RESPONSE;
     }
-    if (!result.success()) {
+    if (!result.has_error() == false) {
         if (error != nullptr) {
             *error = "services init failed: " + result.error().message();
         }
@@ -436,7 +436,7 @@ rac_result_t login(LoginSummary* out, std::string* error) {
         out->backend_device_id = backend_device_id != nullptr ? backend_device_id : "";
         out->persistent_device_id = persistent_device_id != nullptr ? persistent_device_id : "";
         out->token_expires_at = rac_auth_get_token_expires_at();
-        out->device_registered = result.device_registered();
+        out->has_completed_http_setup = result.has_completed_http_setup();
         out->assignment_count = result.linked_models_count();
         out->warning = result.warning();
     }

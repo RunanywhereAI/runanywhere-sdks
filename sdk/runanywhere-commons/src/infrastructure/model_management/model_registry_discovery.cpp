@@ -127,10 +127,10 @@ std::filesystem::path canonical_model_folder_for(const std::string& model_id,
 
 namespace rac::infra::model_registry::detail {
 
+// artifact_type (top-level) was reserved -- the artifact oneof's kBuiltIn
+// arm is now the only wire signal alongside source == MODEL_SOURCE_BUILT_IN.
 bool model_is_built_in(const ModelInfo& model) {
-    return (model.has_artifact_type() &&
-            model.artifact_type() == runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN) ||
-           model.artifact_case() == ModelInfo::kBuiltIn ||
+    return model.artifact_case() == ModelInfo::kBuiltIn ||
            model.source() == runanywhere::v1::MODEL_SOURCE_BUILT_IN;
 }
 
@@ -386,7 +386,6 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
     }
 
     ModelDiscoveryResult result;
-    result.set_success(true);
     int32_t scanned = 0;
     for (const ModelInfo& model : models) {
         if (!request.include_built_in() && model_is_built_in(model)) {
@@ -416,10 +415,13 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
         result.add_warnings(
             "purge_invalid requires platform filesystem callbacks and was not executed");
     }
-    result.set_scanned_count(scanned);
-    result.set_linked_count(result.discovered_models_size());
-    result.set_purged_count(0);
-    result.set_imported_count(restored);
+    // scanned_count/linked_count/purged_count/imported_count were reserved
+    // off ModelDiscoveryResult (pure derivations over `discovered_models`,
+    // no remaining consumer) -- log the figures instead of silently dropping
+    // the diagnostic.
+    RAC_LOG_INFO("ModelRegistry",
+                "Discovery: scanned=%d discovered=%d restored_from_manifest=%d",
+                scanned, result.discovered_models_size(), restored);
     return serialize_proto_to_buffer(result, out_result);
 #endif
 }

@@ -479,8 +479,14 @@ static TestResult test_generate_with_history() {
     rac_llm_result_t gen_result = {};
     {
         ScopedTimer timer("llm_generate_with_history");
-        rc = rac_llm_llamacpp_generate(handle, "What is my name? Reply with only my name.", &opts,
-                                       &gen_result);
+        // This calls the raw llama.cpp backend, which (unlike the rac_llm service
+        // layer) does not inject the no-think directive for disable_thinking. The
+        // default test model (Qwen3) is a reasoning model, so without it the whole
+        // 48-token budget is spent inside a <think> block and the name never
+        // appears. Prepend Qwen's "/no_think" control token so it answers directly;
+        // this test verifies history threading, not reasoning.
+        rc = rac_llm_llamacpp_generate(
+            handle, "/no_think\nWhat is my name? Reply with only my name.", &opts, &gen_result);
     }
     ASSERT_EQ(rc, RAC_SUCCESS, "generate with history should succeed");
     ASSERT_TRUE(gen_result.text != nullptr, "result text should not be NULL");

@@ -306,7 +306,9 @@ void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, dou
     (*sdk_event.mutable_properties())["interrupted"] = interrupted != RAC_FALSE ? "1" : "0";
 
     auto* vp = sdk_event.mutable_voice_pipeline();
-    vp->set_timestamp_us(rac_get_current_time_ms() * 1000);
+    // VoiceEvent.timestamp_us was renamed to timestamp_ms (the producer clock
+    // is millisecond-granular, so no *1000 conversion is needed anymore).
+    vp->set_timestamp_ms(rac_get_current_time_ms());
     vp->set_severity(failed ? runanywhere::v1::ERROR_SEVERITY_ERROR
                             : runanywhere::v1::ERROR_SEVERITY_INFO);
     vp->set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
@@ -345,7 +347,7 @@ void emit_generated_voice_event(rac_voice_agent_handle_t handle,
 
 void emit_component_states(rac_voice_agent_handle_t handle) {
     runanywhere::v1::VoiceEvent event;
-    event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+    event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
@@ -357,7 +359,7 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
                          runanywhere::v1::TurnLifecycleEventKind kind, const char* transcript,
                          const char* response, const char* error) {
     runanywhere::v1::VoiceEvent event;
-    event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+    event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_category(error ? runanywhere::v1::EVENT_CATEGORY_ERROR
                              : runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
     event.set_severity(error ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -370,8 +372,13 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
         turn->set_transcript(transcript);
     if (response)
         turn->set_response(response);
-    if (error)
-        turn->set_error(error);
+    if (error) {
+        // TurnLifecycleEvent.error is now optional VoiceSessionError (same
+        // payload as VoiceEvent.session_error), not a bare string.
+        auto* turn_error = turn->mutable_error();
+        turn_error->set_code(runanywhere::v1::ERROR_CODE_PROCESSING_FAILED);
+        turn_error->set_message(error);
+    }
     emit_generated_voice_event(handle, event,
                                error ? runanywhere::v1::ERROR_SEVERITY_ERROR
                                      : runanywhere::v1::ERROR_SEVERITY_INFO);
@@ -380,7 +387,7 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
 void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
                             rac_result_t code, const char* message) {
     runanywhere::v1::VoiceEvent event;
-    event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+    event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
@@ -400,27 +407,28 @@ void emit_component_failure(rac_voice_agent_handle_t handle, const char* compone
 
 rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComposeConfig& proto) {
     rac_voice_agent_config_t config = RAC_VOICE_AGENT_CONFIG_DEFAULT;
+    // stt_model_name / llm_model_name / tts_voice_name were deleted: id is the
+    // normal choice (resolved via the model registry), path is the escape
+    // hatch for a self-staged artifact -- there is no third "name" selector.
     config.stt_config.model_path =
         proto.has_stt_model_path() ? proto.stt_model_path().c_str() : nullptr;
     config.stt_config.model_id = proto.has_stt_model_id() ? proto.stt_model_id().c_str() : nullptr;
-    config.stt_config.model_name =
-        proto.has_stt_model_name() ? proto.stt_model_name().c_str() : nullptr;
     config.llm_config.model_path =
         proto.has_llm_model_path() ? proto.llm_model_path().c_str() : nullptr;
     config.llm_config.model_id = proto.has_llm_model_id() ? proto.llm_model_id().c_str() : nullptr;
-    config.llm_config.model_name =
-        proto.has_llm_model_name() ? proto.llm_model_name().c_str() : nullptr;
     config.tts_config.voice_path =
         proto.has_tts_voice_path() ? proto.tts_voice_path().c_str() : nullptr;
     config.tts_config.voice_id = proto.has_tts_voice_id() ? proto.tts_voice_id().c_str() : nullptr;
-    config.tts_config.voice_name =
-        proto.has_tts_voice_name() ? proto.tts_voice_name().c_str() : nullptr;
+    // Canonical VADConfiguration; frame_length_ms is int32 ms on the wire,
+    // float seconds in the C struct.
+    const auto& vad = proto.vad_config();
     config.vad_config.sample_rate =
-        proto.vad_sample_rate() > 0 ? proto.vad_sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
-    config.vad_config.frame_length =
-        proto.vad_frame_length() > 0.0f ? proto.vad_frame_length() : RAC_VAD_DEFAULT_FRAME_LENGTH;
-    config.vad_config.energy_threshold = proto.vad_energy_threshold() > 0.0f
-                                             ? proto.vad_energy_threshold()
+        vad.sample_rate() > 0 ? vad.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    config.vad_config.frame_length = vad.frame_length_ms() > 0
+                                         ? static_cast<float>(vad.frame_length_ms()) / 1000.0f
+                                         : RAC_VAD_DEFAULT_FRAME_LENGTH;
+    config.vad_config.energy_threshold = vad.activation_threshold() > 0.0f
+                                             ? vad.activation_threshold()
                                              : RAC_VOICE_AGENT_VAD_CONFIG_DEFAULT.energy_threshold;
     return config;
 }

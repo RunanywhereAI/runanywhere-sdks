@@ -35,8 +35,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_vad_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::VADAudioSource
         {&::_pbi::kDescriptorMethods, &::descriptor_table_vad_5foptions_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_vad_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::VADProcessRequest
         {&::_pbi::kDescriptorMethods, &::descriptor_table_vad_5foptions_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::VADResult
@@ -207,7 +205,7 @@ constexpr auto VADStatistics::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[6],
+      &file_reflection_data[5],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_vad_5foptions_2eproto,
@@ -258,341 +256,6 @@ const ::_pbi::ClassData* VADStatistics_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class VADServiceState::_Internal {
- public:
-  using HasBits = decltype(::std::declval<VADServiceState>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_._has_bits_);
-};
-
-constexpr VADServiceState::ParseTableT_ VADServiceState::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_._has_bits_),
-      0, // no _extensions_
-      8, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967040,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      8,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::VADServiceState>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // int32 error_code = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADServiceState, _impl_.error_code_), 7>(),
-       {64, 7, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_code_)}},
-      // bool is_ready = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADServiceState, _impl_.is_ready_), 2>(),
-       {8, 2, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_ready_)}},
-      // bool is_speech_active = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADServiceState, _impl_.is_speech_active_), 3>(),
-       {16, 3, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_speech_active_)}},
-      // float energy_threshold = 3;
-      {::_pbi::TcParser::FastF32S1,
-       {29, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.energy_threshold_)}},
-      // int32 sample_rate = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADServiceState, _impl_.sample_rate_), 5>(),
-       {32, 5, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.sample_rate_)}},
-      // int32 frame_length_ms = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADServiceState, _impl_.frame_length_ms_), 6>(),
-       {40, 6, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.frame_length_ms_)}},
-      // optional string current_model = 6;
-      {::_pbi::TcParser::FastUS1,
-       {50, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.current_model_)}},
-      // optional string error_message = 7;
-      {::_pbi::TcParser::FastUS1,
-       {58, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_message_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // bool is_ready = 1;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_ready_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool is_speech_active = 2;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_speech_active_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // float energy_threshold = 3;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.energy_threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 sample_rate = 4;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.sample_rate_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 frame_length_ms = 5;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.frame_length_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional string current_model = 6;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.current_model_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string error_message = 7;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 8;
-      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_code_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    // no aux_entries
-    {{
-      "\36\0\0\0\0\0\15\15\0\0\0\0\0\0\0\0"
-      "runanywhere.v1.VADServiceState"
-      "current_model"
-      "error_message"
-    }},
-  };
-}
-
-
-inline constexpr VADServiceState::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        current_model_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        is_ready_{false},
-        is_speech_active_{false},
-        energy_threshold_{0},
-        sample_rate_{0},
-        frame_length_ms_{0},
-        error_code_{0} {}
-
-template <typename>
-constexpr VADServiceState::VADServiceState(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL VADServiceState::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) VADServiceState(arena);
-}
-constexpr auto VADServiceState::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VADServiceState), alignof(VADServiceState));
-}
-constexpr auto VADServiceState::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &VADServiceState::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<VADServiceState>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &VADServiceState::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<VADServiceState>(), &VADServiceState::ByteSizeLong,
-              &VADServiceState::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_vad_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct VADServiceStateGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr VADServiceStateGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 VADServiceState_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(VADServiceState::InternalGenerateClassData_(
-            _default, &VADServiceState_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<VADServiceState>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~VADServiceStateGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) VADServiceState _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<VADServiceState>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(VADServiceStateGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VADServiceStateGlobalsTypeInternal VADServiceState_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* VADServiceState_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return VADServiceState_globals_.GetClassData();
-#else
-  return VADServiceState_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-constexpr VADProcessRequest_MetadataEntry_DoNotUse::ParseTableT_ VADProcessRequest_MetadataEntry_DoNotUse::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(VADProcessRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
-      0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::DiscardEverythingFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // string value = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VADProcessRequest_MetadataEntry_DoNotUse, _impl_.value_)}},
-      // string key = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VADProcessRequest_MetadataEntry_DoNotUse, _impl_.key_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string key = 1;
-      {PROTOBUF_FIELD_OFFSET(VADProcessRequest_MetadataEntry_DoNotUse, _impl_.key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string value = 2;
-      {PROTOBUF_FIELD_OFFSET(VADProcessRequest_MetadataEntry_DoNotUse, _impl_.value_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
-      "\56\3\5\0\0\0\0\0"
-      "runanywhere.v1.VADProcessRequest.MetadataEntry"
-      "key"
-      "value"
-    }},
-  };
-}
-
-template <typename>
-constexpr VADProcessRequest_MetadataEntry_DoNotUse::VADProcessRequest_MetadataEntry_DoNotUse(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : VADProcessRequest_MetadataEntry_DoNotUse::MapEntry(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      ) {
-}
-inline void* PROTOBUF_NONNULL VADProcessRequest_MetadataEntry_DoNotUse::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) VADProcessRequest_MetadataEntry_DoNotUse(arena);
-}
-constexpr auto VADProcessRequest_MetadataEntry_DoNotUse::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VADProcessRequest_MetadataEntry_DoNotUse), alignof(VADProcessRequest_MetadataEntry_DoNotUse));
-}
-constexpr auto VADProcessRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &VADProcessRequest_MetadataEntry_DoNotUse::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<VADProcessRequest_MetadataEntry_DoNotUse>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &VADProcessRequest_MetadataEntry_DoNotUse::SharedDtor,
-          static_cast<void (::google::protobuf::MessageLite::*)()>(&VADProcessRequest_MetadataEntry_DoNotUse::ClearImpl),
-              ::google::protobuf::Message::ByteSizeLongImpl, ::google::protobuf::Message::_InternalSerializeImpl
-              ,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(VADProcessRequest_MetadataEntry_DoNotUse, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[3],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_vad_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 VADProcessRequest_MetadataEntry_DoNotUse_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(VADProcessRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_(
-            _default, &VADProcessRequest_MetadataEntry_DoNotUse_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<VADProcessRequest_MetadataEntry_DoNotUse>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) VADProcessRequest_MetadataEntry_DoNotUse _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<VADProcessRequest_MetadataEntry_DoNotUse>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VADProcessRequest_MetadataEntry_DoNotUseGlobalsTypeInternal VADProcessRequest_MetadataEntry_DoNotUse_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* VADProcessRequest_MetadataEntry_DoNotUse_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return VADProcessRequest_MetadataEntry_DoNotUse_globals_.GetClassData();
-#else
-  return VADProcessRequest_MetadataEntry_DoNotUse_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class VADOptions::_Internal {
  public:
   using HasBits = decltype(::std::declval<VADOptions>()._impl_._has_bits_);
@@ -605,11 +268,11 @@ constexpr VADOptions::ParseTableT_ VADOptions::InternalGenerateParseTable_(const
     {
       PROTOBUF_FIELD_OFFSET(VADOptions, _impl_._has_bits_),
       0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
+      6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
+      4294967232,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
+      6,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -620,41 +283,46 @@ constexpr VADOptions::ParseTableT_ VADOptions::InternalGenerateParseTable_(const
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // float threshold = 1;
+      // optional float activation_threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {13, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.threshold_)}},
-      // int32 min_speech_duration_ms = 2;
+        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.activation_threshold_)}},
+      // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "250"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.min_speech_duration_ms_), 1>(),
        {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_speech_duration_ms_)}},
-      // int32 min_silence_duration_ms = 3;
+      // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "500"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.min_silence_duration_ms_), 2>(),
        {24, 2, 0,
         PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_silence_duration_ms_)}},
-      // int32 max_speech_duration_ms = 4;
+      // optional int32 max_speech_duration_ms = 4;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.max_speech_duration_ms_), 3>(),
        {32, 3, 0,
         PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.max_speech_duration_ms_)}},
-      // bool include_statistics = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADOptions, _impl_.include_statistics_), 4>(),
+      // int32 prefix_padding_ms = 5 [(.runanywhere.v1.rac_default) = "300"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.prefix_padding_ms_), 4>(),
        {40, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.include_statistics_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.prefix_padding_ms_)}},
+      // int32 sample_rate = 6 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.sample_rate_), 5>(),
+       {48, 5, 0,
+        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.sample_rate_)}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // float threshold = 1;
-      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.threshold_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 min_speech_duration_ms = 2;
+      // optional float activation_threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.activation_threshold_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "250"];
       {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_speech_duration_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 min_silence_duration_ms = 3;
+      // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "500"];
       {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_silence_duration_ms_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 max_speech_duration_ms = 4;
+      // optional int32 max_speech_duration_ms = 4;
       {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.max_speech_duration_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // bool include_statistics = 5;
-      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.include_statistics_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // int32 prefix_padding_ms = 5 [(.runanywhere.v1.rac_default) = "300"];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.prefix_padding_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 sample_rate = 6 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.sample_rate_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     }},
     // no aux_entries
     {{
@@ -667,11 +335,12 @@ inline constexpr VADOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        threshold_{0},
+        activation_threshold_{0},
         min_speech_duration_ms_{0},
         min_silence_duration_ms_{0},
         max_speech_duration_ms_{0},
-        include_statistics_{false} {}
+        prefix_padding_ms_{0},
+        sample_rate_{0} {}
 
 template <typename>
 constexpr VADOptions::VADOptions(::_pbi::ConstantInitialized,
@@ -777,11 +446,11 @@ constexpr VADConfiguration::ParseTableT_ VADConfiguration::InternalGenerateParse
     {
       PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_._has_bits_),
       0, // no _extensions_
-      10, 120,  // max_field_number, fast_idx_mask
+      8, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966272,  // skipmap
+      4294967040,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      10,  // num_field_entries
+      8,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -791,28 +460,31 @@ constexpr VADConfiguration::ParseTableT_ VADConfiguration::InternalGenerateParse
       ::_pbi::TcParser::GetTable<::runanywhere::v1::VADConfiguration>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional string model_path = 8;
+      {::_pbi::TcParser::FastUS1,
+       {66, 1, 0,
+        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.model_path_)}},
       // string model_id = 1;
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.model_id_)}},
-      // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
+      // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADConfiguration, _impl_.sample_rate_), 2>(),
        {16, 2, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.sample_rate_)}},
-      // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
+      // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 20, (.runanywhere.v1.rac_max) = 1000];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADConfiguration, _impl_.frame_length_ms_), 3>(),
        {24, 3, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.frame_length_ms_)}},
-      // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {37, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.threshold_)}},
+        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.activation_threshold_)}},
       // bool enable_auto_calibration = 5;
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADConfiguration, _impl_.enable_auto_calibration_), 5>(),
        {40, 5, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.enable_auto_calibration_)}},
-      // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
+      // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.2, (.runanywhere.v1.rac_max_float) = 4];
       {::_pbi::TcParser::FastF32S1,
        {53, 6, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.calibration_multiplier_)}},
@@ -820,46 +492,25 @@ constexpr VADConfiguration::ParseTableT_ VADConfiguration::InternalGenerateParse
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADConfiguration, _impl_.preferred_framework_), 7>(),
        {56, 7, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.preferred_framework_)}},
-      // optional string model_path = 8;
-      {::_pbi::TcParser::FastUS1,
-       {66, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.model_path_)}},
-      // int32 window_size_samples = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADConfiguration, _impl_.window_size_samples_), 8>(),
-       {72, 8, 0,
-        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.window_size_samples_)}},
-      // int32 max_speech_duration_ms = 10;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADConfiguration, _impl_.max_speech_duration_ms_), 9>(),
-       {80, 9, 0,
-        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.max_speech_duration_ms_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // string model_id = 1;
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
+      // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.sample_rate_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
+      // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 20, (.runanywhere.v1.rac_max) = 1000];
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.frame_length_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
-      {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.activation_threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // bool enable_auto_calibration = 5;
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.enable_auto_calibration_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
+      // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.2, (.runanywhere.v1.rac_max_float) = 4];
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.calibration_multiplier_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // optional .runanywhere.v1.InferenceFramework preferred_framework = 7;
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional string model_path = 8;
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.model_path_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 window_size_samples = 9;
-      {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.window_size_samples_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 max_speech_duration_ms = 10;
-      {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.max_speech_duration_ms_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     }},
     // no aux_entries
     {{
@@ -884,12 +535,10 @@ inline constexpr VADConfiguration::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         sample_rate_{0},
         frame_length_ms_{0},
-        threshold_{0},
+        activation_threshold_{0},
         enable_auto_calibration_{false},
         calibration_multiplier_{0},
-        preferred_framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
-        window_size_samples_{0},
-        max_speech_duration_ms_{0} {}
+        preferred_framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)} {}
 
 template <typename>
 constexpr VADConfiguration::VADConfiguration(::_pbi::ConstantInitialized,
@@ -988,8 +637,6 @@ class VADAudioSource::_Internal {
   using HasBits = decltype(::std::declval<VADAudioSource>()._impl_._has_bits_);
   static constexpr ::int32_t kHasBitsOffset =
       8 * PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_._has_bits_);
-  static constexpr ::int32_t kOneofCaseOffset =
-      PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_._oneof_case_);
 };
 
 constexpr VADAudioSource::ParseTableT_ VADAudioSource::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
@@ -997,11 +644,11 @@ constexpr VADAudioSource::ParseTableT_ VADAudioSource::InternalGenerateParseTabl
     {
       PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_._has_bits_),
       0, // no _extensions_
-      6, 24,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967264,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
+      5,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -1011,43 +658,45 @@ constexpr VADAudioSource::ParseTableT_ VADAudioSource::InternalGenerateParseTabl
       ::_pbi::TcParser::GetTable<::runanywhere::v1::VADAudioSource>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // int32 sample_rate = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADAudioSource, _impl_.sample_rate_), 1>(),
-       {32, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.sample_rate_)}},
-      // int32 channels = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADAudioSource, _impl_.channels_), 3>(),
-       {40, 3, 0,
-        PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.channels_)}},
-      // int64 frame_offset_ms = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADAudioSource, _impl_.frame_offset_ms_), 2>(),
-       {48, 2, 0,
-        PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.frame_offset_ms_)}},
-      // .runanywhere.v1.VADAudioEncoding encoding = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADAudioSource, _impl_.encoding_), 0>(),
-       {24, 0, 0,
+      {::_pbi::TcParser::MiniParse, {}},
+      // bytes audio_data = 1;
+      {::_pbi::TcParser::FastBS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.audio_data_)}},
+      // .runanywhere.v1.AudioEncoding encoding = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADAudioSource, _impl_.encoding_), 1>(),
+       {16, 1, 0,
         PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.encoding_)}},
+      // int32 sample_rate = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADAudioSource, _impl_.sample_rate_), 2>(),
+       {24, 2, 0,
+        PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.sample_rate_)}},
+      // int32 channels = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADAudioSource, _impl_.channels_), 4>(),
+       {32, 4, 0,
+        PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.channels_)}},
+      // int64 frame_offset_ms = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADAudioSource, _impl_.frame_offset_ms_), 3>(),
+       {40, 3, 0,
+        PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.frame_offset_ms_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // bytes audio_data = 1;
-      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.source_.audio_data_), _Internal::kOneofCaseOffset + 0, 0, (0 | ::_fl::kFcOneof | ::_fl::kBytes | ::_fl::kRepAString)},
-      // string adapter_handle = 2;
-      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.source_.adapter_handle_), _Internal::kOneofCaseOffset + 0, 0, (0 | ::_fl::kFcOneof | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.VADAudioEncoding encoding = 3;
-      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.encoding_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // int32 sample_rate = 4;
-      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.sample_rate_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 channels = 5;
-      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.channels_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int64 frame_offset_ms = 6;
-      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.frame_offset_ms_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.audio_data_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
+      // .runanywhere.v1.AudioEncoding encoding = 2;
+      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.encoding_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // int32 sample_rate = 3;
+      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.sample_rate_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 channels = 4;
+      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.channels_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int64 frame_offset_ms = 5;
+      {PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.frame_offset_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
     // no aux_entries
     {{
-      "\35\0\16\0\0\0\0\0"
-      "runanywhere.v1.VADAudioSource"
-      "adapter_handle"
     }},
   };
 }
@@ -1057,12 +706,13 @@ inline constexpr VADAudioSource::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        encoding_{static_cast< ::runanywhere::v1::VADAudioEncoding >(0)},
+        audio_data_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        encoding_{static_cast< ::runanywhere::v1::AudioEncoding >(0)},
         sample_rate_{0},
         frame_offset_ms_{::int64_t{0}},
-        channels_{0},
-        source_{},
-        _oneof_case_{} {}
+        channels_{0} {}
 
 template <typename>
 constexpr VADAudioSource::VADAudioSource(::_pbi::ConstantInitialized,
@@ -1080,7 +730,7 @@ inline void* PROTOBUF_NONNULL VADAudioSource::PlacementNew_(
   return ::new (mem) VADAudioSource(arena);
 }
 constexpr auto VADAudioSource::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(VADAudioSource), alignof(VADAudioSource));
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VADAudioSource), alignof(VADAudioSource));
 }
 constexpr auto VADAudioSource::InternalGenerateClassData_(
     const MessageLite& prototype,
@@ -1156,6 +806,378 @@ const ::_pbi::ClassData* VADAudioSource_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class SpeechActivityEvent::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<SpeechActivityEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_._has_bits_);
+};
+
+constexpr SpeechActivityEvent::ParseTableT_ SpeechActivityEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_._has_bits_),
+      0, // no _extensions_
+      5, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967264,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      5,  // num_field_entries
+      0,  // num_aux_entries
+      offsetof(ParseTableT_, field_names),  // no aux_entries
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::SpeechActivityEvent>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.SpeechActivityKind event_type = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SpeechActivityEvent, _impl_.event_type_), 4>(),
+       {8, 4, 0,
+        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.event_type_)}},
+      // int64 timestamp_ms = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SpeechActivityEvent, _impl_.timestamp_ms_), 1>(),
+       {16, 1, 0,
+        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.timestamp_ms_)}},
+      // int64 audio_start_ms = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SpeechActivityEvent, _impl_.audio_start_ms_), 2>(),
+       {24, 2, 0,
+        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.audio_start_ms_)}},
+      // int64 audio_end_ms = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SpeechActivityEvent, _impl_.audio_end_ms_), 3>(),
+       {32, 3, 0,
+        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.audio_end_ms_)}},
+      // optional string segment_id = 5;
+      {::_pbi::TcParser::FastUS1,
+       {42, 0, 0,
+        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.segment_id_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // .runanywhere.v1.SpeechActivityKind event_type = 1;
+      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.event_type_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // int64 timestamp_ms = 2;
+      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 audio_start_ms = 3;
+      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.audio_start_ms_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 audio_end_ms = 4;
+      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.audio_end_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // optional string segment_id = 5;
+      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.segment_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    }},
+    // no aux_entries
+    {{
+      "\42\0\0\0\0\12\0\0"
+      "runanywhere.v1.SpeechActivityEvent"
+      "segment_id"
+    }},
+  };
+}
+
+
+inline constexpr SpeechActivityEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        segment_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        timestamp_ms_{::int64_t{0}},
+        audio_start_ms_{::int64_t{0}},
+        audio_end_ms_{::int64_t{0}},
+        event_type_{static_cast< ::runanywhere::v1::SpeechActivityKind >(0)} {}
+
+template <typename>
+constexpr SpeechActivityEvent::SpeechActivityEvent(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL SpeechActivityEvent::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) SpeechActivityEvent(arena);
+}
+constexpr auto SpeechActivityEvent::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SpeechActivityEvent), alignof(SpeechActivityEvent));
+}
+constexpr auto SpeechActivityEvent::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &SpeechActivityEvent::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<SpeechActivityEvent>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &SpeechActivityEvent::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<SpeechActivityEvent>(), &SpeechActivityEvent::ByteSizeLong,
+              &SpeechActivityEvent::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[6],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_vad_5foptions_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct SpeechActivityEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr SpeechActivityEventGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 SpeechActivityEvent_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(SpeechActivityEvent::InternalGenerateClassData_(
+            _default, &SpeechActivityEvent_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<SpeechActivityEvent>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~SpeechActivityEventGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) SpeechActivityEvent _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<SpeechActivityEvent>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(SpeechActivityEventGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST SpeechActivityEventGlobalsTypeInternal SpeechActivityEvent_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* SpeechActivityEvent_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return SpeechActivityEvent_globals_.GetClassData();
+#else
+  return SpeechActivityEvent_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class VADServiceState::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<VADServiceState>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_._has_bits_);
+};
+
+constexpr VADServiceState::ParseTableT_ VADServiceState::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_._has_bits_),
+      0, // no _extensions_
+      7, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967168,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      7,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::VADServiceState>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // bool is_ready = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADServiceState, _impl_.is_ready_), 2>(),
+       {8, 2, 0,
+        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_ready_)}},
+      // bool is_speech_active = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADServiceState, _impl_.is_speech_active_), 3>(),
+       {16, 3, 0,
+        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_speech_active_)}},
+      // float activation_threshold = 3;
+      {::_pbi::TcParser::FastF32S1,
+       {29, 4, 0,
+        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.activation_threshold_)}},
+      // int32 sample_rate = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADServiceState, _impl_.sample_rate_), 5>(),
+       {32, 5, 0,
+        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.sample_rate_)}},
+      // int32 frame_length_ms = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADServiceState, _impl_.frame_length_ms_), 6>(),
+       {40, 6, 0,
+        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.frame_length_ms_)}},
+      // optional string current_model = 6;
+      {::_pbi::TcParser::FastUS1,
+       {50, 0, 0,
+        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.current_model_)}},
+      // optional .runanywhere.v1.SDKError error = 7;
+      {::_pbi::TcParser::FastMtS1,
+       {58, 1, 0,
+        PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // bool is_ready = 1;
+      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_ready_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool is_speech_active = 2;
+      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_speech_active_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // float activation_threshold = 3;
+      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.activation_threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // int32 sample_rate = 4;
+      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.sample_rate_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 frame_length_ms = 5;
+      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.frame_length_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // optional string current_model = 6;
+      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.current_model_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional .runanywhere.v1.SDKError error = 7;
+      {PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\36\0\0\0\0\0\15\0"
+      "runanywhere.v1.VADServiceState"
+      "current_model"
+    }},
+  };
+}
+
+
+inline constexpr VADServiceState::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        current_model_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        is_ready_{false},
+        is_speech_active_{false},
+        activation_threshold_{0},
+        sample_rate_{0},
+        frame_length_ms_{0} {}
+
+template <typename>
+constexpr VADServiceState::VADServiceState(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL VADServiceState::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) VADServiceState(arena);
+}
+constexpr auto VADServiceState::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VADServiceState), alignof(VADServiceState));
+}
+constexpr auto VADServiceState::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &VADServiceState::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<VADServiceState>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &VADServiceState::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<VADServiceState>(), &VADServiceState::ByteSizeLong,
+              &VADServiceState::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[8],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_vad_5foptions_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct VADServiceStateGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr VADServiceStateGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 VADServiceState_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(VADServiceState::InternalGenerateClassData_(
+            _default, &VADServiceState_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<VADServiceState>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~VADServiceStateGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) VADServiceState _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<VADServiceState>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(VADServiceStateGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VADServiceStateGlobalsTypeInternal VADServiceState_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* VADServiceState_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return VADServiceState_globals_.GetClassData();
+#else
+  return VADServiceState_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class VADResult::_Internal {
  public:
   using HasBits = decltype(::std::declval<VADResult>()._impl_._has_bits_);
@@ -1168,11 +1190,11 @@ constexpr VADResult::ParseTableT_ VADResult::InternalGenerateParseTable_(const :
     {
       PROTOBUF_FIELD_OFFSET(VADResult, _impl_._has_bits_),
       0, // no _extensions_
-      10, 120,  // max_field_number, fast_idx_mask
+      6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966272,  // skipmap
+      4294967232,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      10,  // num_field_entries
+      6,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1184,85 +1206,54 @@ constexpr VADResult::ParseTableT_ VADResult::InternalGenerateParseTable_(const :
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
       // bool is_speech = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADResult, _impl_.is_speech_), 2>(),
-       {8, 2, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADResult, _impl_.is_speech_), 1>(),
+       {8, 1, 0,
         PROTOBUF_FIELD_OFFSET(VADResult, _impl_.is_speech_)}},
-      // float confidence = 2;
+      // float probability = 2;
       {::_pbi::TcParser::FastF32S1,
-       {21, 3, 0,
-        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.confidence_)}},
+       {21, 2, 0,
+        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.probability_)}},
       // float energy = 3;
       {::_pbi::TcParser::FastF32S1,
-       {29, 4, 0,
+       {29, 3, 0,
         PROTOBUF_FIELD_OFFSET(VADResult, _impl_.energy_)}},
       // int32 duration_ms = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADResult, _impl_.duration_ms_), 5>(),
-       {32, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADResult, _impl_.duration_ms_), 4>(),
+       {32, 4, 0,
         PROTOBUF_FIELD_OFFSET(VADResult, _impl_.duration_ms_)}},
       // int64 timestamp_ms = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADResult, _impl_.timestamp_ms_), 6>(),
-       {40, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADResult, _impl_.timestamp_ms_), 5>(),
+       {40, 5, 0,
         PROTOBUF_FIELD_OFFSET(VADResult, _impl_.timestamp_ms_)}},
-      // int64 start_time_ms = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADResult, _impl_.start_time_ms_), 7>(),
-       {48, 7, 0,
-        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.start_time_ms_)}},
-      // int64 end_time_ms = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADResult, _impl_.end_time_ms_), 8>(),
-       {56, 8, 0,
-        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.end_time_ms_)}},
-      // optional .runanywhere.v1.VADStatistics statistics = 8;
+      // optional .runanywhere.v1.SDKError error = 6;
       {::_pbi::TcParser::FastMtS1,
-       {66, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.statistics_)}},
-      // optional string error_message = 9;
-      {::_pbi::TcParser::FastUS1,
-       {74, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_message_)}},
-      // int32 error_code = 10;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADResult, _impl_.error_code_), 9>(),
-       {80, 9, 0,
-        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_code_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+       {50, 0, 0,
+        PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_)}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // bool is_speech = 1;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.is_speech_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // float confidence = 2;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.confidence_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.is_speech_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // float probability = 2;
+      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.probability_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // float energy = 3;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.energy_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.energy_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // int32 duration_ms = 4;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.duration_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.duration_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int64 timestamp_ms = 5;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 start_time_ms = 6;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.start_time_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 end_time_ms = 7;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.end_time_ms_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // optional .runanywhere.v1.VADStatistics statistics = 8;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.statistics_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional string error_message = 9;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 10;
-      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_code_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // optional .runanywhere.v1.SDKError error = 6;
+      {PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::VADStatistics>()},
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
         #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::VADStatistics_globals_},
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
         #endif
     }},
     {{
-      "\30\0\0\0\0\0\0\0\0\15\0\0\0\0\0\0"
-      "runanywhere.v1.VADResult"
-      "error_message"
     }},
   };
 }
@@ -1272,18 +1263,12 @@ inline constexpr VADResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        statistics_{nullptr},
+        error_{nullptr},
         is_speech_{false},
-        confidence_{0},
+        probability_{0},
         energy_{0},
         duration_ms_{0},
-        timestamp_ms_{::int64_t{0}},
-        start_time_ms_{::int64_t{0}},
-        end_time_ms_{::int64_t{0}},
-        error_code_{0} {}
+        timestamp_ms_{::int64_t{0}} {}
 
 template <typename>
 constexpr VADResult::VADResult(::_pbi::ConstantInitialized,
@@ -1301,7 +1286,7 @@ inline void* PROTOBUF_NONNULL VADResult::PlacementNew_(
   return ::new (mem) VADResult(arena);
 }
 constexpr auto VADResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VADResult), alignof(VADResult));
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(VADResult), alignof(VADResult));
 }
 constexpr auto VADResult::InternalGenerateClassData_(
     const MessageLite& prototype,
@@ -1326,7 +1311,7 @@ constexpr auto VADResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[5],
+      &file_reflection_data[4],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_vad_5foptions_2eproto,
@@ -1389,12 +1374,12 @@ constexpr VADProcessRequest::ParseTableT_ VADProcessRequest::InternalGeneratePar
     {
       PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      2, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967292,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
-      3,  // num_aux_entries
+      2,  // num_field_entries
+      2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -1403,30 +1388,21 @@ constexpr VADProcessRequest::ParseTableT_ VADProcessRequest::InternalGeneratePar
       ::_pbi::TcParser::GetTable<::runanywhere::v1::VADProcessRequest>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string request_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.request_id_)}},
-      // optional .runanywhere.v1.VADAudioSource audio = 2;
+      // optional .runanywhere.v1.VADOptions options = 2;
       {::_pbi::TcParser::FastMtS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.audio_)}},
-      // optional .runanywhere.v1.VADOptions options = 3;
-      {::_pbi::TcParser::FastMtS1,
-       {26, 2, 1,
+       {18, 1, 1,
         PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.options_)}},
+      // optional .runanywhere.v1.VADAudioSource audio = 1;
+      {::_pbi::TcParser::FastMtS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.audio_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // string request_id = 1;
-      {PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.request_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional .runanywhere.v1.VADAudioSource audio = 2;
-      {PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.audio_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional .runanywhere.v1.VADOptions options = 3;
-      {PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.options_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // map<string, string> metadata = 4;
-      {PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.metadata_), _Internal::kHasBitsOffset + 3, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
+      // optional .runanywhere.v1.VADAudioSource audio = 1;
+      {PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.audio_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.VADOptions options = 2;
+      {PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.options_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1439,14 +1415,8 @@ constexpr VADProcessRequest::ParseTableT_ VADProcessRequest::InternalGeneratePar
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::VADOptions_globals_},
         #endif
-        {::_pbi::TcParser::GetMapAuxInfo(
-            1, 0, 9, 9, 0)},
     }},
     {{
-      "\40\12\0\0\10\0\0\0"
-      "runanywhere.v1.VADProcessRequest"
-      "request_id"
-      "metadata"
     }},
   };
 }
@@ -1456,16 +1426,8 @@ inline constexpr VADProcessRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        request_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         audio_{nullptr},
-        options_{nullptr},
-        metadata_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::VADProcessRequest,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_.metadata_)>()
-         }
-     {}
+        options_{nullptr} {}
 
 template <typename>
 constexpr VADProcessRequest::VADProcessRequest(::_pbi::ConstantInitialized,
@@ -1483,7 +1445,7 @@ inline void* PROTOBUF_NONNULL VADProcessRequest::PlacementNew_(
   return ::new (mem) VADProcessRequest(arena);
 }
 constexpr auto VADProcessRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VADProcessRequest), alignof(VADProcessRequest));
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(VADProcessRequest), alignof(VADProcessRequest));
 }
 constexpr auto VADProcessRequest::InternalGenerateClassData_(
     const MessageLite& prototype,
@@ -1508,7 +1470,7 @@ constexpr auto VADProcessRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[4],
+      &file_reflection_data[3],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_vad_5foptions_2eproto,
@@ -1559,195 +1521,6 @@ const ::_pbi::ClassData* VADProcessRequest_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class SpeechActivityEvent::_Internal {
- public:
-  using HasBits = decltype(::std::declval<SpeechActivityEvent>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_._has_bits_);
-};
-
-constexpr SpeechActivityEvent::ParseTableT_ SpeechActivityEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_._has_bits_),
-      0, // no _extensions_
-      6, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::SpeechActivityEvent>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // .runanywhere.v1.SpeechActivityKind event_type = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SpeechActivityEvent, _impl_.event_type_), 3>(),
-       {8, 3, 0,
-        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.event_type_)}},
-      // int64 timestamp_ms = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(SpeechActivityEvent, _impl_.timestamp_ms_), 2>(),
-       {16, 2, 0,
-        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.timestamp_ms_)}},
-      // int32 duration_ms = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SpeechActivityEvent, _impl_.duration_ms_), 4>(),
-       {24, 4, 0,
-        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.duration_ms_)}},
-      // float confidence = 4;
-      {::_pbi::TcParser::FastF32S1,
-       {37, 5, 0,
-        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.confidence_)}},
-      // optional .runanywhere.v1.VADResult result = 5;
-      {::_pbi::TcParser::FastMtS1,
-       {42, 1, 0,
-        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.result_)}},
-      // optional string segment_id = 6;
-      {::_pbi::TcParser::FastUS1,
-       {50, 0, 0,
-        PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.segment_id_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.SpeechActivityKind event_type = 1;
-      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.event_type_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // int64 timestamp_ms = 2;
-      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.timestamp_ms_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int32 duration_ms = 3;
-      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.duration_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float confidence = 4;
-      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.confidence_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // optional .runanywhere.v1.VADResult result = 5;
-      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.result_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional string segment_id = 6;
-      {PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.segment_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::VADResult>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::VADResult_globals_},
-        #endif
-    }},
-    {{
-      "\42\0\0\0\0\0\12\0"
-      "runanywhere.v1.SpeechActivityEvent"
-      "segment_id"
-    }},
-  };
-}
-
-
-inline constexpr SpeechActivityEvent::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        segment_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        result_{nullptr},
-        timestamp_ms_{::int64_t{0}},
-        event_type_{static_cast< ::runanywhere::v1::SpeechActivityKind >(0)},
-        duration_ms_{0},
-        confidence_{0} {}
-
-template <typename>
-constexpr SpeechActivityEvent::SpeechActivityEvent(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL SpeechActivityEvent::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) SpeechActivityEvent(arena);
-}
-constexpr auto SpeechActivityEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SpeechActivityEvent), alignof(SpeechActivityEvent));
-}
-constexpr auto SpeechActivityEvent::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &SpeechActivityEvent::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<SpeechActivityEvent>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &SpeechActivityEvent::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<SpeechActivityEvent>(), &SpeechActivityEvent::ByteSizeLong,
-              &SpeechActivityEvent::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[7],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_vad_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct SpeechActivityEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr SpeechActivityEventGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 SpeechActivityEvent_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(SpeechActivityEvent::InternalGenerateClassData_(
-            _default, &SpeechActivityEvent_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<SpeechActivityEvent>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~SpeechActivityEventGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) SpeechActivityEvent _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<SpeechActivityEvent>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(SpeechActivityEventGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST SpeechActivityEventGlobalsTypeInternal SpeechActivityEvent_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* SpeechActivityEvent_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return SpeechActivityEvent_globals_.GetClassData();
-#else
-  return SpeechActivityEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class VADStreamEvent::_Internal {
  public:
   using HasBits = decltype(::std::declval<VADStreamEvent>()._impl_._has_bits_);
@@ -1760,11 +1533,11 @@ constexpr VADStreamEvent::ParseTableT_ VADStreamEvent::InternalGenerateParseTabl
     {
       PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_._has_bits_),
       0, // no _extensions_
-      9, 120,  // max_field_number, fast_idx_mask
+      7, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966784,  // skipmap
+      4294967168,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
+      7,  // num_field_entries
       3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1776,68 +1549,50 @@ constexpr VADStreamEvent::ParseTableT_ VADStreamEvent::InternalGenerateParseTabl
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
       // uint64 seq = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADStreamEvent, _impl_.seq_), 5>(),
-       {8, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADStreamEvent, _impl_.seq_), 4>(),
+       {8, 4, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.seq_)}},
       // int64 timestamp_us = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADStreamEvent, _impl_.timestamp_us_), 6>(),
-       {16, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADStreamEvent, _impl_.timestamp_us_), 5>(),
+       {16, 5, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.timestamp_us_)}},
       // string request_id = 3;
       {::_pbi::TcParser::FastUS1,
        {26, 0, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.request_id_)}},
       // .runanywhere.v1.VADStreamEventKind kind = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADStreamEvent, _impl_.kind_), 7>(),
-       {32, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADStreamEvent, _impl_.kind_), 6>(),
+       {32, 6, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.kind_)}},
       // optional .runanywhere.v1.VADResult result = 5;
       {::_pbi::TcParser::FastMtS1,
-       {42, 2, 0,
+       {42, 1, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.result_)}},
       // optional .runanywhere.v1.SpeechActivityEvent activity = 6;
       {::_pbi::TcParser::FastMtS1,
-       {50, 3, 1,
+       {50, 2, 1,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.activity_)}},
-      // optional .runanywhere.v1.VADStatistics statistics = 7;
+      // optional .runanywhere.v1.SDKError error = 7;
       {::_pbi::TcParser::FastMtS1,
-       {58, 4, 2,
-        PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.statistics_)}},
-      // optional string error_message = 8;
-      {::_pbi::TcParser::FastUS1,
-       {66, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_message_)}},
-      // int32 error_code = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADStreamEvent, _impl_.error_code_), 8>(),
-       {72, 8, 0,
-        PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_code_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+       {58, 3, 2,
+        PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_)}},
     }}, {{
       65535, 65535
     }}, {{
       // uint64 seq = 1;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.seq_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.seq_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
       // int64 timestamp_us = 2;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // string request_id = 3;
       {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.request_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // .runanywhere.v1.VADStreamEventKind kind = 4;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional .runanywhere.v1.VADResult result = 5;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional .runanywhere.v1.SpeechActivityEvent activity = 6;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.activity_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional .runanywhere.v1.VADStatistics statistics = 7;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.statistics_), _Internal::kHasBitsOffset + 4, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional string error_message = 8;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 9;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_code_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.activity_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.SDKError error = 7;
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_), _Internal::kHasBitsOffset + 3, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1851,16 +1606,15 @@ constexpr VADStreamEvent::ParseTableT_ VADStreamEvent::InternalGenerateParseTabl
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SpeechActivityEvent_globals_},
         #endif
         #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::VADStatistics>()},
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
         #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::VADStatistics_globals_},
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
         #endif
     }},
     {{
-      "\35\0\0\12\0\0\0\0\15\0\0\0\0\0\0\0"
+      "\35\0\0\12\0\0\0\0"
       "runanywhere.v1.VADStreamEvent"
       "request_id"
-      "error_message"
     }},
   };
 }
@@ -1873,16 +1627,12 @@ inline constexpr VADStreamEvent::Impl_::Impl_(
         request_id_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         result_{nullptr},
         activity_{nullptr},
-        statistics_{nullptr},
+        error_{nullptr},
         seq_{::uint64_t{0u}},
         timestamp_us_{::int64_t{0}},
-        kind_{static_cast< ::runanywhere::v1::VADStreamEventKind >(0)},
-        error_code_{0} {}
+        kind_{static_cast< ::runanywhere::v1::VADStreamEventKind >(0)} {}
 
 template <typename>
 constexpr VADStreamEvent::VADStreamEvent(::_pbi::ConstantInitialized,
@@ -1925,7 +1675,7 @@ constexpr auto VADStreamEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[8],
+      &file_reflection_data[7],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_vad_5foptions_2eproto,
@@ -1979,7 +1729,7 @@ const ::_pbi::ClassData* VADStreamEvent_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_vad_5foptions_2eproto[3];
+    file_level_enum_descriptors_vad_5foptions_2eproto[2];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_vad_5foptions_2eproto = nullptr;
 const ::uint32_t
@@ -1987,17 +1737,15 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_._has_bits_),
-        13, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.sample_rate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.frame_length_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.threshold_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.activation_threshold_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.enable_auto_calibration_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.calibration_multiplier_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.preferred_framework_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.model_path_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.window_size_samples_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.max_speech_duration_ms_),
         0,
         2,
         3,
@@ -2006,79 +1754,56 @@ const ::uint32_t
         6,
         7,
         1,
-        8,
-        9,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_._has_bits_),
-        8, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.threshold_),
+        9, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.activation_threshold_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.min_speech_duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.min_silence_duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.max_speech_duration_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.include_statistics_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.prefix_padding_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.sample_rate_),
         0,
         1,
         2,
         3,
         4,
-        0x085, // bitmap
+        5,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_._has_bits_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_._oneof_case_[0]),
-        11, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.source_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.source_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.audio_data_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.encoding_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.sample_rate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.channels_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.frame_offset_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_.source_),
-        ~0u,
-        ~0u,
         0,
         1,
-        3,
         2,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
-        5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse, _impl_.key_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse, _impl_.value_),
-        0,
-        1,
+        4,
+        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_._has_bits_),
-        7, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_.request_id_),
+        5, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_.audio_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_.options_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_.metadata_),
         0,
         1,
-        2,
-        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_._has_bits_),
-        13, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.is_speech_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.confidence_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.probability_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.energy_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.timestamp_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.start_time_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.end_time_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.statistics_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADResult, _impl_.error_),
+        1,
         2,
         3,
         4,
         5,
-        6,
-        7,
-        8,
-        1,
         0,
-        9,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStatistics, _impl_._has_bits_),
         12, // hasbit index offset
@@ -2102,51 +1827,44 @@ const ::uint32_t
         8,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_._has_bits_),
-        9, // hasbit index offset
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.event_type_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.timestamp_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.duration_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.confidence_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.result_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.audio_start_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.audio_end_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechActivityEvent, _impl_.segment_id_),
-        3,
-        2,
         4,
-        5,
         1,
+        2,
+        3,
         0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_._has_bits_),
-        12, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.seq_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.timestamp_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.request_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.result_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.activity_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.statistics_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.error_),
+        4,
         5,
-        6,
         0,
-        7,
+        6,
+        1,
         2,
         3,
-        4,
-        1,
-        8,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_._has_bits_),
-        11, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.is_ready_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.is_speech_active_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.energy_threshold_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.activation_threshold_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.sample_rate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.frame_length_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.current_model_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADServiceState, _impl_.error_),
         2,
         3,
         4,
@@ -2154,28 +1872,25 @@ const ::uint32_t
         6,
         0,
         1,
-        7,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::VADConfiguration)},
-        {23, sizeof(::runanywhere::v1::VADOptions)},
-        {36, sizeof(::runanywhere::v1::VADAudioSource)},
-        {53, sizeof(::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse)},
-        {60, sizeof(::runanywhere::v1::VADProcessRequest)},
-        {71, sizeof(::runanywhere::v1::VADResult)},
-        {94, sizeof(::runanywhere::v1::VADStatistics)},
-        {115, sizeof(::runanywhere::v1::SpeechActivityEvent)},
-        {130, sizeof(::runanywhere::v1::VADStreamEvent)},
-        {151, sizeof(::runanywhere::v1::VADServiceState)},
+        {19, sizeof(::runanywhere::v1::VADOptions)},
+        {34, sizeof(::runanywhere::v1::VADAudioSource)},
+        {47, sizeof(::runanywhere::v1::VADProcessRequest)},
+        {54, sizeof(::runanywhere::v1::VADResult)},
+        {69, sizeof(::runanywhere::v1::VADStatistics)},
+        {90, sizeof(::runanywhere::v1::SpeechActivityEvent)},
+        {103, sizeof(::runanywhere::v1::VADStreamEvent)},
+        {120, sizeof(::runanywhere::v1::VADServiceState)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::runanywhere::v1::VADConfiguration_globals_,
         &::runanywhere::v1::VADOptions_globals_,
         &::runanywhere::v1::VADAudioSource_globals_,
-        &::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse_globals_,
         &::runanywhere::v1::VADProcessRequest_globals_,
         &::runanywhere::v1::VADResult_globals_,
         &::runanywhere::v1::VADStatistics_globals_,
@@ -2185,98 +1900,80 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_vad_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\021vad_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\032\021rac_options.proto\"\320\003\n\020VA"
-    "DConfiguration\022\020\n\010model_id\030\001 \001(\t\022(\n\013samp"
-    "le_rate\030\002 \001(\005B\023\212\265\030\00516000\240\265\030\001\250\265\030\200\367\002\022)\n\017fr"
-    "ame_length_ms\030\003 \001(\005B\020\212\265\030\003100\240\265\030\001\250\265\030\350\007\0222\n"
-    "\tthreshold\030\004 \001(\002B\037\212\265\030\0050.015\261\265\030\000\000\000\000\000\000\000\000\271\265"
-    "\030\000\000\000\000\000\000\360\?\022\037\n\027enable_auto_calibration\030\005 \001"
-    "(\010\022=\n\026calibration_multiplier\030\006 \001(\002B\035\212\265\030\003"
-    "2.0\261\265\030\000\000\000\000\000\000\370\?\271\265\030\000\000\000\000\000\000\020@\022D\n\023preferred_f"
-    "ramework\030\007 \001(\0162\".runanywhere.v1.Inferenc"
-    "eFrameworkH\000\210\001\001\022\027\n\nmodel_path\030\010 \001(\tH\001\210\001\001"
-    "\022\033\n\023window_size_samples\030\t \001(\005\022\036\n\026max_spe"
-    "ech_duration_ms\030\n \001(\005B\026\n\024_preferred_fram"
-    "eworkB\r\n\013_model_path\"\234\001\n\nVADOptions\022\021\n\tt"
-    "hreshold\030\001 \001(\002\022\036\n\026min_speech_duration_ms"
-    "\030\002 \001(\005\022\037\n\027min_silence_duration_ms\030\003 \001(\005\022"
-    "\036\n\026max_speech_duration_ms\030\004 \001(\005\022\032\n\022inclu"
-    "de_statistics\030\005 \001(\010\"\276\001\n\016VADAudioSource\022\024"
-    "\n\naudio_data\030\001 \001(\014H\000\022\030\n\016adapter_handle\030\002"
-    " \001(\tH\000\0222\n\010encoding\030\003 \001(\0162 .runanywhere.v"
-    "1.VADAudioEncoding\022\023\n\013sample_rate\030\004 \001(\005\022"
-    "\020\n\010channels\030\005 \001(\005\022\027\n\017frame_offset_ms\030\006 \001"
-    "(\003B\010\n\006source\"\227\002\n\021VADProcessRequest\022\022\n\nre"
-    "quest_id\030\001 \001(\t\0222\n\005audio\030\002 \001(\0132\036.runanywh"
-    "ere.v1.VADAudioSourceH\000\210\001\001\0220\n\007options\030\003 "
-    "\001(\0132\032.runanywhere.v1.VADOptionsH\001\210\001\001\022A\n\010"
-    "metadata\030\004 \003(\0132/.runanywhere.v1.VADProce"
-    "ssRequest.MetadataEntry\032/\n\rMetadataEntry"
-    "\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006_aud"
-    "ioB\n\n\010_options\"\242\002\n\tVADResult\022\021\n\tis_speec"
-    "h\030\001 \001(\010\022\022\n\nconfidence\030\002 \001(\002\022\016\n\006energy\030\003 "
+    "\n\021vad_options.proto\022\016runanywhere.v1\032\014err"
+    "ors.proto\032\021model_types.proto\032\021rac_option"
+    "s.proto\"\235\003\n\020VADConfiguration\022\020\n\010model_id"
+    "\030\001 \001(\t\022)\n\013sample_rate\030\002 \001(\005B\024\212\265\030\00516000\240\265"
+    "\030\300>\250\265\030\200\367\002\022)\n\017frame_length_ms\030\003 \001(\005B\020\212\265\030\003"
+    "100\240\265\030\024\250\265\030\350\007\022;\n\024activation_threshold\030\004 \001"
+    "(\002B\035\212\265\030\0030.5\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\037\n\027ena"
+    "ble_auto_calibration\030\005 \001(\010\022=\n\026calibratio"
+    "n_multiplier\030\006 \001(\002B\035\212\265\030\0032.0\261\265\030333333\363\?\271\265"
+    "\030\000\000\000\000\000\000\020@\022D\n\023preferred_framework\030\007 \001(\0162\""
+    ".runanywhere.v1.InferenceFrameworkH\000\210\001\001\022"
+    "\027\n\nmodel_path\030\010 \001(\tH\001\210\001\001B\026\n\024_preferred_f"
+    "rameworkB\r\n\013_model_path\"\311\002\n\nVADOptions\022@"
+    "\n\024activation_threshold\030\001 \001(\002B\035\212\265\030\0030.5\261\265\030"
+    "\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?H\000\210\001\001\022\'\n\026min_speech_d"
+    "uration_ms\030\002 \001(\005B\007\212\265\030\003250\022(\n\027min_silence"
+    "_duration_ms\030\003 \001(\005B\007\212\265\030\003500\022#\n\026max_speec"
+    "h_duration_ms\030\004 \001(\005H\001\210\001\001\022\"\n\021prefix_paddi"
+    "ng_ms\030\005 \001(\005B\007\212\265\030\003300\022)\n\013sample_rate\030\006 \001("
+    "\005B\024\212\265\030\00516000\240\265\030\300>\250\265\030\200\367\002B\027\n\025_activation_t"
+    "hresholdB\031\n\027_max_speech_duration_ms\"\225\001\n\016"
+    "VADAudioSource\022\022\n\naudio_data\030\001 \001(\014\022/\n\010en"
+    "coding\030\002 \001(\0162\035.runanywhere.v1.AudioEncod"
+    "ing\022\023\n\013sample_rate\030\003 \001(\005\022\020\n\010channels\030\004 \001"
+    "(\005\022\027\n\017frame_offset_ms\030\005 \001(\003\"\217\001\n\021VADProce"
+    "ssRequest\0222\n\005audio\030\001 \001(\0132\036.runanywhere.v"
+    "1.VADAudioSourceH\000\210\001\001\0220\n\007options\030\002 \001(\0132\032"
+    ".runanywhere.v1.VADOptionsH\001\210\001\001B\010\n\006_audi"
+    "oB\n\n\010_options\"\246\001\n\tVADResult\022\021\n\tis_speech"
+    "\030\001 \001(\010\022\023\n\013probability\030\002 \001(\002\022\016\n\006energy\030\003 "
     "\001(\002\022\023\n\013duration_ms\030\004 \001(\005\022\024\n\014timestamp_ms"
-    "\030\005 \001(\003\022\025\n\rstart_time_ms\030\006 \001(\003\022\023\n\013end_tim"
-    "e_ms\030\007 \001(\003\0226\n\nstatistics\030\010 \001(\0132\035.runanyw"
-    "here.v1.VADStatisticsH\000\210\001\001\022\032\n\rerror_mess"
-    "age\030\t \001(\tH\001\210\001\001\022\022\n\nerror_code\030\n \001(\005B\r\n\013_s"
-    "tatisticsB\020\n\016_error_message\"\357\001\n\rVADStati"
-    "stics\022\026\n\016current_energy\030\001 \001(\002\022\031\n\021current"
-    "_threshold\030\002 \001(\002\022\025\n\rambient_level\030\003 \001(\002\022"
-    "\022\n\nrecent_avg\030\004 \001(\002\022\022\n\nrecent_max\030\005 \001(\002\022"
-    "\035\n\025total_speech_segments\030\006 \001(\005\022 \n\030total_"
-    "speech_duration_ms\030\007 \001(\003\022\026\n\016average_ener"
-    "gy\030\010 \001(\002\022\023\n\013peak_energy\030\t \001(\002\"\357\001\n\023Speech"
-    "ActivityEvent\0226\n\nevent_type\030\001 \001(\0162\".runa"
-    "nywhere.v1.SpeechActivityKind\022\024\n\014timesta"
-    "mp_ms\030\002 \001(\003\022\023\n\013duration_ms\030\003 \001(\005\022\022\n\nconf"
-    "idence\030\004 \001(\002\022.\n\006result\030\005 \001(\0132\031.runanywhe"
-    "re.v1.VADResultH\000\210\001\001\022\027\n\nsegment_id\030\006 \001(\t"
-    "H\001\210\001\001B\t\n\007_resultB\r\n\013_segment_id\"\206\003\n\016VADS"
-    "treamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030"
-    "\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162"
-    "\".runanywhere.v1.VADStreamEventKind\022.\n\006r"
-    "esult\030\005 \001(\0132\031.runanywhere.v1.VADResultH\000"
-    "\210\001\001\022:\n\010activity\030\006 \001(\0132#.runanywhere.v1.S"
-    "peechActivityEventH\001\210\001\001\0226\n\nstatistics\030\007 "
-    "\001(\0132\035.runanywhere.v1.VADStatisticsH\002\210\001\001\022"
-    "\032\n\rerror_message\030\010 \001(\tH\003\210\001\001\022\022\n\nerror_cod"
-    "e\030\t \001(\005B\t\n\007_resultB\013\n\t_activityB\r\n\013_stat"
-    "isticsB\020\n\016_error_message\"\365\001\n\017VADServiceS"
-    "tate\022\020\n\010is_ready\030\001 \001(\010\022\030\n\020is_speech_acti"
-    "ve\030\002 \001(\010\022\030\n\020energy_threshold\030\003 \001(\002\022\023\n\013sa"
-    "mple_rate\030\004 \001(\005\022\027\n\017frame_length_ms\030\005 \001(\005"
-    "\022\032\n\rcurrent_model\030\006 \001(\tH\000\210\001\001\022\032\n\rerror_me"
-    "ssage\030\007 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\020\n\016"
-    "_current_modelB\020\n\016_error_message*\254\001\n\022Spe"
-    "echActivityKind\022$\n SPEECH_ACTIVITY_KIND_"
-    "UNSPECIFIED\020\000\022\'\n#SPEECH_ACTIVITY_KIND_SP"
-    "EECH_STARTED\020\001\022%\n!SPEECH_ACTIVITY_KIND_S"
-    "PEECH_ENDED\020\002\022 \n\034SPEECH_ACTIVITY_KIND_ON"
-    "GOING\020\003*|\n\020VADAudioEncoding\022\"\n\036VAD_AUDIO"
-    "_ENCODING_UNSPECIFIED\020\000\022!\n\035VAD_AUDIO_ENC"
-    "ODING_PCM_F32_LE\020\001\022!\n\035VAD_AUDIO_ENCODING"
-    "_PCM_S16_LE\020\002*\270\002\n\022VADStreamEventKind\022%\n!"
-    "VAD_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035V"
-    "AD_STREAM_EVENT_KIND_STARTED\020\001\022\037\n\033VAD_ST"
-    "REAM_EVENT_KIND_FRAME\020\002\022)\n%VAD_STREAM_EV"
-    "ENT_KIND_SPEECH_ACTIVITY\020\003\022$\n VAD_STREAM"
-    "_EVENT_KIND_STATISTICS\020\004\022!\n\035VAD_STREAM_E"
-    "VENT_KIND_STOPPED\020\005\022\037\n\033VAD_STREAM_EVENT_"
-    "KIND_ERROR\020\006\022\"\n\036VAD_STREAM_EVENT_KIND_BA"
-    "RGE_IN\020\0072\242\001\n\003VAD\022L\n\014ProcessFrame\022!.runan"
-    "ywhere.v1.VADProcessRequest\032\031.runanywher"
-    "e.v1.VADResult\022M\n\006Stream\022!.runanywhere.v"
-    "1.VADProcessRequest\032\036.runanywhere.v1.VAD"
-    "StreamEvent0\001B\212\001\n\027ai.runanywhere.proto.v"
-    "1B\017VadOptionsProtoP\001Z<github.com/runanyw"
-    "here/runanywhere-sdks/idl/v1;runanywhere"
-    "v1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006prot"
-    "o3"
+    "\030\005 \001(\003\022,\n\005error\030\006 \001(\0132\030.runanywhere.v1.S"
+    "DKErrorH\000\210\001\001B\010\n\006_error\"\357\001\n\rVADStatistics"
+    "\022\026\n\016current_energy\030\001 \001(\002\022\031\n\021current_thre"
+    "shold\030\002 \001(\002\022\025\n\rambient_level\030\003 \001(\002\022\022\n\nre"
+    "cent_avg\030\004 \001(\002\022\022\n\nrecent_max\030\005 \001(\002\022\035\n\025to"
+    "tal_speech_segments\030\006 \001(\005\022 \n\030total_speec"
+    "h_duration_ms\030\007 \001(\003\022\026\n\016average_energy\030\010 "
+    "\001(\002\022\023\n\013peak_energy\030\t \001(\002\"\271\001\n\023SpeechActiv"
+    "ityEvent\0226\n\nevent_type\030\001 \001(\0162\".runanywhe"
+    "re.v1.SpeechActivityKind\022\024\n\014timestamp_ms"
+    "\030\002 \001(\003\022\026\n\016audio_start_ms\030\003 \001(\003\022\024\n\014audio_"
+    "end_ms\030\004 \001(\003\022\027\n\nsegment_id\030\005 \001(\tH\000\210\001\001B\r\n"
+    "\013_segment_id\"\265\002\n\016VADStreamEvent\022\013\n\003seq\030\001"
+    " \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_id"
+    "\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".runanywhere.v1.VA"
+    "DStreamEventKind\022.\n\006result\030\005 \001(\0132\031.runan"
+    "ywhere.v1.VADResultH\000\210\001\001\022:\n\010activity\030\006 \001"
+    "(\0132#.runanywhere.v1.SpeechActivityEventH"
+    "\001\210\001\001\022,\n\005error\030\007 \001(\0132\030.runanywhere.v1.SDK"
+    "ErrorH\002\210\001\001B\t\n\007_resultB\013\n\t_activityB\010\n\006_e"
+    "rror\"\357\001\n\017VADServiceState\022\020\n\010is_ready\030\001 \001"
+    "(\010\022\030\n\020is_speech_active\030\002 \001(\010\022\034\n\024activati"
+    "on_threshold\030\003 \001(\002\022\023\n\013sample_rate\030\004 \001(\005\022"
+    "\027\n\017frame_length_ms\030\005 \001(\005\022\032\n\rcurrent_mode"
+    "l\030\006 \001(\tH\000\210\001\001\022,\n\005error\030\007 \001(\0132\030.runanywher"
+    "e.v1.SDKErrorH\001\210\001\001B\020\n\016_current_modelB\010\n\006"
+    "_error*\254\001\n\022SpeechActivityKind\022$\n SPEECH_"
+    "ACTIVITY_KIND_UNSPECIFIED\020\000\022\'\n#SPEECH_AC"
+    "TIVITY_KIND_SPEECH_STARTED\020\001\022%\n!SPEECH_A"
+    "CTIVITY_KIND_SPEECH_ENDED\020\002\022 \n\034SPEECH_AC"
+    "TIVITY_KIND_ONGOING\020\003*\250\001\n\022VADStreamEvent"
+    "Kind\022%\n!VAD_STREAM_EVENT_KIND_UNSPECIFIE"
+    "D\020\000\022\037\n\033VAD_STREAM_EVENT_KIND_FRAME\020\001\022)\n%"
+    "VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY\020\002\022"
+    "\037\n\033VAD_STREAM_EVENT_KIND_ERROR\020\003B\212\001\n\027ai."
+    "runanywhere.proto.v1B\017VadOptionsProtoP\001Z"
+    "<github.com/runanywhere/runanywhere-sdks"
+    "/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runany"
+    "where.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_vad_5foptions_2eproto_deps[2] = {
+    descriptor_table_vad_5foptions_2eproto_deps[3] = {
+        &::descriptor_table_errors_2eproto,
         &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
 };
@@ -2284,13 +1981,13 @@ static ::absl::once_flag descriptor_table_vad_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vad_5foptions_2eproto = {
     false,
     false,
-    3522,
+    2781,
     descriptor_table_protodef_vad_5foptions_2eproto,
     "vad_options.proto",
     &descriptor_table_vad_5foptions_2eproto_once,
     descriptor_table_vad_5foptions_2eproto_deps,
-    2,
-    10,
+    3,
+    9,
     schemas,
     file_message_globals,
     TableStruct_vad_5foptions_2eproto::offsets,
@@ -2307,19 +2004,12 @@ SpeechActivityKind_descriptor() {
 PROTOBUF_CONSTINIT const uint32_t SpeechActivityKind_internal_data_[] = {
     262144u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VADAudioEncoding_descriptor() {
+VADStreamEventKind_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_vad_5foptions_2eproto);
   return file_level_enum_descriptors_vad_5foptions_2eproto[1];
 }
-PROTOBUF_CONSTINIT const uint32_t VADAudioEncoding_internal_data_[] = {
-    196608u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VADStreamEventKind_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_vad_5foptions_2eproto);
-  return file_level_enum_descriptors_vad_5foptions_2eproto[2];
-}
 PROTOBUF_CONSTINIT const uint32_t VADStreamEventKind_internal_data_[] = {
-    524288u, 0u, };
+    262144u, 0u, };
 // ===================================================================
 
 VADConfiguration::VADConfiguration(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -2358,9 +2048,9 @@ VADConfiguration::VADConfiguration(
                offsetof(Impl_, sample_rate_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, sample_rate_),
-           offsetof(Impl_, max_speech_duration_ms_) -
+           offsetof(Impl_, preferred_framework_) -
                offsetof(Impl_, sample_rate_) +
-               sizeof(Impl_::max_speech_duration_ms_));
+               sizeof(Impl_::preferred_framework_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VADConfiguration)
 }
@@ -2376,9 +2066,9 @@ inline void VADConfiguration::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) 
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, sample_rate_),
            0,
-           offsetof(Impl_, max_speech_duration_ms_) -
+           offsetof(Impl_, preferred_framework_) -
                offsetof(Impl_, sample_rate_) +
-               sizeof(Impl_::max_speech_duration_ms_));
+               sizeof(Impl_::preferred_framework_));
 }
 VADConfiguration::~VADConfiguration() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VADConfiguration)
@@ -2443,11 +2133,6 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
         reinterpret_cast<char*>(&_impl_.preferred_framework_) -
         reinterpret_cast<char*>(&_impl_.sample_rate_)) + sizeof(_impl_.preferred_framework_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    ::memset(&_impl_.window_size_samples_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.max_speech_duration_ms_) -
-        reinterpret_cast<char*>(&_impl_.window_size_samples_)) + sizeof(_impl_.max_speech_duration_ms_));
-  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -2481,7 +2166,7 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     }
   }
 
-  // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
+  // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_sample_rate() != 0) {
       target =
@@ -2490,7 +2175,7 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     }
   }
 
-  // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
+  // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 20, (.runanywhere.v1.rac_max) = 1000];
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_frame_length_ms() != 0) {
       target =
@@ -2499,12 +2184,12 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     }
   }
 
-  // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          4, this_._internal_threshold(), target);
+          4, this_._internal_activation_threshold(), target);
     }
   }
 
@@ -2517,7 +2202,7 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     }
   }
 
-  // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
+  // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.2, (.runanywhere.v1.rac_max_float) = 4];
   if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_calibration_multiplier()) != 0) {
       target = stream->EnsureSpace(target);
@@ -2539,24 +2224,6 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADConfiguration.model_path");
     target = stream->WriteStringMaybeAliased(8, _s, target);
-  }
-
-  // int32 window_size_samples = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_window_size_samples() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
-              stream, this_._internal_window_size_samples(), target);
-    }
-  }
-
-  // int32 max_speech_duration_ms = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-    if (this_._internal_max_speech_duration_ms() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<10>(
-              stream, this_._internal_max_speech_duration_ms(), target);
-    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -2597,23 +2264,23 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_model_path());
     }
-    // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
+    // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_sample_rate() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_sample_rate());
       }
     }
-    // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
+    // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 20, (.runanywhere.v1.rac_max) = 1000];
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_frame_length_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_frame_length_ms());
       }
     }
-    // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+    // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
         total_size += 5;
       }
     }
@@ -2623,7 +2290,7 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
         total_size += 2;
       }
     }
-    // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
+    // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.2, (.runanywhere.v1.rac_max_float) = 4];
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_calibration_multiplier()) != 0) {
         total_size += 5;
@@ -2633,22 +2300,6 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_preferred_framework());
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    // int32 window_size_samples = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_window_size_samples() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_window_size_samples());
-      }
-    }
-    // int32 max_speech_duration_ms = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_max_speech_duration_ms() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_speech_duration_ms());
-      }
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -2692,8 +2343,8 @@ void VADConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_threshold()) != 0) {
-        _this->_impl_.threshold_ = from._impl_.threshold_;
+      if (::absl::bit_cast<::uint32_t>(from._internal_activation_threshold()) != 0) {
+        _this->_impl_.activation_threshold_ = from._impl_.activation_threshold_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
@@ -2708,18 +2359,6 @@ void VADConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       _this->_impl_.preferred_framework_ = from._impl_.preferred_framework_;
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_window_size_samples() != 0) {
-        _this->_impl_.window_size_samples_ = from._impl_.window_size_samples_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_max_speech_duration_ms() != 0) {
-        _this->_impl_.max_speech_duration_ms_ = from._impl_.max_speech_duration_ms_;
-      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -2744,8 +2383,8 @@ void VADConfiguration::InternalSwap(VADConfiguration* PROTOBUF_RESTRICT PROTOBUF
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_path_, &other->_impl_.model_path_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.max_speech_duration_ms_)
-      + sizeof(VADConfiguration::_impl_.max_speech_duration_ms_)
+      PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.preferred_framework_)
+      + sizeof(VADConfiguration::_impl_.preferred_framework_)
       - PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.sample_rate_)>(
           reinterpret_cast<char*>(&_impl_.sample_rate_),
           reinterpret_cast<char*>(&other->_impl_.sample_rate_));
@@ -2784,11 +2423,11 @@ PROTOBUF_NDEBUG_INLINE VADOptions::Impl_::Impl_(
 inline void VADOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, threshold_),
+               offsetof(Impl_, activation_threshold_),
            0,
-           offsetof(Impl_, include_statistics_) -
-               offsetof(Impl_, threshold_) +
-               sizeof(Impl_::include_statistics_));
+           offsetof(Impl_, sample_rate_) -
+               offsetof(Impl_, activation_threshold_) +
+               sizeof(Impl_::sample_rate_));
 }
 VADOptions::~VADOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VADOptions)
@@ -2838,10 +2477,10 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    ::memset(&_impl_.threshold_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.include_statistics_) -
-        reinterpret_cast<char*>(&_impl_.threshold_)) + sizeof(_impl_.include_statistics_));
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    ::memset(&_impl_.activation_threshold_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.sample_rate_) -
+        reinterpret_cast<char*>(&_impl_.activation_threshold_)) + sizeof(_impl_.sample_rate_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2866,16 +2505,14 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // float threshold = 1;
+  // optional float activation_threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          1, this_._internal_threshold(), target);
-    }
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(
+        1, this_._internal_activation_threshold(), target);
   }
 
-  // int32 min_speech_duration_ms = 2;
+  // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "250"];
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_min_speech_duration_ms() != 0) {
       target =
@@ -2884,7 +2521,7 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
     }
   }
 
-  // int32 min_silence_duration_ms = 3;
+  // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "500"];
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_min_silence_duration_ms() != 0) {
       target =
@@ -2893,21 +2530,28 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
     }
   }
 
-  // int32 max_speech_duration_ms = 4;
+  // optional int32 max_speech_duration_ms = 4;
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_max_speech_duration_ms() != 0) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+            stream, this_._internal_max_speech_duration_ms(), target);
+  }
+
+  // int32 prefix_padding_ms = 5 [(.runanywhere.v1.rac_default) = "300"];
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_prefix_padding_ms() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
-              stream, this_._internal_max_speech_duration_ms(), target);
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
+              stream, this_._internal_prefix_padding_ms(), target);
     }
   }
 
-  // bool include_statistics = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_include_statistics() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          5, this_._internal_include_statistics(), target);
+  // int32 sample_rate = 6 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_sample_rate() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
+              stream, this_._internal_sample_rate(), target);
     }
   }
 
@@ -2936,38 +2580,39 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    // float threshold = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
-        total_size += 5;
-      }
-    }
-    // int32 min_speech_duration_ms = 2;
+  total_size += static_cast<bool>(0x00000001U & cached_has_bits) * 5;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003eU)) {
+    // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "250"];
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_min_speech_duration_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_min_speech_duration_ms());
       }
     }
-    // int32 min_silence_duration_ms = 3;
+    // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "500"];
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_min_silence_duration_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_min_silence_duration_ms());
       }
     }
-    // int32 max_speech_duration_ms = 4;
+    // optional int32 max_speech_duration_ms = 4;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_max_speech_duration_ms() != 0) {
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_max_speech_duration_ms());
+    }
+    // int32 prefix_padding_ms = 5 [(.runanywhere.v1.rac_default) = "300"];
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_prefix_padding_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_speech_duration_ms());
+            this_._internal_prefix_padding_ms());
       }
     }
-    // bool include_statistics = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_include_statistics() != 0) {
-        total_size += 2;
+    // int32 sample_rate = 6 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_sample_rate() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_sample_rate());
       }
     }
   }
@@ -2988,11 +2633,9 @@ void VADOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_threshold()) != 0) {
-        _this->_impl_.threshold_ = from._impl_.threshold_;
-      }
+      _this->_impl_.activation_threshold_ = from._impl_.activation_threshold_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_min_speech_duration_ms() != 0) {
@@ -3005,13 +2648,16 @@ void VADOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_max_speech_duration_ms() != 0) {
-        _this->_impl_.max_speech_duration_ms_ = from._impl_.max_speech_duration_ms_;
-      }
+      _this->_impl_.max_speech_duration_ms_ = from._impl_.max_speech_duration_ms_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_include_statistics() != 0) {
-        _this->_impl_.include_statistics_ = from._impl_.include_statistics_;
+      if (from._internal_prefix_padding_ms() != 0) {
+        _this->_impl_.prefix_padding_ms_ = from._impl_.prefix_padding_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_sample_rate() != 0) {
+        _this->_impl_.sample_rate_ = from._impl_.sample_rate_;
       }
     }
   }
@@ -3033,11 +2679,11 @@ void VADOptions::InternalSwap(VADOptions* PROTOBUF_RESTRICT PROTOBUF_NONNULL oth
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.include_statistics_)
-      + sizeof(VADOptions::_impl_.include_statistics_)
-      - PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.threshold_)>(
-          reinterpret_cast<char*>(&_impl_.threshold_),
-          reinterpret_cast<char*>(&other->_impl_.threshold_));
+      PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.sample_rate_)
+      + sizeof(VADOptions::_impl_.sample_rate_)
+      - PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.activation_threshold_)>(
+          reinterpret_cast<char*>(&_impl_.activation_threshold_),
+          reinterpret_cast<char*>(&other->_impl_.activation_threshold_));
 }
 
 ::google::protobuf::Metadata VADOptions::GetMetadata() const {
@@ -3060,8 +2706,7 @@ PROTOBUF_NDEBUG_INLINE VADAudioSource::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::VADAudioSource& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        source_{},
-        _oneof_case_{from._oneof_case_[0]} {}
+        audio_data_(arena, from.audio_data_) {}
 
 VADAudioSource::VADAudioSource(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -3084,16 +2729,6 @@ VADAudioSource::VADAudioSource(
            offsetof(Impl_, channels_) -
                offsetof(Impl_, encoding_) +
                sizeof(Impl_::channels_));
-  switch (source_case()) {
-    case SOURCE_NOT_SET:
-      break;
-      case kAudioData:
-        new (&_impl_.source_.audio_data_) decltype(_impl_.source_.audio_data_){arena, from._impl_.source_.audio_data_};
-        break;
-      case kAdapterHandle:
-        new (&_impl_.source_.adapter_handle_) decltype(_impl_.source_.adapter_handle_){arena, from._impl_.source_.adapter_handle_};
-        break;
-  }
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VADAudioSource)
 }
@@ -3101,8 +2736,7 @@ PROTOBUF_NDEBUG_INLINE VADAudioSource::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        source_{},
-        _oneof_case_{} {}
+        audio_data_(arena) {}
 
 inline void VADAudioSource::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -3124,31 +2758,9 @@ inline void VADAudioSource::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  if (this_.has_source()) {
-    this_.clear_source();
-  }
+  this_._impl_.audio_data_.Destroy();
   this_._impl_.~Impl_();
 }
-
-void VADAudioSource::clear_source() {
-// @@protoc_insertion_point(one_of_clear_start:runanywhere.v1.VADAudioSource)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  switch (source_case()) {
-    case kAudioData: {
-      _impl_.source_.audio_data_.Destroy();
-      break;
-    }
-    case kAdapterHandle: {
-      _impl_.source_.adapter_handle_.Destroy();
-      break;
-    }
-    case SOURCE_NOT_SET: {
-      break;
-    }
-  }
-  _impl_._oneof_case_[0] = SOURCE_NOT_SET;
-}
-
 
 #ifndef PROTOBUF_MESSAGE_GLOBALS
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
@@ -3184,12 +2796,14 @@ PROTOBUF_NOINLINE void VADAudioSource::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.audio_data_.ClearNonDefaultToEmpty();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001eU)) {
     ::memset(&_impl_.encoding_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.channels_) -
         reinterpret_cast<char*>(&_impl_.encoding_)) + sizeof(_impl_.channels_));
   }
-  clear_source();
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -3212,55 +2826,47 @@ PROTOBUF_NOINLINE void VADAudioSource::Clear() {
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
-  switch (this_.source_case()) {
-    case kAudioData: {
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bytes audio_data = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_audio_data().empty()) {
       const ::std::string& _s = this_._internal_audio_data();
       target = stream->WriteBytesMaybeAliased(1, _s, target);
-      break;
-    }
-    case kAdapterHandle: {
-      const ::std::string& _s = this_._internal_adapter_handle();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADAudioSource.adapter_handle");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-      break;
-    }
-    default:
-      break;
-  }
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.VADAudioEncoding encoding = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (this_._internal_encoding() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          3, this_._internal_encoding(), target);
     }
   }
 
-  // int32 sample_rate = 4;
+  // .runanywhere.v1.AudioEncoding encoding = 2;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_encoding() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          2, this_._internal_encoding(), target);
+    }
+  }
+
+  // int32 sample_rate = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_sample_rate() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
               stream, this_._internal_sample_rate(), target);
     }
   }
 
-  // int32 channels = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  // int32 channels = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_channels() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
               stream, this_._internal_channels(), target);
     }
   }
 
-  // int64 frame_offset_ms = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  // int64 frame_offset_ms = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_frame_offset_ms() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<6>(
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<5>(
               stream, this_._internal_frame_offset_ms(), target);
     }
   }
@@ -3290,51 +2896,41 @@ PROTOBUF_NOINLINE void VADAudioSource::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // .runanywhere.v1.VADAudioEncoding encoding = 3;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // bytes audio_data = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_audio_data().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
+                                        this_._internal_audio_data());
+      }
+    }
+    // .runanywhere.v1.AudioEncoding encoding = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_encoding() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_encoding());
       }
     }
-    // int32 sample_rate = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    // int32 sample_rate = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_sample_rate() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_sample_rate());
       }
     }
-    // int64 frame_offset_ms = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    // int64 frame_offset_ms = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_frame_offset_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_frame_offset_ms());
       }
     }
-    // int32 channels = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    // int32 channels = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_channels() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_channels());
       }
-    }
-  }
-  switch (this_.source_case()) {
-    // bytes audio_data = 1;
-    case kAudioData: {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::BytesSize(
-                                      this_._internal_audio_data());
-      break;
-    }
-    // string adapter_handle = 2;
-    case kAdapterHandle: {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_adapter_handle());
-      break;
-    }
-    case SOURCE_NOT_SET: {
-      break;
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -3348,66 +2944,44 @@ void VADAudioSource::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
-  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.VADAudioSource)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_audio_data().empty()) {
+        _this->_internal_set_audio_data(from._internal_audio_data());
+      } else {
+        if (_this->_impl_.audio_data_.IsDefault()) {
+          _this->_internal_set_audio_data("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_encoding() != 0) {
         _this->_impl_.encoding_ = from._impl_.encoding_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_sample_rate() != 0) {
         _this->_impl_.sample_rate_ = from._impl_.sample_rate_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_frame_offset_ms() != 0) {
         _this->_impl_.frame_offset_ms_ = from._impl_.frame_offset_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_channels() != 0) {
         _this->_impl_.channels_ = from._impl_.channels_;
       }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
-  if (const uint32_t oneof_from_case =
-          from._impl_._oneof_case_[0]) {
-    const uint32_t oneof_to_case = _this->_impl_._oneof_case_[0];
-    const bool oneof_needs_init = oneof_to_case != oneof_from_case;
-    if (oneof_needs_init) {
-      if (oneof_to_case != 0) {
-        _this->clear_source();
-      }
-      _this->_impl_._oneof_case_[0] = oneof_from_case;
-    }
-
-    switch (oneof_from_case) {
-      case kAudioData: {
-        if (oneof_needs_init) {
-          _this->_impl_.source_.audio_data_.InitDefault();
-        }
-        _this->_impl_.source_.audio_data_.Set(from._internal_audio_data(), arena);
-        break;
-      }
-      case kAdapterHandle: {
-        if (oneof_needs_init) {
-          _this->_impl_.source_.adapter_handle_.InitDefault();
-        }
-        _this->_impl_.source_.adapter_handle_.Set(from._internal_adapter_handle(), arena);
-        break;
-      }
-      case SOURCE_NOT_SET:
-        break;
-    }
-  }
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
 }
@@ -3422,59 +2996,22 @@ void VADAudioSource::CopyFrom(const VADAudioSource& from) {
 
 void VADAudioSource::InternalSwap(VADAudioSource* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.audio_data_, &other->_impl_.audio_data_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.channels_)
       + sizeof(VADAudioSource::_impl_.channels_)
       - PROTOBUF_FIELD_OFFSET(VADAudioSource, _impl_.encoding_)>(
           reinterpret_cast<char*>(&_impl_.encoding_),
           reinterpret_cast<char*>(&other->_impl_.encoding_));
-  swap(_impl_.source_, other->_impl_.source_);
-  swap(_impl_._oneof_case_[0], other->_impl_._oneof_case_[0]);
 }
 
 ::google::protobuf::Metadata VADAudioSource::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
-// ===================================================================
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-VADProcessRequest_MetadataEntry_DoNotUse::VADProcessRequest_MetadataEntry_DoNotUse() : SuperType(VADProcessRequest_MetadataEntry_DoNotUse_get_class_data()) {}
-VADProcessRequest_MetadataEntry_DoNotUse::VADProcessRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-    : SuperType(arena, VADProcessRequest_MetadataEntry_DoNotUse_get_class_data()) {}
-#else   // PROTOBUF_CUSTOM_VTABLE
-VADProcessRequest_MetadataEntry_DoNotUse::VADProcessRequest_MetadataEntry_DoNotUse() : SuperType() {}
-VADProcessRequest_MetadataEntry_DoNotUse::VADProcessRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena) : SuperType(arena) {}
-#endif  // PROTOBUF_CUSTOM_VTABLE
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull VADProcessRequest_MetadataEntry_DoNotUse_class_data_ =
-        VADProcessRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_(VADProcessRequest_MetadataEntry_DoNotUse_globals_._default);
-
-// including ~ all the vtables and everything they use become part
-// of the same ~ SCC.
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-VADProcessRequest_MetadataEntry_DoNotUse::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&VADProcessRequest_MetadataEntry_DoNotUse_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(VADProcessRequest_MetadataEntry_DoNotUse_class_data_.tc_table);
-  return VADProcessRequest_MetadataEntry_DoNotUse_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-VADProcessRequest_MetadataEntry_DoNotUse::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&VADProcessRequest_MetadataEntry_DoNotUse_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&VADProcessRequest_MetadataEntry_DoNotUse_globals_));
-  return VADProcessRequest_MetadataEntry_DoNotUse_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const VADProcessRequest_MetadataEntry_DoNotUse::ParseTableT_
-    VADProcessRequest_MetadataEntry_DoNotUse::_table_ =
-        VADProcessRequest_MetadataEntry_DoNotUse::InternalGenerateParseTable_(VADProcessRequest_MetadataEntry_DoNotUse_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
 // ===================================================================
 
 VADProcessRequest::VADProcessRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -3491,15 +3028,7 @@ PROTOBUF_NDEBUG_INLINE VADProcessRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
     [[maybe_unused]] const ::runanywhere::v1::VADProcessRequest& from_msg)
       : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        request_id_(arena, from.request_id_),
-        metadata_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::VADProcessRequest,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_.metadata_)>()
-          , from.metadata_
-        }
-     {}
+        _cached_size_{0} {}
 
 VADProcessRequest::VADProcessRequest(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -3516,10 +3045,10 @@ VADProcessRequest::VADProcessRequest(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.audio_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+  _impl_.audio_ = (CheckHasBit(cached_has_bits, 0x00000001U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.audio_)
                 : nullptr;
-  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_)
                 : nullptr;
 
@@ -3528,13 +3057,7 @@ VADProcessRequest::VADProcessRequest(
 PROTOBUF_NDEBUG_INLINE VADProcessRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        request_id_(arena),
-        metadata_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::VADProcessRequest,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADProcessRequest, _impl_.metadata_)>()
-         }
-     {}
+      : _cached_size_{0} {}
 
 inline void VADProcessRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -3556,7 +3079,6 @@ inline void VADProcessRequest::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.request_id_.Destroy();
   delete this_._impl_.audio_;
   delete this_._impl_.options_;
   this_._impl_.~Impl_();
@@ -3596,20 +3118,14 @@ PROTOBUF_NOINLINE void VADProcessRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.request_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(_impl_.audio_ != nullptr);
       _impl_.audio_->Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(_impl_.options_ != nullptr);
       _impl_.options_->Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.metadata_.Clear();
     }
   }
   _impl_._has_bits_.Clear();
@@ -3635,63 +3151,18 @@ PROTOBUF_NOINLINE void VADProcessRequest::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // string request_id = 1;
+  // optional .runanywhere.v1.VADAudioSource audio = 1;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_request_id().empty()) {
-      const ::std::string& _s = this_._internal_request_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADProcessRequest.request_id");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        1, *this_._impl_.audio_, this_._impl_.audio_->GetCachedSize(), target,
+        stream);
   }
 
-  // optional .runanywhere.v1.VADAudioSource audio = 2;
+  // optional .runanywhere.v1.VADOptions options = 2;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        2, *this_._impl_.audio_, this_._impl_.audio_->GetCachedSize(), target,
+        2, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
         stream);
-  }
-
-  // optional .runanywhere.v1.VADOptions options = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        3, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
-        stream);
-  }
-
-  // map<string, string> metadata = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (!this_._internal_metadata().empty()) {
-      using MapType = ::google::protobuf::Map<::std::string, ::std::string>;
-      using WireHelper = _pbi::MapEntryFuncs<::std::string, ::std::string,
-                                     _pbi::WireFormatLite::TYPE_STRING,
-                                     _pbi::WireFormatLite::TYPE_STRING>;
-      const auto& field = this_._internal_metadata();
-
-      if (stream->IsSerializationDeterministic() && field.size() > 1) {
-        for (const auto& entry : ::google::protobuf::internal::MapSorterPtr<MapType>(field)) {
-          target = WireHelper::InternalSerialize(
-              4, entry.first, entry.second, target, stream);
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.first.data(), static_cast<int>(entry.first.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADProcessRequest.metadata");
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.second.data(), static_cast<int>(entry.second.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADProcessRequest.metadata");
-        }
-      } else {
-        for (const auto& entry : field) {
-          target = WireHelper::InternalSerialize(
-              4, entry.first, entry.second, target, stream);
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.first.data(), static_cast<int>(entry.first.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADProcessRequest.metadata");
-          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-              entry.second.data(), static_cast<int>(entry.second.length()),
- ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADProcessRequest.metadata");
-        }
-      }
-    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -3719,33 +3190,16 @@ PROTOBUF_NOINLINE void VADProcessRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // string request_id = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // optional .runanywhere.v1.VADAudioSource audio = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_request_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_request_id());
-      }
-    }
-    // optional .runanywhere.v1.VADAudioSource audio = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.audio_);
     }
-    // optional .runanywhere.v1.VADOptions options = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    // optional .runanywhere.v1.VADOptions options = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.options_);
-    }
-    // map<string, string> metadata = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size +=
-          1 * ::google::protobuf::internal::FromIntSize(this_._internal_metadata_size());
-      for (const auto& entry : this_._internal_metadata()) {
-        total_size += _pbi::MapEntryFuncs<::std::string, ::std::string,
-                                       _pbi::WireFormatLite::TYPE_STRING,
-                                       _pbi::WireFormatLite::TYPE_STRING>::ByteSizeLong(entry.first, entry.second);
-      }
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -3766,17 +3220,8 @@ void VADProcessRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_request_id().empty()) {
-        _this->_internal_set_request_id(from._internal_request_id());
-      } else {
-        if (_this->_impl_.request_id_.IsDefault()) {
-          _this->_internal_set_request_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(from._impl_.audio_ != nullptr);
       if (_this->_impl_.audio_ == nullptr) {
         _this->_impl_.audio_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.audio_);
@@ -3784,16 +3229,13 @@ void VADProcessRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.audio_->MergeFrom(*from._impl_.audio_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       ABSL_DCHECK(from._impl_.options_ != nullptr);
       if (_this->_impl_.options_ == nullptr) {
         _this->_impl_.options_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_);
       } else {
         _this->_impl_.options_->MergeFrom(*from._impl_.options_);
       }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _this->_impl_.metadata_.MergeFrom(from._impl_.metadata_);
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -3811,18 +3253,14 @@ void VADProcessRequest::CopyFrom(const VADProcessRequest& from) {
 
 void VADProcessRequest::InternalSwap(VADProcessRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.options_)
       + sizeof(VADProcessRequest::_impl_.options_)
       - PROTOBUF_FIELD_OFFSET(VADProcessRequest, _impl_.audio_)>(
           reinterpret_cast<char*>(&_impl_.audio_),
           reinterpret_cast<char*>(&other->_impl_.audio_));
-  _impl_.metadata_.InternalSwap(&other->_impl_.metadata_);
 }
 
 ::google::protobuf::Metadata VADProcessRequest::GetMetadata() const {
@@ -3830,6 +3268,11 @@ void VADProcessRequest::InternalSwap(VADProcessRequest* PROTOBUF_RESTRICT PROTOB
 }
 // ===================================================================
 
+void VADResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
 VADResult::VADResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VADResult_get_class_data()) {
@@ -3844,8 +3287,7 @@ PROTOBUF_NDEBUG_INLINE VADResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
     [[maybe_unused]] const ::runanywhere::v1::VADResult& from_msg)
       : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        error_message_(arena, from.error_message_) {}
+        _cached_size_{0} {}
 
 VADResult::VADResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -3862,33 +3304,32 @@ VADResult::VADResult(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.statistics_ = (CheckHasBit(cached_has_bits, 0x00000002U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.statistics_)
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000001U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, is_speech_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, is_speech_),
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, timestamp_ms_) -
                offsetof(Impl_, is_speech_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::timestamp_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VADResult)
 }
 PROTOBUF_NDEBUG_INLINE VADResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        error_message_(arena) {}
+      : _cached_size_{0} {}
 
 inline void VADResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, statistics_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, statistics_) +
-               sizeof(Impl_::error_code_));
+           offsetof(Impl_, timestamp_ms_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::timestamp_ms_));
 }
 VADResult::~VADResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VADResult)
@@ -3901,8 +3342,7 @@ inline void VADResult::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.error_message_.Destroy();
-  delete this_._impl_.statistics_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -3940,24 +3380,14 @@ PROTOBUF_NOINLINE void VADResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(_impl_.statistics_ != nullptr);
-      _impl_.statistics_->Clear();
-    }
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    ABSL_DCHECK(_impl_.error_ != nullptr);
+    _impl_.error_->Clear();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003eU)) {
     ::memset(&_impl_.is_speech_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.start_time_ms_) -
-        reinterpret_cast<char*>(&_impl_.is_speech_)) + sizeof(_impl_.start_time_ms_));
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    ::memset(&_impl_.end_time_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.end_time_ms_)) + sizeof(_impl_.error_code_));
+        reinterpret_cast<char*>(&_impl_.timestamp_ms_) -
+        reinterpret_cast<char*>(&_impl_.is_speech_)) + sizeof(_impl_.timestamp_ms_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -3983,7 +3413,7 @@ PROTOBUF_NOINLINE void VADResult::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // bool is_speech = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_is_speech() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -3991,17 +3421,17 @@ PROTOBUF_NOINLINE void VADResult::Clear() {
     }
   }
 
-  // float confidence = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
+  // float probability = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_probability()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          2, this_._internal_confidence(), target);
+          2, this_._internal_probability(), target);
     }
   }
 
   // float energy = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_energy()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -4010,7 +3440,7 @@ PROTOBUF_NOINLINE void VADResult::Clear() {
   }
 
   // int32 duration_ms = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_duration_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
@@ -4019,7 +3449,7 @@ PROTOBUF_NOINLINE void VADResult::Clear() {
   }
 
   // int64 timestamp_ms = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_timestamp_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<5>(
@@ -4027,46 +3457,11 @@ PROTOBUF_NOINLINE void VADResult::Clear() {
     }
   }
 
-  // int64 start_time_ms = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (this_._internal_start_time_ms() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<6>(
-              stream, this_._internal_start_time_ms(), target);
-    }
-  }
-
-  // int64 end_time_ms = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_end_time_ms() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
-              stream, this_._internal_end_time_ms(), target);
-    }
-  }
-
-  // optional .runanywhere.v1.VADStatistics statistics = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        8, *this_._impl_.statistics_, this_._impl_.statistics_->GetCachedSize(), target,
-        stream);
-  }
-
-  // optional string error_message = 9;
+  // optional .runanywhere.v1.SDKError error = 6;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADResult.error_message");
-    target = stream->WriteStringMaybeAliased(9, _s, target);
-  }
-
-  // int32 error_code = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<10>(
-              stream, this_._internal_error_code(), target);
-    }
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        6, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -4094,70 +3489,42 @@ PROTOBUF_NOINLINE void VADResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // optional string error_message = 9;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    // optional .runanywhere.v1.SDKError error = 6;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
-    // optional .runanywhere.v1.VADStatistics statistics = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.statistics_);
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // bool is_speech = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_is_speech() != 0) {
         total_size += 2;
       }
     }
-    // float confidence = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
+    // float probability = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_probability()) != 0) {
         total_size += 5;
       }
     }
     // float energy = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_energy()) != 0) {
         total_size += 5;
       }
     }
     // int32 duration_ms = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_duration_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_duration_ms());
       }
     }
     // int64 timestamp_ms = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_timestamp_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_ms());
-      }
-    }
-    // int64 start_time_ms = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (this_._internal_start_time_ms() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_start_time_ms());
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    // int64 end_time_ms = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_end_time_ms() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_end_time_ms());
-      }
-    }
-    // int32 error_code = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -4179,58 +3546,38 @@ void VADResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(from._impl_.statistics_ != nullptr);
-      if (_this->_impl_.statistics_ == nullptr) {
-        _this->_impl_.statistics_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.statistics_);
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
       } else {
-        _this->_impl_.statistics_->MergeFrom(*from._impl_.statistics_);
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_is_speech() != 0) {
         _this->_impl_.is_speech_ = from._impl_.is_speech_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_confidence()) != 0) {
-        _this->_impl_.confidence_ = from._impl_.confidence_;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_probability()) != 0) {
+        _this->_impl_.probability_ = from._impl_.probability_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_energy()) != 0) {
         _this->_impl_.energy_ = from._impl_.energy_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_duration_ms() != 0) {
         _this->_impl_.duration_ms_ = from._impl_.duration_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_timestamp_ms() != 0) {
         _this->_impl_.timestamp_ms_ = from._impl_.timestamp_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_start_time_ms() != 0) {
-        _this->_impl_.start_time_ms_ = from._impl_.start_time_ms_;
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_end_time_ms() != 0) {
-        _this->_impl_.end_time_ms_ = from._impl_.end_time_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -4249,17 +3596,14 @@ void VADResult::CopyFrom(const VADResult& from) {
 
 void VADResult::InternalSwap(VADResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_code_)
-      + sizeof(VADResult::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(VADResult, _impl_.statistics_)>(
-          reinterpret_cast<char*>(&_impl_.statistics_),
-          reinterpret_cast<char*>(&other->_impl_.statistics_));
+      PROTOBUF_FIELD_OFFSET(VADResult, _impl_.timestamp_ms_)
+      + sizeof(VADResult::_impl_.timestamp_ms_)
+      - PROTOBUF_FIELD_OFFSET(VADResult, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata VADResult::GetMetadata() const {
@@ -4669,17 +4013,13 @@ SpeechActivityEvent::SpeechActivityEvent(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.result_ = (CheckHasBit(cached_has_bits, 0x00000002U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_)
-                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, timestamp_ms_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, timestamp_ms_),
-           offsetof(Impl_, confidence_) -
+           offsetof(Impl_, event_type_) -
                offsetof(Impl_, timestamp_ms_) +
-               sizeof(Impl_::confidence_));
+               sizeof(Impl_::event_type_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SpeechActivityEvent)
 }
@@ -4692,11 +4032,11 @@ PROTOBUF_NDEBUG_INLINE SpeechActivityEvent::Impl_::Impl_(
 inline void SpeechActivityEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, result_),
+               offsetof(Impl_, timestamp_ms_),
            0,
-           offsetof(Impl_, confidence_) -
-               offsetof(Impl_, result_) +
-               sizeof(Impl_::confidence_));
+           offsetof(Impl_, event_type_) -
+               offsetof(Impl_, timestamp_ms_) +
+               sizeof(Impl_::event_type_));
 }
 SpeechActivityEvent::~SpeechActivityEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.SpeechActivityEvent)
@@ -4710,7 +4050,6 @@ inline void SpeechActivityEvent::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.segment_id_.Destroy();
-  delete this_._impl_.result_;
   this_._impl_.~Impl_();
 }
 
@@ -4748,19 +4087,13 @@ PROTOBUF_NOINLINE void SpeechActivityEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.segment_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(_impl_.result_ != nullptr);
-      _impl_.result_->Clear();
-    }
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.segment_id_.ClearNonDefaultToEmpty();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001eU)) {
     ::memset(&_impl_.timestamp_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.confidence_) -
-        reinterpret_cast<char*>(&_impl_.timestamp_ms_)) + sizeof(_impl_.confidence_));
+        reinterpret_cast<char*>(&_impl_.event_type_) -
+        reinterpret_cast<char*>(&_impl_.timestamp_ms_)) + sizeof(_impl_.event_type_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4786,7 +4119,7 @@ PROTOBUF_NOINLINE void SpeechActivityEvent::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.SpeechActivityKind event_type = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_event_type() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -4795,7 +4128,7 @@ PROTOBUF_NOINLINE void SpeechActivityEvent::Clear() {
   }
 
   // int64 timestamp_ms = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_timestamp_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
@@ -4803,37 +4136,30 @@ PROTOBUF_NOINLINE void SpeechActivityEvent::Clear() {
     }
   }
 
-  // int32 duration_ms = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_duration_ms() != 0) {
+  // int64 audio_start_ms = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_audio_start_ms() != 0) {
       target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_duration_ms(), target);
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
+              stream, this_._internal_audio_start_ms(), target);
     }
   }
 
-  // float confidence = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          4, this_._internal_confidence(), target);
+  // int64 audio_end_ms = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_audio_end_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
+              stream, this_._internal_audio_end_ms(), target);
     }
   }
 
-  // optional .runanywhere.v1.VADResult result = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        5, *this_._impl_.result_, this_._impl_.result_->GetCachedSize(), target,
-        stream);
-  }
-
-  // optional string segment_id = 6;
+  // optional string segment_id = 5;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     const ::std::string& _s = this_._internal_segment_id();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SpeechActivityEvent.segment_id");
-    target = stream->WriteStringMaybeAliased(6, _s, target);
+    target = stream->WriteStringMaybeAliased(5, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -4861,42 +4187,38 @@ PROTOBUF_NOINLINE void SpeechActivityEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
-    // optional string segment_id = 6;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // optional string segment_id = 5;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_segment_id());
     }
-    // optional .runanywhere.v1.VADResult result = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.result_);
-    }
     // int64 timestamp_ms = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_timestamp_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_ms());
       }
     }
-    // .runanywhere.v1.SpeechActivityKind event_type = 1;
+    // int64 audio_start_ms = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_audio_start_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_audio_start_ms());
+      }
+    }
+    // int64 audio_end_ms = 4;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_audio_end_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_audio_end_ms());
+      }
+    }
+    // .runanywhere.v1.SpeechActivityKind event_type = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_event_type() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_event_type());
-      }
-    }
-    // int32 duration_ms = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_duration_ms() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_duration_ms());
-      }
-    }
-    // float confidence = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
-        total_size += 5;
       }
     }
   }
@@ -4911,43 +4233,34 @@ void SpeechActivityEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
-  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SpeechActivityEvent)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_set_segment_id(from._internal_segment_id());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      ABSL_DCHECK(from._impl_.result_ != nullptr);
-      if (_this->_impl_.result_ == nullptr) {
-        _this->_impl_.result_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_);
-      } else {
-        _this->_impl_.result_->MergeFrom(*from._impl_.result_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_timestamp_ms() != 0) {
         _this->_impl_.timestamp_ms_ = from._impl_.timestamp_ms_;
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_audio_start_ms() != 0) {
+        _this->_impl_.audio_start_ms_ = from._impl_.audio_start_ms_;
+      }
+    }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_event_type() != 0) {
-        _this->_impl_.event_type_ = from._impl_.event_type_;
+      if (from._internal_audio_end_ms() != 0) {
+        _this->_impl_.audio_end_ms_ = from._impl_.audio_end_ms_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_duration_ms() != 0) {
-        _this->_impl_.duration_ms_ = from._impl_.duration_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_confidence()) != 0) {
-        _this->_impl_.confidence_ = from._impl_.confidence_;
+      if (from._internal_event_type() != 0) {
+        _this->_impl_.event_type_ = from._impl_.event_type_;
       }
     }
   }
@@ -4972,11 +4285,11 @@ void SpeechActivityEvent::InternalSwap(SpeechActivityEvent* PROTOBUF_RESTRICT PR
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.segment_id_, &other->_impl_.segment_id_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.confidence_)
-      + sizeof(SpeechActivityEvent::_impl_.confidence_)
-      - PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.result_)>(
-          reinterpret_cast<char*>(&_impl_.result_),
-          reinterpret_cast<char*>(&other->_impl_.result_));
+      PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.event_type_)
+      + sizeof(SpeechActivityEvent::_impl_.event_type_)
+      - PROTOBUF_FIELD_OFFSET(SpeechActivityEvent, _impl_.timestamp_ms_)>(
+          reinterpret_cast<char*>(&_impl_.timestamp_ms_),
+          reinterpret_cast<char*>(&other->_impl_.timestamp_ms_));
 }
 
 ::google::protobuf::Metadata SpeechActivityEvent::GetMetadata() const {
@@ -4984,6 +4297,11 @@ void SpeechActivityEvent::InternalSwap(SpeechActivityEvent* PROTOBUF_RESTRICT PR
 }
 // ===================================================================
 
+void VADStreamEvent::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
 VADStreamEvent::VADStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VADStreamEvent_get_class_data()) {
@@ -4999,8 +4317,7 @@ PROTOBUF_NDEBUG_INLINE VADStreamEvent::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::VADStreamEvent& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        request_id_(arena, from.request_id_),
-        error_message_(arena, from.error_message_) {}
+        request_id_(arena, from.request_id_) {}
 
 VADStreamEvent::VADStreamEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5017,22 +4334,22 @@ VADStreamEvent::VADStreamEvent(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.result_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+  _impl_.result_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_)
                 : nullptr;
-  _impl_.activity_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+  _impl_.activity_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.activity_)
                 : nullptr;
-  _impl_.statistics_ = (CheckHasBit(cached_has_bits, 0x00000010U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.statistics_)
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, seq_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, seq_),
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, kind_) -
                offsetof(Impl_, seq_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::kind_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VADStreamEvent)
 }
@@ -5040,17 +4357,16 @@ PROTOBUF_NDEBUG_INLINE VADStreamEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        request_id_(arena),
-        error_message_(arena) {}
+        request_id_(arena) {}
 
 inline void VADStreamEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, result_),
            0,
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, kind_) -
                offsetof(Impl_, result_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::kind_));
 }
 VADStreamEvent::~VADStreamEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VADStreamEvent)
@@ -5064,10 +4380,9 @@ inline void VADStreamEvent::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.request_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
   delete this_._impl_.result_;
   delete this_._impl_.activity_;
-  delete this_._impl_.statistics_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -5105,32 +4420,28 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.request_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.result_ != nullptr);
       _impl_.result_->Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.activity_ != nullptr);
       _impl_.activity_->Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      ABSL_DCHECK(_impl_.statistics_ != nullptr);
-      _impl_.statistics_->Clear();
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000070U)) {
     ::memset(&_impl_.seq_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.kind_) -
         reinterpret_cast<char*>(&_impl_.seq_)) + sizeof(_impl_.kind_));
   }
-  _impl_.error_code_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -5155,7 +4466,7 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // uint64 seq = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_seq() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt64ToArray(
@@ -5164,7 +4475,7 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
   }
 
   // int64 timestamp_us = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
@@ -5183,7 +4494,7 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
   }
 
   // .runanywhere.v1.VADStreamEventKind kind = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -5192,41 +4503,24 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
   }
 
   // optional .runanywhere.v1.VADResult result = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         5, *this_._impl_.result_, this_._impl_.result_->GetCachedSize(), target,
         stream);
   }
 
   // optional .runanywhere.v1.SpeechActivityEvent activity = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         6, *this_._impl_.activity_, this_._impl_.activity_->GetCachedSize(), target,
         stream);
   }
 
-  // optional .runanywhere.v1.VADStatistics statistics = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  // optional .runanywhere.v1.SDKError error = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        7, *this_._impl_.statistics_, this_._impl_.statistics_->GetCachedSize(), target,
+        7, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
         stream);
-  }
-
-  // optional string error_message = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADStreamEvent.error_message");
-    target = stream->WriteStringMaybeAliased(8, _s, target);
-  }
-
-  // int32 error_code = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
-              stream, this_._internal_error_code(), target);
-    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5254,7 +4548,7 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     // string request_id = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_request_id().empty()) {
@@ -5262,54 +4556,40 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
                                         this_._internal_request_id());
       }
     }
-    // optional string error_message = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
     // optional .runanywhere.v1.VADResult result = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.result_);
     }
     // optional .runanywhere.v1.SpeechActivityEvent activity = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.activity_);
     }
-    // optional .runanywhere.v1.VADStatistics statistics = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    // optional .runanywhere.v1.SDKError error = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.statistics_);
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // uint64 seq = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_seq() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(
             this_._internal_seq());
       }
     }
     // int64 timestamp_us = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
     // .runanywhere.v1.VADStreamEventKind kind = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
-      }
-    }
-  }
-   {
-    // int32 error_code = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -5331,7 +4611,7 @@ void VADStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_request_id().empty()) {
         _this->_internal_set_request_id(from._internal_request_id());
@@ -5342,9 +4622,6 @@ void VADStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.result_ != nullptr);
       if (_this->_impl_.result_ == nullptr) {
         _this->_impl_.result_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_);
@@ -5352,7 +4629,7 @@ void VADStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.result_->MergeFrom(*from._impl_.result_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.activity_ != nullptr);
       if (_this->_impl_.activity_ == nullptr) {
         _this->_impl_.activity_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.activity_);
@@ -5360,33 +4637,28 @@ void VADStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.activity_->MergeFrom(*from._impl_.activity_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      ABSL_DCHECK(from._impl_.statistics_ != nullptr);
-      if (_this->_impl_.statistics_ == nullptr) {
-        _this->_impl_.statistics_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.statistics_);
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
       } else {
-        _this->_impl_.statistics_->MergeFrom(*from._impl_.statistics_);
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_seq() != 0) {
         _this->_impl_.seq_ = from._impl_.seq_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_timestamp_us() != 0) {
         _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
       }
-    }
-  }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_error_code() != 0) {
-      _this->_impl_.error_code_ = from._impl_.error_code_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -5409,10 +4681,9 @@ void VADStreamEvent::InternalSwap(VADStreamEvent* PROTOBUF_RESTRICT PROTOBUF_NON
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_code_)
-      + sizeof(VADStreamEvent::_impl_.error_code_)
+      PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.kind_)
+      + sizeof(VADStreamEvent::_impl_.kind_)
       - PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.result_)>(
           reinterpret_cast<char*>(&_impl_.result_),
           reinterpret_cast<char*>(&other->_impl_.result_));
@@ -5423,6 +4694,11 @@ void VADStreamEvent::InternalSwap(VADStreamEvent* PROTOBUF_RESTRICT PROTOBUF_NON
 }
 // ===================================================================
 
+void VADServiceState::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
 VADServiceState::VADServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VADServiceState_get_class_data()) {
@@ -5438,8 +4714,7 @@ PROTOBUF_NDEBUG_INLINE VADServiceState::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::VADServiceState& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        current_model_(arena, from.current_model_),
-        error_message_(arena, from.error_message_) {}
+        current_model_(arena, from.current_model_) {}
 
 VADServiceState::VADServiceState(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5455,13 +4730,17 @@ VADServiceState::VADServiceState(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, is_ready_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, is_ready_),
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, frame_length_ms_) -
                offsetof(Impl_, is_ready_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::frame_length_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VADServiceState)
 }
@@ -5469,17 +4748,16 @@ PROTOBUF_NDEBUG_INLINE VADServiceState::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        current_model_(arena),
-        error_message_(arena) {}
+        current_model_(arena) {}
 
 inline void VADServiceState::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, is_ready_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, is_ready_) +
-               sizeof(Impl_::error_code_));
+           offsetof(Impl_, frame_length_ms_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::frame_length_ms_));
 }
 VADServiceState::~VADServiceState() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VADServiceState)
@@ -5493,7 +4771,7 @@ inline void VADServiceState::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.current_model_.Destroy();
-  this_._impl_.error_message_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -5536,13 +4814,14 @@ PROTOBUF_NOINLINE void VADServiceState::Clear() {
       _impl_.current_model_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007cU)) {
     ::memset(&_impl_.is_ready_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.is_ready_)) + sizeof(_impl_.error_code_));
+        reinterpret_cast<char*>(&_impl_.frame_length_ms_) -
+        reinterpret_cast<char*>(&_impl_.is_ready_)) + sizeof(_impl_.frame_length_ms_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -5585,12 +4864,12 @@ PROTOBUF_NOINLINE void VADServiceState::Clear() {
     }
   }
 
-  // float energy_threshold = 3;
+  // float activation_threshold = 3;
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_energy_threshold()) != 0) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          3, this_._internal_energy_threshold(), target);
+          3, this_._internal_activation_threshold(), target);
     }
   }
 
@@ -5620,21 +4899,11 @@ PROTOBUF_NOINLINE void VADServiceState::Clear() {
     target = stream->WriteStringMaybeAliased(6, _s, target);
   }
 
-  // optional string error_message = 7;
+  // optional .runanywhere.v1.SDKError error = 7;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VADServiceState.error_message");
-    target = stream->WriteStringMaybeAliased(7, _s, target);
-  }
-
-  // int32 error_code = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<8>(
-              stream, this_._internal_error_code(), target);
-    }
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        7, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5662,16 +4931,16 @@ PROTOBUF_NOINLINE void VADServiceState::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     // optional string current_model = 6;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_current_model());
     }
-    // optional string error_message = 7;
+    // optional .runanywhere.v1.SDKError error = 7;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // bool is_ready = 1;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
@@ -5685,9 +4954,9 @@ PROTOBUF_NOINLINE void VADServiceState::Clear() {
         total_size += 2;
       }
     }
-    // float energy_threshold = 3;
+    // float activation_threshold = 3;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_energy_threshold()) != 0) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
         total_size += 5;
       }
     }
@@ -5705,13 +4974,6 @@ PROTOBUF_NOINLINE void VADServiceState::Clear() {
             this_._internal_frame_length_ms());
       }
     }
-    // int32 error_code = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -5724,18 +4986,24 @@ void VADServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.VADServiceState)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_set_current_model(from._internal_current_model());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_is_ready() != 0) {
@@ -5748,8 +5016,8 @@ void VADServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_energy_threshold()) != 0) {
-        _this->_impl_.energy_threshold_ = from._impl_.energy_threshold_;
+      if (::absl::bit_cast<::uint32_t>(from._internal_activation_threshold()) != 0) {
+        _this->_impl_.activation_threshold_ = from._impl_.activation_threshold_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
@@ -5760,11 +5028,6 @@ void VADServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_frame_length_ms() != 0) {
         _this->_impl_.frame_length_ms_ = from._impl_.frame_length_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -5788,13 +5051,12 @@ void VADServiceState::InternalSwap(VADServiceState* PROTOBUF_RESTRICT PROTOBUF_N
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.current_model_, &other->_impl_.current_model_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_code_)
-      + sizeof(VADServiceState::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.is_ready_)>(
-          reinterpret_cast<char*>(&_impl_.is_ready_),
-          reinterpret_cast<char*>(&other->_impl_.is_ready_));
+      PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.frame_length_ms_)
+      + sizeof(VADServiceState::_impl_.frame_length_ms_)
+      - PROTOBUF_FIELD_OFFSET(VADServiceState, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata VADServiceState::GetMetadata() const {

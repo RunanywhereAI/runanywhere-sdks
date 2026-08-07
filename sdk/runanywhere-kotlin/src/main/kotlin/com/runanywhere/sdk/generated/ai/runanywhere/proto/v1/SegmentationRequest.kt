@@ -16,6 +16,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -42,6 +43,18 @@ public class SegmentationRequest(
     schemaIndex = 1,
   )
   public val options: SegmentationOptions? = null,
+  /**
+   * Registry id, catalog id, or absolute path. Unset = use the resident
+   * semantic-segmentation model. Mirrors EmbeddingsRequest.model_id and
+   * VLMGenerationRequest.model_id.
+   */
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "modelId",
+    schemaIndex = 2,
+  )
+  public val model_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SegmentationRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -56,6 +69,7 @@ public class SegmentationRequest(
     if (unknownFields != other.unknownFields) return false
     if (image != other.image) return false
     if (options != other.options) return false
+    if (model_id != other.model_id) return false
     return true
   }
 
@@ -65,6 +79,7 @@ public class SegmentationRequest(
       result = unknownFields.hashCode()
       result = result * 37 + (image?.hashCode() ?: 0)
       result = result * 37 + (options?.hashCode() ?: 0)
+      result = result * 37 + (model_id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -74,14 +89,16 @@ public class SegmentationRequest(
     val result = mutableListOf<String>()
     if (image != null) result += """image=$image"""
     if (options != null) result += """options=$options"""
+    if (model_id != null) result += """model_id=${sanitize(model_id)}"""
     return result.joinToString(prefix = "SegmentationRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     image: SegmentationImage? = this.image,
     options: SegmentationOptions? = this.options,
+    model_id: String? = this.model_id,
     unknownFields: ByteString = this.unknownFields,
-  ): SegmentationRequest = SegmentationRequest(image, options, unknownFields)
+  ): SegmentationRequest = SegmentationRequest(image, options, model_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -100,6 +117,7 @@ public class SegmentationRequest(
           size += SegmentationImage.ADAPTER.encodedSizeWithTag(1, value.image)
         }
         size += SegmentationOptions.ADAPTER.encodedSizeWithTag(2, value.options)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.model_id)
         return size
       }
 
@@ -108,11 +126,13 @@ public class SegmentationRequest(
           SegmentationImage.ADAPTER.encodeWithTag(writer, 1, value.image)
         }
         SegmentationOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
+        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.model_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SegmentationRequest) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.model_id)
         SegmentationOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
         if (value.image != null) {
           SegmentationImage.ADAPTER.encodeWithTag(writer, 1, value.image)
@@ -122,16 +142,19 @@ public class SegmentationRequest(
       override fun decode(reader: ProtoReader): SegmentationRequest {
         var image: SegmentationImage? = null
         var options: SegmentationOptions? = null
+        var model_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> image = SegmentationImage.ADAPTER.decode(reader)
             2 -> options = SegmentationOptions.ADAPTER.decode(reader)
+            3 -> model_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return SegmentationRequest(
           image = image,
           options = options,
+          model_id = model_id,
           unknownFields = unknownFields
         )
       }

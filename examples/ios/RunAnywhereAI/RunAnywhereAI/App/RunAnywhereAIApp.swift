@@ -24,10 +24,25 @@ import os
 import AppKit
 #endif
 
+#if os(iOS)
+/// Forwards background URLSession relaunch events to the SDK so restored model
+/// downloads can finalize. No business logic lives here.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        RunAnywhere.handleBackgroundURLSessionEvents(identifier: identifier, completionHandler: completionHandler)
+    }
+}
+#endif
+
 @main
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var flowSession = FlowSessionManager.shared
     @State private var showFlowActivation = false
     #endif
@@ -127,12 +142,12 @@ struct RunAnywhereAIApp: App {
         if let credentials = storedCredentials() ?? bundledCredentials() {
             try RunAnywhere.initialize(
                 apiKey: credentials.apiKey,
-                baseURL: credentials.baseURL,
+                baseUrl: credentials.baseURL,
                 environment: .production
             )
         } else {
             #if DEBUG
-            try RunAnywhere.initialize()
+            try RunAnywhere.initialize(environment: .development)
             #else
             fatalError(
                 "Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; " +
@@ -221,19 +236,23 @@ struct RunAnywhereAIApp: App {
     private func refreshSDKCatalogs() async {
         logger.info("Refreshing SDK model registry...")
 
-        await RunAnywhere.refreshModelRegistry()
+        await RunAnywhere.models.refresh()
 
-        let listResult = await RunAnywhere.listModels()
-        if listResult.success {
-            let models = listResult.models.models
-            let downloaded = models.filter(\.isDownloaded).count
+        do {
+            let models = try await RunAnywhere.models.list()
+            // ModelInfo.isDownloaded was deleted outright (idl/model_types.proto:
+            // "reserved 32; // was is_downloaded: a bool cannot express
+            // DOWNLOADING") -- a non-empty localPath is the simplest local
+            // proxy, same as every other read site in the SDK.
+            let downloaded = models.filter { !$0.localPath.isEmpty }.count
             let available = models.filter(\.isAvailableForUse).count
             logger.info(
                 "Model registry: registered=\(models.count), downloaded=\(downloaded), available=\(available)"
             )
-        } else {
-            let message = listResult.errorMessage.isEmpty ? "unknown error" : listResult.errorMessage
-            logger.warning("Model registry refresh incomplete: \(message, privacy: .public)")
+        } catch {
+            logger.warning(
+                "Model registry refresh incomplete: \(error.localizedDescription, privacy: .public)"
+            )
         }
 
         do {

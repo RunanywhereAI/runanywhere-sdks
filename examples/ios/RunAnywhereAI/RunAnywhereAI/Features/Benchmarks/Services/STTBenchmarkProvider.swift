@@ -11,6 +11,9 @@ import RunAnywhere
 struct STTBenchmarkProvider: BenchmarkScenarioProvider {
     let category: BenchmarkCategory = .stt
 
+    /// `SyntheticInputGenerator` emits mono Int16 PCM at this rate.
+    private static let sampleRate = 16_000
+
     func scenarios() -> [BenchmarkScenario] {
         [
             BenchmarkScenario(name: "Silent 2s", category: .stt, parameters: ["type": "silent"]),
@@ -18,6 +21,7 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
         ]
     }
 
+    // swiftlint:disable:next function_body_length
     func execute(
         scenario: BenchmarkScenario,
         model: RAModelInfo
@@ -26,22 +30,11 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load (canonical proto-request form)
         let loadStart = Date()
-        var loadRequest = RAModelLoadRequest()
-        loadRequest.modelID = model.id
-        loadRequest.category = .speechRecognition
-        let loadResult = await RunAnywhere.loadModel(loadRequest)
-        guard loadResult.success else {
-            throw SDKException(code: .unknown, message: loadResult.errorMessage, category: .internal)
-        }
+        try await RunAnywhere.models.load(id: model.id)
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
-        var unloadRequest = RAModelUnloadRequest()
-        unloadRequest.category = .speechRecognition
-
         do {
-            // Generate audio
             let audioData: Data
             let audioDuration: Double
             switch scenario.parameters?["type"] {
@@ -53,15 +46,15 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
                 audioData = SyntheticInputGenerator.sineWaveAudio(durationSeconds: audioDuration)
             }
 
-            let options = RASTTOptions.defaults()
-
             // Warmup: one discarded transcription so first-run cache/JIT cost is not
             // charged to the measured pass (parity with the LLM/VLM warmup).
             let warmupStart = Date()
             do {
-                _ = try await RunAnywhere.transcribe(
-                    audio: SyntheticInputGenerator.silentAudio(durationSeconds: 0.5),
-                    options: options
+                _ = try await RunAnywhere.stt.transcribe(
+                    .pcm16(
+                        SyntheticInputGenerator.silentAudio(durationSeconds: 0.5),
+                        sampleRate: Self.sampleRate
+                    )
                 )
             } catch let error as CancellationError {
                 throw error
@@ -70,22 +63,22 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
             }
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
 
-            // Transcribe
             let benchStart = Date()
-            let result = try await RunAnywhere.transcribe(audio: audioData, options: options)
-            metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
+            _ = try await RunAnywhere.stt.transcribe(.pcm16(audioData, sampleRate: Self.sampleRate))
+            let elapsed = Date().timeIntervalSince(benchStart)
+            metrics.endToEndLatencyMs = elapsed * 1000
 
-            // processingTime is in seconds
             metrics.audioLengthSeconds = audioDuration
-            metrics.realTimeFactor = Double(result.metadata.realTimeFactor)
+            // Wall-clock RTF: the transcript carries no backend timing block.
+            metrics.realTimeFactor = audioDuration > 0 ? elapsed / audioDuration : nil
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            _ = await RunAnywhere.unloadModel(unloadRequest)
+            try? await RunAnywhere.models.unload(category: .speechRecognition)
             return metrics
         } catch {
-            _ = await RunAnywhere.unloadModel(unloadRequest)
+            try? await RunAnywhere.models.unload(category: .speechRecognition)
             throw error
         }
     }

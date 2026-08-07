@@ -166,9 +166,8 @@ final class FlowSessionManager: ObservableObject {
     /// Ensure an STT model is loaded; returns true on success. On failure the
     /// session is transitioned back to `.idle` and `lastError` is populated.
     private func ensureSTTModelLoaded() async -> Bool {
-        var req = RACurrentModelRequest()
-        req.category = .speechRecognition
-        if RunAnywhere.currentModel(req).found { return true }
+        let state = await RunAnywhere.models.state()
+        if state.loaded[.speechRecognition] != nil { return true }
 
         guard let preferredId = SharedDataBridge.shared.preferredSTTModelId else {
             lastError = "No STT model selected. Open Voice Keyboard settings to download one."
@@ -179,15 +178,12 @@ final class FlowSessionManager: ObservableObject {
         }
 
         logger.info("Auto-loading preferred STT model: \(preferredId)")
-        var request = RAModelLoadRequest()
-        request.modelID = preferredId
-        request.category = .speechRecognition
-        let result = await RunAnywhere.loadModel(request)
-        if result.success {
+        do {
+            try await RunAnywhere.models.load(id: preferredId)
             return true
-        } else {
+        } catch {
             lastError = "Could not load model. Please check Voice Keyboard settings."
-            logger.error("Auto-load failed: \(result.errorMessage)")
+            logger.error("Auto-load failed: \(error.localizedDescription)")
             SharedDataBridge.shared.clearSession()
             transition(to: .idle)
             return false
@@ -294,7 +290,8 @@ final class FlowSessionManager: ObservableObject {
         logger.info("Transcribing \(audio.count) bytes")
 
         do {
-            let output = try await RunAnywhere.transcribe(audio: audio)
+            // AudioCaptureManager delivers mono Int16 PCM at 16 kHz.
+            let output = try await RunAnywhere.stt.transcribe(.pcm16(audio, sampleRate: 16_000))
             let text = output.text
             logger.info("Transcription complete: \"\(text)\"")
             wordCount += text.split(separator: " ").count

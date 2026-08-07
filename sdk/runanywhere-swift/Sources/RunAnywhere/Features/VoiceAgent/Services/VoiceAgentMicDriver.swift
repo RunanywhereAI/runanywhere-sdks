@@ -69,6 +69,13 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
         try await feedLoop()
     }
 
+    /// Cut the agent off mid-utterance: stop playout and drop the frames that
+    /// were captured while it was speaking.
+    func stopPlayback() {
+        playback.stop()
+        discardPendingChunks()
+    }
+
     // MARK: - Audio session
 
     private func configureVoiceAudioSession() async throws {
@@ -144,9 +151,9 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
                 let (status, result) = try CppBridge.VoiceAgent.feedAudioProto(
                     handle: handle.rawValue,
                     audio: chunk,
-                    sampleRateHz: Int32(MicConstants.sampleRateHz),
+                    sampleRate: Int32(MicConstants.sampleRateHz),
                     channels: 1,
-                    encoding: Int32(RAAudioEncoding.pcmS16Le.rawValue),
+                    encoding: .pcmS16Le,
                     isFinal: false
                 )
 

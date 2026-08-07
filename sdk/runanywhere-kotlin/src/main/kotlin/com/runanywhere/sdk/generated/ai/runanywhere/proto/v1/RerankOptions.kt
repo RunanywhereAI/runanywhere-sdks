@@ -28,11 +28,18 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * RerankCandidate is deleted: every facade already builds it with id set to
+ * the stringified array index, so the wrapper carried no information the
+ * flat `documents` list below does not.
+ */
 public class RerankOptions(
   /**
    * When > 0, only the top_n highest-scoring candidates are returned (every
    * candidate is still scored). 0 = return all candidates, ranked.
+   * Industry name (Cohere rerank `top_n`).
    */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
@@ -41,6 +48,21 @@ public class RerankOptions(
     schemaIndex = 0,
   )
   public val top_n: Int = 0,
+  /**
+   * Per-document token budget; longer documents are truncated (tail
+   * dropped) before scoring. 0 = the SDK default budget. This is the
+   * direct knob on peak memory and per-pair latency on device.
+   * Industry name (Cohere v2 / vLLM `max_tokens_per_doc`).
+   */
+  @RacDefaultOption("0")
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxTokensPerDoc",
+    schemaIndex = 1,
+  )
+  public val max_tokens_per_doc: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RerankOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -54,6 +76,7 @@ public class RerankOptions(
     if (other !is RerankOptions) return false
     if (unknownFields != other.unknownFields) return false
     if (top_n != other.top_n) return false
+    if (max_tokens_per_doc != other.max_tokens_per_doc) return false
     return true
   }
 
@@ -62,6 +85,7 @@ public class RerankOptions(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + top_n.hashCode()
+      result = result * 37 + max_tokens_per_doc.hashCode()
       super.hashCode = result
     }
     return result
@@ -70,10 +94,15 @@ public class RerankOptions(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """top_n=$top_n"""
+    result += """max_tokens_per_doc=$max_tokens_per_doc"""
     return result.joinToString(prefix = "RerankOptions{", separator = ", ", postfix = "}")
   }
 
-  public fun copy(top_n: Int = this.top_n, unknownFields: ByteString = this.unknownFields): RerankOptions = RerankOptions(top_n, unknownFields)
+  public fun copy(
+    top_n: Int = this.top_n,
+    max_tokens_per_doc: Int = this.max_tokens_per_doc,
+    unknownFields: ByteString = this.unknownFields,
+  ): RerankOptions = RerankOptions(top_n, max_tokens_per_doc, unknownFields)
 
   public companion object {
     @JvmField
@@ -90,6 +119,9 @@ public class RerankOptions(
         if (value.top_n != 0) {
           size += ProtoAdapter.UINT32.encodedSizeWithTag(1, value.top_n)
         }
+        if (value.max_tokens_per_doc != 0) {
+          size += ProtoAdapter.UINT32.encodedSizeWithTag(2, value.max_tokens_per_doc)
+        }
         return size
       }
 
@@ -97,11 +129,17 @@ public class RerankOptions(
         if (value.top_n != 0) {
           ProtoAdapter.UINT32.encodeWithTag(writer, 1, value.top_n)
         }
+        if (value.max_tokens_per_doc != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 2, value.max_tokens_per_doc)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RerankOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.max_tokens_per_doc != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 2, value.max_tokens_per_doc)
+        }
         if (value.top_n != 0) {
           ProtoAdapter.UINT32.encodeWithTag(writer, 1, value.top_n)
         }
@@ -109,14 +147,17 @@ public class RerankOptions(
 
       override fun decode(reader: ProtoReader): RerankOptions {
         var top_n: Int = 0
+        var max_tokens_per_doc: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> top_n = ProtoAdapter.UINT32.decode(reader)
+            2 -> max_tokens_per_doc = ProtoAdapter.UINT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RerankOptions(
           top_n = top_n,
+          max_tokens_per_doc = max_tokens_per_doc,
           unknownFields = unknownFields
         )
       }

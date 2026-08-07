@@ -31,30 +31,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Compile-time / load-time configuration for a VAD instance.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift:15                (energyThreshold, sampleRate, frameLength,
- *                                            enableAutoCalibration, calibrationMultiplier)
- *   Kotlin VADTypes.kt:26                   (same five fields, defaults match Swift)
- *   Dart   vad_configuration.dart:5         (same five fields)
- *   RN     VADTypes.ts:12                   (sampleRate, frameLength, energyThreshold;
- *                                            no calibration fields)
- *   Web    VADTypes.ts —                    (no VADConfiguration; per-backend in WebSDK)
- *   C ABI  rac_vad_types.h:63 (rac_vad_config_t)
- *                                           (model_id, preferred_framework, energy_threshold,
- *                                            sample_rate, frame_length, enable_auto_calibration,
- *                                            calibration_multiplier)
- *
- * `frame_length_ms` is the canonical wire field — Swift/Kotlin/Dart/C use
- * seconds (float), but ms is more interoperable across protobuf consumers.
- * Generators must convert when binding to per-platform types.
- * ---------------------------------------------------------------------------
+ * Load-time configuration for a VAD instance.
  */
 public class VADConfiguration(
   /**
-   * Optional model id; empty when using the built-in energy VAD.
-   * C ABI: model_id (rac_vad_config_t::model_id, may be NULL).
+   * Empty when using the built-in energy VAD.
    */
   @field:WireField(
     tag = 1,
@@ -64,11 +45,8 @@ public class VADConfiguration(
     schemaIndex = 0,
   )
   public val model_id: String = "",
-  /**
-   * PCM sample rate in Hz. Default 16000 (RAC_VAD_DEFAULT_SAMPLE_RATE).
-   */
   @RacDefaultOption("16000")
-  @RacMinOption(1)
+  @RacMinOption(8_000)
   @RacMaxOption(48_000)
   @field:WireField(
     tag = 2,
@@ -79,11 +57,11 @@ public class VADConfiguration(
   )
   public val sample_rate: Int = 0,
   /**
-   * Frame length in milliseconds. Default 100 (Swift/Kotlin/Dart store
-   * 0.1 seconds; we canonicalize to ms on the wire).
+   * Milliseconds, on the wire AND in every generated binding. Only the
+   * internal rac_vad_config_t holds seconds; commons converts there.
    */
   @RacDefaultOption("100")
-  @RacMinOption(1)
+  @RacMinOption(20)
   @RacMaxOption(1_000)
   @field:WireField(
     tag = 3,
@@ -94,23 +72,28 @@ public class VADConfiguration(
   )
   public val frame_length_ms: Int = 0,
   /**
-   * Energy threshold in \[0.0, 1.0\] for voice detection.
-   * Recommended range 0.01–0.05; default 0.015 across SDKs.
+   * Normalized activation sensitivity in \[0,1\]; higher = harder to trigger.
+   * 0.5 is the industry default (OpenAI turn_detection.threshold, Silero,
+   * LiveKit activation_threshold). Each backend maps it onto its own units:
+   * a probability model uses it 1:1, the built-in energy detector converts
+   * it to an RMS bar. That conversion is backend-owned and is NOT fixed
+   * here; the built-in energy path and the voice-agent path calibrate
+   * separately today.
    */
-  @RacDefaultOption("0.015")
+  @RacDefaultOption("0.5")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "activationThreshold",
     schemaIndex = 3,
   )
-  public val threshold: Float = 0f,
+  public val activation_threshold: Float = 0f,
   /**
-   * When true, the VAD performs ambient-noise calibration and uses the
-   * result as a multiplier on the threshold (see calibration_multiplier
-   * in the C ABI). Defaults to false.
+   * Calibrate against ambient noise and scale the threshold by
+   * calibration_multiplier.
    */
   @field:WireField(
     tag = 5,
@@ -121,11 +104,10 @@ public class VADConfiguration(
   )
   public val enable_auto_calibration: Boolean = false,
   /**
-   * Calibration multiplier (threshold = ambient noise * multiplier).
-   * Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+   * threshold = ambient noise * multiplier
    */
   @RacDefaultOption("2.0")
-  @RacMinFloatOption(1.5)
+  @RacMinFloatOption(1.2)
   @RacMaxFloatOption(4.0)
   @field:WireField(
     tag = 6,
@@ -135,9 +117,6 @@ public class VADConfiguration(
     schemaIndex = 5,
   )
   public val calibration_multiplier: Float = 0f,
-  /**
-   * Preferred framework for VAD. Absent = auto.
-   */
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -146,7 +125,7 @@ public class VADConfiguration(
   )
   public val preferred_framework: InferenceFramework? = null,
   /**
-   * Optional model path for backend-specific VADs (e.g. Silero ONNX).
+   * For backend-specific VADs such as Silero ONNX.
    */
   @field:WireField(
     tag = 8,
@@ -155,30 +134,6 @@ public class VADConfiguration(
     schemaIndex = 7,
   )
   public val model_path: String? = null,
-  /**
-   * Window size in samples for frame-based neural VAD backends. 0 =
-   * backend/default.
-   */
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "windowSizeSamples",
-    schemaIndex = 8,
-  )
-  public val window_size_samples: Int = 0,
-  /**
-   * Maximum continuous speech segment duration in milliseconds. 0 =
-   * backend/default.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxSpeechDurationMs",
-    schemaIndex = 9,
-  )
-  public val max_speech_duration_ms: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -194,13 +149,11 @@ public class VADConfiguration(
     if (model_id != other.model_id) return false
     if (sample_rate != other.sample_rate) return false
     if (frame_length_ms != other.frame_length_ms) return false
-    if (threshold != other.threshold) return false
+    if (activation_threshold != other.activation_threshold) return false
     if (enable_auto_calibration != other.enable_auto_calibration) return false
     if (calibration_multiplier != other.calibration_multiplier) return false
     if (preferred_framework != other.preferred_framework) return false
     if (model_path != other.model_path) return false
-    if (window_size_samples != other.window_size_samples) return false
-    if (max_speech_duration_ms != other.max_speech_duration_ms) return false
     return true
   }
 
@@ -211,13 +164,11 @@ public class VADConfiguration(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + frame_length_ms.hashCode()
-      result = result * 37 + threshold.hashCode()
+      result = result * 37 + activation_threshold.hashCode()
       result = result * 37 + enable_auto_calibration.hashCode()
       result = result * 37 + calibration_multiplier.hashCode()
       result = result * 37 + (preferred_framework?.hashCode() ?: 0)
       result = result * 37 + (model_path?.hashCode() ?: 0)
-      result = result * 37 + window_size_samples.hashCode()
-      result = result * 37 + max_speech_duration_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -228,13 +179,11 @@ public class VADConfiguration(
     result += """model_id=${sanitize(model_id)}"""
     result += """sample_rate=$sample_rate"""
     result += """frame_length_ms=$frame_length_ms"""
-    result += """threshold=$threshold"""
+    result += """activation_threshold=$activation_threshold"""
     result += """enable_auto_calibration=$enable_auto_calibration"""
     result += """calibration_multiplier=$calibration_multiplier"""
     if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
     if (model_path != null) result += """model_path=${sanitize(model_path)}"""
-    result += """window_size_samples=$window_size_samples"""
-    result += """max_speech_duration_ms=$max_speech_duration_ms"""
     return result.joinToString(prefix = "VADConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -242,15 +191,13 @@ public class VADConfiguration(
     model_id: String = this.model_id,
     sample_rate: Int = this.sample_rate,
     frame_length_ms: Int = this.frame_length_ms,
-    threshold: Float = this.threshold,
+    activation_threshold: Float = this.activation_threshold,
     enable_auto_calibration: Boolean = this.enable_auto_calibration,
     calibration_multiplier: Float = this.calibration_multiplier,
     preferred_framework: InferenceFramework? = this.preferred_framework,
     model_path: String? = this.model_path,
-    window_size_samples: Int = this.window_size_samples,
-    max_speech_duration_ms: Int = this.max_speech_duration_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): VADConfiguration = VADConfiguration(model_id, sample_rate, frame_length_ms, threshold, enable_auto_calibration, calibration_multiplier, preferred_framework, model_path, window_size_samples, max_speech_duration_ms, unknownFields)
+  ): VADConfiguration = VADConfiguration(model_id, sample_rate, frame_length_ms, activation_threshold, enable_auto_calibration, calibration_multiplier, preferred_framework, model_path, unknownFields)
 
   public companion object {
     @JvmField
@@ -273,8 +220,8 @@ public class VADConfiguration(
         if (value.frame_length_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.frame_length_ms)
         }
-        if (!value.threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.activation_threshold)
         }
         if (value.enable_auto_calibration != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.enable_auto_calibration)
@@ -284,12 +231,6 @@ public class VADConfiguration(
         }
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(7, value.preferred_framework)
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.model_path)
-        if (value.window_size_samples != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.window_size_samples)
-        }
-        if (value.max_speech_duration_ms != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.max_speech_duration_ms)
-        }
         return size
       }
 
@@ -303,8 +244,8 @@ public class VADConfiguration(
         if (value.frame_length_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.frame_length_ms)
         }
-        if (!value.threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.activation_threshold)
         }
         if (value.enable_auto_calibration != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.enable_auto_calibration)
@@ -314,23 +255,11 @@ public class VADConfiguration(
         }
         InferenceFramework.ADAPTER.encodeWithTag(writer, 7, value.preferred_framework)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.model_path)
-        if (value.window_size_samples != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.window_size_samples)
-        }
-        if (value.max_speech_duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.max_speech_duration_ms)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADConfiguration) {
         writer.writeBytes(value.unknownFields)
-        if (value.max_speech_duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.max_speech_duration_ms)
-        }
-        if (value.window_size_samples != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.window_size_samples)
-        }
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.model_path)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 7, value.preferred_framework)
         if (!value.calibration_multiplier.equals(0f)) {
@@ -339,8 +268,8 @@ public class VADConfiguration(
         if (value.enable_auto_calibration != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.enable_auto_calibration)
         }
-        if (!value.threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.activation_threshold)
         }
         if (value.frame_length_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.frame_length_ms)
@@ -357,19 +286,17 @@ public class VADConfiguration(
         var model_id: String = ""
         var sample_rate: Int = 0
         var frame_length_ms: Int = 0
-        var threshold: Float = 0f
+        var activation_threshold: Float = 0f
         var enable_auto_calibration: Boolean = false
         var calibration_multiplier: Float = 0f
         var preferred_framework: InferenceFramework? = null
         var model_path: String? = null
-        var window_size_samples: Int = 0
-        var max_speech_duration_ms: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             3 -> frame_length_ms = ProtoAdapter.INT32.decode(reader)
-            4 -> threshold = ProtoAdapter.FLOAT.decode(reader)
+            4 -> activation_threshold = ProtoAdapter.FLOAT.decode(reader)
             5 -> enable_auto_calibration = ProtoAdapter.BOOL.decode(reader)
             6 -> calibration_multiplier = ProtoAdapter.FLOAT.decode(reader)
             7 -> try {
@@ -378,8 +305,6 @@ public class VADConfiguration(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             8 -> model_path = ProtoAdapter.STRING.decode(reader)
-            9 -> window_size_samples = ProtoAdapter.INT32.decode(reader)
-            10 -> max_speech_duration_ms = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -387,13 +312,11 @@ public class VADConfiguration(
           model_id = model_id,
           sample_rate = sample_rate,
           frame_length_ms = frame_length_ms,
-          threshold = threshold,
+          activation_threshold = activation_threshold,
           enable_auto_calibration = enable_auto_calibration,
           calibration_multiplier = calibration_multiplier,
           preferred_framework = preferred_framework,
           model_path = model_path,
-          window_size_samples = window_size_samples,
-          max_speech_duration_ms = max_speech_duration_ms,
           unknownFields = unknownFields
         )
       }

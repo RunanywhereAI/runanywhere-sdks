@@ -15,17 +15,21 @@
 
 import 'dart:typed_data';
 
+import 'package:runanywhere/generated/convenience/ra_convenience.dart'
+    show ConfidenceCascadeConvenience;
 import 'package:runanywhere/generated/hybrid_router.pb.dart' as pb;
-import 'package:runanywhere/generated/hybrid_router.pbenum.dart'
-    show HybridRank;
-import 'package:runanywhere/generated/ra_defaults_pool.dart';
 
 /// Suggested default confidence threshold for an STT confidence cascade.
-/// Mirrors `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` in rac_hybrid_types.h — the
-/// router uses the threshold carried in the installed policy; this is only the
-/// recommended value to build it with.
-const double kHybridSttConfidenceThreshold =
-    RADefaultsHybrid.sttConfidenceThreshold;
+///
+/// `RADefaultsHybrid` was deleted outright (idl/sdk_defaults.proto): its one
+/// field duplicated `hybrid_router.ConfidenceCascade.threshold`, which now
+/// carries the same `rac_default` annotation directly on the field it
+/// configures — `ConfidenceCascadeConvenience.defaults()` is the single
+/// source of this value. Mirrors `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` in
+/// rac_hybrid_types.h — the router uses the threshold carried in the
+/// installed policy; this is only the recommended value to build it with.
+final double kHybridSttConfidenceThreshold =
+    ConfidenceCascadeConvenience.defaults().threshold;
 
 /// A hard eligibility predicate. Every filter in a policy must pass for a
 /// candidate to survive the filter phase (filters AND-compose). Concrete
@@ -38,11 +42,6 @@ sealed class HybridFilter {
   /// candidate is unaffected. Network state is read from the device-state
   /// vtable on every request — never passed in per-call.
   const factory HybridFilter.network() = HybridNetworkFilter;
-
-  /// Requires the candidate to declare at least [tier]. Reserved: v1
-  /// descriptors carry no quality tier, so commons treats this as a no-op
-  /// today. Kept for wire/API parity with Kotlin/Swift.
-  const factory HybridFilter.quality({int tier}) = HybridQualityFilter;
 
   /// Drops the online candidate when the device battery is below [minPercent]
   /// (0–100). The offline candidate is unaffected.
@@ -66,15 +65,6 @@ sealed class HybridFilter {
 class HybridNetworkFilter extends HybridFilter {
   /// Build a NETWORK filter.
   const HybridNetworkFilter();
-}
-
-/// QUALITY hard filter. See [HybridFilter.quality].
-class HybridQualityFilter extends HybridFilter {
-  /// Build a QUALITY filter requiring at least [tier].
-  const HybridQualityFilter({this.tier = 1});
-
-  /// Minimum tier the candidate must declare.
-  final int tier;
 }
 
 /// BATTERY hard filter. See [HybridFilter.battery].
@@ -127,18 +117,22 @@ class HybridConfidenceCascade extends HybridCascade {
 }
 
 /// Comparator that orders eligible candidates. Exactly one rank per policy.
-/// Wire values match `HybridRank` in hybrid_router.proto.
+///
+/// The wire `prefer_local` bool was replaced by `HybridInferenceMode`
+/// (idl/hybrid_router.proto); [toProtoBytes] maps this rank onto the
+/// equivalent PREFER_ON_DEVICE / PREFER_IN_CLOUD mode value.
 enum HybridRankOrder {
   /// Prefer the offline candidate when both are eligible.
-  preferLocalFirst(HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST),
+  preferLocalFirst(true),
 
   /// Prefer the online candidate when both are eligible.
-  preferOnlineFirst(HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST);
+  preferOnlineFirst(false);
 
-  const HybridRankOrder(this.proto);
+  const HybridRankOrder(this.preferLocal);
 
-  /// The generated proto enum this maps to on the wire.
-  final HybridRank proto;
+  /// True maps to `HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE`, false to
+  /// `HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD`.
+  final bool preferLocal;
 }
 
 /// The full routing policy attached to a model pair: filters (AND-composed),
@@ -183,11 +177,20 @@ class HybridRoutingPolicy {
 
   /// Encode this policy as `runanywhere.v1.HybridRoutingPolicy` bytes for
   /// `rac_stt_hybrid_router_set_policy_proto`. Pure: no FFI, no state.
+  ///
+  /// The boolean `prefer_local` was replaced by `HybridInferenceMode`
+  /// (idl/hybrid_router.proto) — commons still maps it onto the same
+  /// prefer-local/prefer-online rank internally (see
+  /// `rac_stt_hybrid_router_proto.cpp`: PREFER_/ONLY_IN_CLOUD ranks online
+  /// first, everything else ranks on-device first), so [rank] is encoded as
+  /// the equivalent PREFER_ON_DEVICE / PREFER_IN_CLOUD mode value.
   Uint8List toProtoBytes() {
     final policy = pb.HybridRoutingPolicy(
       hardFilters: hardFilters.map(_encodeFilter),
       cascade: cascade == null ? null : _encodeCascade(cascade!),
-      rank: rank.proto,
+      mode: rank.preferLocal
+          ? pb.HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE
+          : pb.HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD,
     );
     return policy.writeToBuffer();
   }
@@ -196,8 +199,6 @@ class HybridRoutingPolicy {
     switch (filter) {
       case HybridNetworkFilter():
         return pb.HybridFilter(network: true);
-      case HybridQualityFilter(:final tier):
-        return pb.HybridFilter(qualityTier: tier);
       case HybridBatteryFilter(:final minPercent):
         return pb.HybridFilter(
           battery: pb.BatteryFilter(minBatteryPercent: minPercent),

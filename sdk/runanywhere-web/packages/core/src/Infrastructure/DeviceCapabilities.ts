@@ -5,9 +5,8 @@
  * WebGPU, SharedArrayBuffer (for pthreads), WASM SIMD, etc.
  */
 
-import type { DeviceInfo } from '@runanywhere/proto-ts/device_info';
+import { FormFactor, Platform, type DeviceInfo } from '@runanywhere/proto-ts/device_info';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
-import { SDK_PLATFORM } from '../Foundation/Version.js';
 import type { AccelerationMode } from '../Foundation/WASMBridge.js';
 
 const logger = new SDKLogger('DeviceCapabilities');
@@ -105,22 +104,20 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
   const caps = await detectCapabilities();
 
   return {
-    deviceModel: 'Browser',
-    deviceName: getBrowserName(caps.userAgent),
-    platform: SDK_PLATFORM,
+    deviceModel: getBrowserName(caps.userAgent),
+    platform: Platform.PLATFORM_WEB,
     osVersion: getOSVersion(caps.userAgent),
-    formFactor: 'desktop',
+    formFactor: FormFactor.FORM_FACTOR_DESKTOP,
     architecture: 'wasm32',
     chipName: '',
-    totalMemory: caps.deviceMemoryGB * 1024 * 1024 * 1024,
-    availableMemory: 0,
-    hasNeuralEngine: false,
-    neuralEngineCores: 0,
+    totalMemoryBytes: caps.deviceMemoryGB * 1024 * 1024 * 1024,
+    availableMemoryBytes: 0,
+    hasNpu: false,
+    npuCores: 0,
     gpuFamily: caps.gpuAdapterInfo?.architecture ?? '',
     isLowPowerMode: false,
     coreCount: caps.hardwareConcurrency,
     performanceCores: 0,
-    efficiencyCores: 0,
     platformExtras: {
       has_webgpu: String(caps.hasWebGPU),
       has_shared_array_buffer: String(caps.hasSharedArrayBuffer),

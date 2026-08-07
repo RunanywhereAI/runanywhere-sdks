@@ -1,15 +1,17 @@
 /**
  * @file cmd_run.cpp
- * @brief `rcli run <model> [prompt]` — LLM chat (one-shot or REPL) and
- *        `--image` VLM understanding.
+ * @brief `rcli llm generate|stream`, `rcli vlm generate`, and the terminal
+ *        aliases `rcli run` / `rcli chat`.
  *
  * Canonical SDK flow, all heavy lifting in commons:
  *   rac_model_lifecycle_load_proto(validate_availability=true)  → auto-pulls
  *   missing models through the download orchestrator (progress rendered via
  *   DownloadProgressScope), resolves artifact paths (incl. VLM mmproj) and
  *   loads the engine once.
- *   LLM: rac_llm_generate_stream_proto streams LLMStreamEvent protos; ANSWER
- *   tokens go to stdout, THOUGHT tokens to stderr (dimmed, hidden with -q).
+ *   llm generate: rac_llm_generate_proto returns one LLMGenerationResult.
+ *   llm stream:   rac_llm_generate_stream_proto streams LLMStreamEvent protos;
+ *   ANSWER tokens go to stdout, THOUGHT tokens to stderr (dimmed, hidden with
+ *   -q or --hide-thinking).
  *   VLM: rac_vlm_generate_proto (unary) returns a VLMResult.
  *   Ctrl-C: rac_llm_cancel_proto from the token callback thread.
  *
@@ -25,14 +27,18 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
+#include "chat.pb.h"
 #include "llm_service.pb.h"
 #include "model_types.pb.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_stream.h"
+#include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "lora_options.pb.h"
 #include "vlm_options.pb.h"
 
 #include "catalog/model_ref.h"
@@ -51,20 +57,80 @@ namespace {
 namespace v1 = runanywhere::v1;
 
 // ---------------------------------------------------------------------------
-// Generation parameters shared by one-shot and REPL turns.
+// Generation parameters shared by one-shot, streaming and REPL turns. Field
+// names follow LlmOptions in the public API spec.
 // ---------------------------------------------------------------------------
 struct RunParams {
+    std::string model;
+    std::string image;
     std::string system_prompt;
     std::string engine;
-    float temperature = 0.0f;  // 0 = engine default
-    int32_t max_tokens = 1024;
-    bool no_think = false;
+    std::string lora;            // optional LoRA adapter (.gguf) to attach before generating
+    float lora_scale = 1.0f;     // how strongly the adapter applies
+    std::string reasoning = "on";  // on | off
+    bool show_thinking = true;     // reasoning.include_in_output
+    float temperature = 0.0f;      // 0 = engine default
+    float top_p = 0.0f;
+    float min_p = 0.0f;
+    float repetition_penalty = 0.0f;
+    float frequency_penalty = 0.0f;
+    float presence_penalty = 0.0f;
+    int32_t top_k = 0;
+    int32_t max_output_tokens = 1024;
+    int64_t seed = -1;  // -1 = unset; LLMGenerationOptions.seed default is 0
+    std::vector<std::string> stop_sequences;
 };
 
 volatile std::sig_atomic_t g_interrupted = 0;
 
 void on_sigint(int /*signum*/) {
     g_interrupted = 1;
+}
+
+bool reasoning_off(const RunParams& params) {
+    return params.reasoning == "off";
+}
+
+// Fill LLMGenerationOptions from the parsed flags. Zero means "leave it to the
+// engine default" for every sampling knob the proto declares as non-optional.
+void apply_options(const RunParams& params, v1::LLMGenerationOptions* gen) {
+    gen->set_max_output_tokens(params.max_output_tokens);
+    if (params.temperature > 0.0f) {
+        gen->set_temperature(params.temperature);
+    }
+    if (params.top_p > 0.0f) {
+        gen->set_top_p(params.top_p);
+    }
+    if (params.top_k > 0) {
+        gen->set_top_k(params.top_k);
+    }
+    if (params.min_p > 0.0f) {
+        gen->set_min_p(params.min_p);
+    }
+    if (params.repetition_penalty > 0.0f) {
+        gen->set_repeat_penalty(params.repetition_penalty);
+    }
+    if (params.frequency_penalty != 0.0f) {
+        gen->set_frequency_penalty(params.frequency_penalty);
+    }
+    if (params.presence_penalty != 0.0f) {
+        gen->set_presence_penalty(params.presence_penalty);
+    }
+    if (params.seed >= 0) {
+        gen->set_seed(params.seed);
+    }
+    for (const std::string& stop : params.stop_sequences) {
+        gen->add_stop_sequences(stop);
+    }
+    if (!params.system_prompt.empty()) {
+        gen->set_system_prompt(params.system_prompt);
+    }
+    v1::ReasoningOptions* reasoning = gen->mutable_reasoning();
+    if (reasoning_off(params)) {
+        reasoning->set_mode(v1::REASONING_MODE_OFF);
+    } else {
+        reasoning->set_include_in_output(params.show_thinking);
+    }
 }
 
 // Streaming state shared with the LLM proto callback.
@@ -107,7 +173,7 @@ void llm_stream_callback(const uint8_t* event_bytes, size_t event_size, void* /*
 
     if (!event.token().empty()) {
         std::lock_guard<std::mutex> lock(state->mutex);
-        if (event.kind() == v1::TOKEN_KIND_THOUGHT) {
+        if (event.event_kind() == v1::LLM_STREAM_EVENT_KIND_THINKING) {
             if (state->show_thoughts) {
                 if (!state->in_thought_block) {
                     std::fprintf(stderr, "%s", term::color_enabled() ? "\033[2m" : "");
@@ -142,42 +208,35 @@ void llm_stream_callback(const uint8_t* event_bytes, size_t event_size, void* /*
         }
     }
 
-    if (event.is_final()) {
+    if (event.event_kind() == v1::LLM_STREAM_EVENT_KIND_COMPLETED ||
+        event.event_kind() == v1::LLM_STREAM_EVENT_KIND_ERROR) {
         std::lock_guard<std::mutex> lock(state->mutex);
         if (state->in_thought_block) {
             std::fprintf(stderr, "%s\n", term::color_enabled() ? "\033[0m" : "");
             state->in_thought_block = false;
         }
-        state->finish_reason = event.finish_reason();
-        if (!event.error_message().empty()) {
-            state->error = event.error_message();
+        state->finish_reason = v1::FinishReason_Name(event.finish_reason());
+        if (!event.error().message().empty()) {
+            state->error = event.error().message();
         }
         state->done = true;
         state->cv.notify_all();
     }
 }
 
-// One blocking generation; returns 0 ok, 1 error, 130 user-cancel.
-int generate_once(const GlobalOptions& options, const std::string& model_id,
-                  const std::string& prompt, const RunParams& params) {
+// One blocking streaming generation; returns 0 ok, 1 error, 130 user-cancel.
+int stream_once(const GlobalOptions& options, const std::string& model_id,
+                const std::string& prompt, const RunParams& params) {
     v1::LLMGenerateRequest request;
-    request.set_prompt(prompt);
-    request.set_emit_thoughts(!params.no_think);
-    v1::LLMGenerationOptions* gen = request.mutable_options();
-    gen->set_max_tokens(params.max_tokens);
-    if (params.temperature > 0.0f) {
-        gen->set_temperature(params.temperature);
-    }
-    if (!params.system_prompt.empty()) {
-        gen->set_system_prompt(params.system_prompt);
-    }
-    if (params.no_think) {
-        gen->set_disable_thinking(true);
-    }
+    v1::ChatMessage* message = request.add_messages();
+    message->set_role(v1::MESSAGE_ROLE_USER);
+    message->set_content(prompt);
+    apply_options(params, request.mutable_options());
     (void)model_id;  // lifecycle-owned state knows the loaded model
 
     GenState state;
-    state.show_thoughts = !options.quiet && !options.json;
+    state.show_thoughts = params.show_thinking && !reasoning_off(params) && !options.quiet &&
+                          !options.json;
     state.stream_to_stdout = !options.json;
     g_gen = &state;
     g_interrupted = 0;
@@ -227,6 +286,56 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
     return exit_code;
 }
 
+// One unary generation (`llm generate`): the whole result lands at once.
+int generate_once(const GlobalOptions& options, const std::string& model_id,
+                  const std::string& prompt, const RunParams& params) {
+    v1::LLMGenerateRequest request;
+    v1::ChatMessage* message = request.add_messages();
+    message->set_role(v1::MESSAGE_ROLE_USER);
+    message->set_content(prompt);
+    apply_options(params, request.mutable_options());
+
+    const std::string bytes = proto::serialize(request);
+    rac_proto_buffer_t out_buffer;
+    rac_proto_buffer_init(&out_buffer);
+    std::string error;
+    v1::LLMGenerationResult result;
+    if (rac_llm_generate_proto(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
+                               &out_buffer) != RAC_SUCCESS ||
+        !proto::parse_proto_buffer(&out_buffer, &result, &error)) {
+        out::error_line("generation failed: " + error);
+        return 1;
+    }
+
+    if (options.json) {
+        out::JsonWriter json;
+        json.begin_object()
+            .field("model", result.model_used().empty() ? model_id : result.model_used())
+            .field("response", result.text())
+            .field("thinking", result.thinking_content())
+            .field("finish_reason", v1::FinishReason_Name(result.finish_reason()))
+            .field("input_tokens", static_cast<int64_t>(result.usage().input_tokens()))
+            .field("output_tokens", static_cast<int64_t>(result.usage().output_tokens()))
+            .field("tokens_per_second", result.usage().decode_tokens_per_second())
+            .field("total_ms", static_cast<int64_t>(result.generation_time_ms()))
+            .end_object();
+        out::result_line(json.str());
+        return 0;
+    }
+    if (params.show_thinking && !reasoning_off(params) && !options.quiet &&
+        !result.thinking_content().empty()) {
+        std::fprintf(stderr, "%s%s%s\n", term::color_enabled() ? "\033[2m" : "",
+                     result.thinking_content().c_str(), term::color_enabled() ? "\033[0m" : "");
+    }
+    out::result_line(result.text());
+    if (options.verbose) {
+        out::status_line("(" + std::to_string(static_cast<int64_t>(result.generation_time_ms())) +
+                         " ms, " + std::to_string(result.usage().decode_tokens_per_second()) +
+                         " tok/s)");
+    }
+    return 0;
+}
+
 bool load_model(const GlobalOptions& options, const std::string& model_id,
                 v1::InferenceFramework framework, bool is_vlm) {
     // Auto-pull (validate_availability) + resolve + engine load, one call.
@@ -254,10 +363,10 @@ bool load_model(const GlobalOptions& options, const std::string& model_id,
         out::error_line("model load failed: " + error);
         return false;
     }
-    if (!result.success()) {
-        out::error_line("model load failed: " + (result.error_message().empty()
+    if (!result.has_error() == false) {
+        out::error_line("model load failed: " + (result.error().message().empty()
                                                      ? "unknown error"
-                                                     : result.error_message()));
+                                                     : result.error().message()));
         return false;
     }
     if (options.verbose) {
@@ -272,14 +381,46 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
     request.set_model_id(model_id);
     v1::VLMImage* image = request.add_images();
     image->set_file_path(image_path);
-    v1::VLMGenerationOptions* gen = request.mutable_options();
-    gen->set_prompt(prompt.empty() ? "Describe this image." : prompt);
-    gen->set_max_tokens(params.max_tokens);
+    request.set_prompt(prompt.empty() ? "Describe this image." : prompt);
+    v1::LLMGenerationOptions* gen = request.mutable_options();
+    gen->set_max_output_tokens(params.max_output_tokens);
     if (params.temperature > 0.0f) {
         gen->set_temperature(params.temperature);
     }
+    if (params.top_p > 0.0f) {
+        gen->set_top_p(params.top_p);
+    }
+    if (params.top_k > 0) {
+        gen->set_top_k(params.top_k);
+    }
+    if (params.min_p > 0.0f) {
+        gen->set_min_p(params.min_p);
+    }
+    if (params.repetition_penalty > 0.0f) {
+        gen->set_repeat_penalty(params.repetition_penalty);
+    }
+    if (params.seed >= 0) {
+        gen->set_seed(params.seed);
+    }
+    for (const std::string& stop : params.stop_sequences) {
+        gen->add_stop_sequences(stop);
+    }
     if (!params.system_prompt.empty()) {
         gen->set_system_prompt(params.system_prompt);
+    }
+    v1::ReasoningOptions* reasoning = gen->mutable_reasoning();
+    if (reasoning_off(params)) {
+        reasoning->set_mode(v1::REASONING_MODE_OFF);
+    } else {
+        reasoning->set_include_in_output(params.show_thinking);
+    }
+    // VLMGenerationRequest.options is now the shared LLMGenerationOptions, so
+    // frequency/presence penalty apply to VLM generation too.
+    if (params.frequency_penalty != 0.0f) {
+        gen->set_frequency_penalty(params.frequency_penalty);
+    }
+    if (params.presence_penalty != 0.0f) {
+        gen->set_presence_penalty(params.presence_penalty);
     }
 
     const std::string bytes = proto::serialize(request);
@@ -293,8 +434,8 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
         out::error_line("vlm generation failed: " + error);
         return 1;
     }
-    if (!result.error_message().empty()) {
-        out::error_line("vlm generation failed: " + result.error_message());
+    if (!result.error().message().empty()) {
+        out::error_line("vlm generation failed: " + result.error().message());
         return 1;
     }
 
@@ -303,15 +444,17 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
         json.begin_object()
             .field("model", model_id)
             .field("response", result.text())
-            .field("total_ms", static_cast<int64_t>(result.processing_time_ms()))
-            .field("tokens_per_second", static_cast<double>(result.tokens_per_second()))
+            .field("total_ms", static_cast<int64_t>(result.total_time_ms()))
+            .field("tokens_per_second",
+                   static_cast<double>(result.usage().decode_tokens_per_second()))
             .end_object();
         out::result_line(json.str());
     } else {
         out::result_line(result.text());
         if (options.verbose) {
-            out::status_line("(" + std::to_string(result.processing_time_ms()) + " ms, " +
-                             std::to_string(result.tokens_per_second()) + " tok/s)");
+            out::status_line("(" + std::to_string(result.total_time_ms()) + " ms, " +
+                             std::to_string(result.usage().decode_tokens_per_second()) +
+                             " tok/s)");
         }
     }
     return 0;
@@ -319,11 +462,11 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
 
 void print_repl_help() {
     out::status_line("commands:");
-    out::status_line("  /set system <text>   set the system prompt");
-    out::status_line("  /set temp <float>    set sampling temperature");
-    out::status_line("  /set max-tokens <n>  set the generation budget");
-    out::status_line("  /show                show current settings");
-    out::status_line("  /bye                 exit (also Ctrl-D)");
+    out::status_line("  /set system <text>          set the system prompt");
+    out::status_line("  /set temperature <float>    set sampling temperature");
+    out::status_line("  /set max-output-tokens <n>  set the generation budget");
+    out::status_line("  /show                       show current settings");
+    out::status_line("  /bye                        exit (also Ctrl-D)");
     out::status_line("note: turns are independent — no conversation memory yet");
 }
 
@@ -348,14 +491,14 @@ int run_repl(const GlobalOptions& options, const std::string& model_id, RunParam
             continue;
         }
         if (line == "/show") {
-            out::status_line("model       " + model_id);
-            out::status_line("system      " +
+            out::status_line("model              " + model_id);
+            out::status_line("system-prompt      " +
                              (params.system_prompt.empty() ? "(none)" : params.system_prompt));
-            out::status_line("temperature " + (params.temperature > 0
-                                                   ? std::to_string(params.temperature)
-                                                   : "(engine default)"));
-            out::status_line("max-tokens  " + std::to_string(params.max_tokens));
-            out::status_line("thinking    " + std::string(params.no_think ? "off" : "model default"));
+            out::status_line("temperature        " + (params.temperature > 0
+                                                         ? std::to_string(params.temperature)
+                                                         : "(engine default)"));
+            out::status_line("max-output-tokens  " + std::to_string(params.max_output_tokens));
+            out::status_line("reasoning          " + params.reasoning);
             continue;
         }
         if (line.starts_with("/set ")) {
@@ -363,15 +506,23 @@ int run_repl(const GlobalOptions& options, const std::string& model_id, RunParam
             if (rest.starts_with("system ")) {
                 params.system_prompt = rest.substr(7);
                 out::status_line("system prompt set");
+            } else if (rest.starts_with("temperature ")) {
+                params.temperature = std::strtof(rest.substr(12).c_str(), nullptr);
+                out::status_line("temperature set");
             } else if (rest.starts_with("temp ")) {
                 params.temperature = std::strtof(rest.substr(5).c_str(), nullptr);
                 out::status_line("temperature set");
+            } else if (rest.starts_with("max-output-tokens ")) {
+                params.max_output_tokens =
+                    static_cast<int32_t>(std::strtol(rest.substr(18).c_str(), nullptr, 10));
+                out::status_line("max-output-tokens set");
             } else if (rest.starts_with("max-tokens ")) {
-                params.max_tokens = static_cast<int32_t>(std::strtol(rest.substr(11).c_str(),
-                                                                     nullptr, 10));
-                out::status_line("max-tokens set");
+                params.max_output_tokens =
+                    static_cast<int32_t>(std::strtol(rest.substr(11).c_str(), nullptr, 10));
+                out::status_line("max-output-tokens set");
             } else {
-                out::status_line("unknown /set option (system | temp | max-tokens)");
+                out::status_line(
+                    "unknown /set option (system | temperature | max-output-tokens)");
             }
             continue;
         }
@@ -380,7 +531,7 @@ int run_repl(const GlobalOptions& options, const std::string& model_id, RunParam
             continue;
         }
 
-        const int code = generate_once(options, model_id, line, params);
+        const int code = stream_once(options, model_id, line, params);
         if (code == 1) {
             return 1;  // hard error; cancel (130) just returns to the prompt
         }
@@ -388,11 +539,57 @@ int run_repl(const GlobalOptions& options, const std::string& model_id, RunParam
     return 0;
 }
 
-int run_run(const GlobalOptions& options, const std::string& ref, const std::string& prompt,
-            const std::string& image_path, const RunParams& params) {
+std::string read_piped_prompt() {
+    std::string piped;
+    char buffer[4096];
+    size_t n = 0;
+    while ((n = fread(buffer, 1, sizeof(buffer), stdin)) > 0) {
+        piped.append(buffer, n);
+    }
+    while (!piped.empty() && (piped.back() == '\n' || piped.back() == '\r')) {
+        piped.pop_back();
+    }
+    return piped;
+}
+
+// Attach a LoRA adapter to the already-loaded LLM in this same process, so the
+// following generation actually uses it (adapter state is session-scoped).
+bool apply_lora_adapter(const std::string& adapter_path, float scale) {
+    // keep_existing left unset (false): SET semantics, which is what the
+    // former explicit replace_existing(true) meant. LoraApplyRequest has no
+    // replace_existing field to set.
+    v1::LoraApplyRequest request;
+    v1::LoraAdapterConfig* adapter = request.add_adapters();
+    adapter->set_adapter_path(adapter_path);
+    adapter->set_scale(scale);
+
+    const std::string request_bytes = proto::serialize(request);
+    rac_proto_buffer_t out_buffer;
+    rac_proto_buffer_init(&out_buffer);
+    const rac_result_t rc = rac_lora_apply_proto(
+        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(), &out_buffer);
+    v1::LoraApplyResult result;
+    std::string error;
+    const bool parsed = proto::parse_proto_buffer(&out_buffer, &result, &error);
+    if (!parsed || rc != RAC_SUCCESS || result.has_error()) {
+        out::error_line("lora apply failed: " +
+                        (result.has_error() && !result.error().message().empty()
+                             ? result.error().message()
+                             : (error.empty() ? std::to_string(rc) : error)));
+        return false;
+    }
+    return true;
+}
+
+int run_llm(const GlobalOptions& options, LlmVerb verb, const std::string& prompt,
+            const RunParams& params) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
+    }
+    if (params.model.empty()) {
+        out::error_line("--model is required (a catalog id, alias, hf.co/... ref or URL)");
+        return 2;
     }
 
     EngineHintResolution engine_hint;
@@ -402,14 +599,16 @@ int run_run(const GlobalOptions& options, const std::string& ref, const std::str
         return 2;
     }
 
-    if (!image_path.empty()) {
+    const bool is_vlm = !params.image.empty();
+    if (is_vlm) {
         engine_hint.resolve_options.has_category = true;
         engine_hint.resolve_options.category = v1::MODEL_CATEGORY_MULTIMODAL;
     }
 
     model_ref::Resolved resolved;
     std::string error;
-    if (model_ref::resolve(ref, &resolved, &error, &engine_hint.resolve_options) != RAC_SUCCESS) {
+    if (model_ref::resolve(params.model, &resolved, &error, &engine_hint.resolve_options) !=
+        RAC_SUCCESS) {
         out::error_line(error);
         return 1;
     }
@@ -420,63 +619,149 @@ int run_run(const GlobalOptions& options, const std::string& ref, const std::str
     // catalog — `--engine <x>` on a catalog model did nothing at all, with no
     // warning. When the flag is absent engine_hint.framework is UNSPECIFIED, so
     // catalog entries still fall back to their own declared framework exactly as
-    // before; the only behaviour that changes is that asking now works.
-    if (!load_model(options, resolved.model_id, engine_hint.framework, !image_path.empty())) {
+    // before; the only behaviour that changes is that asking now works. Mirrors
+    // cmd_embed.cpp.
+    if (!load_model(options, resolved.model_id, engine_hint.framework, is_vlm)) {
+        return 1;
+    }
+    if (!params.lora.empty() && !apply_lora_adapter(params.lora, params.lora_scale)) {
         return 1;
     }
 
-    if (!image_path.empty()) {
-        return run_vlm(options, resolved.model_id, image_path, prompt, params);
+    std::string effective_prompt = prompt;
+    if (effective_prompt.empty() && !term::stdin_is_tty()) {
+        // Piped stdin is the prompt: echo "..." | rcli llm generate -m qwen3
+        effective_prompt = read_piped_prompt();
     }
-    if (!prompt.empty()) {
-        return generate_once(options, resolved.model_id, prompt, params);
+
+    if (is_vlm) {
+        return run_vlm(options, resolved.model_id, params.image, effective_prompt, params);
     }
-    if (!term::stdin_is_tty()) {
-        // Piped stdin: read it all as the prompt (echo "..." | rcli run model).
-        std::string piped;
-        char buffer[4096];
-        size_t n = 0;
-        while ((n = fread(buffer, 1, sizeof(buffer), stdin)) > 0) {
-            piped.append(buffer, n);
-        }
-        while (!piped.empty() && (piped.back() == '\n' || piped.back() == '\r')) {
-            piped.pop_back();
-        }
-        if (piped.empty()) {
-            out::error_line("no prompt given");
-            return 2;
-        }
-        return generate_once(options, resolved.model_id, piped, params);
+    if (!effective_prompt.empty()) {
+        return verb == LlmVerb::Generate ? generate_once(options, resolved.model_id,
+                                                         effective_prompt, params)
+                                         : stream_once(options, resolved.model_id,
+                                                       effective_prompt, params);
     }
-    return run_repl(options, resolved.model_id, params);
+    if (verb == LlmVerb::Chat) {
+        return run_repl(options, resolved.model_id, params);
+    }
+    out::error_line("no prompt given");
+    return 2;
+}
+
+// The sampling / reasoning / model flags shared by every llm and vlm command.
+// VLMGenerationRequest.options is now the same LLMGenerationOptions the LLM
+// path uses (VLMGenerationOptions was deleted), so llm and vlm expose an
+// identical sampling surface -- the `vlm` parameter only controls whether
+// --seed / --frequency-penalty / --presence-penalty are offered at all
+// (kept for CLI-surface stability; both option sets now support them).
+void add_generation_options(CLI::App* cmd, const std::shared_ptr<RunParams>& params,
+                           ModelArg model_arg, bool vlm) {
+    (void)vlm;
+    if (model_arg == ModelArg::Option) {
+        cmd->add_option("--model,-m", params->model,
+                        "Model to generate with; downloads and loads it when absent");
+    } else {
+        cmd->add_option("model", params->model, "Model id, alias, hf.co/... ref or URL")
+            ->required();
+    }
+    cmd->add_option("--system-prompt,--system", params->system_prompt,
+                    "Steer the model with a system instruction");
+    cmd->add_option("--lora", params->lora,
+                    "Attach a LoRA adapter (.gguf) before generating");
+    cmd->add_option("--lora-scale", params->lora_scale,
+                    "How strongly the LoRA applies (default 1.0)");
+    cmd->add_option("--engine", params->engine,
+                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
+                    "catalog models too, not just URL/HF refs.");
+    cmd->add_option("--temperature,--temp", params->temperature,
+                    "Raise for more random sampling (0 = engine default)");
+    cmd->add_option("--top-p", params->top_p, "Keep the smallest token set above this probability");
+    cmd->add_option("--top-k", params->top_k, "Sample from this many highest-probability tokens");
+    cmd->add_option("--min-p", params->min_p, "Drop tokens below this share of the top token");
+    cmd->add_option("--repetition-penalty", params->repetition_penalty,
+                    "Penalize tokens already present in the context");
+    cmd->add_option("--seed", params->seed, "Fix the RNG for a repeatable answer");
+    cmd->add_option("--frequency-penalty", params->frequency_penalty,
+                    "Penalize tokens by how often they have appeared");
+    cmd->add_option("--presence-penalty", params->presence_penalty,
+                    "Penalize tokens that appeared at all");
+    cmd->add_option("--stop", params->stop_sequences,
+                    "Stop as soon as this text is produced (repeat for several)");
+    cmd->add_option("--max-output-tokens,--max-tokens", params->max_output_tokens,
+                    "Cap the generated tokens (default 1024)");
+    cmd->add_option("--reasoning", params->reasoning,
+                    "Turn the model's thinking phase on or off (default on)")
+        ->check(CLI::IsMember({"on", "off"}));
+    cmd->add_flag("--show-thinking,!--hide-thinking", params->show_thinking,
+                  "Stream thought tokens to stderr (default on)");
+    cmd->add_flag_callback(
+        "--no-think", [params]() { params->reasoning = "off"; },
+        "Older spelling of `--reasoning off`");
 }
 
 }  // namespace
 
-void register_run(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd =
-        app.add_subcommand("run", "Chat with a model (REPL, one-shot, or --image VLM)");
-    auto ref = std::make_shared<std::string>();
-    auto prompt = std::make_shared<std::string>();
-    auto image = std::make_shared<std::string>();
+void configure_llm(CLI::App* cmd, GlobalOptions& options, LlmVerb verb, ModelArg model_arg) {
     auto params = std::make_shared<RunParams>();
-    cmd->add_option("model", *ref, "Model id, alias, hf.co/... or URL")->required();
-    cmd->add_option("prompt", *prompt, "One-shot prompt (omit for interactive REPL)");
-    cmd->add_option("--image", *image, "Image file for VLM models")
-        ->check(CLI::ExistingFile);
-    cmd->add_option("--system", params->system_prompt, "System prompt");
-    cmd->add_option("--engine", params->engine,
-                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
-                    "catalog models too, not just URL/HF refs.");
-    cmd->add_option("--temp,--temperature", params->temperature, "Sampling temperature");
-    cmd->add_option("--max-tokens", params->max_tokens, "Max tokens to generate (default 1024)");
-    cmd->add_flag("--no-think", params->no_think, "Disable the model's thinking phase");
-    cmd->callback([&options, ref, prompt, image, params]() {
-        const int exit_code = run_run(options, *ref, *prompt, *image, *params);
+    auto prompt = std::make_shared<std::string>();
+    add_generation_options(cmd, params, model_arg, false);
+    cmd->add_option("prompt", *prompt,
+                    verb == LlmVerb::Chat ? "First prompt (omit for the interactive REPL)"
+                                          : "Prompt to complete (omit to read stdin)");
+    if (verb == LlmVerb::Chat) {
+        // The REPL and VLM paths share one implementation; `run --image` stays
+        // the documented alias of `vlm generate`.
+        cmd->add_option("--image", params->image, "Describe this image instead (VLM models)")
+            ->check(CLI::ExistingFile);
+    }
+    cmd->callback([&options, verb, params, prompt]() {
+        const int exit_code = run_llm(options, verb, *prompt, *params);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }
     });
+}
+
+void configure_vlm_generate(CLI::App* cmd, GlobalOptions& options) {
+    auto params = std::make_shared<RunParams>();
+    auto prompt = std::make_shared<std::string>();
+    add_generation_options(cmd, params, ModelArg::Option, true);
+    cmd->add_option("prompt", *prompt, "Question about the image (default: describe it)");
+    cmd->add_option("--image,-i", params->image, "Image to look at")
+        ->required()
+        ->check(CLI::ExistingFile);
+    cmd->callback([&options, params, prompt]() {
+        const int exit_code = run_llm(options, LlmVerb::Generate, *prompt, *params);
+        if (exit_code != 0) {
+            throw CLI::RuntimeError(exit_code);
+        }
+    });
+}
+
+void register_llm(CLI::App& app, GlobalOptions& options) {
+    CLI::App* ns = app.add_subcommand("llm", "Generate text with a language model");
+    ns->require_subcommand(1);
+    configure_llm(ns->add_subcommand("generate", "Complete a prompt and print the result"),
+                  options, LlmVerb::Generate, ModelArg::Option);
+    configure_llm(ns->add_subcommand("stream", "Complete a prompt, printing tokens as they arrive"),
+                  options, LlmVerb::Stream, ModelArg::Option);
+}
+
+void register_vlm(CLI::App& app, GlobalOptions& options) {
+    CLI::App* ns = app.add_subcommand("vlm", "Ask a vision-language model about an image");
+    ns->require_subcommand(1);
+    configure_vlm_generate(ns->add_subcommand("generate", "Answer a prompt about an image"),
+                           options);
+}
+
+void register_llm_aliases(CLI::App& app, GlobalOptions& options) {
+    configure_llm(app.add_subcommand("run", "Chat with a model (alias of `llm stream`)"), options,
+                  LlmVerb::Chat, ModelArg::Positional);
+    configure_llm(
+        app.add_subcommand("chat", "Start an interactive session (alias of `llm stream`)"),
+        options, LlmVerb::Chat, ModelArg::Positional);
 }
 
 }  // namespace rcli::commands

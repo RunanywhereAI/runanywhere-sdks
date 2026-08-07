@@ -42,9 +42,12 @@ set(RCLI_SOURCES
     src/commands/cmd_backends.cpp
     src/commands/cmd_list.cpp
     src/commands/cmd_lora.cpp
+    src/commands/cmd_models.cpp
     src/commands/cmd_pull.cpp
+    src/commands/cmd_rerank.cpp
     src/commands/cmd_rm.cpp
     src/commands/cmd_run.cpp
+    src/commands/cmd_tool.cpp
     src/commands/cmd_image.cpp
     src/commands/cmd_segment.cpp
     src/commands/cmd_serve.cpp

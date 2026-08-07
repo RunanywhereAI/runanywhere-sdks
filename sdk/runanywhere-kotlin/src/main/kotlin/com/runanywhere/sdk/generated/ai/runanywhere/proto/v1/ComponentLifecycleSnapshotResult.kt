@@ -18,7 +18,6 @@ import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.redactElements
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -33,29 +32,20 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class ComponentLifecycleSnapshotResult(
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
   snapshots: List<ComponentLifecycleSnapshot> = emptyList(),
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 2,
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 1,
   )
-  public val error_message: String = "",
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ComponentLifecycleSnapshotResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.ComponentLifecycleSnapshot#ADAPTER",
     label = WireField.Label.REPEATED,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val snapshots: List<ComponentLifecycleSnapshot> = immutableCopyOf("snapshots", snapshots)
 
@@ -69,9 +59,8 @@ public class ComponentLifecycleSnapshotResult(
     if (other === this) return true
     if (other !is ComponentLifecycleSnapshotResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (snapshots != other.snapshots) return false
-    if (error_message != other.error_message) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -79,9 +68,8 @@ public class ComponentLifecycleSnapshotResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + snapshots.hashCode()
-      result = result * 37 + error_message.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -89,18 +77,16 @@ public class ComponentLifecycleSnapshotResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (snapshots.isNotEmpty()) result += """snapshots=$snapshots"""
-    result += """error_message=${sanitize(error_message)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ComponentLifecycleSnapshotResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     snapshots: List<ComponentLifecycleSnapshot> = this.snapshots,
-    error_message: String = this.error_message,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ComponentLifecycleSnapshotResult = ComponentLifecycleSnapshotResult(success, snapshots, error_message, unknownFields)
+  ): ComponentLifecycleSnapshotResult = ComponentLifecycleSnapshotResult(snapshots, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -115,60 +101,43 @@ public class ComponentLifecycleSnapshotResult(
     ) {
       override fun encodedSize(`value`: ComponentLifecycleSnapshotResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         size += ComponentLifecycleSnapshot.ADAPTER.asRepeated().encodedSizeWithTag(2, value.snapshots)
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(4, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ComponentLifecycleSnapshotResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         ComponentLifecycleSnapshot.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.snapshots)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 4, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ComponentLifecycleSnapshotResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 4, value.error)
         ComponentLifecycleSnapshot.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.snapshots)
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): ComponentLifecycleSnapshotResult {
-        var success: Boolean = false
         val snapshots = mutableListOf<ComponentLifecycleSnapshot>()
-        var error_message: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> snapshots.add(ComponentLifecycleSnapshot.ADAPTER.decode(reader))
-            3 -> error_message = ProtoAdapter.STRING.decode(reader)
+            4 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ComponentLifecycleSnapshotResult(
-          success = success,
           snapshots = snapshots,
-          error_message = error_message,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ComponentLifecycleSnapshotResult): ComponentLifecycleSnapshotResult = value.copy(
         snapshots = value.snapshots.redactElements(ComponentLifecycleSnapshot.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

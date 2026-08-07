@@ -13,9 +13,10 @@ extension RADeviceStorageInfo {
         self.totalBytes = totalBytes
         self.freeBytes = freeBytes
         self.usedBytes = usedBytes
-        self.usedPercent = totalBytes > 0
-            ? Float(Double(usedBytes) / Double(totalBytes) * 100.0)
-            : 0.0
+        // usedPercent was deleted outright (idl/storage_types.proto): it
+        // was a pure derivation of totalBytes/usedBytes with no independent
+        // wire value, so `usagePercentage` below is the sole surviving
+        // computed accessor.
     }
 
     // Aliases `totalSpace` / `freeSpace` / `usedSpace` removed — shadowed
@@ -53,7 +54,8 @@ extension RAStorageInfo {
         info.app = RAAppStorageInfo()
         info.device = RADeviceStorageInfo()
         info.models = []
-        info.totalModels = 0
+        // totalModels was deleted outright (idl/storage_types.proto):
+        // models.count / modelCount below is the sole count now.
         info.totalModelsBytes = 0
         return info
     }()
@@ -83,11 +85,12 @@ extension RAStorageInfo {
 // MARK: - RAModelStorageMetrics
 
 extension RAModelStorageMetrics {
-    public init(modelID: String, sizeOnDiskBytes: Int64, lastUsedMs: Int64? = nil) {
+    // lastUsedMs was deleted outright (idl/storage_types.proto): this
+    // metrics record now carries only modelID + sizeOnDiskBytes.
+    public init(modelID: String, sizeOnDiskBytes: Int64) {
         self.init()
         self.modelID = modelID
         self.sizeOnDiskBytes = sizeOnDiskBytes
-        if let lastUsedMs { self.lastUsedMs = lastUsedMs }
     }
 
     // `modelId` / `sizeOnDisk` / `lastUsed` aliases removed — pure renames of

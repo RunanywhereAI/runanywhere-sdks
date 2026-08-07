@@ -12,9 +12,9 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.pcm16ToFloat32
-import com.runanywhere.sdk.public.extensions.resetVAD
-import com.runanywhere.sdk.public.extensions.streamVAD
+import com.runanywhere.sdk.public.api.AudioInput
+import com.runanywhere.sdk.public.api.VadEvent
+import com.runanywhere.sdk.public.api.vad
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -44,7 +44,7 @@ class VadViewModel : ViewModel() {
 
     // Mic chunks are fed straight into the SDK's streamVAD session; the SDK
     // owns model framing — no app-side buffer math. Mirrors iOS VADViewModel.
-    private var audio: Channel<ByteArray>? = null
+    private var audio: Channel<AudioInput>? = null
     private var detectionJob: Job? = null
 
     fun toggle() {
@@ -64,8 +64,8 @@ class VadViewModel : ViewModel() {
         try {
             recorder.start(
                 onChunk = { chunk, level ->
-                    // SDK expects Float32 PCM; framing is handled natively.
-                    audio?.trySend(RunAnywhere.pcm16ToFloat32(chunk))
+                    // The SDK normalises the samples; framing is handled natively.
+                    audio?.trySend(AudioInput.pcm16(chunk, AudioRecorder.SAMPLE_RATE))
                     audioLevel = level
                 },
                 onError = { e ->
@@ -92,17 +92,12 @@ class VadViewModel : ViewModel() {
         stopDetectionStream()
         isSpeechDetected = false
         audioLevel = 0f
-        viewModelScope.launch {
-            runCatching { RunAnywhere.resetVAD() }
-                .onFailure { RACLog.w("vad reset failed: ${it.message}") }
-        }
     }
 
-    // One RAVADResult per mic chunk; speech-state transitions feed the log.
-    // Per-chunk failures never throw — they arrive as an error-marked result
-    // and the flow completes, so a still-listening session is shut down here.
+    // The SDK reports speech-state transitions directly; a failed chunk throws
+    // into the collector, so a still-listening session is shut down below.
     private fun startDetectionStream() {
-        val channel = Channel<ByteArray>(
+        val channel = Channel<AudioInput>(
             capacity = AUDIO_CHANNEL_CAPACITY,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
@@ -110,21 +105,18 @@ class VadViewModel : ViewModel() {
         detectionJob = viewModelScope.launch {
             try {
                 RuntimeModelSelection.requireCurrent(ModelSelectionContext.VAD)
-                var wasSpeechActive = false
-                RunAnywhere.streamVAD(channel.receiveAsFlow()).collect { result ->
-                    val message = result.error_message
-                    if (!message.isNullOrEmpty()) {
-                        RACLog.e("vad stream error: $message")
-                        error = message
-                        return@collect
-                    }
-                    isSpeechDetected = result.is_speech
-                    if (result.is_speech && !wasSpeechActive) {
-                        addLogEntry(VadActivity.SPEECH_STARTED)
-                        wasSpeechActive = true
-                    } else if (!result.is_speech && wasSpeechActive) {
-                        addLogEntry(VadActivity.SPEECH_ENDED)
-                        wasSpeechActive = false
+                RunAnywhere.vad.detectStream(channel.receiveAsFlow()).collect { event ->
+                    when (event) {
+                        is VadEvent.SpeechStarted -> {
+                            isSpeechDetected = true
+                            addLogEntry(VadActivity.SPEECH_STARTED)
+                        }
+                        is VadEvent.SpeechEnded -> {
+                            isSpeechDetected = false
+                            addLogEntry(VadActivity.SPEECH_ENDED)
+                        }
+                        is VadEvent.Activity -> isSpeechDetected = event.isSpeech
+                        else -> Unit
                     }
                 }
             } catch (e: CancellationException) {

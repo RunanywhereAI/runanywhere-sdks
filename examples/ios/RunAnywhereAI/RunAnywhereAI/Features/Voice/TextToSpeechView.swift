@@ -127,11 +127,6 @@ struct TextToSpeechView: View {
 
                 // Voice settings section
                 voiceSettingsSection
-
-                // Speech info (shown after speaking)
-                if let result = viewModel.lastResult {
-                    speechInfoSection(result: result)
-                }
             }
             .padding()
         }
@@ -248,47 +243,6 @@ struct TextToSpeechView: View {
         .padding(20)
         .background(AppColors.backgroundTertiary)
         .cornerRadius(AppSpacing.cornerRadiusCard)
-    }
-
-    /// Speech info section showing result details
-    private func speechInfoSection(result: RATTSSpeakResult) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Last Speech")
-                .font(.headline)
-                .foregroundColor(.primary)
-
-            VStack(alignment: .leading, spacing: 4) {
-                metadataRow(
-                    icon: "waveform",
-                    label: "Duration",
-                    value: String(format: "%.2fs", result.duration)
-                )
-                if result.audioSizeBytes > 0 {
-                    metadataRow(
-                        icon: "doc.text",
-                        label: "Size",
-                        value: viewModel.formatBytes(result.audioSizeBytes)
-                    )
-                    metadataRow(
-                        icon: "speaker.wave.2",
-                        label: "Format",
-                        value: result.audioFormat.wireString.uppercased()
-                    )
-                }
-                metadataRow(
-                    icon: "person.wave.2",
-                    label: "Voice",
-                    value: result.metadata.voiceID.isEmpty
-                        ? (viewModel.selectedModelName ?? "Current voice")
-                        : result.metadata.voiceID.modelNameFromID()
-                )
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-        }
-        .padding()
-        .background(AppColors.backgroundSecondary)
-        .cornerRadius(AppSpacing.cornerRadiusXLarge)
     }
 
     /// Controls section with waveform visualization and speak button
@@ -486,28 +440,13 @@ struct TextToSpeechView: View {
     }
 
 
-    // MARK: - Helper Views
-
-    /// Metadata row with icon, label, and value
-    @ViewBuilder
-    private func metadataRow(icon: String, label: String, value: String) -> some View {
-        HStack {
-            Image(systemName: icon)
-                .frame(width: 16)
-            Text(label + ":")
-            Spacer()
-            Text(value)
-                .fontWeight(.medium)
-        }
-    }
-
     // MARK: - Computed UI Properties
 
     /// Status text based on current state
     private var statusText: String {
         if viewModel.isSpeaking {
             return "Speaking..."
-        } else if viewModel.lastResult != nil {
+        } else if viewModel.didSpeak {
             return "Tap Speak to hear it again"
         } else {
             return "Ready"

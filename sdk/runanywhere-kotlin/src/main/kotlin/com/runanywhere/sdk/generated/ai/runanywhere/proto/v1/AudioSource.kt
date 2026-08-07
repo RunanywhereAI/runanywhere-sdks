@@ -20,16 +20,10 @@ public enum class AudioSource(
   override val `value`: Int,
 ) : WireEnum {
   AUDIO_SOURCE_UNSPECIFIED(0),
-  /**
-   * Platform mic (default)
-   */
   AUDIO_SOURCE_MICROPHONE(1),
-  /**
-   * Path supplied in audio_file_path
-   */
   AUDIO_SOURCE_FILE(2),
   /**
-   * Frontend feeds frames via C ABI
+   * Frontend feeds frames through the C ABI
    */
   AUDIO_SOURCE_CALLBACK(3),
   ;

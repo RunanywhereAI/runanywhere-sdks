@@ -61,18 +61,7 @@ suspend fun RunAnywhere.checkModelCompatibility(
                 category = ErrorCategory.ERROR_CATEGORY_MODEL,
                 shouldLog = false,
             )
-    if (result.error_code < 0) {
-        val code =
-            ErrorCode.fromValue(-result.error_code)
-                ?: ErrorCode.ERROR_CODE_UNKNOWN
-        throw SDKException.make(
-            code = code,
-            message = result.error_message.ifBlank { "Model compatibility check failed" },
-            category = ErrorCategory.ERROR_CATEGORY_MODEL,
-            cAbiCode = result.error_code,
-            shouldLog = false,
-        )
-    }
+    result.error?.let { throw SDKException(it) }
     return result
 }
 
@@ -130,13 +119,12 @@ internal suspend fun withModelLoadCompatibilityPreflight(
         }
     if (failure != null) {
         return RAModelLoadResult(
-            success = false,
             model_id = request.model_id,
             category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
             framework =
                 request.framework
                     ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-            error_message = failure.message ?: "Model compatibility check failed",
+            error = failure.error,
         )
     }
     return action()

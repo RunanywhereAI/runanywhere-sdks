@@ -1,17 +1,14 @@
-// RunAnywhere IDL — Hybrid router schema.
+// RunAnywhere IDL — hybrid on-device / cloud routing.
 //
-// Per-request routing between an on-device (offline) backend and a cloud
-// (online) backend. Wired today for STT: sherpa-onnx offline ↔ cloud STT
-// (provider=sarvam) online. The schema is capability-agnostic; cascade/filter/
-// rank semantics are identical across capabilities.
-//
-// Schema is consumed by Square Wire (Kotlin) and protobuf (C++/Swift) via
-// the codegen scripts in idl/codegen/. The JNI boundary between the Kotlin
-// SDK and rac_commons exchanges these messages as serialized bytes.
+// Only STT is wired today. Most of these types are consumed by the TypeScript
+// and Dart routing policy rather than by commons.
 
 syntax = "proto3";
 
 package runanywhere.v1;
+
+import "model_types.proto";
+import "rac_options.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -22,73 +19,33 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// Capability under hybrid routing. Only STT is wired today.
-// ---------------------------------------------------------------------------
-enum HybridCapability {
-    HYBRID_CAPABILITY_UNSPECIFIED = 0;
-    HYBRID_CAPABILITY_LLM         = 1;
-    HYBRID_CAPABILITY_VLM         = 2;
-    HYBRID_CAPABILITY_STT         = 3;
-    HYBRID_CAPABILITY_TTS         = 4;
-    HYBRID_CAPABILITY_VAD         = 5;
+// Firebase AI Logic / developer.android.com InferenceMode, verbatim.
+// PREFER_* falls back silently across the boundary; ONLY_* fails instead.
+enum HybridInferenceMode {
+    // Treated as PREFER_ON_DEVICE, so the proto3 zero is the private default.
+    HYBRID_INFERENCE_MODE_UNSPECIFIED      = 0;
+    HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE = 1;
+    HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE   = 2;
+    HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD  = 3;
+    HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD    = 4;
 }
 
-// ---------------------------------------------------------------------------
-// Backend identity. Matches the engines/ directory entry that registers
-// the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
-// ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
-// the descriptor's `provider` field, not from a distinct enum kind.
-// ---------------------------------------------------------------------------
-enum HybridBackendKind {
-    HYBRID_BACKEND_UNSPECIFIED = 0;
-    HYBRID_BACKEND_LLAMACPP    = 1;
-    HYBRID_BACKEND_OPENROUTER  = 2;
-    HYBRID_BACKEND_SHERPA      = 3;
-    // Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
-    // the generic "cloud_stt" backend; the provider is carried out-of-band.
-    HYBRID_BACKEND_CLOUD       = 4;
-}
-
-// ---------------------------------------------------------------------------
-// Whether a model runs on-device or in the cloud. The router decides which
-// of its two registered candidates to invoke based on policy.
-// ---------------------------------------------------------------------------
-enum HybridModelType {
-    HYBRID_MODEL_TYPE_UNSPECIFIED = 0;
-    HYBRID_MODEL_TYPE_OFFLINE     = 1;
-    HYBRID_MODEL_TYPE_ONLINE      = 2;
-}
-
-// ---------------------------------------------------------------------------
-// Hard filter — drops a candidate from consideration when the predicate
-// fails. Filters compose with AND semantics. The wire kinds match
-// thoughts/file.txt's Routing Conditions list verbatim.
-// ---------------------------------------------------------------------------
+// A candidate must pass every hard filter to stay in the running.
 message HybridFilter {
-    reserved 2;
-
     oneof kind {
-        // True iff the host has working network. Disqualifies online
-        // candidates when false; offline candidates are unaffected.
         bool network = 1;
-
-        // Discrete quality tier required from the candidate. Candidates
-        // declaring a lower tier in their descriptor are filtered out.
-        int32 quality_tier = 3;
-
-        // Disqualifies cloud candidates when the device is below the
-        // given battery percent (0–100).
-        BatteryFilter battery = 4;
-
-        // Caller-supplied predicate, evaluated host-side via the
-        // registered custom-filter callback table.
-        CustomFilter custom = 5;
+        BatteryFilter battery = 2;
+        CustomFilter custom = 3;
     }
 }
 
 message BatteryFilter {
-    int32 min_battery_percent = 1;
+    // Charge floor, 0-100, below which the on-device candidate is dropped.
+    int32 min_battery_percent = 1 [
+        (runanywhere.v1.rac_default) = "20",
+        (runanywhere.v1.rac_min) = 0,
+        (runanywhere.v1.rac_max) = 100
+    ];
 }
 
 message CustomFilter {
@@ -96,146 +53,102 @@ message CustomFilter {
     string description = 2;
 }
 
-// ---------------------------------------------------------------------------
-// Cascade — triggers fallback from the primary candidate to the next
-// candidate mid-request. Matches the file.txt Confidence policy.
-// ---------------------------------------------------------------------------
 message HybridCascade {
     oneof kind {
-        // Cascade when the primary's confidence/logprob signal falls below
-        // `threshold`, or when the primary returns an error (treated as
-        // "no confidence").
         ConfidenceCascade confidence = 1;
     }
 }
 
+// Below this on-device confidence, the router escalates to cloud.
 message ConfidenceCascade {
-    float threshold = 1;
+    float threshold = 1 [
+        (runanywhere.v1.rac_default) = "0.5",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
 }
 
-// ---------------------------------------------------------------------------
-// Rank — comparator used to sort eligible candidates. Exactly one rank
-// per policy.
-// ---------------------------------------------------------------------------
-enum HybridRank {
-    HYBRID_RANK_UNSPECIFIED        = 0;
-    HYBRID_RANK_PREFER_LOCAL_FIRST  = 1;
-    HYBRID_RANK_PREFER_ONLINE_FIRST = 2;
-}
-
-// ---------------------------------------------------------------------------
-// Full routing policy attached to a model pair. `simple` mode collapses
-// to a single filter; `advanced` mode allows composition.
-// ---------------------------------------------------------------------------
+// The candidate chain for one routed request: tried first to last, first
+// success wins, position IS the priority. `mode` still governs whether the
+// chain may cross the on-device/cloud line.
 message HybridRoutingPolicy {
     repeated HybridFilter hard_filters = 1;
     HybridCascade         cascade      = 2;
-    HybridRank            rank         = 3;
+    HybridInferenceMode   mode         = 3;
+
+    // Per-ATTEMPT deadline, not the overall request deadline. When a candidate
+    // has produced nothing within this many milliseconds it is abandoned and
+    // the next candidate is tried. 0 = no per-attempt deadline.
+    int32                 attempt_timeout_ms = 4 [
+        (runanywhere.v1.rac_default) = "0",
+        (runanywhere.v1.rac_min) = 0
+    ];
+
+    // Ordered candidates, priority first. Replaces the offline/online pair.
+    repeated HybridModelDescriptor models = 5;
 }
 
-// ---------------------------------------------------------------------------
-// Descriptor for a single registered model on one side of the pair.
-// ---------------------------------------------------------------------------
 message HybridModelDescriptor {
-    string            model_id   = 1;
-    HybridModelType   model_type = 2;
-    HybridBackendKind backend    = 3;
-    // Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-    // "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-    // empty defaults to "sarvam". Ignored for non-cloud backends.
-    string            provider   = 4;
+    string model_id     = 1;
+
+    // True = this candidate runs ON DEVICE (and is exempt from the network and
+    // battery filters). False = it runs IN CLOUD. Firebase/Android vocabulary.
+    bool   is_on_device = 2;
+
+    // The plugin-registry engine name the runtime already pins on: "sherpa",
+    // "llamacpp", "onnx", "qhexrt", "mlx", "cloud", or any name passed to
+    // registerCloudProvider(). Empty = let the registry pick by priority.
+    string engine       = 3;
 }
 
-// ---------------------------------------------------------------------------
-// Metadata returned alongside the capability result describing what the
-// router did. Always populated even on success.
-// ---------------------------------------------------------------------------
+// What the router actually did, including the failed primary attempt.
 message HybridRoutedMetadata {
     string chosen_model_id        = 1;
     bool   was_fallback           = 2;
     int32  attempt_count          = 3;
-    // Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
-    // the primary served the request or no fallback occurred.
     int32  primary_error_code     = 4;
     string primary_error_message  = 5;
-    // Final confidence of the result that was actually returned. NaN when
-    // the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
-    float  confidence             = 6;
-    // Primary's confidence captured BEFORE cascading to the secondary.
-    // Populated only when `was_fallback = true` AND the fallback fired on
-    // confidence (not on an error). NaN otherwise.
-    float  primary_confidence     = 7;
+
+    // Absent (not NaN, not 0.0) when the engine reports no quality score.
+    optional float confidence         = 6;
+    // Absent unless a confidence cascade discarded a primary answer.
+    optional float primary_confidence = 7;
+
+    // True when the answer was produced ON DEVICE. This is the field an app
+    // reads to truthfully claim "processed on your device"; never infer it by
+    // comparing chosen_model_id.
+    bool   served_on_device       = 8;
 }
 
-
-// ---------------------------------------------------------------------------
-// Per-request routing context — caller-supplied hints only.
-//
-// Device state lives behind the rac_hybrid_device_state C ABI vtable in
-// commons; callers do not serialize platform state into this message.
-// ---------------------------------------------------------------------------
-message HybridRoutingContext {
-    reserved 1, 2, 3, 4;
-}
-
-// ---------------------------------------------------------------------------
-// Cloud STT backend registration config. Replaces the hand-built
-// `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
-// HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
-// (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
-// across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
-// these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
-// the same keys out of the JSON blob (`config_json["provider"]` etc., see
-// HybridModelDescriptor.provider).
-// ---------------------------------------------------------------------------
 message CloudSttBackendConfig {
-    // HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
     string provider      = 1;
-    // Provider-side model id (e.g. "saarika:v2").
     string model         = 2;
-    // Provider API key / credential.
+
+    // SECRET. Held in memory only; never logged, never persisted, never
+    // included in a toString()/toJSON() dump.
     string api_key       = 3;
-    // BCP-47 language hint forwarded to the provider (empty = auto-detect).
     string language_code = 4;
-    // Override the provider base URL (empty = provider default).
     string base_url      = 5;
-    // Request timeout in milliseconds (0 = engine default).
     int32  timeout_ms    = 6;
 }
 
-// ---------------------------------------------------------------------------
-// STT transcription options carried through the router. Sample rate and
-// audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
-// caller-supplied BCP-47 hint (empty = backend auto-detect).
-// ---------------------------------------------------------------------------
 message HybridSttTranscribeOptions {
     string language     = 1;
     int32  sample_rate  = 2;
-    // Matches rac_audio_format_enum_t: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
-    int32  audio_format = 3;
+
+    // Container the bytes are already in. UNSPECIFIED (the proto3 zero) means
+    // headerless PCM16, which commons wraps in a WAV container.
+    AudioFormat audio_format = 3;
 }
 
-// ---------------------------------------------------------------------------
-// Request handed to the JNI transcribe thunk. Audio bytes are passed
-// verbatim to the chosen backend; each engine is responsible for parsing
-// the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
-// file part; sherpa decodes the WAV/PCM bytes).
-// ---------------------------------------------------------------------------
 message HybridSttTranscribeRequest {
     bytes                       audio_bytes = 1;
-    HybridRoutingContext        context     = 2;
-    HybridSttTranscribeOptions  options     = 3;
+    HybridSttTranscribeOptions  options     = 2;
 }
 
-// ---------------------------------------------------------------------------
-// Response returned by the JNI transcribe thunk. Carries the transcript,
-// the detected (or hinted) language, the routing decision metadata, the
-// native rc, and a human-readable error message when rc != 0.
-// ---------------------------------------------------------------------------
 message HybridSttTranscribeResponse {
     int32                rc                = 1;
     string               text              = 2;
     string               detected_language = 3;
     HybridRoutedMetadata routing           = 4;
-    string               error_msg         = 5;
 }

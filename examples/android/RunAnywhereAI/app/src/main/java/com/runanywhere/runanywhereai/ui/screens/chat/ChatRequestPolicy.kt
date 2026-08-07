@@ -76,13 +76,17 @@ internal object ChatRequestPolicy {
         options: RALLMGenerationOptions,
         conversationId: String,
         streaming: Boolean,
-    ): RALLMGenerateRequest =
-        options.copy(
-            streaming_enabled = streaming,
-        ).toRALLMGenerateRequest(turn.prompt).copy(
+    ): RALLMGenerateRequest {
+        // `LLMGenerateRequest.history` was deleted outright: the request now
+        // carries only `messages` (oldest first, ending with the turn the
+        // model must answer). Prepend the prior turns to the single-message
+        // list `toRALLMGenerateRequest` built for the current prompt.
+        val request = options.toRALLMGenerateRequest(turn.prompt)
+        return request.copy(
             conversation_id = conversationId,
-            history = turn.history,
+            messages = turn.history + request.messages,
         )
+    }
 
     /**
      * Flatten prior turns into the commons tool-calling history contract: a flat

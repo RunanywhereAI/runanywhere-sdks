@@ -16,21 +16,12 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Routing destination for a generation (Web SDK ExecutionTarget in
- * types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
- * ---------------------------------------------------------------------------
- */
 public enum class ExecutionTarget(
   override val `value`: Int,
 ) : WireEnum {
   EXECUTION_TARGET_UNSPECIFIED(0),
   EXECUTION_TARGET_ON_DEVICE(1),
   EXECUTION_TARGET_CLOUD(2),
-  /**
-   * Let the SDK decide based on policy (cost, latency, privacy, etc.).
-   */
   EXECUTION_TARGET_AUTO(3),
   ;
 

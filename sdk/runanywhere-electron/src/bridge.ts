@@ -11,20 +11,67 @@ import { asSDKException } from './errors';
 // implementation now lives in stream.ts so it stays addon-free and testable.
 export { toAsyncIterable } from './stream';
 
+/** Terminal payload every generation stream resolves with. */
+export interface NativeGenerationMetrics {
+  cancelled: boolean;
+  hasMetrics: boolean;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  timeToFirstTokenMs: number;
+  totalTimeMs: number;
+  tokensPerSecond: number;
+}
+
 /** Raw surface exported by runanywhere_native.node. */
 export interface NativeAddon {
   readonly version: string;
   initialize(secureDir: string, baseDir?: string): void;
+  // Desktop control plane (telemetry + auth). Present only when the addon is
+  // built with the desktop libcurl transport (RAC_DESKTOP_ADAPTER=ON); guarded
+  // by `hasControlPlane`. `configureControlPlane` runs the two-phase init off the
+  // JS thread and resolves the serialized SdkInitResult bytes. `environment` is a
+  // rac_environment_t (0=dev, 2=prod); phase bytes are SdkInit{Phase1,Phase2}Request.
+  readonly hasControlPlane?: boolean;
+  devicePersistentId?(): string;
+  devStagingBaseUrl?(): string;
+  configureControlPlane?(
+    environment: number,
+    apiKey: string,
+    baseUrl: string,
+    deviceId: string,
+    platform: string,
+    sdkVersion: string,
+    sdkBinding: string,
+    appIdentifier: string,
+    appName: string,
+    appVersion: string,
+    phase1Bytes: Uint8Array,
+    phase2Bytes: Uint8Array
+  ): Promise<Uint8Array>;
   secureSet(key: string, value: string): void;
   secureGet(key: string): string | null;
   secureDelete(key: string): void;
-  createVad(threshold?: number): number;
+  // A bare threshold number (legacy) or a full config object.
+  createVad(thresholdOrConfig?: number | object): number;
   vadProcess(handle: number, samples: Float32Array): boolean;
   vadIsActive(handle: number): boolean;
   vadSetThreshold(handle: number, threshold: number): void;
   vadReset(handle: number): void;
+  vadStatistics(handle: number): {
+    threshold?: number;
+    ambientLevel?: number;
+    recentAverage?: number;
+    recentMax?: number;
+  };
   unloadVad(handle: number): void;
-  loadModel(modelPath: string, id?: string, name?: string): number;
+  loadModel(
+    modelPath: string,
+    id?: string,
+    name?: string,
+    /** Load-time placement: rac_llm_config_t's preferred_framework / context_length. */
+    config?: { framework?: number; contextLength?: number }
+  ): number;
   // (handle, prompt, onToken) or (handle, prompt, options, onToken) — the addon
   // detects whether arg 3 is the callback or a generation-options object.
   generate(
@@ -32,22 +79,99 @@ export interface NativeAddon {
     prompt: string,
     optionsOrOnToken: object | ((t: string) => void),
     onToken?: (t: string) => void
-  ): Promise<void>;
+  ): Promise<NativeGenerationMetrics>;
+  cancelGenerate(handle: number): void;
   unloadModel(handle: number): void;
+  loraApply(handle: number, adapterPath: string, scale?: number): void;
+  loraRemove(handle: number, adapterPath?: string): void;
+  loraList(handle: number): Array<{ id: string; scale: number }>;
   loadVlmModel(modelPath: string, mmprojPath: string, id?: string, name?: string): number;
+  // The image is a path string or { path } | { base64 } | { rgb, width, height }.
   generateVlm(
-    handle: number, imagePath: string, prompt: string, onToken: (t: string) => void
-  ): Promise<void>;
+    handle: number,
+    image: string | object,
+    prompt: string,
+    optionsOrOnToken: object | ((t: string) => void),
+    onToken?: (t: string) => void
+  ): Promise<NativeGenerationMetrics>;
+  cancelVlm(handle: number): void;
   unloadVlmModel(handle: number): void;
   loadEmbeddingModel(modelPath: string, configJson?: string): number;
-  embed(handle: number, text: string): Float32Array;
+  embed(handle: number, text: string, options?: object): Float32Array;
+  embedBatch(handle: number, texts: string[], options?: object): Float32Array[];
   unloadEmbeddingModel(handle: number): void;
   loadSttModel(modelDir: string, id?: string, name?: string): number;
-  transcribe(handle: number, pcm16: Uint8Array): string;
+  transcribe(
+    handle: number,
+    pcm16: Uint8Array,
+    options?: object
+  ): {
+    text: string;
+    language?: string;
+    confidence: number;
+    processingTimeMs: number;
+    words: Array<{ text: string; startMs: number; endMs: number; confidence: number }>;
+  };
+  transcribeStream(
+    handle: number,
+    pcm16: Uint8Array,
+    options: object,
+    onPartial: (p: { text: string; isFinal: boolean }) => void
+  ): Promise<void>;
+  sttInfo(handle: number): {
+    isReady: boolean;
+    modelId?: string;
+    supportsStreaming: boolean;
+    languagesJson?: string;
+  };
   unloadSttModel(handle: number): void;
   loadTtsVoice(voiceDir: string, id?: string, name?: string): number;
-  synthesize(handle: number, text: string): { sampleRate: number; samples: Float32Array };
+  synthesize(
+    handle: number,
+    text: string,
+    options?: object
+  ): { sampleRate: number; samples: Float32Array; audioFormat: number; durationMs: number };
+  synthesizeStream(
+    handle: number,
+    text: string,
+    options: object,
+    onChunk: (c: { samples: Float32Array }) => void
+  ): Promise<void>;
+  ttsStop(handle: number): void;
+  ttsInfo(handle: number): { voiceId?: string; languagesJson?: string };
   unloadTtsVoice(handle: number): void;
+  loadRerankModel(modelPath: string, id?: string): number;
+  rerank(
+    handle: number,
+    query: string,
+    documents: string[],
+    topN?: number
+  ): Array<{ index: number; score: number; rank: number }>;
+  unloadRerankModel(handle: number): void;
+  loadDiarizationModel(modelPath: string, id?: string): number;
+  diarize(
+    handle: number,
+    samples: Float32Array,
+    options?: object
+  ): {
+    segments: Array<{ speakerId: string; speakerIndex: number; startMs: number; endMs: number }>;
+    speakerCount: number;
+    durationMs: number;
+  };
+  unloadDiarizationModel(handle: number): void;
+  loadSegmentationModel(modelPath: string, id?: string): number;
+  segment(
+    handle: number,
+    image: { data: Uint8Array; width: number; height: number; pixelFormat?: number },
+    options?: object
+  ): {
+    width: number;
+    height: number;
+    classMask: Uint16Array;
+    classes: Array<{ classId: number; label?: string; pixelCount: number; fraction: number }>;
+    diagnosticRgba?: Uint8Array;
+  };
+  unloadSegmentationModel(handle: number): void;
   shutdown(): void;
   // Model registry + RAG (proto-byte). registerModel populates commons' global
   // registry so RAG can resolve embedding/LLM ids to paths; the rag* methods take
@@ -58,6 +182,14 @@ export interface NativeAddon {
   ragCreateSession(configProtoBytes: Uint8Array): Promise<number>;
   ragIngest(handle: number, documentProtoBytes: Uint8Array): Promise<Uint8Array>;
   ragQuery(handle: number, queryProtoBytes: Uint8Array): Promise<Uint8Array>;
+  ragSearch(handle: number, requestProtoBytes: Uint8Array): Promise<Uint8Array>;
+  // Resolves true when the stream ended because it was cancelled.
+  ragQueryStream(
+    handle: number,
+    queryProtoBytes: Uint8Array,
+    onEvent: (eventBytes: Uint8Array) => void
+  ): Promise<boolean>;
+  ragCancel(handle: number): void;
   ragStats(handle: number): Uint8Array;
   ragClear(handle: number): Uint8Array;
   ragDestroySession(handle: number): void;

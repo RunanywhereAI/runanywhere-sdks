@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 
+#include "chat.pb.h"
 #include "llm_options.pb.h"
 #include "llm_service.pb.h"
 #include "model_types.pb.h"
@@ -256,8 +257,8 @@ double load_model_timed(const std::string& model_id, v1::ModelCategory category,
         *out_error = parse_err.empty() ? "load failed" : parse_err;
         return -1.0;
     }
-    if (!result.success()) {
-        *out_error = result.error_message().empty() ? "load failed" : result.error_message();
+    if (!result.has_error() == false) {
+        *out_error = result.error().message().empty() ? "load failed" : result.error().message();
         return -1.0;
     }
     return static_cast<double>(t1 - t0);
@@ -268,9 +269,11 @@ double load_model_timed(const std::string& model_id, v1::ModelCategory category,
 bool llm_generate(int32_t max_tokens, bool system_prompt, v1::LLMGenerationResult* out,
                   std::string* err) {
     v1::LLMGenerateRequest request;
-    request.set_prompt(kLlmPrompt);
+    v1::ChatMessage* message = request.add_messages();
+    message->set_role(v1::MESSAGE_ROLE_USER);
+    message->set_content(kLlmPrompt);
     v1::LLMGenerationOptions* gen = request.mutable_options();
-    gen->set_max_tokens(max_tokens);
+    gen->set_max_output_tokens(max_tokens);
     gen->set_temperature(0.0f);
     if (system_prompt) {
         gen->set_system_prompt(kLlmSystemPrompt);
@@ -293,13 +296,13 @@ bool stt_transcribe(const std::string& pcm, v1::STTOutput* out, std::string* err
     v1::STTTranscriptionRequest request;
     v1::STTAudioSource* audio = request.mutable_audio();
     audio->set_audio_data(pcm);
-    audio->set_encoding(v1::STT_AUDIO_ENCODING_PCM_S16_LE);
+    audio->set_encoding(v1::AUDIO_ENCODING_PCM_S16_LE);
     audio->set_sample_rate(16000);
     audio->set_channels(1);
-    audio->set_bits_per_sample(16);
+    // bits_per_sample deleted: sample width is determined by `encoding`
+    // (AUDIO_ENCODING_PCM_S16_LE above already says 16-bit).
     v1::STTOptions* opts = request.mutable_options();
-    opts->set_language(v1::STT_LANGUAGE_EN);
-    opts->set_sample_rate(16000);
+    opts->set_language("en");
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t buf;
     rac_proto_buffer_init(&buf);
@@ -338,9 +341,9 @@ bool vlm_process(const std::string& image_path, int32_t max_tokens, v1::VLMResul
     v1::VLMGenerationRequest request;
     v1::VLMImage* image = request.add_images();
     image->set_file_path(image_path);
-    v1::VLMGenerationOptions* gen = request.mutable_options();
-    gen->set_prompt(kVlmPrompt);
-    gen->set_max_tokens(max_tokens);
+    request.set_prompt(kVlmPrompt);
+    v1::LLMGenerationOptions* gen = request.mutable_options();
+    gen->set_max_output_tokens(max_tokens);
     gen->set_temperature(0.0f);
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t buf;
@@ -391,7 +394,7 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.tokens_generated();
+    const int32_t out_tokens = r.usage().output_tokens();
     if (out_tokens <= 0) {
         *err = "no output tokens";
         return false;
@@ -399,7 +402,8 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     const double e2e = r.generation_time_ms() > 0.0 ? r.generation_time_ms() : measured_e2e;
     const double explicit_decode =
         r.decode_time_ms() > 0 ? static_cast<double>(r.decode_time_ms()) : 0.0;
-    double tps = r.tokens_per_second() > 0.0 ? r.tokens_per_second() : 0.0;
+    double tps = r.usage().decode_tokens_per_second() > 0.0 ? r.usage().decode_tokens_per_second()
+                                                            : 0.0;
     if (tps <= 0.0 && explicit_decode > 0.0) {
         tps = out_tokens * 1000.0 / explicit_decode;
     }
@@ -411,7 +415,7 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->decode_ms = explicit_decode > 0.0 ? explicit_decode : (tps > 0.0 ? out_tokens * 1000.0 / tps
                                                                         : 0.0);
     m->prompt_eval_ms = r.prompt_eval_time_ms() > 0 ? static_cast<double>(r.prompt_eval_time_ms())
-                        : (r.has_ttft_ms() ? r.ttft_ms() : 0.0);
+                        : static_cast<double>(r.usage().ttft_ms());
     m->output_tokens = out_tokens;
     return true;
 }
@@ -436,8 +440,15 @@ bool stt_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    m->real_time_factor = r.has_metadata() && r.metadata().real_time_factor() > 0.0
-                              ? r.metadata().real_time_factor()
+    // TranscriptionMetadata.audio_length_ms is gone -- STTOutput.duration_ms
+    // is the canonical spelling now.
+    const double meta_rtf =
+        r.has_metadata() && r.duration_ms() > 0
+            ? static_cast<double>(r.metadata().processing_time_ms()) /
+                  static_cast<double>(r.duration_ms())
+            : 0.0;
+    m->real_time_factor = meta_rtf > 0.0
+                              ? meta_rtf
                               : (c.scenario.seconds > 0.0
                                      ? m->end_to_end_ms / (c.scenario.seconds * 1000.0)
                                      : 0.0);
@@ -466,8 +477,8 @@ bool tts_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     unload_category(c.category);
 
     m->audio_duration_ms = static_cast<double>(r.duration_ms());
-    const int32_t chars = r.has_metadata() && r.metadata().character_count() > 0
-                              ? r.metadata().character_count()
+    const int32_t chars = r.has_metadata() && r.metadata().input_bytes() > 0
+                              ? r.metadata().input_bytes()
                               : static_cast<int32_t>(text.size());
     m->chars_per_second = m->end_to_end_ms > 0.0 ? chars * 1000.0 / m->end_to_end_ms : 0.0;
     return true;
@@ -494,11 +505,11 @@ bool vlm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.completion_tokens();
-    m->end_to_end_ms = r.processing_time_ms() > 0 ? static_cast<double>(r.processing_time_ms())
-                                                  : measured_e2e;
-    m->tokens_per_second = r.tokens_per_second();
-    m->prompt_eval_ms = static_cast<double>(r.time_to_first_token_ms());
+    const int32_t out_tokens = r.usage().output_tokens();
+    m->end_to_end_ms = r.total_time_ms() > 0 ? static_cast<double>(r.total_time_ms())
+                                            : measured_e2e;
+    m->tokens_per_second = r.usage().decode_tokens_per_second();
+    m->prompt_eval_ms = static_cast<double>(r.usage().ttft_ms());
     m->output_tokens = out_tokens;
     if (m->tokens_per_second <= 0.0 && out_tokens > 0 && m->end_to_end_ms > 0.0) {
         m->tokens_per_second = out_tokens * 1000.0 / m->end_to_end_ms;
@@ -758,7 +769,7 @@ int run_bench(const GlobalOptions& options, const std::string& model_ref_arg, in
 
 void register_bench(CLI::App& app, GlobalOptions& options) {
     CLI::App* cmd = app.add_subcommand(
-        "bench", "Benchmark installed models (auto-runs all downloaded LLM/STT/TTS/VLM models)");
+        "bench", "Measure throughput and load time of downloaded models");
     auto model = std::make_shared<std::string>();
     auto trials = std::make_shared<int>(3);
     auto vlm_image = std::make_shared<std::string>("docs/gifs/npu-model-tag-screenshot.png");

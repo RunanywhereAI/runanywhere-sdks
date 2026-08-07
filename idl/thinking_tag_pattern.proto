@@ -1,12 +1,7 @@
-// RunAnywhere IDL — thinking tag pattern shared across LLM generation options
-// and model catalog metadata.
+// RunAnywhere IDL — reasoning control and thinking-tag pattern.
 //
-// Historically duplicated as `ThinkingTagPattern` (llm_options.proto, with
-// `opening_tag`/`closing_tag` fields) and `ModelThinkingTagPattern`
-// (model_types.proto, with `open_tag`/`close_tag` fields). This file
-// collapses both into this single canonical message. Extracted into its own
-// file so it can be shared between llm_options.proto and model_types.proto
-// without introducing a proto import cycle.
+// Its own file so llm_options.proto and model_types.proto can both import it
+// without a cycle.
 
 syntax = "proto3";
 
@@ -21,16 +16,35 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// Pattern used to extract a model's "thinking" / reasoning block from its
-// raw output. Used by Qwen3 and LFM2 family models that emit
-// <think>...</think> wrappers. Shared by LLM generation options (per-call
-// override) and ModelInfo catalog metadata (default pattern for a model).
-// ---------------------------------------------------------------------------
+// Extracts a model's reasoning block from raw output, for families like Qwen3
+// and LFM2 that wrap it in <think>...</think>. Used both per-call and as
+// ModelInfo catalog metadata.
 message ThinkingTagPattern {
-    // Opening tag string. Default if empty: "<think>".
+    // Empty defaults to "<think>".
     string open_tag  = 1;
 
-    // Closing tag string. Default if empty: "</think>".
+    // Empty defaults to "</think>".
     string close_tag = 2;
+}
+
+// The single home for reasoning control. Composed surfaces (tool calling, RAG,
+// voice agent) inherit it through the embedded LLMGenerationOptions.
+enum ReasoningMode {
+    // Reasoning-capable models think; others don't.
+    REASONING_MODE_UNSPECIFIED = 0;
+    // Commons applies the model's no-think directive at the prompt level.
+    REASONING_MODE_OFF = 1;
+    // Request thinking on models where it is optional.
+    REASONING_MODE_ON = 2;
+}
+
+message ReasoningOptions {
+    ReasoningMode mode = 1;
+
+    // Emit thought tokens to the caller as TokenKind.THOUGHT events plus
+    // result thinking_content. False strips them.
+    bool include_in_output = 2;
+
+    // For models whose thinking markers differ from the catalog default.
+    optional ThinkingTagPattern pattern = 3;
 }

@@ -111,10 +111,14 @@ public final class EventBus: @unchecked Sendable {
         }
     }
 
-    /// Stream of `RADownloadEvent` payloads (model download progress / lifecycle).
-    public var downloadEventPayloads: AnyPublisher<RADownloadEvent, Never> {
+    /// Stream of `RAModelEvent` payloads (model load/unload, download
+    /// progress/lifecycle, and registry refresh/assignment/import/discovery
+    /// results — `RADownloadEvent`/`RAModelRegistryEvent` were absorbed into
+    /// this single message outright, idl/sdk_events.proto: "+ model_registry,
+    /// + download").
+    public var modelEventPayloads: AnyPublisher<RAModelEvent, Never> {
         eventsOfPayload { envelope in
-            guard case .download(let payload)? = envelope.event else { return nil }
+            guard case .model(let payload)? = envelope.event else { return nil }
             return payload
         }
     }
@@ -123,14 +127,6 @@ public final class EventBus: @unchecked Sendable {
     public var componentLifecycleEventPayloads: AnyPublisher<RAComponentLifecycleEvent, Never> {
         eventsOfPayload { envelope in
             guard case .componentLifecycle(let payload)? = envelope.event else { return nil }
-            return payload
-        }
-    }
-
-    /// Stream of `RAModelRegistryEvent` payloads.
-    public var modelRegistryEventPayloads: AnyPublisher<RAModelRegistryEvent, Never> {
-        eventsOfPayload { envelope in
-            guard case .modelRegistry(let payload)? = envelope.event else { return nil }
             return payload
         }
     }

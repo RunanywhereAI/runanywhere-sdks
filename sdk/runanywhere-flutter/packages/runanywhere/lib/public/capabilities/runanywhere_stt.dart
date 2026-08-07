@@ -11,10 +11,12 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart'
-    show STTLanguageWireString;
+    show STTOptionsConvenience;
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show AudioEncoding;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
@@ -100,13 +102,8 @@ class RunAnywhereSTT {
           validateAvailability: true,
         ),
       );
-      if (!result.success) {
-        throw SDKException.modelLoadFailed(
-          modelId,
-          result.errorMessage.isNotEmpty
-              ? result.errorMessage
-              : 'STT lifecycle load failed',
-        );
+      if (result.hasError()) {
+        throw SDKException(result.error);
       }
 
       logger.info('STT model loaded: $modelId');
@@ -136,12 +133,8 @@ class RunAnywhereSTT {
         category: _sttCategory,
       ),
     );
-    if (!result.success) {
-      throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'STT lifecycle unload failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
     _isStreaming = false;
   }
@@ -268,34 +261,43 @@ class RunAnywhereSTT {
     for (var i = 0; i < samples.length; i++) {
       byteData.setFloat32(i * 4, samples[i], Endian.little);
     }
-    final opts = _effectiveOptions(options ?? STTOptions());
-    opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_PCM;
     return _transcribeAudioData(
       byteData.buffer.asUint8List(),
-      opts,
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE,
-      bitsPerSample: 32,
+      _effectiveOptions(options ?? STTOptions()),
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
     );
+  }
+
+  /// Read the lifecycle-owned STT service state (readiness, current model,
+  /// streaming support, supported languages).
+  Future<STTServiceState> sttState() async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeSTT.shared.stateLifecycleProto();
   }
 
   Future<STTOutput> _transcribeAudioData(
     Uint8List audio,
     STTOptions options, {
-    STTAudioEncoding? encoding,
-    int? bitsPerSample,
+    AudioEncoding? encoding,
   }) async {
     final modelId = await _requireLoadedModelId();
     final opts = _effectiveOptions(options);
-    final sourceEncoding = encoding ?? _encodingForOptions(opts);
+    // Audio properties live on the audio source, not the options. The mic
+    // capture path produces raw PCM; container formats (WAV/MP3/...) are
+    // detected by commons from the bytes themselves.
+    final sourceEncoding =
+        encoding ?? AudioEncoding.AUDIO_ENCODING_CONTAINER;
 
+    // `bits_per_sample` was deleted outright (idl/stt_options.proto) — it is
+    // implied by `encoding` now, so it is no longer set here.
     final request = STTTranscriptionRequest(
       audio: STTAudioSource(
         audioData: audio,
         encoding: sourceEncoding,
-        audioFormat: opts.audioFormat,
-        sampleRate: opts.sampleRate,
+        sampleRate: RADefaultsAudioCapture.micSampleRateHz,
         channels: 1,
-        bitsPerSample: bitsPerSample ?? _bitsPerSample(sourceEncoding),
       ),
       options: opts,
       metadata: <String, String>{'model_id': modelId}.entries,
@@ -324,62 +326,20 @@ class RunAnywhereSTT {
   }
 
   STTOptions _effectiveOptions(STTOptions options) {
+    // Fill unset fields from the generated defaults, which come from the
+    // rac_default annotations in idl/stt_options.proto.
+    final d = STTOptionsConvenience.defaults();
     final opts = options.deepCopy();
-    if (!opts.hasSampleRate()) {
-      opts.sampleRate = RADefaultsAudioCapture.micSampleRateHz;
-    }
-    if (!opts.hasAudioFormat()) {
-      opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_WAV;
-    }
     if (!opts.hasEnablePunctuation()) {
-      opts.enablePunctuation = true;
+      opts.enablePunctuation = d.enablePunctuation;
     }
     if (!opts.hasEnableWordTimestamps()) {
-      opts.enableWordTimestamps = true;
+      opts.enableWordTimestamps = d.enableWordTimestamps;
     }
-    if (!opts.hasDetectLanguage()) {
-      opts.detectLanguage = opts.language == STTLanguage.STT_LANGUAGE_AUTO;
-    }
-    if (!opts.hasLanguageCode() &&
-        opts.language != STTLanguage.STT_LANGUAGE_AUTO) {
-      final code = opts.language.wireString;
-      opts.languageCode = code.isEmpty ? 'en' : code;
-    }
+    // `language` is an optional BCP-47 string; unset = auto-detect.
     return opts;
   }
 
-  STTAudioEncoding _encodingForOptions(STTOptions options) {
-    switch (options.audioFormat) {
-      case model_pb.AudioFormat.AUDIO_FORMAT_PCM:
-      case model_pb.AudioFormat.AUDIO_FORMAT_PCM_S16LE:
-        return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE;
-      case model_pb.AudioFormat.AUDIO_FORMAT_UNSPECIFIED:
-      case model_pb.AudioFormat.AUDIO_FORMAT_WAV:
-      case model_pb.AudioFormat.AUDIO_FORMAT_MP3:
-      case model_pb.AudioFormat.AUDIO_FORMAT_OPUS:
-      case model_pb.AudioFormat.AUDIO_FORMAT_AAC:
-      case model_pb.AudioFormat.AUDIO_FORMAT_FLAC:
-      case model_pb.AudioFormat.AUDIO_FORMAT_M4A:
-      case model_pb.AudioFormat.AUDIO_FORMAT_OGG:
-        return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
-      default:
-        return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
-    }
-  }
-
-  int _bitsPerSample(STTAudioEncoding encoding) {
-    switch (encoding) {
-      case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE:
-        return 32;
-      case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE:
-        return 16;
-      case STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED:
-      case STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER:
-        return 0;
-      default:
-        return 0;
-    }
-  }
 
   ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
       RunAnywhereModelLifecycle.shared.componentSnapshot(

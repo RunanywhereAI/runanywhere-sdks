@@ -1274,7 +1274,11 @@ async function selfTest() {
 const IS_SELFTEST = new URLSearchParams(location.search).get('selftest') === '1';
 (async () => {
   await ra.ready();
-  await ra.initialize();
+  // Backend creds (telemetry/auth) come from the main process's .env reader; a
+  // desktop-control-plane build uses them, an inference-only build ignores them.
+  let backendCfg;
+  try { backendCfg = await window.appStore.backendConfig(); } catch { backendCfg = undefined; }
+  await ra.initialize(undefined, undefined, backendCfg);
   if (!IS_SELFTEST) {
     // Accept ANY persisted object — gating on systemPrompt discarded saved
     // settings whose prompt was cleared, and would drop the model choices too.

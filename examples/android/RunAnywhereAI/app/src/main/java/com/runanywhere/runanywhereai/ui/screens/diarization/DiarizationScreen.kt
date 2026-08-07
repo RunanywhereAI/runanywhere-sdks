@@ -214,20 +214,23 @@ private fun resultCard(viewModel: DiarizationViewModel) {
                 )
             }
         }
+        // v3 segments carry a speaker id but no ordinal, so the chip palette is
+        // keyed off first-appearance order.
+        val speakerOrder = viewModel.segments.map { it.speakerId }.distinct()
         viewModel.segments.forEach { segment ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
             ) {
-                SpeakerChip(index = segment.speaker_index, id = segment.speaker_id)
+                SpeakerChip(index = speakerOrder.indexOf(segment.speakerId), id = segment.speakerId)
                 Text(
-                    "${formatMs(segment.start_ms)} – ${formatMs(segment.end_ms)}",
+                    "${formatMs(segment.startMs)} – ${formatMs(segment.endMs)}",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    formatDuration(segment.end_ms - segment.start_ms),
+                    formatDuration(segment.endMs - segment.startMs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -37,9 +37,9 @@ final class VLMViewModel: NSObject {
     // Auto-streaming mode
     var isAutoStreamingEnabled = false
     static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
-    private static let liveFrameMaxTokens: Int32 = 96
-    private static let selectedImageMaxTokens: Int32 = 128
-    private static let autoStreamMaxTokens: Int32 = 64
+    private static let liveFrameMaxTokens = 96
+    private static let selectedImageMaxTokens = 128
+    private static let autoStreamMaxTokens = 64
 
     // Camera
     private(set) var captureSession: AVCaptureSession?
@@ -47,6 +47,7 @@ final class VLMViewModel: NSObject {
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VLM")
     private var lifecycleCancellable: AnyCancellable?
+    private var generationTask: Task<Void, Error>?
 
     // MARK: - Init
 
@@ -59,17 +60,15 @@ final class VLMViewModel: NSObject {
     // MARK: - Model
 
     func checkModelStatus() async {
-        var req = RACurrentModelRequest()
-        req.category = .multimodal
-        isModelLoaded = RunAnywhere.currentModel(req).found
+        let state = await RunAnywhere.models.state()
+        isModelLoaded = (state.loaded[.multimodal] ?? state.loaded[.vision]) != nil
     }
 
-    /// Track the VLM model slot via the SDK event bus. Model loads route through
-    /// `RunAnywhere.loadModel(category: .multimodal)`, which publishes a
+    /// Track the VLM model slot via the SDK event bus. Model loads publish a
     /// component-lifecycle event for SDK_COMPONENT_VLM — the single source of
     /// truth, replacing the former "VLMModelLoaded" NotificationCenter post.
     private func subscribeToModelLifecycle() {
-        lifecycleCancellable = RunAnywhere.events.events(for: .component)
+        lifecycleCancellable = RunAnywhere.eventBus.events(for: .component)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 Task { @MainActor in self?.handleComponentLifecycleEvent(event) }
@@ -136,8 +135,8 @@ final class VLMViewModel: NSObject {
         if session.canAddInput(input) { session.addInput(input) }
 
         let output = AVCaptureVideoDataOutput()
-        // Request BGRA explicitly: the default camera output is YUV, and the
-        // SDK's `RAVLMImage.fromPixelBuffer` accepts BGRA buffers.
+        // Request BGRA explicitly: the default camera output is YUV, which costs
+        // an extra colour conversion on every frame we hand to the VLM.
         output.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
         ]
@@ -161,30 +160,45 @@ final class VLMViewModel: NSObject {
 
     // MARK: - Describe
 
-    /// Drain a typed VLM stream, forwarding TOKEN text via `onToken`.
-    /// Throws when the stream terminates with an ERROR event so callers'
-    /// existing catch blocks surface it like any other failure.
-    private func consumeVLMStream(
-        _ stream: AsyncStream<RAVLMStreamEvent>,
-        onToken: (String) -> Void
+    /// Stream one VLM turn into `currentDescription`. The iteration runs inside
+    /// `generationTask` so `cancel()` can tear the native stream down.
+    /// `clearOnFirstToken` keeps the previous answer on screen until new text
+    /// arrives, which is what auto-stream mode wants.
+    private func runGeneration(
+        image: ImageInput,
+        prompt: String,
+        maxTokens: Int,
+        clearOnFirstToken: Bool = false
     ) async throws {
-        for await event in stream {
-            switch event.kind {
-            case .token:
-                if !event.token.isEmpty { onToken(event.token) }
-            case .completed:
-                let result = event.result
-                logger.info("VLM streaming completed: \(result.completionTokens) tokens, \(result.tokensPerSecond) tok/s")
-            case .error:
-                throw NSError(
-                    domain: "com.runanywhere.RunAnywhereAI",
-                    code: Int(event.errorCode),
-                    userInfo: [NSLocalizedDescriptionKey: event.errorMessage.isEmpty ? "VLM stream failed" : event.errorMessage]
-                )
-            default:
-                break
+        let options = LlmOptions(maxOutputTokens: maxTokens)
+        let task = Task { @MainActor in
+            let stream = try await RunAnywhere.vlm.generateStream(
+                image: image,
+                prompt: prompt,
+                options: options
+            )
+            var isFirstToken = true
+            for try await event in stream {
+                switch event {
+                case .textDelta(_, _, _, _, let text):
+                    guard !text.isEmpty else { continue }
+                    if isFirstToken {
+                        isFirstToken = false
+                        if clearOnFirstToken { self.currentDescription = "" }
+                    }
+                    self.currentDescription += text
+                case .completed(_, let result):
+                    self.logger.info(
+                        "VLM streaming completed: \(result.outputTokens) tokens, \(result.tokensPerSecond) tok/s"
+                    )
+                default:
+                    break
+                }
             }
         }
+        generationTask = task
+        defer { generationTask = nil }
+        try await task.value
     }
 
     func describeCurrentFrame() async {
@@ -195,15 +209,14 @@ final class VLMViewModel: NSObject {
         currentDescription = ""
 
         do {
-            guard let image = RAVLMImage.fromPixelBuffer(pixelBuffer) else {
-                throw Self.imageConversionError("Failed to convert camera frame to VLM input")
-            }
-            let prompt = "Describe what you see briefly."
-            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.liveFrameMaxTokens
-            let stream = try await RunAnywhere.processImageStream(image, options: options)
-
-            try await consumeVLMStream(stream) { currentDescription += $0 }
+            let image = try ImageInput.pixelBuffer(pixelBuffer)
+            try await runGeneration(
+                image: image,
+                prompt: "Describe what you see briefly.",
+                maxTokens: Self.liveFrameMaxTokens
+            )
+        } catch is CancellationError {
+            // User-initiated cancel; keep whatever text already streamed in.
         } catch {
             self.error = error
             logger.error("VLM error: \(error.localizedDescription)")
@@ -219,15 +232,14 @@ final class VLMViewModel: NSObject {
         currentDescription = ""
 
         do {
-            guard let image = RAVLMImage.fromUIImage(uiImage) else {
-                throw Self.imageConversionError("Failed to convert image to VLM input")
-            }
-            let prompt = "Describe this image in detail."
-            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.selectedImageMaxTokens
-            let stream = try await RunAnywhere.processImageStream(image, options: options)
-
-            try await consumeVLMStream(stream) { currentDescription += $0 }
+            let image = try ImageInput.uiImage(uiImage)
+            try await runGeneration(
+                image: image,
+                prompt: "Describe this image in detail.",
+                maxTokens: Self.selectedImageMaxTokens
+            )
+        } catch is CancellationError {
+            // User-initiated cancel.
         } catch {
             self.error = error
         }
@@ -243,15 +255,17 @@ final class VLMViewModel: NSObject {
         currentDescription = ""
 
         do {
-            guard let image = RAVLMImage.fromNSImage(nsImage) else {
+            guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
                 throw Self.imageConversionError("Failed to convert image to VLM input")
             }
-            let prompt = "Describe this image in detail."
-            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.selectedImageMaxTokens
-            let stream = try await RunAnywhere.processImageStream(image, options: options)
-
-            try await consumeVLMStream(stream) { currentDescription += $0 }
+            let image = try ImageInput.cgImage(cgImage)
+            try await runGeneration(
+                image: image,
+                prompt: "Describe this image in detail.",
+                maxTokens: Self.selectedImageMaxTokens
+            )
+        } catch is CancellationError {
+            // User-initiated cancel.
         } catch {
             self.error = error
         }
@@ -261,7 +275,8 @@ final class VLMViewModel: NSObject {
     #endif
 
     func cancel() {
-        Task { await RunAnywhere.cancelVLMGeneration() }
+        generationTask?.cancel()
+        generationTask = nil
     }
 
     // MARK: - Auto Streaming
@@ -287,23 +302,16 @@ final class VLMViewModel: NSObject {
         isProcessing = true
         error = nil
 
-        // For auto-stream, we replace the description instead of clearing first
-        // This gives a smoother visual transition
-        var newDescription = ""
-
         do {
-            guard let image = RAVLMImage.fromPixelBuffer(pixelBuffer) else {
-                throw Self.imageConversionError("Failed to convert camera frame to VLM input")
-            }
-            let prompt = "Describe what you see in one sentence."
-            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.autoStreamMaxTokens
-            let stream = try await RunAnywhere.processImageStream(image, options: options)
-
-            try await consumeVLMStream(stream) {
-                newDescription += $0
-                currentDescription = newDescription
-            }
+            let image = try ImageInput.pixelBuffer(pixelBuffer)
+            try await runGeneration(
+                image: image,
+                prompt: "Describe what you see in one sentence.",
+                maxTokens: Self.autoStreamMaxTokens,
+                clearOnFirstToken: true
+            )
+        } catch is CancellationError {
+            // User-initiated cancel.
         } catch {
             // Don't show errors during auto-stream, just log
             logger.error("Auto-stream VLM error: \(error.localizedDescription)")

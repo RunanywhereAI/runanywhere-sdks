@@ -447,7 +447,7 @@ extension CppBridge {
             var options = RATTSOptions.defaults()
             guard let optionsPtr else { return options }
 
-            options.speakingRate = optionsPtr.pointee.rate
+            options.speed = optionsPtr.pointee.rate
             options.pitch = optionsPtr.pointee.pitch
             options.volume = optionsPtr.pointee.volume
             if let voicePtr = optionsPtr.pointee.voice_id {

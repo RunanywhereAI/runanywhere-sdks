@@ -21,18 +21,17 @@
 
 import type { TabLifecycle } from '../app';
 import {
-  ChatMessageStatus,
-  MessageRole,
   ModelCategory,
   RunAnywhere,
-  ToolChoiceMode,
-  ToolParameterType,
   type ChatMessage as SDKChatMessage,
+  type GenerationResult,
+  type LlmOptions,
   type ToolDefinition,
-  type ToolValue,
 } from '@runanywhere/web';
+import type { ToolValue } from '@runanywhere/proto-ts/tool_calling';
 import {
   buildGetStartedOverlay,
+  findLoadedModelForCategory,
   onModelStateChange,
   openSheet,
   refreshModelSelectionState,
@@ -684,26 +683,21 @@ function isAbortError(error: unknown): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Build generation options from the Settings tab — iOS parity:
- * LLMViewModel.swift:579-619 getGenerationOptions(). `disableThinking` is the
- * same structured gate as iOS (LLMViewModel.swift:618): suppress the thinking
- * phase only when the loaded model supports thinking AND the user toggle is
- * off — commons applies the model's no-think directive; the app never injects
- * control tokens into prompts.
+ * Build generation options from the Settings tab. Thinking is suppressed
+ * structurally through `reasoning.mode` only when the loaded model supports it
+ * and the user toggle is off — the app never injects control tokens.
  */
-function buildGenerationOptions(): {
-  maxTokens: number;
-  temperature: number;
-  systemPrompt?: string;
-  disableThinking: boolean;
-} {
+function buildGenerationOptions(): LlmOptions {
   const settings = getGenerationSettings();
   const systemPrompt = settings.systemPrompt.trim();
+  const thinkingSuppressed = loadedModelSupportsThinking() && !settings.thinkingModeEnabled;
   return {
-    maxTokens: settings.maxTokens,
+    maxOutputTokens: settings.maxTokens,
     temperature: settings.temperature,
     ...(systemPrompt.length > 0 ? { systemPrompt } : {}),
-    disableThinking: loadedModelSupportsThinking() && !settings.thinkingModeEnabled,
+    ...(thinkingSuppressed
+      ? { reasoning: { mode: 'off' as const } }
+      : { reasoning: { mode: 'on' as const, includeInOutput: true } }),
   };
 }
 
@@ -714,54 +708,59 @@ async function generateStreaming(
   context: ConversationGenerationContext,
 ): Promise<void> {
   const options = buildGenerationOptions();
-  const stream = await RunAnywhere.generateStream({
-    prompt,
-    ...options,
-    ...context,
-  });
-  cancelGeneration = stream.cancel;
+  const events = RunAnywhere.llm.generateStream(
+    [...context.history, { role: 'user' as const, content: prompt }],
+    { ...options, conversationId: context.conversationId },
+  );
+  const iterator = events[Symbol.asyncIterator]();
+  cancelGeneration = () => { void iterator.return?.(); };
 
-  const thinkingEnabled = loadedModelSupportsThinking() && !options.disableThinking;
+  const thinkingEnabled = options.reasoning?.mode === 'on';
   if (thinkingEnabled) {
     assistantMsg.thinking = 'Starting…';
     renderLastMessage(messagesEl, assistantMsg);
   }
 
-  let receivedThinking = false;
+  let answer = '';
+  let thinking = '';
   let sawAnyToken = false;
+  let finishReason: GenerationResult['finishReason'] = 'stop';
   const firstTokenTimeoutMs = 120_000;
   const firstTokenTimer = window.setTimeout(() => {
     if (sawAnyToken || !isGenerating) return;
-    try {
-      stream.cancel();
-    } catch {
-      /* ignore */
-    }
+    void iterator.return?.();
   }, firstTokenTimeoutMs);
 
-  const result = await RunAnywhere.textGeneration.aggregateStream(
-    prompt,
-    stream,
-    (answer) => {
-      sawAnyToken = true;
-      window.clearTimeout(firstTokenTimer);
-      assistantMsg.content = answer;
-      renderLastMessage(messagesEl, assistantMsg);
-    },
-    (thinking) => {
-      sawAnyToken = true;
-      window.clearTimeout(firstTokenTimer);
-      receivedThinking = true;
-      assistantMsg.thinking = thinking;
-      renderLastMessage(messagesEl, assistantMsg);
-    },
-  ).finally(() => {
+  try {
+    // Hermes-style manual iteration keeps the cancel handle addressable and
+    // matches the shape the RN SDK requires, so the two demos read alike.
+    for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
+      const event = step.value;
+      if (event.type === 'reasoningDelta') {
+        sawAnyToken = true;
+        window.clearTimeout(firstTokenTimer);
+        thinking += event.text;
+        assistantMsg.thinking = thinking;
+        renderLastMessage(messagesEl, assistantMsg);
+      } else if (event.type === 'textDelta') {
+        sawAnyToken = true;
+        window.clearTimeout(firstTokenTimer);
+        answer += event.text;
+        assistantMsg.content = answer;
+        renderLastMessage(messagesEl, assistantMsg);
+      } else if (event.type === 'completed') {
+        answer = event.result.text || answer;
+        thinking = event.result.thinkingText || thinking;
+        finishReason = event.result.finishReason;
+      }
+    }
+  } finally {
     window.clearTimeout(firstTokenTimer);
-  });
+  }
 
-  if (!sawAnyToken && !result.text.trim() && !result.thinkingContent?.trim()) {
+  if (!sawAnyToken && !answer.trim() && !thinking.trim()) {
     assistantMsg.thinking = undefined;
-    assistantMsg.content = result.finishReason === 'cancelled'
+    assistantMsg.content = finishReason === 'cancelled'
       ? 'Cancelled — no tokens arrived before the first-token timeout or stop.'
       : 'No tokens arrived within 2 minutes. The model may still be loading '
         + 'into WebGPU, or generation stalled. Try Stop, reload the model, or switch to a smaller model.';
@@ -769,14 +768,13 @@ async function generateStreaming(
     return;
   }
 
-  const thinkingText = result.thinkingContent?.trim()
-    || (receivedThinking ? assistantMsg.thinking?.trim() : undefined);
+  const thinkingText = thinking.trim();
   assistantMsg.thinking = thinkingText || undefined;
-  assistantMsg.content = result.text.trim();
+  assistantMsg.content = answer.trim();
   if (!assistantMsg.content) {
-    if (result.finishReason === 'cancelled') {
+    if (finishReason === 'cancelled') {
       assistantMsg.content = 'Cancelled.';
-    } else if (result.finishReason === 'length') {
+    } else if (finishReason === 'length') {
       assistantMsg.content = 'The response limit was reached before a final answer. '
         + 'Increase Max tokens in Settings or turn off thinking, then try again.';
     } else if (thinkingText) {
@@ -807,36 +805,28 @@ async function generateWithToolCalling(
   messagesEl: HTMLElement,
 ): Promise<void> {
   const options = buildGenerationOptions();
-  const controller = new AbortController();
-  cancelGeneration = () => controller.abort();
   const forcedToolName = explicitlyRequestedDemoTool(prompt);
+  cancelGeneration = null;
 
-  const result = await RunAnywhere.generateWithTools(prompt, forcedToolName ? {
-    toolChoice: ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC,
-    forcedToolName,
-  } : {}, {
-    signal: controller.signal,
-    llmOptions: options,
+  // The SDK runs the tool loop when `options.tools` or the registry has tools;
+  // `toolChoice` only pins which one the model must reach for.
+  const result = await RunAnywhere.llm.generate(prompt, {
+    ...options,
+    toolChoice: forcedToolName
+      ? { kind: 'forced', name: forcedToolName }
+      : { kind: 'auto' },
   });
 
   const split = splitThinking(result.text);
   assistantMsg.content = split.content || (result.toolCalls.length > 0
     ? 'The tool completed, but the model did not provide a final answer.'
     : 'The model did not produce a tool call or answer. Please try again.');
-  assistantMsg.thinking = result.thinkingContent || split.thinking || undefined;
+  assistantMsg.thinking = result.thinkingText || split.thinking || undefined;
   if (result.toolCalls.length > 0) {
-    assistantMsg.toolCalls = result.toolCalls.map((call) => {
-      const toolResult = result.toolResults.find(
-        (r) => r.name === call.name
-          && (!r.toolCallId || !call.id || r.toolCallId === call.id),
-      );
-      return {
-        name: call.name,
-        argumentsJson: call.argumentsJson,
-        resultJson: toolResult?.resultJson,
-        error: toolResult && !toolResult.success ? (toolResult.error || 'failed') : undefined,
-      };
-    });
+    assistantMsg.toolCalls = result.toolCalls.map((call) => ({
+      name: call.name,
+      argumentsJson: call.argumentsJson,
+    }));
   }
   renderLastMessage(messagesEl, assistantMsg, false);
 }
@@ -864,7 +854,7 @@ function registerDemoTools(): void {
   if (demoToolsRegistered) return;
   demoToolsRegistered = true;
 
-  RunAnywhere.toolCalling.registerTool(
+  RunAnywhere.llm.tools.register(
     toolDefinition(
       'get_weather',
       'Gets the current weather for a given location using Open-Meteo API',
@@ -873,7 +863,7 @@ function registerDemoTools(): void {
     async (args) => fetchWeather(toolValueString(args.location) ?? 'San Francisco'),
   );
 
-  RunAnywhere.toolCalling.registerTool(
+  RunAnywhere.llm.tools.register(
     toolDefinition(
       'get_current_time',
       'Gets the current date, time, and timezone information',
@@ -891,7 +881,7 @@ function registerDemoTools(): void {
     },
   );
 
-  RunAnywhere.toolCalling.registerTool(
+  RunAnywhere.llm.tools.register(
     toolDefinition(
       'calculate',
       'Performs math calculations. Supports +, -, *, /, and parentheses',
@@ -926,28 +916,42 @@ function registerDemoTools(): void {
   );
 }
 
+/** A single required string parameter, described as a JSON Schema property. */
+interface DemoToolStringParameter {
+  name: string;
+  description: string;
+}
+
+/**
+ * `ToolDefinition.parameters` is one JSON-Schema-object string now (OpenAI
+ * `parameters` / Anthropic `input_schema` / MCP `inputSchema` shape), not a
+ * structured `ToolParameter[]`. Build that schema string here rather than
+ * hand-rolling proto types the app has no business constructing.
+ */
 function toolDefinition(
   name: string,
   description: string,
-  parameters: ToolDefinition['parameters'],
+  parameters: DemoToolStringParameter[],
 ): ToolDefinition {
+  const properties: Record<string, { type: 'string'; description: string }> = {};
+  for (const param of parameters) {
+    properties[param.name] = { type: 'string', description: param.description };
+  }
+  const schema = {
+    type: 'object',
+    properties,
+    required: parameters.map((param) => param.name),
+  };
   return {
     name,
     description,
-    parameters,
+    parameters: JSON.stringify(schema),
     category: 'Utility',
-    metadata: {},
   };
 }
 
-function stringParameter(name: string, description: string): ToolDefinition['parameters'][number] {
-  return {
-    name,
-    type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-    description,
-    required: true,
-    enumValues: [],
-  };
+function stringParameter(name: string, description: string): DemoToolStringParameter {
+  return { name, description };
 }
 
 function tv(value: string | number | boolean): ToolValue {
@@ -1198,10 +1202,9 @@ function safeMathEvaluate(expression: string): number | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Convert completed UI turns into the public proto chat shape accepted by
- * `RunAnywhere.generateStream({ history, conversationId })`. The current user
- * prompt is deliberately not included; callers snapshot history before they
- * append that prompt to the visible conversation.
+ * Convert completed UI turns into the transcript `RunAnywhere.llm.generateStream`
+ * accepts. The current user prompt is deliberately not included; callers
+ * snapshot history before they append that prompt to the visible conversation.
  */
 export function conversationHistoryForGeneration(
   conversationMessages: readonly unknown[],
@@ -1210,16 +1213,8 @@ export function conversationHistoryForGeneration(
     .filter(isChatMessage)
     .filter(({ content }) => content.trim().length > 0)
     .map((message) => ({
-      id: '',
-      role: message.role === 'user'
-        ? MessageRole.MESSAGE_ROLE_USER
-        : MessageRole.MESSAGE_ROLE_ASSISTANT,
+      role: message.role === 'user' ? ('user' as const) : ('assistant' as const),
       content: message.content,
-      timestampUs: 0,
-      toolCalls: [],
-      status: ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
-      metadata: {},
-      attachments: [],
     }));
 }
 
@@ -1260,11 +1255,7 @@ function saveToolsEnabled(enabled: boolean): void {
 // ---------------------------------------------------------------------------
 
 function isLLMBackendAvailable(): boolean {
-  try {
-    return RunAnywhere.textGeneration.supportsProtoLLM();
-  } catch {
-    return false;
-  }
+  return RunAnywhere.runtime.modalities.llm.status !== 'unavailable';
 }
 
 function navigateTo(tab: string): void {
@@ -1281,15 +1272,7 @@ function svgIcon(paths: string): string {
  * model from the toolbar picker.
  */
 function isModelLoaded(): boolean {
-  try {
-    const current = RunAnywhere.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-      includeModelMetadata: false,
-    });
-    return Boolean(current?.modelId);
-  } catch {
-    return false;
-  }
+  return findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE) !== null;
 }
 
 /**
@@ -1297,16 +1280,8 @@ function isModelLoaded(): boolean {
  * record, same source iOS uses (LLMViewModel `loadedModelSupportsThinking`).
  */
 function loadedModelSupportsThinking(): boolean {
-  try {
-    const current = RunAnywhere.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-      includeModelMetadata: false,
-    });
-    if (!current?.modelId) return false;
-    return RunAnywhere.getModel(current.modelId)?.supportsThinking ?? false;
-  } catch {
-    return false;
-  }
+  return findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)
+    ?.supportsThinking ?? false;
 }
 
 /**

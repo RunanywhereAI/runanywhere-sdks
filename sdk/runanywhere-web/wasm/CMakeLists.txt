@@ -403,6 +403,13 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_offsetof_proto_buffer_status"
     "_rac_wasm_offsetof_proto_buffer_error_message"
 
+    # Computer-Use Agent (CUA) — stateless profile-driven system-prompt +
+    # action-parse ABI (pairs with rac_vlm_*). The parse result crosses back as
+    # a serialized runanywhere.v1.CuaAction via the shared rac_proto_buffer_t
+    # helpers exported above — no struct sizeof/offset helpers needed.
+    "_rac_cua_system_prompt"
+    "_rac_cua_parse_action_proto"
+
     # Canonical rac_result_t -> SDKError proto mapping. Lets
     # SDKException route error construction through the shared commons helper
     # rac_result_to_proto_error instead of the local TypeScript category table.
@@ -1048,12 +1055,14 @@ set(RAC_EXPORTED_FUNCTIONS_ONNX
     # by ModelLifecycle and must only ship with the ONNX/Sherpa speech target.
     "_rac_stt_transcribe_lifecycle_proto"
     "_rac_stt_transcribe_stream_lifecycle_proto"
+    "_rac_stt_state_lifecycle_proto"
     # Lifecycle-owned TTS. Avoid temporary component loads replacing the
     # canonical voice in RACommons' latest-load-wins lifecycle map.
     "_rac_tts_synthesize_lifecycle_proto"
     "_rac_tts_synthesize_stream_lifecycle_proto"
     "_rac_tts_stop_lifecycle_proto"
     "_rac_tts_list_voices_lifecycle_proto"
+    "_rac_tts_state_lifecycle_proto"
     # Lifecycle-owned VAD. Reuse the loaded detector and its recurrent state
     # instead of allocating a second Sherpa/ORT session for microphone input.
     "_rac_vad_process_lifecycle_proto"
@@ -1107,6 +1116,7 @@ set(RAC_EXPORTED_FUNCTIONS_RAG
     "_rac_rag_ingest_proto"
     "_rac_rag_query_proto"
     "_rac_rag_query_stream_proto"
+    "_rac_rag_search_proto"
     "_rac_rag_clear_proto"
     "_rac_rag_stats_proto"
 )
@@ -1397,6 +1407,12 @@ set(_targets_built "")
 
 # --- Core (commons-only) -----------------------------------------------------
 if(RAC_WASM_BUILD_CORE)
+    # The core module runs phase1/phase2 (auth, device registration, model
+    # assignment) on the browser main thread, where synchronous emscripten_fetch
+    # and emscripten_fetch_wait both fail. The emscripten transport instead runs
+    # an async fetch and yields with emscripten_sleep(), which requires Asyncify.
+    # Callers enter through ccall({async:true}); Asyncify suspends the whole
+    # transitive call graph down to the fetch and resumes it on completion.
     rac_wasm_add_target(
         NAME racommons_core_wasm
         OUTPUT_NAME racommons
@@ -1404,6 +1420,7 @@ if(RAC_WASM_BUILD_CORE)
         EXPORT_NAME createRACommonsCoreModule
         LINK_LIBRARIES rac_commons
         EXPORTED_FUNCTIONS ${RAC_EXPORTED_FUNCTIONS_BASE}
+        EXTRA_LINK_FLAGS "-sASYNCIFY=1" "-sASYNCIFY_STACK_SIZE=1048576"
     )
     list(APPEND _targets_built "racommons_core_wasm -> packages/core/wasm/racommons.{js,wasm}")
 endif()

@@ -5,7 +5,7 @@ import {
   HybridSttRouter,
   offlineSherpa,
   onlineCloud,
-} from '../../../../../src/index';
+} from '../../../../../src/Public/Extensions/Hybrid/index';
 import {
   clearRunanywhereModule,
   registerWasmModule,

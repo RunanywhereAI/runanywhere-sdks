@@ -83,10 +83,9 @@ class RunAnywhereVAD {
   ///
   /// Mirrors Swift's `RunAnywhere.streamVAD(audio:)`
   /// (RunAnywhere+VAD.swift:50-72): when the underlying detector throws, the
-  /// failure surfaces as an error-marked [VADResult] (non-empty
-  /// `errorMessage`, non-zero `errorCode`) and the stream finishes — callers
-  /// do not silently keep pumping audio into a dead detector, and the stream
-  /// never aborts with an exception.
+  /// failure surfaces as an error-marked [VADResult] (populated `error`
+  /// submessage) and the stream finishes — callers do not silently keep pumping
+  /// audio into a dead detector, and the stream never aborts with an exception.
   Stream<VADResult> streamVAD(Stream<Uint8List> audio) async* {
     await for (final chunk in audio) {
       VADResult result;
@@ -98,8 +97,11 @@ class RunAnywhereVAD {
           category: ErrorCategory.ERROR_CATEGORY_COMPONENT,
         );
         yield VADResult(
-          errorMessage: 'VAD stream failed: ${sdkError.message}',
-          errorCode: sdkError.code.value,
+          error: SDKException.make(
+            code: sdkError.code,
+            category: ErrorCategory.ERROR_CATEGORY_COMPONENT,
+            message: 'VAD stream failed: ${sdkError.message}',
+          ).error,
         );
         return;
       }
@@ -158,11 +160,11 @@ class RunAnywhereVAD {
         validateAvailability: true,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.modelLoadFailed(
         modelId,
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'VAD lifecycle load failed',
       );
     }
@@ -188,10 +190,10 @@ class RunAnywhereVAD {
         category: _vadCategory,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'VAD lifecycle unload failed',
       );
     }

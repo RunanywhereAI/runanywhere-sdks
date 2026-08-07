@@ -32,47 +32,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// Raw PCM encodings accepted at the SDK boundary. Commons validates complete
-/// sample frames and normalizes either representation to float samples before
-/// dispatching to an engine.
-public nonisolated enum RADiarizationAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case pcmF32Le // = 1
-  case pcmS16Le // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .pcmF32Le
-    case 2: self = .pcmS16Le
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .pcmF32Le: return 1
-    case .pcmS16Le: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RADiarizationAudioEncoding] = [
-    .unspecified,
-    .pcmF32Le,
-    .pcmS16Le,
-  ]
-
-}
-
 public nonisolated enum RADiarizationStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -124,25 +83,32 @@ public nonisolated struct RADiarizationOptions: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var sampleRateHz: Int32 {
-    get {_sampleRateHz ?? 0}
-    set {_sampleRateHz = newValue}
+  /// Only 16 kHz is accepted: the engine does not resample, and any other
+  /// rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
+  public var sampleRate: Int32 {
+    get {_sampleRate ?? 0}
+    set {_sampleRate = newValue}
   }
-  /// Returns true if `sampleRateHz` has been explicitly set.
-  public var hasSampleRateHz: Bool {self._sampleRateHz != nil}
-  /// Clears the value of `sampleRateHz`. Subsequent reads from it will return its default value.
-  public mutating func clearSampleRateHz() {self._sampleRateHz = nil}
+  /// Returns true if `sampleRate` has been explicitly set.
+  public var hasSampleRate: Bool {self._sampleRate != nil}
+  /// Clears the value of `sampleRate`. Subsequent reads from it will return its default value.
+  public mutating func clearSampleRate() {self._sampleRate = nil}
 
-  public var channelCount: Int32 {
-    get {_channelCount ?? 0}
-    set {_channelCount = newValue}
+  public var channels: Int32 {
+    get {_channels ?? 0}
+    set {_channels = newValue}
   }
-  /// Returns true if `channelCount` has been explicitly set.
-  public var hasChannelCount: Bool {self._channelCount != nil}
-  /// Clears the value of `channelCount`. Subsequent reads from it will return its default value.
-  public mutating func clearChannelCount() {self._channelCount = nil}
+  /// Returns true if `channels` has been explicitly set.
+  public var hasChannels: Bool {self._channels != nil}
+  /// Clears the value of `channels`. Subsequent reads from it will return its default value.
+  public mutating func clearChannels() {self._channels = nil}
 
-  public var encoding: RADiarizationAudioEncoding {
+  /// Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+  /// AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+  /// float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+  /// and AUDIO_ENCODING_UNSPECIFIED are rejected with
+  /// RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
+  public var encoding: RAAudioEncoding {
     get {_encoding ?? .unspecified}
     set {_encoding = newValue}
   }
@@ -164,14 +130,29 @@ public nonisolated struct RADiarizationOptions: Sendable {
 
   public var mergeGapMs: Int64 = 0
 
+  /// Speaker-count hint: an upper bound, not an exact count. Unset =
+  /// auto-detect. An engine that detects more than max_speakers speakers
+  /// ranks them by total active duration, drops the weakest, and re-densifies
+  /// the speaker indices. Values above the loaded model's speaker capacity
+  /// are clamped.
+  public var maxSpeakers: Int32 {
+    get {_maxSpeakers ?? 0}
+    set {_maxSpeakers = newValue}
+  }
+  /// Returns true if `maxSpeakers` has been explicitly set.
+  public var hasMaxSpeakers: Bool {self._maxSpeakers != nil}
+  /// Clears the value of `maxSpeakers`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxSpeakers() {self._maxSpeakers = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _sampleRateHz: Int32? = nil
-  fileprivate var _channelCount: Int32? = nil
-  fileprivate var _encoding: RADiarizationAudioEncoding? = nil
+  fileprivate var _sampleRate: Int32? = nil
+  fileprivate var _channels: Int32? = nil
+  fileprivate var _encoding: RAAudioEncoding? = nil
   fileprivate var _threshold: Float? = nil
+  fileprivate var _maxSpeakers: Int32? = nil
 }
 
 public nonisolated struct RADiarizationRequest: Sendable {
@@ -292,17 +273,13 @@ public nonisolated struct RADiarizationStreamEvent: @unchecked Sendable {
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RADiarizationAudioEncoding: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIARIZATION_AUDIO_ENCODING_UNSPECIFIED\0\u{1}DIARIZATION_AUDIO_ENCODING_PCM_F32_LE\0\u{1}DIARIZATION_AUDIO_ENCODING_PCM_S16_LE\0")
-}
-
 nonisolated extension RADiarizationStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}DIARIZATION_STREAM_EVENT_KIND_STARTED\0\u{1}DIARIZATION_STREAM_EVENT_KIND_UPDATE\0\u{1}DIARIZATION_STREAM_EVENT_KIND_FINAL\0\u{1}DIARIZATION_STREAM_EVENT_KIND_ERROR\0")
 }
 
 nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiarizationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}sample_rate_hz\0\u{3}channel_count\0\u{1}encoding\0\u{1}threshold\0\u{3}minimum_duration_ms\0\u{3}merge_gap_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}sample_rate\0\u{1}channels\0\u{1}encoding\0\u{1}threshold\0\u{3}minimum_duration_ms\0\u{3}merge_gap_ms\0\u{4}\u{2}max_speakers\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -310,12 +287,13 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self._sampleRateHz) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self._channelCount) }()
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self._sampleRate) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self._channels) }()
       case 3: try { try decoder.decodeSingularEnumField(value: &self._encoding) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self._threshold) }()
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.minimumDurationMs) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self.mergeGapMs) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self._maxSpeakers) }()
       default: break
       }
     }
@@ -326,10 +304,10 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._sampleRateHz {
+    try { if let v = self._sampleRate {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 1)
     } }()
-    try { if let v = self._channelCount {
+    try { if let v = self._channels {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 2)
     } }()
     try { if let v = self._encoding {
@@ -344,16 +322,20 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
     if self.mergeGapMs != 0 {
       try visitor.visitSingularInt64Field(value: self.mergeGapMs, fieldNumber: 6)
     }
+    try { if let v = self._maxSpeakers {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RADiarizationOptions, rhs: RADiarizationOptions) -> Bool {
-    if lhs._sampleRateHz != rhs._sampleRateHz {return false}
-    if lhs._channelCount != rhs._channelCount {return false}
+    if lhs._sampleRate != rhs._sampleRate {return false}
+    if lhs._channels != rhs._channels {return false}
     if lhs._encoding != rhs._encoding {return false}
     if lhs._threshold != rhs._threshold {return false}
     if lhs.minimumDurationMs != rhs.minimumDurationMs {return false}
     if lhs.mergeGapMs != rhs.mergeGapMs {return false}
+    if lhs._maxSpeakers != rhs._maxSpeakers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -25,17 +25,20 @@ jest.mock('../../src/native/NitroModulesGlobalInit', () => ({
 }));
 
 import { SdkInitResult } from '@runanywhere/proto-ts/sdk_init';
-import { RunAnywhere } from '../../src/Public/RunAnywhere';
+import {
+  RunAnywhere,
+  completeServicesInitialization,
+} from '../../src/Public/RunAnywhere';
 
+// `SdkInitResult.httpConfigured` is deleted outright — `hasCompletedHttpSetup`
+// is the sole cross-phase latched bit now.
 function phase2Payload(
   httpConfigured: boolean = true,
   httpApplicable: boolean = true
 ): ArrayBuffer {
   const bytes = SdkInitResult.encode(
     SdkInitResult.create({
-      success: true,
       hasCompletedHttpSetup: httpConfigured,
-      httpConfigured,
       httpApplicable,
     })
   ).finish();
@@ -98,7 +101,7 @@ describe('RunAnywhere lifecycle serialization', () => {
     expect(mockNative.initialize).toHaveBeenCalledTimes(1);
 
     const reset = RunAnywhere.reset();
-    expect(RunAnywhere.isInitialized).toBe(false);
+    expect(RunAnywhere.isReady).toBe(false);
     expect(mockNative.destroy).not.toHaveBeenCalled();
 
     phase1.resolve(true);
@@ -107,12 +110,12 @@ describe('RunAnywhere lifecycle serialization', () => {
 
     expect(mockNative.completeServicesInitialization).not.toHaveBeenCalled();
     expect(mockNative.destroy).toHaveBeenCalledTimes(1);
-    expect(RunAnywhere.isInitialized).toBe(false);
+    expect(RunAnywhere.isReady).toBe(false);
   });
 
   test('concurrent resets join and initialize waits for native destroy', async () => {
     await RunAnywhere.initialize();
-    await RunAnywhere.completeServicesInitialization();
+    await completeServicesInitialization();
 
     const destroy = deferred<void>();
     mockNative.destroy.mockReturnValueOnce(destroy.promise);
@@ -133,7 +136,7 @@ describe('RunAnywhere lifecycle serialization', () => {
 
     expect(mockNative.destroy).toHaveBeenCalledTimes(1);
     expect(mockNative.initialize).toHaveBeenCalledTimes(2);
-    expect(RunAnywhere.isInitialized).toBe(true);
+    expect(RunAnywhere.isReady).toBe(true);
   });
 
   test('reset awaits Phase 2 and blocks its stale state completion', async () => {
@@ -146,7 +149,7 @@ describe('RunAnywhere lifecycle serialization', () => {
     await flushMicrotasks();
     expect(mockNative.completeServicesInitialization).toHaveBeenCalledTimes(1);
 
-    const services = RunAnywhere.completeServicesInitialization();
+    const services = completeServicesInitialization();
     const reset = RunAnywhere.reset();
     expect(mockNative.destroy).not.toHaveBeenCalled();
 
@@ -155,8 +158,7 @@ describe('RunAnywhere lifecycle serialization', () => {
     await reset;
 
     expect(mockNative.destroy).toHaveBeenCalledTimes(1);
-    expect(RunAnywhere.isInitialized).toBe(false);
-    expect(RunAnywhere.areServicesReady).toBe(false);
+    expect(RunAnywhere.isReady).toBe(false);
   });
 
   test('reset joins HTTP recovery and blocks its stale state completion', async () => {
@@ -167,7 +169,7 @@ describe('RunAnywhere lifecycle serialization', () => {
     mockNative.retryHTTPSetupProto.mockReturnValueOnce(retryResult.promise);
 
     await RunAnywhere.initialize();
-    await RunAnywhere.completeServicesInitialization();
+    await completeServicesInitialization();
 
     const { ensureServicesReady } = await import(
       '../../src/Foundation/Initialization/ServicesReadyGuard'
@@ -177,7 +179,7 @@ describe('RunAnywhere lifecycle serialization', () => {
     expect(mockNative.retryHTTPSetupProto).toHaveBeenCalledTimes(1);
 
     const reset = RunAnywhere.reset();
-    expect(RunAnywhere.isInitialized).toBe(false);
+    expect(RunAnywhere.isReady).toBe(false);
     expect(mockNative.destroy).not.toHaveBeenCalled();
 
     retryResult.resolve(phase2Payload());
@@ -185,17 +187,16 @@ describe('RunAnywhere lifecycle serialization', () => {
     await reset;
 
     expect(mockNative.destroy).toHaveBeenCalledTimes(1);
-    expect(RunAnywhere.isInitialized).toBe(false);
-    expect(RunAnywhere.areServicesReady).toBe(false);
+    expect(RunAnywhere.isReady).toBe(false);
   });
 
   test('failed native destroy keeps initialization closed until reset retries', async () => {
     await RunAnywhere.initialize();
-    await RunAnywhere.completeServicesInitialization();
+    await completeServicesInitialization();
 
     mockNative.destroy.mockRejectedValueOnce(new Error('destroy failed'));
     const reset = RunAnywhere.reset();
-    expect(RunAnywhere.isInitialized).toBe(false);
+    expect(RunAnywhere.isReady).toBe(false);
     await expect(reset).rejects.toThrow('destroy failed');
 
     await expect(RunAnywhere.initialize()).rejects.toThrow(
@@ -209,6 +210,6 @@ describe('RunAnywhere lifecycle serialization', () => {
 
     expect(mockNative.destroy).toHaveBeenCalledTimes(2);
     expect(mockNative.initialize).toHaveBeenCalledTimes(2);
-    expect(RunAnywhere.isInitialized).toBe(true);
+    expect(RunAnywhere.isReady).toBe(true);
   });
 });

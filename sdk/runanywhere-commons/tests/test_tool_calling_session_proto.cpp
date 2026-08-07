@@ -19,6 +19,7 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_engine_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -138,8 +139,29 @@ const uint32_t g_formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMA
 rac_engine_vtable_t g_mock_vtable = [] {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
-    v.metadata.name = "llamacpp";
+    v.metadata.name = RAC_ENGINE_ID_LLAMACPP;
     v.metadata.display_name = "mock llama.cpp";
+    v.metadata.engine_version = "0.0.0";
+    v.metadata.priority = 100;
+    v.metadata.formats = g_formats;
+    v.metadata.formats_count = 1;
+    v.llm_ops = &g_mock_ops;
+    return v;
+}();
+
+// Same mock ops under the QHexRT engine id, so a model registered with
+// framework=QHEXRT actually loads through an engine NAMED "qhexrt" (as
+// rac_model_lifecycle_load_proto's engine_name_for_framework()/
+// framework_for_engine_name() round-trip expects) instead of silently
+// falling back to the plain-llamacpp mock by priority. Lifecycle now reports
+// ModelLoadResult.framework as the ACTUALLY selected engine, not the
+// catalog/request pin, so exercising the QHexRT-only grammar path needs a
+// real (mock) engine registered under that name.
+rac_engine_vtable_t g_mock_vtable_qhexrt = [] {
+    rac_engine_vtable_t v{};
+    v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
+    v.metadata.name = RAC_ENGINE_ID_QHEXRT;
+    v.metadata.display_name = "mock QHexRT";
     v.metadata.engine_version = "0.0.0";
     v.metadata.priority = 100;
     v.metadata.formats = g_formats;
@@ -202,7 +224,9 @@ runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework f
     // path can be exercised with the mock ops (supports_grammar=true).
     model.set_framework(framework);
     model.set_local_path("/tmp/toolsession-test.gguf");
-    model.set_is_downloaded(true);
+    // ModelInfo.is_downloaded (tag 32) was deleted outright: registry_status
+    // is now the single downloaded-ness signal (idl/model_types.proto).
+    model.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
     model.set_is_available(true);
     return model;
 }
@@ -212,14 +236,23 @@ rac_model_registry_handle_t g_registry = nullptr;
 void cleanup_environment() {
     rac_model_lifecycle_reset();
     rac_sdk_event_clear_queue();
-    (void)rac_plugin_unregister("llamacpp");
+    (void)rac_plugin_unregister(RAC_ENGINE_ID_LLAMACPP);
+    (void)rac_plugin_unregister(RAC_ENGINE_ID_QHEXRT);
     set_responses({});
 }
 
 bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
                        runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     cleanup_environment();
-    if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
+    // Register the mock engine under the id that actually matches the
+    // requested framework so rac_model_lifecycle_load_proto's engine pin
+    // (and its now-truthful ModelLoadResult.framework) resolves to a REAL
+    // registered engine of that framework, not a priority-order fallback to
+    // a differently-named one.
+    const rac_engine_vtable_t* vtable_for_framework =
+        framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT ? &g_mock_vtable_qhexrt
+                                                                 : &g_mock_vtable;
+    if (rac_plugin_register(vtable_for_framework) != RAC_SUCCESS)
         return false;
 
     if (!g_registry && (rac_model_registry_create(&g_registry) != RAC_SUCCESS || !g_registry)) {
@@ -245,7 +278,7 @@ bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
     rac_result_t rc =
         rac_model_lifecycle_load_proto(g_registry, load_bytes.data(), load_bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.success();
+    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && !result.has_error();
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -419,15 +452,16 @@ bool parse_first_error(EventSink& sink, runanywhere::v1::SDKError* out_error) {
     return event && out_error && out_error->ParseFromString(event->error_bytes());
 }
 
+// ToolDefinition.parameters is now ONE JSON Schema object string
+// (idl/tool_calling.proto, tools-one-json-schema) — the typed ToolParameter
+// message / ToolParameterType enum were deleted outright.
 runanywhere::v1::ToolDefinition make_weather_tool() {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name("get_weather");
     tool.set_description("Get weather for a city");
-    auto* param = tool.add_parameters();
-    param->set_name("location");
-    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_description("City name");
-    param->set_required(true);
+    tool.set_parameters(R"({"type":"object","properties":{)"
+                        R"("location":{"type":"string","description":"City name"}},)"
+                        R"("required":["location"]})");
     return tool;
 }
 
@@ -435,23 +469,25 @@ runanywhere::v1::ToolDefinition make_calculate_tool() {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name("calculate");
     tool.set_description("Evaluate a math expression");
-    auto* param = tool.add_parameters();
-    param->set_name("expression");
-    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    param->set_required(true);
+    tool.set_parameters(R"({"type":"object","properties":{)"
+                        R"("expression":{"type":"string"}},)"
+                        R"("required":["expression"]})");
     return tool;
 }
 
 runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string& prompt,
                                                               uint32_t max_tool_calls = 0) {
+    // ToolCallingSessionCreateRequest collapsed to 3 fields — prompt(1),
+    // history(2), ToolCallingOptions options(3)
+    // (tools-collapse-options-and-session-request, idl/tool_calling.proto).
+    // max_tokens/temperature were deleted outright with no replacement home.
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
-    request.set_max_tokens(64);
-    request.set_temperature(0.5f);
-    *request.add_tools() = make_weather_tool();
-    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    *request.mutable_options()->add_tools() = make_weather_tool();
+    request.mutable_options()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    request.mutable_options()->set_auto_execute(true);
     if (max_tool_calls > 0)
-        request.set_max_tool_calls(max_tool_calls);
+        request.mutable_options()->set_max_tool_calls(max_tool_calls);
     return request;
 }
 
@@ -560,7 +596,7 @@ int test_max_tool_calls_allows_final_synthesis() {
 
     EventSink sink;
     auto request = make_request("weather everywhere", 2);
-    request.set_keep_tools_available(true);
+    request.mutable_options()->set_keep_tools_available(true);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -616,8 +652,8 @@ int test_forced_tool_name_only_promotes_session_to_specific() {
 
     EventSink sink;
     auto request = make_request("Use the selected tool.");
-    request.set_forced_tool_name("get_weather");
-    *request.add_tools() = make_calculate_tool();
+    request.mutable_options()->set_forced_tool_name("get_weather");
+    *request.mutable_options()->add_tools() = make_calculate_tool();
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -653,8 +689,8 @@ int test_none_vetoes_forced_name_in_session() {
 
     EventSink sink;
     auto request = make_request("Answer directly without tools.");
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
-    request.set_forced_tool_name("get_weather");
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.mutable_options()->set_forced_tool_name("get_weather");
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -688,8 +724,8 @@ int test_none_blocks_session_call_when_validation_disabled() {
 
     EventSink sink;
     auto request = make_request("Answer directly without tools.");
-    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
-    request.set_validate_calls(false);
+    request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.mutable_options()->set_validate_calls(false);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -728,9 +764,9 @@ int test_forced_target_blocks_wrong_session_call_when_validation_disabled() {
 
     EventSink sink;
     auto request = make_request("Use calculate only.");
-    *request.add_tools() = make_calculate_tool();
-    request.set_forced_tool_name("calculate");
-    request.set_validate_calls(false);
+    *request.mutable_options()->add_tools() = make_calculate_tool();
+    request.mutable_options()->set_forced_tool_name("calculate");
+    request.mutable_options()->set_validate_calls(false);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -780,12 +816,12 @@ int test_specific_session_target_must_be_nonempty_and_present() {
     };
 
     auto empty_target = make_request("Use a specific tool.");
-    empty_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    empty_target.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
     run_invalid_request(empty_target, "SPECIFIC session without target is rejected");
 
     auto missing_target = make_request("Use the missing tool.");
-    missing_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
-    missing_target.set_forced_tool_name("missing_tool");
+    missing_target.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    missing_target.mutable_options()->set_forced_tool_name("missing_tool");
     run_invalid_request(missing_target, "SPECIFIC session target absent from tools is rejected");
     CHECK(generate_calls() == 0, "invalid SPECIFIC sessions fail before generation");
 
@@ -802,9 +838,9 @@ int test_specific_and_required_sessions_reject_initial_no_call() {
         set_responses({"I decided not to call a tool."});
         EventSink sink;
         auto request = make_request("A tool call is mandatory.");
-        request.set_tool_choice(mode);
+        request.mutable_options()->set_tool_choice(mode);
         if (mode == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC) {
-            request.set_forced_tool_name("get_weather");
+            request.mutable_options()->set_forced_tool_name("get_weather");
         }
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
@@ -1040,7 +1076,7 @@ int test_session_grammar_gated_on_framework() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();  // tools: get_weather, calculate
+        *request.mutable_options()->add_tools() = make_calculate_tool();  // tools: get_weather, calculate
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1063,7 +1099,7 @@ int test_session_grammar_gated_on_framework() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();
+        *request.mutable_options()->add_tools() = make_calculate_tool();
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1085,8 +1121,8 @@ int test_session_grammar_gated_on_framework() {
     {
         EventSink sink;
         auto request = make_request("Answer directly.");
-        *request.add_tools() = make_calculate_tool();
-        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        *request.mutable_options()->add_tools() = make_calculate_tool();
+        request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1155,7 +1191,7 @@ int test_session_decision_hint_on_auto_path() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();
+        *request.mutable_options()->add_tools() = make_calculate_tool();
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1178,8 +1214,8 @@ int test_session_decision_hint_on_auto_path() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.add_tools() = make_calculate_tool();
-        request.set_system_prompt("You are Halo, a concise assistant.");
+        *request.mutable_options()->add_tools() = make_calculate_tool();
+        request.mutable_options()->set_system_prompt("You are Halo, a concise assistant.");
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1205,8 +1241,8 @@ int test_session_decision_hint_on_auto_path() {
     {
         EventSink sink;
         auto request = make_request("Answer directly.");
-        *request.add_tools() = make_calculate_tool();
-        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        *request.mutable_options()->add_tools() = make_calculate_tool();
+        request.mutable_options()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1275,7 +1311,7 @@ int test_session_grammar_keep_tools_bare_pythonic() {
     {
         EventSink sink;
         auto request = make_request("Weather in Tokyo then Osaka?");
-        request.set_keep_tools_available(true);
+        request.mutable_options()->set_keep_tools_available(true);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;

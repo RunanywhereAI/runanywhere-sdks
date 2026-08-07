@@ -14,7 +14,7 @@
 
 /* eslint-disable */
 
-import { ArchiveStructure, AudioFormat, ModelCategory, ModelSource, SDKEnvironment } from '../model_types';
+import { AcceleratorPolicy, ArchiveStructure, AudioFormat, ModelCategory, ModelSource, SDKEnvironment } from '../model_types';
 
 export const audioFormatWireString = (e: AudioFormat): string => {
   switch (e) {
@@ -96,6 +96,8 @@ export const modelCategoryWireString = (e: ModelCategory): string => {
       return 'speaker-diarization';
     case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
       return 'semantic-segmentation';
+    case ModelCategory.MODEL_CATEGORY_RERANK:
+      return 'rerank';
     default:
       return '';
   }
@@ -127,6 +129,8 @@ export const modelCategoryFromWireString = (s: string): ModelCategory | undefine
       return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
     case 'semantic-segmentation':
       return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+    case 'rerank':
+      return ModelCategory.MODEL_CATEGORY_RERANK;
     default:
       return undefined;
   }
@@ -217,6 +221,40 @@ export const archiveStructureFromWireString = (s: string): ArchiveStructure | un
       return ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY;
     case 'unknown':
       return ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN;
+    default:
+      return undefined;
+  }
+};
+
+export const acceleratorPolicyWireString = (e: AcceleratorPolicy): string => {
+  switch (e) {
+    case AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED:
+      return 'unspecified';
+    case AcceleratorPolicy.ACCELERATOR_POLICY_AUTO:
+      return 'auto';
+    case AcceleratorPolicy.ACCELERATOR_POLICY_CPU:
+      return 'cpu';
+    case AcceleratorPolicy.ACCELERATOR_POLICY_GPU:
+      return 'gpu';
+    case AcceleratorPolicy.ACCELERATOR_POLICY_NPU:
+      return 'npu';
+    default:
+      return '';
+  }
+};
+
+export const acceleratorPolicyFromWireString = (s: string): AcceleratorPolicy | undefined => {
+  switch (s.toLowerCase()) {
+    case 'unspecified':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_UNSPECIFIED;
+    case 'auto':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_AUTO;
+    case 'cpu':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_CPU;
+    case 'gpu':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_GPU;
+    case 'npu':
+      return AcceleratorPolicy.ACCELERATOR_POLICY_NPU;
     default:
       return undefined;
   }

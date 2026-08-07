@@ -64,25 +64,17 @@ public class CurrentModelResult(
   )
   public val found: Boolean = false,
   @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 4,
-  )
-  public val error_message: String = "",
-  @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.ModelCategory#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val category: ModelCategory = ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
   @field:WireField(
@@ -90,10 +82,16 @@ public class CurrentModelResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "resolvedPath",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val resolved_path: String = "",
   resolved_artifacts: List<ModelFileDescriptor> = emptyList(),
+  @field:WireField(
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 8,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<CurrentModelResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -101,7 +99,7 @@ public class CurrentModelResult(
     adapter = "ai.runanywhere.proto.v1.ModelFileDescriptor#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "resolvedArtifacts",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val resolved_artifacts: List<ModelFileDescriptor> =
       immutableCopyOf("resolved_artifacts", resolved_artifacts)
@@ -120,11 +118,11 @@ public class CurrentModelResult(
     if (model != other.model) return false
     if (loaded_at_unix_ms != other.loaded_at_unix_ms) return false
     if (found != other.found) return false
-    if (error_message != other.error_message) return false
     if (category != other.category) return false
     if (framework != other.framework) return false
     if (resolved_path != other.resolved_path) return false
     if (resolved_artifacts != other.resolved_artifacts) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -136,11 +134,11 @@ public class CurrentModelResult(
       result = result * 37 + (model?.hashCode() ?: 0)
       result = result * 37 + loaded_at_unix_ms.hashCode()
       result = result * 37 + found.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + category.hashCode()
       result = result * 37 + framework.hashCode()
       result = result * 37 + resolved_path.hashCode()
       result = result * 37 + resolved_artifacts.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -152,11 +150,11 @@ public class CurrentModelResult(
     if (model != null) result += """model=$model"""
     result += """loaded_at_unix_ms=$loaded_at_unix_ms"""
     result += """found=$found"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """category=$category"""
     result += """framework=$framework"""
     result += """resolved_path=${sanitize(resolved_path)}"""
     if (resolved_artifacts.isNotEmpty()) result += """resolved_artifacts=$resolved_artifacts"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "CurrentModelResult{", separator = ", ", postfix = "}")
   }
 
@@ -165,13 +163,13 @@ public class CurrentModelResult(
     model: ModelInfo? = this.model,
     loaded_at_unix_ms: Long = this.loaded_at_unix_ms,
     found: Boolean = this.found,
-    error_message: String = this.error_message,
     category: ModelCategory = this.category,
     framework: InferenceFramework = this.framework,
     resolved_path: String = this.resolved_path,
     resolved_artifacts: List<ModelFileDescriptor> = this.resolved_artifacts,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): CurrentModelResult = CurrentModelResult(model_id, model, loaded_at_unix_ms, found, error_message, category, framework, resolved_path, resolved_artifacts, unknownFields)
+  ): CurrentModelResult = CurrentModelResult(model_id, model, loaded_at_unix_ms, found, category, framework, resolved_path, resolved_artifacts, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -198,9 +196,6 @@ public class CurrentModelResult(
         if (value.found != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.found)
         }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error_message)
-        }
         if (value.category != ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED) {
           size += ModelCategory.ADAPTER.encodedSizeWithTag(7, value.category)
         }
@@ -211,6 +206,7 @@ public class CurrentModelResult(
           size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.resolved_path)
         }
         size += ModelFileDescriptor.ADAPTER.asRepeated().encodedSizeWithTag(10, value.resolved_artifacts)
+        size += SDKError.ADAPTER.encodedSizeWithTag(11, value.error)
         return size
       }
 
@@ -227,9 +223,6 @@ public class CurrentModelResult(
         if (value.found != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.found)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
-        }
         if (value.category != ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED) {
           ModelCategory.ADAPTER.encodeWithTag(writer, 7, value.category)
         }
@@ -240,11 +233,13 @@ public class CurrentModelResult(
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.resolved_path)
         }
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: CurrentModelResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
         if (value.resolved_path != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.resolved_path)
@@ -254,9 +249,6 @@ public class CurrentModelResult(
         }
         if (value.category != ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED) {
           ModelCategory.ADAPTER.encodeWithTag(writer, 7, value.category)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
         }
         if (value.found != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.found)
@@ -277,18 +269,17 @@ public class CurrentModelResult(
         var model: ModelInfo? = null
         var loaded_at_unix_ms: Long = 0L
         var found: Boolean = false
-        var error_message: String = ""
         var category: ModelCategory = ModelCategory.MODEL_CATEGORY_UNSPECIFIED
         var framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         var resolved_path: String = ""
         val resolved_artifacts = mutableListOf<ModelFileDescriptor>()
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
             3 -> model = ModelInfo.ADAPTER.decode(reader)
             4 -> loaded_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             5 -> found = ProtoAdapter.BOOL.decode(reader)
-            6 -> error_message = ProtoAdapter.STRING.decode(reader)
             7 -> try {
               category = ModelCategory.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -301,6 +292,7 @@ public class CurrentModelResult(
             }
             9 -> resolved_path = ProtoAdapter.STRING.decode(reader)
             10 -> resolved_artifacts.add(ModelFileDescriptor.ADAPTER.decode(reader))
+            11 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -309,11 +301,11 @@ public class CurrentModelResult(
           model = model,
           loaded_at_unix_ms = loaded_at_unix_ms,
           found = found,
-          error_message = error_message,
           category = category,
           framework = framework,
           resolved_path = resolved_path,
           resolved_artifacts = resolved_artifacts,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -321,6 +313,7 @@ public class CurrentModelResult(
       override fun redact(`value`: CurrentModelResult): CurrentModelResult = value.copy(
         model = value.model?.let(ModelInfo.ADAPTER::redact),
         resolved_artifacts = value.resolved_artifacts.redactElements(ModelFileDescriptor.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

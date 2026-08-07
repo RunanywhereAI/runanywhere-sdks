@@ -1,6 +1,8 @@
 #include "features/llm/tool_calling_grammar.h"
 
+#include <cctype>
 #include <sstream>
+#include <string>
 #include <vector>
 
 namespace rac::llm::tool_calling {
@@ -140,6 +142,22 @@ ToolCallGrammar build_tool_call_grammar(const runanywhere::v1::ToolCallingOption
     }
 
     return result;
+}
+
+runanywhere::v1::ToolCallFormatName resolve_tool_call_format_for_model(
+    runanywhere::v1::ToolCallFormatName requested, const std::string& model_id) {
+    if (requested != runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
+        return requested;
+    }
+    std::string id_lower(model_id);
+    for (char& c : id_lower) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (id_lower.find("lfm") != std::string::npos ||
+        id_lower.find("liquid") != std::string::npos) {
+        return runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2;
+    }
+    return runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON;
 }
 
 #endif  // RAC_HAVE_PROTOBUF

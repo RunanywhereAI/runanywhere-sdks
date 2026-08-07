@@ -69,11 +69,11 @@ public struct SDKException: Error, LocalizedError, Sendable, CustomStringConvert
     /// callers can programmatically identify the failing field without
     /// parsing the human-readable message.
     ///
-    /// Backed by the typed `context.fieldPath` proto field, which is the
-    /// wire-canonical carrier shared with Kotlin / Dart / TS.
+    /// `RAErrorContext`/`SDKError.context` were deleted outright
+    /// (idl/errors.proto); the flat `param` string field (OpenAI's `param`)
+    /// is the wire-canonical carrier now, shared with Kotlin / Dart / TS.
     public var fieldPath: String? {
-        guard proto.hasContext, proto.context.hasFieldPath else { return nil }
-        return proto.context.fieldPath
+        proto.hasParam ? proto.param : nil
     }
 
     // MARK: LocalizedError
@@ -206,14 +206,11 @@ extension SDKException {
         message: String,
         underlying: (any Error)? = nil
     ) -> SDKException {
-        var context = RAErrorContext()
-        context.fieldPath = fieldPath
-
         var proto = RASDKError()
         proto.code = .invalidArgument
         proto.category = .validation
         proto.message = message
-        proto.context = context
+        proto.param = fieldPath
         // Round-trip C ABI code: positive proto code ↔ negative rac_result_t.
         let raw = RAErrorCode.invalidArgument.rawValue
         if raw > 0 && raw <= 899 {

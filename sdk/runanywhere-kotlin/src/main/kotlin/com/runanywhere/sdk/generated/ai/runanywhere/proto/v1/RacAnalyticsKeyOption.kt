@@ -15,8 +15,7 @@ import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
 /**
- * Stable string used in analytics / telemetry instead of the proto
- * enum-constant name. Decouples enum renames from analytics history.
+ * Stable analytics key, so enum renames don't break analytics history.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(

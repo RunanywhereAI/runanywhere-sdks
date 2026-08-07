@@ -13,30 +13,31 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tTSOptionsDefaults = exports.tTSConfigurationDefaults = void 0;
+exports.validateTTSOptions = exports.tTSOptionsDefaults = void 0;
 const model_types_1 = require("../model_types");
-const tTSConfigurationDefaults = () => ({
-    modelId: '',
-    voice: 'default',
-    languageCode: 'en-US',
-    speakingRate: 1.0,
-    pitch: 1.0,
-    volume: 1.0,
-    audioFormat: 0,
-    sampleRate: 22050,
-    enableNeuralVoice: true,
-    enableSsml: false,
-});
-exports.tTSConfigurationDefaults = tTSConfigurationDefaults;
+const _errors_1 = require("./_errors");
 const tTSOptionsDefaults = () => ({
     voice: '',
     languageCode: 'en-US',
-    speakingRate: 1.0,
+    speed: 1.0,
     pitch: 1.0,
     volume: 1.0,
-    enableSsml: false,
     audioFormat: model_types_1.AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: 22050,
-    speakerId: 0,
+    sampleRate: 0,
 });
 exports.tTSOptionsDefaults = tTSOptionsDefaults;
+const validateTTSOptions = (m) => {
+    if (!Number.isFinite(m.speed) || m.speed < 0.5 || m.speed > 2.0) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'TTSOptions.speed',
+            message: `speed must be in 0.5...2.0 (got ${m.speed})`,
+        });
+    }
+    if (!Number.isFinite(m.pitch) || m.pitch < 0.5 || m.pitch > 2.0) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'TTSOptions.pitch',
+            message: `pitch must be in 0.5...2.0 (got ${m.pitch})`,
+        });
+    }
+};
+exports.validateTTSOptions = validateTTSOptions;

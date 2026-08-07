@@ -20,6 +20,8 @@
 
 package com.runanywhere.sdk.public.extensions.LLM
 
+import ai.runanywhere.proto.v1.ToolCallingHistoryTurn
+import ai.runanywhere.proto.v1.ToolCallingRole
 import ai.runanywhere.proto.v1.ToolCallingSessionCreateRequest
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -145,8 +147,22 @@ internal fun <T> runBlockingToolExecutor(
     block: suspend () -> T,
 ): T = runBlocking(ownerJob) { block() }
 
-/** Pure request builder kept separate so zero-valued greedy sampling and
- * forced-tool routing cannot regress silently at the Kotlin/native boundary. */
+/**
+ * Pure request builder kept separate so forced-tool routing and history
+ * mapping cannot regress silently at the Kotlin/native boundary.
+ *
+ * idl/tool_calling.proto (tools-collapse-options-and-session-request)
+ * collapsed `ToolCallingSessionCreateRequest` to `prompt` / `history`
+ * (`List<ToolCallingHistoryTurn>`) / `options` (`ToolCallingOptions`),
+ * deleting the dozen knobs (max_tokens, temperature, top_p, tools, format,
+ * max_tool_calls, auto_execute, replace_system_prompt,
+ * require_json_arguments, keep_tools_available, parallel_tool_calls,
+ * validate_calls, tool_choice, forced_tool_name, disable_thinking,
+ * system_prompt) that used to be re-published on the request envelope.
+ * Every one of them now lives exclusively on [ToolCallingOptions]; commons
+ * has no `temperature`/`max_output_tokens` knob for the tool loop at all
+ * (mirrors Swift `makeRunLoopRequest`, which drops them too).
+ */
 internal fun makeToolCallingRunLoopRequest(
     prompt: String,
     options: ToolCallingOptions,
@@ -158,41 +174,40 @@ internal fun makeToolCallingRunLoopRequest(
     // every generate in the loop so multi-turn tool use keeps context. Same
     // contract as the standard path's ChatMessage history, as strings.
     history: List<String> = emptyList(),
-): ToolCallingSessionCreateRequest =
-    ToolCallingSessionCreateRequest(
+): ToolCallingSessionCreateRequest {
+    val effectiveOptions =
+        options.copy(
+            tools = tools,
+            validate_calls = validateCalls ?: options.validate_calls,
+            top_p = options.top_p ?: llmOptions.top_p,
+            system_prompt =
+                options.system_prompt?.takeIf { it.isNotEmpty() }
+                    ?: llmOptions.system_prompt?.takeIf { it.isNotEmpty() },
+            // Suppress thinking when either options surface asks for it
+            // (commons prepends the no-think directive).
+            disable_thinking =
+                (options.disable_thinking ?: false) ||
+                    (llmOptions.reasoning?.mode == ai.runanywhere.proto.v1.ReasoningMode.REASONING_MODE_OFF),
+        )
+    return ToolCallingSessionCreateRequest(
         prompt = prompt,
-        max_tokens = options.max_tokens?.takeIf { it > 0 } ?: llmOptions.max_tokens,
-        // Zero is a real greedy temperature. Do not use takeIf/non-zero
-        // fallback here; the native tool loop now honors this value exactly.
-        temperature = options.temperature ?: llmOptions.temperature,
-        top_p = llmOptions.top_p,
-        system_prompt =
-            options.system_prompt?.takeIf { it.isNotEmpty() }
-                ?: llmOptions.system_prompt?.takeIf { it.isNotEmpty() }
-                ?: "",
-        format =
-            options.format
-                ?: ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
-        max_tool_calls = options.effectiveMaxToolCalls(),
-        keep_tools_available = options.keep_tools_available,
-        // Suppress thinking when either options surface asks for it (commons
-        // prepends the no-think directive).
-        disable_thinking = (options.disable_thinking ?: false) || llmOptions.disable_thinking,
-        validate_calls = validateCalls,
-        tools = tools,
-        tool_choice =
-            options.tool_choice.takeIf {
-                it != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
-            },
-        forced_tool_name = options.forced_tool_name?.takeIf { it.isNotEmpty() },
-        auto_execute = options.auto_execute,
-        replace_system_prompt = options.replace_system_prompt,
-        require_json_arguments = options.require_json_arguments,
-        history = history,
-        // TC-2: mirror options onto request field 20 — commons reads parallel
-        // mode from the session/run-loop request, not from inline options alone.
-        parallel_tool_calls = options.parallel_tool_calls,
+        options = effectiveOptions,
+        history = history.toToolCallingHistoryTurns(),
     )
+}
+
+/**
+ * Flat alternating `[user0, asst0, user1, ...]` strings map onto alternating
+ * USER/ASSISTANT [ToolCallingHistoryTurn]s (mirrors Swift `makeRunLoopRequest`
+ * — `index.isMultiple(of: 2) ? .user : .assistant`).
+ */
+private fun List<String>.toToolCallingHistoryTurns(): List<ToolCallingHistoryTurn> =
+    mapIndexed { index, content ->
+        ToolCallingHistoryTurn(
+            role = if (index % 2 == 0) ToolCallingRole.TOOL_CALLING_ROLE_USER else ToolCallingRole.TOOL_CALLING_ROLE_ASSISTANT,
+            content = content,
+        )
+    }
 
 /**
  * Tool calling orchestrator behind the public `RunAnywhere.{registerTool,
@@ -284,6 +299,12 @@ internal object ToolCallingOrchestrator {
      * Build a `ToolResult` proto from a typed result map. Mirrors Swift's
      * `makeToolResult(...)`: `result_json` is the canonical wire shape (the
      * C++ tool-prompt formatter reads it directly).
+     *
+     * `success` (the caller-facing param, unchanged) is inverted onto the
+     * wire: `ToolResult.success` was deleted and replaced by `is_error` with
+     * OPPOSITE polarity (idl/tool_calling.proto) — a `ToolResult` nobody
+     * touched (`is_error == false`, the proto3 zero value) now reads as a
+     * good result. Industry: Anthropic `is_error`, MCP `isError`.
      */
     private fun makeToolResult(
         name: String,
@@ -299,7 +320,7 @@ internal object ToolCallingOrchestrator {
             name = name,
             result_json = RAToolValue.jsonString(from = result),
             error = error,
-            success = success,
+            is_error = !success,
             started_at_ms = startedAtMs,
             completed_at_ms = completedAtMs,
         )

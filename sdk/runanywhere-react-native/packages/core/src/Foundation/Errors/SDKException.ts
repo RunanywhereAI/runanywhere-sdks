@@ -13,7 +13,6 @@ import {
   ErrorCategory as ErrorCategoryProto,
   ErrorCode as ErrorCodeProto,
   type SDKError as SDKErrorProto,
-  type ErrorContext as ErrorContextProto,
   SDKError as SDKErrorProtoCtor,
 } from '@runanywhere/proto-ts/errors';
 
@@ -47,24 +46,19 @@ export class SDKException extends Error {
     return this.proto.cAbiCode;
   }
 
-  /** Optional source location + telemetry metadata. */
-  get context(): ErrorContextProto | undefined {
-    return this.proto.context;
-  }
-
   /**
    * Structured validation field-path accessor.
    *
-   * Byte-isomorphic with Swift/Kotlin/Flutter SDKException: reads the typed
-   * `ErrorContext.fieldPath` proto field. Cross-SDK consumer code can rely on
+   * `ErrorContext` is deleted outright — `SDKError.param` ("<Message>.<field>",
+   * OpenAI's `param`) now carries the field path directly, no longer nested
+   * under a `context` submessage. Cross-SDK consumer code can rely on
    * `e.fieldPath === 'X.y'` regardless of which SDK threw the exception.
    * Returns `undefined` when no value is carried (e.g. non-validation
    * exceptions).
    */
   get fieldPath(): string | undefined {
-    const ctx = this.proto.context;
-    const path = ctx?.fieldPath;
-    return path && path.length > 0 ? path : undefined;
+    const param = this.proto.param;
+    return param && param.length > 0 ? param : undefined;
   }
 
   /**
@@ -115,7 +109,8 @@ export class SDKException extends Error {
       category?: ErrorCategoryProto;
       cAbiCode?: number;
       nestedMessage?: string;
-      context?: ErrorContextProto;
+      /** "<Message>.<field>" — replaces the deleted `ErrorContext.fieldPath`. */
+      param?: string;
     }
   ): SDKException {
     // Round-trip C ABI code: positive proto code ↔ negative rac_result_t.
@@ -132,7 +127,7 @@ export class SDKException extends Error {
       message,
       cAbiCode,
       nestedMessage: options?.nestedMessage,
-      context: options?.context,
+      param: options?.param,
     });
     return new SDKException(proto);
   }
@@ -234,15 +229,10 @@ export class SDKException extends Error {
         category: ErrorCategoryProto.ERROR_CATEGORY_VALIDATION,
         cAbiCode: -259,
         nestedMessage: args.cause?.message,
-        // ErrorContext.fieldPath carries the structured field path so the
+        // `SDKError.param` carries the structured field path directly now
+        // (the nested `ErrorContext` submessage is deleted outright) so the
         // accessor `e.fieldPath` returns the value across SDKs.
-        context: {
-          metadata: {},
-          fieldPath: args.fieldPath,
-          sourceFile: undefined,
-          sourceLine: undefined,
-          operation: undefined,
-        } as ErrorContextProto,
+        param: args.fieldPath,
       }
     );
   }
@@ -307,6 +297,17 @@ export class SDKException extends Error {
       ? `${feature} not implemented`
       : 'Not implemented';
     return SDKException.of(ErrorCodeProto.ERROR_CODE_NOT_IMPLEMENTED, message);
+  }
+
+  /** Raised when a native ABI symbol or platform feature is absent. */
+  static featureNotAvailable(feature?: string): SDKException {
+    const message = feature
+      ? `Feature '${feature}' is not available.`
+      : 'Feature is not available.';
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_FEATURE_NOT_AVAILABLE,
+      message
+    );
   }
 
   /**

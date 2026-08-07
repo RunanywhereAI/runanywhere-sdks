@@ -22,6 +22,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.STTAudioSource
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.STTPartialResult
+import ai.runanywhere.proto.v1.STTServiceState
 import ai.runanywhere.proto.v1.STTStreamEvent
 import ai.runanywhere.proto.v1.STTStreamEventKind
 import ai.runanywhere.proto.v1.STTTranscriptionRequest
@@ -149,6 +150,17 @@ object CppBridgeSTT {
     }
 
     /**
+     * Snapshot the lifecycle STT service state. Mirrors iOS Swift's
+     * `rac_stt_state_lifecycle_proto` call site — no handle is threaded.
+     */
+    suspend fun state(): STTServiceState =
+        decodeOrThrow(
+            STTServiceState.ADAPTER,
+            RunAnywhereBridge.racSttStateLifecycleProto(),
+            "racSttStateLifecycleProto",
+        )
+
+    /**
      * One-shot transcription via lifecycle-loaded STT model.
      *
      * Mirrors iOS Swift's `RunAnywhere.transcribe(...)` which builds an
@@ -238,7 +250,7 @@ object CppBridgeSTT {
                 if (chunk.isEmpty()) return@collect
                 val feedRc = RunAnywhereBridge.racSttStreamFeedAudioProto(sessionId, chunk)
                 if (feedRc != RunAnywhereBridge.RAC_SUCCESS) {
-                    onPartial(errorPartial("STT stream feed failed: $feedRc", feedRc))
+                    onPartial(errorPartial("STT stream feed failed: $feedRc"))
                     shouldCancel = true
                     throw SDKException.operation("racSttStreamFeedAudioProto failed with rc=$feedRc")
                 }
@@ -246,7 +258,7 @@ object CppBridgeSTT {
 
             val stopRc = RunAnywhereBridge.racSttStreamStopProto(sessionId)
             if (stopRc != RunAnywhereBridge.RAC_SUCCESS) {
-                onPartial(errorPartial("STT stream stop failed: $stopRc", stopRc))
+                onPartial(errorPartial("STT stream stop failed: $stopRc"))
             }
         } catch (e: CancellationException) {
             shouldCancel = true
@@ -292,6 +304,15 @@ object CppBridgeSTT {
         return getHandle()
     }
 
+    /**
+     * `STTPartialResult` collapsed to `text`/`is_final`/`language`
+     * (idl/stt_options.proto): `final_output`/`confidence`/`audio_start_ms`/
+     * `audio_end_ms` no longer exist on it, so a FINAL event now only
+     * back-fills `text` from `STTStreamEvent.final_output` (a distinct,
+     * still-live field) when the partial's own text is empty, and a
+     * synthetic failure carries its message on `text` alone. Mirrors
+     * Swift's `CppBridge+STT.swift` `yield(_:)`/`yieldFailure`.
+     */
     private fun partialFromEvent(event: STTStreamEvent): STTPartialResult? =
         when (event.kind) {
             STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL,
@@ -301,25 +322,22 @@ object CppBridgeSTT {
                 val basis = event.partial ?: STTPartialResult()
                 basis.copy(
                     is_final = true,
-                    final_output = event.final_output ?: basis.final_output,
                     text = basis.text.ifEmpty { event.final_output?.text.orEmpty() },
                 )
             }
             STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR ->
                 errorPartial(
-                    event.error_message ?: "STT stream failed",
-                    event.error_code,
+                    event.error?.message?.takeIf { it.isNotBlank() } ?: "STT stream failed",
                 )
             STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED,
             STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED,
             -> null
         }
 
-    private fun errorPartial(message: String, code: Int): STTPartialResult =
+    private fun errorPartial(message: String): STTPartialResult =
         STTPartialResult(
             text = message,
             is_final = true,
-            final_output = STTOutput(text = message, error_message = message, error_code = code),
         )
 
     private fun InferenceFramework.toCFramework(): Int =

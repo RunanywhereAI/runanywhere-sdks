@@ -17,23 +17,9 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * AccelerationPreference enum moved to hardware_profile.proto.
- * Hardware preference is a pure hardware concern; consolidating it
- * there avoids cyclic proto imports and collapses the prior duplicate
- * AcceleratorPreference (ANE/GPU/CPU/AUTO) with the richer AccelerationPreference
- * (AUTO/CPU/GPU/NPU/WEBGPU/METAL/VULKAN) into a single enum. Messages in this
- * file reference it via the existing `import "hardware_profile.proto";`.
- * ---------------------------------------------------------------------------
- * ---------------------------------------------------------------------------
- * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
- *   Web    enums.ts (RoutingPolicy)
- *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
- *          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
- *   Swift  extensions (RoutingPolicy)
- * Canonical short-form below; specific PreferLocal/PreferCloud cover the
- * "preferred" cases, MANUAL covers explicit user override.
- * ---------------------------------------------------------------------------
+ * AccelerationPreference lives in hardware_profile.proto, imported above.
+ * On-device versus cloud routing. PREFER_LOCAL and PREFER_CLOUD cover the
+ * "preferred" cases; MANUAL is an explicit user override.
  */
 public enum class RoutingPolicy(
   override val `value`: Int,

@@ -4,12 +4,17 @@
  * Typed model-lifecycle stream over the raw SDK event bus — Swift parity:
  * `EventBus+ModelLifecycle.swift` (Public/Extensions/Events).
  *
- * Native commons signals "model loaded/unloaded" on THREE different proto
+ * Native commons signals "model loaded/unloaded" on TWO different proto
  * channels depending on the path that performed the work:
  *   1. component-lifecycle events (EVENT_CATEGORY_COMPONENT,
  *      `event.componentLifecycle.currentState`) — the `loadModel` path,
- *   2. model events (`event.model.kind` load/unload completed),
- *   3. LLM generation events (`event.generation.kind` modelLoaded/Unloaded).
+ *   2. model events (`event.model.kind` load/unload completed).
+ *
+ * `GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED`/`_UNLOADED` were
+ * deleted outright (idl/sdk_events.proto: "Model load/unload ->
+ * ModelEventKind") — the third channel this file used to fold in no longer
+ * exists; ModelEvent is now the sole channel for load/unload completions
+ * outside the component-lifecycle path.
  *
  * Which channel fires when is an SDK-internal detail. Consumers should not
  * need to know it — `modelLifecycle()` folds them into one typed stream;
@@ -21,7 +26,6 @@
 
 import { ComponentLifecycleState, EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
-  GenerationEventKind,
   ModelEventKind,
   type SDKComponent,
   type SDKEvent as ProtoSDKEvent,
@@ -91,20 +95,16 @@ export function modelLifecycleChange(event: ProtoSDKEvent): ModelLifecycleChange
     }
   }
 
-  // Channels 2 + 3: model events and LLM generation events.
-  const modelId = event.model?.modelId || event.generation?.modelId || '';
+  // Channel 2: model events. GenerationEventKind's own MODEL_LOADED/
+  // MODEL_UNLOADED cases were deleted outright (idl/sdk_events.proto), so
+  // this is the only remaining non-component-lifecycle channel.
+  const modelId = event.model?.modelId || '';
 
-  if (
-    event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED ||
-    event.generation?.kind === GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED
-  ) {
+  if (event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED) {
     return { kind: 'loaded', modelId, component: event.component, event };
   }
 
-  if (
-    event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED ||
-    event.generation?.kind === GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED
-  ) {
+  if (event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED) {
     return { kind: 'unloaded', modelId, component: event.component, event };
   }
 

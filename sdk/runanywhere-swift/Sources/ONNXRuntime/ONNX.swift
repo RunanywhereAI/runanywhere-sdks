@@ -33,10 +33,10 @@ import RunAnywhere
 ///
 /// ```swift
 /// // STT via public API
-/// let text = try await RunAnywhere.transcribe(audioData)
+/// let transcript = try await RunAnywhere.stt.transcribe(.wav(audioData))
 ///
 /// // TTS via public API
-/// try await RunAnywhere.speak("Hello")
+/// try await RunAnywhere.tts.speak("Hello")
 /// ```
 public enum ONNX {
     private static let logger = SDKLogger(category: "ONNX")

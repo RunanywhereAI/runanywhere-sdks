@@ -33,7 +33,10 @@
 #include "rac/features/stt/rac_stt_stream.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/tts/rac_tts_stream.h"
+#include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/rerank/rac_rerank_component.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
@@ -568,6 +571,21 @@ HybridRunAnywhereCore::sttTranscribeProto(
     });
 }
 
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::sttStateProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = rac_stt_state_lifecycle_proto(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("sttStateProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "sttStateProto");
+    });
+}
+
 std::shared_ptr<Promise<void>>
 HybridRunAnywhereCore::sttTranscribeStreamProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes,
@@ -880,6 +898,21 @@ HybridRunAnywhereCore::ttsStopProto() {
     });
 }
 
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::ttsStateProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = rac_tts_state_lifecycle_proto(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("ttsStateProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "ttsStateProto");
+    });
+}
+
 // ============================================================================
 // VAD Capability (Backend-Agnostic)
 // Calls rac_vad_component_* APIs - works with any registered backend
@@ -1120,6 +1153,103 @@ HybridRunAnywhereCore::diffusionGenerateLifecycleProto(
 }
 
 // ============================================================================
+// Diarization / Segmentation Capabilities
+// Both publish handle-free `*_lifecycle_proto` verbs whose commons resolver
+// reads the global loaded-model store, exactly like the VLM and diffusion
+// paths above. Load the model through modelLifecycleLoadProto first.
+// ============================================================================
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::diarizationDiarizeLifecycleProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [request = std::move(request)]() {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc =
+            rac_diarization_diarize_lifecycle_proto(requestData, request.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("diarizationDiarizeLifecycleProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "diarizationDiarizeLifecycleProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::segmentationSegmentLifecycleProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [request = std::move(request)]() {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc =
+            rac_segmentation_segment_lifecycle_proto(requestData, request.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("segmentationSegmentLifecycleProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "segmentationSegmentLifecycleProto");
+    });
+}
+
+// ============================================================================
+// Rerank Capability
+// The revived rerank primitive ships only the handle-scoped
+// `rac_rerank_component_rerank_proto`, whose lifecycle acquire is
+// owner-scoped, so this bridge owns the component handle and loads the
+// caller-resolved model into it before scoring. Mirrors the handle-prep half
+// of Kotlin's CppBridgeRerank.
+// ============================================================================
+
+static std::mutex g_rerank_mutex;
+static rac_handle_t g_rerank_component_handle = nullptr;
+static std::string g_rerank_loaded_model_id;
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::rerankProto(const std::string& modelPath, const std::string& modelId,
+                                   const std::string& modelName,
+                                   const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [request = std::move(request), modelPath, modelId, modelName]() {
+        std::lock_guard<std::mutex> lock(g_rerank_mutex);
+        if (g_rerank_component_handle == nullptr) {
+            rac_result_t created = rac_rerank_component_create(&g_rerank_component_handle);
+            if (created != RAC_SUCCESS || g_rerank_component_handle == nullptr) {
+                throw std::runtime_error("rerankProto: rac_rerank_component_create failed");
+            }
+        }
+        if (g_rerank_loaded_model_id != modelId) {
+            rac_result_t loaded = rac_rerank_component_load_model(
+                g_rerank_component_handle, modelPath.c_str(), modelId.c_str(), modelName.c_str());
+            if (loaded != RAC_SUCCESS) {
+                throw std::runtime_error("rerankProto: rerank model load failed for " + modelId);
+            }
+            g_rerank_loaded_model_id = modelId;
+        }
+
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = rac_rerank_component_rerank_proto(g_rerank_component_handle, requestData,
+                                                           request.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("rerankProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "rerankProto");
+    });
+}
+
+// ============================================================================
 // Voice Agent Capability (Backend-Agnostic)
 // Calls rac_voice_agent_* APIs - requires STT, LLM, TTS, and VAD backends
 // Uses a standalone voice agent whose child handles are owned by commons.
@@ -1344,11 +1474,10 @@ HybridRunAnywhereCore::voiceAgentProcessTurnProto(
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::voiceAgentFeedAudioProto(
-    const std::shared_ptr<ArrayBuffer>& audioBytes, double sampleRateHz,
-    double channels, double encoding, bool isFinal) {
-    auto audio = copyVoiceArrayBufferBytes(audioBytes);
+    const std::shared_ptr<ArrayBuffer>& frameBytes) {
+    auto frame = copyVoiceArrayBufferBytes(frameBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [audio = std::move(audio), sampleRateHz, channels, encoding, isFinal]() {
+        [frame = std::move(frame)]() {
             rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
             if (!handle) {
                 LOGE("voiceAgentFeedAudioProto: handle unavailable");
@@ -1356,13 +1485,9 @@ HybridRunAnywhereCore::voiceAgentFeedAudioProto(
             }
             rac_proto_buffer_t out;
             rac_proto_buffer_init(&out);
-            const void* data = audio.empty() ? nullptr : audio.data();
+            const uint8_t* data = frame.empty() ? nullptr : frame.data();
             rac_result_t rc = rac_voice_agent_feed_audio_proto(
-                handle, data, audio.size(),
-                static_cast<int32_t>(sampleRateHz),
-                static_cast<int32_t>(channels),
-                static_cast<int32_t>(encoding),
-                isFinal ? RAC_TRUE : RAC_FALSE, &out);
+                handle, data, frame.size(), &out);
             if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
                 LOGE("voiceAgentFeedAudioProto: rc=%d", rc);
                 rac_proto_buffer_free(&out);
@@ -1430,6 +1555,16 @@ void resetAllGlobalComponentHandles() {
             rac_vad_component_cleanup(g_vad_component_handle);
             rac_vad_component_destroy(g_vad_component_handle);
             g_vad_component_handle = nullptr;
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_rerank_mutex);
+        if (g_rerank_component_handle != nullptr) {
+            rac_rerank_component_unload(g_rerank_component_handle);
+            rac_rerank_component_destroy(g_rerank_component_handle);
+            g_rerank_component_handle = nullptr;
+            g_rerank_loaded_model_id.clear();
         }
     }
 

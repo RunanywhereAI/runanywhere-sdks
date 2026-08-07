@@ -4,7 +4,7 @@
  *
  * iOS runs scenario suites per modality (LLM/STT/TTS/VLM) through
  * `BenchmarkRunner`; the web MVP scopes to what the web SDK exposes today:
- * a short `RunAnywhere.generateStream` run against the loaded LLM, reporting
+ * a short `RunAnywhere.llm.generateStream` run against the loaded LLM, reporting
  * time-to-first-token and tokens/sec (iOS parity:
  * LLMBenchmarkProvider.swift:84-90 — SDK stream-result metrics preferred,
  * wall-clock fallback). Results are kept in an in-memory history list.
@@ -14,6 +14,7 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
+  type GenerationResult,
 } from '@runanywhere/web';
 import {
   findLoadedModelForCategory,
@@ -97,7 +98,7 @@ function renderBenchmarks(): void {
       <div class="docs-section">
         <h3>LLM generation</h3>
         <p class="text-secondary">Runs a streamed generation against the loaded
-        LLM via <code>RunAnywhere.generateStream</code> and reports
+        LLM via <code>RunAnywhere.llm.generateStream</code> and reports
         time-to-first-token and tokens/sec.</p>
         <div class="toolbar-actions">
           ${SCENARIOS.map((s) => `
@@ -172,27 +173,31 @@ async function runBenchmark(scenario: string, maxTokens: number): Promise<void> 
   let tokenCount = 0;
 
   try {
-    const stream = await RunAnywhere.generateStream({
-      prompt: BENCH_PROMPT,
-      maxTokens,
+    let completed: GenerationResult | null = null;
+    for await (const event of RunAnywhere.llm.generateStream(BENCH_PROMPT, {
+      maxOutputTokens: maxTokens,
       temperature: 0,
-    });
-    for await (const _token of stream.stream) {
-      if (firstTokenAt == null) firstTokenAt = performance.now();
-      tokenCount += 1;
+    })) {
+      if (event.type === 'textDelta') {
+        if (firstTokenAt == null) firstTokenAt = performance.now();
+        tokenCount += 1;
+      } else if (event.type === 'completed') {
+        completed = event.result;
+      }
     }
-    const result = await stream.result;
     const wallMs = performance.now() - startedAt;
 
-    // Prefer SDK-reported metrics; fall back to wall-clock measurements
-    // (iOS parity: LLMBenchmarkProvider.swift:84-90).
-    const totalTimeMs = result.generationTimeMs > 0 ? result.generationTimeMs : wallMs;
-    const ttftMs = result.ttftMs != null && result.ttftMs > 0
-      ? result.ttftMs
+    // Every generation result carries the same metrics block, so the wall-clock
+    // fallbacks below only apply when a backend reports zeros.
+    const totalTimeMs = wallMs;
+    const ttftMs = completed && completed.timeToFirstTokenMs > 0
+      ? completed.timeToFirstTokenMs
       : firstTokenAt != null ? firstTokenAt - startedAt : null;
-    const outputTokens = result.tokensGenerated > 0 ? result.tokensGenerated : tokenCount;
-    const tokensPerSecond = result.tokensPerSecond > 0
-      ? result.tokensPerSecond
+    const outputTokens = completed && completed.outputTokens > 0
+      ? completed.outputTokens
+      : tokenCount;
+    const tokensPerSecond = completed && completed.tokensPerSecond > 0
+      ? completed.tokensPerSecond
       : totalTimeMs > 0 ? outputTokens / (totalTimeMs / 1000) : null;
 
     history.unshift({

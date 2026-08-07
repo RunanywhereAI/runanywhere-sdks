@@ -99,35 +99,16 @@ bool dispatch_expected_files(const runanywhere::v1::ModelInfo& model,
 // ---------------------------------------------------------------------------
 // Test cases — Swift parity matrix.
 // ---------------------------------------------------------------------------
-int test_top_level_expected_files_short_circuit() {
-    // Swift's `if hasExpectedFiles { return expectedFiles }` short-circuit:
-    // when the top-level model.expected_files manifest is set, return it
-    // verbatim regardless of what the artifact carries.
-    runanywhere::v1::ModelInfo model;
-    model.set_id("top-level-manifest");
-    runanywhere::v1::ExpectedModelFiles* top = model.mutable_expected_files();
-    top->add_required_patterns("*.bin");
-    top->add_optional_patterns("README.md");
-    top->set_root_directory("models/whisper-tiny");
-    top->set_description("Top-level wins.");
-
-    // Even if the artifact branch has a competing manifest, Swift returns the
-    // top-level one. Wire one into single_file to verify we don't pick it up.
-    runanywhere::v1::SingleFileArtifact* art = model.mutable_single_file();
-    art->mutable_expected_files()->add_required_patterns("ignored.bin");
-
-    runanywhere::v1::ExpectedModelFiles result;
-    ASSERT_TRUE(dispatch_expected_files(model, &result));
-
-    ASSERT_EQ(result.required_patterns_size(), 1);
-    ASSERT_STR_EQ(result.required_patterns(0), std::string("*.bin"));
-    ASSERT_EQ(result.optional_patterns_size(), 1);
-    ASSERT_STR_EQ(result.optional_patterns(0), std::string("README.md"));
-    ASSERT_STR_EQ(result.root_directory(), std::string("models/whisper-tiny"));
-    ASSERT_STR_EQ(result.description(), std::string("Top-level wins."));
-    ASSERT_EQ(result.files_size(), 0);
-    return 0;
-}
+//
+// NOTE: ModelInfo.expected_files (the top-level short-circuit) and the
+// required_patterns/optional_patterns shorthand directly on
+// SingleFileArtifact/ArchiveArtifact were removed from the proto (see
+// idl/model_types.proto reserved tags on ModelInfo and SingleFileArtifact /
+// ArchiveArtifact). Patterns now live solely on ExpectedModelFiles, reached
+// via the artifact's `expected_files` submessage. The tests that exercised
+// the removed top-level short-circuit and the removed patterns-shorthand
+// fields were deleted accordingly (test_top_level_expected_files_short_circuit,
+// test_single_file_with_pattern_shorthand, test_tar_gz_archive_with_pattern_shorthand).
 
 int test_single_file_with_explicit_manifest() {
     // SINGLE_FILE artifact carrying an explicit ExpectedModelFiles manifest.
@@ -147,30 +128,6 @@ int test_single_file_with_explicit_manifest() {
     ASSERT_EQ(result.optional_patterns_size(), 1);
     ASSERT_STR_EQ(result.optional_patterns(0), std::string("tokenizer.json"));
     ASSERT_STR_EQ(result.description(), std::string("Single file with manifest."));
-    return 0;
-}
-
-int test_single_file_with_pattern_shorthand() {
-    // SINGLE_FILE artifact with patterns shorthand (no explicit manifest).
-    runanywhere::v1::ModelInfo model;
-    model.set_id("single-file-patterns");
-    runanywhere::v1::SingleFileArtifact* art = model.mutable_single_file();
-    art->add_required_patterns("*.gguf");
-    art->add_required_patterns("config.json");
-    art->add_optional_patterns("README.md");
-
-    runanywhere::v1::ExpectedModelFiles result;
-    ASSERT_TRUE(dispatch_expected_files(model, &result));
-
-    ASSERT_EQ(result.required_patterns_size(), 2);
-    ASSERT_STR_EQ(result.required_patterns(0), std::string("*.gguf"));
-    ASSERT_STR_EQ(result.required_patterns(1), std::string("config.json"));
-    ASSERT_EQ(result.optional_patterns_size(), 1);
-    ASSERT_STR_EQ(result.optional_patterns(0), std::string("README.md"));
-    // Description and root_directory remain empty when synthesised from
-    // patterns shorthand.
-    ASSERT_STR_EQ(result.description(), std::string(""));
-    ASSERT_STR_EQ(result.root_directory(), std::string(""));
     return 0;
 }
 
@@ -196,51 +153,34 @@ int test_zip_archive_with_explicit_manifest() {
     return 0;
 }
 
-int test_tar_gz_archive_with_pattern_shorthand() {
-    // ARCHIVE (tar.gz) artifact with patterns shorthand.
-    runanywhere::v1::ModelInfo model;
-    model.set_id("tar-gz-patterns");
-    runanywhere::v1::ArchiveArtifact* art = model.mutable_archive();
-    art->set_type(runanywhere::v1::ARCHIVE_TYPE_TAR_GZ);
-    art->set_structure(runanywhere::v1::ARCHIVE_STRUCTURE_NESTED_DIRECTORY);
-    art->add_required_patterns("*.onnx");
-    art->add_optional_patterns("tokens.txt");
-
-    runanywhere::v1::ExpectedModelFiles result;
-    ASSERT_TRUE(dispatch_expected_files(model, &result));
-
-    ASSERT_EQ(result.required_patterns_size(), 1);
-    ASSERT_STR_EQ(result.required_patterns(0), std::string("*.onnx"));
-    ASSERT_EQ(result.optional_patterns_size(), 1);
-    ASSERT_STR_EQ(result.optional_patterns(0), std::string("tokens.txt"));
-    return 0;
-}
-
 int test_multi_file_descriptors() {
     // MULTI_FILE artifact: ExpectedModelFiles.files seeded from descriptor
     // list. Mirrors Swift's
     //   var expected = RAExpectedModelFiles()
     //   expected.files = artifact.files
     //   return expected
-    // Each descriptor's url/filename/role/is_required round-trips.
+    // Each descriptor's url/filename/role/is_optional round-trips.
+    // NOTE: is_required (tag 3) was reserved and replaced by is_optional
+    // (tag 12) with INVERTED semantics -- is_required=true becomes
+    // is_optional=false, and is_required=false becomes is_optional=true.
     runanywhere::v1::ModelInfo model;
     model.set_id("multi-file");
     runanywhere::v1::MultiFileArtifact* art = model.mutable_multi_file();
 
-    // Primary GGUF model file.
+    // Primary GGUF model file (required).
     {
         runanywhere::v1::ModelFileDescriptor* d = art->add_files();
         d->set_url("https://example.test/qwen-vl/model.gguf");
         d->set_filename("model.gguf");
-        d->set_is_required(true);
+        d->set_is_optional(false);
         d->set_role(runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
     }
-    // Vision projector (mmproj).
+    // Vision projector (mmproj, required).
     {
         runanywhere::v1::ModelFileDescriptor* d = art->add_files();
         d->set_url("https://example.test/qwen-vl/mmproj.gguf");
         d->set_filename("mmproj.gguf");
-        d->set_is_required(true);
+        d->set_is_optional(false);
         d->set_role(runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
     }
     // Tokenizer (optional).
@@ -248,7 +188,7 @@ int test_multi_file_descriptors() {
         runanywhere::v1::ModelFileDescriptor* d = art->add_files();
         d->set_url("https://example.test/qwen-vl/tokenizer.json");
         d->set_filename("tokenizer.json");
-        d->set_is_required(false);
+        d->set_is_optional(true);
         d->set_role(runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
     }
 
@@ -262,14 +202,14 @@ int test_multi_file_descriptors() {
 
     ASSERT_STR_EQ(result.files(0).url(), std::string("https://example.test/qwen-vl/model.gguf"));
     ASSERT_STR_EQ(result.files(0).filename(), std::string("model.gguf"));
-    ASSERT_EQ(result.files(0).is_required(), true);
+    ASSERT_EQ(result.files(0).is_optional(), false);
     ASSERT_EQ(result.files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
 
     ASSERT_STR_EQ(result.files(1).filename(), std::string("mmproj.gguf"));
     ASSERT_EQ(result.files(1).role(), runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
 
     ASSERT_STR_EQ(result.files(2).filename(), std::string("tokenizer.json"));
-    ASSERT_EQ(result.files(2).is_required(), false);
+    ASSERT_EQ(result.files(2).is_optional(), true);
     ASSERT_EQ(result.files(2).role(), runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
     return 0;
 }
@@ -319,20 +259,10 @@ int test_built_in_artifact_default() {
     return 0;
 }
 
-int test_custom_strategy_id_default() {
-    // custom_strategy_id artifact → empty manifest (Swift's `.custom` falls
-    // through the `default` arm of expectedFiles).
-    runanywhere::v1::ModelInfo model;
-    model.set_id("custom-strategy");
-    model.set_custom_strategy_id("my-strategy");
-
-    runanywhere::v1::ExpectedModelFiles result;
-    ASSERT_TRUE(dispatch_expected_files(model, &result));
-
-    ASSERT_EQ(result.required_patterns_size(), 0);
-    ASSERT_EQ(result.files_size(), 0);
-    return 0;
-}
+// test_custom_strategy_id_default deleted: ModelInfo.custom_strategy_id
+// (former tag 23) is reserved -- the field no longer exists (see
+// idl/model_types.proto: "reserved 23, 25, 26; // custom_strategy_id
+// (undocumented registry), ...").
 
 int test_empty_model_bytes_returns_empty_manifest() {
     // Empty input → default ModelInfo → empty manifest.
@@ -395,21 +325,14 @@ int main(int /*argc*/, char** /*argv*/) {
         int (*fn)();
     };
     static const TestCase kTests[] = {
-        {.name = "top_level_expected_files_short_circuit",
-         .fn = test_top_level_expected_files_short_circuit},
         {.name = "single_file_with_explicit_manifest",
          .fn = test_single_file_with_explicit_manifest},
-        {.name = "single_file_with_pattern_shorthand",
-         .fn = test_single_file_with_pattern_shorthand},
         {.name = "zip_archive_with_explicit_manifest",
          .fn = test_zip_archive_with_explicit_manifest},
-        {.name = "tar_gz_archive_with_pattern_shorthand",
-         .fn = test_tar_gz_archive_with_pattern_shorthand},
         {.name = "multi_file_descriptors", .fn = test_multi_file_descriptors},
         {.name = "multi_file_empty_descriptors", .fn = test_multi_file_empty_descriptors},
         {.name = "no_artifact_default", .fn = test_no_artifact_default},
         {.name = "built_in_artifact_default", .fn = test_built_in_artifact_default},
-        {.name = "custom_strategy_id_default", .fn = test_custom_strategy_id_default},
         {.name = "empty_model_bytes_returns_empty_manifest",
          .fn = test_empty_model_bytes_returns_empty_manifest},
         {.name = "null_out_pointer", .fn = test_null_out_pointer},

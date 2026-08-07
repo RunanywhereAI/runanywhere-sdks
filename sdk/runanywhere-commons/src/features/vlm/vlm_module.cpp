@@ -32,6 +32,7 @@
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_proto_adapters.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -1010,18 +1011,24 @@ rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t r
             "VLMGenerationRequest.images must contain exactly one image");
     }
 
-    const runanywhere::v1::VLMGenerationOptions& options_proto =
+    const runanywhere::v1::LLMGenerationOptions& options_proto =
         out_request->has_options() ? out_request->options()
-                                   : runanywhere::v1::VLMGenerationOptions::default_instance();
+                                   : runanywhere::v1::LLMGenerationOptions::default_instance();
+    const runanywhere::v1::VLMVisionOptions* vision_proto =
+        out_request->has_vision() ? &out_request->vision() : nullptr;
+
+    // VLMGenerationRequest.prompt is now a top-level string (tag 6), not part
+    // of the options message, so the adapter no longer produces it.
+    *out_prompt = out_request->prompt().c_str();
 
     if (!rac::foundation::rac_vlm_image_from_proto(out_request->images(0), out_image) ||
-        !rac::foundation::rac_vlm_options_from_proto(options_proto, out_options, out_prompt)) {
+        !rac::foundation::rac_vlm_options_from_proto(options_proto, vision_proto, out_options)) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
                                           "failed to convert VLMGenerationRequest");
     }
     if (!*out_prompt || (*out_prompt)[0] == '\0') {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
-                                          "VLMGenerationOptions.prompt is required");
+                                          "VLMGenerationRequest.prompt is required");
     }
     if (!out_image->file_path && !out_image->pixel_data && !out_image->base64_data) {
         return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
@@ -1052,12 +1059,15 @@ struct StreamCtx {
 void populate_result_from_stream(const StreamCtx& ctx, int64_t elapsed_ms,
                                  runanywhere::v1::VLMResult* out) {
     out->set_text(ctx.text);
-    out->set_completion_tokens(ctx.token_count);
-    out->set_total_tokens(ctx.token_count);
-    out->set_processing_time_ms(elapsed_ms);
+    out->mutable_usage()->set_output_tokens(ctx.token_count);
+    out->mutable_usage()->set_total_tokens(ctx.token_count);
+    // processing_time_ms renamed to total_time_ms.
+    out->set_total_time_ms(elapsed_ms);
     if (elapsed_ms > 0) {
-        out->set_tokens_per_second(static_cast<float>(ctx.token_count) /
-                                   (static_cast<float>(elapsed_ms) / 1000.0f));
+        // TokenUsage has no tokens_per_second field; decode_tokens_per_second
+        // is the decode-phase-only throughput this maps onto.
+        out->mutable_usage()->set_decode_tokens_per_second(
+            static_cast<double>(ctx.token_count) / (static_cast<double>(elapsed_ms) / 1000.0));
     }
 }
 
@@ -1067,7 +1077,6 @@ struct GeneratedStreamCtx {
     rac::vlm::LifecycleVlmRef* ref{nullptr};
     std::string request_id;
     std::string text;
-    uint64_t seq{0};
     int32_t token_count{0};
     int64_t started_ms{0};
     bool terminal_sent{false};
@@ -1086,26 +1095,29 @@ rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
     if (!ctx || !ctx->callback) {
         return RAC_TRUE;
     }
+    (void)is_final;  // kind (COMPLETED/ERROR) is the sole terminal discriminator now.
 
     runanywhere::v1::VLMStreamEvent event;
-    event.set_seq(++ctx->seq);
     event.set_timestamp_us(now_us());
     event.set_request_id(ctx->request_id);
     event.set_kind(kind);
-    event.set_is_final(is_final);
     if (token != nullptr && token[0] != '\0') {
         event.set_token(token);
         event.set_token_index(ctx->token_count - 1);
     }
     if (result) {
+        // Rate comes from result.usage().decode_tokens_per_second() on the
+        // terminal event -- no second copy on VLMStreamEvent itself
+        // (is_final/tokens_per_second were both deleted).
         event.mutable_result()->CopyFrom(*result);
-        event.set_tokens_per_second(result->tokens_per_second());
     }
-    if (error_message != nullptr && error_message[0] != '\0') {
-        event.set_error_message(error_message);
-    }
-    if (error_code != 0) {
-        event.set_error_code(error_code);
+    if (error_code != 0 || (error_message != nullptr && error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            event.mutable_error(),
+            error_code != 0 ? static_cast<rac_result_t>(error_code) : RAC_ERROR_UNKNOWN);
+        if (error_message != nullptr && error_message[0] != '\0') {
+            event.mutable_error()->set_message(error_message);
+        }
     }
 
     std::vector<uint8_t> bytes;
@@ -1150,7 +1162,7 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
                              : runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED);
     generation->set_token(display_token);
     generation->set_streaming_text(ctx->text);
-    generation->set_tokens_count(ctx->token_count);
+    generation->set_output_tokens(ctx->token_count);
     if (ctx->ref->model_id)
         generation->set_model_id(ctx->ref->model_id);
     publish_event(event);
@@ -1252,7 +1264,9 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     if (rc != RAC_SUCCESS) {
         publish_failure(rc, "vlm.generate", out_result->error_message);
         free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
+        // `prompt` points into `request.prompt()` (owned by the request
+        // message, which outlives this scope) -- not a heap allocation, so
+        // it must not be freed here.
         rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return rc;
@@ -1270,7 +1284,9 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     if (rc != RAC_SUCCESS) {
         publish_failure(rc, "vlm.generate", rac_error_message(rc));
         free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
+        // `prompt` points into `request.prompt()` (owned by the request
+        // message, which outlives this scope) -- not a heap allocation, so
+        // it must not be freed here.
         rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
@@ -1292,18 +1308,18 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                                         ? std::to_string(res_w) + "x" + std::to_string(res_h)
                                         : std::string();
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr,
-                       static_cast<double>(result.processing_time_ms()), ref.model_id,
-                       result.prompt_tokens(), result.total_tokens(),
-                       static_cast<double>(result.tokens_per_second()),
-                       static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
+                       "vlm.generate", 1.0f, 1, result.usage().output_tokens(), nullptr,
+                       static_cast<double>(result.total_time_ms()), ref.model_id,
+                       result.usage().input_tokens(), result.usage().total_tokens(),
+                       result.usage().decode_tokens_per_second(),
+                       static_cast<double>(result.usage().ttft_ms()), ref.framework_name,
                        static_cast<double>(options.temperature), options.max_tokens,
                        result.image_tokens(), static_cast<double>(result.image_encode_time_ms()),
                        vlm_gen_res.empty() ? nullptr : vlm_gen_res.c_str(), raw.context_length,
                        static_cast<double>(raw.prompt_eval_time_ms));
     rac_vlm_result_free(&raw);
     free_vlm_image(&image);
-    rac_free(const_cast<char*>(prompt));
+    // `prompt` points into `request.prompt()`, not a heap allocation.
     rac::foundation::rac_vlm_options_free_owned(&options);
     rac::vlm::release_lifecycle_vlm(&ref);
     return rc;
@@ -1350,7 +1366,9 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         publish_failure(rc, "vlm.stream", error_buffer.error_message);
         rac_proto_buffer_free(&error_buffer);
         free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
+        // `prompt` points into `request.prompt()` (owned by the request
+        // message, which outlives this scope) -- not a heap allocation, so
+        // it must not be freed here.
         rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return rc;
@@ -1358,7 +1376,9 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     rac_proto_buffer_free(&error_buffer);
     if (!ref.ops || !ref.ops->process_stream) {
         free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
+        // `prompt` points into `request.prompt()` (owned by the request
+        // message, which outlives this scope) -- not a heap allocation, so
+        // it must not be freed here.
         rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return RAC_ERROR_NOT_SUPPORTED;
@@ -1407,19 +1427,19 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
             (image.width > 0 && image.height > 0)
                 ? std::to_string(image.width) + "x" + std::to_string(image.height)
                 : std::string();
-        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                           "vlm.stream", 1.0f, 1, ctx.token_count, nullptr,
-                           static_cast<double>(elapsed_ms), ref.model_id, result.prompt_tokens(),
-                           result.total_tokens(), static_cast<double>(result.tokens_per_second()),
-                           static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
-                           static_cast<double>(options.temperature), options.max_tokens,
-                           result.image_tokens(),
-                           static_cast<double>(result.image_encode_time_ms()),
-                           vlm_stream_res.empty() ? nullptr : vlm_stream_res.c_str());
+        publish_capability(
+            runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED, "vlm.stream", 1.0f, 1,
+            ctx.token_count, nullptr, static_cast<double>(elapsed_ms), ref.model_id,
+            result.usage().input_tokens(), result.usage().total_tokens(),
+            result.usage().decode_tokens_per_second(),
+            static_cast<double>(result.usage().ttft_ms()), ref.framework_name,
+            static_cast<double>(options.temperature), options.max_tokens, result.image_tokens(),
+            static_cast<double>(result.image_encode_time_ms()),
+            vlm_stream_res.empty() ? nullptr : vlm_stream_res.c_str());
     }
 
     free_vlm_image(&image);
-    rac_free(const_cast<char*>(prompt));
+    // `prompt` points into `request.prompt()`, not a heap allocation.
     rac::foundation::rac_vlm_options_free_owned(&options);
     rac::vlm::release_lifecycle_vlm(&ref);
     return rc;

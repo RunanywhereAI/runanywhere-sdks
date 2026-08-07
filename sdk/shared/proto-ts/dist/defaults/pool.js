@@ -29,7 +29,6 @@ exports.audioCaptureDefaults = Object.freeze({
     micSampleRateHz: 16000,
     micChannels: 1,
     micChannelCapacity: 128,
-    micTapBufferFrames: 4096,
     ttsSampleRateHz: 22050,
 });
 exports.voiceAgentDefaults = Object.freeze({

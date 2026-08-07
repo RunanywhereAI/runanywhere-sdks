@@ -163,7 +163,7 @@ class FakeStreamWorker {
       case 'stream.llm.generate':
       case 'stream.stt.transcribe':
       case 'stream.tts.synthesize':
-      case 'stream.vlm.process':
+      case 'stream.vlm.generate':
         this.observations.streamRequestsObserved += 1;
         this.scheduleStream(msg.requestId);
         return;

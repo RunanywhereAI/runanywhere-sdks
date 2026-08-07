@@ -97,7 +97,7 @@ test('ingest returns index statistics', { timeout: 120000 }, async (t) => {
 
 test('query returns a grounded answer + supporting chunks', { timeout: 180000 }, async (t) => {
   if (!ENABLED || session == null) { t.skip(setupError ? setupError.message : 'no session'); return; }
-  const q = enc(proto.RAGQueryOptions, { question: 'How often must member stations rotate their encryption keys?', maxTokens: 96 });
+  const q = enc(proto.RAGQueryOptions, { question: 'How often must member stations rotate their encryption keys?', generation: { maxOutputTokens: 96 } });
   const res = proto.RAGResult.decode(await addon.ragQuery(session, q));
   assert.ok(res.retrievedChunks.length > 0, 'retrieved supporting chunks');
   assert.match(res.contextUsed, /90/, 'retrieved context carries the grounding fact');

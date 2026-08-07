@@ -18,6 +18,7 @@ package com.runanywhere.sdk.hybrid
 import ai.runanywhere.proto.v1.BatteryFilter
 import ai.runanywhere.proto.v1.ConfidenceCascade
 import ai.runanywhere.proto.v1.CustomFilter
+import ai.runanywhere.proto.v1.HybridInferenceMode
 import ai.runanywhere.proto.v1.HybridModelDescriptor
 import ai.runanywhere.proto.v1.HybridCascade as HybridCascadeProto
 import ai.runanywhere.proto.v1.HybridFilter as HybridFilterProto
@@ -38,17 +39,18 @@ internal object HybridRouterProto {
     /**
      * Serialise a [HybridModel] as a HybridModelDescriptor. Native side
      * decodes via runanywhere::v1::HybridModelDescriptor::ParseFromArray.
-     * The descriptor's `provider` field carries [HybridModel.provider] for a
-     * `HYBRID_BACKEND_CLOUD` backend (e.g. "sarvam"); empty for non-cloud
-     * backends, where the field is ignored.
+     *
+     * `HybridModelDescriptor.backend`/`.provider` are deleted outright
+     * (idl/hybrid_router.proto), replaced by a single `engine: string` field
+     * so a new backend name is not a proto change; `is_local` was renamed
+     * `is_on_device`. Mirrors Swift's `HybridModel.descriptorBytes()`.
      */
     fun descriptor(model: HybridModel): ByteArray {
         val msg =
             HybridModelDescriptor(
                 model_id = model.id,
-                model_type = model.modelType,
-                backend = model.backend,
-                provider = model.provider,
+                is_on_device = model.isLocal,
+                engine = model.backend,
             )
         return HybridModelDescriptor.ADAPTER.encode(msg)
     }
@@ -57,12 +59,28 @@ internal object HybridRouterProto {
      * Marshal a [HybridRoutingPolicy] into HybridRoutingPolicy bytes plus the
      * list of [HybridFilter.Custom] filters the router must register with the
      * commons callback table.
+     *
+     * `prefer_local` is deleted outright (idl/hybrid_router.proto), replaced
+     * by `mode: HybridInferenceMode`. commons
+     * (rac_stt_hybrid_router_proto.cpp) has not wired up a `models` list
+     * consumer yet -- it still drives routing off the two separately
+     * registered offline/online service descriptors and reads only `mode`
+     * from this policy to decide rank direction. Anything other than
+     * PREFER_IN_CLOUD/ONLY_IN_CLOUD is treated as local-first, so
+     * `preferLocal = true` maps to PREFER_ON_DEVICE and `false` to
+     * PREFER_IN_CLOUD to preserve the exact old behavior. Mirrors Swift's
+     * `HybridRoutingPolicy.serializedBytes()`.
      */
     fun policy(policy: HybridRoutingPolicy): PackedPolicy {
         val msg =
             HybridRoutingPolicyProto(
                 cascade = policy.cascade?.let(::cascadeToProto),
-                rank = policy.rank,
+                mode =
+                    if (policy.preferLocal) {
+                        HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE
+                    } else {
+                        HybridInferenceMode.HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD
+                    },
                 hard_filters = policy.hardFilters.map(::filterToProto),
             )
         return PackedPolicy(
@@ -77,8 +95,12 @@ internal object HybridRouterProto {
         when (filter) {
             is HybridFilter.Network ->
                 HybridFilterProto(network = true)
-            is HybridFilter.Quality ->
-                HybridFilterProto(quality_tier = filter.tier)
+            // HybridFilter's oneof only has network/battery/custom arms
+            // (idl/hybrid_router.proto) -- there has never been a wire slot
+            // for a quality tier. Matches this case's own doc comment: "v1
+            // descriptors carry no quality tier, so commons treats this as
+            // a no-op today." Nothing to encode.
+            is HybridFilter.Quality -> HybridFilterProto()
             is HybridFilter.Battery ->
                 HybridFilterProto(battery = BatteryFilter(min_battery_percent = filter.minPercent))
             is HybridFilter.Custom ->

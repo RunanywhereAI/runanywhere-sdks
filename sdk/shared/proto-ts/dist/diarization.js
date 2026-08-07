@@ -5,57 +5,14 @@
 //   protoc               v7.35.1
 // source: diarization.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DiarizationStreamEvent = exports.DiarizationResult = exports.DiarizationSegment = exports.DiarizationRequest = exports.DiarizationOptions = exports.DiarizationStreamEventKind = exports.DiarizationAudioEncoding = exports.protobufPackage = void 0;
-exports.diarizationAudioEncodingFromJSON = diarizationAudioEncodingFromJSON;
-exports.diarizationAudioEncodingToJSON = diarizationAudioEncodingToJSON;
+exports.DiarizationStreamEvent = exports.DiarizationResult = exports.DiarizationSegment = exports.DiarizationRequest = exports.DiarizationOptions = exports.DiarizationStreamEventKind = exports.protobufPackage = void 0;
 exports.diarizationStreamEventKindFromJSON = diarizationStreamEventKindFromJSON;
 exports.diarizationStreamEventKindToJSON = diarizationStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
+const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * Raw PCM encodings accepted at the SDK boundary. Commons validates complete
- * sample frames and normalizes either representation to float samples before
- * dispatching to an engine.
- */
-var DiarizationAudioEncoding;
-(function (DiarizationAudioEncoding) {
-    DiarizationAudioEncoding[DiarizationAudioEncoding["DIARIZATION_AUDIO_ENCODING_UNSPECIFIED"] = 0] = "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED";
-    DiarizationAudioEncoding[DiarizationAudioEncoding["DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"] = 1] = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE";
-    DiarizationAudioEncoding[DiarizationAudioEncoding["DIARIZATION_AUDIO_ENCODING_PCM_S16_LE"] = 2] = "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE";
-    DiarizationAudioEncoding[DiarizationAudioEncoding["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(DiarizationAudioEncoding || (exports.DiarizationAudioEncoding = DiarizationAudioEncoding = {}));
-function diarizationAudioEncodingFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED":
-            return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED;
-        case 1:
-        case "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE":
-            return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
-        case 2:
-        case "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE":
-            return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return DiarizationAudioEncoding.UNRECOGNIZED;
-    }
-}
-function diarizationAudioEncodingToJSON(object) {
-    switch (object) {
-        case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED:
-            return "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED";
-        case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE:
-            return "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE";
-        case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE:
-            return "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE";
-        case DiarizationAudioEncoding.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var DiarizationStreamEventKind;
 (function (DiarizationStreamEventKind) {
     DiarizationStreamEventKind[DiarizationStreamEventKind["DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED";
@@ -107,21 +64,22 @@ function diarizationStreamEventKindToJSON(object) {
 }
 function createBaseDiarizationOptions() {
     return {
-        sampleRateHz: undefined,
-        channelCount: undefined,
+        sampleRate: undefined,
+        channels: undefined,
         encoding: undefined,
         threshold: undefined,
         minimumDurationMs: 0,
         mergeGapMs: 0,
+        maxSpeakers: undefined,
     };
 }
 exports.DiarizationOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.sampleRateHz !== undefined) {
-            writer.uint32(8).int32(message.sampleRateHz);
+        if (message.sampleRate !== undefined) {
+            writer.uint32(8).int32(message.sampleRate);
         }
-        if (message.channelCount !== undefined) {
-            writer.uint32(16).int32(message.channelCount);
+        if (message.channels !== undefined) {
+            writer.uint32(16).int32(message.channels);
         }
         if (message.encoding !== undefined) {
             writer.uint32(24).int32(message.encoding);
@@ -134,6 +92,9 @@ exports.DiarizationOptions = {
         }
         if (message.mergeGapMs !== 0) {
             writer.uint32(48).int64(message.mergeGapMs);
+        }
+        if (message.maxSpeakers !== undefined) {
+            writer.uint32(64).int32(message.maxSpeakers);
         }
         return writer;
     },
@@ -148,14 +109,14 @@ exports.DiarizationOptions = {
                     if (tag !== 8) {
                         break;
                     }
-                    message.sampleRateHz = reader.int32();
+                    message.sampleRate = reader.int32();
                     continue;
                 }
                 case 2: {
                     if (tag !== 16) {
                         break;
                     }
-                    message.channelCount = reader.int32();
+                    message.channels = reader.int32();
                     continue;
                 }
                 case 3: {
@@ -186,6 +147,13 @@ exports.DiarizationOptions = {
                     message.mergeGapMs = longToNumber(reader.int64());
                     continue;
                 }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.maxSpeakers = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -196,17 +164,13 @@ exports.DiarizationOptions = {
     },
     fromJSON(object) {
         return {
-            sampleRateHz: isSet(object.sampleRateHz)
-                ? globalThis.Number(object.sampleRateHz)
-                : isSet(object.sample_rate_hz)
-                    ? globalThis.Number(object.sample_rate_hz)
+            sampleRate: isSet(object.sampleRate)
+                ? globalThis.Number(object.sampleRate)
+                : isSet(object.sample_rate)
+                    ? globalThis.Number(object.sample_rate)
                     : undefined,
-            channelCount: isSet(object.channelCount)
-                ? globalThis.Number(object.channelCount)
-                : isSet(object.channel_count)
-                    ? globalThis.Number(object.channel_count)
-                    : undefined,
-            encoding: isSet(object.encoding) ? diarizationAudioEncodingFromJSON(object.encoding) : undefined,
+            channels: isSet(object.channels) ? globalThis.Number(object.channels) : undefined,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : undefined,
             threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : undefined,
             minimumDurationMs: isSet(object.minimumDurationMs)
                 ? globalThis.Number(object.minimumDurationMs)
@@ -218,18 +182,23 @@ exports.DiarizationOptions = {
                 : isSet(object.merge_gap_ms)
                     ? globalThis.Number(object.merge_gap_ms)
                     : 0,
+            maxSpeakers: isSet(object.maxSpeakers)
+                ? globalThis.Number(object.maxSpeakers)
+                : isSet(object.max_speakers)
+                    ? globalThis.Number(object.max_speakers)
+                    : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.sampleRateHz !== undefined) {
-            obj.sampleRateHz = Math.round(message.sampleRateHz);
+        if (message.sampleRate !== undefined) {
+            obj.sampleRate = Math.round(message.sampleRate);
         }
-        if (message.channelCount !== undefined) {
-            obj.channelCount = Math.round(message.channelCount);
+        if (message.channels !== undefined) {
+            obj.channels = Math.round(message.channels);
         }
         if (message.encoding !== undefined) {
-            obj.encoding = diarizationAudioEncodingToJSON(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.threshold !== undefined) {
             obj.threshold = message.threshold;
@@ -240,6 +209,9 @@ exports.DiarizationOptions = {
         if (message.mergeGapMs !== 0) {
             obj.mergeGapMs = Math.round(message.mergeGapMs);
         }
+        if (message.maxSpeakers !== undefined) {
+            obj.maxSpeakers = Math.round(message.maxSpeakers);
+        }
         return obj;
     },
     create(base) {
@@ -247,12 +219,13 @@ exports.DiarizationOptions = {
     },
     fromPartial(object) {
         const message = createBaseDiarizationOptions();
-        message.sampleRateHz = object.sampleRateHz ?? undefined;
-        message.channelCount = object.channelCount ?? undefined;
+        message.sampleRate = object.sampleRate ?? undefined;
+        message.channels = object.channels ?? undefined;
         message.encoding = object.encoding ?? undefined;
         message.threshold = object.threshold ?? undefined;
         message.minimumDurationMs = object.minimumDurationMs ?? 0;
         message.mergeGapMs = object.mergeGapMs ?? 0;
+        message.maxSpeakers = object.maxSpeakers ?? undefined;
         return message;
     },
 };

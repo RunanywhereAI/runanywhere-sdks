@@ -1,14 +1,15 @@
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
-  STTAudioEncoding,
-  STTOptions,
   STTOutput,
   STTPartialResult,
+  STTServiceState,
   STTStreamEvent,
   STTStreamEventKind,
   STTTranscriptionRequest,
   type STTOptions as ProtoSTTOptions,
   type STTOutput as ProtoSTTOutput,
   type STTPartialResult as ProtoSTTPartialResult,
+  type STTServiceState as ProtoSTTServiceState,
   type STTStreamEvent as ProtoSTTStreamEvent,
   type STTTranscriptionRequest as ProtoSTTTranscriptionRequest,
 } from '@runanywhere/proto-ts/stt_options';
@@ -64,6 +65,19 @@ export class STTProtoAdapter {
       '_rac_stt_transcribe_lifecycle_proto',
       '_rac_stt_transcribe_stream_lifecycle_proto',
     ]).length === 0;
+  }
+
+  stateLifecycle(): ProtoSTTServiceState | null {
+    if (!ensureExports(this.module, 'stt.stateLifecycle', [
+      '_rac_stt_state_lifecycle_proto',
+    ])) {
+      return null;
+    }
+    return this.bridge().callResultProto(
+      STTServiceState,
+      (outResult) => this.module._rac_stt_state_lifecycle_proto!(outResult),
+      'rac_stt_state_lifecycle_proto',
+    );
   }
 
   async transcribeLifecycle(
@@ -132,8 +146,7 @@ export class STTProtoAdapter {
       undefined,
       (rc) => STTStreamEvent.fromPartial({
         kind: STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR,
-        errorCode: rc,
-        errorMessage: `STT stream failed: ${rc}`,
+        error: SDKException.fromCode(rc, `STT stream failed: ${rc}`).proto,
       }),
     );
   }
@@ -146,24 +159,20 @@ export class STTProtoAdapter {
     if (!ensureExports(this.module, 'stt.transcribe', ['_rac_stt_component_transcribe_proto'])) {
       return null;
     }
-    const optionsBytes = STTOptions.encode(options).finish();
-    const bridge = this.bridge();
-    return bridge.withHeapBytes(audioData, (audioPtr, audioSize) => (
-      bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-        bridge.callResultProto(
-          STTOutput,
-          (outResult) => this.module._rac_stt_component_transcribe_proto!(
-            handle,
-            audioPtr,
-            audioSize,
-            optionsPtr,
-            optionsSize,
-            outResult,
-          ),
-          'rac_stt_component_transcribe_proto',
+    return this.bridge().withEncodedRequest(
+      lifecycleRequest(audioData, options),
+      STTTranscriptionRequest,
+      STTOutput,
+      (requestPtr, requestSize, outResult) => (
+        this.module._rac_stt_component_transcribe_proto!(
+          handle,
+          requestPtr,
+          requestSize,
+          outResult,
         )
-      ))
-    ));
+      ),
+      'rac_stt_component_transcribe_proto',
+    );
   }
 
   transcribeStream(
@@ -171,7 +180,9 @@ export class STTProtoAdapter {
     audioData: Uint8Array,
     options: ProtoSTTOptions,
   ): AsyncIterable<ProtoSTTPartialResult> {
-    const optionsBytes = STTOptions.encode(options).finish();
+    const requestBytes = STTTranscriptionRequest.encode(
+      lifecycleRequest(audioData, options),
+    ).finish();
     // T6.1: prefer Worker path when available; otherwise main-thread MVP.
     const offscreen = OffscreenRuntimeBridge.tryGet();
     if (offscreen != null) {
@@ -179,8 +190,7 @@ export class STTProtoAdapter {
         {
           kind: 'stream.stt.transcribe',
           handle,
-          audioBytes: audioData,
-          optionsBytes,
+          requestBytes,
         },
         STTPartialResult,
         { stopWhen: (event) => event.isFinal },
@@ -193,18 +203,14 @@ export class STTProtoAdapter {
       this.module,
       STTPartialResult,
       'rac_stt_component_transcribe_stream_proto',
-      (callbackPtr) => this.bridge().withHeapBytes(audioData, (audioPtr, audioSize) => (
-        this.bridge().withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-          this.module._rac_stt_component_transcribe_stream_proto!(
-            handle,
-            audioPtr,
-            audioSize,
-            optionsPtr,
-            optionsSize,
-            callbackPtr,
-            0,
-          )
-        ))
+      (callbackPtr) => this.bridge().withHeapBytes(requestBytes, (requestPtr, requestSize) => (
+        this.module._rac_stt_component_transcribe_stream_proto!(
+          handle,
+          requestPtr,
+          requestSize,
+          callbackPtr,
+          0,
+        )
       )),
       (event) => event.isFinal,
       undefined,
@@ -225,15 +231,16 @@ export class STTProtoAdapter {
 function lifecycleRequest(
   audioData: Uint8Array,
   options: ProtoSTTOptions,
+  sampleRate = audioCaptureDefaults.micSampleRateHz,
 ): ProtoSTTTranscriptionRequest {
   return STTTranscriptionRequest.create({
     audio: {
       audioData,
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
-      sampleRate: options.sampleRate > 0 ? options.sampleRate : audioCaptureDefaults.micSampleRateHz,
+      sampleRate,
       channels: 1,
-      bitsPerSample: 16,
+      durationMs: Math.round((audioData.byteLength / 2 / sampleRate) * 1000),
     },
     options,
   });

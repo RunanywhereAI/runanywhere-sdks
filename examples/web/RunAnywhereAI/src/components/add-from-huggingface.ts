@@ -5,7 +5,7 @@
  * Flow: search repos → pick a repo → see its GGUF quantizations (quant + size)
  * → Download. Discovery is served by the small `hf-hub-client` REST helper; the
  * SDK does all resolve/register/download/persist work
- * (`RunAnywhere.registerModel` + `RunAnywhere.downloadModel`), exactly like the
+ * (`RunAnywhere.models.register` + `RunAnywhere.models.download`), exactly like the
  * built-in catalog flow in `model-selection.ts`.
  *
  * This is example-app UI only — no SDK/WASM/proto changes. The 4 GiB WASM32
@@ -15,8 +15,6 @@
 
 import { RunAnywhere } from '@runanywhere/web';
 import { InferenceFramework, ModelFormat } from '@runanywhere/proto-ts/model_types';
-import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
-import { DownloadState } from '@runanywhere/proto-ts/download_service';
 import {
   searchGgufModels,
   listGgufFiles,
@@ -330,33 +328,26 @@ async function downloadFile(repoId: string, file: HfRepoFile): Promise<void> {
 
     // The SDK builds the canonical ModelInfo, persists it, and returns it with a
     // derived id. Example apps never hand-assemble proto model metadata.
-    const model = RunAnywhere.registerModel(
-      url,
+    const model = RunAnywhere.models.register({
       name,
-      InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      {
-        description: `Added from Hugging Face: ${repoId}`,
-        format: ModelFormat.MODEL_FORMAT_GGUF,
-        downloadSizeBytes: file.sizeBytes,
-        memoryRequirement: file.sizeBytes,
-      },
-    );
-
-    const progress = await RunAnywhere.downloadModel({
-      modelId: model.id,
-      model,
-      allowMeteredNetwork: true,
-      resumeExisting: false,
-      verifyChecksums: false,
-      validateExistingBytes: false,
-      updateRegistryOnCompletion: true,
-      storageNamespace: '',
-      availableStorageBytes: 0,
-      requiredFreeBytesAfterDownload: 0,
-      pollIntervalMs: 500,
-      onProgress: (next) => applyProgress(file.path, model.id, next),
+      url,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      format: ModelFormat.MODEL_FORMAT_GGUF,
+      description: `Added from Hugging Face: ${repoId}`,
+      sizeBytes: file.sizeBytes,
+      memoryRequiredBytes: file.sizeBytes,
     });
-    applyProgress(file.path, model.id, progress);
+
+    for await (const event of RunAnywhere.models.download(model.id)) {
+      if (event.type === 'progress') {
+        const progress = event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0;
+        setFileState(file.path, { status: 'downloading', progress });
+      } else if (event.type === 'extracting') {
+        setFileState(file.path, { status: 'downloading', progress: 1 });
+      } else {
+        setFileState(file.path, { status: 'downloaded', modelId: model.id });
+      }
+    }
 
     if ((fileStates.get(file.path) ?? { status: 'idle' }).status === 'downloaded') {
       showToast(`Downloaded ${name}`, 'success');
@@ -369,23 +360,6 @@ async function downloadFile(repoId: string, file: HfRepoFile): Promise<void> {
   }
 }
 
-function applyProgress(path: string, modelId: string, progress: DownloadProgress): void {
-  if (progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED) {
-    setFileState(path, { status: 'downloaded', modelId });
-    return;
-  }
-  if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
-    setFileState(path, { status: 'error', error: progress.errorMessage || 'Download failed' });
-    return;
-  }
-  if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
-    setFileState(path, { status: 'idle' });
-    return;
-  }
-  const fraction = Math.max(0, Math.min(1, progress.overallProgress));
-  setFileState(path, { status: 'downloading', progress: fraction });
-}
-
 async function loadFile(file: HfRepoFile): Promise<void> {
   const state = fileStates.get(file.path);
   if (!state || state.status !== 'downloaded') return;
@@ -393,14 +367,7 @@ async function loadFile(file: HfRepoFile): Promise<void> {
 
   setFileState(file.path, { status: 'loading', modelId });
   try {
-    const result = await RunAnywhere.loadModel({
-      modelId,
-      forceReload: false,
-      validateAvailability: true,
-    });
-    if (!result || !result.success) {
-      throw new Error(result?.errorMessage || 'Model load failed');
-    }
+    await RunAnywhere.models.load(modelId);
     setFileState(file.path, { status: 'loaded', modelId });
     refreshModelSelectionState();
     showToast(`Loaded ${modelId}`, 'success');

@@ -1,13 +1,15 @@
 package com.runanywhere.runanywhereai
 
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
-import ai.runanywhere.proto.v1.DiffusionMode
+import ai.runanywhere.proto.v1.HexagonArch
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.ModelUnloadRequest
+import ai.runanywhere.proto.v1.ReasoningOptions
 import ai.runanywhere.proto.v1.ThinkingTagPattern
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -21,9 +23,9 @@ import com.runanywhere.runanywhereai.data.SingleFileModel
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.embeddings
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModel
-import com.runanywhere.sdk.public.extensions.embeddings
 import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.generateImage
 import com.runanywhere.sdk.public.extensions.generateStream
@@ -38,7 +40,7 @@ import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMGenerationRequest
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.collect
@@ -179,16 +181,19 @@ class NpuModelE2ETest {
                 // ---- NPU capability + arch match (a v79 bundle will not load on v81) ----
                 phase = "probe"
                 val npu = QHexRT.probeNpu()
+                // NpuCapability.arch_name/qhexrt_supported were renamed hexagon_arch
+                // (a HexagonArch enum, not a String)/supported.
+                val npuArchName = npu.hexagon_arch.archDisplayName()
                 report.put("soc_model", npu.soc_model).put("soc_id", npu.soc_id)
-                    .put("probe_arch", npu.arch_name).put("npu_supported", npu.qhexrt_supported)
-                    .put("arch", npu.arch_name)
-                report.gate("npu_supported", npu.qhexrt_supported)
-                val expectedArch = requestedArch ?: npu.arch_name
+                    .put("probe_arch", npuArchName).put("npu_supported", npu.supported)
+                    .put("arch", npuArchName)
+                report.gate("npu_supported", npu.supported)
+                val expectedArch = requestedArch ?: npuArchName
                 report.put("expected_arch", expectedArch)
-                report.gate("arch_match", npu.arch_name.equals(expectedArch, ignoreCase = true))
-                if (!npu.qhexrt_supported) throw AssertionError("device NPU not supported (arch=${npu.arch_name})")
-                if (!npu.arch_name.equals(expectedArch, ignoreCase = true)) {
-                    throw AssertionError("arch mismatch: requested=$expectedArch device=${npu.arch_name} (context binaries are arch-pinned)")
+                report.gate("arch_match", npuArchName.equals(expectedArch, ignoreCase = true))
+                if (!npu.supported) throw AssertionError("device NPU not supported (arch=$npuArchName)")
+                if (!npuArchName.equals(expectedArch, ignoreCase = true)) {
+                    throw AssertionError("arch mismatch: requested=$expectedArch device=$npuArchName (context binaries are arch-pinned)")
                 }
 
                 if (localBundleRequested && hfToken != null) {
@@ -255,7 +260,7 @@ class NpuModelE2ETest {
                             ),
                         )
                     val importOk =
-                        imported.success && imported.registered &&
+                        imported.error == null && imported.registered &&
                             imported.local_path == localRoot.absolutePath
                     report.put("acquisition_ms", System.currentTimeMillis() - importStart)
                         .put("local_bundle_mb", round2(localBundle.files.sumOf { it.bytes } / 1e6))
@@ -263,16 +268,16 @@ class NpuModelE2ETest {
                         .put(
                             "local_import",
                             JSONObject()
-                                .put("success", imported.success)
+                                .put("success", imported.error == null)
                                 .put("registered", imported.registered)
                                 .put("copied_into_managed_storage", imported.copied_into_managed_storage)
                                 .put("imported_bytes", imported.imported_bytes)
                                 .put("warnings", JSONArray(imported.warnings))
-                                .put("error_message", imported.error_message),
+                                .put("error_message", imported.error?.message),
                         )
                         .gate("local_import_registered", importOk)
                     if (!importOk) {
-                        throw AssertionError(imported.error_message.ifBlank { "local model import failed" })
+                        throw AssertionError(imported.error?.message?.ifBlank { "local model import failed" } ?: "local model import failed")
                     }
                 } else {
                     // ---- download (unbounded on time; size drives it) + real transfer metrics ----
@@ -283,7 +288,8 @@ class NpuModelE2ETest {
                     var bps = 0f
                     val dl = RunAnywhere.downloadModel(registered) { p ->
                         seen = maxOf(seen, p.bytes_downloaded)
-                        if (p.overall_speed_bps > 0f) bps = p.overall_speed_bps
+                        // DownloadProgress.overall_speed_bps was renamed bytes_per_second.
+                        if (p.bytes_per_second > 0f) bps = p.bytes_per_second
                         val pct = ((if (p.overall_progress > 0f) p.overall_progress else p.stage_progress) * 100).toInt()
                         if (pct >= lastLog + 20) { lastLog = pct; Log.i(tag, "${model.id} download $pct%") }
                     }
@@ -291,7 +297,7 @@ class NpuModelE2ETest {
                     val totBytes = maxOf(dl.total_bytes, dl.bytes_downloaded, seen)
                     report.put("download_s", dlMs / 1000).put("download_ms", dlMs)
                         .put("download_mb", round2(totBytes / 1e6))
-                        .put("download_mbps", round2((if (dl.overall_speed_bps > 0f) dl.overall_speed_bps else bps) / 1e6))
+                        .put("download_mbps", round2((if (dl.bytes_per_second > 0f) dl.bytes_per_second else bps) / 1e6))
                         .put("public_download_model_exercised", true)
                         .put("hf_download_exercised", localBundle == null)
                     if (localBundle?.mode == "local_loopback_download") {
@@ -325,13 +331,13 @@ class NpuModelE2ETest {
                         JSONObject()
                             .put("cycle", cycle + 1)
                             .put("load_ms", loadMs)
-                            .put("load_success", candidate.success)
+                            .put("load_success", candidate.error == null)
                             .put("framework", candidate.framework.name)
                     lifecycleStable =
-                        lifecycleStable && candidate.success &&
+                        lifecycleStable && candidate.error == null &&
                             candidate.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
-                    if (!candidate.success) {
-                        throw AssertionError(candidate.error_message.ifBlank { "load cycle ${cycle + 1} failed" })
+                    if (candidate.error != null) {
+                        throw AssertionError(candidate.error?.message?.ifBlank { "load cycle ${cycle + 1} failed" } ?: "load cycle ${cycle + 1} failed")
                     }
                     load = candidate
                     if (cycle + 1 < lifecycleCycles) {
@@ -344,13 +350,13 @@ class NpuModelE2ETest {
                                     framework = model.framework,
                                 ),
                             )
-                        val unloadOk = unload.success && model.id in unload.unloaded_model_ids
-                        row.put("unload_success", unload.success)
+                        val unloadOk = unload.error == null && model.id in unload.unloaded_model_ids
+                        row.put("unload_success", unload.error == null)
                             .put("unloaded_model_ids", JSONArray(unload.unloaded_model_ids))
-                            .put("unload_error", unload.error_message)
+                            .put("unload_error", unload.error?.message)
                         lifecycleStable = lifecycleStable && unloadOk
                         require(unloadOk) {
-                            unload.error_message.ifBlank { "unload cycle ${cycle + 1} failed" }
+                            unload.error?.message?.ifBlank { "unload cycle ${cycle + 1} failed" } ?: "unload cycle ${cycle + 1} failed"
                         }
                     }
                     cycleReport.put(row)
@@ -385,7 +391,7 @@ class NpuModelE2ETest {
                     ModelCategory.MODEL_CATEGORY_MULTIMODAL -> runVlm(report, maxNew, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
-                    ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, model, suite)
+                    ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, suite)
                     ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION ->
                         if (suite?.metric == "t2i_reference_smoke") runTextToImage(report, suite, outDir)
                         else runInpaint(report, model, suite, outDir)
@@ -438,13 +444,13 @@ class NpuModelE2ETest {
                     try {
                         val result = RunAnywhere.deleteModel(model.id)
                         val modelIdDeleted = model.id in result.deleted_model_ids
-                        val deleteOk = result.success && modelIdDeleted && result.failed_model_ids.isEmpty() &&
+                        val deleteOk = result.error == null && modelIdDeleted && result.failed_model_ids.isEmpty() &&
                             result.skipped_model_ids.isEmpty() && result.files_deleted &&
                             result.registry_updated && !result.dry_run
                         report.put("delete", JSONObject()
                             .put("applicable", true)
                             .put("requested", true)
-                            .put("success", result.success)
+                            .put("success", result.error == null)
                             .put("duration_ms", System.currentTimeMillis() - deleteStart)
                             .put("deleted_bytes", result.deleted_bytes)
                             .put("deleted_model_ids", JSONArray(result.deleted_model_ids))
@@ -454,15 +460,15 @@ class NpuModelE2ETest {
                             .put("files_deleted", result.files_deleted)
                             .put("registry_updated", result.registry_updated)
                             .put("dry_run", result.dry_run)
-                            .put("error_message", result.error_message))
+                            .put("error_message", result.error?.message))
                             .gate("delete_model", deleteOk)
                         if (!deleteOk) {
                             val deleteWasPrimaryFailure = finalStatus in setOf("PASS", "SMOKE_PASS")
                             finalStatus = "FAIL"
                             if (deleteWasPrimaryFailure) finalPhase = "delete"
-                            val reason = result.error_message.ifBlank {
+                            val reason = result.error?.message?.ifBlank {
                                 "delete result did not confirm files + registry cleanup for ${model.id}"
-                            }
+                            } ?: "delete result did not confirm files + registry cleanup for ${model.id}"
                             finalDetail = appendDetail(finalDetail, reason)
                         }
                     } catch (e: Exception) {
@@ -521,7 +527,11 @@ class NpuModelE2ETest {
                 val gold = c.goldTokens
                 val budget = maxOf(maxNew, suite.maxNew, c.maxNew, (gold?.size ?: 0) + 24, 32)
                 val g = withTimeout(INFER_TIMEOUT_MS) { greedyGenerate(c.text!!, budget) }
-                val drift = gold?.let { NpuMetrics.normalizedTokenEdit(g.tokenIds, it) } // vs base gold (informational)
+                // Base-token drift (vs `gold`) was diagnostic-only, informational, never an
+                // applied acceptance threshold. LLMStreamEvent.token_id is permanently
+                // `reserved` now (idl/llm_service.proto) with no replacement -- per-token
+                // ids are no longer obtainable from the stream, so this drift metric is
+                // gone; answer-keyword correctness + coherence remains the sole gate.
                 val repetitionRatio = NpuMetrics.wordRepeatRatio(g.text)
                 val coherent = g.text.isNotBlank() && repetitionRatio < NpuRubric.REPEAT_MAX
                 val visibleAnswer = NpuMetrics.answerText(g.text)
@@ -541,11 +551,11 @@ class NpuModelE2ETest {
                     .put("metric", "answer+coherence").put("max_new", budget)
                     .put("keyword_match", keywordMatch).put("coherent", coherent)
                     .put("word_repeat_ratio", round6(repetitionRatio))
-                    .put("dev_ntok", g.tokenIds.size)
+                    .put("dev_ntok", g.outputTokenCount)
                     .put("ttft_ms", round2(g.ttftMs)).put("decode_toks", round2(g.decodeToks))
                     .put("prefill_toks", round2(g.prefillToks)).put("tokens_per_s", round2(g.tokensPerS))
                     .put("total_ms", round2(g.totalMs)).put("out_tok", g.outTok).put("pass", pass)
-                if (gold != null) sample.put("greedy_tol_base", round3(drift!!)).put("gold_ntok", gold.size)
+                if (gold != null) sample.put("gold_ntok", gold.size)
                 report.addSample(sample)
             }
             val frac = passN.toDouble() / suiteCases.size
@@ -560,39 +570,50 @@ class NpuModelE2ETest {
             }
     }
 
-    private data class Gen(val text: String, val tokenIds: List<Int>, val ttftMs: Double, val decodeToks: Double,
+    // LLMStreamEvent.token_id/is_final/kind/logprob are permanently `reserved`
+    // in idl/llm_service.proto with no replacement -- per-token ids are no
+    // longer obtainable from the stream, so token-level parity (tokenIds) is
+    // dropped from Gen; event_kind (COMPLETED/ERROR) is the sole terminal
+    // discriminator now.
+    private data class Gen(val text: String, val outputTokenCount: Int, val ttftMs: Double, val decodeToks: Double,
                            val prefillToks: Double, val tokensPerS: Double, val totalMs: Double, val outTok: Int)
 
-    /** Greedy (temp=0) generation collecting per-token ids (for token-level parity) + perf metrics. */
+    /** Greedy (temp=0) generation collecting text + perf metrics. */
     private suspend fun greedyGenerate(prompt: String, maxNew: Int): Gen {
         val opts = RALLMGenerationOptions(
-            max_tokens = maxNew,
+            max_output_tokens = maxNew,
             temperature = 0f,
             top_p = 1f,
-            thinking_pattern = THINKING_TAGS,
+            reasoning = ReasoningOptions(include_in_output = true, pattern = THINKING_TAGS),
         )
-        val ids = ArrayList<Int>(); val sb = StringBuilder()
+        var tokenCount = 0; val sb = StringBuilder()
         val t0 = System.currentTimeMillis(); var ttftWall = 0.0
         var ttft = 0.0; var tps = 0.0; var decMs = 0.0; var preMs = 0.0; var totMs = 0.0; var outTok = 0; var inTok = 0
         RunAnywhere.generateStream(prompt, opts).collect { ev ->
             val tk = ev.token
             if (!tk.isNullOrEmpty()) {
                 if (ttftWall == 0.0) ttftWall = (System.currentTimeMillis() - t0).toDouble()
-                sb.append(tk); ids.add(ev.token_id)
+                sb.append(tk); tokenCount++
             }
-            if (ev.is_final) ev.result?.let { r ->
-                ttft = r.time_to_first_token_ms.toDouble(); tps = r.tokens_per_second.toDouble()
-                decMs = r.decode_time_ms.toDouble(); preMs = r.prompt_eval_time_ms.toDouble()
-                totMs = r.total_time_ms.toDouble(); outTok = r.completion_tokens; inTok = r.prompt_tokens
+            if (ev.event_kind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED) {
+                ev.result?.let { r ->
+                    // Top-level LLMGenerationResult.time_to_first_token_ms/total_time_ms
+                    // and TokenUsage.tokens_per_second were deleted/renamed: TokenUsage.ttft_ms
+                    // and .decode_tokens_per_second are canonical now, and generation_time_ms
+                    // is the sole wall-clock field left on the result.
+                    ttft = (r.usage?.ttft_ms ?: 0L).toDouble(); tps = r.usage?.decode_tokens_per_second ?: 0.0
+                    decMs = r.decode_time_ms.toDouble(); preMs = r.prompt_eval_time_ms.toDouble()
+                    totMs = r.generation_time_ms; outTok = r.usage?.output_tokens ?: 0; inTok = r.usage?.input_tokens ?: 0
+                }
             }
         }
         val totalWall = (System.currentTimeMillis() - t0).toDouble()
-        if (outTok == 0) outTok = ids.size
+        if (outTok == 0) outTok = tokenCount
         val ttftF = if (ttft > 0) ttft else ttftWall
         val total = if (totMs > 0) totMs else totalWall
         val decToks = if (decMs > 0) outTok * 1000.0 / decMs else if (tps > 0) tps else if (total > 0) outTok * 1000.0 / total else 0.0
         val preToks = if (preMs > 0) inTok * 1000.0 / preMs else 0.0
-        return Gen(sb.toString().trim(), ids, ttftF, decToks, preToks, if (tps > 0) tps else decToks, total, outTok)
+        return Gen(sb.toString().trim(), tokenCount, ttftF, decToks, preToks, if (tps > 0) tps else decToks, total, outTok)
     }
 
     // ---------------------------------------------------------------- VLM ----
@@ -620,24 +641,33 @@ class NpuModelE2ETest {
                 // Greedy (temperature=0, no top-p/top-k) — the parity setting: the device caption must
                 // match the fp32 gold deterministically, not a sampled variant. (0f is also the option
                 // default, but pin it explicitly so a future default change can't silently un-greedy the gate.)
-                RunAnywhere.processImage(RAVLMImage.fromFilePath(f.absolutePath),
-                    RAVLMGenerationOptions(prompt = prompt, max_tokens = budget, temperature = 0f, top_p = 0f, top_k = 0))
+                RunAnywhere.processImage(
+                    RAVLMGenerationRequest(
+                        images = listOf(RAVLMImage.fromFilePath(f.absolutePath)),
+                        prompt = prompt,
+                        options = RALLMGenerationOptions(max_output_tokens = budget, temperature = 0f, top_p = 0f, top_k = 0),
+                    ),
+                )
             }
             val text = r.text.trim()
             val visibleAnswer = NpuMetrics.answerText(text)
             val pass = visibleAnswer.isNotBlank() && kws.any { NpuMetrics.containsKeyword(visibleAnswer, it) }
             if (pass) passed++
+            // RAVLMGenerationOptions is deleted; VLMResult.time_to_first_token_ms/
+            // tokens_per_second/processing_time_ms were likewise deleted -- ttft_ms
+            // and decode_tokens_per_second are canonical on the shared TokenUsage
+            // now, and total_time_ms is the sole wall-clock field left on the result.
             report.addSample(JSONObject().put("idx", i).put("id", id).put("input", prompt)
                 .put("output", text).put("expect_keywords", JSONArray(kws))
                 .put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
-                .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))
-                .put("tokens_per_s", round2(r.tokens_per_second.toDouble()))
-                .put("total_ms", round2(r.processing_time_ms.toDouble()))
-                .put("out_tok", r.completion_tokens).put("img_tok", r.image_tokens)
+                .put("ttft_ms", round2((r.usage?.ttft_ms ?: 0L).toDouble()))
+                .put("tokens_per_s", round2(r.usage?.decode_tokens_per_second ?: 0.0))
+                .put("total_ms", round2(r.total_time_ms.toDouble()))
+                .put("out_tok", r.usage?.output_tokens ?: 0).put("img_tok", r.image_tokens)
                 .put("metric", "keyword:${kws.firstOrNull() ?: ""}").put("max_new", budget).put("pass", pass))
             report.put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
-                .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))
-                .put("tokens_per_s", round2(r.tokens_per_second.toDouble()))
+                .put("ttft_ms", round2((r.usage?.ttft_ms ?: 0L).toDouble()))
+                .put("tokens_per_s", round2(r.usage?.decode_tokens_per_second ?: 0.0))
         }
         val passFraction = passed.toDouble() / imgCases.size
         report.put("suite_pass_frac", round6(passFraction))
@@ -703,18 +733,22 @@ class NpuModelE2ETest {
             val wallMs = (System.currentTimeMillis() - started).toDouble()
             val latencyMs = result.total_time_ms.takeIf { it > 0 }?.toDouble() ?: wallMs
             totalLatencyMs += latencyMs
-            val rgba = result.image_data.toByteArray()
+            // DiffusionResult now carries `images` (a list, one entry per requested
+            // image) instead of flat image_data/width/height/image_media_type
+            // fields at the top level (idl/diffusion_options.proto).
+            val image = result.images.firstOrNull()
+            val rgba = image?.data_?.toByteArray() ?: ByteArray(0)
             val shapeOk =
-                result.width == expectedWidth && result.height == expectedHeight &&
+                image != null && image.width == expectedWidth && image.height == expectedHeight &&
                     rgba.size == expectedWidth * expectedHeight * 4
-            val mediaOk = result.image_media_type == "image/raw-rgba"
+            val mediaOk = image?.media_type == "image/raw-rgba"
             if (!shapeOk || !mediaOk) {
                 report.addSample(
                     JSONObject()
                         .put("idx", index)
                         .put("id", case.id)
-                        .put("output", "${result.width}x${result.height}:${rgba.size}bytes")
-                        .put("image_media_type", result.image_media_type ?: JSONObject.NULL)
+                        .put("output", "${image?.width}x${image?.height}:${rgba.size}bytes")
+                        .put("image_media_type", image?.media_type ?: JSONObject.NULL)
                         .put("latency_ms", round2(latencyMs))
                         .put("metric", "inpaint_output_contract")
                         .put("pass", false),
@@ -862,18 +896,23 @@ class NpuModelE2ETest {
                                 prompt = case.text!!,
                                 width = expectedWidth,
                                 height = expectedHeight,
-                                mode = DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
+                                // Mode is inferred, never declared (idl/diffusion_options.proto):
+                                // no `image` set = text-to-image, which is exactly this case.
                             ),
                     )
                 }
             val wallMs = (System.currentTimeMillis() - started).toDouble()
             val latencyMs = result.total_time_ms.takeIf { it > 0 }?.toDouble() ?: wallMs
             totalLatencyMs += latencyMs
-            val rgba = result.image_data.toByteArray()
+            // DiffusionResult now carries `images` (a list, one entry per requested
+            // image) instead of flat image_data/width/height/image_media_type
+            // fields at the top level (idl/diffusion_options.proto).
+            val image = result.images.firstOrNull()
+            val rgba = image?.data_?.toByteArray() ?: ByteArray(0)
             val shapeOk =
-                result.width == expectedWidth && result.height == expectedHeight &&
+                image != null && image.width == expectedWidth && image.height == expectedHeight &&
                     rgba.size == expectedWidth * expectedHeight * 4
-            val mediaOk = result.image_media_type == "image/raw-rgba"
+            val mediaOk = image?.media_type == "image/raw-rgba"
             val candidateRgb = if (shapeOk) rgbaToRgb(rgba) else ByteArray(0)
             // structure: population std of RGB8 pixels (a degenerate flat/blank image fails)
             val std =
@@ -910,8 +949,8 @@ class NpuModelE2ETest {
                     .put("idx", index)
                     .put("id", case.id)
                     .put("input", case.text)
-                    .put("output", "${result.width}x${result.height}:${rgba.size}bytes")
-                    .put("image_media_type", result.image_media_type ?: JSONObject.NULL)
+                    .put("output", "${image?.width}x${image?.height}:${rgba.size}bytes")
+                    .put("image_media_type", image?.media_type ?: JSONObject.NULL)
                     .put("pixel_std", round2(std))
                     .put("psnr_db", if (psnr.isNaN()) JSONObject.NULL else round2(psnr))
                     .put("latency_ms", round2(latencyMs))
@@ -951,7 +990,7 @@ class NpuModelE2ETest {
             val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.transcribe(pcm) }
             val wallMs = (System.currentTimeMillis() - start).toDouble()
             val procMs = r.metadata?.processing_time_ms?.takeIf { it > 0 }?.toDouble() ?: wallMs
-            val rtf = r.metadata?.real_time_factor?.takeIf { it > 0f }?.toDouble() ?: (procMs / 1000.0 / audioS)
+            val rtf = procMs / 1000.0 / audioS
             val text = r.text.trim()
             val wer = NpuMetrics.wer(ref, text)
             val artifacts = NpuMetrics.tokenizerArtifacts(text)
@@ -977,7 +1016,7 @@ class NpuModelE2ETest {
 
     // ------------------------------------------------------------- EMBEDDING ----
     // Canonical retrieval-ranking gate through the public embedding API.
-    private suspend fun runEmbedding(report: RunReport, model: SingleFileModel, suite: NpuSuite?) {
+    private suspend fun runEmbedding(report: RunReport, suite: NpuSuite?) {
         requireNotNull(suite) { "embedding requires a canonical npu_suite/v1" }
         require(suite.metric == "embedding_retrieval_ranking") {
             "embedding suite metric must be embedding_retrieval_ranking, got ${suite.metric}"
@@ -986,12 +1025,12 @@ class NpuModelE2ETest {
         var embedMsTotal = 0L
         suspend fun vec(t: String): FloatArray {
             val start = System.currentTimeMillis()
-            val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.embeddings.embed(t, model.id) }
+            val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.embeddings.embed(listOf(t)) }
             val elapsed = System.currentTimeMillis() - start
             embedCalls++
             embedMsTotal += elapsed
             report.put("last_embed_ms", elapsed)
-            return (r.vectors.firstOrNull()?.values ?: emptyList()).toFloatArray()
+            return r.firstOrNull()?.vector ?: FloatArray(0)
         }
         val retrievalCases = suite.cases.filter {
             it.query != null && it.positive != null && it.negative != null
@@ -1155,7 +1194,9 @@ class NpuModelE2ETest {
                 bundle.baseUrl?.trimEnd('/')?.let { "$it/$relativePath" }
                     ?: "local://$modelId/$relativePath",
             filename = File(relativePath).name,
-            is_required = true,
+            // Wire polarity: is_required -> is_optional (inverted). Every local
+            // bundle file here is required, so is_optional = false.
+            is_optional = false,
             size_bytes = bytes,
             relative_path = relativePath,
             local_path =
@@ -1396,6 +1437,17 @@ class NpuModelE2ETest {
 
     private fun hfRepoOf(bundle: SingleFileModel): String =
         bundle.url.removePrefix("https://huggingface.co/").split("/").take(2).joinToString("/")
+
+    /** `HexagonArch.HEXAGON_ARCH_V79` -> `"v79"`, matching the `-e arch` CLI arg convention. */
+    private fun HexagonArch.archDisplayName(): String = when (this) {
+        HexagonArch.HEXAGON_ARCH_V68 -> "v68"
+        HexagonArch.HEXAGON_ARCH_V69 -> "v69"
+        HexagonArch.HEXAGON_ARCH_V73 -> "v73"
+        HexagonArch.HEXAGON_ARCH_V75 -> "v75"
+        HexagonArch.HEXAGON_ARCH_V79 -> "v79"
+        HexagonArch.HEXAGON_ARCH_V81 -> "v81"
+        HexagonArch.HEXAGON_ARCH_UNKNOWN -> "unknown"
+    }
 
     private fun logicalIdAndArch(rawId: String): Pair<String, String?> {
         val match = ARCH_SUFFIX.matchEntire(rawId) ?: return rawId to null

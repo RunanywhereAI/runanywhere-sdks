@@ -295,7 +295,7 @@ export class ModelRegistryAdapter {
         return false;
       }
       const result = ProtoModelRegistryRefreshResultCodec.decode(resultBytes);
-      return result.success;
+      return !result.error;
     } catch (error) {
       logger.warning(
         `rac_model_registry_refresh_proto threw: ${

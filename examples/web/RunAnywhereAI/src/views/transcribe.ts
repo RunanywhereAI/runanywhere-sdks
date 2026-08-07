@@ -5,7 +5,7 @@
  * STTViewModel.swift:43-61 `selectedMode`):
  *
  *  - Batch (STTViewModel.swift:241-261): record, then one-shot
- *    `RunAnywhere.transcribe(samples)`.
+ *    `RunAnywhere.stt.transcribe(audio)`.
  *  - Live (STTViewModel.swift:365-408): the SDK streaming session emits
  *    partial hypotheses (`isFinal=false`) that preview the utterance and a
  *    final result (`isFinal=true`) that replaces them.
@@ -18,6 +18,7 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
+  type AudioInput,
 } from '@runanywhere/web';
 import {
   AudioCapture,
@@ -78,7 +79,7 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
 }
 
 function renderTranscribe(): void {
-  const supportsProto = RunAnywhere.stt.supportsLifecycleProtoSTT();
+  const supportsProto = RunAnywhere.runtime.modalities.stt.status !== 'unavailable';
   const loadedModel = findLoadedModelForCategory(
     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
   );
@@ -107,7 +108,7 @@ function renderTranscribe(): void {
           </div>
           <div class="docs-section">
             <h3>Microphone</h3>
-            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>${selectedMode === 'live' ? 'RunAnywhere.transcribeStream(...)' : 'RunAnywhere.transcribe(...)'}</code>.</p>
+            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>${selectedMode === 'live' ? 'RunAnywhere.stt.transcribeStream(...)' : 'RunAnywhere.stt.transcribe(...)'}</code>.</p>
             <div class="toolbar-actions">
               <button class="btn btn-primary" id="mic-toggle-btn" ${isProcessing || !canRunInference ? 'disabled' : ''}>
                 ${isCapturing ? 'Stop & transcribe' : 'Start recording'}
@@ -132,11 +133,11 @@ function renderTranscribe(): void {
             <p class="text-secondary">
               Once a speech-capable backend is registered against a WASM build
               that includes <code>RAC_WASM_ONNX=ON</code>, this view dispatches
-              transcription through <code>RunAnywhere.transcribeStream(audio, options)</code>.
+              transcription through <code>RunAnywhere.stt.transcribeStream(chunks, options)</code>.
             </p>
             <ul class="feature-unavailable__list">
-              <li><code>RunAnywhere.loadModel(...)</code></li>
-              <li><code>RunAnywhere.transcribeStream(audio)</code></li>
+              <li><code>RunAnywhere.models.load(id)</code></li>
+              <li><code>RunAnywhere.stt.transcribeStream(chunks)</code></li>
             </ul>
           </div>`}
     </div>
@@ -234,7 +235,7 @@ async function runTranscribe(samples: Float32Array): Promise<void> {
   renderTranscribe();
   setStatus(`Transcribing ${(samples.length / 16000).toFixed(2)}s of audio...`);
   try {
-    const output = await RunAnywhere.transcribe(samples);
+    const output = await RunAnywhere.stt.transcribe(RunAnywhere.AudioInput.float32(samples));
     transcript = output.text;
     setStatus('Done.');
   } catch (err) {
@@ -246,34 +247,30 @@ async function runTranscribe(samples: Float32Array): Promise<void> {
 }
 
 /**
- * Live mode — SDK streaming session emitting partial + final results (iOS
- * parity: STTViewModel.swift:377 `RunAnywhere.transcribeStream`; partial
- * folding mirrors STTViewModel.swift:387-408 — non-final partials preview
- * the utterance, the final replaces them).
- *
- * The top-level Web streaming verb is lifecycle-owned, matching batch mode:
- * commons resolves the model already loaded by `RunAnywhere.loadModel(...)`.
+ * Live mode — the streaming verb takes a chunk stream and emits `partial`
+ * previews followed by the `final` transcription. Failures throw into this
+ * loop rather than arriving as a terminal partial.
  */
 async function runTranscribeStream(samples: Float32Array): Promise<void> {
   isProcessing = true;
   renderTranscribe();
   setStatus(`Streaming ${(samples.length / 16000).toFixed(2)}s of audio...`);
 
+  async function* chunks(): AsyncGenerator<AudioInput> {
+    yield RunAnywhere.AudioInput.float32(samples);
+  }
+
   try {
     transcript = '';
-    for await (const partial of RunAnywhere.transcribeStream(samples)) {
-      const text = partial.text.trim();
-      if (partial.isFinal) {
-        // Stream errors surface as a terminal partial carrying the failure
-        // text (iOS parity: STTViewModel.swift:391-396).
-        if (text.startsWith('STT stream failed')) {
-          setStatus(text);
-          return;
+    for await (const event of RunAnywhere.stt.transcribeStream(chunks())) {
+      if (event.type === 'partial') {
+        const text = event.alternatives[0]?.text.trim();
+        if (text) {
+          transcript = text;
+          updateOutput();
         }
-        transcript = text;
-        updateOutput();
-      } else if (text) {
-        transcript = text;
+      } else if (event.type === 'transcriptFinal') {
+        transcript = event.segment.text.trim();
         updateOutput();
       }
     }

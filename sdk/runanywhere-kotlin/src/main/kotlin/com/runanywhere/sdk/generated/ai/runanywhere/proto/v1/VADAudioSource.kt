@@ -16,8 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.countNonNull
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -34,57 +32,51 @@ public class VADAudioSource(
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioData",
-    oneofName = "source",
     schemaIndex = 0,
   )
-  public val audio_data: ByteString? = null,
+  public val audio_data: ByteString = ByteString.EMPTY,
   @field:WireField(
     tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "adapterHandle",
-    oneofName = "source",
+    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 1,
   )
-  public val adapter_handle: String? = null,
+  public val encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.VADAudioEncoding#ADAPTER",
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sampleRate",
     schemaIndex = 2,
   )
-  public val encoding: VADAudioEncoding = VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED,
+  public val sample_rate: Int = 0,
+  /**
+   * Kept: commons rejects channels > 1 with RAC_ERROR_NOT_SUPPORTED, and
+   * this is the only signal that a caller pushed interleaved stereo.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sampleRate",
     schemaIndex = 3,
   )
-  public val sample_rate: Int = 0,
+  public val channels: Int = 0,
+  /**
+   * Position of this chunk on the session timeline; feeds
+   * SpeechActivityEvent.audio_start_ms / audio_end_ms.
+   */
   @field:WireField(
     tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val channels: Int = 0,
-  @field:WireField(
-    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "frameOffsetMs",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val frame_offset_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADAudioSource, Nothing>(ADAPTER, unknownFields) {
-  init {
-    require(countNonNull(audio_data, adapter_handle) <= 1) {
-      "At most one of audio_data, adapter_handle may be non-null"
-    }
-  }
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -96,7 +88,6 @@ public class VADAudioSource(
     if (other !is VADAudioSource) return false
     if (unknownFields != other.unknownFields) return false
     if (audio_data != other.audio_data) return false
-    if (adapter_handle != other.adapter_handle) return false
     if (encoding != other.encoding) return false
     if (sample_rate != other.sample_rate) return false
     if (channels != other.channels) return false
@@ -108,8 +99,7 @@ public class VADAudioSource(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + (audio_data?.hashCode() ?: 0)
-      result = result * 37 + (adapter_handle?.hashCode() ?: 0)
+      result = result * 37 + audio_data.hashCode()
       result = result * 37 + encoding.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + channels.hashCode()
@@ -121,8 +111,7 @@ public class VADAudioSource(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    if (audio_data != null) result += """audio_data=$audio_data"""
-    if (adapter_handle != null) result += """adapter_handle=${sanitize(adapter_handle)}"""
+    result += """audio_data=$audio_data"""
     result += """encoding=$encoding"""
     result += """sample_rate=$sample_rate"""
     result += """channels=$channels"""
@@ -131,14 +120,13 @@ public class VADAudioSource(
   }
 
   public fun copy(
-    audio_data: ByteString? = this.audio_data,
-    adapter_handle: String? = this.adapter_handle,
-    encoding: VADAudioEncoding = this.encoding,
+    audio_data: ByteString = this.audio_data,
+    encoding: AudioEncoding = this.encoding,
     sample_rate: Int = this.sample_rate,
     channels: Int = this.channels,
     frame_offset_ms: Long = this.frame_offset_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): VADAudioSource = VADAudioSource(audio_data, adapter_handle, encoding, sample_rate, channels, frame_offset_ms, unknownFields)
+  ): VADAudioSource = VADAudioSource(audio_data, encoding, sample_rate, channels, frame_offset_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -152,84 +140,84 @@ public class VADAudioSource(
     ) {
       override fun encodedSize(`value`: VADAudioSource): Int {
         var size = value.unknownFields.size
-        size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.audio_data)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.adapter_handle)
-        if (value.encoding != ai.runanywhere.proto.v1.VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED) {
-          size += VADAudioEncoding.ADAPTER.encodedSizeWithTag(3, value.encoding)
+        if (value.audio_data != okio.ByteString.EMPTY) {
+          size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.audio_data)
+        }
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          size += AudioEncoding.ADAPTER.encodedSizeWithTag(2, value.encoding)
         }
         if (value.sample_rate != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.sample_rate)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.sample_rate)
         }
         if (value.channels != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.channels)
+          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.channels)
         }
         if (value.frame_offset_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.frame_offset_ms)
+          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.frame_offset_ms)
         }
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: VADAudioSource) {
-        if (value.encoding != ai.runanywhere.proto.v1.VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED) {
-          VADAudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
+        if (value.audio_data != okio.ByteString.EMPTY) {
+          ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
+        }
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          AudioEncoding.ADAPTER.encodeWithTag(writer, 2, value.encoding)
         }
         if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.sample_rate)
+          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.sample_rate)
         }
         if (value.channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.channels)
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.channels)
         }
         if (value.frame_offset_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.frame_offset_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.frame_offset_ms)
         }
-        ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
-        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.adapter_handle)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADAudioSource) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.adapter_handle)
-        ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
         if (value.frame_offset_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 6, value.frame_offset_ms)
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.frame_offset_ms)
         }
         if (value.channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.channels)
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.channels)
         }
         if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.sample_rate)
+          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.sample_rate)
         }
-        if (value.encoding != ai.runanywhere.proto.v1.VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED) {
-          VADAudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          AudioEncoding.ADAPTER.encodeWithTag(writer, 2, value.encoding)
+        }
+        if (value.audio_data != okio.ByteString.EMPTY) {
+          ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
         }
       }
 
       override fun decode(reader: ProtoReader): VADAudioSource {
-        var audio_data: ByteString? = null
-        var adapter_handle: String? = null
-        var encoding: VADAudioEncoding = VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED
+        var audio_data: ByteString = ByteString.EMPTY
+        var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
         var sample_rate: Int = 0
         var channels: Int = 0
         var frame_offset_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> audio_data = ProtoAdapter.BYTES.decode(reader)
-            2 -> adapter_handle = ProtoAdapter.STRING.decode(reader)
-            3 -> try {
-              encoding = VADAudioEncoding.ADAPTER.decode(reader)
+            2 -> try {
+              encoding = AudioEncoding.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            4 -> sample_rate = ProtoAdapter.INT32.decode(reader)
-            5 -> channels = ProtoAdapter.INT32.decode(reader)
-            6 -> frame_offset_ms = ProtoAdapter.INT64.decode(reader)
+            3 -> sample_rate = ProtoAdapter.INT32.decode(reader)
+            4 -> channels = ProtoAdapter.INT32.decode(reader)
+            5 -> frame_offset_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADAudioSource(
           audio_data = audio_data,
-          adapter_handle = adapter_handle,
           encoding = encoding,
           sample_rate = sample_rate,
           channels = channels,

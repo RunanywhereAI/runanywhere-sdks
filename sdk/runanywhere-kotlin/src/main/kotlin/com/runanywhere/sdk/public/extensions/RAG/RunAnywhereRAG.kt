@@ -57,6 +57,7 @@ private fun ensureRagNativeLibsLoaded() {
     }
 }
 
+@Deprecated("Use RunAnywhere.rag.open(embeddingModel, llmModel, config).")
 suspend fun RunAnywhere.ragResolvedConfiguration(
     embeddingModel: RAModelInfo,
     llmModel: RAModelInfo,
@@ -104,9 +105,9 @@ private suspend fun loadRagArtifactModel(
                 },
         )
     val result = sdk.loadModel(request)
-    if (!result.success) {
+    if (result.error != null) {
         val message =
-            result.error_message.ifBlank { "$errorLabel model lifecycle artifact resolution failed" }
+            result.error!!.message.ifBlank { "$errorLabel model lifecycle artifact resolution failed" }
         throw SDKException.model("$errorLabel model '${model.id}': $message")
     }
     return result
@@ -118,6 +119,7 @@ private suspend fun loadRagArtifactModel(
  * can hand in [RAModelInfo] entries from the catalogue without first building a
  * [RARAGConfiguration] by hand. Mirrors Swift `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)`.
  */
+@Deprecated("Use RunAnywhere.rag.open(embeddingModel, llmModel, config).")
 suspend fun RunAnywhere.ragCreatePipeline(
     embeddingModel: RAModelInfo,
     llmModel: RAModelInfo,
@@ -132,6 +134,7 @@ suspend fun RunAnywhere.ragCreatePipeline(
     ragCreatePipeline(resolved)
 }
 
+@Deprecated("Use RunAnywhere.rag.open(embeddingModel, llmModel, config).")
 suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
@@ -145,12 +148,14 @@ suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
 }
 
 /** Destroy the RAG pipeline and release all resources. */
+@Deprecated("Use RagSession.close().")
 suspend fun RunAnywhere.ragDestroyPipeline() {
     ragNativeRequests.withExclusiveOperation(interruptActiveRequest = true) {
         CppBridgeRAG.destroy()
     }
 }
 
+@Deprecated("Use RagSession.ingest(document).")
 suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
@@ -159,6 +164,7 @@ suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics {
     }
 }
 
+@Deprecated("Use RagSession.clear().")
 suspend fun RunAnywhere.ragClearDocuments() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
@@ -172,6 +178,7 @@ suspend fun RunAnywhere.ragClearDocuments() {
  *
  * @return Number of indexed chunks in the pipeline, or 0 if not initialized.
  */
+@Deprecated("Use RagSession.stats().chunkCount.")
 suspend fun RunAnywhere.ragGetDocumentCount(): Int =
     ragNativeRequests.withExclusiveOperation {
         try {
@@ -182,8 +189,10 @@ suspend fun RunAnywhere.ragGetDocumentCount(): Int =
     }
 
 /** The current number of indexed document chunks in the pipeline. */
+@Deprecated("Use RagSession.stats().documentCount.")
 suspend fun RunAnywhere.ragDocumentCount(): Int = ragGetDocumentCount()
 
+@Deprecated("Use RagSession.query(question, options).")
 suspend fun RunAnywhere.ragQuery(
     question: String,
     options: RAGQueryOptions? = null,
@@ -192,7 +201,7 @@ suspend fun RunAnywhere.ragQuery(
     ensureServicesReady()
     val queryOptions =
         (options ?: RAGQueryOptions.defaults(question)).let {
-            if (it.question.isEmpty()) it.copy(question = question) else it
+            if (it.query.isEmpty()) it.copy(query = question) else it
         }
     val nativeRequest = CppBridgeRAG.prepareQuery(queryOptions)
     return runCancellableNativeRagQuery(
@@ -201,8 +210,9 @@ suspend fun RunAnywhere.ragQuery(
     )
 }
 
+@Deprecated("Use RagSession.query(question, options).")
 suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
-    ragQuery(options.question, options)
+    ragQuery(options.query, options)
 
 /**
  * Streaming RAG query. Emits a [RAGStreamEvent] per generated token
@@ -214,6 +224,7 @@ suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
  * native query request-scoped (via racRagCancelRequestProto), so concurrent
  * collectors and unary queries serialize instead of cancelling each other.
  */
+@Deprecated("Use RagSession.queryStream(question, options).")
 fun RunAnywhere.ragQueryStream(
     question: String,
     options: RAGQueryOptions? = null,
@@ -223,7 +234,7 @@ fun RunAnywhere.ragQueryStream(
         ensureServicesReady()
         val queryOptions =
             (options ?: RAGQueryOptions.defaults(question)).let {
-                if (it.question.isEmpty()) it.copy(question = question) else it
+                if (it.query.isEmpty()) it.copy(query = question) else it
             }
         val nativeRequest = CppBridgeRAG.prepareQuery(queryOptions)
         // Run the blocking native stream through the RAG request coordinator so
@@ -250,10 +261,12 @@ fun RunAnywhere.ragQueryStream(
         awaitClose { worker.cancel() }
     }
 
+@Deprecated("Use RagSession.queryStream(question, options).")
 fun RunAnywhere.ragQueryStream(options: RAGQueryOptions): Flow<RAGStreamEvent> =
-    ragQueryStream(options.question, options)
+    ragQueryStream(options.query, options)
 
 /** Immediately request cancellation of the active native RAG query. */
+@Deprecated("Cancel the Flow returned by RagSession.queryStream instead.")
 suspend fun RunAnywhere.ragCancelQuery() {
     // The coordinator routes the potentially blocking request-scoped JNI
     // relay through its dedicated elastic cancellation dispatcher, keeping it
@@ -278,6 +291,7 @@ internal suspend fun <T> runCancellableNativeRagQuery(
         cancel = cancel,
     )
 
+@Deprecated("Use RagSession.ingest(documents).")
 suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     if (documents.isEmpty()) return
@@ -289,6 +303,7 @@ suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>) {
     }
 }
 
+@Deprecated("Use RagSession.stats().")
 suspend fun RunAnywhere.ragGetStatistics(): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()

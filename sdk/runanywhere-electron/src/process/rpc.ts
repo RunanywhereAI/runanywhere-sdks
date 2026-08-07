@@ -28,6 +28,18 @@ export type RpcMessage =
 
 /**
  * Methods whose last logical argument is a per-event callback the host injects:
- * generate/generateVlm stream tokens; downloadModel streams progress objects.
+ * generate/generateVlm stream tokens; downloadModel streams progress objects. The
+ * `v3.*` entries are the streaming operations of the v3 backend contract
+ * (see BACKEND_STREAMING_METHODS).
  */
-export const STREAMING_METHODS = new Set<string>(['generate', 'generateVlm', 'downloadModel']);
+export const STREAMING_METHODS = new Set<string>([
+  'generate',
+  'generateVlm',
+  'downloadModel',
+  'v3.resolveModel',
+  'v3.llmGenerate',
+  'v3.vlmGenerate',
+  'v3.sttTranscribeStream',
+  'v3.ttsSynthesizeStream',
+  'v3.ragQueryStream',
+]);

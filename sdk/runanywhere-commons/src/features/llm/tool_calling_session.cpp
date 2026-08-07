@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/rac_llm_stream_internal.h"
 #include "features/llm/tool_calling_generation_internal.h"
 #include "features/llm/tool_calling_grammar.h"
 #include "features/llm/tool_calling_internal.h"
@@ -51,11 +52,6 @@ constexpr const char* kTag = "ToolCallingSession";
 constexpr uint32_t kDefaultMaxToolCalls = 5;
 
 #if defined(RAC_HAVE_PROTOBUF)
-
-int64_t now_us() {
-    using namespace std::chrono;
-    return duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
-}
 
 int64_t now_ms() {
     using namespace std::chrono;
@@ -381,21 +377,23 @@ void emit_final_event(ToolCallingSession& session, bool is_complete) {
     }
     final_result->set_is_complete(is_complete);
     final_result->set_iterations_used(static_cast<int32_t>(session.iteration));
+    rac::llm::tool_calling::set_tool_result_usage(final_result, session.telemetry);
     rac::llm::tool_calling::ensure_web_search_attribution(final_result);
     emit_event(session, std::move(event));
 }
 
 void emit_llm_chunk(ToolCallingSession& session, const std::string& text, bool is_final,
                     const std::string& finish_reason) {
+    // timestamp_us/is_final/kind were all deleted from LLMStreamEvent
+    // (idl/llm_service.proto): event_kind is now the sole discriminator, and
+    // finish_reason widened from a bare string to the FinishReason enum.
     runanywhere::v1::LLMStreamEvent stream;
     stream.set_seq(session.seq + 1);
-    stream.set_timestamp_us(now_us());
     stream.set_token(text);
-    stream.set_is_final(is_final);
-    stream.set_kind(runanywhere::v1::TOKEN_KIND_ANSWER);
     if (is_final) {
         stream.set_event_kind(runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED);
-        stream.set_finish_reason(finish_reason);
+        stream.set_finish_reason(static_cast<runanywhere::v1::FinishReason>(
+            rac::llm::finish_reason_from_string(finish_reason.c_str())));
     } else {
         stream.set_event_kind(runanywhere::v1::LLM_STREAM_EVENT_KIND_TOKEN);
     }
@@ -418,12 +416,10 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const ToolCallingSess
     options.set_format(session.format);
     options.set_max_tool_calls(static_cast<int32_t>(session.max_tool_calls));
     options.set_keep_tools_available(session.keep_tools_available);
-    if (session.generation.max_tokens > 0) {
-        options.set_max_tokens(session.generation.max_tokens);
-    }
-    if (session.generation.temperature > 0.0f) {
-        options.set_temperature(session.generation.temperature);
-    }
+    // ToolCallingOptions.max_tokens/temperature were deleted outright
+    // (idl/tool_calling.proto, llm-tool-options-no-shadow) — they duplicated
+    // the enclosing LLMGenerationOptions wherever one exists; there is no
+    // field here to forward session.generation.{max_tokens,temperature} onto.
     if (!session.generation.system_prompt.empty()) {
         options.set_system_prompt(session.generation.system_prompt);
     }
@@ -702,7 +698,7 @@ void run_generate_loop(ToolCallingSession& session) {
         failed.set_tool_call_id(parsed_call.id());
         failed.set_name(parsed_call.name());
         failed.set_error(policy_error);
-        failed.set_success(false);
+        failed.set_is_error(true);
         failed.set_started_at_ms(now_ms());
         failed.set_completed_at_ms(now_ms());
         session.all_tool_calls.push_back(parsed_call);
@@ -737,7 +733,7 @@ void run_generate_loop(ToolCallingSession& session) {
             failed.set_tool_call_id(parsed_call.id());
             failed.set_name(parsed_call.name());
             failed.set_error(msg);
-            failed.set_success(false);
+            failed.set_is_error(true);
             failed.set_started_at_ms(now_ms());
             failed.set_completed_at_ms(now_ms());
             session.all_tool_calls.push_back(parsed_call);
@@ -814,59 +810,78 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // ToolCallingSessionCreateRequest is now 3 fields — prompt(1), history(2),
+    // ToolCallingOptions options(3) — after tools-collapse-options-and-session-request
+    // (idl/tool_calling.proto). Every knob that used to be re-published here
+    // lives on `options` alone now (temperature/max_tokens have no home at
+    // all — see the comment on build_options_snapshot above).
+    const runanywhere::v1::ToolCallingOptions& req_options = request.options();
+
     auto session = std::make_shared<ToolCallingSession>();
     session->callback = callback;
     session->user_data = user_data;
 
     session->user_prompt = request.prompt();
-    session->generation.max_tokens = request.max_tokens();
-    session->generation.temperature = request.temperature();
-    session->generation.top_p = request.top_p();
-    session->generation.system_prompt = request.system_prompt();
-    session->generation.disable_thinking = request.disable_thinking();
-    // Prior conversation turns (tool_calling.proto field 19). The session path
-    // shares run_generate_once (via generation_for_tool_step), which flattens
-    // generation.history into options.history for EVERY generate — so setting it
-    // here gives Web/Flutter (session ABI) the same multi-turn context the
-    // run-loop ABI already threads. request.history already EXCLUDES the current
-    // turn and is pre-alternated [user,asst,...]; drop a dangling trailing turn
-    // on an odd count so the positional role assignment stays aligned (mirrors
-    // tool_calling_run_loop.cpp and the standard path's trailing-user pop).
-    session->generation.history.assign(request.history().begin(), request.history().end());
+    session->generation.top_p = req_options.top_p();
+    session->generation.system_prompt = req_options.system_prompt();
+    session->generation.disable_thinking = req_options.disable_thinking();
+    // Prior conversation turns. ToolCallingSessionCreateRequest.history is now
+    // `repeated ToolCallingHistoryTurn` (role + content) instead of
+    // `repeated string` (tools-typed-history) — flatten USER/ASSISTANT turns
+    // into the role-less alternating string list GenerationState still
+    // carries; SYSTEM turns are dropped since options.system_prompt is the
+    // system-prompt channel. The session path shares run_generate_once (via
+    // generation_for_tool_step), which flattens generation.history into
+    // options.history for EVERY generate — so setting it here gives
+    // Web/Flutter (session ABI) the same multi-turn context the run-loop ABI
+    // already threads. request.history already EXCLUDES the current turn;
+    // drop a dangling trailing turn on an odd count so the positional role
+    // assignment stays aligned (mirrors tool_calling_run_loop.cpp).
+    session->generation.history.clear();
+    session->generation.history.reserve(static_cast<size_t>(request.history_size()));
+    for (const auto& turn : request.history()) {
+        if (turn.role() == runanywhere::v1::TOOL_CALLING_ROLE_USER ||
+            turn.role() == runanywhere::v1::TOOL_CALLING_ROLE_ASSISTANT) {
+            session->generation.history.push_back(turn.content());
+        }
+    }
     if (session->generation.history.size() % 2 != 0) {
         session->generation.history.pop_back();
     }
 
-    session->format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
-                          ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
-                          : request.format();
+    // Derive the wire format from the loaded model when the caller left it
+    // UNSPECIFIED (same contract as the run-loop path) so LFM2 and other
+    // non-JSON dialects get an aligned prompt + grammar + parser.
+    session->format = rac::llm::tool_calling::resolve_tool_call_format_for_model(
+        req_options.format(), rac::llm::lifecycle_llm_model_id());
     // Probe grammar capability once (cheap acquire/release): grammar backends build +
     // parse the tool prompt in the bare-Pythonic format the QHexRT grammar enforces.
     // Non-grammar engines keep the declared format — a strict no-op for them (RUN-80).
     session->grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     session->max_tool_calls =
-        request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
-    session->auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
-    session->replace_system_prompt = request.replace_system_prompt();
-    session->require_json_arguments = request.require_json_arguments();
-    session->keep_tools_available = request.keep_tools_available();
-    // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
-    // The field is `optional bool` so we can preserve the documented default
-    // (validate=true) when the caller did not set it, while still letting hosts
-    // that delegate validation/authorization to their executor opt out by
-    // explicitly setting validate_calls=false.
-    session->validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
-    // Pick up the OpenAI-style request-level tool_choice and
-    // forced_tool_name knobs (idl/tool_calling.proto fields 7/8).
-    if (request.has_tool_choice()) {
+        req_options.max_tool_calls() == 0 ? kDefaultMaxToolCalls : req_options.max_tool_calls();
+    session->auto_execute = req_options.has_auto_execute() ? req_options.auto_execute() : true;
+    session->replace_system_prompt = req_options.replace_system_prompt();
+    session->require_json_arguments = req_options.require_json_arguments();
+    session->keep_tools_available = req_options.keep_tools_available();
+    // Honor ToolCallingOptions.validate_calls (idl/tool_calling.proto, moved
+    // here from ToolCallingSessionCreateRequest). The field is `optional
+    // bool` so we can preserve the documented default (validate=true) when
+    // the caller did not set it, while still letting hosts that delegate
+    // validation/authorization to their executor opt out by explicitly
+    // setting validate_calls=false.
+    session->validate_calls = req_options.has_validate_calls() ? req_options.validate_calls() : true;
+    // Pick up the OpenAI-style request-level tool_choice and forced_tool_name
+    // knobs (now on ToolCallingOptions fields 13/14).
+    if (req_options.tool_choice() != runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED) {
         session->has_tool_choice = true;
-        session->tool_choice = request.tool_choice();
+        session->tool_choice = req_options.tool_choice();
     }
-    if (request.has_forced_tool_name()) {
-        session->forced_tool_name = request.forced_tool_name();
+    if (req_options.has_forced_tool_name()) {
+        session->forced_tool_name = req_options.forced_tool_name();
     }
 
-    for (const auto& tool : request.tools()) {
+    for (const auto& tool : req_options.tools()) {
         *session->tool_options.add_tools() = tool;
     }
 
@@ -980,11 +995,11 @@ rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_byt
         const bool has_error = request.has_error() && !request.error().empty();
         if (has_error) {
             tr.set_error(request.error());
-            tr.set_success(false);
+            tr.set_is_error(true);
         } else {
             tr.set_result_json(request.result_json().empty() ? std::string("{}")
                                                              : request.result_json());
-            tr.set_success(true);
+            tr.set_is_error(false);
         }
         tr.set_started_at_ms(now_ms());
         tr.set_completed_at_ms(now_ms());

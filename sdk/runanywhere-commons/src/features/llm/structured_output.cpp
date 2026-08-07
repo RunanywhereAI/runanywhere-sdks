@@ -27,6 +27,7 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/features/llm/rac_llm_thinking.h"
+#include "rac/foundation/rac_proto_adapters.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "structured_output.pb.h"
@@ -305,174 +306,15 @@ static rac_result_t copy_serialized_proto(const ProtoMessage& message,
     return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
 }
 
-static const char* json_schema_type_name(runanywhere::v1::JSONSchemaType type) {
-    switch (type) {
-        case runanywhere::v1::JSON_SCHEMA_TYPE_OBJECT:
-            return "object";
-        case runanywhere::v1::JSON_SCHEMA_TYPE_ARRAY:
-            return "array";
-        case runanywhere::v1::JSON_SCHEMA_TYPE_STRING:
-            return "string";
-        case runanywhere::v1::JSON_SCHEMA_TYPE_NUMBER:
-            return "number";
-        case runanywhere::v1::JSON_SCHEMA_TYPE_INTEGER:
-            return "integer";
-        case runanywhere::v1::JSON_SCHEMA_TYPE_BOOLEAN:
-            return "boolean";
-        case runanywhere::v1::JSON_SCHEMA_TYPE_NULL:
-            return "null";
-        case runanywhere::v1::JSON_SCHEMA_TYPE_UNSPECIFIED:
-        default:
-            return nullptr;
-    }
-}
-
-static json json_schema_proto_to_json(const runanywhere::v1::JSONSchema& schema);
-
-static json
-json_schema_property_proto_to_json(const runanywhere::v1::JSONSchemaProperty& property) {
-    json object = json::object();
-    if (const char* type = json_schema_type_name(property.type())) {
-        object["type"] = type;
-    }
-    if (property.has_description()) {
-        object["description"] = property.description();
-    }
-    if (property.enum_values_size() > 0) {
-        object["enum"] = json::array();
-        for (const auto& value : property.enum_values()) {
-            object["enum"].push_back(value);
-        }
-    }
-    if (property.has_format()) {
-        object["format"] = property.format();
-    }
-    if (property.has_items_schema()) {
-        object["items"] = json_schema_proto_to_json(property.items_schema());
-    }
-    if (property.has_object_schema()) {
-        const json nested = json_schema_proto_to_json(property.object_schema());
-        if (nested.contains("properties")) {
-            object["properties"] = nested["properties"];
-        }
-        if (nested.contains("required")) {
-            object["required"] = nested["required"];
-        }
-        if (nested.contains("additionalProperties")) {
-            object["additionalProperties"] = nested["additionalProperties"];
-        }
-    }
-    if (property.has_minimum()) {
-        object["minimum"] = property.minimum();
-    }
-    if (property.has_maximum()) {
-        object["maximum"] = property.maximum();
-    }
-    if (property.has_min_length()) {
-        object["minLength"] = property.min_length();
-    }
-    if (property.has_max_length()) {
-        object["maxLength"] = property.max_length();
-    }
-    if (property.has_pattern()) {
-        object["pattern"] = property.pattern();
-    }
-    if (property.has_min_items()) {
-        object["minItems"] = property.min_items();
-    }
-    if (property.has_max_items()) {
-        object["maxItems"] = property.max_items();
-    }
-    if (property.has_default_json()) {
-        json default_value = json::parse(property.default_json(), nullptr, false);
-        object["default"] =
-            default_value.is_discarded() ? json(property.default_json()) : std::move(default_value);
-    }
-    return object;
-}
-
-static json json_schema_proto_to_json(const runanywhere::v1::JSONSchema& schema) {
-    if (schema.has_raw_json()) {
-        json raw = json::parse(schema.raw_json(), nullptr, false);
-        if (!raw.is_discarded()) {
-            return raw;
-        }
-    }
-
-    json object = json::object();
-    if (const char* type = json_schema_type_name(schema.type())) {
-        object["type"] = type;
-    }
-    if (schema.properties_size() > 0) {
-        object["properties"] = json::object();
-        for (const auto& entry : schema.properties()) {
-            object["properties"][entry.first] = json_schema_property_proto_to_json(entry.second);
-        }
-    }
-    if (schema.required_size() > 0) {
-        object["required"] = json::array();
-        for (const auto& required : schema.required()) {
-            object["required"].push_back(required);
-        }
-    }
-    if (schema.has_items()) {
-        object["items"] = json_schema_property_proto_to_json(schema.items());
-    }
-    if (schema.has_additional_properties()) {
-        object["additionalProperties"] = schema.additional_properties();
-    }
-    if (schema.has_schema_uri()) {
-        object["$schema"] = schema.schema_uri();
-    }
-    if (schema.has_id_uri()) {
-        object["$id"] = schema.id_uri();
-    }
-    if (schema.has_title()) {
-        object["title"] = schema.title();
-    }
-    if (schema.has_description()) {
-        object["description"] = schema.description();
-    }
-    if (schema.definitions_size() > 0) {
-        object["definitions"] = json::object();
-        for (const auto& entry : schema.definitions()) {
-            object["definitions"][entry.first] = json_schema_proto_to_json(entry.second);
-        }
-    }
-    if (schema.has_ref()) {
-        object["$ref"] = schema.ref();
-    }
-    if (schema.all_of_size() > 0) {
-        object["allOf"] = json::array();
-        for (const auto& item : schema.all_of()) {
-            object["allOf"].push_back(json_schema_proto_to_json(item));
-        }
-    }
-    if (schema.any_of_size() > 0) {
-        object["anyOf"] = json::array();
-        for (const auto& item : schema.any_of()) {
-            object["anyOf"].push_back(json_schema_proto_to_json(item));
-        }
-    }
-    if (schema.one_of_size() > 0) {
-        object["oneOf"] = json::array();
-        for (const auto& item : schema.one_of()) {
-            object["oneOf"].push_back(json_schema_proto_to_json(item));
-        }
-    }
-    if (schema.has_not_schema()) {
-        object["not"] = json_schema_proto_to_json(schema.not_schema());
-    }
-    return object;
-}
-
+// idl/structured_output.proto (API-realignment so-p1) deleted the typed
+// JSON-Schema-in-protobuf tree (enum JSONSchemaType, messages JSONSchema /
+// JSONSchemaProperty) entirely. StructuredOutputOptions.schema is now a
+// single JSON Schema STRING (the `schema` arm of the `oneof constraint`),
+// so there is no tree left to walk — the caller already holds schema text.
 static std::string
 json_schema_from_options(const runanywhere::v1::StructuredOutputOptions& options) {
-    if (options.has_json_schema() && !options.json_schema().empty()) {
-        return options.json_schema();
-    }
     if (options.has_schema()) {
-        return json_schema_proto_to_json(options.schema()).dump();
+        return options.schema();
     }
     return {};
 }
@@ -500,66 +342,6 @@ structured_output_config_from_options(const runanywhere::v1::StructuredOutputOpt
     return converted;
 }
 
-// commons-103: StructuredOutputOptions advertises modes/fields the C ABI does
-// not yet implement (REGEX/GRAMMAR-constrained decoding, post-generation JSON
-// repair, retry budget). Until those are plumbed through rac_llm_options_t and
-// the engine sampler hooks, surface a typed RAC_ERROR_FEATURE_NOT_AVAILABLE
-// via the proto envelope instead of silently downgrading to plain JSON-schema
-// generation — silent downgrade caused SDKs requesting GRAMMAR mode to accept
-// non-conforming output as if the constraint had been applied. Mirrors the
-// short-term path documented in the cluster-13 finding synthesis.
-static rac_result_t
-unsupported_structured_options_message(const runanywhere::v1::StructuredOutputOptions& options,
-                                       std::string* out_message) {
-    const auto mode = options.mode();
-    if (mode == runanywhere::v1::STRUCTURED_OUTPUT_MODE_REGEX) {
-        *out_message =
-            "regex-constrained structured output is not supported by the C ABI engine yet";
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
-    if (mode == runanywhere::v1::STRUCTURED_OUTPUT_MODE_GRAMMAR) {
-        *out_message =
-            "grammar-constrained structured output is not supported by the C ABI engine yet";
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
-    if (options.has_regex_pattern() && !options.regex_pattern().empty()) {
-        *out_message =
-            "StructuredOutputOptions.regex_pattern is not consumed by the C ABI engine yet";
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
-    if (options.has_grammar() && !options.grammar().empty()) {
-        *out_message = "StructuredOutputOptions.grammar is not consumed by the C ABI engine yet";
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
-    if (options.repair_json()) {
-        *out_message =
-            "StructuredOutputOptions.repair_json is not implemented by commons (post-generation "
-            "repair must happen in the SDK)";
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
-    if (options.max_retries() > 0) {
-        *out_message =
-            "StructuredOutputOptions.max_retries is not implemented by commons (retry budget must "
-            "happen in the SDK)";
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
-    return RAC_SUCCESS;
-}
-
-// commons-031: StructuredOutputRequest currently has no LLMGenerationOptions
-// field, so the per-call sampling knobs (max_tokens, temperature, top_p,
-// stop_sequences, system_prompt overrides) — and likewise
-// LLMGenerationOptions.disable_thinking — reach the engine only as the
-// rac_llm_options_t defaults below. Callers that need sampling control or
-// thinking suppression must route through rac_llm_generate_proto /
-// rac_llm_generate_stream_proto with LLMGenerationOptions.structured_output
-// set instead (Swift's generateStructured wrapper takes that path — see
-// sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/
-// RunAnywhere+StructuredOutput.swift — so disable_thinking already works
-// there). Embedding LLMGenerationOptions into StructuredOutputRequest would
-// close this gap but requires an IDL change + proto regeneration across all
-// SDKs and is tracked outside this cluster.
-
 static void add_structured_validation_errors_from_json(
     const char* validation_errors_json, runanywhere::v1::StructuredOutputValidation* validation) {
     if (!validation_errors_json || !validation) {
@@ -582,8 +364,12 @@ fill_structured_validation_proto(const rac_structured_output_parse_result_t& par
                                  runanywhere::v1::StructuredOutputValidation* validation) {
     validation->set_is_valid(parsed.is_valid == RAC_TRUE);
     validation->set_contains_json(parsed.contains_json == RAC_TRUE);
-    if (parsed.error_message) {
-        validation->set_error_message(parsed.error_message);
+    if (parsed.error_message && parsed.error_message[0] != '\0') {
+        const rac_result_t vrc = parsed.error_code != 0
+                                     ? static_cast<rac_result_t>(parsed.error_code)
+                                     : RAC_ERROR_VALIDATION_FAILED;
+        rac::foundation::populate_sdk_error(validation->mutable_error(), vrc);
+        validation->mutable_error()->set_message(parsed.error_message);
     }
     if (parsed.raw_text) {
         validation->set_raw_output(parsed.raw_text);
@@ -595,253 +381,7 @@ fill_structured_validation_proto(const rac_structured_output_parse_result_t& par
     validation->set_validation_time_ms(0);
 }
 
-static int64_t structured_now_us() {
-    using namespace std::chrono;
-    return duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
-}
-
-static rac_result_t structured_result_from_text(const std::string& raw_text,
-                                                const rac_structured_output_config_t* config,
-                                                runanywhere::v1::StructuredOutputResult* result,
-                                                const std::string& thinking_open_tag,
-                                                const std::string& thinking_close_tag) {
-    if (!result) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    const char* response = nullptr;
-    size_t response_len = 0;
-    const char* thinking = nullptr;
-    size_t thinking_len = 0;
-    (void)rac_llm_extract_thinking_with_tags(
-        raw_text.c_str(), thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response, &response_len,
-        &thinking, &thinking_len);
-    const std::string parse_text = response ? std::string(response, response_len) : raw_text;
-
-    rac_structured_output_parse_result_t parsed{};
-    const rac_result_t rc = rac_structured_output_parse(parse_text.c_str(), config, &parsed);
-    // Treat ordinary invalid output (INVALID_FORMAT/VALIDATION_FAILED) as a
-    // typed StructuredOutputResult payload — the parsed struct still carries
-    // the populated validation envelope (error_code, error_message,
-    // validation_errors_json). Only ABI/IO failures (null args, OOM, etc.)
-    // escape as a non-success rc to the caller.
-    if (rc != RAC_SUCCESS && rc != RAC_ERROR_INVALID_FORMAT && rc != RAC_ERROR_VALIDATION_FAILED) {
-        rac_structured_output_parse_result_free(&parsed);
-        return rc;
-    }
-
-    if (parsed.parsed_json) {
-        result->set_parsed_json(parsed.parsed_json);
-    }
-    fill_structured_validation_proto(parsed, result->mutable_validation());
-    if (parsed.raw_text) {
-        result->set_raw_text(parsed.raw_text);
-    }
-    if (parsed.error_message) {
-        result->set_error_message(parsed.error_message);
-    }
-    result->set_error_code(static_cast<int32_t>(parsed.error_code));
-    rac_structured_output_parse_result_free(&parsed);
-    return RAC_SUCCESS;
-}
-
-static rac_result_t
-prepare_structured_generation(const runanywhere::v1::StructuredOutputRequest& request,
-                              ProtoStructuredOutputConfig* converted, bool* has_options,
-                              std::string* prepared_prompt, std::string* system_prompt) {
-    if (!converted || !has_options || !prepared_prompt || !system_prompt) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    *has_options = false;
-    if (request.has_options()) {
-        *has_options = true;
-        *converted = structured_output_config_from_options(request.options());
-        refresh_proto_structured_output_config(converted);
-    }
-
-    char* prepared = nullptr;
-    const rac_result_t prepare_rc = rac_structured_output_prepare_prompt(
-        request.prompt().c_str(), *has_options ? &converted->config : nullptr, &prepared);
-    if (prepare_rc != RAC_SUCCESS) {
-        free(prepared);
-        return prepare_rc;
-    }
-    prepared_prompt->assign(prepared ? prepared : "");
-    free(prepared);
-
-    system_prompt->clear();
-    if (converted->config.json_schema) {
-        char* system = nullptr;
-        const rac_result_t system_rc =
-            rac_structured_output_get_system_prompt(converted->config.json_schema, &system);
-        if (system_rc != RAC_SUCCESS) {
-            free(system);
-            return system_rc;
-        }
-        system_prompt->assign(system ? system : "");
-        free(system);
-    }
-    return RAC_SUCCESS;
-}
-
-struct StructuredStreamContext {
-    rac_proto_bytes_callback_fn callback = nullptr;
-    void* user_data = nullptr;
-    rac::llm::LifecycleLlmRef* ref = nullptr;
-    const rac_structured_output_config_t* config = nullptr;
-    uint64_t seq = 0;
-    bool terminal_sent = false;
-    std::string request_id;
-    std::string raw_text;
-    std::string last_partial_json;
-    std::string thinking_open_tag;
-    std::string thinking_close_tag;
-    // commons-104: track tokens so terminal events can report finish_reason
-    // "length" when the engine stopped because options.max_tokens was reached,
-    // mirroring rac_llm_proto_service.cpp generate_stream and llm_component.
-    uint64_t token_count = 0;
-    int32_t max_tokens = 0;
-};
-
-static void dispatch_structured_stream_event(StructuredStreamContext* ctx,
-                                             runanywhere::v1::StructuredOutputStreamEventKind kind,
-                                             const char* token, const char* partial_json,
-                                             const runanywhere::v1::StructuredOutputResult* result,
-                                             const char* error_message, rac_result_t error_code) {
-    if (!ctx || !ctx->callback) {
-        return;
-    }
-
-    runanywhere::v1::StructuredOutputStreamEvent event;
-    event.set_seq(++ctx->seq);
-    event.set_timestamp_us(structured_now_us());
-    if (!ctx->request_id.empty()) {
-        event.set_request_id(ctx->request_id);
-    }
-    event.set_kind(kind);
-    if (token != nullptr && token[0] != '\0') {
-        event.set_token(token);
-    }
-    if (partial_json != nullptr && partial_json[0] != '\0') {
-        event.set_partial_json(partial_json);
-    }
-    if (result) {
-        *event.mutable_result() = *result;
-        if (result->has_validation()) {
-            *event.mutable_validation() = result->validation();
-        }
-    }
-    if (error_message != nullptr && error_message[0] != '\0') {
-        event.set_error_message(error_message);
-    }
-    event.set_error_code(static_cast<int32_t>(error_code));
-
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return;
-    }
-    ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
-}
-
-static void maybe_dispatch_partial_json(StructuredStreamContext* ctx) {
-    if (!ctx || ctx->raw_text.empty()) {
-        return;
-    }
-
-    const char* response = nullptr;
-    size_t response_len = 0;
-    const char* thinking = nullptr;
-    size_t thinking_len = 0;
-    (void)rac_llm_extract_thinking_with_tags(
-        ctx->raw_text.c_str(),
-        ctx->thinking_open_tag.empty() ? nullptr : ctx->thinking_open_tag.c_str(),
-        ctx->thinking_close_tag.empty() ? nullptr : ctx->thinking_close_tag.c_str(), &response,
-        &response_len, &thinking, &thinking_len);
-    const std::string scan_text = response ? std::string(response, response_len) : ctx->raw_text;
-
-    size_t start = 0;
-    size_t end = 0;
-    if (rac_structured_output_find_complete_json(scan_text.c_str(), &start, &end) != RAC_TRUE ||
-        end <= start) {
-        return;
-    }
-
-    std::string partial = scan_text.substr(start, end - start);
-    if (partial == ctx->last_partial_json) {
-        return;
-    }
-    ctx->last_partial_json = partial;
-    dispatch_structured_stream_event(
-        ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON, nullptr,
-        partial.c_str(), nullptr, nullptr, RAC_SUCCESS);
-}
-
-static rac_bool_t structured_stream_token_callback(const char* token, void* user_data) {
-    auto* ctx = static_cast<StructuredStreamContext*>(user_data);
-    if (!ctx || !ctx->ref) {
-        return RAC_FALSE;
-    }
-    if (rac::llm::lifecycle_llm_cancel_requested(ctx->ref)) {
-        return RAC_FALSE;
-    }
-
-    const char* safe_token = token ? token : "";
-    ctx->raw_text += safe_token;
-    if (safe_token[0] != '\0') {
-        ctx->token_count++;
-    }
-    dispatch_structured_stream_event(ctx,
-                                     runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
-                                     safe_token, nullptr, nullptr, nullptr, RAC_SUCCESS);
-    maybe_dispatch_partial_json(ctx);
-    return RAC_TRUE;
-}
-
-static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
-                                              const char* finish_reason, rac_result_t status) {
-    if (!ctx || ctx->terminal_sent) {
-        return;
-    }
-    ctx->terminal_sent = true;
-
-    runanywhere::v1::StructuredOutputResult result;
-    rac_result_t result_rc = structured_result_from_text(
-        ctx->raw_text, ctx->config, &result, ctx->thinking_open_tag, ctx->thinking_close_tag);
-    // Treat INVALID_FORMAT/VALIDATION_FAILED as typed semantic outcomes carried
-    // by the StructuredOutputResult envelope, not as transport errors. Only
-    // ABI/IO failures (null args, OOM, serialization) emit an ERROR event with
-    // no result payload — mirrors rac_structured_output_parse_proto.
-    if (result_rc != RAC_SUCCESS && result_rc != RAC_ERROR_INVALID_FORMAT &&
-        result_rc != RAC_ERROR_VALIDATION_FAILED) {
-        dispatch_structured_stream_event(
-            ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
-            nullptr, rac_error_message(result_rc), result_rc);
-        return;
-    }
-
-    // The stream completed at the transport layer — even if the generated text
-    // failed JSON parsing or schema validation, surface a COMPLETED event with
-    // the populated result so callers can render validation_errors via the
-    // typed envelope. Reserve the ERROR kind for transport-layer failures.
-    const bool transport_ok = status == RAC_SUCCESS;
-    const auto kind = transport_ok ? runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED
-                                   : runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
-    const bool validation_ok = result.error_code() == static_cast<int32_t>(RAC_SUCCESS);
-    const char* message = nullptr;
-    if (!transport_ok) {
-        message = finish_reason != nullptr && finish_reason[0] != '\0' ? finish_reason
-                                                                       : rac_error_message(status);
-    } else if (!validation_ok && result.has_error_message()) {
-        message = result.error_message().c_str();
-    }
-    dispatch_structured_stream_event(ctx, kind, nullptr, nullptr, &result, message,
-                                     transport_ok ? static_cast<rac_result_t>(result.error_code())
-                                                  : status);
-}
-#endif
+#endif  // RAC_HAVE_PROTOBUF
 
 // =============================================================================
 // FIND MATCHING BRACE - Ported from Swift lines 179-212
@@ -1334,261 +874,64 @@ extern "C" rac_result_t rac_structured_output_parse_proto(const uint8_t* request
 
     runanywhere::v1::StructuredOutputResult result;
     if (parsed.parsed_json) {
-        result.set_parsed_json(parsed.parsed_json);
+        result.set_json(parsed.parsed_json);
     }
     fill_structured_validation_proto(parsed, result.mutable_validation());
     if (parsed.raw_text) {
         result.set_raw_text(parsed.raw_text);
     }
-    if (parsed.error_message) {
-        result.set_error_message(parsed.error_message);
+    if (parsed.error_code != 0) {
+        rac::foundation::populate_sdk_error(result.mutable_error(),
+                                            static_cast<rac_result_t>(parsed.error_code));
+        if (parsed.error_message && parsed.error_message[0] != '\0') {
+            result.mutable_error()->set_message(parsed.error_message);
+        }
     }
-    result.set_error_code(static_cast<int32_t>(parsed.error_code));
     rac_structured_output_parse_result_free(&parsed);
 
     return copy_serialized_proto(result, out_result, "StructuredOutputResult");
 #endif
 }
 
+// idl/structured_output.proto (API-realignment so-p2) deleted
+// StructuredOutputRequest, StructuredOutputValidationRequest,
+// StructuredOutputStreamEventKind and StructuredOutputStreamEvent outright.
+// The proto's own file header now states the contract explicitly: structured
+// GENERATION is LLMGenerationOptions.structured_output on the ordinary LLM
+// request (rac_llm_generate_proto / rac_llm_generate_stream_proto in
+// llm_module.cpp); this file keeps only the extract / validate /
+// prepare-prompt surface over StructuredOutputParseRequest. There is no
+// longer an input message for a standalone structured-output generate call,
+// so both ABIs report the typed removal instead of silently no-op'ing.
 extern "C" rac_result_t rac_structured_output_generate_proto(const uint8_t* request_proto_bytes,
                                                              size_t request_proto_size,
                                                              rac_proto_buffer_t* out_result) {
+    (void)request_proto_bytes;
+    (void)request_proto_size;
     if (!out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)request_proto_bytes;
-    (void)request_proto_size;
-    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-                                      "protobuf support is not available");
-#else
-    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
-    if (validation != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "StructuredOutputRequest bytes are invalid");
-    }
-
-    runanywhere::v1::StructuredOutputRequest request;
-    if (!request.ParseFromArray(
-            rac_proto_bytes_data_or_empty(request_proto_bytes, request_proto_size),
-            static_cast<int>(request_proto_size))) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to parse StructuredOutputRequest");
-    }
-    if (request.prompt().empty()) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
-                                          "StructuredOutputRequest.prompt is required");
-    }
-
-    // commons-103: reject unsupported StructuredOutputOptions modes/fields with
-    // a typed StructuredOutputResult envelope so SDKs that request
-    // grammar/regex/repair/retries see a clear error instead of silent
-    // downgrade to plain JSON-schema generation.
-    if (request.has_options()) {
-        std::string unsupported_message;
-        const rac_result_t unsupported =
-            unsupported_structured_options_message(request.options(), &unsupported_message);
-        if (unsupported != RAC_SUCCESS) {
-            runanywhere::v1::StructuredOutputResult typed_result;
-            typed_result.set_error_message(unsupported_message);
-            typed_result.set_error_code(static_cast<int32_t>(unsupported));
-            auto* result_validation = typed_result.mutable_validation();
-            result_validation->set_is_valid(false);
-            result_validation->set_contains_json(false);
-            result_validation->set_error_message(unsupported_message);
-            result_validation->add_validation_errors(unsupported_message);
-            return copy_serialized_proto(typed_result, out_result, "StructuredOutputResult");
-        }
-    }
-
-    ProtoStructuredOutputConfig converted;
-    bool has_options = false;
-    std::string prepared_prompt;
-    std::string system_prompt;
-    rac_result_t rc = prepare_structured_generation(request, &converted, &has_options,
-                                                    &prepared_prompt, &system_prompt);
-    if (rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
-    }
-
-    rac::llm::LifecycleLlmRef ref;
-    rc = rac::llm::acquire_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_result, rc, "no lifecycle LLM model loaded");
-    }
-
-    rac::llm::clear_lifecycle_llm_cancel(&ref);
-    std::string thinking_open_tag;
-    std::string thinking_close_tag;
-    (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, &thinking_open_tag,
-                                                      &thinking_close_tag);
-    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
-    options.streaming_enabled = RAC_FALSE;
-    options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
-
-    rac_llm_result_t raw{};
-    // Defensive: catch any C++ exception that escapes the engine vtable so it
-    // cannot propagate across the extern "C" boundary. See parallel guard in
-    // rac_llm_proto_service.cpp generate_stream path.
-    if (ref.ops && ref.ops->generate) {
-        try {
-            rc = ref.ops->generate(ref.impl, prepared_prompt.c_str(), &options, &raw);
-        } catch (const std::exception& e) {
-            rac_error_set_details(e.what());
-            rc = RAC_ERROR_INFERENCE_FAILED;
-        } catch (...) {
-            rac_error_set_details("Unknown C++ exception escaped LLM engine generate");
-            rc = RAC_ERROR_INFERENCE_FAILED;
-        }
-    } else {
-        rc = RAC_ERROR_NOT_SUPPORTED;
-    }
-    if (rc != RAC_SUCCESS) {
-        rac::llm::release_lifecycle_llm(&ref);
-        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
-    }
-
-    runanywhere::v1::StructuredOutputResult result;
-    rc = structured_result_from_text(raw.text ? raw.text : "",
-                                     has_options ? &converted.config : nullptr, &result,
-                                     thinking_open_tag, thinking_close_tag);
-    rac_llm_result_free(&raw);
-    rac::llm::release_lifecycle_llm(&ref);
-    // Mirrors rac_structured_output_parse_proto: INVALID_FORMAT and
-    // VALIDATION_FAILED are typed semantic outcomes that travel via the
-    // StructuredOutputResult.error_code / validation envelope, not transport
-    // errors. Reserve rac_proto_buffer_set_error for malformed request bytes,
-    // null pointers, missing lifecycle model, serialization/allocation failures.
-    if (rc != RAC_SUCCESS && rc != RAC_ERROR_INVALID_FORMAT && rc != RAC_ERROR_VALIDATION_FAILED) {
-        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
-    }
-    return copy_serialized_proto(result, out_result, "StructuredOutputResult");
-#endif
+    return rac_proto_buffer_set_error(
+        out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+        "StructuredOutputRequest was removed; use rac_llm_generate_proto with "
+        "LLMGenerationOptions.structured_output set instead");
 }
 
 extern "C" rac_result_t
 rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
                                             size_t request_proto_size,
                                             rac_proto_bytes_callback_fn callback, void* user_data) {
-#if !defined(RAC_HAVE_PROTOBUF)
     (void)request_proto_bytes;
     (void)request_proto_size;
     (void)callback;
     (void)user_data;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
-    if (!callback) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
-    if (validation != RAC_SUCCESS) {
-        return RAC_ERROR_DECODING_ERROR;
-    }
-
-    runanywhere::v1::StructuredOutputRequest request;
-    if (!request.ParseFromArray(
-            rac_proto_bytes_data_or_empty(request_proto_bytes, request_proto_size),
-            static_cast<int>(request_proto_size))) {
-        return RAC_ERROR_DECODING_ERROR;
-    }
-    if (request.prompt().empty()) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    // commons-103: emit a terminal ERROR event when the request asks for an
-    // unsupported mode/field so the stream surfaces the typed reason instead
-    // of silently downgrading. The stream proto returns rac_result_t and has
-    // no separate result buffer, so the ERROR event carries the message.
-    if (request.has_options()) {
-        std::string unsupported_message;
-        const rac_result_t unsupported =
-            unsupported_structured_options_message(request.options(), &unsupported_message);
-        if (unsupported != RAC_SUCCESS) {
-            StructuredStreamContext err_ctx;
-            err_ctx.callback = callback;
-            err_ctx.user_data = user_data;
-            err_ctx.request_id = request.request_id();
-            dispatch_structured_stream_event(
-                &err_ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR, nullptr,
-                nullptr, nullptr, unsupported_message.c_str(), unsupported);
-            return unsupported;
-        }
-    }
-
-    ProtoStructuredOutputConfig converted;
-    bool has_options = false;
-    std::string prepared_prompt;
-    std::string system_prompt;
-    rac_result_t rc = prepare_structured_generation(request, &converted, &has_options,
-                                                    &prepared_prompt, &system_prompt);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-
-    rac::llm::LifecycleLlmRef ref;
-    rc = rac::llm::acquire_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-    if (!ref.ops || !ref.ops->generate_stream) {
-        rac::llm::release_lifecycle_llm(&ref);
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    rac::llm::clear_lifecycle_llm_cancel(&ref);
-    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
-    options.streaming_enabled = RAC_TRUE;
-    options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
-
-    StructuredStreamContext ctx;
-    ctx.callback = callback;
-    ctx.user_data = user_data;
-    ctx.ref = &ref;
-    ctx.config = has_options ? &converted.config : nullptr;
-    ctx.request_id = request.request_id();
-    ctx.max_tokens = options.max_tokens;
-    (void)rac::llm::model_thinking_tags_from_registry(ref.model_id, &ctx.thinking_open_tag,
-                                                      &ctx.thinking_close_tag);
-
-    // Defensive: catch any C++ exception that escapes the engine vtable so it
-    // cannot propagate across the extern "C" boundary. See parallel guard in
-    // rac_llm_proto_service.cpp generate_stream path.
-    try {
-        rc = ref.ops->generate_stream(ref.impl, prepared_prompt.c_str(), &options,
-                                      structured_stream_token_callback, &ctx);
-    } catch (const std::exception& e) {
-        rac_error_set_details(e.what());
-        rc = RAC_ERROR_INFERENCE_FAILED;
-    } catch (...) {
-        rac_error_set_details("Unknown C++ exception escaped LLM engine generate_stream");
-        rc = RAC_ERROR_INFERENCE_FAILED;
-    }
-
-    const bool cancelled = rac::llm::lifecycle_llm_cancel_requested(&ref) ||
-                           rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
-    if (cancelled) {
-        dispatch_structured_terminal_once(&ctx, "cancelled", RAC_ERROR_CANCELLED);
-        rc = RAC_SUCCESS;
-    } else if (rc == RAC_SUCCESS) {
-        // commons-104: mirror the OpenAI-style finish_reason contract from
-        // rac_llm_proto_service.cpp:778-779 / llm_component.cpp:1003-1006 —
-        // when the backend stopped because it generated max_tokens, report
-        // "length" instead of "stop" so agent retry/recovery loops can
-        // distinguish truncation from a natural stop.
-        const char* finish_reason =
-            (ctx.max_tokens > 0 && ctx.token_count >= static_cast<uint64_t>(ctx.max_tokens))
-                ? "length"
-                : "stop";
-        dispatch_structured_terminal_once(&ctx, finish_reason, rc);
-    } else {
-        dispatch_structured_terminal_once(&ctx, rac_error_message(rc), rc);
-    }
-
-    rac::llm::release_lifecycle_llm(&ref);
-    return rc;
-#endif
 }
 
+// idl/structured_output.proto (API-realignment so-p2) deleted the dedicated
+// StructuredOutputRequest message; StructuredOutputParseRequest (request_id,
+// text, options, metadata) is now the sole request envelope shared by parse/
+// validate/prepare-prompt. `text` plays the role the old `prompt` field did.
 extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_result) {
     if (!out_result) {
@@ -1603,15 +946,15 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
     rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
     if (validation != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "StructuredOutputRequest bytes are invalid");
+                                          "StructuredOutputParseRequest bytes are invalid");
     }
 
-    runanywhere::v1::StructuredOutputRequest request;
+    runanywhere::v1::StructuredOutputParseRequest request;
     if (!request.ParseFromArray(
             rac_proto_bytes_data_or_empty(request_proto_bytes, request_proto_size),
             static_cast<int>(request_proto_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to parse StructuredOutputRequest");
+                                          "failed to parse StructuredOutputParseRequest");
     }
 
     ProtoStructuredOutputConfig converted;
@@ -1624,18 +967,16 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
 
     char* prepared_prompt = nullptr;
     const rac_result_t prepare_rc = rac_structured_output_prepare_prompt(
-        request.prompt().c_str(), has_options ? &converted.config : nullptr, &prepared_prompt);
+        request.text().c_str(), has_options ? &converted.config : nullptr, &prepared_prompt);
 
     runanywhere::v1::StructuredOutputPromptResult result;
     if (prepare_rc != RAC_SUCCESS) {
-        result.set_error_message(rac_error_message(prepare_rc));
-        result.set_error_code(static_cast<int32_t>(prepare_rc));
+        rac::foundation::populate_sdk_error(result.mutable_error(), prepare_rc);
         free(prepared_prompt);
         return copy_serialized_proto(result, out_result, "StructuredOutputPromptResult");
     }
 
     result.set_prepared_prompt(prepared_prompt ? prepared_prompt : "");
-    result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
     if (converted.config.json_schema) {
         result.set_json_schema(converted.config.json_schema);
         char* system_prompt = nullptr;
@@ -1648,10 +989,10 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
     }
     if (has_options) {
         const auto& options = request.options();
-        if (options.has_regex_pattern()) {
-            result.set_regex_pattern(options.regex_pattern());
+        if (options.has_regex() && !options.regex().empty()) {
+            result.set_regex_pattern(options.regex());
         }
-        if (options.has_grammar()) {
+        if (options.has_grammar() && !options.grammar().empty()) {
             result.set_grammar(options.grammar());
         }
     }
@@ -1676,15 +1017,15 @@ extern "C" rac_result_t rac_structured_output_validate_proto(const uint8_t* requ
     rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
     if (validation != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "StructuredOutputValidationRequest bytes are invalid");
+                                          "StructuredOutputParseRequest bytes are invalid");
     }
 
-    runanywhere::v1::StructuredOutputValidationRequest request;
+    runanywhere::v1::StructuredOutputParseRequest request;
     if (!request.ParseFromArray(
             rac_proto_bytes_data_or_empty(request_proto_bytes, request_proto_size),
             static_cast<int>(request_proto_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to parse StructuredOutputValidationRequest");
+                                          "failed to parse StructuredOutputParseRequest");
     }
 
     ProtoStructuredOutputConfig converted;

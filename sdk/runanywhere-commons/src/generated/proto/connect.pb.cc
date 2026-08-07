@@ -2683,6 +2683,176 @@ const ::_pbi::ClassData* ConnectClientSessionState_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class ConnectInvocationRequest::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ConnectInvocationRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_._has_bits_);
+};
+
+constexpr ConnectInvocationRequest::ParseTableT_ ConnectInvocationRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_._has_bits_),
+      0, // no _extensions_
+      3, 24,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967288,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      3,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ConnectInvocationRequest>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // string session_id = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.session_id_)}},
+      // string request_id = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.request_id_)}},
+      // .runanywhere.v1.LLMGenerateRequest generation = 3;
+      {::_pbi::TcParser::FastMtS1,
+       {26, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.generation_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string session_id = 1;
+      {PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.session_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string request_id = 2;
+      {PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.request_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.LLMGenerateRequest generation = 3;
+      {PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.generation_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::LLMGenerateRequest>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::LLMGenerateRequest_globals_},
+        #endif
+    }},
+    {{
+      "\47\12\12\0\0\0\0\0"
+      "runanywhere.v1.ConnectInvocationRequest"
+      "session_id"
+      "request_id"
+    }},
+  };
+}
+
+
+inline constexpr ConnectInvocationRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        session_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        request_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        generation_{nullptr} {}
+
+template <typename>
+constexpr ConnectInvocationRequest::ConnectInvocationRequest(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ConnectInvocationRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ConnectInvocationRequest(arena);
+}
+constexpr auto ConnectInvocationRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ConnectInvocationRequest), alignof(ConnectInvocationRequest));
+}
+constexpr auto ConnectInvocationRequest::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ConnectInvocationRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ConnectInvocationRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ConnectInvocationRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ConnectInvocationRequest>(), &ConnectInvocationRequest::ByteSizeLong,
+              &ConnectInvocationRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[12],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_connect_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ConnectInvocationRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ConnectInvocationRequestGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ConnectInvocationRequest_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ConnectInvocationRequest::InternalGenerateClassData_(
+            _default, &ConnectInvocationRequest_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ConnectInvocationRequest>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ConnectInvocationRequestGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ConnectInvocationRequest _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ConnectInvocationRequest>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ConnectInvocationRequestGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ConnectInvocationRequestGlobalsTypeInternal ConnectInvocationRequest_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ConnectInvocationRequest_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ConnectInvocationRequest_globals_.GetClassData();
+#else
+  return ConnectInvocationRequest_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class ConnectInvocationEvent::_Internal {
  public:
   using HasBits = decltype(::std::declval<ConnectInvocationEvent>()._impl_._has_bits_);
@@ -2990,176 +3160,6 @@ const ::_pbi::ClassData* ConnectHostFrame_get_class_data() {
   return ConnectHostFrame_globals_.GetClassData();
 #else
   return ConnectHostFrame_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class ConnectInvocationRequest::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ConnectInvocationRequest>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_._has_bits_);
-};
-
-constexpr ConnectInvocationRequest::ParseTableT_ ConnectInvocationRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_._has_bits_),
-      0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ConnectInvocationRequest>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string session_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.session_id_)}},
-      // string request_id = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.request_id_)}},
-      // .runanywhere.v1.LLMGenerateRequest generation = 3;
-      {::_pbi::TcParser::FastMtS1,
-       {26, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.generation_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string session_id = 1;
-      {PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.session_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string request_id = 2;
-      {PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.request_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.LLMGenerateRequest generation = 3;
-      {PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_.generation_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::LLMGenerateRequest>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::LLMGenerateRequest_globals_},
-        #endif
-    }},
-    {{
-      "\47\12\12\0\0\0\0\0"
-      "runanywhere.v1.ConnectInvocationRequest"
-      "session_id"
-      "request_id"
-    }},
-  };
-}
-
-
-inline constexpr ConnectInvocationRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        session_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        request_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        generation_{nullptr} {}
-
-template <typename>
-constexpr ConnectInvocationRequest::ConnectInvocationRequest(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ConnectInvocationRequest::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ConnectInvocationRequest(arena);
-}
-constexpr auto ConnectInvocationRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ConnectInvocationRequest), alignof(ConnectInvocationRequest));
-}
-constexpr auto ConnectInvocationRequest::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ConnectInvocationRequest::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ConnectInvocationRequest>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ConnectInvocationRequest::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ConnectInvocationRequest>(), &ConnectInvocationRequest::ByteSizeLong,
-              &ConnectInvocationRequest::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ConnectInvocationRequest, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[12],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_connect_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ConnectInvocationRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ConnectInvocationRequestGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ConnectInvocationRequest_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ConnectInvocationRequest::InternalGenerateClassData_(
-            _default, &ConnectInvocationRequest_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ConnectInvocationRequest>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ConnectInvocationRequestGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ConnectInvocationRequest _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ConnectInvocationRequest>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ConnectInvocationRequestGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ConnectInvocationRequestGlobalsTypeInternal ConnectInvocationRequest_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ConnectInvocationRequest_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ConnectInvocationRequest_globals_.GetClassData();
-#else
-  return ConnectInvocationRequest_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace

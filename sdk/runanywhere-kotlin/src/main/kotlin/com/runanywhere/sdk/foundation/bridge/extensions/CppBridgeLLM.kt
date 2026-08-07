@@ -52,32 +52,31 @@ private fun checkRc(rc: Int, operation: String) {
     }
 }
 
-internal fun RALLMGenerationOptions?.toGenerateRequest(
-    prompt: String,
-    streaming: Boolean,
-): RALLMGenerateRequest {
-    val options = this ?: RALLMGenerationOptions.defaults()
+/**
+ * `max_output_tokens`/`temperature`/`top_p`/`repeat_penalty` (renamed from
+ * `repetition_penalty`) are all optional now (idl/llm_options.proto): absent
+ * means "let the engine decide," so zero is a real caller-supplied greedy
+ * temperature that survives, and only an explicit null falls back to
+ * defaults(). `LLMGenerateRequest.prompt` is deleted outright
+ * (idl/llm_service.proto): the request now carries only `messages`.
+ */
+internal fun RALLMGenerationOptions?.toGenerateRequest(prompt: String): RALLMGenerateRequest {
+    val defaults = RALLMGenerationOptions.defaults()
+    val options = this ?: defaults
     val requestOptions =
         options.copy(
-            max_tokens = options.max_tokens.takeIf { it > 0 } ?: 100,
-            // A canonical options message has presence at the request level, so
-            // temperature=0 is an explicit, documented request for greedy
-            // decoding. Apply 0.8 only when the entire options object is absent
-            // (via defaults() above); rewriting an explicit zero makes greedy
-            // generation impossible through this overload.
-            temperature = options.temperature.coerceIn(0.0f, 2.0f),
-            top_p = options.top_p.takeIf { it > 0.0f } ?: 1.0f,
-            repetition_penalty = options.repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
-            streaming_enabled = streaming || options.streaming_enabled,
+            max_output_tokens = options.max_output_tokens?.takeIf { it > 0 } ?: defaults.max_output_tokens,
+            temperature = options.temperature?.coerceIn(0.0f, 2.0f) ?: defaults.temperature,
+            top_p = options.top_p?.takeIf { it > 0.0f } ?: defaults.top_p,
+            repeat_penalty = options.repeat_penalty?.takeIf { it > 0.0f } ?: defaults.repeat_penalty,
         )
     return RALLMGenerateRequest(
-        prompt = prompt,
-        // Commons resolves a model's thinking tags from the registry, so a
-        // request-local thinking_pattern is NOT required to surface thought
-        // events. Emit thoughts whenever thinking is enabled (i.e. not
-        // explicitly disabled) so default catalog models still stream reasoning.
-        emit_thoughts = !requestOptions.disable_thinking,
         options = requestOptions,
+        messages =
+            listOf(
+                ai.runanywhere.proto.v1
+                    .ChatMessage(role = ai.runanywhere.proto.v1.MessageRole.MESSAGE_ROLE_USER, content = prompt),
+            ),
     )
 }
 
@@ -148,7 +147,7 @@ object CppBridgeLLM {
 
     /** One-shot generation. */
     suspend fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {
-        val request = options.toGenerateRequest(prompt, streaming = false)
+        val request = options.toGenerateRequest(prompt)
         return generate(request)
     }
 
@@ -216,7 +215,7 @@ object CppBridgeLLM {
         options: RALLMGenerationOptions?,
         onEvent: (RALLMStreamEvent) -> Boolean,
     ) {
-        val request = options.toGenerateRequest(prompt, streaming = true)
+        val request = options.toGenerateRequest(prompt)
         generateStream(request, onEvent)
     }
 

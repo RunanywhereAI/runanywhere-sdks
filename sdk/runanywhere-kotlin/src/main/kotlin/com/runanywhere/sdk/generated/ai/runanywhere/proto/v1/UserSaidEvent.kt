@@ -59,30 +59,37 @@ public class UserSaidEvent(
     schemaIndex = 2,
   )
   public val confidence: Float = 0f,
+  /**
+   * Milliseconds from the start of ALL audio fed this session, matching
+   * OpenAI input_audio_buffer.speech_started.audio_start_ms.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioStartUs",
+    jsonName = "audioStartMs",
     schemaIndex = 3,
   )
-  public val audio_start_us: Long = 0L,
+  public val audio_start_ms: Long = 0L,
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioEndUs",
+    jsonName = "audioEndMs",
     schemaIndex = 4,
   )
-  public val audio_end_us: Long = 0L,
+  public val audio_end_ms: Long = 0L,
+  /**
+   * Detected language, BCP-47. One spelling across this domain and
+   * stt_options.proto.
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "languageCode",
     schemaIndex = 5,
   )
-  public val language_code: String = "",
+  public val language: String = "",
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -106,9 +113,9 @@ public class UserSaidEvent(
     if (text != other.text) return false
     if (is_final != other.is_final) return false
     if (confidence != other.confidence) return false
-    if (audio_start_us != other.audio_start_us) return false
-    if (audio_end_us != other.audio_end_us) return false
-    if (language_code != other.language_code) return false
+    if (audio_start_ms != other.audio_start_ms) return false
+    if (audio_end_ms != other.audio_end_ms) return false
+    if (language != other.language) return false
     if (segment_index != other.segment_index) return false
     return true
   }
@@ -120,9 +127,9 @@ public class UserSaidEvent(
       result = result * 37 + text.hashCode()
       result = result * 37 + is_final.hashCode()
       result = result * 37 + confidence.hashCode()
-      result = result * 37 + audio_start_us.hashCode()
-      result = result * 37 + audio_end_us.hashCode()
-      result = result * 37 + language_code.hashCode()
+      result = result * 37 + audio_start_ms.hashCode()
+      result = result * 37 + audio_end_ms.hashCode()
+      result = result * 37 + language.hashCode()
       result = result * 37 + segment_index.hashCode()
       super.hashCode = result
     }
@@ -134,9 +141,9 @@ public class UserSaidEvent(
     result += """text=${sanitize(text)}"""
     result += """is_final=$is_final"""
     result += """confidence=$confidence"""
-    result += """audio_start_us=$audio_start_us"""
-    result += """audio_end_us=$audio_end_us"""
-    result += """language_code=${sanitize(language_code)}"""
+    result += """audio_start_ms=$audio_start_ms"""
+    result += """audio_end_ms=$audio_end_ms"""
+    result += """language=${sanitize(language)}"""
     result += """segment_index=$segment_index"""
     return result.joinToString(prefix = "UserSaidEvent{", separator = ", ", postfix = "}")
   }
@@ -145,12 +152,12 @@ public class UserSaidEvent(
     text: String = this.text,
     is_final: Boolean = this.is_final,
     confidence: Float = this.confidence,
-    audio_start_us: Long = this.audio_start_us,
-    audio_end_us: Long = this.audio_end_us,
-    language_code: String = this.language_code,
+    audio_start_ms: Long = this.audio_start_ms,
+    audio_end_ms: Long = this.audio_end_ms,
+    language: String = this.language,
     segment_index: Int = this.segment_index,
     unknownFields: ByteString = this.unknownFields,
-  ): UserSaidEvent = UserSaidEvent(text, is_final, confidence, audio_start_us, audio_end_us, language_code, segment_index, unknownFields)
+  ): UserSaidEvent = UserSaidEvent(text, is_final, confidence, audio_start_ms, audio_end_ms, language, segment_index, unknownFields)
 
   public companion object {
     @JvmField
@@ -173,14 +180,14 @@ public class UserSaidEvent(
         if (!value.confidence.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.confidence)
         }
-        if (value.audio_start_us != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.audio_start_us)
+        if (value.audio_start_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.audio_start_ms)
         }
-        if (value.audio_end_us != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.audio_end_us)
+        if (value.audio_end_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.audio_end_ms)
         }
-        if (value.language_code != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.language_code)
+        if (value.language != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.language)
         }
         if (value.segment_index != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.segment_index)
@@ -198,14 +205,14 @@ public class UserSaidEvent(
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
         }
-        if (value.audio_start_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.audio_start_us)
+        if (value.audio_start_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.audio_start_ms)
         }
-        if (value.audio_end_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.audio_end_us)
+        if (value.audio_end_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.audio_end_ms)
         }
-        if (value.language_code != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.language_code)
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.language)
         }
         if (value.segment_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.segment_index)
@@ -218,14 +225,14 @@ public class UserSaidEvent(
         if (value.segment_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.segment_index)
         }
-        if (value.language_code != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.language_code)
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.language)
         }
-        if (value.audio_end_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.audio_end_us)
+        if (value.audio_end_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 5, value.audio_end_ms)
         }
-        if (value.audio_start_us != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.audio_start_us)
+        if (value.audio_start_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 4, value.audio_start_ms)
         }
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
@@ -242,18 +249,18 @@ public class UserSaidEvent(
         var text: String = ""
         var is_final: Boolean = false
         var confidence: Float = 0f
-        var audio_start_us: Long = 0L
-        var audio_end_us: Long = 0L
-        var language_code: String = ""
+        var audio_start_ms: Long = 0L
+        var audio_end_ms: Long = 0L
+        var language: String = ""
         var segment_index: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
             2 -> is_final = ProtoAdapter.BOOL.decode(reader)
             3 -> confidence = ProtoAdapter.FLOAT.decode(reader)
-            4 -> audio_start_us = ProtoAdapter.INT64.decode(reader)
-            5 -> audio_end_us = ProtoAdapter.INT64.decode(reader)
-            6 -> language_code = ProtoAdapter.STRING.decode(reader)
+            4 -> audio_start_ms = ProtoAdapter.INT64.decode(reader)
+            5 -> audio_end_ms = ProtoAdapter.INT64.decode(reader)
+            6 -> language = ProtoAdapter.STRING.decode(reader)
             7 -> segment_index = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -262,9 +269,9 @@ public class UserSaidEvent(
           text = text,
           is_final = is_final,
           confidence = confidence,
-          audio_start_us = audio_start_us,
-          audio_end_us = audio_end_us,
-          language_code = language_code,
+          audio_start_ms = audio_start_ms,
+          audio_end_ms = audio_end_ms,
+          language = language,
           segment_index = segment_index,
           unknownFields = unknownFields
         )

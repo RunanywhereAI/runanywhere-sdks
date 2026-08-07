@@ -4,11 +4,11 @@
  * Matches iOS DocumentRAGView.swift flow:
  * 1. Select embedding model (ONNX) and LLM model (LlamaCpp) via shared ModelSelectionSheet
  * 2. Pick a document (txt/json) via system file picker
- * 3. Pipeline auto-creates on document selection, text is extracted and ingested
+ * 3. A RAG session opens on document selection, text is extracted and ingested
  * 4. Chat-based Q&A interface with user/assistant message bubbles
  *
  * Architecture:
- * - Uses @runanywhere/core RAG pipeline (compiled into RACommons)
+ * - Uses @runanywhere/core RAG sessions (compiled into RACommons)
  * - Reuses the shared ModelSelectionSheet with RagEmbedding/RagLLM contexts
  * - Document picker via @react-native-documents/picker
  */
@@ -22,7 +22,6 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Switch,
 } from 'react-native';
 import Animated, {
   useAnimatedKeyboard,
@@ -39,10 +38,9 @@ import {
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RunAnywhere } from '@runanywhere/core';
+import type { LlmOptions, RagSession } from '@runanywhere/core';
 import type { ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
 import { GENERATION_SETTINGS_KEYS } from '../types/settings';
-import { RAGConfiguration, RAGDocument } from '@runanywhere/proto-ts/rag';
-import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 // MARK: - Types
 
@@ -106,12 +104,8 @@ export const RAGScreen: React.FC = () => {
   const [isQuerying, setIsQuerying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // RAG retrieval options. Rerank is a pipeline setting (RAGConfiguration);
-  // multi-query is a per-query option (RAGQueryOptions).
-  const [rerankEnabled, setRerankEnabled] = useState(false);
-  const [multiQueryEnabled, setMultiQueryEnabled] = useState(false);
-
   const scrollViewRef = useRef<ScrollView>(null);
+  const sessionRef = useRef<RagSession | null>(null);
 
   const areModelsReady =
     selectedEmbeddingModel?.id != null &&
@@ -148,14 +142,20 @@ export const RAGScreen: React.FC = () => {
     };
   }, []);
 
-  // Cleanup pipeline on unmount
+  // Only one RAG session may be open per process, so always release ours.
   useEffect(() => {
     return () => {
-      if (hasDocuments) {
-        RunAnywhere.ragDestroyPipeline().catch(console.error);
-      }
+      const session = sessionRef.current;
+      sessionRef.current = null;
+      session?.close().catch(console.error);
     };
-  }, [hasDocuments]);
+  }, []);
+
+  const closeSession = useCallback(async () => {
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    if (session) await session.close();
+  }, []);
 
   // MARK: - Document Loading
 
@@ -179,19 +179,17 @@ export const RAGScreen: React.FC = () => {
 
       const text = await extractTextFromFile(fileUri);
 
-      const config = RAGConfiguration.fromPartial({
-        ...rAGConfigurationDefaults(),
-        embeddingModelId,
-        llmModelId,
-        rerankResults: rerankEnabled,
+      // Each document is queried in isolation: the previous session (and its
+      // index) is closed, so the fresh one holds only this document — replace
+      // the list rather than appending, which would misrepresent a wiped corpus
+      // as multiple loaded documents and answer "not enough info" for earlier ones.
+      await closeSession();
+      const session = await RunAnywhere.rag.open({
+        embeddingModel: { id: embeddingModelId },
+        llmModel: { id: llmModelId },
       });
-
-      // Each document is queried in isolation. ragCreatePipeline destroys the
-      // prior session, so the fresh index holds only this document — replace the
-      // list rather than appending, which would misrepresent a wiped corpus as
-      // multiple loaded documents and answer "not enough info" for earlier ones.
-      await RunAnywhere.ragCreatePipeline(config);
-      await RunAnywhere.ragIngest(RAGDocument.fromPartial({ text }));
+      sessionRef.current = session;
+      await session.ingest({ text });
 
       const name = result.name || 'Document';
       setDocuments([name]);
@@ -216,56 +214,30 @@ export const RAGScreen: React.FC = () => {
     isNitroReady,
     selectedEmbeddingModel,
     selectedLLMModel,
-    rerankEnabled,
+    closeSession,
   ]);
 
   const handleClearAll = useCallback(async () => {
     // Reset local state even if teardown fails, so the UI never references a
-    // pipeline that may already be gone (and no unhandled rejection escapes to
-    // the Switch/onValueChange caller).
+    // session that may already be gone.
     try {
-      await RunAnywhere.ragDestroyPipeline();
+      await closeSession();
     } catch (err) {
-      console.error('[RAGScreen] Pipeline destroy failed:', err);
+      console.error('[RAGScreen] Session close failed:', err);
     }
     setDocuments([]);
     setMessages([]);
     setError(null);
     setCurrentQuestion('');
     setSetupExpanded(true);
-  }, []);
-
-  // Rerank is a pipeline-level setting, so changing it rebuilds the pipeline.
-  // The current corpus is dropped (re-add documents), matching a model change.
-  const handleRerankChange = useCallback(
-    async (value: boolean) => {
-      try {
-        if (documents.length > 0) {
-          await RunAnywhere.ragDestroyPipeline();
-          setDocuments([]);
-          setMessages([]);
-          setCurrentQuestion('');
-          setSetupExpanded(true);
-        }
-        setError(null);
-        setRerankEnabled(value);
-      } catch (err) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : 'Failed to update rerank setting';
-        setError(msg);
-        console.error('[RAGScreen] Rerank toggle failed:', err);
-      }
-    },
-    [documents.length]
-  );
+  }, [closeSession]);
 
   // MARK: - Q&A
 
   const handleAskQuestion = useCallback(async () => {
     const question = currentQuestion.trim();
-    if (!question || !hasDocuments) return;
+    const session = sessionRef.current;
+    if (!question || !hasDocuments || !session) return;
 
     setMessages((prev) => [...prev, { role: 'user', text: question }]);
     setCurrentQuestion('');
@@ -278,10 +250,14 @@ export const RAGScreen: React.FC = () => {
       );
       const thinkingModeEnabled = thinkingStr === 'true';
       const supportsThinking = selectedLLMModel?.supportsThinking ?? false;
-      const result = await RunAnywhere.ragQuery(question, {
-        disableThinking: supportsThinking && !thinkingModeEnabled,
-        enableMultiQuery: multiQueryEnabled,
-      });
+      const generation: LlmOptions | undefined =
+        supportsThinking && !thinkingModeEnabled
+          ? { reasoning: { mode: 'off' } }
+          : undefined;
+      const result = await session.query(
+        question,
+        generation ? { generation } : undefined
+      );
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: result.answer },
@@ -300,22 +276,41 @@ export const RAGScreen: React.FC = () => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  }, [currentQuestion, hasDocuments, selectedLLMModel, multiQueryEnabled]);
+  }, [currentQuestion, hasDocuments, selectedLLMModel]);
 
   // MARK: - Model Selection Callbacks
+
+  // A session is bound to the models it was opened with, so a model change
+  // retires it; the corpus is dropped and documents must be re-added.
+  const handleModelChange = useCallback(async () => {
+    try {
+      await closeSession();
+    } catch (err) {
+      console.error('[RAGScreen] Session close failed:', err);
+    }
+    setDocuments([]);
+    setMessages([]);
+    setCurrentQuestion('');
+    setSetupExpanded(true);
+  }, [closeSession]);
 
   const handleEmbeddingModelSelected = useCallback(
     async (model: SDKModelInfo) => {
       setSelectedEmbeddingModel(model);
       setShowingEmbeddingPicker(false);
+      await handleModelChange();
     },
-    []
+    [handleModelChange]
   );
 
-  const handleLLMModelSelected = useCallback(async (model: SDKModelInfo) => {
-    setSelectedLLMModel(model);
-    setShowingLLMPicker(false);
-  }, []);
+  const handleLLMModelSelected = useCallback(
+    async (model: SDKModelInfo) => {
+      setSelectedLLMModel(model);
+      setShowingLLMPicker(false);
+      await handleModelChange();
+    },
+    [handleModelChange]
+  );
 
   // MARK: - Error / Loading state for NitroModules
 
@@ -656,69 +651,6 @@ export const RAGScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-
-            <View
-              style={[
-                styles.divider,
-                { backgroundColor: colors.outlineVariant },
-              ]}
-            />
-
-            {/* Retrieval options */}
-            <View
-              style={{ padding: dimens.spacing.lg, gap: dimens.spacing.md }}
-            >
-              <Text
-                style={[
-                  typography.bodySmall,
-                  { color: colors.onSurfaceVariant },
-                ]}
-              >
-                Retrieval
-              </Text>
-              <View style={styles.optionRow}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[typography.bodyLarge, { color: colors.onSurface }]}
-                  >
-                    Rerank results
-                  </Text>
-                  <Text
-                    style={[
-                      typography.bodySmall,
-                      { color: colors.onSurfaceVariant },
-                    ]}
-                  >
-                    LLM re-scores retrieved chunks for relevance
-                  </Text>
-                </View>
-                <Switch
-                  value={rerankEnabled}
-                  onValueChange={handleRerankChange}
-                />
-              </View>
-              <View style={styles.optionRow}>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[typography.bodyLarge, { color: colors.onSurface }]}
-                  >
-                    Multi-query expansion
-                  </Text>
-                  <Text
-                    style={[
-                      typography.bodySmall,
-                      { color: colors.onSurfaceVariant },
-                    ]}
-                  >
-                    Rewrites the question into variants, fuses results
-                  </Text>
-                </View>
-                <Switch
-                  value={multiQueryEnabled}
-                  onValueChange={setMultiQueryEnabled}
-                />
-              </View>
-            </View>
           </View>
         ) : (
           /* Compact bar */
@@ -970,11 +902,6 @@ const styles = StyleSheet.create({
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   addDocButton: {
     flexDirection: 'row',

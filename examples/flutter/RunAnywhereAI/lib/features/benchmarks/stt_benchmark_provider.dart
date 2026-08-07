@@ -39,7 +39,7 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
 
     // Load
     final loadStopwatch = Stopwatch()..start();
-    await sdk.RunAnywhere.stt.load(model.id);
+    await sdk.RunAnywhere.models.load(model.id);
     metrics.loadTimeMs = loadStopwatch.elapsedMicroseconds / 1000.0;
 
     try {
@@ -54,25 +54,28 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
         audioData = _sineWaveAudio(durationSeconds: audioDuration);
       }
 
-      // Transcribe raw PCM Int16 mono @ 16 kHz.
+      // Transcribe raw PCM Int16 mono @ 16 kHz. Audio properties live on the
+      // SDK-built STTAudioSource; the SDK detects the encoding from the bytes.
       final benchStopwatch = Stopwatch()..start();
       final result = await sdk.RunAnywhere.stt.transcribe(
-        audioData,
-        sdk.STTOptions(
-          audioFormat: sdk.AudioFormat.AUDIO_FORMAT_PCM,
-          sampleRate: _sampleRate,
-        ),
+        sdk.AudioInput.pcm16(audioData),
       );
-      metrics.endToEndLatencyMs = benchStopwatch.elapsedMicroseconds / 1000.0;
+      final elapsedMs = benchStopwatch.elapsedMicroseconds / 1000.0;
+      metrics.endToEndLatencyMs = elapsedMs;
 
       metrics.audioLengthSeconds = audioDuration;
-      metrics.realTimeFactor = result.metadata.realTimeFactor;
+      final transcribedMs = result.durationMs > 0
+          ? result.durationMs
+          : (audioDuration * 1000).round();
+      metrics.realTimeFactor = elapsedMs / transcribedMs;
 
       // memoryDeltaBytes stays 0: no portable Dart available-memory probe.
       return metrics;
     } finally {
       try {
-        await sdk.RunAnywhere.stt.unload();
+        await sdk.RunAnywhere.models.unloadAll(
+          sdk.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+        );
       } catch (_) {
         // Best-effort cleanup.
       }

@@ -48,16 +48,15 @@ class VisionGenerationPolicyTest {
     @Test
     fun `generation options pin greedy decoding and carry the system prompt`() {
         val options = VisionGenerationPolicy.options(
-            prompt = "Read the total.",
             model = ModelInfo(id = "vision", context_length = 512),
             mode = VisionAnswerMode.FOCUSED_QUESTION,
             systemPrompt = "Be precise.",
         )
 
-        assertEquals(96, options.max_tokens)
+        assertEquals(96, options.maxOutputTokens)
         assertEquals(0f, options.temperature)
-        assertEquals(0f, options.top_p)
-        assertEquals(0, options.top_k)
-        assertEquals("Be precise.", options.system_prompt)
+        assertEquals(0f, options.topP)
+        assertEquals(0, options.topK)
+        assertEquals("Be precise.", options.systemPrompt)
     }
 }

@@ -20,7 +20,8 @@ import androidx.core.content.ContextCompat
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.downloadModelStream
+import com.runanywhere.sdk.public.api.DownloadEvent
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -102,14 +103,21 @@ class ModelDownloadService : Service() {
             // download RAM preflight on mid-range phones. Free them first; the
             // user can re-select after the transfer finishes.
             freeResidentModelsForDownload()
-            RunAnywhere.downloadModelStream(model).collect { p ->
-                val pct = if (p.total_bytes > 0) {
-                    (p.bytes_downloaded * 100 / p.total_bytes).toInt()
-                } else {
-                    (p.stage_progress.coerceIn(0f, 1f) * 100).toInt()
+            RunAnywhere.models.download(model.id).collect { event ->
+                val pct = when (event) {
+                    is DownloadEvent.Progress ->
+                        if (event.bytesTotal > 0) {
+                            (event.bytesDone * 100 / event.bytesTotal).toInt()
+                        } else {
+                            null
+                        }
+                    is DownloadEvent.Completed -> 100
+                    else -> null
                 }
-                _state.value = Download(model.id, progressPercent = pct, status = Status.RUNNING)
-                updateNotification(model, pct)
+                if (pct != null) {
+                    _state.value = Download(model.id, progressPercent = pct, status = Status.RUNNING)
+                    updateNotification(model, pct)
+                }
             }
             _state.value = Download(model.id, progressPercent = 100, status = Status.COMPLETED)
         } catch (e: CancellationException) {

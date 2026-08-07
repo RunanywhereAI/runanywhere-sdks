@@ -165,9 +165,15 @@ using StreamAdapter = rac::plugin::StreamAdapter<rac_llm_stream_callback_fn>;
 
 static rac_bool_t stream_adapter_callback(const char* token, rac_bool_t is_final, void* ctx) {
     auto* adapter = static_cast<StreamAdapter*>(ctx);
-    (void)is_final;
+    // Forward is_final + OpenAI-style finish_reason on the widened commons
+    // callback. Keep the side channel as a belt-and-suspenders signal for
+    // any commons path that still consults it during migration.
+    if (is_final) {
+        rac_llm_stream_report_final_signal();
+    }
     if (adapter && adapter->callback) {
-        return adapter->callback(token, adapter->user_data);
+        const char* reason = is_final ? "stop" : nullptr;
+        return adapter->callback(token, is_final, reason, adapter->user_data);
     }
     return RAC_TRUE;
 }

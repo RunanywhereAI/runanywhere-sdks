@@ -232,22 +232,22 @@ typedef void (*rac_stt_proto_stream_event_callback_fn)(const uint8_t* event_prot
                                                        size_t event_proto_size, void* user_data);
 
 /**
- * @brief Transcribe audio using serialized runanywhere.v1.STTOptions bytes.
+ * @brief Transcribe from serialized runanywhere.v1.STTTranscriptionRequest
+ *        bytes (inline audio in request.audio.audio_data).
  *
  * Returns serialized runanywhere.v1.STTOutput bytes in out_result.
  */
-RAC_API rac_result_t rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data,
-                                                        size_t audio_size,
-                                                        const uint8_t* options_proto_bytes,
-                                                        size_t options_proto_size,
+RAC_API rac_result_t rac_stt_component_transcribe_proto(rac_handle_t handle,
+                                                        const uint8_t* request_proto_bytes,
+                                                        size_t request_proto_size,
                                                         rac_proto_buffer_t* out_result);
 
 /**
- * @brief Stream transcription as generated runanywhere.v1.STTStreamEvent bytes.
+ * @brief Stream transcription of one STTTranscriptionRequest as serialized
+ *        runanywhere.v1.STTStreamEvent bytes.
  */
 RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
-    rac_handle_t handle, const void* audio_data, size_t audio_size,
-    const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_stt_proto_stream_event_callback_fn callback, void* user_data);
 
 // =============================================================================

@@ -67,18 +67,12 @@ OUTPUT_PATH = (
 
 STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
     "rac_llm_generate_stream_proto": """{ rc in
-                let mapped = RASDKError.from(rcResult: rc)
                 var event = RALLMStreamEvent()
-                event.isFinal = true
-                event.finishReason = "error"
-                event.errorCode = rc
-                event.errorMessage = mapped?.message ?? "LLM stream failed: \\(rc)"
-                return event
-            }""",
-    "rac_structured_output_generate_stream_proto": """{ rc in
-                var event = RAStructuredOutputStreamEvent()
-                event.kind = .error
-                event.errorMessage = "Structured output stream failed: \\(rc)"
+                event.eventKind = .error
+                event.finishReason = .error
+                if let mapped = RASDKError.from(rcResult: rc) {
+                    event.error = mapped
+                }
                 return event
             }""",
     "rac_stt_transcribe_stream_lifecycle_proto": """{ rc in
@@ -101,19 +95,14 @@ STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
 # so consumer cancellation (`AsyncStream` termination = .cancelled) tears down
 # the native producer.
 #
-# LLM + StructuredOutput both route through the lifecycle-LLM cancel symbol
-# `rac_llm_cancel_proto` (parameter-less, proto-out — the result is discarded
-# here because the consumer has already cancelled). STT/TTS streams are
+# LLM routes through the lifecycle-LLM cancel symbol `rac_llm_cancel_proto`
+# (parameter-less, proto-out — the result is discarded here because the
+# consumer has already cancelled). STT/TTS streams are
 # session-id-owned; the session handle isn't visible at this layer, so we
 # emit an empty closure that satisfies the parameter contract while leaving
 # the session to be torn down by `runRequestStream`'s native unwind.
 STREAM_ON_CANCEL_FACTORIES: dict[str, str] = {
     "rac_llm_generate_stream_proto": """{
-                var outBuffer = rac_proto_buffer_t()
-                defer { NativeProtoABI.free(&outBuffer) }
-                _ = rac_llm_cancel_proto(&outBuffer)
-            }""",
-    "rac_structured_output_generate_stream_proto": """{
                 var outBuffer = rac_proto_buffer_t()
                 defer { NativeProtoABI.free(&outBuffer) }
                 _ = rac_llm_cancel_proto(&outBuffer)
@@ -362,7 +351,11 @@ def render_invoke_method(modality: dict[str, Any], method: dict[str, Any]) -> st
     # Visibility / static-ness. Methods without `static: true` become instance
     # methods on the actor/enum extension (matching the hand-written shape).
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     if context:
         # Context-threaded invocation: `(handle:, request:)` shape. The handle
@@ -430,7 +423,11 @@ def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> st
         on_cancel_clause = f"\n            onCancel: {cancel_factory},"
 
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
     # Category mirrors the hand-written file: `CppBridge.<Name>.ProtoStream`
     # (no `Generated` suffix anymore — the hand-written copy was deleted).
     category = f"CppBridge.{name}.ProtoStream"
@@ -485,7 +482,11 @@ def render_get_with_context_method(
     context = method["context"]
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     head = (
         f"    {keyword} {swift}(handle: {context}) "
@@ -528,7 +529,11 @@ def render_void_call_method(
     context = method["context"]
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     error_code = method.get("error_code", "processingFailed")
     error_category = method.get("error_category", "internal")
@@ -586,7 +591,11 @@ def render_create_handle_method(
     out_handle = method.get("output_handle", "rac_handle_t")
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     error_code = method.get("error_code", "processingFailed")
     error_category = method.get("error_category", "internal")
@@ -630,7 +639,11 @@ def render_invoke_out_only_method(
     response_proto = method["response"]
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     head = (
         f"    {keyword} {swift}() throws -> {response_proto} {{"

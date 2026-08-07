@@ -58,6 +58,7 @@ private fun requireStorageInitialized(sdk: RunAnywhere) {
 
 // MARK: - Model Registration
 
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.url(...)).")
 suspend fun RunAnywhere.registerModel(
     id: String? = null,
     name: String,
@@ -68,7 +69,8 @@ suspend fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
-    downloadSize: Long? = memoryRequirement,
+    downloadSize: Long? = null,
+    cuaProfile: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -85,14 +87,16 @@ suspend fun RunAnywhere.registerModel(
             source = ModelSource.MODEL_SOURCE_REMOTE,
             id = id,
             memory_required_bytes = memoryRequirement,
-            // Memory and transport size usually match in legacy catalogs, so
-            // downloadSize defaults to memoryRequirement. Exact large-model
-            // rows may provide both independently: compatibility needs runtime
-            // headroom while the download planner verifies exact artifact bytes.
+            // Download size comes only from a real transport-size argument. When
+            // the caller has none it stays unset so commons resolves it from the
+            // HEAD Content-Length probe; the RAM hint must never stand in here.
             download_size_bytes = downloadSize,
             supports_thinking = if (supportsThinking) true else null,
             supports_lora = if (supportsLora) true else null,
             artifact_type = artifactType,
+            // Computer-Use-Agent profile id (idl/cua.proto); lands on
+            // ModelInfo.cua_profile so callers can discover CUA-drivable models.
+            cua_profile = cuaProfile?.takeIf { it.isNotEmpty() },
         )
 
     val saved =
@@ -103,6 +107,7 @@ suspend fun RunAnywhere.registerModel(
     return saved
 }
 
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.archive(...)).")
 suspend fun RunAnywhere.registerModel(
     archiveUrl: String,
     structure: ArchiveStructure,
@@ -114,6 +119,7 @@ suspend fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
+    cuaProfile: String? = null,
 ): RAModelInfo {
     val resolvedArtifactType: ModelArtifactType? =
         archiveType?.let { type ->
@@ -137,6 +143,7 @@ suspend fun RunAnywhere.registerModel(
             memoryRequirement = memoryRequirement,
             supportsThinking = supportsThinking,
             supportsLora = supportsLora,
+            cuaProfile = cuaProfile,
         )
 
     // Preserve the structure on the archive artifact. The URL-form inferred
@@ -158,6 +165,7 @@ suspend fun RunAnywhere.registerModel(
     return model
 }
 
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.multiFile(...)).")
 suspend fun RunAnywhere.registerModel(
     multiFile: List<ModelFileDescriptor>,
     id: String,
@@ -168,7 +176,8 @@ suspend fun RunAnywhere.registerModel(
     contextLength: Int? = null,
     supportsThinking: Boolean = false,
     source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
-    downloadSize: Long? = memoryRequirement,
+    downloadSize: Long? = null,
+    cuaProfile: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -182,15 +191,15 @@ suspend fun RunAnywhere.registerModel(
             framework = framework,
             category = modality,
             memory_required_bytes = memoryRequirement,
-            // Runtime compatibility and storage planning are independent.
-            // Legacy callers retain the old behavior because downloadSize
-            // defaults to memoryRequirement, while exact catalogs can provide
-            // the aggregate final artifact size separately.
+            // Runtime compatibility and storage planning are independent: this is
+            // the aggregate artifact size only when a caller supplies it, else
+            // unset so commons probes the real bytes. Never seeded from RAM.
             download_size_bytes = downloadSize,
             context_length = contextLength,
             supports_thinking = if (supportsThinking) true else null,
             source = source,
             files = multiFile,
+            cua_profile = cuaProfile?.takeIf { it.isNotEmpty() },
         )
 
     val saved =
@@ -232,11 +241,16 @@ suspend fun RunAnywhere.deleteStorage(request: StorageDeleteRequest): StorageDel
  * over [deleteStorage] with the canonical flag set — mirrors Swift
  * `RunAnywhere.deleteModel(_:)`.
  */
+@Deprecated("Use RunAnywhere.models.delete(id).")
 suspend fun RunAnywhere.deleteModel(modelId: String): StorageDeleteResult =
     deleteStorage(
         StorageDeleteRequest(
             model_ids = listOf(modelId),
-            delete_files = true,
+            // `delete_files` is deleted outright (idl/storage_types.proto)
+            // and inverted into `keep_files_on_disk`: files are deleted by
+            // default now, so this only opts OUT when true. Leaving it at
+            // its `false` default is the equivalent of the old
+            // `delete_files = true`.
             clear_registry_paths = true,
             unload_if_loaded = true,
             allow_platform_delete = true,

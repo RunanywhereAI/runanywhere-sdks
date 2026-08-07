@@ -18,14 +18,16 @@ import type {
   RAGDocument,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchRequest,
   RAGSearchResult,
   RAGStatistics,
   RAGStreamEvent,
 } from '@runanywhere/proto-ts/rag';
 import type { EmbeddingVector } from '@runanywhere/proto-ts/embeddings_options';
+import type { TokenUsage } from '@runanywhere/proto-ts/token_usage';
 import {
   rAGConfigurationDefaults,
-  rAGQueryOptionsDefaults,
+  rAGRetrievalOptionsDefaults,
 } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { getBackendWorkerOwner } from '../../runtime/BackendWorkerModelOwnership.js';
@@ -43,16 +45,13 @@ import {
 import { TextGeneration } from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('RAG');
-const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
-  'Persistent Web RAG indexes require a provider with a browser storage-backed index adapter. The current native Web RAG session ABI is in-memory only.';
-
 export interface RAGDocumentSummary {
   id: string;
   name: string;
   chunkCount: number;
 }
 
-export type RAGQueryOverrides = Partial<Omit<RAGQueryOptions, 'question'>>;
+export type RAGQueryOverrides = Partial<Omit<RAGQueryOptions, 'query'>>;
 
 export interface RAGProviderCapabilities {
   native: boolean;
@@ -72,6 +71,9 @@ export interface RAGProvider {
   ragIngestDocument?(document: RAGDocument): Promise<RAGStatistics>;
   ragAddDocumentsBatch?(documents: Array<{ text: string; metadataJson?: string }>): Promise<void>;
   ragQuery(question: string, options?: RAGQueryOverrides): Promise<RAGResult>;
+  /** Retrieval without generation via `rac_rag_search_proto` (native) or the
+   * TypeScript-owned vector index (CrossWasm / Persistent). */
+  ragSearch?(question: string, topK?: number): Promise<RAGSearchResult[]>;
   /** Streaming query — emits a RAGStreamEvent per token, then COMPLETED/ERROR.
    * Optional so providers without a streaming path stay compatible. */
   ragQueryStream?(question: string, options?: RAGQueryOverrides): AsyncIterable<RAGStreamEvent>;
@@ -316,22 +318,14 @@ class NativeRAGSessionProvider implements RAGProvider {
     this.session = options.session != null
       ? assertNativeHandle(options.session, 'RAG.nativeProvider')
       : null;
-    if (options.config?.persistIndex) {
-      throw SDKException.backendNotAvailable(
-        'RAG.nativeProvider',
-        NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
-      );
-    }
+    // `RAGConfiguration.indexPath`/`.persistIndex` were deleted outright
+    // (idl/rag.proto): the RAG index is in-memory only now, so the native
+    // session is unconditionally non-persistent -- there is nothing left to
+    // reject here.
     this.config = createDefaultRAGConfiguration(options.config);
   }
 
   async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
-    if (config.persistIndex) {
-      throw SDKException.backendNotAvailable(
-        'RAG.createPipeline',
-        NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
-      );
-    }
     validateNativeRAGConfiguration(config, 'RAG.createPipeline');
     if (this.session != null) {
       await this.adapter.destroySession(this.session);
@@ -403,6 +397,25 @@ class NativeRAGSessionProvider implements RAGProvider {
     return result;
   }
 
+  async ragSearch(question: string, topK?: number): Promise<RAGSearchResult[]> {
+    const session = await this.ensureSession();
+    const response = await this.adapter.search(
+      session,
+      makeRAGSearchRequest(question, this.config, topK),
+    );
+    if (!response) {
+      throw SDKException.backendNotAvailable(
+        'RAG.search',
+        'rac_rag_search_proto is unavailable in this WASM module. '
+          + 'Rebuild against a commons binary that exports the retrieval-only ABI.',
+      );
+    }
+    if (response.error) {
+      throw new SDKException(response.error);
+    }
+    return response.chunks;
+  }
+
   async *ragQueryStream(
     question: string,
     options: RAGQueryOverrides = {},
@@ -457,13 +470,7 @@ class NativeRAGSessionProvider implements RAGProvider {
   private async statistics(): Promise<RAGStatistics> {
     // Swift parity: failures throw — no synthetic error-shaped statistics.
     if (this.session == null) {
-      if (this.config.persistIndex) {
-        throw SDKException.backendNotAvailable(
-          'RAG.statistics',
-          NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
-        );
-      }
-      return emptyRAGStatistics(this.config);
+      return emptyRAGStatistics();
     }
     const stats = await this.adapter.statistics(this.session);
     if (!stats) {
@@ -666,7 +673,6 @@ class CrossWasmRAGProvider implements RAGProvider {
       texts: textChunks.map((chunk) => chunk.text),
       requestId: '',
       modelId: this.config.embeddingModelId,
-      metadata: {},
     }, this.config.embeddingModelId);
     this.assertCurrent(version, 'RAG.ingest');
     if (result.vectors.length !== textChunks.length) {
@@ -710,6 +716,65 @@ class CrossWasmRAGProvider implements RAGProvider {
     }
   }
 
+  /**
+   * Embed the query and rank the in-memory chunk index against it. Shared by
+   * `ragQuery` (which then generates) and `ragSearch` (which does not).
+   */
+  private async retrieve(
+    query: string,
+    queryOptions: RAGQueryOptions,
+    version: number,
+  ): Promise<RAGSearchResult[]> {
+    const queryEmbedding = await Embeddings.embed(query, this.config.embeddingModelId);
+    this.assertCurrent(version, 'RAG.retrieve');
+    const queryVector = queryEmbedding.vectors[0];
+    if (!queryVector) {
+      throw SDKException.backendNotAvailable(
+        'RAG.retrieve',
+        'Embedding backend returned no query vector.',
+      );
+    }
+    const minimumSimilarity = queryOptions.retrieval?.scoreThreshold ?? 0;
+    const requestedTopK = queryOptions.retrieval?.topK || this.config.topK || 5;
+    // `RAGSearchResult.similarityScore`/`.rank` were renamed/deleted outright
+    // (idl/rag.proto): the single fused relevance value is now `score`, and
+    // there is no wire-carried rank -- callers reconstruct rank from array
+    // position when they need it (see `boundedRAGContext`'s use of `index`).
+    return this.chunks
+      .map((chunk) => ({ chunk, score: embeddingCosineSimilarity(queryVector, chunk.vector) }))
+      .filter(({ score }) => score >= minimumSimilarity)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Math.max(1, requestedTopK))
+      .map(({ chunk, score }) => ({
+        chunkId: chunk.id,
+        text: chunk.text,
+        score,
+        sourceDocument: chunk.documentName,
+        metadata: { ...chunk.metadata },
+        startOffset: chunk.startOffset,
+        endOffset: chunk.endOffset,
+        tokenCount: chunk.tokenCount,
+      }));
+  }
+
+  async ragSearch(question: string, topK?: number): Promise<RAGSearchResult[]> {
+    this.requireInitialized('RAG.search');
+    const query = question.trim();
+    if (!query) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+        'RAG search query is empty.',
+        'RAG.search',
+      );
+    }
+    const queryOptions = makeRAGQuery(
+      query,
+      this.config,
+      topK ? { retrieval: { topK, enableMultiQuery: false } } : {},
+    );
+    return this.retrieve(query, queryOptions, this.lifecycleVersion);
+  }
+
   async ragQuery(
     question: string,
     options: RAGQueryOverrides = {},
@@ -725,47 +790,14 @@ class CrossWasmRAGProvider implements RAGProvider {
       );
     }
 
-    const totalStarted = nowMs();
     const retrievalStarted = nowMs();
-    const queryEmbedding = await Embeddings.embed(
-      query,
-      this.config.embeddingModelId,
-    );
-    this.assertCurrent(version, 'RAG.query');
-    const queryVector = queryEmbedding.vectors[0];
-    if (!queryVector) {
-      throw SDKException.backendNotAvailable(
-        'RAG.query',
-        'Embedding backend returned no query vector.',
-      );
-    }
-
     const queryOptions = makeRAGQuery(query, this.config, options);
-    const minimumSimilarity = queryOptions.similarityThreshold ?? 0;
-    const requestedTopK = queryOptions.retrievalTopK || this.config.topK || 5;
-    const ranked = this.chunks
-      .map((chunk) => ({
-        chunk,
-        score: embeddingCosineSimilarity(queryVector, chunk.vector),
-      }))
-      .filter(({ score }) => score >= minimumSimilarity)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, Math.max(1, requestedTopK));
+    const retrievedChunks = await this.retrieve(query, queryOptions, version);
     const retrievalTimeMs = nowMs() - retrievalStarted;
-
-    const retrievedChunks: RAGSearchResult[] = ranked.map(({ chunk, score }, index) => ({
-      chunkId: chunk.id,
-      text: chunk.text,
-      similarityScore: score,
-      sourceDocument: chunk.documentName,
-      metadata: { ...chunk.metadata },
-      rank: index + 1,
-      startOffset: chunk.startOffset,
-      endOffset: chunk.endOffset,
-      tokenCount: chunk.tokenCount,
-    }));
     if (retrievedChunks.length === 0) {
-      const totalTimeMs = nowMs() - totalStarted;
+      // `RAGResult.totalTimeMs` was deleted outright (idl/rag.proto):
+      // `retrievalTimeMs + generationTimeMs` is the closest surviving
+      // equivalent (Swift parity: RARAGResult.totalTime).
       this.lastQueryMs = Date.now();
       return {
         answer: '',
@@ -773,11 +805,7 @@ class CrossWasmRAGProvider implements RAGProvider {
         contextUsed: '',
         retrievalTimeMs,
         generationTimeMs: 0,
-        totalTimeMs,
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        errorCode: 0,
+        usage: emptyTokenUsage(),
         requestId: createId('rag-query'),
       };
     }
@@ -812,19 +840,14 @@ class CrossWasmRAGProvider implements RAGProvider {
 
     const generationStarted = nowMs();
     const generated = await TextGeneration.generate({
+      ...(queryOptions.generation ?? {}),
       prompt,
-      systemPrompt: queryOptions.systemPrompt
+      systemPrompt: queryOptions.generation?.systemPrompt
         ?? 'Answer the question using only the supplied context. If the context does not contain the answer, say so.',
-      maxTokens: queryOptions.maxTokens,
-      temperature: queryOptions.temperature,
-      topP: queryOptions.topP,
-      topK: queryOptions.topK,
-      disableThinking: queryOptions.disableThinking,
       conversationId: 'web-cross-wasm-rag',
     });
     this.assertCurrent(version, 'RAG.query');
     const generationTimeMs = nowMs() - generationStarted;
-    const totalTimeMs = nowMs() - totalStarted;
     this.lastQueryMs = Date.now();
     return {
       answer: generated.text,
@@ -832,11 +855,7 @@ class CrossWasmRAGProvider implements RAGProvider {
       contextUsed: context,
       retrievalTimeMs,
       generationTimeMs,
-      totalTimeMs,
-      promptTokens: generated.inputTokens,
-      completionTokens: generated.tokensGenerated,
-      totalTokens: generated.inputTokens + generated.tokensGenerated,
-      errorCode: 0,
+      usage: generated.usage ?? emptyTokenUsage(),
       requestId: createId('rag-query'),
       thinkingContent: generated.thinkingContent,
     };
@@ -890,13 +909,7 @@ class CrossWasmRAGProvider implements RAGProvider {
       indexedChunks: this.chunks.length,
       totalTokensIndexed,
       lastUpdatedMs: this.lastUpdatedMs,
-      indexPath: undefined,
-      statsJson: JSON.stringify({ provider: 'cross-wasm', dimension: this.chunks[0]?.vector.dimension ?? 0 }),
       vectorStoreSizeBytes,
-      isPersistent: false,
-      lastQueryMs: this.lastQueryMs,
-      errorMessage: undefined,
-      errorCode: 0,
     };
   }
 
@@ -927,8 +940,12 @@ class PersistentRAGProvider extends CrossWasmRAGProvider {
   private storageKey = '';
 
   async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
-    await super.ragCreatePipeline({ ...config, persistIndex: true });
-    this.storageKey = config.indexPath || `default:${config.embeddingModelId}:${config.llmModelId}`;
+    await super.ragCreatePipeline(config);
+    // `RAGConfiguration.indexPath` was deleted outright (idl/rag.proto): the
+    // storage key that scopes this provider's IndexedDB snapshot is now
+    // derived purely from the model-id pair (Web-only persistence, not a
+    // wire concept).
+    this.storageKey = `default:${config.embeddingModelId}:${config.llmModelId}`;
     const snapshot = await readPersistentRAGSnapshot(this.storageKey);
     if (snapshot) {
       this.chunks = snapshot.chunks;
@@ -964,23 +981,10 @@ class PersistentRAGProvider extends CrossWasmRAGProvider {
     };
   }
 
-  protected statistics(): RAGStatistics {
-    return {
-      ...super.statistics(),
-      indexPath: this.storageKey || this.config.indexPath,
-      isPersistent: true,
-      statsJson: JSON.stringify({
-        provider: 'persistent-cross-wasm',
-        persistent: true,
-        dimension: this.chunks[0]?.vector.dimension ?? 0,
-      }),
-    };
-  }
-
   private async persist(): Promise<void> {
     if (!this.storageKey) return;
     await writePersistentRAGSnapshot(this.storageKey, {
-      config: { ...this.config, persistIndex: true },
+      config: this.config,
       chunks: this.chunks,
       documents: [...this.documents.entries()],
       lastUpdatedMs: this.lastUpdatedMs,
@@ -1159,15 +1163,18 @@ function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number
   const maxTokens = Math.max(1, Math.floor(requestedMaxTokens));
   const parts: string[] = [];
   let used = 0;
-  for (const chunk of chunks) {
+  // `RAGSearchResult.rank` was deleted outright (idl/rag.proto): rank was
+  // always just this array's position, so the 1-based index reconstructs it
+  // exactly.
+  chunks.forEach((chunk, index) => {
     const available = maxTokens - used;
-    if (available <= 0) break;
+    if (available <= 0) return;
     const words = chunk.text.split(/\s+/).filter(Boolean);
     const text = words.slice(0, available).join(' ');
-    if (!text) continue;
-    parts.push(`[Source ${chunk.rank}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
+    if (!text) return;
+    parts.push(`[Source ${index + 1}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
     used += Math.min(words.length, available);
-  }
+  });
   return parts.join('\n\n');
 }
 
@@ -1182,6 +1189,18 @@ function renderRAGPrompt(template: string | undefined, context: string, query: s
 
 function nowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
+}
+
+/** `TokenUsage` zero value — used where a RAG result has no real usage to report. */
+function emptyTokenUsage(): TokenUsage {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    decodeTokensPerSecond: 0,
+    prefillMs: 0,
+    ttftMs: 0,
+  };
 }
 
 function assertNativeHandle(handle: number, feature: string): number {
@@ -1225,44 +1244,60 @@ function makeRAGQuery(
   config: RAGConfiguration,
   options: RAGQueryOverrides,
 ): RAGQueryOptions {
-  // Seed with the proto-generated canonical defaults (maxTokens 512 /
-  // temperature 0.7 / topP 1.0 from idl/rag.proto rac_default) so Web matches
-  // Swift's `RARAGQueryOptions.defaults(question:)` (RAGProto+Helpers.swift:72).
-  //
-  // Per rag.proto: `retrievalTopK = 0` and `similarityThreshold = 0` mean
-  // "use the RAGConfiguration default" so falling back to 0 when neither the
-  // per-query override nor the pipeline config supplies a value is the
-  // correct way to defer to commons.
-  const defaults = rAGQueryOptionsDefaults();
+  // `RAGQueryOptions` was collapsed to `{ query, retrieval?, generation? }`
+  // (idl/rag.proto): the flat `retrievalTopK`/`similarityThreshold`/
+  // `enableMultiQuery`/`multiQueryCount`/`scopePrefix`/`stream` fields moved
+  // one level down onto the nested `RAGRetrievalOptions`, and `question` was
+  // renamed `query`. `stream` was deleted outright -- streaming is now
+  // selected by which verb the caller calls (`ragQuery` vs
+  // `ragQueryStream`), not a request flag. Unset topK/scoreThreshold defer to
+  // RAGConfiguration's own value (0 = "use the pipeline default").
+  const retrievalDefaults = rAGRetrievalOptionsDefaults();
   return {
-    ...defaults,
-    question,
-    systemPrompt: options.systemPrompt,
-    maxTokens: options.maxTokens ?? defaults.maxTokens,
-    temperature: options.temperature ?? defaults.temperature,
-    topP: options.topP ?? defaults.topP,
-    topK: options.topK ?? defaults.topK,
-    retrievalTopK: options.retrievalTopK ?? config.topK ?? 0,
-    similarityThreshold: options.similarityThreshold ?? config.similarityThreshold ?? 0,
-    stream: options.stream ?? false,
-    // Structured flag — commons prepends the model's no-think directive.
-    disableThinking: options.disableThinking ?? false,
-    enableMultiQuery: options.enableMultiQuery ?? defaults.enableMultiQuery,
-    multiQueryCount: options.multiQueryCount ?? defaults.multiQueryCount,
-    scopePrefix: options.scopePrefix ?? defaults.scopePrefix,
+    query: question,
+    generation: options.generation,
+    retrieval: {
+      ...retrievalDefaults,
+      topK: options.retrieval?.topK ?? config.topK ?? 0,
+      scoreThreshold: options.retrieval?.scoreThreshold ?? config.scoreThreshold ?? 0,
+      enableMultiQuery: options.retrieval?.enableMultiQuery ?? retrievalDefaults.enableMultiQuery,
+      multiQueryCount: options.retrieval?.multiQueryCount ?? retrievalDefaults.multiQueryCount,
+      scopePrefix: options.retrieval?.scopePrefix,
+    },
+  };
+}
+
+function makeRAGSearchRequest(
+  question: string,
+  config: RAGConfiguration,
+  topK?: number,
+): RAGSearchRequest {
+  // `RAGSearchRequest` is now `{ query, retrieval? }` (idl/rag.proto);
+  // `question` was renamed `query` and the flat retrieval knobs moved onto
+  // the nested `RAGRetrievalOptions`, same as `RAGQueryOptions` above.
+  const retrievalDefaults = rAGRetrievalOptionsDefaults();
+  return {
+    query: question,
+    retrieval: {
+      ...retrievalDefaults,
+      topK: topK ?? config.topK ?? 0,
+      scoreThreshold: config.scoreThreshold ?? 0,
+    },
   };
 }
 
 function makeRAGDocument(text: string, metadataJson?: string): RAGDocument {
+  // `RAGDocument.adapterHandle`/`.mediaType`/`.sizeBytes` were deleted
+  // outright (idl/rag.proto): the message is now `{ id, text, metadata,
+  // sourceUri? }` only. `mediaType`/`sizeBytes` are folded into the free-form
+  // `metadata` map instead of being dropped, mirroring how `docId`/`docName`
+  // are already threaded through below.
   const parsed = parseMetadata(metadataJson);
   return {
     id: parsed.docId,
     text,
     metadata: parsed.metadata,
     sourceUri: parsed.sourceUri,
-    adapterHandle: undefined,
-    mediaType: parsed.mediaType,
-    sizeBytes: parsed.sizeBytes,
   };
 }
 
@@ -1287,14 +1322,20 @@ function parseMetadata(metadataJson?: string): ParsedMetadata {
   const docId = metadata.docId ?? metadata.id ?? createId('rag-doc');
   const docName = metadata.docName ?? metadata.name ?? metadata.sourceDocument ?? metadata.sourceUri ?? 'Document';
   const parsedSizeBytes = Number(metadata.sizeBytes ?? 0);
+  const sizeBytes = Number.isFinite(parsedSizeBytes) && parsedSizeBytes >= 0
+    ? parsedSizeBytes
+    : 0;
   return {
     docId,
     docName,
     sourceUri: metadata.sourceUri,
     mediaType: metadata.mediaType,
-    sizeBytes: Number.isFinite(parsedSizeBytes) && parsedSizeBytes >= 0
-      ? parsedSizeBytes
-      : 0,
+    sizeBytes,
+    // `mediaType`/`sizeBytes` have no RAGDocument wire field anymore
+    // (idl/rag.proto): `...metadata` already carries them through as
+    // strings (parseMetadataJson stringifies every input value), so the
+    // information survives the ingest call instead of being silently
+    // dropped.
     metadata: {
       ...metadata,
       docId,
@@ -1320,19 +1361,13 @@ function parseMetadataJson(metadataJson?: string): Record<string, string> {
   }
 }
 
-function emptyRAGStatistics(config: RAGConfiguration): RAGStatistics {
+function emptyRAGStatistics(): RAGStatistics {
   return {
     indexedDocuments: 0,
     indexedChunks: 0,
     totalTokensIndexed: 0,
     lastUpdatedMs: 0,
-    indexPath: config.indexPath,
-    statsJson: undefined,
     vectorStoreSizeBytes: 0,
-    isPersistent: config.persistIndex,
-    lastQueryMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
   };
 }
 
@@ -1363,9 +1398,10 @@ async function loadRagArtifactModel(
     ...(model?.framework !== undefined ? { framework: model.framework } : {}),
     forceReload: false,
     validateAvailability: false,
+    backendPreferences: [],
   });
-  if (!result?.success) {
-    const message = result?.errorMessage
+  if (!result || result.error) {
+    const message = result?.error?.message
       || `${errorLabel} model lifecycle artifact resolution failed`;
     throw SDKException.fromCode(
       -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
@@ -1531,8 +1567,9 @@ export async function ragQuery(
   if (typeof questionOrOptions === 'string') {
     return requireProvider('RAG.query').ragQuery(questionOrOptions, options);
   }
-  const { question, ...overrides } = questionOrOptions;
-  return requireProvider('RAG.query').ragQuery(question, overrides);
+  // RAGQueryOptions.question was renamed `query` (idl/rag.proto).
+  const { query, ...overrides } = questionOrOptions;
+  return requireProvider('RAG.query').ragQuery(query, overrides);
 }
 
 /**
@@ -1560,8 +1597,8 @@ export function ragQueryStream(
   if (typeof questionOrOptions === 'string') {
     return provider.ragQueryStream(questionOrOptions, options);
   }
-  const { question, ...overrides } = questionOrOptions;
-  return provider.ragQueryStream(question, overrides);
+  const { query, ...overrides } = questionOrOptions;
+  return provider.ragQueryStream(query, overrides);
 }
 
 // ---------------------------------------------------------------------------
@@ -1569,21 +1606,27 @@ export function ragQueryStream(
 // ---------------------------------------------------------------------------
 
 /**
- * Generated defaults with a required question string. Question is excluded
- * from the proto annotation because it has no semantic default
- * (caller-supplied). Swift parity: `RARAGQueryOptions.defaults(question:)`
- * (RAGProto+Helpers.swift:72).
+ * Build a `RAGQueryOptions` for `question` with no retrieval/generation
+ * overrides. `RAGQueryOptions` has no generated zero-arg `defaults()` (its
+ * only field-level annotation is `rac_required` on `query`, not
+ * `rac_default`), so this builds the message directly rather than wrapping
+ * a non-existent generated factory. `question` was renamed `query`
+ * (idl/rag.proto). Swift parity: `RARAGQueryOptions.defaults(question:)`
+ * (RAGProto+Helpers.swift:44).
  */
 export function ragQueryOptionsWithQuestion(question: string): RAGQueryOptions {
-  return { ...rAGQueryOptionsDefaults(), question };
+  return { query: question };
 }
 
 /**
- * Total end-to-end query time in seconds (from `totalTimeMs`).
- * Swift parity: `RARAGResult.totalTime` (RAGProto+Helpers.swift:82).
+ * Total end-to-end query time in seconds. `RAGResult.totalTimeMs` was
+ * deleted outright (idl/rag.proto); the sum of the two surviving measured
+ * phases (retrieval + generation) is the closest equivalent — never derived
+ * by subtraction from a wall clock. Swift parity: `RARAGResult.totalTime`
+ * (RAGProto+Helpers.swift:57).
  */
 export function ragResultTotalTime(result: RAGResult): number {
-  return result.totalTimeMs / 1000;
+  return (result.retrievalTimeMs + result.generationTimeMs) / 1000;
 }
 
 /**
@@ -1593,6 +1636,27 @@ export function ragResultTotalTime(result: RAGResult): number {
 export function ragStatisticsLastUpdated(statistics: RAGStatistics): Date | null {
   if (statistics.lastUpdatedMs <= 0) return null;
   return new Date(statistics.lastUpdatedMs);
+}
+
+/**
+ * Retrieve chunks for a query without generating an answer.
+ *
+ * Native WASM sessions use `rac_rag_search_proto`; CrossWasm / Persistent
+ * providers keep their TypeScript-owned retrieve path.
+ */
+export async function ragSearch(
+  question: string,
+  topK?: number,
+): Promise<RAGSearchResult[]> {
+  const provider = requireProvider('RAG.search');
+  if (!provider.ragSearch) {
+    throw SDKException.backendNotAvailable(
+      'RAG.search',
+      'The active RAG provider has no retrieval-only path '
+        + '(rac_rag_search_proto unavailable).',
+    );
+  }
+  return provider.ragSearch(question, topK);
 }
 
 export async function ragGetStatistics(): Promise<RAGStatistics> {
@@ -1606,13 +1670,7 @@ export async function ragGetStatistics(): Promise<RAGStatistics> {
     indexedChunks: indexedDocuments,
     totalTokensIndexed: 0,
     lastUpdatedMs: 0,
-    indexPath: undefined,
-    statsJson: undefined,
     vectorStoreSizeBytes: 0,
-    isPersistent: false,
-    lastQueryMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
   };
 }
 

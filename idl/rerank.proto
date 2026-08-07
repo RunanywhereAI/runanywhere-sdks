@@ -1,13 +1,17 @@
 // RunAnywhere IDL - reranking (cross-encoder relevance scoring) types.
 //
-// A reranker scores each candidate document/passage against a query and returns
-// the candidates re-ordered by relevance. Mirrors the shape of
-// segmentation.proto: a request (query + repeated candidates), a result
-// (repeated scored items), and a service lifecycle rpc.
+// A reranker scores each document/passage against a query and returns them
+// re-ordered by relevance. Wire types only: a request (query + repeated
+// documents + options) and a result (repeated scored items). There is no
+// service block - model lifecycle is the C ABI (rac_rerank_component_create /
+// load_model / unload / destroy), and scoring crosses the boundary as proto
+// bytes via rac_rerank_component_rerank_proto.
 
 syntax = "proto3";
 
 package runanywhere.v1;
+
+import "rac_options.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -18,36 +22,61 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// A single candidate document/passage to be scored against the query. The id is
-// caller-supplied and echoed back on the scored item so callers can correlate
-// results with their own records without relying on ordering.
-message RerankCandidate {
-    string id = 1;
-    string text = 2;
-}
+// RerankCandidate is deleted: every facade already builds it with id set to
+// the stringified array index, so the wrapper carried no information the
+// flat `documents` list below does not.
 
 message RerankOptions {
     // When > 0, only the top_n highest-scoring candidates are returned (every
     // candidate is still scored). 0 = return all candidates, ranked.
-    uint32 top_n = 1;
+    // Industry name (Cohere rerank `top_n`).
+    uint32 top_n = 1 [(runanywhere.v1.rac_default) = "0"];
+
+    // Per-document token budget; longer documents are truncated (tail
+    // dropped) before scoring. 0 = the SDK default budget. This is the
+    // direct knob on peak memory and per-pair latency on device.
+    // Industry name (Cohere v2 / vLLM `max_tokens_per_doc`).
+    uint32 max_tokens_per_doc = 2 [(runanywhere.v1.rac_default) = "0"];
 }
 
 message RerankRequest {
-    string query = 1;
-    repeated RerankCandidate candidates = 2;
+    string query = 1 [(runanywhere.v1.rac_required) = true];
+
+    reserved 2;               // was: repeated RerankCandidate candidates
+    reserved "candidates";
+
     optional RerankOptions options = 3;
+
+    // The passages to score, in caller order. Results point back at these by
+    // index. Cost is LINEAR (one model pass per document), so this is a
+    // second-stage reranker over a retriever's output, not a corpus scan;
+    // commons rejects more than 100,000 entries with
+    // RAC_ERROR_INVALID_PARAMETER. Industry name (Cohere/Voyage/Jina `documents`).
+    repeated string documents = 4;
+
+    // Registry id of the reranker to score with. Unset = whatever model is
+    // already resident under the rerank component. Mirrors
+    // EmbeddingsRequest.model_id and the industry-universal `model` field.
+    optional string model_id = 5;
 }
 
 message RerankScoredItem {
-    // Echo of RerankCandidate.id for correlation.
-    string id = 1;
-    // Raw relevance score from the reranker (higher = more relevant). Not
-    // normalized to a fixed range; comparable only within one result set.
-    float score = 2;
-    // Index of this candidate in the original RerankRequest.candidates list.
-    uint32 original_index = 3;
-    // 0-based position after sorting by score descending (0 = most relevant).
-    uint32 rank = 4;
+    reserved 1;               // was: string id (echo of RerankCandidate.id)
+    reserved "id";
+
+    // Relevance of this document to the query, normalized to [0, 1] (sigmoid
+    // of the cross-encoder logit). Ordinal, not cardinal: 0.9 is not "twice
+    // as relevant" as 0.45, and scores are not comparable across models.
+    // Industry name (Cohere/Voyage `relevance_score`).
+    float relevance_score = 2;
+
+    // Index of this document in the original RerankRequest.documents list.
+    // Industry name (`index`).
+    uint32 index = 3;
+
+    reserved 4;               // was: uint32 rank - always equal to this item's
+    reserved "rank";          //      position in RerankResult.items, which is
+                              //      already sorted by score descending
 }
 
 message RerankResult {
@@ -56,8 +85,4 @@ message RerankResult {
     repeated RerankScoredItem items = 1;
     int64 processing_time_ms = 2;
     string model_id = 3;
-}
-
-service Reranking {
-    rpc Rerank(RerankRequest) returns (RerankResult);
 }

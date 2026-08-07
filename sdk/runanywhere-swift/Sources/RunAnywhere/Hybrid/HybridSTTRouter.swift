@@ -49,7 +49,7 @@ import SwiftProtobuf
 ///     offline: .offlineSherpa("sherpa-onnx-whisper-tiny.en"),
 ///     online:  .onlineCloud("saaras"),
 ///     policy:  .init(hardFilters: [.network], cascade: .confidence(threshold: 0.5),
-///                    rank: .preferLocalFirst)
+///                    preferLocal: true)
 /// )
 /// var options = HybridTranscribeOptions()
 /// options.sampleRate = 16_000
@@ -303,17 +303,15 @@ public final class HybridSTTRouter: @unchecked Sendable {
     // MARK: - Request encode / response decode
 
     /// Build a `runanywhere.v1.HybridSttTranscribeRequest` carrying the audio
-    /// bytes, an (empty, present) routing context, and the options, via the
-    /// generated SwiftProtobuf message.
+    /// bytes and the options, via the generated SwiftProtobuf message.
     ///
-    /// HybridRoutingContext currently has no fields — device-state lives behind
-    /// the `rac_hybrid_device_state` vtable. The empty message is still set
-    /// explicitly so the wire shape (field 2 present) is stable for future
-    /// per-call hints, matching the C++/JNI peers.
+    /// `RAHybridRoutingContext`/`HybridSttTranscribeRequest.context` were
+    /// deleted outright (idl/hybrid_router.proto); device-state still lives
+    /// entirely behind the `rac_hybrid_device_state` vtable, so there is no
+    /// per-call context left to set.
     private func encodeRequest(audio: Data, options: HybridTranscribeOptions) throws -> [UInt8] {
         var request = RAHybridSttTranscribeRequest()
         request.audioBytes = audio
-        request.context = RAHybridRoutingContext()
         request.options = options
         return try [UInt8](request.serializedData())
     }
@@ -323,13 +321,13 @@ public final class HybridSTTRouter: @unchecked Sendable {
     private func decodeResponse(_ data: Data) throws -> HybridTranscribeResult {
         let response = try RAHybridSttTranscribeResponse(serializedBytes: data)
 
+        // errorMsg was deleted outright (idl/hybrid_router.proto): the
+        // response now carries only the bare rc on failure, with no
+        // human-readable message field.
         guard response.rc == 0 else {
-            let message = response.errorMsg.isEmpty
-                ? "Hybrid STT transcribe failed (rc=\(response.rc))"
-                : response.errorMsg
             throw SDKException(
                 code: .serviceNotAvailable,
-                message: message,
+                message: "Hybrid STT transcribe failed (rc=\(response.rc))",
                 category: .component
             )
         }
@@ -393,11 +391,14 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// `vt->stt_ops->create(model_id, config_json, &impl)` builds the backend
     /// instance — the same path every commons STT consumer uses.
     private func createService(for model: HybridModel) throws -> AttachedService {
-        if model.backend == .hybridBackendSherpa {
+        if model.backend == .sherpa {
             try requireSherpaRegistered()
         }
 
-        let engineName = pinnedEngineName(for: model.backend)
+        // HybridBackendKind is now a free-form plugin-registry engine name
+        // (idl/hybrid_router.proto deleted RAHybridBackendKind outright), so
+        // the backend value IS the name `rac_plugin_find_for_engine` pins on.
+        let engineName = model.backend
 
         // Pin the named engine (offline "sherpa" vs cloud "cloud") — simple
         // priority order cannot distinguish two TRANSCRIBE plugins, so select
@@ -489,17 +490,6 @@ public final class HybridSTTRouter: @unchecked Sendable {
                     + "Registered plugins: \(names.isEmpty ? "(none)" : names.joined(separator: ", "))",
                 category: .component
             )
-        }
-    }
-
-    /// Map a backend kind to the plugin name `rac_plugin_route` pins on.
-    private func pinnedEngineName(for backend: HybridBackendKind) -> String {
-        switch backend {
-        case .hybridBackendSherpa: return "sherpa"
-        case .hybridBackendCloud: return "cloud"
-        case .hybridBackendLlamacpp: return "llamacpp"
-        case .hybridBackendOpenrouter: return "openrouter"
-        case .hybridBackendUnspecified, .UNRECOGNIZED: return ""
         }
     }
 

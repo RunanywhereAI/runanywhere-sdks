@@ -8,6 +8,7 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { isSDKInitialized } from '../../../Foundation/Initialization/InitializedGuard';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   CurrentModelRequest,
   CurrentModelResult,
@@ -71,18 +72,16 @@ export async function loadModel(
   // request's id/category/framework (RunAnywhere+ModelLifecycle.swift:23-31).
   if (!isSDKInitialized()) {
     return ModelLoadResult.fromPartial({
-      success: false,
       modelId: request.modelId,
       category: request.category,
       framework: request.framework,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelLoadResult.fromPartial({
-      success: false,
       modelId: request.modelId,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
 
@@ -96,9 +95,8 @@ export async function loadModel(
     buffer,
     ModelLoadResult,
     ModelLoadResult.fromPartial({
-      success: false,
       modelId: request.modelId,
-      errorMessage: 'modelLifecycleLoadProto returned an empty result',
+      error: SDKException.protoDecodeFailed('modelLifecycleLoadProto').proto,
     })
   );
 }
@@ -110,14 +108,12 @@ export async function unloadModel(
   // (RunAnywhere+ModelLifecycle.swift:42-47).
   if (!isSDKInitialized()) {
     return ModelUnloadResult.fromPartial({
-      success: false,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelUnloadResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
 
@@ -129,8 +125,7 @@ export async function unloadModel(
     buffer,
     ModelUnloadResult,
     ModelUnloadResult.fromPartial({
-      success: false,
-      errorMessage: 'modelLifecycleUnloadProto returned an empty result',
+      error: SDKException.protoDecodeFailed('modelLifecycleUnloadProto').proto,
     })
   );
 }

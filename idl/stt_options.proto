@@ -1,80 +1,13 @@
 // RunAnywhere IDL — Speech-to-Text (STT) types.
 //
-// Canonical wire format consumed by all five SDKs (Swift, Kotlin, Dart,
-// React Native, Web) and the C ABI in runanywhere-commons. Every message
-// below is the *union* of the hand-written types currently shipped per
-// platform. This file is the single source of truth; per-language
-// bindings are generated downstream.
-//
-// Sources pre-IDL (file:line):
-//   Swift  STTTypes.swift:15           STTConfiguration  (8 fields)
-//   Swift  STTTypes.swift:64           STTOptions        (10 fields)
-//   Swift  STTTypes.swift:147          STTOutput         (7 fields)
-//   Swift  STTTypes.swift:241          TranscriptionMetadata (4 fields incl. realTimeFactor)
-//   Swift  STTTypes.swift:260          WordTimestamp     (4 fields)
-//   Swift  STTTypes.swift:275          TranscriptionAlternative (2 fields)
-//   Swift  STTTypes.swift:288          STTTranscriptionResult (5 fields, legacy)
-//   Kotlin STTTypes.kt:27              STTConfiguration  (9 fields, adds preferredFramework)
-//   Kotlin STTTypes.kt:65              STTOptions        (10 fields)
-//   Kotlin STTTypes.kt:100             STTOutput         (7 fields)
-//   Kotlin STTTypes.kt:124             TranscriptionMetadata (3 fields, realTimeFactor computed)
-//   Kotlin STTTypes.kt:141             WordTimestamp     (4 fields)
-//   Kotlin STTTypes.kt:155             TranscriptionAlternative (2 fields)
-//   Dart   generation_types.dart:78    STTOptions        (10 fields)
-//   Dart   generation_types.dart:124   WordTimestamp     (4 fields, confidence optional)
-//   Dart   generation_types.dart:146   TranscriptionAlternative (transcript+confidence)
-//   Dart   generation_types.dart:160   TranscriptionMetadata (3 fields, modelId nullable)
-//   Dart   generation_types.dart:184   STTPartialResult  (6 fields)
-//   Dart   generation_types.dart:218   STTResult / STTOutput (8 fields, durationMs)
-//   Dart   stt_configuration.dart:9    STTConfiguration  (9 fields)
-//   RN     STTTypes.ts:12              STTOptions        (5 fields, narrower)
-//   RN     STTTypes.ts:32              STTOutput         (6 fields)
-//   RN     STTTypes.ts:55              WordTimestamp     (4 fields)
-//   RN     STTTypes.ts:65              STTAlternative    (text+confidence)
-//   RN     STTTypes.ts:73              TranscriptionMetadata (4 fields)
-//   RN     STTTypes.ts:90              STTPartialResult  (6 fields)
-//   Web    STTTypes.ts:9               STTTranscriptionResult (5 fields, processingTimeMs)
-//   Web    STTTypes.ts:18              STTWord           (4 fields, ms-based)
-//   Web    STTTypes.ts:25              STTTranscribeOptions (2 fields, narrowest)
-//   C ABI  rac_stt_types.h:76          rac_stt_config_t  (9 fields)
-//   C ABI  rac_stt_types.h:130         rac_stt_options_t (8 fields)
-//   C ABI  rac_stt_types.h:175         rac_stt_word_t    (text/start_ms/end_ms/confidence)
-//   C ABI  rac_stt_types.h:191         rac_stt_result_t  (6 fields)
-//   C ABI  rac_stt_types.h:297         rac_transcription_metadata_t (4 fields, ms+RTF)
-//   C ABI  rac_stt_types.h:320         rac_transcription_alternative_t (text+confidence)
-//   C ABI  rac_stt_types.h:338         rac_stt_output_t  (8 fields)
-//
-// Drift reconciled:
-//   - language: Swift/Kotlin/Dart/RN/Web/C all use `string` (BCP-47 codes
-//     like "en", "en-US", "es"). We promote to enum `STTLanguage` for type
-//     safety; the union of codes seen pre-IDL is captured. Free-form
-//     codes (e.g. "en-US" regional variants) collapse to the base code.
-//   - timestamps: Swift uses `TimeInterval` (seconds, double),
-//     C ABI uses `int64 *_ms`, Web uses `*Ms: number`. Canonicalize on
-//     `*_ms` int64 (matches C ABI / Web; Swift adapter divides by 1000).
-//   - real_time_factor: Swift stores as `Double`, C ABI as `float`,
-//     Kotlin/Dart compute on read. Canonicalize on `float` field
-//     populated by producer; consumers MAY recompute.
-//   - confidence: Swift/Kotlin/RN/C use `Float`, Dart uses `double`.
-//     Canonicalize on `float` (proto3 single-precision).
-//   - audio_format: import from model_types.proto; reuse AudioFormat enum.
-//   - max_speakers: Swift `Int?` (nullable), Dart `int = 0` (sentinel),
-//     C ABI `int32 max_speakers` (0 = auto). Canonicalize on int32 with
-//     0 = auto/unset (matches C ABI default).
-//   - vocabulary list: Swift/Kotlin = `vocabularyList`, Dart/Swift options
-//     also use `vocabularyFilter`. Canonicalize on `vocabulary_list` for
-//     STTConfiguration (config-level word bias) and re-use the same name
-//     in STTOptions (runtime override).
-//   - beam_size: only present in Kotlin Whisper bridge (CppBridgeSTT.kt).
-//     Included in STTOptions per spec; default 0 = backend default.
-//   - sample_rate: int32 across all SDKs and C ABI.
-//   - model_id: optional `string` in Swift/Kotlin/Dart, nullable C string
-//     in C ABI. Canonicalize on `string` (empty = unset, proto3 default).
+// Timestamps are int64 milliseconds throughout. Language is a BCP-47 /
+// ISO-639-1 string; unset or empty means auto-detect.
 
 syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "model_types.proto";
 import "rac_options.proto";
 
@@ -87,64 +20,12 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// STT language hint. Sources pre-IDL:
-//   Swift  STTConfiguration default = "en-US", STTOptions default = "en"
-//   Kotlin STTConfiguration default = "en-US", STTOptions default = "en"
-//   Dart   STTOptions language nullable; auto-detect when null
-//   RN     STTOptions.language?: string (free-form)
-//   Web    STTTranscribeOptions.language?: string (free-form)
-//   C ABI  RAC_STT_DEFAULT_LANGUAGE = "en"
-// Free-form BCP-47 strings are collapsed to base language codes here.
-// AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
-// back to the backend default (typically "en").
-// ---------------------------------------------------------------------------
-// `rac_wire_string` annotations expose the BCP-47 base code for each value via
-// the codegen-generated `wireString` accessor (see idl/rac_options.proto and
-// idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
-// from this annotation; the unspecified case falls back to "" by default.
-enum STTLanguage {
-    STT_LANGUAGE_UNSPECIFIED = 0;
-    STT_LANGUAGE_AUTO        = 1 [(runanywhere.v1.rac_wire_string) = "auto"];   // Auto-detect from audio
-    STT_LANGUAGE_EN          = 2 [(runanywhere.v1.rac_wire_string) = "en"];
-    STT_LANGUAGE_ES          = 3 [(runanywhere.v1.rac_wire_string) = "es"];
-    STT_LANGUAGE_FR          = 4 [(runanywhere.v1.rac_wire_string) = "fr"];
-    STT_LANGUAGE_DE          = 5 [(runanywhere.v1.rac_wire_string) = "de"];
-    STT_LANGUAGE_ZH          = 6 [(runanywhere.v1.rac_wire_string) = "zh"];
-    STT_LANGUAGE_JA          = 7 [(runanywhere.v1.rac_wire_string) = "ja"];
-    STT_LANGUAGE_KO          = 8 [(runanywhere.v1.rac_wire_string) = "ko"];
-    STT_LANGUAGE_IT          = 9 [(runanywhere.v1.rac_wire_string) = "it"];
-    STT_LANGUAGE_PT          = 10 [(runanywhere.v1.rac_wire_string) = "pt"];
-    STT_LANGUAGE_AR          = 11 [(runanywhere.v1.rac_wire_string) = "ar"];
-    STT_LANGUAGE_RU          = 12 [(runanywhere.v1.rac_wire_string) = "ru"];
-    STT_LANGUAGE_HI          = 13 [(runanywhere.v1.rac_wire_string) = "hi"];
-}
-
-enum STTAudioEncoding {
-    STT_AUDIO_ENCODING_UNSPECIFIED = 0;
-    STT_AUDIO_ENCODING_PCM_S16_LE  = 1;
-    STT_AUDIO_ENCODING_PCM_F32_LE  = 2;
-    STT_AUDIO_ENCODING_CONTAINER   = 3;  // WAV/MP3/FLAC/etc.; see AudioFormat.
-}
-
-// ---------------------------------------------------------------------------
-// STT component configuration (init-time settings).
-// Sources pre-IDL:
-//   Swift  STTTypes.swift:15           STTConfiguration
-//   Kotlin STTTypes.kt:27              STTConfiguration
-//   Dart   stt_configuration.dart:9    STTConfiguration
-//   C ABI  rac_stt_types.h:76          rac_stt_config_t
-//
-// Note: max_alternatives, enable_punctuation, enable_diarization, and
-// enable_timestamps appear in the pre-IDL configs but are runtime knobs
-// in the canonical model. They live on STTOptions; STTConfiguration
-// keeps only true init-time fields (model id, language, sample rate,
-// VAD toggle, audio format). Producers should mirror runtime knobs into
-// STTOptions when constructing requests.
-// ---------------------------------------------------------------------------
+// Init-time settings. Per-call knobs live on STTOptions; adapters mirror the
+// transcription defaults below into STTOptions when building a request.
 message STTConfiguration {
     string      model_id     = 1;
-    STTLanguage language     = 2 [(runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+
+    optional string language = 13;
     int32       sample_rate  = 3 [
         (runanywhere.v1.rac_default) = "16000",
         (runanywhere.v1.rac_min) = 8000,
@@ -153,81 +34,72 @@ message STTConfiguration {
     bool        enable_vad   = 4;
     AudioFormat audio_format = 5;
 
-    // C ABI / legacy SDK config-level transcription defaults. These may be
-    // mirrored into STTOptions by adapters for per-call overrides.
     bool        enable_punctuation      = 6 [(runanywhere.v1.rac_default) = "true"];
     bool        enable_diarization      = 7;
-    repeated string vocabulary_list     = 8;
-    int32       max_alternatives        = 9;   // 0 = backend/default
+
+    // 8 was vocabulary_list, 9 was max_alternatives: same dead surface as
+    // STTOptions' copies (never read by any backend).
+    reserved 8, 9;
+    reserved "vocabulary_list", "max_alternatives";
     bool        enable_word_timestamps  = 10 [(runanywhere.v1.rac_default) = "true"];
 
-    // Preferred framework for the component. Absent = auto.
     optional InferenceFramework preferred_framework = 11;
-
-    // Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
-    // that cannot be represented by STTLanguage's base-code enum.
-    optional string language_code       = 12;
 }
 
-// ---------------------------------------------------------------------------
-// STT runtime transcription options (per-call overrides).
-// Sources pre-IDL:
-//   Swift  STTTypes.swift:64           STTOptions  (10 fields)
-//   Kotlin STTTypes.kt:65              STTOptions  (10 fields)
-//   Dart   generation_types.dart:78    STTOptions  (10 fields)
-//   RN     STTTypes.ts:12              STTOptions  (5 fields, narrower)
-//   Web    STTTypes.ts:25              STTTranscribeOptions (2 fields)
-//   C ABI  rac_stt_types.h:130         rac_stt_options_t (8 fields)
-//
-// Per spec, this canonical message exposes: language, enable_punctuation,
-// enable_diarization, max_speakers, vocabulary_list, enable_word_timestamps,
-// beam_size. Other pre-IDL fields (audio_format, sample_rate, detect_language,
-// preferred_framework) are part of STTConfiguration or implied by
-// STT_LANGUAGE_AUTO.
-// ---------------------------------------------------------------------------
+// Per-call overrides.
 message STTOptions {
-    STTLanguage     language               = 1 [(runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+    // BCP-47 tag (bare ISO-639-1 accepted). Unset or "" means auto-detect;
+    // the code the engine settles on comes back on STTOutput.language.
+    optional string language               = 17;
+
     bool            enable_punctuation     = 2 [(runanywhere.v1.rac_default) = "true"];
-    bool            enable_diarization     = 3;
-    int32           max_speakers           = 4;   // 0 = auto / unset
-    repeated string vocabulary_list        = 5;   // Custom vocabulary bias
+
+    // Attribute each word to a speaker. Labels come back on
+    // WordTimestamp.speaker_id and STTOutput.speaker_ids. Deepgram `diarize`,
+    // AssemblyAI `speaker_labels`.
+    bool            diarize                = 3;
+
+    // Hint for how many distinct speakers to expect. AssemblyAI
+    // `speakers_expected`. Unset = let the engine decide.
+    optional int32  speakers_expected      = 4;
     bool            enable_word_timestamps = 6 [(runanywhere.v1.rac_default) = "true"];
-    int32           beam_size              = 7;   // 0 = backend default
 
-    // Free-form BCP-47 language tag. When set, consumers should prefer this
-    // over the base-language enum above.
-    optional string language_code          = 8;
+    // Trailing silence after which the utterance is finalized and an
+    // STT_STREAM_EVENT_KIND_ENDPOINT + FINAL pair is emitted. 0 = engine
+    // default.
+    int32           silence_duration_ms    = 14 [(runanywhere.v1.rac_default) = "0"];
 
-    // Explicit language auto-detection flag for C ABI parity. Equivalent to
-    // language == STT_LANGUAGE_AUTO for generated-only consumers.
-    bool            detect_language        = 9;
-
-    // Per-call input audio hints mirrored from rac_stt_options_t.
-    AudioFormat     audio_format           = 10;
-    int32           sample_rate            = 11;
-
-    // Maximum number of alternatives to return. 0 = backend/default.
-    int32           max_alternatives       = 12;
-
-    // Streaming/endpointer controls. 0 = backend/default.
-    int32           chunk_duration_ms      = 13;
-    int32           endpoint_silence_ms    = 14;
-    bool            suppress_blank         = 15;
-    bool            translate_to_english   = 16;
+    // 5, 7, 12, 15, 16 were vocabulary_list, beam_size, max_alternatives,
+    // suppress_blank, translate_to_english. None were ever read by any
+    // backend; re-add only alongside working wiring.
+    // 1, 8, 9, 10, 11 vacated by earlier renames; never reuse.
+    reserved 1, 5, 7, 8, 9, 10, 11, 12, 13, 15, 16;
+    reserved "vocabulary_list", "beam_size", "max_alternatives",
+             "chunk_duration_ms", "suppress_blank", "translate_to_english";
 }
 
 message STTAudioSource {
     oneof source {
+        // Audio bytes, in-process.
         bytes  audio_data      = 1;
+
+        // Local path or file:// URI, read and decoded by the platform adapter.
         string file_uri        = 2;
-        string adapter_handle  = 3;
     }
 
-    STTAudioEncoding encoding = 4;
+    reserved 3;   // was adapter_handle: no SDK set it, no engine read it
+    reserved "adapter_handle";
+
+    AudioEncoding encoding = 4;
     AudioFormat audio_format = 5;
     int32 sample_rate = 6;
+
+    // Interleaved channel count; 0 or 1 = mono. Non-mono audio is downmixed
+    // before decoding and MUST be divided out of the duration estimate.
     int32 channels = 7;
-    int32 bits_per_sample = 8;
+
+    reserved 8;   // bits_per_sample: sample width is determined by `encoding`
+    reserved "bits_per_sample";
     int64 duration_ms = 9;
 }
 
@@ -238,138 +110,71 @@ message STTTranscriptionRequest {
     map<string, string> metadata = 4;
 }
 
-// ---------------------------------------------------------------------------
-// Word-level timestamp.
-// Sources pre-IDL:
-//   Swift  STTTypes.swift:260          WordTimestamp (TimeInterval seconds)
-//   Kotlin STTTypes.kt:141             WordTimestamp (Double seconds)
-//   Dart   generation_types.dart:124   WordTimestamp (double seconds, conf?)
-//   RN     STTTypes.ts:55              WordTimestamp (number seconds)
-//   Web    STTTypes.ts:18              STTWord       (number ms)
-//   C ABI  rac_stt_types.h:175         rac_stt_word_t (int64 ms)
-//
-// Canonicalize on int64 *_ms (matches C ABI and Web).
-// ---------------------------------------------------------------------------
 message WordTimestamp {
     string word       = 1;
     int64  start_ms   = 2;
     int64  end_ms     = 3;
     float  confidence = 4;
+
+    // Always empty today: no backend fills this. Kept live -- read by all
+    // five SDK facades as public API -- pending real diarization wiring.
     optional string speaker_id = 5;
 }
 
-// ---------------------------------------------------------------------------
-// Alternative transcription hypothesis (n-best).
-// Sources pre-IDL:
-//   Swift  STTTypes.swift:275          TranscriptionAlternative (text, confidence)
-//   Kotlin STTTypes.kt:155             TranscriptionAlternative (text, confidence)
-//   Dart   generation_types.dart:146   TranscriptionAlternative (transcript, confidence)
-//   RN     STTTypes.ts:65              STTAlternative (text, confidence)
-//   C ABI  rac_stt_types.h:320         rac_transcription_alternative_t (text, confidence)
-//
-// Drift: Dart uses `transcript` while everyone else uses `text`. Canonical
-// field name is `text`. Per-word breakdown is OPTIONAL (only some backends
-// emit it for alternatives).
-// ---------------------------------------------------------------------------
+// One n-best hypothesis. Per-word breakdown only when the backend emits it.
 message TranscriptionAlternative {
     string                 text       = 1;
     float                  confidence = 2;
     repeated WordTimestamp words      = 3;
 }
 
-// ---------------------------------------------------------------------------
-// Per-pass transcription metadata.
-// Sources pre-IDL:
-//   Swift  STTTypes.swift:241          TranscriptionMetadata (s + computed RTF)
-//   Kotlin STTTypes.kt:124             TranscriptionMetadata (s + computed RTF)
-//   Dart   generation_types.dart:160   TranscriptionMetadata (s + computed RTF)
-//   RN     STTTypes.ts:73              TranscriptionMetadata (s + optional RTF)
-//   C ABI  rac_stt_types.h:297         rac_transcription_metadata_t (ms + RTF)
-//
-// Canonicalize on ms (matches C ABI). real_time_factor is producer-set;
-// consumers may recompute as processing_time_ms / audio_length_ms.
-// ---------------------------------------------------------------------------
+// Which model ran, and how long it took.
 message TranscriptionMetadata {
     string model_id           = 1;
     int64  processing_time_ms = 2;
-    int64  audio_length_ms    = 3;
-    float  real_time_factor   = 4;
+
+    reserved 3;   // audio length lives on STTOutput.duration_ms
+    reserved "audio_length_ms";
 }
 
-// ---------------------------------------------------------------------------
-// Final STT output.
-// Sources pre-IDL:
-//   Swift  STTTypes.swift:147          STTOutput (text, conf, words, lang, alts, meta, ts)
-//   Kotlin STTTypes.kt:100             STTOutput (text, conf, words, lang, alts, meta, ts)
-//   Dart   generation_types.dart:218   STTResult / STTOutput (text, conf, durMs, lang, words, alts, meta, ts)
-//   RN     STTTypes.ts:32              STTOutput (text, conf, words, lang, alts, meta)
-//   Web    STTTypes.ts:9               STTTranscriptionResult (text, conf, lang, procMs, words)
-//   C ABI  rac_stt_types.h:338         rac_stt_output_t (text, conf, words, lang, alts, meta, ts_ms)
-//
-// Drift reconciled:
-//   - language: detected language. Promoted to STTLanguage enum.
-//   - durationMs (Dart) / processingTimeMs (Web) → captured in metadata.
-// ---------------------------------------------------------------------------
 message STTOutput {
     string                            text          = 1;
-    STTLanguage                       language      = 2;
     float                             confidence    = 3;
+
+    // Detected language, BCP-47. Empty = unknown.
+    optional string                   language      = 14;
     repeated WordTimestamp            words         = 4;
     repeated TranscriptionAlternative alternatives  = 5;
     TranscriptionMetadata             metadata      = 6;
 
-    // Free-form detected language tag, preserving regional variants.
-    optional string                   language_code = 7;
-
-    // Wall-clock output timestamp in milliseconds since Unix epoch.
+    // Milliseconds since epoch.
     int64                             timestamp_ms  = 8;
 
-    // Audio duration in milliseconds for SDKs that expose duration directly.
-    // Often duplicates metadata.audio_length_ms.
     int64                             duration_ms   = 9;
 
-    // Diarization summary when available.
-    repeated string                   speaker_ids   = 10;
+    reserved 10;   // speaker_ids: zero writers, zero readers anywhere
+    reserved "speaker_ids";
+    reserved 2, 7, 11, 12;   // vacated gaps, never reused
 
-    // Terminal error details for result-envelope APIs.
-    optional string                   error_message = 11;
-    int32                             error_code    = 12;
-
-    // Segment index for long-running/streaming transcription.
+    // For long-running or streaming transcription.
     int32                             segment_index = 13;
+
+    optional SDKError                 error         = 15;
 }
 
-// ---------------------------------------------------------------------------
-// Streaming partial result emitted during live transcription.
-// Sources pre-IDL:
-//   Dart   generation_types.dart:184   STTPartialResult (transcript, conf, isFinal, lang, ts, alts)
-//   RN     STTTypes.ts:90              STTPartialResult (transcript, conf, ts, lang, alts, isFinal)
-//   C ABI  rac_stt_types.h:240         rac_stt_stream_callback_t (partial_text, is_final)
-//   Web    STTTypes.ts:31              STTStreamCallback (text, isFinal)
-//
-// Canonical minimal shape per spec: text, is_final, stability. Full word
-// timestamps + alternatives flow through STTOutput on the terminal event.
-// `stability` is the Whisper-style hypothesis stability score (0.0-1.0);
-// 0.0 when backend does not provide one.
-// ---------------------------------------------------------------------------
+// An in-progress hypothesis. `text` replaces the previous partial in full.
+// The finished result arrives on STTStreamEvent.final_output and never here;
+// correlation (request_id, seq) and failures live on the STTStreamEvent
+// envelope.
 message STTPartialResult {
     string text      = 1;
     bool   is_final  = 2;
-    float  stability = 3;
+    optional string language = 14;
 
-    // Additional partial-hypothesis fields carried by Dart/RN live streams.
-    float  confidence = 4;
-    STTLanguage language = 5;
-    int64  timestamp_ms = 6;
-    repeated TranscriptionAlternative alternatives = 7;
-    optional string language_code = 8;
-
-    // Streaming correlation and endpointing metadata.
-    string request_id = 9;
-    int32 segment_index = 10;
-    int64 audio_start_ms = 11;
-    int64 audio_end_ms = 12;
-    optional STTOutput final_output = 13;
+    reserved 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13;
+    reserved "stability", "confidence", "timestamp_ms", "alternatives",
+             "request_id", "segment_index", "audio_start_ms", "audio_end_ms",
+             "final_output";
 }
 
 enum STTStreamEventKind {
@@ -388,8 +193,7 @@ message STTStreamEvent {
     STTStreamEventKind kind = 4;
     optional STTPartialResult partial = 5;
     optional STTOutput final_output = 6;
-    optional string error_message = 7;
-    int32 error_code = 8;
+    optional SDKError error = 9;
 }
 
 message STTServiceState {
@@ -397,26 +201,9 @@ message STTServiceState {
     optional string current_model = 2;
     bool supports_streaming = 3;
     repeated string supported_language_codes = 4;
-    optional string error_message = 5;
-    int32 error_code = 6;
-}
 
-message STTLanguageDetectionResult {
-    STTLanguage language = 1;
-    optional string language_code = 2;
-    float confidence = 3;
-    repeated string alternatives = 4;
-}
-
-// Logical STT service contract. Platform adapters remain responsible for
-// native capture, file access, and stream plumbing; C++ consumes only the
-// serialized request/event messages defined above.
-service STT {
-    // One-shot transcription. The request may carry audio bytes or a logical
-    // adapter-provided handle; native file/capture I/O stays outside this IDL.
-    rpc Transcribe(STTTranscriptionRequest) returns (STTOutput);
-
-    // Server-streaming transcription events: started, partial hypotheses,
-    // terminal final output, endpoint notifications, and errors.
-    rpc Stream(STTTranscriptionRequest) returns (stream STTStreamEvent);
+    // 5 and 6 were vacated; 7 was `error`, declared but never written --
+    // failures surface on the call that fails, not on the state snapshot.
+    reserved 5, 6, 7;
+    reserved "error";
 }

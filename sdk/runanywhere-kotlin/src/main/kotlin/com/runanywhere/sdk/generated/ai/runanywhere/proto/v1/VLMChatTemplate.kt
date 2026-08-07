@@ -29,12 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Custom VLM chat template.
- * Mirrors rac_vlm_chat_template_t.
- * ---------------------------------------------------------------------------
- */
 public class VLMChatTemplate(
   @field:WireField(
     tag = 1,

@@ -10,33 +10,11 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export const protobufPackage = "runanywhere.v1";
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorCategory — coarse-grained logical grouping for filtering / analytics.
+ * Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
+ * into COMPONENT; use SDKError.component to tell them apart.
  *
- * This is the union of all categories declared across SDKs, condensed to the
- * minimum stable set. The task spec pins a 9-case enum (UNSPECIFIED, NETWORK,
- * VALIDATION, MODEL, COMPONENT, IO, AUTH, INTERNAL, CONFIGURATION); that set
- * covers every category currently in use except for the per-modality ones
- * (STT, TTS, LLM, VAD, VLM, etc.) which are intentionally folded into
- * COMPONENT. Per-modality routing is recovered at runtime from the source
- * of the failure (the `c_abi_code` numeric value uniquely identifies the
- * component) and from `ErrorContext.operation` — there is no need to encode
- * modality twice.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:46  rac_error_category_t — 15 cases incl.
- *                                      stt/tts/llm/vad/vlm/etc.
- *   Swift   ErrorCategory.swift:11     16 cases incl. rag.
- *   Kotlin  ErrorCategory.kt:19        18 cases incl. CONFIGURATION,
- *                                      INITIALIZATION, FILE_RESOURCE,
- *                                      OPERATION, PLATFORM (no per-modality).
- *   Dart    error_category.dart:3      27 cases (superset).
- *   RN      ErrorCategory.ts:10        12 cases.
- *   Web     ErrorTypes.ts              (none — only SDKErrorCode exists).
- *
- * The drift here is severe — every SDK uses a different category vocabulary.
- * Codegen MUST collapse to the 9 canonical buckets below.
- * ---------------------------------------------------------------------------
+ * The rac_wire_string values are the one form every SDK prints, so a crash
+ * report written by Swift and one written by Web say the same word.
  */
 export enum ErrorCategory {
   ERROR_CATEGORY_UNSPECIFIED = 0,
@@ -179,35 +157,13 @@ export function errorSeverityToJSON(object: ErrorSeverity): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorCode — exhaustive enumeration of every distinct numeric error code in
- * the C ABI (`rac_result_t`).
+ * proto3 forbids negative enum values, so each constant is the absolute
+ * magnitude of its C ABI code: ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>).
+ * SDKError.c_abi_code carries the signed original.
  *
- * proto3 forbids negative enum values, so the proto enum holds POSITIVE
- * values that mirror the *absolute* magnitude of each C ABI code. The signed
- * `rac_result_t` numeric value is preserved on `SDKError.c_abi_code` so
- * platforms can round-trip the original C ABI integer. The naming scheme is:
- *
- *     ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>)
- *
- * (e.g. RAC_ERROR_MODEL_NOT_FOUND = -110 → ERROR_CODE_MODEL_NOT_FOUND = 110)
- *
- * `ERROR_CODE_UNSPECIFIED = 0` covers proto3's required zero-default; the
- * C ABI's `RAC_SUCCESS = 0` is NOT an error and MUST NOT appear inside an
- * SDKError.code (an SDKError implies a failure; success is signalled by the
- * absence of an SDKError). The zero-value enum entry exists only because
- * proto3 mandates it.
- *
- * CRITICAL: Do not change the numeric values without coordinated
- * migrations across every SDK *and* the C ABI. Adding new values is safe;
- * removing or renumbering is a wire-format break.
- *
- * All values below are sourced from
- * `sdk/runanywhere-commons/include/rac/core/rac_error.h`. Aliases (codes
- * where the C ABI defines two distinct macro names for the same numeric
- * value) are documented inline; we pick one canonical name per numeric value
- * to keep proto enum values unique.
- * ---------------------------------------------------------------------------
+ * The trailing macro names below are kept because they are the cross-reference
+ * into rac_error.h; where the C ABI defines two names for one value, the alias
+ * is noted.
  */
 export enum ErrorCode {
   ERROR_CODE_UNSPECIFIED = 0,
@@ -1144,407 +1100,62 @@ export function errorCodeToJSON(object: ErrorCode): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorContext — debugging metadata captured at the throw site.
+ * The unified error payload every SDK throws or returns.
  *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:102  rac_error_t fields source_file,
- *                                       source_line, source_function plus a
- *                                       rac_stack_frame_t[32] fixed-size
- *                                       stack capture and 3 custom k/v slots
- *                                       (custom_key1..3 / custom_value1..3).
- *                                       The fixed-shape custom slots flatten
- *                                       to a `metadata` map<string,string> in
- *                                       proto.
- *   Swift   ErrorContext.swift          (matches Dart equivalent).
- *   Kotlin  SDKError.kt                 No ErrorContext — uses Throwable.cause
- *                                       only. Will pick up source location
- *                                       from this proto on regeneration.
- *   Dart    error_context.dart:4        StackTrace? stackTrace, String file,
- *                                       int line, String function, DateTime
- *                                       timestamp, String threadInfo.
- *   RN      ErrorContext.ts:11          stackTrace[], file, line, function,
- *                                       timestamp, threadInfo.
- *   Web     ErrorTypes.ts               (no context type).
- *
- * Stack traces are intentionally NOT modeled here — they are platform-shaped
- * (string lines on RN/Dart, rac_stack_frame_t[] on C, StackTrace on Dart) and
- * belong in a platform-local logging path, not in the wire IDL. If the C ABI
- * ever ships symbolicated frames, add a `repeated StackFrame frames` field
- * guarded by a feature flag.
- * ---------------------------------------------------------------------------
- */
-export interface ErrorContext {
-  /**
-   * Free-form key/value pairs for telemetry tagging. Maps onto the C ABI's
-   * three custom_key/custom_value slots and Dart's `Map<String, dynamic>`
-   * (after string-coercion).
-   */
-  metadata: { [key: string]: string };
-  /** __FILE__ at the throw site. C ABI cap is RAC_MAX_METADATA_STRING (256). */
-  sourceFile?:
-    | string
-    | undefined;
-  /** __LINE__ at the throw site. */
-  sourceLine?:
-    | number
-    | undefined;
-  /**
-   * Logical operation name ("loadModel", "generate", "transcribeStream",
-   * ...). Lets clients route on operation without parsing free-text.
-   * Maps roughly onto Dart's `function` field and C ABI's source_function;
-   * we use the more generic "operation" name because some platforms (C++,
-   * Swift) symbolicate the function name from the stack frame instead.
-   */
-  operation?:
-    | string
-    | undefined;
-  /**
-   * The structured field path a validation error refers to
-   * ("<Message>.<field>"). First-class replacement for the
-   * metadata["field_path"] magic key all five SDKs read/write today; the
-   * generated convenience validate() already emits this path.
-   */
-  fieldPath?: string | undefined;
-}
-
-export interface ErrorContext_MetadataEntry {
-  key: string;
-  value: string;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * SDKError — the unified error payload every SDK throws / returns.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:102  rac_error_t (code, category, message,
- *                                       source location, stack trace,
- *                                       underlying_code, underlying_message,
- *                                       model_id, framework, session_id,
- *                                       timestamp_ms, 3 custom k/v slots).
- *   Swift   (no concrete SDKError type was located; Swift code uses
- *           ErrorCode + ErrorCategory + a SDKErrorProtocol shape that
- *           matches this message; the migrated Swift SDK in sdk/swift/ will
- *           be regenerated from this proto).
- *   Kotlin  SDKError.kt:27              data class (code, category, message,
- *                                       cause).
- *   Dart    sdk_error.dart:13           class SDKError (message, type,
- *                                       underlyingError, context).
- *   RN      SDKError.ts:147             class SDKError (code, legacyCode?,
- *                                       category, underlyingError, context,
- *                                       details?).
- *   Web     ErrorTypes.ts:68            class SDKError (code, details?).
- *
- * Wire contract:
- *   * `code` — required. Always non-zero (zero indicates success and there
- *     should be no SDKError to begin with). Codegen MUST refuse to emit
- *     ERROR_CODE_UNSPECIFIED at runtime.
- *   * `category` — required. Coarse routing bucket. May be UNSPECIFIED only
- *     when `code` itself doesn't fit any bucket cleanly (rare).
- *   * `message` — required, human-readable, non-localized. Localization is a
- *     consumer concern.
- *   * `context` — optional. Source location + telemetry metadata.
- *   * `c_abi_code` — optional. Negative `rac_result_t` integer from the C ABI
- *     (e.g. -110 for MODEL_NOT_FOUND). Allows lossless round-trip with the
- *     C ABI even when intermediate platforms (Kotlin, Dart, RN) use a
- *     positive-numbered local enum. If `code` is set, `c_abi_code` MUST
- *     equal `-int32(code)` for codes ≤ 899; for the Web-only WASM codes
- *     (≥ 900) `c_abi_code` is unset because no canonical C ABI value exists.
- *   * `nested_message` — optional. Underlying-error message as captured at
- *     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
- *     and Kotlin's Throwable.cause.message.
- *   * `retryable` — canonical retry hint. This is business-policy metadata
- *     owned by the portable layer; the platform adapter still decides how to
- *     schedule the retry through native/background APIs when appropriate.
- *   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
- *     also carries this field so callers can join success/progress/failure
- *     events without parsing free-form properties.
- * ---------------------------------------------------------------------------
+ * `code` is always non-zero: an SDKError implies failure, and success is
+ * signalled by its absence. `message` is non-localized; localization is a
+ * consumer concern. Stack traces are deliberately absent: they are
+ * platform-shaped and belong in platform-local logging.
  */
 export interface SDKError {
   code: ErrorCode;
   category: ErrorCategory;
   message: string;
-  context?:
-    | ErrorContext
-    | undefined;
   /**
-   * Negative rac_result_t value from the C ABI. May be negative; preserved
-   * via int32 (proto3 int32 is signed). Unset when the failure originated
-   * outside the C ABI (e.g. a pure-Web WASM failure).
+   * Signed rac_result_t. Equals -code for codes <= 899. Unset for the
+   * Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
+   * failures originating outside the C ABI.
    */
   cAbiCode?:
     | number
     | undefined;
-  /** Underlying error's message (the "caused by" chain), if any. */
-  nestedMessage?:
-    | string
-    | undefined;
-  /**
-   * Envelope metadata for canonical error emission. `component` is a stable
-   * lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
-   * "download", "storage", ...); SDKEvent carries the enum-typed component.
-   */
+  /** The "caused by" chain. */
+  nestedMessage?: string | undefined;
   timestampMs: number;
   severity: ErrorSeverity;
+  /**
+   * Which subsystem raised the error, written as SDKComponent's
+   * rac_wire_string ("llm", "stt", "rag", "rerank"). Producers MUST write
+   * the wire string, never the proto constant name. Errors raised outside
+   * any SDKComponent may carry their own lowercase key.
+   */
   component: string;
   retryable: boolean;
-  remediationHint: string;
-  correlationId: string;
+  /**
+   * Ties this failure to the operation that produced it. Named for
+   * Anthropic's body-level `request_id`. Producers MUST set it.
+   */
+  requestId: string;
+  /**
+   * "<Message>.<field>" for validation errors, e.g. "STTOptions.sampleRate".
+   * OpenAI's `param`. The generated validate() emits this.
+   */
+  param?: string | undefined;
 }
-
-function createBaseErrorContext(): ErrorContext {
-  return { metadata: {}, sourceFile: undefined, sourceLine: undefined, operation: undefined, fieldPath: undefined };
-}
-
-export const ErrorContext: MessageFns<ErrorContext> = {
-  encode(message: ErrorContext, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      ErrorContext_MetadataEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).join();
-    });
-    if (message.sourceFile !== undefined) {
-      writer.uint32(18).string(message.sourceFile);
-    }
-    if (message.sourceLine !== undefined) {
-      writer.uint32(24).int32(message.sourceLine);
-    }
-    if (message.operation !== undefined) {
-      writer.uint32(34).string(message.operation);
-    }
-    if (message.fieldPath !== undefined) {
-      writer.uint32(42).string(message.fieldPath);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ErrorContext {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseErrorContext();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          const entry1 = ErrorContext_MetadataEntry.decode(reader, reader.uint32());
-          if (entry1.value !== undefined) {
-            message.metadata[entry1.key] = entry1.value;
-          }
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.sourceFile = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.sourceLine = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.operation = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.fieldPath = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ErrorContext {
-    return {
-      metadata: isObject(object.metadata)
-        ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
-          (acc: { [key: string]: string }, [key, value]: [string, any]) => {
-            acc[key] = globalThis.String(value);
-            return acc;
-          },
-          {},
-        )
-        : {},
-      sourceFile: isSet(object.sourceFile)
-        ? globalThis.String(object.sourceFile)
-        : isSet(object.source_file)
-        ? globalThis.String(object.source_file)
-        : undefined,
-      sourceLine: isSet(object.sourceLine)
-        ? globalThis.Number(object.sourceLine)
-        : isSet(object.source_line)
-        ? globalThis.Number(object.source_line)
-        : undefined,
-      operation: isSet(object.operation) ? globalThis.String(object.operation) : undefined,
-      fieldPath: isSet(object.fieldPath)
-        ? globalThis.String(object.fieldPath)
-        : isSet(object.field_path)
-        ? globalThis.String(object.field_path)
-        : undefined,
-    };
-  },
-
-  toJSON(message: ErrorContext): unknown {
-    const obj: any = {};
-    if (message.metadata) {
-      const entries = globalThis.Object.entries(message.metadata) as [string, string][];
-      if (entries.length > 0) {
-        obj.metadata = {};
-        entries.forEach(([k, v]) => {
-          obj.metadata[k] = v;
-        });
-      }
-    }
-    if (message.sourceFile !== undefined) {
-      obj.sourceFile = message.sourceFile;
-    }
-    if (message.sourceLine !== undefined) {
-      obj.sourceLine = Math.round(message.sourceLine);
-    }
-    if (message.operation !== undefined) {
-      obj.operation = message.operation;
-    }
-    if (message.fieldPath !== undefined) {
-      obj.fieldPath = message.fieldPath;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ErrorContext>, I>>(base?: I): ErrorContext {
-    return ErrorContext.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ErrorContext>, I>>(object: I): ErrorContext {
-    const message = createBaseErrorContext();
-    message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
-      (acc: { [key: string]: string }, [key, value]: [string, string]) => {
-        if (value !== undefined) {
-          acc[key] = globalThis.String(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    message.sourceFile = object.sourceFile ?? undefined;
-    message.sourceLine = object.sourceLine ?? undefined;
-    message.operation = object.operation ?? undefined;
-    message.fieldPath = object.fieldPath ?? undefined;
-    return message;
-  },
-};
-
-function createBaseErrorContext_MetadataEntry(): ErrorContext_MetadataEntry {
-  return { key: "", value: "" };
-}
-
-export const ErrorContext_MetadataEntry: MessageFns<ErrorContext_MetadataEntry> = {
-  encode(message: ErrorContext_MetadataEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== "") {
-      writer.uint32(18).string(message.value);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ErrorContext_MetadataEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseErrorContext_MetadataEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ErrorContext_MetadataEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? globalThis.String(object.value) : "",
-    };
-  },
-
-  toJSON(message: ErrorContext_MetadataEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== "") {
-      obj.value = message.value;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ErrorContext_MetadataEntry>, I>>(base?: I): ErrorContext_MetadataEntry {
-    return ErrorContext_MetadataEntry.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ErrorContext_MetadataEntry>, I>>(object: I): ErrorContext_MetadataEntry {
-    const message = createBaseErrorContext_MetadataEntry();
-    message.key = object.key ?? "";
-    message.value = object.value ?? "";
-    return message;
-  },
-};
 
 function createBaseSDKError(): SDKError {
   return {
     code: 0,
     category: 0,
     message: "",
-    context: undefined,
     cAbiCode: undefined,
     nestedMessage: undefined,
     timestampMs: 0,
     severity: 0,
     component: "",
     retryable: false,
-    remediationHint: "",
-    correlationId: "",
+    requestId: "",
+    param: undefined,
   };
 }
 
@@ -1559,32 +1170,29 @@ export const SDKError: MessageFns<SDKError> = {
     if (message.message !== "") {
       writer.uint32(26).string(message.message);
     }
-    if (message.context !== undefined) {
-      ErrorContext.encode(message.context, writer.uint32(34).fork()).join();
-    }
     if (message.cAbiCode !== undefined) {
-      writer.uint32(40).int32(message.cAbiCode);
+      writer.uint32(32).int32(message.cAbiCode);
     }
     if (message.nestedMessage !== undefined) {
-      writer.uint32(50).string(message.nestedMessage);
+      writer.uint32(42).string(message.nestedMessage);
     }
     if (message.timestampMs !== 0) {
-      writer.uint32(56).int64(message.timestampMs);
+      writer.uint32(48).int64(message.timestampMs);
     }
     if (message.severity !== 0) {
-      writer.uint32(64).int32(message.severity);
+      writer.uint32(56).int32(message.severity);
     }
     if (message.component !== "") {
-      writer.uint32(74).string(message.component);
+      writer.uint32(66).string(message.component);
     }
     if (message.retryable !== false) {
-      writer.uint32(80).bool(message.retryable);
+      writer.uint32(72).bool(message.retryable);
     }
-    if (message.remediationHint !== "") {
-      writer.uint32(90).string(message.remediationHint);
+    if (message.requestId !== "") {
+      writer.uint32(82).string(message.requestId);
     }
-    if (message.correlationId !== "") {
-      writer.uint32(98).string(message.correlationId);
+    if (message.param !== undefined) {
+      writer.uint32(90).string(message.param);
     }
     return writer;
   },
@@ -1621,27 +1229,27 @@ export const SDKError: MessageFns<SDKError> = {
           continue;
         }
         case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.context = ErrorContext.decode(reader, reader.uint32());
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
+          if (tag !== 32) {
             break;
           }
 
           message.cAbiCode = reader.int32();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
           message.nestedMessage = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.timestampMs = longToNumber(reader.int64());
           continue;
         }
         case 7: {
@@ -1649,31 +1257,31 @@ export const SDKError: MessageFns<SDKError> = {
             break;
           }
 
-          message.timestampMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
           message.severity = reader.int32() as any;
           continue;
         }
-        case 9: {
-          if (tag !== 74) {
+        case 8: {
+          if (tag !== 66) {
             break;
           }
 
           message.component = reader.string();
           continue;
         }
-        case 10: {
-          if (tag !== 80) {
+        case 9: {
+          if (tag !== 72) {
             break;
           }
 
           message.retryable = reader.bool();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.requestId = reader.string();
           continue;
         }
         case 11: {
@@ -1681,15 +1289,7 @@ export const SDKError: MessageFns<SDKError> = {
             break;
           }
 
-          message.remediationHint = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.correlationId = reader.string();
+          message.param = reader.string();
           continue;
         }
       }
@@ -1706,7 +1306,6 @@ export const SDKError: MessageFns<SDKError> = {
       code: isSet(object.code) ? errorCodeFromJSON(object.code) : 0,
       category: isSet(object.category) ? errorCategoryFromJSON(object.category) : 0,
       message: isSet(object.message) ? globalThis.String(object.message) : "",
-      context: isSet(object.context) ? ErrorContext.fromJSON(object.context) : undefined,
       cAbiCode: isSet(object.cAbiCode)
         ? globalThis.Number(object.cAbiCode)
         : isSet(object.c_abi_code)
@@ -1725,16 +1324,12 @@ export const SDKError: MessageFns<SDKError> = {
       severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
       component: isSet(object.component) ? globalThis.String(object.component) : "",
       retryable: isSet(object.retryable) ? globalThis.Boolean(object.retryable) : false,
-      remediationHint: isSet(object.remediationHint)
-        ? globalThis.String(object.remediationHint)
-        : isSet(object.remediation_hint)
-        ? globalThis.String(object.remediation_hint)
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
         : "",
-      correlationId: isSet(object.correlationId)
-        ? globalThis.String(object.correlationId)
-        : isSet(object.correlation_id)
-        ? globalThis.String(object.correlation_id)
-        : "",
+      param: isSet(object.param) ? globalThis.String(object.param) : undefined,
     };
   },
 
@@ -1748,9 +1343,6 @@ export const SDKError: MessageFns<SDKError> = {
     }
     if (message.message !== "") {
       obj.message = message.message;
-    }
-    if (message.context !== undefined) {
-      obj.context = ErrorContext.toJSON(message.context);
     }
     if (message.cAbiCode !== undefined) {
       obj.cAbiCode = Math.round(message.cAbiCode);
@@ -1770,11 +1362,11 @@ export const SDKError: MessageFns<SDKError> = {
     if (message.retryable !== false) {
       obj.retryable = message.retryable;
     }
-    if (message.remediationHint !== "") {
-      obj.remediationHint = message.remediationHint;
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
     }
-    if (message.correlationId !== "") {
-      obj.correlationId = message.correlationId;
+    if (message.param !== undefined) {
+      obj.param = message.param;
     }
     return obj;
   },
@@ -1787,17 +1379,14 @@ export const SDKError: MessageFns<SDKError> = {
     message.code = object.code ?? 0;
     message.category = object.category ?? 0;
     message.message = object.message ?? "";
-    message.context = (object.context !== undefined && object.context !== null)
-      ? ErrorContext.fromPartial(object.context)
-      : undefined;
     message.cAbiCode = object.cAbiCode ?? undefined;
     message.nestedMessage = object.nestedMessage ?? undefined;
     message.timestampMs = object.timestampMs ?? 0;
     message.severity = object.severity ?? 0;
     message.component = object.component ?? "";
     message.retryable = object.retryable ?? false;
-    message.remediationHint = object.remediationHint ?? "";
-    message.correlationId = object.correlationId ?? "";
+    message.requestId = object.requestId ?? "";
+    message.param = object.param ?? undefined;
     return message;
   },
 };
@@ -1823,10 +1412,6 @@ function longToNumber(int64: { toString(): string }): number {
     throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
   }
   return num;
-}
-
-function isObject(value: any): boolean {
-  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

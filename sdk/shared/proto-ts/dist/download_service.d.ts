@@ -1,16 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { ModelFileDescriptor, ModelInfo } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
-export declare enum DownloadStage {
-    DOWNLOAD_STAGE_UNSPECIFIED = 0,
-    DOWNLOAD_STAGE_DOWNLOADING = 1,
-    DOWNLOAD_STAGE_EXTRACTING = 2,
-    DOWNLOAD_STAGE_VALIDATING = 3,
-    DOWNLOAD_STAGE_COMPLETED = 4,
-    UNRECOGNIZED = -1
-}
-export declare function downloadStageFromJSON(object: any): DownloadStage;
-export declare function downloadStageToJSON(object: DownloadStage): string;
 export declare enum DownloadState {
     DOWNLOAD_STATE_UNSPECIFIED = 0,
     DOWNLOAD_STATE_PENDING = 1,
@@ -22,6 +13,8 @@ export declare enum DownloadState {
     DOWNLOAD_STATE_CANCELLED = 7,
     DOWNLOAD_STATE_PAUSED = 8,
     DOWNLOAD_STATE_RESUMING = 9,
+    /** DOWNLOAD_STATE_VALIDATING - checksum / expected-files verification */
+    DOWNLOAD_STATE_VALIDATING = 10,
     UNRECOGNIZED = -1
 }
 export declare function downloadStateFromJSON(object: any): DownloadState;
@@ -81,20 +74,24 @@ export interface DownloadSubscribeRequest {
 }
 export interface DownloadProgress {
     modelId: string;
-    stage: DownloadStage;
     bytesDownloaded: number;
     /** 0 if unknown */
     totalBytes: number;
     /** 0.0..1.0 within current stage */
     stageProgress: number;
-    overallSpeedBps: number;
-    /** -1 if unknown */
-    etaSeconds: number;
+    /**
+     * Bytes per second. Absent means unknown -- no sentinel that collides
+     * with a real value.
+     */
+    bytesPerSecond: number;
+    etaSeconds?: number | undefined;
+    /**
+     * The single phase of this transfer. `error` (21) is populated exactly
+     * when state == DOWNLOAD_STATE_FAILED and is meaningless otherwise.
+     */
     state: DownloadState;
     /** 0 on first try */
     retryAttempt: number;
-    /** populated when state == FAILED */
-    errorMessage: string;
     taskId: string;
     /** 0-based within the planned file list */
     currentFileIndex: number;
@@ -108,18 +105,20 @@ export interface DownloadProgress {
     startedAtUnixMs: number;
     updatedAtUnixMs: number;
     currentFileName: string;
-    /** logical resume marker, not a native handle */
-    resumeToken: string;
+    error?: SDKError | undefined;
 }
 export interface DownloadPlanRequest {
     modelId: string;
     model?: ModelInfo | undefined;
-    resumeExisting: boolean;
     availableStorageBytes: number;
     allowMeteredNetwork: boolean;
     storageNamespace: string;
     validateExistingBytes: boolean;
-    verifyChecksums: boolean;
+    /**
+     * Checksums are verified whenever the catalog has one; set this only to
+     * opt OUT.
+     */
+    skipChecksumVerification: boolean;
     requiredFreeBytesAfterDownload: number;
 }
 export interface DownloadFilePlan {
@@ -140,29 +139,39 @@ export interface DownloadPlanResult {
     canResume: boolean;
     resumeFromBytes: number;
     warnings: string[];
-    errorMessage: string;
     storageNamespace: string;
-    resumeToken: string;
     requiredFreeBytesAfterDownload: number;
-    /** structured companion to error_message */
+    /** structured companion to error */
     failureReason: DownloadFailureReason;
+    error?: SDKError | undefined;
 }
 export interface DownloadStartRequest {
     modelId: string;
+    /**
+     * Optional. ABSENT (the common path) = plan internally and start, one
+     * call. PRESENT = execute this exact previously-approved plan, for the
+     * flow that showed the user a size and a metered-network warning first.
+     */
     plan?: DownloadPlanResult | undefined;
-    resume: boolean;
-    resumeToken: string;
-    updateRegistryOnCompletion: boolean;
+    /**
+     * The registry is updated on completion; set this only to opt OUT
+     * (staging flows).
+     */
+    skipRegistryUpdate: boolean;
 }
 export interface DownloadStartResult {
     accepted: boolean;
     taskId: string;
     modelId: string;
     initialProgress?: DownloadProgress | undefined;
-    errorMessage: string;
-    resumeToken: string;
-    /** structured companion to error_message */
+    /** structured companion to error */
     failureReason: DownloadFailureReason;
+    error?: SDKError | undefined;
+    /**
+     * The plan that was executed, supplied or computed, so a one-call caller
+     * still gets the byte numbers.
+     */
+    plan?: DownloadPlanResult | undefined;
 }
 export interface DownloadCancelRequest {
     taskId: string;
@@ -170,31 +179,12 @@ export interface DownloadCancelRequest {
     deletePartialBytes: boolean;
 }
 export interface DownloadCancelResult {
-    success: boolean;
     taskId: string;
     modelId: string;
     partialBytesDeleted: number;
-    errorMessage: string;
     wasRunning: boolean;
     partialBytesPreserved: boolean;
-    resumeToken: string;
-}
-export interface DownloadResumeRequest {
-    taskId: string;
-    modelId: string;
-    resumeFromBytes: number;
-    resumeToken: string;
-    validatePartialBytes: boolean;
-}
-export interface DownloadResumeResult {
-    accepted: boolean;
-    taskId: string;
-    modelId: string;
-    initialProgress?: DownloadProgress | undefined;
-    errorMessage: string;
-    resumeToken: string;
-    /** structured companion to error_message */
-    failureReason: DownloadFailureReason;
+    error?: SDKError | undefined;
 }
 export declare const DownloadSubscribeRequest: MessageFns<DownloadSubscribeRequest>;
 export declare const DownloadProgress: MessageFns<DownloadProgress>;
@@ -205,8 +195,6 @@ export declare const DownloadStartRequest: MessageFns<DownloadStartRequest>;
 export declare const DownloadStartResult: MessageFns<DownloadStartResult>;
 export declare const DownloadCancelRequest: MessageFns<DownloadCancelRequest>;
 export declare const DownloadCancelResult: MessageFns<DownloadCancelResult>;
-export declare const DownloadResumeRequest: MessageFns<DownloadResumeRequest>;
-export declare const DownloadResumeResult: MessageFns<DownloadResumeResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

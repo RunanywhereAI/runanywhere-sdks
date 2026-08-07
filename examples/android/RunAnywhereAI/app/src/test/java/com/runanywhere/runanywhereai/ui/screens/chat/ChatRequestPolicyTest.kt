@@ -13,15 +13,17 @@ class ChatRequestPolicyTest {
         val turn = ChatRequestPolicy.snapshot("Current prompt", emptyList())
         val request = ChatRequestPolicy.buildRequest(
             turn = turn,
-            options = RALLMGenerationOptions(max_tokens = 96),
+            options = RALLMGenerationOptions(max_output_tokens = 96),
             conversationId = "conversation-1",
             streaming = false,
         )
 
-        assertEquals("Current prompt", request.prompt)
+        // LLMGenerateRequest.prompt/.history were deleted outright; the request now
+        // carries only `messages` (oldest first, ending with the turn to answer).
+        assertEquals("Current prompt", request.messages.last().content)
+        assertEquals(MessageRole.MESSAGE_ROLE_USER, request.messages.last().role)
         assertEquals("conversation-1", request.conversation_id)
-        assertTrue(request.history.isEmpty())
-        assertFalse(requireNotNull(request.options).streaming_enabled)
+        assertEquals(1, request.messages.size)
     }
 
     @Test
@@ -54,14 +56,17 @@ class ChatRequestPolicyTest {
         )
         val request = ChatRequestPolicy.buildRequest(
             turn = turn,
-            options = RALLMGenerationOptions(max_tokens = 37),
+            options = RALLMGenerationOptions(max_output_tokens = 37),
             conversationId = "conversation-2",
             streaming = true,
         )
 
-        assertEquals(37, requireNotNull(request.options).max_tokens)
-        assertEquals(turn.history, request.history)
-        assertTrue(requireNotNull(request.options).streaming_enabled)
+        assertEquals(37, requireNotNull(request.options).max_output_tokens)
+        // LLMGenerateRequest.history was deleted outright; the prior turns are
+        // prepended onto the single-message `messages` list buildRequest built
+        // for the current prompt.
+        assertEquals(turn.history, request.messages.dropLast(1))
+        assertEquals("follow up", request.messages.last().content)
     }
 
     @Test

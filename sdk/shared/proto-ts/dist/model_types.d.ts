@@ -1,18 +1,9 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { AccelerationPreference, HardwareProfile } from "./hardware_profile";
+import { SDKError } from "./errors";
+import { AccelerationPreference } from "./hardware_profile";
 import { ThinkingTagPattern } from "./thinking_tag_pattern";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Audio format — union of all cases currently defined across SDKs.
- * Sources pre-IDL:
- *   Kotlin  AudioTypes.kt:12          (pcm, wav, mp3, opus, aac, flac, ogg, pcm_16bit)
- *   Kotlin  ComponentTypes.kt:39      (pcm, wav, mp3, aac, ogg, opus, flac)  ← duplicate
- *   Swift   AudioTypes.swift:17       (pcm, wav, mp3, opus, aac, flac)
- *   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
- *   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
- * ---------------------------------------------------------------------------
- */
+/** Container format of an audio payload. */
 export declare enum AudioFormat {
     AUDIO_FORMAT_UNSPECIFIED = 0,
     AUDIO_FORMAT_PCM = 1,
@@ -31,16 +22,26 @@ export declare enum AudioFormat {
 export declare function audioFormatFromJSON(object: any): AudioFormat;
 export declare function audioFormatToJSON(object: AudioFormat): string;
 /**
- * ---------------------------------------------------------------------------
- * Model file format — union across all SDKs.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:27        (onnx, ort, gguf, bin, coreml, unknown)
- *   Kotlin ModelTypes.kt:41           (ONNX, ORT, GGUF, BIN, QNN_CONTEXT, UNKNOWN)
- *   Dart   model_types.dart:34        (onnx, ort, gguf, bin, unknown)
- *   RN     enums.ts:115               (12-case superset incl. MLModel, MLPackage, TFLite,
- *                                       SafeTensors, Zip, Folder, Proprietary)
- *   Web    enums.ts:56                (copy of RN)
- * ---------------------------------------------------------------------------
+ * Sample layout of a raw audio payload, as opposed to AudioFormat above, which
+ * names the container. CONTAINER means the bytes carry their own header and the
+ * companion AudioFormat field says which one.
+ *
+ * This is the single encoding enum for STT, VAD, diarization, and the voice
+ * agent. STT previously numbered PCM_S16_LE=1 and PCM_F32_LE=2, the reverse of
+ * everywhere else; it now follows the ordering below.
+ */
+export declare enum AudioEncoding {
+    AUDIO_ENCODING_UNSPECIFIED = 0,
+    AUDIO_ENCODING_PCM_F32_LE = 1,
+    AUDIO_ENCODING_PCM_S16_LE = 2,
+    AUDIO_ENCODING_CONTAINER = 3,
+    UNRECOGNIZED = -1
+}
+export declare function audioEncodingFromJSON(object: any): AudioEncoding;
+export declare function audioEncodingToJSON(object: AudioEncoding): string;
+/**
+ * On-disk file format, as opposed to ModelArtifactType (bundle kind) or
+ * ArchiveType (compression).
  */
 export declare enum ModelFormat {
     MODEL_FORMAT_UNSPECIFIED = 0,
@@ -70,16 +71,8 @@ export declare enum ModelFormat {
 export declare function modelFormatFromJSON(object: any): ModelFormat;
 export declare function modelFormatToJSON(object: ModelFormat): string;
 /**
- * ---------------------------------------------------------------------------
- * Inference framework / runtime. Same name used across all SDKs (RN names it
- * LLMFramework; we canonicalize on InferenceFramework).
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
- *   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
- *   Dart   model_types.dart:106       (9 cases, matches Kotlin)
- *   RN     enums.ts:30 (LLMFramework) (16 cases)
- *   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
- * ---------------------------------------------------------------------------
+ * Engine that executes a model. Reached from ModelInfo.framework, so the
+ * reserved values below are manifest-critical.
  */
 export declare enum InferenceFramework {
     INFERENCE_FRAMEWORK_UNSPECIFIED = 0,
@@ -112,16 +105,7 @@ export declare enum InferenceFramework {
 }
 export declare function inferenceFrameworkFromJSON(object: any): InferenceFramework;
 export declare function inferenceFrameworkToJSON(object: InferenceFramework): string;
-/**
- * ---------------------------------------------------------------------------
- * Model category / modality class. Sources pre-IDL:
- *   Swift ModelTypes.swift:39         (9 cases incl. voiceActivityDetection + audio)
- *   Kotlin ModelTypes.kt:147          (8 cases, no VAD)
- *   Dart  model_types.dart:55         (8 cases, no VAD)
- *   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
- *   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
- * ---------------------------------------------------------------------------
- */
+/** What a model does. */
 export declare enum ModelCategory {
     MODEL_CATEGORY_UNSPECIFIED = 0,
     MODEL_CATEGORY_LANGUAGE = 1,
@@ -136,6 +120,7 @@ export declare enum ModelCategory {
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
     MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
+    MODEL_CATEGORY_RERANK = 12,
     UNRECOGNIZED = -1
 }
 export declare function modelCategoryFromJSON(object: any): ModelCategory;
@@ -172,14 +157,7 @@ export declare enum ModelSource {
 }
 export declare function modelSourceFromJSON(object: any): ModelSource;
 export declare function modelSourceToJSON(object: ModelSource): string;
-/**
- * ---------------------------------------------------------------------------
- * Archive types for multi-file model packages. Sources pre-IDL:
- *   Swift  ModelTypes.swift:195       (zip, tarBz2, tarGz, tarXz)
- *   Kotlin ModelTypes.kt:176          (ZIP, TAR_BZ2, TAR_GZ, TAR_XZ)
- *   Dart   model_types.dart:141       (zip, tarBz2, tarGz, tarXz)
- * ---------------------------------------------------------------------------
- */
+/** Compression flavor of a multi-file model package. */
 export declare enum ArchiveType {
     ARCHIVE_TYPE_UNSPECIFIED = 0,
     ARCHIVE_TYPE_ZIP = 1,
@@ -200,16 +178,7 @@ export declare enum ArchiveStructure {
 }
 export declare function archiveStructureFromJSON(object: any): ArchiveStructure;
 export declare function archiveStructureToJSON(object: ArchiveStructure): string;
-/**
- * ---------------------------------------------------------------------------
- * High-level artifact classification — what KIND of bundle a model ships as.
- * Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
- * compression flavor). Sources pre-IDL:
- *   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
- *   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
- *   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
- * ---------------------------------------------------------------------------
- */
+/** What kind of bundle a model ships as. */
 export declare enum ModelArtifactType {
     MODEL_ARTIFACT_TYPE_UNSPECIFIED = 0,
     MODEL_ARTIFACT_TYPE_SINGLE_FILE = 1,
@@ -227,14 +196,8 @@ export declare enum ModelArtifactType {
 export declare function modelArtifactTypeFromJSON(object: any): ModelArtifactType;
 export declare function modelArtifactTypeToJSON(object: ModelArtifactType): string;
 /**
- * ---------------------------------------------------------------------------
- * Model registry lifecycle state. This is durable/catalog state, not a live
- * transfer progress stream. Per-download byte counters and transient progress
- * events stay in download_service.proto.
- * Sources pre-IDL:
- *   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
- *   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
- * ---------------------------------------------------------------------------
+ * Durable catalog state, not a live transfer stream. Byte counters and
+ * progress events live in download_service.proto.
  */
 export declare enum ModelRegistryStatus {
     MODEL_REGISTRY_STATUS_UNSPECIFIED = 0,
@@ -248,26 +211,6 @@ export declare enum ModelRegistryStatus {
 }
 export declare function modelRegistryStatusFromJSON(object: any): ModelRegistryStatus;
 export declare function modelRegistryStatusToJSON(object: ModelRegistryStatus): string;
-export declare enum ModelQuerySortField {
-    MODEL_QUERY_SORT_FIELD_UNSPECIFIED = 0,
-    MODEL_QUERY_SORT_FIELD_NAME = 1,
-    MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS = 2,
-    MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS = 3,
-    MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4,
-    MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5,
-    MODEL_QUERY_SORT_FIELD_USAGE_COUNT = 6,
-    UNRECOGNIZED = -1
-}
-export declare function modelQuerySortFieldFromJSON(object: any): ModelQuerySortField;
-export declare function modelQuerySortFieldToJSON(object: ModelQuerySortField): string;
-export declare enum ModelQuerySortOrder {
-    MODEL_QUERY_SORT_ORDER_UNSPECIFIED = 0,
-    MODEL_QUERY_SORT_ORDER_ASCENDING = 1,
-    MODEL_QUERY_SORT_ORDER_DESCENDING = 2,
-    UNRECOGNIZED = -1
-}
-export declare function modelQuerySortOrderFromJSON(object: any): ModelQuerySortOrder;
-export declare function modelQuerySortOrderToJSON(object: ModelQuerySortOrder): string;
 /**
  * Role of a file inside a single/multi-file artifact. The generic COMPANION
  * role covers arbitrary sidecars; specific roles document common public
@@ -293,15 +236,8 @@ export declare enum ModelFileRole {
 export declare function modelFileRoleFromJSON(object: any): ModelFileRole;
 export declare function modelFileRoleToJSON(object: ModelFileRole): string;
 /**
- * ---------------------------------------------------------------------------
- * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
- *   Web    enums.ts (RoutingPolicy)
- *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
- *          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
- *   Swift  extensions (RoutingPolicy)
- * Canonical short-form below; specific PreferLocal/PreferCloud cover the
- * "preferred" cases, MANUAL covers explicit user override.
- * ---------------------------------------------------------------------------
+ * On-device versus cloud routing. PREFER_LOCAL and PREFER_CLOUD cover the
+ * "preferred" cases; MANUAL is an explicit user override.
  */
 export declare enum RoutingPolicy {
     ROUTING_POLICY_UNSPECIFIED = 0,
@@ -314,6 +250,17 @@ export declare enum RoutingPolicy {
 }
 export declare function routingPolicyFromJSON(object: any): RoutingPolicy;
 export declare function routingPolicyToJSON(object: RoutingPolicy): string;
+/** Requested execution placement for a load. LiteRT/ExecuTorch-aligned. */
+export declare enum AcceleratorPolicy {
+    ACCELERATOR_POLICY_UNSPECIFIED = 0,
+    ACCELERATOR_POLICY_AUTO = 1,
+    ACCELERATOR_POLICY_CPU = 2,
+    ACCELERATOR_POLICY_GPU = 3,
+    ACCELERATOR_POLICY_NPU = 4,
+    UNRECOGNIZED = -1
+}
+export declare function acceleratorPolicyFromJSON(object: any): AcceleratorPolicy;
+export declare function acceleratorPolicyToJSON(object: AcceleratorPolicy): string;
 export interface ModelInfoMetadata {
     description: string;
     author: string;
@@ -326,14 +273,8 @@ export interface ModelRuntimeCompatibility {
     compatibleFormats: ModelFormat[];
 }
 /**
- * ---------------------------------------------------------------------------
- * Core metadata for a model entry.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:393       (16 fields)
- *   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
- *   Dart   model_types.dart:335       (similar shape, nullable divergences)
- *   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
- * ---------------------------------------------------------------------------
+ * Core metadata for a model entry. This message is persisted verbatim to
+ * .rac-manifest.binpb, so field numbers here are permanent.
  */
 export interface ModelInfo {
     id: string;
@@ -382,16 +323,7 @@ export interface ModelInfo {
     singleFile?: SingleFileArtifact | undefined;
     archive?: ArchiveArtifact | undefined;
     multiFile?: MultiFileArtifact | undefined;
-    customStrategyId?: string | undefined;
     builtIn?: boolean | undefined;
-    /**
-     * High-level artifact classification, complementary to the `artifact`
-     * oneof above. Allows catalog entries to carry a coarse type tag without
-     * resolving the full strategy variant.
-     */
-    artifactType?: ModelArtifactType | undefined;
-    /** Manifest of files that are expected on disk after fetch/extraction. */
-    expectedFiles?: ExpectedModelFiles | undefined;
     /** Preferred hardware acceleration backend for this model. */
     accelerationPreference?: AccelerationPreference | undefined;
     /** Hybrid (on-device vs cloud) routing policy for this entry. */
@@ -403,16 +335,21 @@ export interface ModelInfo {
     compatibility?: ModelRuntimeCompatibility | undefined;
     preferredFramework?: InferenceFramework | undefined;
     /**
-     * Durable registry state. Live byte progress belongs to
-     * download_service.DownloadProgress, not ModelInfo.
+     * The single durable state of this entry, and the only downloaded-ness
+     * signal. A non-empty local_path (7) is location data, NOT state: it
+     * stays populated for an entry whose files were deleted. Live byte
+     * progress belongs to download_service.DownloadProgress, not ModelInfo.
      */
     registryStatus?: ModelRegistryStatus | undefined;
-    isDownloaded?: boolean | undefined;
     isAvailable?: boolean | undefined;
     lastUsedAtUnixMs?: number | undefined;
-    usageCount?: number | undefined;
-    syncPending?: boolean | undefined;
-    statusMessage?: string | undefined;
+    /**
+     * Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+     * this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+     * models. Lets the catalog mark which models are drivable through
+     * RunAnywhere.CUA and with which profile, without hardcoding model ids.
+     */
+    cuaProfile?: string | undefined;
 }
 /**
  * Repeated model registry responses use this wrapper because protobuf cannot
@@ -422,20 +359,11 @@ export interface ModelInfoList {
     models: ModelInfo[];
 }
 export interface SingleFileArtifact {
-    requiredPatterns: string[];
-    optionalPatterns: string[];
-    /**
-     * Full manifest form for SDK-local wrappers that attach expected files to
-     * a single-file artifact. The pattern fields above remain for existing
-     * generated consumers.
-     */
     expectedFiles?: ExpectedModelFiles | undefined;
 }
 export interface ArchiveArtifact {
     type: ArchiveType;
     structure: ArchiveStructure;
-    requiredPatterns: string[];
-    optionalPatterns: string[];
     /**
      * Full manifest form for archive artifacts after extraction. Archive
      * extraction policy is portable; native filesystem permissions and handles
@@ -446,14 +374,8 @@ export interface ArchiveArtifact {
 export interface ModelFileDescriptor {
     url: string;
     filename: string;
-    isRequired: boolean;
-    /**
-     * Extended descriptor fields (Flutter model_types.dart:~350,
-     * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
-     * canonical "required" flag — the documented `required` boolean from
-     * newer SDK sources maps onto it (default true, mirrored in Swift).
-     * Exact on-disk artifact size, verified after download.
-     */
+    isOptional: boolean;
+    /** Exact on-disk artifact size, verified after download. */
     sizeBytes?: number | undefined;
     /**
      * Path fields used by SDK-local wrappers/catalogs. `filename` is the
@@ -471,13 +393,8 @@ export interface MultiFileArtifact {
     files: ModelFileDescriptor[];
 }
 /**
- * ---------------------------------------------------------------------------
- * Declarative manifest of files a multi-file / directory model is expected
- * to contain on disk after download/extraction. Used for verification before
- * hand-off to the inference framework. Sources pre-IDL:
- *   Flutter core/types/model_types.dart:420
- *   Swift   ModelTypes.swift:~300
- * ---------------------------------------------------------------------------
+ * What a multi-file model should contain on disk after extraction. Verified
+ * before hand-off to the inference framework.
  */
 export interface ExpectedModelFiles {
     files: ModelFileDescriptor[];
@@ -490,18 +407,16 @@ export interface ExpectedModelFiles {
  * Registry/query filters shared by SDK model-management APIs. UI-only
  * presentation state and platform filesystem handles are intentionally not
  * represented here.
+ * Filters only. Ordering is the client's -- a local catalog is tens of rows.
  */
 export interface ModelQuery {
     framework?: InferenceFramework | undefined;
     category?: ModelCategory | undefined;
     format?: ModelFormat | undefined;
     downloadedOnly?: boolean | undefined;
-    availableOnly?: boolean | undefined;
     maxSizeBytes?: number | undefined;
-    searchQuery: string;
-    source?: ModelSource | undefined;
-    sortField?: ModelQuerySortField | undefined;
-    sortOrder?: ModelQuerySortOrder | undefined;
+    /** Optional so "no search" is expressible; empty string is not a filter. */
+    searchQuery?: string | undefined;
     registryStatus?: ModelRegistryStatus | undefined;
 }
 export interface ModelRegistryRefreshRequest {
@@ -524,33 +439,18 @@ export interface ModelRegistryRefreshRequest {
     includeDownloadedState: boolean;
 }
 export interface ModelRegistryRefreshResult {
-    success: boolean;
     models?: ModelInfoList | undefined;
-    registeredCount: number;
-    updatedCount: number;
-    discoveredCount: number;
-    prunedCount: number;
     refreshedAtUnixMs: number;
     warnings: string[];
-    errorMessage: string;
-    downloadedCount: number;
-    availableCount: number;
-    errorCount: number;
+    error?: SDKError | undefined;
 }
 export interface ModelListRequest {
     /** Set query.downloaded_only for downloaded-only lists. */
     query?: ModelQuery | undefined;
-    /** Include denormalized counts in ModelListResult. */
-    includeCounts: boolean;
 }
 export interface ModelListResult {
-    success: boolean;
     models?: ModelInfoList | undefined;
-    errorMessage: string;
-    totalCount: number;
-    downloadedCount: number;
-    availableCount: number;
-    filteredCount: number;
+    error?: SDKError | undefined;
 }
 export interface ModelGetRequest {
     modelId: string;
@@ -558,7 +458,7 @@ export interface ModelGetRequest {
 export interface ModelGetResult {
     found: boolean;
     model?: ModelInfo | undefined;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 export interface ModelImportRequest {
     /**
@@ -579,14 +479,13 @@ export interface ModelImportRequest {
     validateBeforeRegister: boolean;
 }
 export interface ModelImportResult {
-    success: boolean;
     model?: ModelInfo | undefined;
     localPath: string;
     importedBytes: number;
     warnings: string[];
-    errorMessage: string;
     registered: boolean;
     copiedIntoManagedStorage: boolean;
+    error?: SDKError | undefined;
 }
 export interface ModelDiscoveryRequest {
     /**
@@ -610,30 +509,38 @@ export interface DiscoveredModel {
     warnings: string[];
 }
 export interface ModelDiscoveryResult {
-    success: boolean;
     discoveredModels: DiscoveredModel[];
-    linkedCount: number;
-    purgedCount: number;
     warnings: string[];
-    errorMessage: string;
-    scannedCount: number;
-    importedCount: number;
+    error?: SDKError | undefined;
 }
 export interface ModelLoadRequest {
     modelId: string;
     category?: ModelCategory | undefined;
+    /**
+     * Preferred backend pin. Retained for wire compatibility; new callers
+     * should prefer backend_preferences + accelerator.
+     */
     framework?: InferenceFramework | undefined;
     forceReload: boolean;
     validateAvailability: boolean;
+    /**
+     * The one load knob every on-device runtime exposes. Unset or 0 means
+     * "take it from the model" (llama.cpp --ctx-size semantics) -- never a
+     * hardcoded small default. Carried by the native load ABI.
+     */
+    contextLength?: number | undefined;
+    /** a hard runtime guarantee */
+    useGpu?: boolean | undefined;
+    backendPreferences: InferenceFramework[];
+    acceleratorPolicy?: AcceleratorPolicy | undefined;
 }
 export interface ModelLoadResult {
-    success: boolean;
     modelId: string;
     category: ModelCategory;
+    /** Actual backend that executed the load (not the catalog/request pin). */
     framework: InferenceFramework;
     resolvedPath: string;
     loadedAtUnixMs: number;
-    errorMessage: string;
     warnings: string[];
     alreadyLoaded: boolean;
     /**
@@ -642,6 +549,21 @@ export interface ModelLoadResult {
      * ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
      */
     resolvedArtifacts: ModelFileDescriptor[];
+    error?: SDKError | undefined;
+    /** v4 placement truth. */
+    requestedBackend?: InferenceFramework | undefined;
+    actualDeviceId?: string | undefined;
+    actualDeviceName?: string | undefined;
+    /** cpu | gpu | npu | metal | webgpu | unknown */
+    actualDeviceKind?: string | undefined;
+    runtimeVersion?: string | undefined;
+    abiVersion?: string | undefined;
+    fallbackReason?: string | undefined;
+    /**
+     * What context length the runtime actually allocated -- a request is
+     * not a promise.
+     */
+    allocatedContextLength?: number | undefined;
 }
 export interface ModelUnloadRequest {
     modelId: string;
@@ -650,11 +572,10 @@ export interface ModelUnloadRequest {
     framework?: InferenceFramework | undefined;
 }
 export interface ModelUnloadResult {
-    success: boolean;
     unloadedModelIds: string[];
-    errorMessage: string;
     unloadedAtUnixMs: number;
     warnings: string[];
+    error?: SDKError | undefined;
 }
 export interface CurrentModelRequest {
     category?: ModelCategory | undefined;
@@ -666,27 +587,22 @@ export interface CurrentModelResult {
     model?: ModelInfo | undefined;
     loadedAtUnixMs: number;
     found: boolean;
-    errorMessage: string;
     category: ModelCategory;
     framework: InferenceFramework;
     resolvedPath: string;
     resolvedArtifacts: ModelFileDescriptor[];
+    error?: SDKError | undefined;
 }
-export interface ModelDeleteRequest {
-    modelId: string;
-    deleteFiles: boolean;
-    unregister: boolean;
-    unloadIfLoaded: boolean;
-}
+/**
+ * delete(model_id) frees DISK. It always unloads the model first if it is
+ * resident -- there is no flag, and no failure mode for "still loaded".
+ * Entries whose source is MODEL_SOURCE_BUILT_IN are never deletable and fail
+ * with an SDKError. Success is the absence of `error`.
+ */
 export interface ModelDeleteResult {
-    success: boolean;
     modelId: string;
     deletedBytes: number;
-    filesDeleted: boolean;
-    registryUpdated: boolean;
-    wasLoaded: boolean;
-    errorMessage: string;
-    warnings: string[];
+    error?: SDKError | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -701,12 +617,6 @@ export interface ModelDeleteResult {
 export interface ModelCompatibilityRequest {
     /** Required. Model identifier to evaluate. */
     modelId: string;
-    /**
-     * Optional cached hardware profile from the platform adapter. If
-     * unset, commons will read whatever it has cached internally; the
-     * RAM/storage values below remain authoritative for the verdict.
-     */
-    hardwareProfile?: HardwareProfile | undefined;
     /**
      * Available RAM in bytes (from device probe). 0 = unknown — commons
      * will treat the requirement as satisfied.
@@ -749,12 +659,7 @@ export interface ModelCompatibilityResult {
      * checks with their request id.
      */
     modelId: string;
-    /**
-     * Negative on failure; mirrors rac_result_t. Empty error_message on
-     * success.
-     */
-    errorCode: number;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -853,12 +758,10 @@ export interface ModelRegistryFetchAssignmentsRequest {
     forceRefresh: boolean;
 }
 export interface ModelRegistryFetchAssignmentsResult {
-    success: boolean;
     models?: ModelInfoList | undefined;
     modelCount: number;
     fetchedAtUnixMs: number;
-    errorCode: number;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -941,6 +844,11 @@ export interface RegisterModelFromUrlRequest {
     downloadSizeBytes?: number | undefined;
     /** Explicit id override. Empty -> derived from URL/name. */
     id?: string | undefined;
+    /**
+     * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+     * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+     */
+    cuaProfile?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -963,6 +871,11 @@ export interface RegisterMultiFileModelRequest {
     supportsLora?: boolean | undefined;
     description?: string | undefined;
     source?: ModelSource | undefined;
+    /**
+     * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+     * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+     */
+    cuaProfile?: string | undefined;
 }
 export declare const ModelInfoMetadata: MessageFns<ModelInfoMetadata>;
 export declare const ModelRuntimeCompatibility: MessageFns<ModelRuntimeCompatibility>;
@@ -991,7 +904,6 @@ export declare const ModelUnloadRequest: MessageFns<ModelUnloadRequest>;
 export declare const ModelUnloadResult: MessageFns<ModelUnloadResult>;
 export declare const CurrentModelRequest: MessageFns<CurrentModelRequest>;
 export declare const CurrentModelResult: MessageFns<CurrentModelResult>;
-export declare const ModelDeleteRequest: MessageFns<ModelDeleteRequest>;
 export declare const ModelDeleteResult: MessageFns<ModelDeleteResult>;
 export declare const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest>;
 export declare const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult>;

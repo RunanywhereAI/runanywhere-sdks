@@ -9,7 +9,6 @@ import 'dart:async';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/generated/diffusion_options.pb.dart'
     show
-        DiffusionCapabilities,
         DiffusionGenerationRequest,
         DiffusionProgress,
         DiffusionResult;
@@ -63,12 +62,6 @@ class DartBridgeDiffusion {
   static int cancel() {
     throw UnsupportedError(
       'Lifecycle-owned diffusion cancellation is unavailable',
-    );
-  }
-
-  static DiffusionCapabilities capabilitiesProto() {
-    throw UnsupportedError(
-      'Lifecycle-owned diffusion capability discovery is unavailable',
     );
   }
 

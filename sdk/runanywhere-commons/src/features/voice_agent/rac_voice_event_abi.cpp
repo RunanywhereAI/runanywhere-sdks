@@ -155,8 +155,9 @@ void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
     if (proto_event.seq() == 0) {
         proto_event.set_seq(seq);
     }
-    if (proto_event.timestamp_us() == 0) {
-        proto_event.set_timestamp_us(now_us());
+    // VoiceEvent.timestamp_us was renamed to timestamp_ms.
+    if (proto_event.timestamp_ms() == 0) {
+        proto_event.set_timestamp_ms(now_us() / 1000);
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());

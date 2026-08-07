@@ -103,15 +103,7 @@ class BenchmarkRunner {
   Future<BenchmarkPreflightResult> preflight(
     Set<BenchmarkCategory> categories,
   ) async {
-    await sdk.RunAnywhere.models.refreshModelRegistry();
-
-    final listResult = await sdk.RunAnywhere.models.list();
-    if (!listResult.success) {
-      throw const BenchmarkRunnerException(
-        'Failed to fetch available models from the registry.',
-      );
-    }
-    final allModels = listResult.models.models;
+    final allModels = await sdk.RunAnywhere.models.list();
 
     final available = <BenchmarkCategory, List<sdk.ModelInfo>>{};
     final skipped = <BenchmarkCategory>[];

@@ -160,9 +160,10 @@ rac_result_t fake_llm_generate_stream(rac_handle_t, const char *prompt,
   }
   g_mlx_state.stream_count++;
   const std::string token = "mlx-stub: " + std::string(prompt);
-  return callback(token.c_str(), callback_user_data) == RAC_TRUE
-             ? RAC_SUCCESS
-             : RAC_ERROR_STREAM_CANCELLED;
+  if (callback(token.c_str(), RAC_FALSE, nullptr, callback_user_data) != RAC_TRUE) {
+    return RAC_ERROR_STREAM_CANCELLED;
+  }
+  return RAC_SUCCESS;
 }
 
 rac_result_t fake_vlm_process(rac_handle_t, const rac_vlm_image_t *,
@@ -382,26 +383,25 @@ bool register_local_mlx_model(const std::filesystem::path &model_dir,
   model.set_format(v1::MODEL_FORMAT_SAFETENSORS);
   model.set_framework(v1::INFERENCE_FRAMEWORK_MLX);
   model.set_local_path(model_dir.string());
-  model.set_is_downloaded(true);
   model.set_is_available(true);
   model.set_registry_status(v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
 
   auto *config = model.mutable_multi_file()->add_files();
   config->set_filename("config.json");
   config->set_destination_path("config.json");
-  config->set_is_required(true);
+  config->set_is_optional(false);
   config->set_role(v1::MODEL_FILE_ROLE_COMPANION);
 
   auto *weights = model.mutable_multi_file()->add_files();
   weights->set_filename("model.safetensors");
   weights->set_destination_path("model.safetensors");
-  weights->set_is_required(true);
+  weights->set_is_optional(false);
   weights->set_role(v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
 
   auto *tokenizer = model.mutable_multi_file()->add_files();
   tokenizer->set_filename("tokenizer.json");
   tokenizer->set_destination_path("tokenizer.json");
-  tokenizer->set_is_required(true);
+  tokenizer->set_is_optional(false);
   tokenizer->set_role(v1::MODEL_FILE_ROLE_TOKENIZER);
 
   std::vector<uint8_t> bytes;
@@ -413,6 +413,12 @@ bool register_local_mlx_model(const std::filesystem::path &model_dir,
 class StdoutCapture {
 public:
   bool start() {
+    // Flush any C-stdio-buffered stdout (e.g. the runner's own "--- Running:
+    // ... ---" banner) BEFORE swapping the raw fd. Without this, buffered
+    // text not yet written to fd 1 gets flushed later into whichever pipe
+    // fd 1 has been dup2'd to at that point -- silently corrupting a
+    // different capture with a stray "---" prefix.
+    std::fflush(stdout);
     if (pipe(pipe_fds_) != 0) {
       return false;
     }
@@ -538,6 +544,18 @@ bool register_mlx_backend_or_fail(TestResult *result) {
   return false;
 }
 
+rac_bool_t append_llm_token_callback(const char *token, rac_bool_t is_final,
+                                     const char * /*finish_reason*/, void *user_data) {
+  if (is_final) {
+    return RAC_TRUE;
+  }
+  auto *out = static_cast<std::string *>(user_data);
+  if (token && out) {
+    out->append(token);
+  }
+  return RAC_TRUE;
+}
+
 rac_bool_t append_token_callback(const char *token, void *user_data) {
   auto *out = static_cast<std::string *>(user_data);
   if (token && out) {
@@ -604,7 +622,7 @@ TestResult test_mlx_callback_bridge_all_slots() {
   if (llm_vt->llm_ops->create("mlx.direct.llm", nullptr, &llm) != RAC_SUCCESS ||
       llm_vt->llm_ops->initialize(llm, "/tmp/mlx-direct-llm") != RAC_SUCCESS ||
       llm_vt->llm_ops->generate(llm, "direct", nullptr, &llm_result) != RAC_SUCCESS ||
-      llm_vt->llm_ops->generate_stream(llm, "stream", nullptr, append_token_callback,
+      llm_vt->llm_ops->generate_stream(llm, "stream", nullptr, append_llm_token_callback,
                                        &llm_stream) != RAC_SUCCESS ||
       llm_vt->llm_ops->get_info(llm, &llm_info) != RAC_SUCCESS ||
       llm_vt->llm_ops->cancel(llm) != RAC_SUCCESS ||
@@ -780,13 +798,20 @@ TestResult test_mlx_callback_bridge_all_slots() {
     rac_backend_mlx_unregister();
     return result;
   }
+  // tts_stop_count is intentionally NOT asserted here: dispatch_interrupt()
+  // (rac_mlx_engine.cpp) only forwards stop/cancel to Swift while the
+  // originating operation is still active -- a stop() called after
+  // synthesize_stream() has already returned is a late interrupt and is
+  // deliberately dropped (see the "late interrupt" comment at its call
+  // site) so it cannot poison the next inference on this session. The
+  // LLM/VLM sections above hold cancel() to the same bar: they only check
+  // for RAC_SUCCESS, not that the fake callback fired.
   const bool tts_ok = tts_result.audio_data &&
                       tts_result.audio_size == 8 * sizeof(float) &&
                       streamed_tts_bytes == 2 * sizeof(float) &&
                       tts_info.is_ready == RAC_TRUE &&
                       g_mlx_state.tts_synthesize_count == 1 &&
                       g_mlx_state.tts_stream_count == 1 &&
-                      g_mlx_state.tts_stop_count == 1 &&
                       g_mlx_state.tts_info_count == 1 &&
                       g_mlx_state.last_kind == RAC_MLX_SESSION_KIND_TTS;
   rac_tts_result_free(&tts_result);
@@ -1020,7 +1045,7 @@ TestResult test_rcli_mlx_run_end_to_end() {
 
   std::string stt_json;
   if (!run_cli_or_fail({"rcli", "--json", "--no-progress", "--home",
-                        home.string(), "stt", "mlx.fake.stt", "--input",
+                        home.string(), "stt", "--model", "mlx.fake.stt", "--input",
                         input_wav.string()},
                        "STT", &stt_json, &result)) {
     rcli::shutdown();
@@ -1053,7 +1078,7 @@ TestResult test_rcli_mlx_run_end_to_end() {
   std::string tts_json;
   const bool tts_ok = run_cli_or_fail(
       {"rcli", "--json", "--no-progress", "--home", home.string(), "tts",
-       "mlx.fake.tts", "--text", "Hello MLX audio", "--output",
+       "--model", "mlx.fake.tts", "--text", "Hello MLX audio", "--output",
        output_wav.string()},
       "TTS", &tts_json, &result);
   rcli::shutdown();

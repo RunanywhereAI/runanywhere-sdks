@@ -49,6 +49,9 @@ public class StorageDeletePlanRequest(
     schemaIndex = 2,
   )
   public val include_cache: Boolean = false,
+  /**
+   * Evict by least-recently-used rather than by size.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

@@ -60,8 +60,7 @@ export type WorkerRequest =
       type: 'stream.stt.transcribe';
       requestId: string;
       handle: number;
-      audioBytes: Uint8Array;
-      optionsBytes: Uint8Array;
+      requestBytes: Uint8Array;
     }
   | {
       type: 'stream.tts.synthesize';
@@ -129,10 +128,8 @@ export interface StreamWorkerModule {
 
   _rac_stt_component_transcribe_stream_proto?(
     handle: number,
-    audioData: number,
-    audioSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     callbackPtr: number,
     userData: number,
   ): number | Promise<number>;
@@ -431,17 +428,13 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_stt_component_transcribe_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-          return withHeapBytesAsync(m, msg.audioBytes, (audioPtr, audioSize) =>
-            withHeapBytesAsync(m, msg.optionsBytes, (optionsPtr, optionsSize) =>
-              m._rac_stt_component_transcribe_stream_proto!(
-                msg.handle,
-                audioPtr,
-                audioSize,
-                optionsPtr,
-                optionsSize,
-                callbackPtr,
-                0,
-              ),
+          return withHeapBytesAsync(m, msg.requestBytes, (requestPtr, requestSize) =>
+            m._rac_stt_component_transcribe_stream_proto!(
+              msg.handle,
+              requestPtr,
+              requestSize,
+              callbackPtr,
+              0,
             ),
           );
         });

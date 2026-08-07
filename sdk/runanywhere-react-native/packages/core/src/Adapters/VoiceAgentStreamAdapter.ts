@@ -19,7 +19,7 @@
  */
 
 import { VoiceAgent as NitroVoiceAgent } from '../Internal/Nitro/NitroVoiceAgentSpec';
-import { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
+import { VoiceAgentTurnRequest } from '@runanywhere/proto-ts/voice_agent_service';
 import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import {
   streamVoiceAgent,
@@ -49,8 +49,13 @@ function fanOutTransportFor(handle: number): VoiceAgentStreamTransport {
 export class VoiceAgentStreamAdapter {
   constructor(private readonly handle: number) {}
 
+  // `VoiceAgentRequest` is deleted outright; the generated stream wrapper's
+  // request type is now `VoiceAgentTurnRequest`. The underlying fan-out
+  // transport ignores the request value entirely (subscription is keyed on
+  // `handle`, not `req` — see `HandleStreamAdapter.transportFor`), so an
+  // empty request is a faithful stand-in for the deleted `eventFilter: ''`.
   stream(
-    req: VoiceAgentRequest = VoiceAgentRequest.fromPartial({ eventFilter: '' })
+    req: VoiceAgentTurnRequest = VoiceAgentTurnRequest.fromPartial({})
   ): AsyncIterable<VoiceEvent> {
     return streamVoiceAgent(fanOutTransportFor(this.handle), req);
   }

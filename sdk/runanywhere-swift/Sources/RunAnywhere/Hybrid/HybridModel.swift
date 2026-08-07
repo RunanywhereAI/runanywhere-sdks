@@ -10,31 +10,25 @@
 import Foundation
 import SwiftProtobuf
 
-// MARK: - Backend kind
+// MARK: - Backend / engine identity
 
-/// Backend identity for a hybrid candidate. The generated proto enum
-/// (`RAHybridBackendKind` from hybrid_router.proto / `rac_hybrid_backend_kind_t`)
-/// is the source of truth; this binding exposes its cases under the SDK's
-/// ergonomic names.
-public typealias HybridBackendKind = RAHybridBackendKind
+/// Plugin-registry engine name for a hybrid candidate — a free-form string
+/// (`rac_plugin_find_for_engine`'s lookup key), not a closed enum.
+/// `RAHybridBackendKind` was deleted outright (idl/hybrid_router.proto):
+/// `HybridModelDescriptor.backend` + `.provider` were replaced by a single
+/// `engine: string` field so a new backend name is not a proto change.
+public typealias HybridBackendKind = String
 
 public extension HybridBackendKind {
-    static var unspecified: HybridBackendKind { .hybridBackendUnspecified }
-    static var llamacpp: HybridBackendKind { .hybridBackendLlamacpp }
-    static var openrouter: HybridBackendKind { .hybridBackendOpenrouter }
+    static var unspecified: HybridBackendKind { "" }
+    static var llamacpp: HybridBackendKind { "llamacpp" }
     /// On-device speech (sherpa-onnx Whisper / Zipformer / Paraformer).
-    static var sherpa: HybridBackendKind { .hybridBackendSherpa }
+    static var sherpa: HybridBackendKind { "sherpa" }
     /// Generic cloud speech (the "cloud" engine). The concrete HTTP
-    /// provider (Sarvam first) is carried in the descriptor's `provider`
-    /// field. Wire value 4 matches HYBRID_BACKEND_CLOUD.
-    static var cloud: HybridBackendKind { .hybridBackendCloud }
+    /// provider (Sarvam first) is resolved by the cloud engine from its own
+    /// config, not carried on the descriptor anymore.
+    static var cloud: HybridBackendKind { "cloud" }
 }
-
-// MARK: - Model type
-
-/// Whether a candidate runs on-device or in the cloud. Backed by the generated
-/// `RAHybridModelType` (wire values match `rac_hybrid_model_type_t`).
-public typealias HybridModelType = RAHybridModelType
 
 // MARK: - Model descriptor
 
@@ -46,38 +40,37 @@ public typealias HybridModelType = RAHybridModelType
 ///     provider, model string + credentials.
 public struct HybridModel: Sendable {
     public let id: String
-    public let modelType: HybridModelType
+    /// `true` when the candidate runs on-device (offline), `false` for cloud
+    /// (online). Marshalled into the descriptor's `is_on_device` field
+    /// (idl/hybrid_router.proto renamed `is_local` -> `is_on_device`).
+    public let isLocal: Bool
+    /// Plugin-registry engine name (`rac_plugin_find_for_engine`'s lookup
+    /// key): "sherpa", "llamacpp", "onnx", "qhexrt", "mlx", "cloud", or any
+    /// name passed to `registerCloudProvider`. Empty lets the registry pick
+    /// by priority.
     public let backend: HybridBackendKind
-    /// Concrete cloud provider when `backend == .cloud` (e.g. "sarvam"). Empty
-    /// for non-cloud backends; marshalled into the descriptor's `provider`
-    /// field (proto tag 4) so the cloud engine selects the HTTP backend.
-    public let provider: String
 
     public init(
         id: String,
-        modelType: HybridModelType,
-        backend: HybridBackendKind,
-        provider: String = ""
+        isLocal: Bool,
+        backend: HybridBackendKind
     ) {
         self.id = id
-        self.modelType = modelType
+        self.isLocal = isLocal
         self.backend = backend
-        self.provider = provider
     }
 
     /// Convenience for an on-device sherpa model.
     public static func offlineSherpa(_ id: String) -> HybridModel {
-        HybridModel(id: id, modelType: .offline, backend: .sherpa)
+        HybridModel(id: id, isLocal: true, backend: .sherpa)
     }
 
     /// Convenience for a cloud model (registered via `Cloud.register`).
-    /// `provider` defaults to `Cloud.defaultProvider` ("sarvam") and is
-    /// carried in the descriptor so the cloud engine picks the HTTP backend.
-    public static func onlineCloud(
-        _ id: String,
-        provider: String = Cloud.defaultProvider
-    ) -> HybridModel {
-        HybridModel(id: id, modelType: .online, backend: .cloud, provider: provider)
+    /// The concrete HTTP provider (Sarvam first) is resolved by the cloud
+    /// engine from the config the caller registered — it no longer rides on
+    /// this descriptor (idl/hybrid_router.proto deleted `provider` outright).
+    public static func onlineCloud(_ id: String) -> HybridModel {
+        HybridModel(id: id, isLocal: false, backend: .cloud)
     }
 
     /// Encode as `runanywhere.v1.HybridModelDescriptor` bytes for
@@ -87,9 +80,8 @@ public struct HybridModel: Sendable {
     func descriptorBytes() throws -> [UInt8] {
         var descriptor = RAHybridModelDescriptor()
         descriptor.modelID = id
-        descriptor.modelType = modelType
-        descriptor.backend = backend
-        descriptor.provider = provider
+        descriptor.isOnDevice = isLocal
+        descriptor.engine = backend
         return try [UInt8](descriptor.serializedData())
     }
 }

@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
+import ai.runanywhere.proto.v1.ReasoningMode
+import ai.runanywhere.proto.v1.ReasoningOptions
 import ai.runanywhere.proto.v1.ToolChoiceMode
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
@@ -102,14 +104,14 @@ internal object ToolCallingExecutionPolicy {
 
     fun generationOptions(base: RALLMGenerationOptions): RALLMGenerationOptions =
         base.copy(
-            max_tokens = base.max_tokens.takeIf { it in 1..MAX_FINAL_RESPONSE_TOKENS }
+            max_output_tokens = base.max_output_tokens.takeIf { it in 1..MAX_FINAL_RESPONSE_TOKENS }
                 ?: MAX_FINAL_RESPONSE_TOKENS,
             // Tool decisions must be reproducible. The native tool loop now
             // preserves temperature=0 as greedy instead of treating it as an
             // unset value and falling back to 0.8 sampling.
             temperature = 0f,
             top_p = 1f,
-            disable_thinking = true,
+            reasoning = ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF),
         )
 
     fun plan(
@@ -119,7 +121,7 @@ internal object ToolCallingExecutionPolicy {
         val generation = generationOptions(base)
         return ToolCallingExecutionPlan(
             generationOptions = generation,
-            toolOptions = toolOptions(registeredTools, generation.max_tokens),
+            toolOptions = toolOptions(registeredTools),
             // Commons recognizes an unambiguous explicit tool name in the
             // prompt and narrows the native decision there, so every SDK gets
             // the same behavior without app-side routing heuristics.
@@ -128,14 +130,16 @@ internal object ToolCallingExecutionPolicy {
         )
     }
 
+    // ToolCallingOptions.max_tokens/temperature were deleted outright
+    // (idl/tool_calling.proto): "the enclosing LLMGenerationOptions.temperature /
+    // max_output_tokens are the one value for both" -- generationOptions() above
+    // already sets both on the enclosing envelope, so there is nothing left to
+    // duplicate here.
     private fun toolOptions(
         tools: List<RAToolDefinition>,
-        finalResponseMaxTokens: Int,
     ): RAToolCallingOptions = RAToolCallingOptions(
         tools = tools,
         max_tool_calls = MAX_TOOL_CALLS,
-        max_tokens = finalResponseMaxTokens,
-        temperature = 0f,
         auto_execute = true,
         keep_tools_available = false,
         disable_thinking = true,

@@ -149,9 +149,17 @@ struct LLMStreamCtx {
     std::atomic<bool>* consumer_stop_requested;
 };
 
-rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
+rac_bool_t llm_stream_trampoline(const char* token, rac_bool_t is_final,
+                                 const char* /*finish_reason*/, void* user_data) {
     auto* ctx = static_cast<LLMStreamCtx*>(user_data);
-    if (!token || !ctx)
+    if (!ctx)
+        return RAC_TRUE;
+
+    // Ignore empty finals / terminal signals — only accumulate non-final tokens.
+    if (is_final) {
+        return RAC_TRUE;
+    }
+    if (!token)
         return RAC_TRUE;
 
     if (ctx->cancel_requested && ctx->cancel_requested->load(std::memory_order_acquire)) {
@@ -180,15 +188,18 @@ rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// run_rag_query — run embed → retrieve → assemble → LLM once, then return the result.
+// run_rag_retrieve — embed → retrieve (+ optional multi-query / rerank).
 // ---------------------------------------------------------------------------
 
-rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
-                           RAGGraphResult& out_result) {
+rac_result_t run_rag_retrieve(const RAGGraphInputs& inputs, RAGGraphResult& out_result) {
     out_result = RAGGraphResult{};
 
-    if (!inputs.embeddings_service || !inputs.llm_service || !inputs.vector_store) {
-        LOGE("run_rag_query: missing embeddings/llm/vector_store handle");
+    if (!inputs.embeddings_service || !inputs.vector_store) {
+        LOGE("run_rag_retrieve: missing embeddings/vector_store handle");
+        return RAC_ERROR_INVALID_STATE;
+    }
+    if ((inputs.enable_multi_query || inputs.rerank) && !inputs.llm_service) {
+        LOGE("run_rag_retrieve: multi-query/rerank require an LLM service");
         return RAC_ERROR_INVALID_STATE;
     }
 
@@ -206,8 +217,6 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     const size_t embed_dim = inputs.embedding_dimension;
     const size_t top_k = inputs.top_k;
     const float sim_thresh = inputs.similarity_threshold;
-    const size_t max_ctx_tokens = inputs.max_context_tokens;
-    const std::string prompt_tmpl = inputs.prompt_template;
     rac_llm_options_t llm_options = inputs.llm_options;
     const std::string sys_prompt = inputs.system_prompt;
     if (!llm_options.system_prompt && !sys_prompt.empty()) {
@@ -233,7 +242,6 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     const size_t fetch_k = scoped ? std::min<size_t>(top_k * 8, 200) : top_k;
 
     std::vector<SearchResult> results;
-    rac_result_t status = RAC_SUCCESS;
     try {
         std::vector<std::vector<std::string>> rankings;
         bool embedded_any = false;
@@ -295,14 +303,46 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         return out_result.status;
     }
 
-    if (results.empty()) {
+    out_result.sources = std::move(results);
+    return out_result.status;
+}
+
+// ---------------------------------------------------------------------------
+// run_rag_query — retrieve → assemble → LLM once, then return the result.
+// ---------------------------------------------------------------------------
+
+rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
+                           RAGGraphResult& out_result) {
+    if (!inputs.embeddings_service || !inputs.llm_service || !inputs.vector_store) {
+        LOGE("run_rag_query: missing embeddings/llm/vector_store handle");
+        return RAC_ERROR_INVALID_STATE;
+    }
+
+    const auto cancelled = [&inputs]() {
+        return inputs.cancel_requested && inputs.cancel_requested->load(std::memory_order_acquire);
+    };
+
+    rac_result_t status = run_rag_retrieve(inputs, out_result);
+    if (status != RAC_SUCCESS)
+        return status;
+
+    const std::string question = inputs.question;
+    const rac_handle_t llm_handle = inputs.llm_service;
+    const size_t max_ctx_tokens = inputs.max_context_tokens;
+    const std::string prompt_tmpl = inputs.prompt_template;
+    rac_llm_options_t llm_options = inputs.llm_options;
+    const std::string sys_prompt = inputs.system_prompt;
+    if (!llm_options.system_prompt && !sys_prompt.empty()) {
+        llm_options.system_prompt = sys_prompt.c_str();
+    }
+
+    if (out_result.sources.empty()) {
         out_result.answer = "I don't have enough information to answer that question.";
         return RAC_SUCCESS;
     }
 
-    out_result.assembled_context = build_context(results, max_ctx_tokens);
+    out_result.assembled_context = build_context(out_result.sources, max_ctx_tokens);
     const std::string prompt = format_prompt(question, out_result.assembled_context, prompt_tmpl);
-    out_result.sources = std::move(results);
 
     LOGI("RAG assemble: built prompt, %zu chars context, %zu sources",
          out_result.assembled_context.size(), out_result.sources.size());

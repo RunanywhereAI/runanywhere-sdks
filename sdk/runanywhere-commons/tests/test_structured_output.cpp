@@ -56,7 +56,10 @@ namespace {
 int test_parse_proto_uses_generated_contract() {
     runanywhere::v1::StructuredOutputParseRequest request;
     request.set_text(R"(answer {"status":"ok","count":2})");
-    request.mutable_options()->set_json_schema(
+    // StructuredOutputOptions.schema is now the `schema` arm of a `oneof
+    // constraint` (a plain JSON Schema string) — the typed JSONSchema tree
+    // and its json_schema setter were deleted (idl/structured_output.proto).
+    request.mutable_options()->set_schema(
         "{\"type\":\"object\",\"required\":[\"status\"],\"properties\":{"
         "\"status\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}},"
         "\"additionalProperties\":false}");
@@ -77,7 +80,8 @@ int test_parse_proto_uses_generated_contract() {
     ASSERT_TRUE(result.has_validation());
     ASSERT_EQ_INT(result.validation().is_valid(), true);
     ASSERT_EQ_INT(result.validation().contains_json(), true);
-    ASSERT_SUBSTR(result.parsed_json().c_str(), "\"status\":\"ok\"");
+    // StructuredOutputResult.parsed_json was renamed to json (idl/structured_output.proto).
+    ASSERT_SUBSTR(result.json().c_str(), "\"status\":\"ok\"");
     ASSERT_EQ_INT(result.validation().validation_errors_size(), 0);
 
     rac_proto_buffer_free(&result_bytes);
@@ -93,7 +97,7 @@ int test_parse_proto_uses_generated_contract() {
     result.Clear();
     ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.validation().is_valid(), true);
-    ASSERT_SUBSTR(result.parsed_json().c_str(), "\"status\":\"ok\"");
+    ASSERT_SUBSTR(result.json().c_str(), "\"status\":\"ok\"");
     rac_proto_buffer_free(&result_bytes);
 
     request.set_text(R"({"count":"two","extra":true})");
@@ -138,18 +142,25 @@ int test_parse_proto_extracts_array_with_brace_in_string() {
     ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.validation().is_valid(), true);
     ASSERT_EQ_INT(result.validation().contains_json(), true);
-    ASSERT_EQ_STR(result.parsed_json().c_str(), "[{\"text\":\"brace } inside\"}]");
+    ASSERT_EQ_STR(result.json().c_str(), "[{\"text\":\"brace } inside\"}]");
 
     rac_proto_buffer_free(&result_bytes);
     return 0;
 }
 
 int test_prepare_prompt_proto_uses_generated_contract() {
-    runanywhere::v1::StructuredOutputRequest request;
-    request.set_prompt("Return a status");
+    // StructuredOutputRequest was deleted outright (idl/structured_output.proto,
+    // API-realignment so-p2): StructuredOutputParseRequest (request_id, text,
+    // options, metadata) is now the sole request envelope shared by
+    // parse/validate/prepare-prompt; `text` plays the role the old `prompt`
+    // field did.
+    runanywhere::v1::StructuredOutputParseRequest request;
+    request.set_text("Return a status");
     auto* options = request.mutable_options();
     options->set_include_schema_in_prompt(true);
-    options->set_json_schema(
+    // StructuredOutputOptions.schema is now the `schema` arm of a `oneof
+    // constraint` (json_schema setter deleted along with the typed tree).
+    options->set_schema(
         "{\"type\":\"object\",\"required\":[\"status\"],"
         "\"properties\":{\"status\":{\"type\":\"string\"}}}");
 
@@ -166,7 +177,7 @@ int test_prepare_prompt_proto_uses_generated_contract() {
 
     runanywhere::v1::StructuredOutputPromptResult result;
     ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
-    ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
+    ASSERT_EQ_INT(result.error().c_abi_code(), RAC_SUCCESS);
     ASSERT_SUBSTR(result.prepared_prompt().c_str(), "Return a status");
     ASSERT_SUBSTR(result.prepared_prompt().c_str(), "\"status\"");
     ASSERT_TRUE(result.has_system_prompt());
@@ -179,14 +190,16 @@ int test_prepare_prompt_proto_uses_generated_contract() {
 }
 
 int test_validate_proto_uses_generated_contract() {
-    runanywhere::v1::StructuredOutputValidationRequest request;
+    // StructuredOutputValidationRequest was deleted outright — the sole
+    // request envelope shared by parse/validate/prepare-prompt is now
+    // StructuredOutputParseRequest. The typed JSONSchema/JSONSchemaProperty
+    // tree was also deleted; StructuredOutputOptions.schema is now a single
+    // JSON Schema STRING (the `schema` arm of `oneof constraint`).
+    runanywhere::v1::StructuredOutputParseRequest request;
     request.set_text(R"(answer {"status":"ok"})");
-    auto* schema = request.mutable_options()->mutable_schema();
-    schema->set_type(runanywhere::v1::JSON_SCHEMA_TYPE_OBJECT);
-    schema->add_required("status");
-    schema->set_additional_properties(false);
-    auto* properties = schema->mutable_properties();
-    (*properties)["status"].set_type(runanywhere::v1::JSON_SCHEMA_TYPE_STRING);
+    request.mutable_options()->set_schema(
+        "{\"type\":\"object\",\"required\":[\"status\"],\"properties\":{"
+        "\"status\":{\"type\":\"string\"}},\"additionalProperties\":false}");
 
     std::string bytes;
     ASSERT_TRUE(request.SerializeToString(&bytes));
@@ -223,7 +236,7 @@ int test_validate_proto_uses_generated_contract() {
     ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.is_valid(), false);
     ASSERT_EQ_INT(result.contains_json(), false);
-    ASSERT_TRUE(result.has_error_message());
+    ASSERT_TRUE(result.has_error());
     ASSERT_TRUE(!result.has_extracted_json());
     rac_proto_buffer_free(&result_bytes);
     return 0;

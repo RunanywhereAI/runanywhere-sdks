@@ -16,23 +16,18 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
+/**
+ * Every value here is emitted by commons. Barge-in is a session-level
+ * decision, not a detector verdict: it lives on InterruptedEvent /
+ * InterruptReason in voice_events.proto.
+ */
 public enum class VADStreamEventKind(
   override val `value`: Int,
 ) : WireEnum {
   VAD_STREAM_EVENT_KIND_UNSPECIFIED(0),
-  VAD_STREAM_EVENT_KIND_STARTED(1),
-  VAD_STREAM_EVENT_KIND_FRAME(2),
-  VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY(3),
-  VAD_STREAM_EVENT_KIND_STATISTICS(4),
-  VAD_STREAM_EVENT_KIND_STOPPED(5),
-  VAD_STREAM_EVENT_KIND_ERROR(6),
-  /**
-   * Pipeline-level barge-in signal previously carried by the
-   * deleted VADEventType enum. Emitted when the VAD detects speech that
-   * interrupts active assistant playback; downstream pipeline typically
-   * routes this through InterruptedEvent/InterruptReason as well.
-   */
-  VAD_STREAM_EVENT_KIND_BARGE_IN(7),
+  VAD_STREAM_EVENT_KIND_FRAME(1),
+  VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY(2),
+  VAD_STREAM_EVENT_KIND_ERROR(3),
   ;
 
   public companion object {
@@ -48,13 +43,9 @@ public enum class VADStreamEventKind(
     @JvmStatic
     public fun fromValue(`value`: Int): VADStreamEventKind? = when (`value`) {
       0 -> VAD_STREAM_EVENT_KIND_UNSPECIFIED
-      1 -> VAD_STREAM_EVENT_KIND_STARTED
-      2 -> VAD_STREAM_EVENT_KIND_FRAME
-      3 -> VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
-      4 -> VAD_STREAM_EVENT_KIND_STATISTICS
-      5 -> VAD_STREAM_EVENT_KIND_STOPPED
-      6 -> VAD_STREAM_EVENT_KIND_ERROR
-      7 -> VAD_STREAM_EVENT_KIND_BARGE_IN
+      1 -> VAD_STREAM_EVENT_KIND_FRAME
+      2 -> VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
+      3 -> VAD_STREAM_EVENT_KIND_ERROR
       else -> null
     }
   }

@@ -24,8 +24,3 @@ message PluginInfo {
     string name = 1;
     string path = 2;
 }
-
-// Result of the plugin-list bridge calls (registeredNames / listLoaded).
-message PluginInfoList {
-    repeated PluginInfo plugins = 1;
-}

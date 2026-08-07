@@ -1,10 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.segmentation
 
-import ai.runanywhere.proto.v1.SegmentationClassSummary
-import ai.runanywhere.proto.v1.SegmentationImage
-import ai.runanywhere.proto.v1.SegmentationOptions
-import ai.runanywhere.proto.v1.SegmentationPixelFormat
-import ai.runanywhere.proto.v1.SegmentationRequest
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
@@ -16,7 +11,10 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.segment
+import com.runanywhere.sdk.public.api.ClassInfo
+import com.runanywhere.sdk.public.api.ImageInput
+import com.runanywhere.sdk.public.api.SegmentationOptions
+import com.runanywhere.sdk.public.api.segmentation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,7 +34,7 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
     var maskBitmap by mutableStateOf<Bitmap?>(null)
         private set
 
-    var classSummaries by mutableStateOf<List<SegmentationClassSummary>>(emptyList())
+    var classSummaries by mutableStateOf<List<ClassInfo>>(emptyList())
         private set
     var processingTimeMs by mutableStateOf(0L)
         private set
@@ -78,23 +76,19 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
             status = "Running segmentation…"
             try {
                 RuntimeModelSelection.requireCurrent(ModelSelectionContext.SEGMENTATION)
-                val request = SegmentationRequest(
-                    image = SegmentationImage(
-                        data_ = pixels.rgba.toByteString(),
-                        width = pixels.width,
-                        height = pixels.height,
-                        pixel_format = SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_RGBA8,
-                    ),
-                    options = SegmentationOptions(include_diagnostic_rgba = true),
+                val startedAt = System.currentTimeMillis()
+                val result = RunAnywhere.segmentation.segment(
+                    ImageInput.rawRgba(pixels.rgba, pixels.width, pixels.height),
+                    SegmentationOptions(includeDiagnosticImage = true),
                 )
-                val result = withContext(Dispatchers.Default) { RunAnywhere.segment(request) }
-                classSummaries = result.class_summaries.sortedByDescending { it.pixel_count }
-                processingTimeMs = result.processing_time_ms
-                val diagnostic = result.diagnostic_rgba
+                val elapsed = System.currentTimeMillis() - startedAt
+                classSummaries = result.classes.sortedByDescending { it.pixelCount }
+                processingTimeMs = elapsed
+                val diagnostic = result.diagnosticImage
                 if (diagnostic != null && diagnostic.size == result.width * result.height * 4) {
-                    maskBitmap = bitmapFromRgba(diagnostic.toByteArray(), result.width, result.height)
+                    maskBitmap = bitmapFromRgba(diagnostic, result.width, result.height)
                 }
-                status = "Done — ${result.class_summaries.size} classes in ${result.processing_time_ms}ms."
+                status = "Done — ${result.classes.size} classes in ${elapsed}ms."
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

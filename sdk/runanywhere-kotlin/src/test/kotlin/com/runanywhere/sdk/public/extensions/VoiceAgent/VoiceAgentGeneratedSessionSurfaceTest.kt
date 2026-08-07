@@ -1,13 +1,12 @@
 package com.runanywhere.sdk.public.extensions.VoiceAgent
 
-import ai.runanywhere.proto.v1.AgentResponseStartedEvent
-import ai.runanywhere.proto.v1.AudioLevelEvent
 import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.PipelineState
-import ai.runanywhere.proto.v1.SessionStartedEvent
 import ai.runanywhere.proto.v1.StateChangeEvent
 import ai.runanywhere.proto.v1.TurnLifecycleEvent
 import ai.runanywhere.proto.v1.TurnLifecycleEventKind
+import ai.runanywhere.proto.v1.VADEvent
+import ai.runanywhere.proto.v1.VADStreamEventKind
 import ai.runanywhere.proto.v1.VoiceEvent
 import ai.runanywhere.proto.v1.VoiceSessionError
 import com.runanywhere.sdk.public.RunAnywhere
@@ -20,13 +19,27 @@ import kotlin.test.assertFalse
 class VoiceAgentGeneratedSessionSurfaceTest {
     @Test
     fun `generated voice event lifecycle arms map to generated pipeline states`() {
+        // session_started/agent_response_started were deleted outright
+        // (idl/voice_events.proto): session start/stop are now
+        // StateChangeEvent transitions, and agent-response start/complete
+        // are TurnLifecycleEventKind values on turn_lifecycle.
         assertEquals(
             PipelineState.PIPELINE_STATE_LISTENING,
-            VoiceEvent(session_started = SessionStartedEvent(session_id = "s1")).pipelineStateOrNull(),
+            VoiceEvent(
+                turn_lifecycle =
+                    TurnLifecycleEvent(
+                        kind = TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_STARTED,
+                    ),
+            ).pipelineStateOrNull(),
         )
         assertEquals(
             PipelineState.PIPELINE_STATE_GENERATING_RESPONSE,
-            VoiceEvent(agent_response_started = AgentResponseStartedEvent(turn_id = "t1")).pipelineStateOrNull(),
+            VoiceEvent(
+                turn_lifecycle =
+                    TurnLifecycleEvent(
+                        kind = TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED,
+                    ),
+            ).pipelineStateOrNull(),
         )
         assertEquals(
             PipelineState.PIPELINE_STATE_STOPPED,
@@ -68,9 +81,30 @@ class VoiceAgentGeneratedSessionSurfaceTest {
     }
 
     @Test
-    fun `generated audio level event maps to speech activity`() {
-        assertFalse(VoiceEvent(audio_level = AudioLevelEvent(rms = 0.01f)).speechDetectedOrNull()!!)
-        assertEquals(true, VoiceEvent(audio_level = AudioLevelEvent(rms = 0.2f, is_speech = true)).speechDetectedOrNull())
+    fun `generated vad event maps to speech activity`() {
+        // AudioLevelEvent was deleted outright (idl/voice_events.proto) with
+        // no replacement -- nothing in commons emits an audio-level event.
+        // Speech activity now derives from VADEvent.is_speech on the
+        // SPEECH_ACTIVITY stream-event kind.
+        assertFalse(
+            VoiceEvent(
+                vad =
+                    VADEvent(
+                        type = VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+                        is_speech = false,
+                    ),
+            ).speechDetectedOrNull()!!,
+        )
+        assertEquals(
+            true,
+            VoiceEvent(
+                vad =
+                    VADEvent(
+                        type = VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+                        is_speech = true,
+                    ),
+            ).speechDetectedOrNull(),
+        )
     }
 }
 

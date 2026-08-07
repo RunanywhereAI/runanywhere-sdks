@@ -8,80 +8,12 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere IDL — LoRA (Low-Rank Adaptation) adapter types.
+// RunAnywhere IDL — LoRA adapter catalog, application, and state.
 //
-// Every message below is the *union* of fields currently declared by hand
-// across Swift, Kotlin, Dart, React Native, Web, and the C ABI. Generating
-// from a single proto definition removes hand-written duplicate shape
-// definitions and locks the field names + types across all SDKs.
-//
-// ABI note: the existing rac_lora_entry_t C ABI struct
-// (sdk/runanywhere-commons/include/rac/infrastructure/model_management/rac_lora_registry.h)
-// is the C-side counterpart for LoraAdapterCatalogEntry; codegen does NOT
-// replace that — Swift's `init(from cEntry: rac_lora_entry_t)` style bridge
-// still flows fields one-by-one into the C struct.
-//
-// Pre-IDL drift table (source-file:line):
-//
-//   LoRAAdapterConfig
-//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:397
-//              (path: String, scale: Float = 1.0)              ← no adapter_id
-//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/LLM/LLMTypes.kt:197
-//              (path: String, scale: Float = 1.0f)             ← no adapter_id
-//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:8
-//              (path: String, scale: double = 1.0)             ← no adapter_id
-//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:15
-//              (path: string, scale?: number)                  ← no adapter_id
-//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:15
-//              (path: string, scale?: number)                  ← no adapter_id
-//
-//   LoRAAdapterInfo
-//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:413
-//              (path, scale, applied)                          ← no adapter_id, no error_message
-//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/LLM/LLMTypes.kt:212
-//              (path, scale, applied)                          ← no adapter_id, no error_message
-//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:22
-//              (path, scale, applied)                          ← no adapter_id, no error_message
-//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:28
-//              (path, scale, applied)                          ← no adapter_id, no error_message
-//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:28
-//              (path, scale, applied)                          ← no adapter_id, no error_message
-//
-//   LoraAdapterCatalogEntry
-//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:427
-//              (id, name, description, downloadURL: URL, filename,
-//               compatibleModelIds: [String], fileSize: Int64 = 0,
-//               defaultScale: Float = 1.0)                     ← no author
-//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/RunAnywhere+LoRA.kt:77
-//              (id, name, description, downloadUrl: String, filename,
-//               compatibleModelIds: List<String>, fileSize: Long = 0,
-//               defaultScale: Float = 1.0f)                    ← no author
-//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:40
-//              (id, name, description, downloadUrl: String, filename,
-//               compatibleModelIds: List<String>, fileSize: int = 0,
-//               defaultScale: double = 1.0)                    ← no author
-//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:45
-//              (id, name, description, downloadURL: string, filename,
-//               compatibleModelIds: string[], fileSize?, defaultScale?) ← no author
-//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:45
-//              (id, name, description, downloadURL: string, filename,
-//               compatibleModelIds: string[], fileSize?, defaultScale?) ← no author
-//     C ABI  sdk/runanywhere-commons/include/rac/infrastructure/model_management/rac_lora_registry.h:28
-//              rac_lora_entry_t { id, name, description, download_url, filename,
-//                                 compatible_model_ids, compatible_model_count,
-//                                 file_size, default_scale }   ← no author
-//
-//   LoraCompatibilityResult
-//     Swift  sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift:493
-//              (isCompatible: Bool, error: String? = nil)      ← no base_model_required
-//     Kotlin sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/RunAnywhere+LoRA.kt:58
-//              (isCompatible: Boolean, error: String? = null)  ← no base_model_required
-//     Dart   sdk/runanywhere-flutter/packages/runanywhere/lib/public/types/lora_types.dart:78
-//              (isCompatible: bool, error: String?)            ← no base_model_required
-//     RN     sdk/runanywhere-react-native/packages/core/src/types/LoRATypes.ts:76
-//              (isCompatible: boolean, error?: string)         ← no base_model_required
-//     Web    sdk/runanywhere-web/packages/core/src/types/LoRATypes.ts:76
-//              (isCompatible: boolean, error?: string)         ← no base_model_required
+// Adapter file acquisition, sandbox handles, and backend load/unload stay
+// adapter and backend owned. Adapter files are acquired through the models
+// domain's download and import verbs; this domain carries no download state
+// of its own, and an adapter that is on disk has a non-empty local_path.
 
 import SwiftProtobuf
 
@@ -95,245 +27,175 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// Configuration for loading a LoRA adapter.
-///
-/// `adapter_path` is a path on disk to a LoRA GGUF file. `scale` controls the
-/// adapter's effect strength (default 1.0; e.g. 0.3 for F16 adapters on
-/// quantized bases). `adapter_id` is optional and, when present, links the
-/// runtime config back to a registered `LoraAdapterCatalogEntry.id`. Catalog
-/// helper APIs should preserve it; raw path-only adapters may omit it.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RALoRAAdapterConfig: Sendable {
+public nonisolated struct RALoraAdapterConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// path on disk to the GGUF file
-  public var adapterPath: String = String()
-
-  /// default 1.0 (set by codegen layer)
-  public var scale: Float = 0
-
-  /// optional link to catalog entry id
-  public var adapterID: String {
-    get {_adapterID ?? String()}
-    set {_adapterID = newValue}
-  }
-  /// Returns true if `adapterID` has been explicitly set.
-  public var hasAdapterID: Bool {self._adapterID != nil}
-  /// Clears the value of `adapterID`. Subsequent reads from it will return its default value.
-  public mutating func clearAdapterID() {self._adapterID = nil}
-
-  public var metadata: Dictionary<String,String> = [:]
-
-  public var targetModules: [String] = []
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _adapterID: String? = nil
-}
-
-/// ---------------------------------------------------------------------------
-/// Info about a currently-loaded LoRA adapter (read-only snapshot).
-///
-/// `adapter_id` and `error_message` are not present in any current SDK shape;
-/// they are encoded as `proto3 optional` so the existing fields (path, scale,
-/// applied) round-trip exactly while reserving room for richer status reports.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RALoRAAdapterInfo: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// catalog id if known, else empty
+  /// The handle. apply, remove, list and per-request selection all key on
+  /// this. Matches PEFT adapter_name / vLLM lora_name / Genie
+  /// loraAdapterName.
   public var adapterID: String = String()
 
-  /// path used when loading
-  public var adapterPath: String = String()
-
-  /// active scale factor
-  public var scale: Float = 0
-
-  /// currently applied to the context
-  public var applied: Bool = false
-
-  /// populated when applied = false
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+  /// Escape hatch for a loose GGUF that was never registered. Commons still
+  /// loads strictly from this path: there is no catalog id -> path resolver
+  /// on the apply path yet.
+  public var adapterPath: String {
+    get {_adapterPath ?? String()}
+    set {_adapterPath = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
+  /// Returns true if `adapterPath` has been explicitly set.
+  public var hasAdapterPath: Bool {self._adapterPath != nil}
+  /// Clears the value of `adapterPath`. Subsequent reads from it will return its default value.
+  public mutating func clearAdapterPath() {self._adapterPath = nil}
 
-  public var errorCode: Int32 = 0
-
-  public var loadedAtMs: Int64 = 0
+  /// 1.0 = as trained, 0.0 = applied but contributing nothing, negatives
+  /// subtract. Unbounded and signed. Unset falls back to the catalog entry's
+  /// default_scale, then to 1.0.
+  public var scale: Float {
+    get {_scale ?? 0}
+    set {_scale = newValue}
+  }
+  /// Returns true if `scale` has been explicitly set.
+  public var hasScale: Bool {self._scale != nil}
+  /// Clears the value of `scale`. Subsequent reads from it will return its default value.
+  public mutating func clearScale() {self._scale = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _errorMessage: String? = nil
+  fileprivate var _adapterPath: String? = nil
+  fileprivate var _scale: Float? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Catalog entry for a LoRA adapter registered with the SDK.
-/// Apps register entries at startup; SDKs query "which adapters work with this
-/// model" without reinventing detection logic per platform.
-///
-/// `author` is not present in any current SDK shape (Swift, Kotlin, Dart, RN,
-/// Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
-/// nullable / has-bit-tracked field.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RALoraAdapterCatalogEntry: @unchecked Sendable {
+public nonisolated struct RALoraAdapterInfo: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// unique adapter identifier
-  public var id: String {
-    get {_storage._id}
-    set {_uniqueStorage()._id = newValue}
+  /// Catalog id when known, else empty.
+  public var adapterID: String {
+    get {_storage._adapterID}
+    set {_uniqueStorage()._adapterID = newValue}
   }
 
-  /// human-readable display name
-  public var name: String {
-    get {_storage._name}
-    set {_uniqueStorage()._name = newValue}
+  public var adapterPath: String {
+    get {_storage._adapterPath}
+    set {_uniqueStorage()._adapterPath = newValue}
   }
 
-  /// short description
-  public var description_p: String {
-    get {_storage._description_p}
-    set {_uniqueStorage()._description_p = newValue}
+  public var scale: Float {
+    get {_storage._scale}
+    set {_uniqueStorage()._scale = newValue}
   }
 
-  /// direct download URL (.gguf)
-  public var url: String {
-    get {_storage._url}
-    set {_uniqueStorage()._url = newValue}
+  /// Whether it is currently applied to the context.
+  public var applied: Bool {
+    get {_storage._applied}
+    set {_uniqueStorage()._applied = newValue}
   }
 
-  /// filename to save as on disk
-  public var filename: String {
-    get {_storage._filename}
-    set {_uniqueStorage()._filename = newValue}
+  /// Read from the adapter artifact at load time. Never settable.
+  /// rank is PEFT's `r`, alpha is lora_alpha; effective strength is
+  /// scale * (alpha / rank), which is why 1.0 is not portable between
+  /// adapters trained with different alpha/rank.
+  public var rank: Int32 {
+    get {_storage._rank ?? 0}
+    set {_uniqueStorage()._rank = newValue}
   }
+  /// Returns true if `rank` has been explicitly set.
+  public var hasRank: Bool {_storage._rank != nil}
+  /// Clears the value of `rank`. Subsequent reads from it will return its default value.
+  public mutating func clearRank() {_uniqueStorage()._rank = nil}
 
-  /// explicit base model IDs
-  public var compatibleModels: [String] {
-    get {_storage._compatibleModels}
-    set {_uniqueStorage()._compatibleModels = newValue}
+  public var alpha: Float {
+    get {_storage._alpha ?? 0}
+    set {_uniqueStorage()._alpha = newValue}
   }
+  /// Returns true if `alpha` has been explicitly set.
+  public var hasAlpha: Bool {_storage._alpha != nil}
+  /// Clears the value of `alpha`. Subsequent reads from it will return its default value.
+  public mutating func clearAlpha() {_uniqueStorage()._alpha = nil}
 
-  /// file size, 0 if unknown
+  /// Measured resident size of this adapter's weights. Absent when the
+  /// backend does not report it.
   public var sizeBytes: Int64 {
-    get {_storage._sizeBytes}
+    get {_storage._sizeBytes ?? 0}
     set {_uniqueStorage()._sizeBytes = newValue}
   }
+  /// Returns true if `sizeBytes` has been explicitly set.
+  public var hasSizeBytes: Bool {_storage._sizeBytes != nil}
+  /// Clears the value of `sizeBytes`. Subsequent reads from it will return its default value.
+  public mutating func clearSizeBytes() {_uniqueStorage()._sizeBytes = nil}
 
-  /// optional adapter author
-  public var author: String {
-    get {_storage._author ?? String()}
-    set {_uniqueStorage()._author = newValue}
-  }
-  /// Returns true if `author` has been explicitly set.
-  public var hasAuthor: Bool {_storage._author != nil}
-  /// Clears the value of `author`. Subsequent reads from it will return its default value.
-  public mutating func clearAuthor() {_uniqueStorage()._author = nil}
-
-  /// recommended adapter scale
-  public var defaultScale: Float {
-    get {_storage._defaultScale}
-    set {_uniqueStorage()._defaultScale = newValue}
+  public var loadedAtMs: Int64 {
+    get {_storage._loadedAtMs}
+    set {_uniqueStorage()._loadedAtMs = newValue}
   }
 
-  /// lowercase hex SHA-256
-  public var checksumSha256: String {
-    get {_storage._checksumSha256 ?? String()}
-    set {_uniqueStorage()._checksumSha256 = newValue}
+  /// Populated when applied is false.
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
   }
-  /// Returns true if `checksumSha256` has been explicitly set.
-  public var hasChecksumSha256: Bool {_storage._checksumSha256 != nil}
-  /// Clears the value of `checksumSha256`. Subsequent reads from it will return its default value.
-  public mutating func clearChecksumSha256() {_uniqueStorage()._checksumSha256 = nil}
-
-  public var license: String {
-    get {_storage._license ?? String()}
-    set {_uniqueStorage()._license = newValue}
-  }
-  /// Returns true if `license` has been explicitly set.
-  public var hasLicense: Bool {_storage._license != nil}
-  /// Clears the value of `license`. Subsequent reads from it will return its default value.
-  public mutating func clearLicense() {_uniqueStorage()._license = nil}
-
-  public var tags: [String] {
-    get {_storage._tags}
-    set {_uniqueStorage()._tags = newValue}
-  }
-
-  public var metadata: Dictionary<String,String> {
-    get {_storage._metadata}
-    set {_uniqueStorage()._metadata = newValue}
-  }
-
-  /// Stable platform-normalized local artifact path after native/Web has
-  /// completed download/import and reported the result back to commons.
-  public var localPath: String {
-    get {_storage._localPath ?? String()}
-    set {_uniqueStorage()._localPath = newValue}
-  }
-  /// Returns true if `localPath` has been explicitly set.
-  public var hasLocalPath: Bool {_storage._localPath != nil}
-  /// Clears the value of `localPath`. Subsequent reads from it will return its default value.
-  public mutating func clearLocalPath() {_uniqueStorage()._localPath = nil}
-
-  public var isDownloaded: Bool {
-    get {_storage._isDownloaded ?? false}
-    set {_uniqueStorage()._isDownloaded = newValue}
-  }
-  /// Returns true if `isDownloaded` has been explicitly set.
-  public var hasIsDownloaded: Bool {_storage._isDownloaded != nil}
-  /// Clears the value of `isDownloaded`. Subsequent reads from it will return its default value.
-  public mutating func clearIsDownloaded() {_uniqueStorage()._isDownloaded = nil}
-
-  public var downloadedAtUnixMs: Int64 {
-    get {_storage._downloadedAtUnixMs ?? 0}
-    set {_uniqueStorage()._downloadedAtUnixMs = newValue}
-  }
-  /// Returns true if `downloadedAtUnixMs` has been explicitly set.
-  public var hasDownloadedAtUnixMs: Bool {_storage._downloadedAtUnixMs != nil}
-  /// Clears the value of `downloadedAtUnixMs`. Subsequent reads from it will return its default value.
-  public mutating func clearDownloadedAtUnixMs() {_uniqueStorage()._downloadedAtUnixMs = nil}
-
-  public var isImported: Bool {
-    get {_storage._isImported ?? false}
-    set {_uniqueStorage()._isImported = newValue}
-  }
-  /// Returns true if `isImported` has been explicitly set.
-  public var hasIsImported: Bool {_storage._isImported != nil}
-  /// Clears the value of `isImported`. Subsequent reads from it will return its default value.
-  public mutating func clearIsImported() {_uniqueStorage()._isImported = nil}
-
-  public var statusMessage: String {
-    get {_storage._statusMessage ?? String()}
-    set {_uniqueStorage()._statusMessage = newValue}
-  }
-  /// Returns true if `statusMessage` has been explicitly set.
-  public var hasStatusMessage: Bool {_storage._statusMessage != nil}
-  /// Clears the value of `statusMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearStatusMessage() {_uniqueStorage()._statusMessage = nil}
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+/// The adapter-specific facts only. Everything generic about the artifact —
+/// where it is fetched from, how large it is, how to verify it, who published
+/// it, and whether it has been fetched — lives on the ModelInfo record for
+/// this adapter.
+public nonisolated struct RALoraAdapterCatalogEntry: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var name: String = String()
+
+  /// Explicit base model ids this adapter works with.
+  public var compatibleModels: [String] = []
+
+  /// Publisher-recommended strength. Unset means 1.0.
+  public var defaultScale: Float {
+    get {_defaultScale ?? 0}
+    set {_defaultScale = newValue}
+  }
+  /// Returns true if `defaultScale` has been explicitly set.
+  public var hasDefaultScale: Bool {self._defaultScale != nil}
+  /// Clears the value of `defaultScale`. Subsequent reads from it will return its default value.
+  public mutating func clearDefaultScale() {self._defaultScale = nil}
+
+  public var tags: [String] = []
+
+  /// Non-empty means the adapter file is on disk. This is the single
+  /// definition of "downloaded".
+  public var localPath: String {
+    get {_localPath ?? String()}
+    set {_localPath = newValue}
+  }
+  /// Returns true if `localPath` has been explicitly set.
+  public var hasLocalPath: Bool {self._localPath != nil}
+  /// Clears the value of `localPath`. Subsequent reads from it will return its default value.
+  public mutating func clearLocalPath() {self._localPath = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _defaultScale: Float? = nil
+  fileprivate var _localPath: String? = nil
 }
 
 public nonisolated struct RALoraAdapterCatalogQuery: Sendable {
@@ -368,6 +230,7 @@ public nonisolated struct RALoraAdapterCatalogQuery: Sendable {
   /// Clears the value of `downloadedOnly`. Subsequent reads from it will return its default value.
   public mutating func clearDownloadedOnly() {self._downloadedOnly = nil}
 
+  /// Substring match against name.
   public var searchQuery: String {
     get {_searchQuery ?? String()}
     set {_searchQuery = newValue}
@@ -403,8 +266,6 @@ public nonisolated struct RALoraAdapterCatalogListRequest: Sendable {
   /// Clears the value of `query`. Subsequent reads from it will return its default value.
   public mutating func clearQuery() {self._query = nil}
 
-  public var includeCounts: Bool = false
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -417,21 +278,28 @@ public nonisolated struct RALoraAdapterCatalogListResult: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var success: Bool = false
-
   public var entries: [RALoraAdapterCatalogEntry] = []
 
-  public var errorMessage: String = String()
-
+  /// total_count is unfiltered. Callers that want a filtered count read
+  /// entries.size(); a downloaded count is entries with a local_path.
   public var totalCount: Int32 = 0
 
-  public var filteredCount: Int32 = 0
-
   public var downloadedCount: Int32 = 0
+
+  public var error: RASDKError {
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {self._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _error: RASDKError? = nil
 }
 
 public nonisolated struct RALoraAdapterCatalogGetRequest: Sendable {
@@ -446,180 +314,41 @@ public nonisolated struct RALoraAdapterCatalogGetRequest: Sendable {
   public init() {}
 }
 
-public nonisolated struct RALoraAdapterCatalogGetResult: Sendable {
+public nonisolated struct RALoraAdapterCatalogGetResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var found: Bool = false
+  public var found: Bool {
+    get {_storage._found}
+    set {_uniqueStorage()._found = newValue}
+  }
 
   public var entry: RALoraAdapterCatalogEntry {
-    get {_entry ?? RALoraAdapterCatalogEntry()}
-    set {_entry = newValue}
+    get {_storage._entry ?? RALoraAdapterCatalogEntry()}
+    set {_uniqueStorage()._entry = newValue}
   }
   /// Returns true if `entry` has been explicitly set.
-  public var hasEntry: Bool {self._entry != nil}
+  public var hasEntry: Bool {_storage._entry != nil}
   /// Clears the value of `entry`. Subsequent reads from it will return its default value.
-  public mutating func clearEntry() {self._entry = nil}
+  public mutating func clearEntry() {_uniqueStorage()._entry = nil}
 
-  public var errorMessage: String = String()
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _entry: RALoraAdapterCatalogEntry? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RALoraAdapterDownloadCompletedRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var adapterID: String = String()
-
-  public var localPath: String = String()
-
-  public var sizeBytes: Int64 {
-    get {_sizeBytes ?? 0}
-    set {_sizeBytes = newValue}
-  }
-  /// Returns true if `sizeBytes` has been explicitly set.
-  public var hasSizeBytes: Bool {self._sizeBytes != nil}
-  /// Clears the value of `sizeBytes`. Subsequent reads from it will return its default value.
-  public mutating func clearSizeBytes() {self._sizeBytes = nil}
-
-  public var checksumSha256: String {
-    get {_checksumSha256 ?? String()}
-    set {_checksumSha256 = newValue}
-  }
-  /// Returns true if `checksumSha256` has been explicitly set.
-  public var hasChecksumSha256: Bool {self._checksumSha256 != nil}
-  /// Clears the value of `checksumSha256`. Subsequent reads from it will return its default value.
-  public mutating func clearChecksumSha256() {self._checksumSha256 = nil}
-
-  public var completedAtUnixMs: Int64 {
-    get {_completedAtUnixMs ?? 0}
-    set {_completedAtUnixMs = newValue}
-  }
-  /// Returns true if `completedAtUnixMs` has been explicitly set.
-  public var hasCompletedAtUnixMs: Bool {self._completedAtUnixMs != nil}
-  /// Clears the value of `completedAtUnixMs`. Subsequent reads from it will return its default value.
-  public mutating func clearCompletedAtUnixMs() {self._completedAtUnixMs = nil}
-
-  public var imported: Bool = false
-
-  public var statusMessage: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _sizeBytes: Int64? = nil
-  fileprivate var _checksumSha256: String? = nil
-  fileprivate var _completedAtUnixMs: Int64? = nil
-}
-
-public nonisolated struct RALoraAdapterDownloadCompletedResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var success: Bool = false
-
-  public var entry: RALoraAdapterCatalogEntry {
-    get {_entry ?? RALoraAdapterCatalogEntry()}
-    set {_entry = newValue}
-  }
-  /// Returns true if `entry` has been explicitly set.
-  public var hasEntry: Bool {self._entry != nil}
-  /// Clears the value of `entry`. Subsequent reads from it will return its default value.
-  public mutating func clearEntry() {self._entry = nil}
-
-  public var errorMessage: String = String()
-
-  public var persisted: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _entry: RALoraAdapterCatalogEntry? = nil
-}
-
-/// ---------------------------------------------------------------------------
-/// Import of a user-picked local adapter file. Commons owns everything past
-/// the platform-readable source path: deterministic catalog matching (exact
-/// local-path match, else an unambiguous filename match), canonical placement
-/// under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
-/// manifest persistence, and catalog completion for matched entries.
-/// Platforms only resolve OS-specific access (security-scoped URLs, content
-/// URIs, Blob-to-FS staging) before calling.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RALoraAdapterImportRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// platform-readable path of the picked file
-  public var sourcePath: String = String()
-
-  /// destination filename; default basename(source_path)
-  public var filename: String {
-    get {_filename ?? String()}
-    set {_filename = newValue}
-  }
-  /// Returns true if `filename` has been explicitly set.
-  public var hasFilename: Bool {self._filename != nil}
-  /// Clears the value of `filename`. Subsequent reads from it will return its default value.
-  public mutating func clearFilename() {self._filename = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _filename: String? = nil
-}
-
-public nonisolated struct RALoraAdapterImportResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var success: Bool = false
-
-  public var errorMessage: String = String()
-
-  /// stable SDK-owned path of the imported file
-  public var localPath: String = String()
-
-  /// a catalog entry matched and was completed
-  public var matched: Bool = false
-
-  /// updated catalog entry when matched
-  public var entry: RALoraAdapterCatalogEntry {
-    get {_entry ?? RALoraAdapterCatalogEntry()}
-    set {_entry = newValue}
-  }
-  /// Returns true if `entry` has been explicitly set.
-  public var hasEntry: Bool {self._entry != nil}
-  /// Clears the value of `entry`. Subsequent reads from it will return its default value.
-  public mutating func clearEntry() {self._entry = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _entry: RALoraAdapterCatalogEntry? = nil
-}
-
-/// ---------------------------------------------------------------------------
-/// Result of a LoRA compatibility pre-check.
-///
-/// `base_model_required` is not present in any current SDK shape — it is
-/// encoded as `proto3 optional` so a future implementation can surface "this
-/// adapter requires base model X" without breaking wire compatibility.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RALoraCompatibilityResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -627,17 +356,6 @@ public nonisolated struct RALoraCompatibilityResult: Sendable {
 
   public var isCompatible: Bool = false
 
-  /// populated when is_compatible = false
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
-  }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
-
-  /// base model id this adapter expects
   public var baseModelRequired: String {
     get {_baseModelRequired ?? String()}
     set {_baseModelRequired = newValue}
@@ -647,73 +365,76 @@ public nonisolated struct RALoraCompatibilityResult: Sendable {
   /// Clears the value of `baseModelRequired`. Subsequent reads from it will return its default value.
   public mutating func clearBaseModelRequired() {self._baseModelRequired = nil}
 
-  public var warnings: [String] = []
-
-  public var errorCode: Int32 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _errorMessage: String? = nil
-  fileprivate var _baseModelRequired: String? = nil
-}
-
-public nonisolated struct RALoRAApplyRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var requestID: String = String()
-
-  public var adapters: [RALoRAAdapterConfig] = []
-
-  public var replaceExisting: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct RALoRAApplyResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var requestID: String = String()
-
-  public var adapters: [RALoRAAdapterInfo] = []
-
-  public var success: Bool = false
-
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+  /// Populated when is_compatible is false.
+  public var error: RASDKError {
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
-
-  public var errorCode: Int32 = 0
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {self._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _errorMessage: String? = nil
+  fileprivate var _baseModelRequired: String? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
-public nonisolated struct RALoRARemoveRequest: Sendable {
+public nonisolated struct RALoraApplyRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var requestID: String = String()
 
-  public var adapterIds: [String] = []
+  /// SET semantics, matching Diffusers set_adapters and
+  /// llama_set_adapters_lora: `adapters` becomes the complete active set and
+  /// anything not listed is detached.
+  public var adapters: [RALoraAdapterConfig] = []
 
-  public var adapterPaths: [String] = []
+  /// Stack on top of the currently-applied set instead of replacing it.
+  public var keepExisting: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct RALoraApplyResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var requestID: String = String()
+
+  public var adapters: [RALoraAdapterInfo] = []
+
+  public var error: RASDKError {
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {self._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {self._error = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _error: RASDKError? = nil
+}
+
+public nonisolated struct RALoraRemoveRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Remove the named adapters; clear_all ignores the list.
+  public var adapterIds: [String] = []
 
   public var clearAll_p: Bool = false
 
@@ -722,14 +443,14 @@ public nonisolated struct RALoRARemoveRequest: Sendable {
   public init() {}
 }
 
-public nonisolated struct RALoRAState: Sendable {
+/// Response only. The state read takes no arguments; base_model_id is
+/// reported, never a filter.
+public nonisolated struct RALoraState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var loadedAdapters: [RALoRAAdapterInfo] = []
-
-  public var hasActiveAdapters_p: Bool = false
+  public var loadedAdapters: [RALoraAdapterInfo] = []
 
   public var baseModelID: String {
     get {_baseModelID ?? String()}
@@ -740,32 +461,30 @@ public nonisolated struct RALoRAState: Sendable {
   /// Clears the value of `baseModelID`. Subsequent reads from it will return its default value.
   public mutating func clearBaseModelID() {self._baseModelID = nil}
 
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+  public var error: RASDKError {
+    get {_error ?? RASDKError()}
+    set {_error = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
-
-  public var errorCode: Int32 = 0
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {self._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {self._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _baseModelID: String? = nil
-  fileprivate var _errorMessage: String? = nil
+  fileprivate var _error: RASDKError? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-nonisolated extension RALoRAAdapterConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoRAAdapterConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_path\0\u{1}scale\0\u{3}adapter_id\0\u{1}metadata\0\u{3}target_modules\0")
+nonisolated extension RALoraAdapterConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterConfig"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_path\0\u{1}scale\0\u{3}adapter_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -773,11 +492,9 @@ nonisolated extension RALoRAAdapterConfig: SwiftProtobuf.Message, SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.adapterPath) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self.scale) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._adapterID) }()
-      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      case 5: try { try decoder.decodeRepeatedStringField(value: &self.targetModules) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self._adapterPath) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self._scale) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.adapterID) }()
       default: break
       }
     }
@@ -788,122 +505,41 @@ nonisolated extension RALoRAAdapterConfig: SwiftProtobuf.Message, SwiftProtobuf.
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.adapterPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.adapterPath, fieldNumber: 1)
-    }
-    if self.scale.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.scale, fieldNumber: 2)
-    }
-    try { if let v = self._adapterID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    try { if let v = self._adapterPath {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
     } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 4)
-    }
-    if !self.targetModules.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.targetModules, fieldNumber: 5)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RALoRAAdapterConfig, rhs: RALoRAAdapterConfig) -> Bool {
-    if lhs.adapterPath != rhs.adapterPath {return false}
-    if lhs.scale != rhs.scale {return false}
-    if lhs._adapterID != rhs._adapterID {return false}
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs.targetModules != rhs.targetModules {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RALoRAAdapterInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoRAAdapterInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_id\0\u{3}adapter_path\0\u{1}scale\0\u{1}applied\0\u{3}error_message\0\u{3}error_code\0\u{3}loaded_at_ms\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.adapterID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.adapterPath) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.scale) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.applied) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.loadedAtMs) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._scale {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 2)
+    } }()
     if !self.adapterID.isEmpty {
-      try visitor.visitSingularStringField(value: self.adapterID, fieldNumber: 1)
-    }
-    if !self.adapterPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.adapterPath, fieldNumber: 2)
-    }
-    if self.scale.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.scale, fieldNumber: 3)
-    }
-    if self.applied != false {
-      try visitor.visitSingularBoolField(value: self.applied, fieldNumber: 4)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 6)
-    }
-    if self.loadedAtMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.loadedAtMs, fieldNumber: 7)
+      try visitor.visitSingularStringField(value: self.adapterID, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RALoRAAdapterInfo, rhs: RALoRAAdapterInfo) -> Bool {
+  public static func ==(lhs: RALoraAdapterConfig, rhs: RALoraAdapterConfig) -> Bool {
     if lhs.adapterID != rhs.adapterID {return false}
-    if lhs.adapterPath != rhs.adapterPath {return false}
-    if lhs.scale != rhs.scale {return false}
-    if lhs.applied != rhs.applied {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
-    if lhs.loadedAtMs != rhs.loadedAtMs {return false}
+    if lhs._adapterPath != rhs._adapterPath {return false}
+    if lhs._scale != rhs._scale {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogEntry"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}description\0\u{1}url\0\u{1}filename\0\u{3}compatible_models\0\u{3}size_bytes\0\u{1}author\0\u{3}default_scale\0\u{3}checksum_sha256\0\u{1}license\0\u{1}tags\0\u{1}metadata\0\u{3}local_path\0\u{3}is_downloaded\0\u{3}downloaded_at_unix_ms\0\u{3}is_imported\0\u{3}status_message\0")
+nonisolated extension RALoraAdapterInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterInfo"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_id\0\u{3}adapter_path\0\u{1}scale\0\u{1}applied\0\u{1}rank\0\u{1}alpha\0\u{3}size_bytes\0\u{3}loaded_at_ms\0\u{1}error\0")
 
   fileprivate class _StorageClass {
-    var _id: String = String()
-    var _name: String = String()
-    var _description_p: String = String()
-    var _url: String = String()
-    var _filename: String = String()
-    var _compatibleModels: [String] = []
-    var _sizeBytes: Int64 = 0
-    var _author: String? = nil
-    var _defaultScale: Float = 0
-    var _checksumSha256: String? = nil
-    var _license: String? = nil
-    var _tags: [String] = []
-    var _metadata: Dictionary<String,String> = [:]
-    var _localPath: String? = nil
-    var _isDownloaded: Bool? = nil
-    var _downloadedAtUnixMs: Int64? = nil
-    var _isImported: Bool? = nil
-    var _statusMessage: String? = nil
+    var _adapterID: String = String()
+    var _adapterPath: String = String()
+    var _scale: Float = 0
+    var _applied: Bool = false
+    var _rank: Int32? = nil
+    var _alpha: Float? = nil
+    var _sizeBytes: Int64? = nil
+    var _loadedAtMs: Int64 = 0
+    var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -914,24 +550,15 @@ nonisolated extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftPro
     private init() {}
 
     init(copying source: _StorageClass) {
-      _id = source._id
-      _name = source._name
-      _description_p = source._description_p
-      _url = source._url
-      _filename = source._filename
-      _compatibleModels = source._compatibleModels
+      _adapterID = source._adapterID
+      _adapterPath = source._adapterPath
+      _scale = source._scale
+      _applied = source._applied
+      _rank = source._rank
+      _alpha = source._alpha
       _sizeBytes = source._sizeBytes
-      _author = source._author
-      _defaultScale = source._defaultScale
-      _checksumSha256 = source._checksumSha256
-      _license = source._license
-      _tags = source._tags
-      _metadata = source._metadata
-      _localPath = source._localPath
-      _isDownloaded = source._isDownloaded
-      _downloadedAtUnixMs = source._downloadedAtUnixMs
-      _isImported = source._isImported
-      _statusMessage = source._statusMessage
+      _loadedAtMs = source._loadedAtMs
+      _error = source._error
     }
   }
 
@@ -950,24 +577,15 @@ nonisolated extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftPro
         // allocates stack space for every case branch when no optimizations are
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._description_p) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._url) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._filename) }()
-        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._compatibleModels) }()
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._adapterID) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._adapterPath) }()
+        case 3: try { try decoder.decodeSingularFloatField(value: &_storage._scale) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._applied) }()
+        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._rank) }()
+        case 6: try { try decoder.decodeSingularFloatField(value: &_storage._alpha) }()
         case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._sizeBytes) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._author) }()
-        case 9: try { try decoder.decodeSingularFloatField(value: &_storage._defaultScale) }()
-        case 10: try { try decoder.decodeSingularStringField(value: &_storage._checksumSha256) }()
-        case 11: try { try decoder.decodeSingularStringField(value: &_storage._license) }()
-        case 12: try { try decoder.decodeRepeatedStringField(value: &_storage._tags) }()
-        case 13: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._metadata) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._localPath) }()
-        case 15: try { try decoder.decodeSingularBoolField(value: &_storage._isDownloaded) }()
-        case 16: try { try decoder.decodeSingularInt64Field(value: &_storage._downloadedAtUnixMs) }()
-        case 17: try { try decoder.decodeSingularBoolField(value: &_storage._isImported) }()
-        case 18: try { try decoder.decodeSingularStringField(value: &_storage._statusMessage) }()
+        case 8: try { try decoder.decodeSingularInt64Field(value: &_storage._loadedAtMs) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
       }
@@ -980,91 +598,114 @@ nonisolated extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftPro
       // allocates stack space for every if/case branch local when no optimizations
       // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
       // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._id.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      if !_storage._adapterID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._adapterID, fieldNumber: 1)
       }
-      if !_storage._name.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 2)
+      if !_storage._adapterPath.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._adapterPath, fieldNumber: 2)
       }
-      if !_storage._description_p.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._description_p, fieldNumber: 3)
+      if _storage._scale.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._scale, fieldNumber: 3)
       }
-      if !_storage._url.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._url, fieldNumber: 4)
+      if _storage._applied != false {
+        try visitor.visitSingularBoolField(value: _storage._applied, fieldNumber: 4)
       }
-      if !_storage._filename.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._filename, fieldNumber: 5)
-      }
-      if !_storage._compatibleModels.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._compatibleModels, fieldNumber: 6)
-      }
-      if _storage._sizeBytes != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._sizeBytes, fieldNumber: 7)
-      }
-      try { if let v = _storage._author {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      try { if let v = _storage._rank {
+        try visitor.visitSingularInt32Field(value: v, fieldNumber: 5)
       } }()
-      if _storage._defaultScale.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._defaultScale, fieldNumber: 9)
+      try { if let v = _storage._alpha {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._sizeBytes {
+        try visitor.visitSingularInt64Field(value: v, fieldNumber: 7)
+      } }()
+      if _storage._loadedAtMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._loadedAtMs, fieldNumber: 8)
       }
-      try { if let v = _storage._checksumSha256 {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 10)
-      } }()
-      try { if let v = _storage._license {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 11)
-      } }()
-      if !_storage._tags.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._tags, fieldNumber: 12)
-      }
-      if !_storage._metadata.isEmpty {
-        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._metadata, fieldNumber: 13)
-      }
-      try { if let v = _storage._localPath {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
-      } }()
-      try { if let v = _storage._isDownloaded {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 15)
-      } }()
-      try { if let v = _storage._downloadedAtUnixMs {
-        try visitor.visitSingularInt64Field(value: v, fieldNumber: 16)
-      } }()
-      try { if let v = _storage._isImported {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 17)
-      } }()
-      try { if let v = _storage._statusMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 18)
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RALoraAdapterCatalogEntry, rhs: RALoraAdapterCatalogEntry) -> Bool {
+  public static func ==(lhs: RALoraAdapterInfo, rhs: RALoraAdapterInfo) -> Bool {
     if lhs._storage !== rhs._storage {
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
         let rhs_storage = _args.1
-        if _storage._id != rhs_storage._id {return false}
-        if _storage._name != rhs_storage._name {return false}
-        if _storage._description_p != rhs_storage._description_p {return false}
-        if _storage._url != rhs_storage._url {return false}
-        if _storage._filename != rhs_storage._filename {return false}
-        if _storage._compatibleModels != rhs_storage._compatibleModels {return false}
+        if _storage._adapterID != rhs_storage._adapterID {return false}
+        if _storage._adapterPath != rhs_storage._adapterPath {return false}
+        if _storage._scale != rhs_storage._scale {return false}
+        if _storage._applied != rhs_storage._applied {return false}
+        if _storage._rank != rhs_storage._rank {return false}
+        if _storage._alpha != rhs_storage._alpha {return false}
         if _storage._sizeBytes != rhs_storage._sizeBytes {return false}
-        if _storage._author != rhs_storage._author {return false}
-        if _storage._defaultScale != rhs_storage._defaultScale {return false}
-        if _storage._checksumSha256 != rhs_storage._checksumSha256 {return false}
-        if _storage._license != rhs_storage._license {return false}
-        if _storage._tags != rhs_storage._tags {return false}
-        if _storage._metadata != rhs_storage._metadata {return false}
-        if _storage._localPath != rhs_storage._localPath {return false}
-        if _storage._isDownloaded != rhs_storage._isDownloaded {return false}
-        if _storage._downloadedAtUnixMs != rhs_storage._downloadedAtUnixMs {return false}
-        if _storage._isImported != rhs_storage._isImported {return false}
-        if _storage._statusMessage != rhs_storage._statusMessage {return false}
+        if _storage._loadedAtMs != rhs_storage._loadedAtMs {return false}
+        if _storage._error != rhs_storage._error {return false}
         return true
       }
       if !storagesAreEqual {return false}
     }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogEntry"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}compatible_models\0\u{3}default_scale\0\u{1}tags\0\u{3}local_path\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.compatibleModels) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self._defaultScale) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.tags) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._localPath) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if !self.compatibleModels.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.compatibleModels, fieldNumber: 3)
+    }
+    try { if let v = self._defaultScale {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 4)
+    } }()
+    if !self.tags.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.tags, fieldNumber: 5)
+    }
+    try { if let v = self._localPath {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RALoraAdapterCatalogEntry, rhs: RALoraAdapterCatalogEntry) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.compatibleModels != rhs.compatibleModels {return false}
+    if lhs._defaultScale != rhs._defaultScale {return false}
+    if lhs.tags != rhs.tags {return false}
+    if lhs._localPath != rhs._localPath {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1126,7 +767,7 @@ nonisolated extension RALoraAdapterCatalogQuery: SwiftProtobuf.Message, SwiftPro
 
 nonisolated extension RALoraAdapterCatalogListRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogListRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{3}include_counts\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1135,7 +776,6 @@ nonisolated extension RALoraAdapterCatalogListRequest: SwiftProtobuf.Message, Sw
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._query) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeCounts) }()
       default: break
       }
     }
@@ -1149,15 +789,11 @@ nonisolated extension RALoraAdapterCatalogListRequest: SwiftProtobuf.Message, Sw
     try { if let v = self._query {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    if self.includeCounts != false {
-      try visitor.visitSingularBoolField(value: self.includeCounts, fieldNumber: 2)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RALoraAdapterCatalogListRequest, rhs: RALoraAdapterCatalogListRequest) -> Bool {
     if lhs._query != rhs._query {return false}
-    if lhs.includeCounts != rhs.includeCounts {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1165,7 +801,7 @@ nonisolated extension RALoraAdapterCatalogListRequest: SwiftProtobuf.Message, Sw
 
 nonisolated extension RALoraAdapterCatalogListResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogListResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}entries\0\u{3}error_message\0\u{3}total_count\0\u{3}filtered_count\0\u{3}downloaded_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entries\0\u{3}total_count\0\u{3}downloaded_count\0\u{1}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1173,46 +809,40 @@ nonisolated extension RALoraAdapterCatalogListResult: SwiftProtobuf.Message, Swi
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.entries) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.totalCount) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.filteredCount) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.downloadedCount) }()
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.entries) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.totalCount) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.downloadedCount) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._error) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.success != false {
-      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
-    }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.entries.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.entries, fieldNumber: 2)
-    }
-    if !self.errorMessage.isEmpty {
-      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 3)
+      try visitor.visitRepeatedMessageField(value: self.entries, fieldNumber: 1)
     }
     if self.totalCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.totalCount, fieldNumber: 4)
-    }
-    if self.filteredCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.filteredCount, fieldNumber: 5)
+      try visitor.visitSingularInt32Field(value: self.totalCount, fieldNumber: 2)
     }
     if self.downloadedCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.downloadedCount, fieldNumber: 6)
+      try visitor.visitSingularInt32Field(value: self.downloadedCount, fieldNumber: 3)
     }
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RALoraAdapterCatalogListResult, rhs: RALoraAdapterCatalogListResult) -> Bool {
-    if lhs.success != rhs.success {return false}
     if lhs.entries != rhs.entries {return false}
-    if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.totalCount != rhs.totalCount {return false}
-    if lhs.filteredCount != rhs.filteredCount {return false}
     if lhs.downloadedCount != rhs.downloadedCount {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1250,249 +880,83 @@ nonisolated extension RALoraAdapterCatalogGetRequest: SwiftProtobuf.Message, Swi
 
 nonisolated extension RALoraAdapterCatalogGetResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogGetResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}found\0\u{1}entry\0\u{3}error_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}found\0\u{1}entry\0\u{2}\u{2}error\0")
+
+  fileprivate class _StorageClass {
+    var _found: Bool = false
+    var _entry: RALoraAdapterCatalogEntry? = nil
+    var _error: RASDKError? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _found = source._found
+      _entry = source._entry
+      _error = source._error
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.found) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._entry) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._found) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._entry) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.found != false {
-      try visitor.visitSingularBoolField(value: self.found, fieldNumber: 1)
-    }
-    try { if let v = self._entry {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if !self.errorMessage.isEmpty {
-      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 3)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._found != false {
+        try visitor.visitSingularBoolField(value: _storage._found, fieldNumber: 1)
+      }
+      try { if let v = _storage._entry {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RALoraAdapterCatalogGetResult, rhs: RALoraAdapterCatalogGetResult) -> Bool {
-    if lhs.found != rhs.found {return false}
-    if lhs._entry != rhs._entry {return false}
-    if lhs.errorMessage != rhs.errorMessage {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RALoraAdapterDownloadCompletedRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterDownloadCompletedRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_id\0\u{3}local_path\0\u{3}size_bytes\0\u{3}checksum_sha256\0\u{3}completed_at_unix_ms\0\u{1}imported\0\u{3}status_message\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.adapterID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.localPath) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self._sizeBytes) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._checksumSha256) }()
-      case 5: try { try decoder.decodeSingularInt64Field(value: &self._completedAtUnixMs) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.imported) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.statusMessage) }()
-      default: break
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._found != rhs_storage._found {return false}
+        if _storage._entry != rhs_storage._entry {return false}
+        if _storage._error != rhs_storage._error {return false}
+        return true
       }
+      if !storagesAreEqual {return false}
     }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.adapterID.isEmpty {
-      try visitor.visitSingularStringField(value: self.adapterID, fieldNumber: 1)
-    }
-    if !self.localPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.localPath, fieldNumber: 2)
-    }
-    try { if let v = self._sizeBytes {
-      try visitor.visitSingularInt64Field(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._checksumSha256 {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._completedAtUnixMs {
-      try visitor.visitSingularInt64Field(value: v, fieldNumber: 5)
-    } }()
-    if self.imported != false {
-      try visitor.visitSingularBoolField(value: self.imported, fieldNumber: 6)
-    }
-    if !self.statusMessage.isEmpty {
-      try visitor.visitSingularStringField(value: self.statusMessage, fieldNumber: 7)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RALoraAdapterDownloadCompletedRequest, rhs: RALoraAdapterDownloadCompletedRequest) -> Bool {
-    if lhs.adapterID != rhs.adapterID {return false}
-    if lhs.localPath != rhs.localPath {return false}
-    if lhs._sizeBytes != rhs._sizeBytes {return false}
-    if lhs._checksumSha256 != rhs._checksumSha256 {return false}
-    if lhs._completedAtUnixMs != rhs._completedAtUnixMs {return false}
-    if lhs.imported != rhs.imported {return false}
-    if lhs.statusMessage != rhs.statusMessage {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RALoraAdapterDownloadCompletedResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterDownloadCompletedResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}entry\0\u{3}error_message\0\u{1}persisted\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._entry) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.persisted) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.success != false {
-      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
-    }
-    try { if let v = self._entry {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if !self.errorMessage.isEmpty {
-      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 3)
-    }
-    if self.persisted != false {
-      try visitor.visitSingularBoolField(value: self.persisted, fieldNumber: 4)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RALoraAdapterDownloadCompletedResult, rhs: RALoraAdapterDownloadCompletedResult) -> Bool {
-    if lhs.success != rhs.success {return false}
-    if lhs._entry != rhs._entry {return false}
-    if lhs.errorMessage != rhs.errorMessage {return false}
-    if lhs.persisted != rhs.persisted {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RALoraAdapterImportRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterImportRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}source_path\0\u{1}filename\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.sourcePath) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._filename) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.sourcePath.isEmpty {
-      try visitor.visitSingularStringField(value: self.sourcePath, fieldNumber: 1)
-    }
-    try { if let v = self._filename {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RALoraAdapterImportRequest, rhs: RALoraAdapterImportRequest) -> Bool {
-    if lhs.sourcePath != rhs.sourcePath {return false}
-    if lhs._filename != rhs._filename {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RALoraAdapterImportResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoraAdapterImportResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}error_message\0\u{3}local_path\0\u{1}matched\0\u{1}entry\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.localPath) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.matched) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._entry) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.success != false {
-      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
-    }
-    if !self.errorMessage.isEmpty {
-      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 2)
-    }
-    if !self.localPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.localPath, fieldNumber: 3)
-    }
-    if self.matched != false {
-      try visitor.visitSingularBoolField(value: self.matched, fieldNumber: 4)
-    }
-    try { if let v = self._entry {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RALoraAdapterImportResult, rhs: RALoraAdapterImportResult) -> Bool {
-    if lhs.success != rhs.success {return false}
-    if lhs.errorMessage != rhs.errorMessage {return false}
-    if lhs.localPath != rhs.localPath {return false}
-    if lhs.matched != rhs.matched {return false}
-    if lhs._entry != rhs._entry {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1500,7 +964,7 @@ nonisolated extension RALoraAdapterImportResult: SwiftProtobuf.Message, SwiftPro
 
 nonisolated extension RALoraCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraCompatibilityResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_compatible\0\u{3}error_message\0\u{3}base_model_required\0\u{1}warnings\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_compatible\0\u{3}base_model_required\0\u{1}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1509,10 +973,8 @@ nonisolated extension RALoraCompatibilityResult: SwiftProtobuf.Message, SwiftPro
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBoolField(value: &self.isCompatible) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._baseModelRequired) }()
-      case 4: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._baseModelRequired) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._error) }()
       default: break
       }
     }
@@ -1526,35 +988,27 @@ nonisolated extension RALoraCompatibilityResult: SwiftProtobuf.Message, SwiftPro
     if self.isCompatible != false {
       try visitor.visitSingularBoolField(value: self.isCompatible, fieldNumber: 1)
     }
-    try { if let v = self._errorMessage {
+    try { if let v = self._baseModelRequired {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
-    try { if let v = self._baseModelRequired {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
-    if !self.warnings.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 4)
-    }
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RALoraCompatibilityResult, rhs: RALoraCompatibilityResult) -> Bool {
     if lhs.isCompatible != rhs.isCompatible {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
     if lhs._baseModelRequired != rhs._baseModelRequired {return false}
-    if lhs.warnings != rhs.warnings {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension RALoRAApplyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoRAApplyRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}adapters\0\u{3}replace_existing\0")
+nonisolated extension RALoraApplyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraApplyRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}adapters\0\u{3}keep_existing\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1564,7 +1018,7 @@ nonisolated extension RALoRAApplyRequest: SwiftProtobuf.Message, SwiftProtobuf._
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.adapters) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.replaceExisting) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.keepExisting) }()
       default: break
       }
     }
@@ -1577,24 +1031,24 @@ nonisolated extension RALoRAApplyRequest: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.adapters.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.adapters, fieldNumber: 2)
     }
-    if self.replaceExisting != false {
-      try visitor.visitSingularBoolField(value: self.replaceExisting, fieldNumber: 3)
+    if self.keepExisting != false {
+      try visitor.visitSingularBoolField(value: self.keepExisting, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RALoRAApplyRequest, rhs: RALoRAApplyRequest) -> Bool {
+  public static func ==(lhs: RALoraApplyRequest, rhs: RALoraApplyRequest) -> Bool {
     if lhs.requestID != rhs.requestID {return false}
     if lhs.adapters != rhs.adapters {return false}
-    if lhs.replaceExisting != rhs.replaceExisting {return false}
+    if lhs.keepExisting != rhs.keepExisting {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension RALoRAApplyResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoRAApplyResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}adapters\0\u{1}success\0\u{3}error_message\0\u{3}error_code\0")
+nonisolated extension RALoraApplyResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraApplyResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}adapters\0\u{2}\u{4}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1604,9 +1058,7 @@ nonisolated extension RALoRAApplyResult: SwiftProtobuf.Message, SwiftProtobuf._M
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.adapters) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.success) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._error) }()
       default: break
       }
     }
@@ -1623,32 +1075,24 @@ nonisolated extension RALoRAApplyResult: SwiftProtobuf.Message, SwiftProtobuf._M
     if !self.adapters.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.adapters, fieldNumber: 2)
     }
-    if self.success != false {
-      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 3)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RALoRAApplyResult, rhs: RALoRAApplyResult) -> Bool {
+  public static func ==(lhs: RALoraApplyResult, rhs: RALoraApplyResult) -> Bool {
     if lhs.requestID != rhs.requestID {return false}
     if lhs.adapters != rhs.adapters {return false}
-    if lhs.success != rhs.success {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension RALoRARemoveRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoRARemoveRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}adapter_ids\0\u{3}adapter_paths\0\u{3}clear_all\0")
+nonisolated extension RALoraRemoveRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraRemoveRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_ids\0\u{3}clear_all\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1656,44 +1100,34 @@ nonisolated extension RALoRARemoveRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 2: try { try decoder.decodeRepeatedStringField(value: &self.adapterIds) }()
-      case 3: try { try decoder.decodeRepeatedStringField(value: &self.adapterPaths) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.clearAll_p) }()
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.adapterIds) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.clearAll_p) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
-    }
     if !self.adapterIds.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.adapterIds, fieldNumber: 2)
-    }
-    if !self.adapterPaths.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.adapterPaths, fieldNumber: 3)
+      try visitor.visitRepeatedStringField(value: self.adapterIds, fieldNumber: 1)
     }
     if self.clearAll_p != false {
-      try visitor.visitSingularBoolField(value: self.clearAll_p, fieldNumber: 4)
+      try visitor.visitSingularBoolField(value: self.clearAll_p, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RALoRARemoveRequest, rhs: RALoRARemoveRequest) -> Bool {
-    if lhs.requestID != rhs.requestID {return false}
+  public static func ==(lhs: RALoraRemoveRequest, rhs: RALoraRemoveRequest) -> Bool {
     if lhs.adapterIds != rhs.adapterIds {return false}
-    if lhs.adapterPaths != rhs.adapterPaths {return false}
     if lhs.clearAll_p != rhs.clearAll_p {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension RALoRAState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LoRAState"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}loaded_adapters\0\u{3}has_active_adapters\0\u{3}base_model_id\0\u{3}error_message\0\u{3}error_code\0")
+nonisolated extension RALoraState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LoraState"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}loaded_adapters\0\u{3}base_model_id\0\u{1}error\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1702,10 +1136,8 @@ nonisolated extension RALoRAState: SwiftProtobuf.Message, SwiftProtobuf._Message
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.loadedAdapters) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.hasActiveAdapters_p) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._baseModelID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._baseModelID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._error) }()
       default: break
       }
     }
@@ -1719,27 +1151,19 @@ nonisolated extension RALoRAState: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.loadedAdapters.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.loadedAdapters, fieldNumber: 1)
     }
-    if self.hasActiveAdapters_p != false {
-      try visitor.visitSingularBoolField(value: self.hasActiveAdapters_p, fieldNumber: 2)
-    }
     try { if let v = self._baseModelID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    try { if let v = self._error {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 5)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RALoRAState, rhs: RALoRAState) -> Bool {
+  public static func ==(lhs: RALoraState, rhs: RALoraState) -> Bool {
     if lhs.loadedAdapters != rhs.loadedAdapters {return false}
-    if lhs.hasActiveAdapters_p != rhs.hasActiveAdapters_p {return false}
     if lhs._baseModelID != rhs._baseModelID {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

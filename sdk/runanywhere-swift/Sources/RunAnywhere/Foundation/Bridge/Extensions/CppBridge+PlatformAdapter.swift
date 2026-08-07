@@ -7,12 +7,6 @@
 //  directory enumeration, vendor id, and HTTP download fallback.
 //
 
-// file_length disabled: every callback must live at file scope (no captures)
-// for C interop, so splitting across files would require making them
-// `internal`. The directory + HTTP blocks push past the 800-line warning;
-// the 1500-line error threshold remains a hard limit.
-// swiftlint:disable file_length
-
 import CRACommons
 import Darwin
 import Foundation
@@ -85,9 +79,13 @@ extension CppBridge {
                 // MARK: Memory Info
                 state.adapter.get_memory_info = platformGetMemoryInfoCallback
 
-                // MARK: Optional Callbacks (handled by Swift directly)
-                state.adapter.http_download = platformHttpDownloadCallback
-                state.adapter.http_download_cancel = platformHttpDownloadCancelCallback
+                // MARK: Optional Callbacks
+                // http_download stays NULL on native platforms: the download
+                // orchestrator drives the URLSession transport through the
+                // blocking runner. The slot is the WASM-only async path
+                // (see rac_platform_adapter.h seam contract).
+                state.adapter.http_download = nil
+                state.adapter.http_download_cancel = nil
                 state.adapter.extract_archive = nil
 
                 // MARK: Vendor ID (Apple-only — used by commons device-identity chain)
@@ -757,208 +755,7 @@ private func platformGetMemoryInfoCallback(
     return RAC_SUCCESS
 }
 
-// MARK: - HTTP Download Callbacks
-//
-// The C++ platform adapter still exposes an HTTP-download callback
-// slot for historical reasons (see `rac_http_download` in
-// `rac_platform_adapter.h`). Swift routes it through commons'
-// `rac_http_download_execute` runner, which in turn issues requests
-// via the registered `rac_http_transport` — i.e. the URLSession
-// transport this SDK installs at init (`URLSessionHttpTransport`),
-// so every request shares one transport path. Cancellation is
-// bridged via a shared flag map keyed on the task id the platform
-// callback hands to the C++ caller.
-
-private final class PlatformDownloadCancelFlag: Sendable {
-    // Per AGENTS.md: NSLock is forbidden — use OSAllocatedUnfairLock.
-    private let cancelled = OSAllocatedUnfairLock<Bool>(initialState: false)
-
-    func cancel() {
-        cancelled.withLock { $0 = true }
-    }
-
-    var isCancelled: Bool {
-        cancelled.withLock { $0 }
-    }
-}
-
-private let platformHttpDownloadQueue = DispatchQueue(
-    label: "com.runanywhere.sdk.platformhttpdownload",
-    qos: .userInitiated,
-    attributes: .concurrent
-)
-
-private let platformHttpDownloadFlagsRegistry =
-    OSAllocatedUnfairLock<[String: PlatformDownloadCancelFlag]>(initialState: [:])
-
-private func platformDownloadRegister(_ taskId: String, _ flag: PlatformDownloadCancelFlag) {
-    platformHttpDownloadFlagsRegistry.withLock { $0[taskId] = flag }
-}
-
-private func platformDownloadUnregister(_ taskId: String) {
-    platformHttpDownloadFlagsRegistry.withLock { _ = $0.removeValue(forKey: taskId) }
-}
-
-private func platformDownloadLookup(_ taskId: String) -> PlatformDownloadCancelFlag? {
-    platformHttpDownloadFlagsRegistry.withLock { $0[taskId] }
-}
-
-/// Boxed per-download state forwarded into the C progress callback
-/// via an opaque pointer (`Unmanaged.passRetained`).
-private final class PlatformDownloadProgressState {
-    let progressCallback: rac_http_progress_callback_fn?
-    let callbackContext: PlatformDownloadCallbackContext
-    let cancelFlag: PlatformDownloadCancelFlag
-
-    init(
-        progressCallback: rac_http_progress_callback_fn?,
-        callbackContext: PlatformDownloadCallbackContext,
-        cancelFlag: PlatformDownloadCancelFlag
-    ) {
-        self.progressCallback = progressCallback
-        self.callbackContext = callbackContext
-        self.cancelFlag = cancelFlag
-    }
-}
-
-/// Borrowed callback context whose lifetime is owned by the C download caller
-/// until its completion callback fires.
-private struct PlatformDownloadCallbackContext: @unchecked Sendable {
-    let rawValue: UnsafeMutableRawPointer?
-}
-
-private func platformDownloadProgressTrampoline(
-    bytesWritten: UInt64,
-    totalBytes: UInt64,
-    userData: UnsafeMutableRawPointer?
-) -> rac_bool_t {
-    guard let userData = userData else { return RAC_TRUE }
-    let state = Unmanaged<PlatformDownloadProgressState>.fromOpaque(userData).takeUnretainedValue()
-
-    if state.cancelFlag.isCancelled {
-        return RAC_FALSE
-    }
-
-    if let progressCallback = state.progressCallback {
-        let written = Int64(min(UInt64(Int64.max), bytesWritten))
-        let total = Int64(min(UInt64(Int64.max), totalBytes))
-        progressCallback(written, total, state.callbackContext.rawValue)
-    }
-    return RAC_TRUE
-}
-
-private func platformMapDownloadStatusToResult(_ status: rac_http_download_status_t) -> rac_result_t {
-    switch status {
-    case RAC_HTTP_DL_OK:
-        return RAC_SUCCESS
-    default:
-        return RAC_ERROR_DOWNLOAD_FAILED
-    }
-}
-
-private func platformHttpDownloadCallback(
-    url: UnsafePointer<CChar>?,
-    destinationPath: UnsafePointer<CChar>?,
-    progressCallback: rac_http_progress_callback_fn?,
-    completeCallback: rac_http_complete_callback_fn?,
-    callbackUserData: UnsafeMutableRawPointer?,
-    outTaskId: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
-    userData _: UnsafeMutableRawPointer?
-) -> rac_result_t {
-    guard let url = url, let destinationPath = destinationPath, let outTaskId = outTaskId else {
-        return RAC_ERROR_INVALID_ARGUMENT
-    }
-
-    let urlString = String(cString: url)
-    let destination = String(cString: destinationPath)
-
-    guard URL(string: urlString) != nil else {
-        return RAC_ERROR_INVALID_ARGUMENT
-    }
-
-    let taskId = UUID().uuidString
-    outTaskId.pointee = rac_strdup(taskId)
-    let callbackContext = PlatformDownloadCallbackContext(rawValue: callbackUserData)
-
-    let cancelFlag = PlatformDownloadCancelFlag()
-    platformDownloadRegister(taskId, cancelFlag)
-
-    platformHttpDownloadQueue.async {
-        // Ensure the destination directory exists before handing off
-        // to curl — the runner opens the destination in write mode
-        // but does not create intermediate directories.
-        let destinationURL = URL(fileURLWithPath: destination)
-        let destinationDir = destinationURL.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: destinationDir, withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try? FileManager.default.removeItem(at: destinationURL)
-        }
-
-        let state = PlatformDownloadProgressState(
-            progressCallback: progressCallback,
-            callbackContext: callbackContext,
-            cancelFlag: cancelFlag
-        )
-        let stateRef = Unmanaged.passRetained(state)
-        defer {
-            stateRef.release()
-            platformDownloadUnregister(taskId)
-        }
-
-        var finalStatus: rac_http_download_status_t = RAC_HTTP_DL_UNKNOWN
-
-        urlString.withCString { urlC in
-            destination.withCString { destC in
-                var request = rac_http_download_request_t(
-                    url: urlC,
-                    destination_path: destC,
-                    headers: nil,
-                    header_count: 0,
-                    timeout_ms: 0,
-                    follow_redirects: RAC_TRUE,
-                    resume_from_byte: 0,
-                    expected_sha256_hex: nil
-                )
-
-                var httpStatusOut: Int32 = 0
-                finalStatus = rac_http_download_execute(
-                    &request,
-                    platformDownloadProgressTrampoline,
-                    stateRef.toOpaque(),
-                    &httpStatusOut
-                )
-            }
-        }
-
-        let result = platformMapDownloadStatusToResult(finalStatus)
-        let finalPath: String? = result == RAC_SUCCESS ? destination : nil
-
-        if let completeCallback = completeCallback {
-            if let finalPath = finalPath {
-                finalPath.withCString { cPath in
-                    completeCallback(result, cPath, callbackContext.rawValue)
-                }
-            } else {
-                completeCallback(result, nil, callbackContext.rawValue)
-            }
-        }
-    }
-
-    return RAC_SUCCESS
-}
-
-private func platformHttpDownloadCancelCallback(
-    taskId: UnsafePointer<CChar>?,
-    userData _: UnsafeMutableRawPointer?
-) -> rac_result_t {
-    guard let taskId = taskId else {
-        return RAC_ERROR_INVALID_ARGUMENT
-    }
-
-    let taskKey = String(cString: taskId)
-    guard let flag = platformDownloadLookup(taskKey) else {
-        return RAC_ERROR_NOT_FOUND
-    }
-    flag.cancel()
-    return RAC_SUCCESS
-}
+// The HTTP-download adapter callbacks were removed: the slot is the WASM-only
+// async path, and Swift's implementation only looped back into commons'
+// rac_http_download_execute runner — the same blocking path the orchestrator
+// takes when the slot is NULL.

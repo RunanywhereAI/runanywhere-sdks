@@ -8,49 +8,18 @@ import SwiftUI
 // MARK: - Loading view shown while the SDK bootstraps
 
 struct InitializationLoadingView: View {
-    @State private var isAnimating = false
     private let startDate = Date()
 
+    private let trackWidth: CGFloat = 240
+    private let barHeight: CGFloat = 6
+
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
+        VStack(spacing: 24) {
+            Text("RunAnywhere")
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundColor(AppColors.textPrimary)
 
-            Image("runanywhere_logo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 120, height: 120)
-                .scaleEffect(isAnimating ? 1.05 : 1.0)
-                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimating)
-
-            VStack(spacing: 12) {
-                Text("Setting Up Your AI")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                Text("Preparing your private AI assistant...")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            // TimelineView drives the progress bar — SwiftUI cancels it
-            // automatically when this view leaves the hierarchy, which avoids
-            // the never-cancelled Timer leak of the previous implementation.
-            TimelineView(.periodic(from: startDate, by: 0.02)) { ctx in
-                let elapsed = ctx.date.timeIntervalSince(startDate)
-                let progress = elapsed.truncatingRemainder(dividingBy: 2.0) / 2.0
-                VStack(spacing: 8) {
-                    ProgressView(value: progress, total: 1.0)
-                        .progressViewStyle(.linear)
-                        .tint(AppColors.primaryAccent)
-                        .frame(width: 240)
-
-                    Text("Getting things ready...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
+            progressBar
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -59,8 +28,44 @@ struct InitializationLoadingView: View {
         #else
         .background(Color(NSColor.windowBackgroundColor))
         #endif
-        .onAppear {
-            isAnimating = true
+    }
+
+    // Determinate 0→100 sweep. TimelineView drives it and SwiftUI cancels the
+    // ticker when the view leaves the hierarchy, so there is no leaked timer.
+    private var progressBar: some View {
+        TimelineView(.periodic(from: startDate, by: 0.02)) { ctx in
+            let elapsed = ctx.date.timeIntervalSince(startDate)
+            let progress = progressValue(elapsed: elapsed)
+
+            Capsule()
+                .fill(AppColors.backgroundGray5)
+                .frame(width: trackWidth, height: barHeight)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(AppColors.primaryAccent)
+                        .frame(width: trackWidth * CGFloat(progress / 100), height: barHeight)
+                }
+                .clipShape(Capsule())
+        }
+    }
+
+    // Piecewise smoothstep so the fill eases to a near-stop (damped arrival) as
+    // it settles at 20 and 60 before accelerating on to 100.
+    private func progressValue(elapsed: Double) -> Double {
+        let total = 2.6
+        let u = min(elapsed / total, 1.0)
+
+        func smoothstep(_ x: Double) -> Double { x * x * (3 - 2 * x) }
+
+        let uA = 0.35   // reaches 20
+        let uB = 0.72   // reaches 60
+
+        if u <= uA {
+            return smoothstep(u / uA) * 20
+        } else if u <= uB {
+            return 20 + smoothstep((u - uA) / (uB - uA)) * 40
+        } else {
+            return 60 + smoothstep((u - uB) / (1 - uB)) * 40
         }
     }
 }

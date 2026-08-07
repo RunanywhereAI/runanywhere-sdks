@@ -33,42 +33,33 @@ import okio.ByteString
 
 public class StorageAvailabilityResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.StorageAvailability#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val availability: StorageAvailability? = null,
   warnings: List<String> = emptyList(),
   @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 3,
-  )
-  public val error_message: String = "",
-  @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.StorageDeletePlan#ADAPTER",
     jsonName = "deletePlan",
-    schemaIndex = 4,
+    schemaIndex = 2,
   )
   public val delete_plan: StorageDeletePlan? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 3,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageAvailabilityResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -82,11 +73,10 @@ public class StorageAvailabilityResult(
     if (other === this) return true
     if (other !is StorageAvailabilityResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (availability != other.availability) return false
     if (warnings != other.warnings) return false
-    if (error_message != other.error_message) return false
     if (delete_plan != other.delete_plan) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -94,11 +84,10 @@ public class StorageAvailabilityResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + (availability?.hashCode() ?: 0)
       result = result * 37 + warnings.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + (delete_plan?.hashCode() ?: 0)
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -106,22 +95,20 @@ public class StorageAvailabilityResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (availability != null) result += """availability=$availability"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
-    result += """error_message=${sanitize(error_message)}"""
     if (delete_plan != null) result += """delete_plan=$delete_plan"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "StorageAvailabilityResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     availability: StorageAvailability? = this.availability,
     warnings: List<String> = this.warnings,
-    error_message: String = this.error_message,
     delete_plan: StorageDeletePlan? = this.delete_plan,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageAvailabilityResult = StorageAvailabilityResult(success, availability, warnings, error_message, delete_plan, unknownFields)
+  ): StorageAvailabilityResult = StorageAvailabilityResult(availability, warnings, delete_plan, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -136,72 +123,54 @@ public class StorageAvailabilityResult(
     ) {
       override fun encodedSize(`value`: StorageAvailabilityResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.availability != null) {
           size += StorageAvailability.ADAPTER.encodedSizeWithTag(2, value.availability)
         }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(3, value.warnings)
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error_message)
-        }
         size += StorageDeletePlan.ADAPTER.encodedSizeWithTag(5, value.delete_plan)
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: StorageAvailabilityResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.availability != null) {
           StorageAvailability.ADAPTER.encodeWithTag(writer, 2, value.availability)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.warnings)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
-        }
         StorageDeletePlan.ADAPTER.encodeWithTag(writer, 5, value.delete_plan)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageAvailabilityResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         StorageDeletePlan.ADAPTER.encodeWithTag(writer, 5, value.delete_plan)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.warnings)
         if (value.availability != null) {
           StorageAvailability.ADAPTER.encodeWithTag(writer, 2, value.availability)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): StorageAvailabilityResult {
-        var success: Boolean = false
         var availability: StorageAvailability? = null
         val warnings = mutableListOf<String>()
-        var error_message: String = ""
         var delete_plan: StorageDeletePlan? = null
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> availability = StorageAvailability.ADAPTER.decode(reader)
             3 -> warnings.add(ProtoAdapter.STRING.decode(reader))
-            4 -> error_message = ProtoAdapter.STRING.decode(reader)
             5 -> delete_plan = StorageDeletePlan.ADAPTER.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return StorageAvailabilityResult(
-          success = success,
           availability = availability,
           warnings = warnings,
-          error_message = error_message,
           delete_plan = delete_plan,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -209,6 +178,7 @@ public class StorageAvailabilityResult(
       override fun redact(`value`: StorageAvailabilityResult): StorageAvailabilityResult = value.copy(
         availability = value.availability?.let(StorageAvailability.ADAPTER::redact),
         delete_plan = value.delete_plan?.let(StorageDeletePlan.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

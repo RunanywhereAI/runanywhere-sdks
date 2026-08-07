@@ -52,7 +52,14 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
         out_ref->impl = (*token)->impl;
         out_ref->model_id = (*token)->model_id.c_str();
         out_ref->framework_name = (*token)->framework_name.c_str();
-        out_ref->supports_lora = (*token)->model.supports_lora();
+        // LoRA support is a backend capability: any engine whose vtable exposes
+        // load_lora (llama.cpp) can attach adapters, regardless of whether the
+        // registry entry declared it — dynamically registered hf/URL models
+        // default the flag false. Trust the real capability, falling back to the
+        // declared flag for backends that gate it some other way.
+        out_ref->supports_lora =
+            ((*token)->llm_ops && (*token)->llm_ops->load_lora != nullptr) ||
+            (*token)->model.supports_lora();
         // Backend capability, gated on the framework enum: only QHexRT currently
         // consumes rac_llm_options_t.grammar (on-device grammar-constrained
         // decoding). Every other engine leaves this false, so the grammar attach
@@ -73,6 +80,16 @@ bool lifecycle_llm_supports_grammar() {
     const bool supported = ref.supports_grammar;
     release_lifecycle_llm(&ref);
     return supported;
+}
+
+std::string lifecycle_llm_model_id() {
+    LifecycleLlmRef ref;
+    if (acquire_lifecycle_llm(&ref) != RAC_SUCCESS) {
+        return std::string();
+    }
+    std::string id = ref.model_id ? ref.model_id : "";
+    release_lifecycle_llm(&ref);
+    return id;
 }
 
 void release_lifecycle_llm(LifecycleLlmRef* ref) {

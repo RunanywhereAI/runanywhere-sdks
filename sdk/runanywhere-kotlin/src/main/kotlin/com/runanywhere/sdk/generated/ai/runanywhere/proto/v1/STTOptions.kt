@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -28,36 +27,22 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * STT runtime transcription options (per-call overrides).
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:64           STTOptions  (10 fields)
- *   Kotlin STTTypes.kt:65              STTOptions  (10 fields)
- *   Dart   generation_types.dart:78    STTOptions  (10 fields)
- *   RN     STTTypes.ts:12              STTOptions  (5 fields, narrower)
- *   Web    STTTypes.ts:25              STTTranscribeOptions (2 fields)
- *   C ABI  rac_stt_types.h:130         rac_stt_options_t (8 fields)
- *
- * Per spec, this canonical message exposes: language, enable_punctuation,
- * enable_diarization, max_speakers, vocabulary_list, enable_word_timestamps,
- * beam_size. Other pre-IDL fields (audio_format, sample_rate, detect_language,
- * preferred_framework) are part of STTConfiguration or implied by
- * STT_LANGUAGE_AUTO.
- * ---------------------------------------------------------------------------
+ * Per-call overrides.
  */
 public class STTOptions(
-  @RacDefaultOption("STT_LANGUAGE_EN")
+  /**
+   * BCP-47 tag (bare ISO-639-1 accepted). Unset or "" means auto-detect;
+   * the code the engine settles on comes back on STTOutput.language.
+   */
   @field:WireField(
-    tag = 1,
-    adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 0,
   )
-  public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+  public val language: String? = null,
   @RacDefaultOption("true")
   @field:WireField(
     tag = 2,
@@ -67,148 +52,54 @@ public class STTOptions(
     schemaIndex = 1,
   )
   public val enable_punctuation: Boolean = false,
+  /**
+   * Attribute each word to a speaker. Labels come back on
+   * WordTimestamp.speaker_id and STTOutput.speaker_ids. Deepgram `diarize`,
+   * AssemblyAI `speaker_labels`.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "enableDiarization",
     schemaIndex = 2,
   )
-  public val enable_diarization: Boolean = false,
+  public val diarize: Boolean = false,
   /**
-   * 0 = auto / unset
+   * Hint for how many distinct speakers to expect. AssemblyAI
+   * `speakers_expected`. Unset = let the engine decide.
    */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxSpeakers",
+    jsonName = "speakersExpected",
     schemaIndex = 3,
   )
-  public val max_speakers: Int = 0,
-  vocabulary_list: List<String> = emptyList(),
+  public val speakers_expected: Int? = null,
   @RacDefaultOption("true")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "enableWordTimestamps",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val enable_word_timestamps: Boolean = false,
   /**
-   * 0 = backend default
+   * Trailing silence after which the utterance is finalized and an
+   * STT_STREAM_EVENT_KIND_ENDPOINT + FINAL pair is emitted. 0 = engine
+   * default.
    */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "beamSize",
-    schemaIndex = 6,
-  )
-  public val beam_size: Int = 0,
-  /**
-   * Free-form BCP-47 language tag. When set, consumers should prefer this
-   * over the base-language enum above.
-   */
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "languageCode",
-    schemaIndex = 7,
-  )
-  public val language_code: String? = null,
-  /**
-   * Explicit language auto-detection flag for C ABI parity. Equivalent to
-   * language == STT_LANGUAGE_AUTO for generated-only consumers.
-   */
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "detectLanguage",
-    schemaIndex = 8,
-  )
-  public val detect_language: Boolean = false,
-  /**
-   * Per-call input audio hints mirrored from rac_stt_options_t.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioFormat",
-    schemaIndex = 9,
-  )
-  public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sampleRate",
-    schemaIndex = 10,
-  )
-  public val sample_rate: Int = 0,
-  /**
-   * Maximum number of alternatives to return. 0 = backend/default.
-   */
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxAlternatives",
-    schemaIndex = 11,
-  )
-  public val max_alternatives: Int = 0,
-  /**
-   * Streaming/endpointer controls. 0 = backend/default.
-   */
-  @field:WireField(
-    tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "chunkDurationMs",
-    schemaIndex = 12,
-  )
-  public val chunk_duration_ms: Int = 0,
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "endpointSilenceMs",
-    schemaIndex = 13,
+    jsonName = "silenceDurationMs",
+    schemaIndex = 5,
   )
-  public val endpoint_silence_ms: Int = 0,
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "suppressBlank",
-    schemaIndex = 14,
-  )
-  public val suppress_blank: Boolean = false,
-  @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "translateToEnglish",
-    schemaIndex = 15,
-  )
-  public val translate_to_english: Boolean = false,
+  public val silence_duration_ms: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTOptions, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Custom vocabulary bias
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "vocabularyList",
-    schemaIndex = 4,
-  )
-  public val vocabulary_list: List<String> = immutableCopyOf("vocabulary_list", vocabulary_list)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -221,20 +112,10 @@ public class STTOptions(
     if (unknownFields != other.unknownFields) return false
     if (language != other.language) return false
     if (enable_punctuation != other.enable_punctuation) return false
-    if (enable_diarization != other.enable_diarization) return false
-    if (max_speakers != other.max_speakers) return false
-    if (vocabulary_list != other.vocabulary_list) return false
+    if (diarize != other.diarize) return false
+    if (speakers_expected != other.speakers_expected) return false
     if (enable_word_timestamps != other.enable_word_timestamps) return false
-    if (beam_size != other.beam_size) return false
-    if (language_code != other.language_code) return false
-    if (detect_language != other.detect_language) return false
-    if (audio_format != other.audio_format) return false
-    if (sample_rate != other.sample_rate) return false
-    if (max_alternatives != other.max_alternatives) return false
-    if (chunk_duration_ms != other.chunk_duration_ms) return false
-    if (endpoint_silence_ms != other.endpoint_silence_ms) return false
-    if (suppress_blank != other.suppress_blank) return false
-    if (translate_to_english != other.translate_to_english) return false
+    if (silence_duration_ms != other.silence_duration_ms) return false
     return true
   }
 
@@ -242,22 +123,12 @@ public class STTOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + language.hashCode()
+      result = result * 37 + (language?.hashCode() ?: 0)
       result = result * 37 + enable_punctuation.hashCode()
-      result = result * 37 + enable_diarization.hashCode()
-      result = result * 37 + max_speakers.hashCode()
-      result = result * 37 + vocabulary_list.hashCode()
+      result = result * 37 + diarize.hashCode()
+      result = result * 37 + (speakers_expected?.hashCode() ?: 0)
       result = result * 37 + enable_word_timestamps.hashCode()
-      result = result * 37 + beam_size.hashCode()
-      result = result * 37 + (language_code?.hashCode() ?: 0)
-      result = result * 37 + detect_language.hashCode()
-      result = result * 37 + audio_format.hashCode()
-      result = result * 37 + sample_rate.hashCode()
-      result = result * 37 + max_alternatives.hashCode()
-      result = result * 37 + chunk_duration_ms.hashCode()
-      result = result * 37 + endpoint_silence_ms.hashCode()
-      result = result * 37 + suppress_blank.hashCode()
-      result = result * 37 + translate_to_english.hashCode()
+      result = result * 37 + silence_duration_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -265,44 +136,24 @@ public class STTOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """language=$language"""
+    if (language != null) result += """language=${sanitize(language)}"""
     result += """enable_punctuation=$enable_punctuation"""
-    result += """enable_diarization=$enable_diarization"""
-    result += """max_speakers=$max_speakers"""
-    if (vocabulary_list.isNotEmpty()) result += """vocabulary_list=${sanitize(vocabulary_list)}"""
+    result += """diarize=$diarize"""
+    if (speakers_expected != null) result += """speakers_expected=$speakers_expected"""
     result += """enable_word_timestamps=$enable_word_timestamps"""
-    result += """beam_size=$beam_size"""
-    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
-    result += """detect_language=$detect_language"""
-    result += """audio_format=$audio_format"""
-    result += """sample_rate=$sample_rate"""
-    result += """max_alternatives=$max_alternatives"""
-    result += """chunk_duration_ms=$chunk_duration_ms"""
-    result += """endpoint_silence_ms=$endpoint_silence_ms"""
-    result += """suppress_blank=$suppress_blank"""
-    result += """translate_to_english=$translate_to_english"""
+    result += """silence_duration_ms=$silence_duration_ms"""
     return result.joinToString(prefix = "STTOptions{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    language: STTLanguage = this.language,
+    language: String? = this.language,
     enable_punctuation: Boolean = this.enable_punctuation,
-    enable_diarization: Boolean = this.enable_diarization,
-    max_speakers: Int = this.max_speakers,
-    vocabulary_list: List<String> = this.vocabulary_list,
+    diarize: Boolean = this.diarize,
+    speakers_expected: Int? = this.speakers_expected,
     enable_word_timestamps: Boolean = this.enable_word_timestamps,
-    beam_size: Int = this.beam_size,
-    language_code: String? = this.language_code,
-    detect_language: Boolean = this.detect_language,
-    audio_format: AudioFormat = this.audio_format,
-    sample_rate: Int = this.sample_rate,
-    max_alternatives: Int = this.max_alternatives,
-    chunk_duration_ms: Int = this.chunk_duration_ms,
-    endpoint_silence_ms: Int = this.endpoint_silence_ms,
-    suppress_blank: Boolean = this.suppress_blank,
-    translate_to_english: Boolean = this.translate_to_english,
+    silence_duration_ms: Int = this.silence_duration_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): STTOptions = STTOptions(language, enable_punctuation, enable_diarization, max_speakers, vocabulary_list, enable_word_timestamps, beam_size, language_code, detect_language, audio_format, sample_rate, max_alternatives, chunk_duration_ms, endpoint_silence_ms, suppress_blank, translate_to_english, unknownFields)
+  ): STTOptions = STTOptions(language, enable_punctuation, diarize, speakers_expected, enable_word_timestamps, silence_duration_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -316,212 +167,84 @@ public class STTOptions(
     ) {
       override fun encodedSize(`value`: STTOptions): Int {
         var size = value.unknownFields.size
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          size += STTLanguage.ADAPTER.encodedSizeWithTag(1, value.language)
-        }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.language)
         if (value.enable_punctuation != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.enable_punctuation)
         }
-        if (value.enable_diarization != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.enable_diarization)
+        if (value.diarize != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.diarize)
         }
-        if (value.max_speakers != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.max_speakers)
-        }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.vocabulary_list)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.speakers_expected)
         if (value.enable_word_timestamps != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.enable_word_timestamps)
         }
-        if (value.beam_size != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.beam_size)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.language_code)
-        if (value.detect_language != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.detect_language)
-        }
-        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
-          size += AudioFormat.ADAPTER.encodedSizeWithTag(10, value.audio_format)
-        }
-        if (value.sample_rate != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.sample_rate)
-        }
-        if (value.max_alternatives != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.max_alternatives)
-        }
-        if (value.chunk_duration_ms != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(13, value.chunk_duration_ms)
-        }
-        if (value.endpoint_silence_ms != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(14, value.endpoint_silence_ms)
-        }
-        if (value.suppress_blank != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(15, value.suppress_blank)
-        }
-        if (value.translate_to_english != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(16, value.translate_to_english)
+        if (value.silence_duration_ms != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(14, value.silence_duration_ms)
         }
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: STTOptions) {
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 1, value.language)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.language)
         if (value.enable_punctuation != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.enable_punctuation)
         }
-        if (value.enable_diarization != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.enable_diarization)
+        if (value.diarize != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.diarize)
         }
-        if (value.max_speakers != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speakers)
-        }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.vocabulary_list)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.speakers_expected)
         if (value.enable_word_timestamps != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.enable_word_timestamps)
         }
-        if (value.beam_size != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.beam_size)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
-        if (value.detect_language != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.detect_language)
-        }
-        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
-          AudioFormat.ADAPTER.encodeWithTag(writer, 10, value.audio_format)
-        }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.sample_rate)
-        }
-        if (value.max_alternatives != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.max_alternatives)
-        }
-        if (value.chunk_duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 13, value.chunk_duration_ms)
-        }
-        if (value.endpoint_silence_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.endpoint_silence_ms)
-        }
-        if (value.suppress_blank != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.suppress_blank)
-        }
-        if (value.translate_to_english != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.translate_to_english)
+        if (value.silence_duration_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.silence_duration_ms)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTOptions) {
         writer.writeBytes(value.unknownFields)
-        if (value.translate_to_english != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.translate_to_english)
-        }
-        if (value.suppress_blank != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.suppress_blank)
-        }
-        if (value.endpoint_silence_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.endpoint_silence_ms)
-        }
-        if (value.chunk_duration_ms != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 13, value.chunk_duration_ms)
-        }
-        if (value.max_alternatives != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.max_alternatives)
-        }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.sample_rate)
-        }
-        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
-          AudioFormat.ADAPTER.encodeWithTag(writer, 10, value.audio_format)
-        }
-        if (value.detect_language != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.detect_language)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
-        if (value.beam_size != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.beam_size)
+        if (value.silence_duration_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 14, value.silence_duration_ms)
         }
         if (value.enable_word_timestamps != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.enable_word_timestamps)
         }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.vocabulary_list)
-        if (value.max_speakers != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speakers)
-        }
-        if (value.enable_diarization != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.enable_diarization)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.speakers_expected)
+        if (value.diarize != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.diarize)
         }
         if (value.enable_punctuation != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.enable_punctuation)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 1, value.language)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.language)
       }
 
       override fun decode(reader: ProtoReader): STTOptions {
-        var language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED
+        var language: String? = null
         var enable_punctuation: Boolean = false
-        var enable_diarization: Boolean = false
-        var max_speakers: Int = 0
-        val vocabulary_list = mutableListOf<String>()
+        var diarize: Boolean = false
+        var speakers_expected: Int? = null
         var enable_word_timestamps: Boolean = false
-        var beam_size: Int = 0
-        var language_code: String? = null
-        var detect_language: Boolean = false
-        var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
-        var sample_rate: Int = 0
-        var max_alternatives: Int = 0
-        var chunk_duration_ms: Int = 0
-        var endpoint_silence_ms: Int = 0
-        var suppress_blank: Boolean = false
-        var translate_to_english: Boolean = false
+        var silence_duration_ms: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> try {
-              language = STTLanguage.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            17 -> language = ProtoAdapter.STRING.decode(reader)
             2 -> enable_punctuation = ProtoAdapter.BOOL.decode(reader)
-            3 -> enable_diarization = ProtoAdapter.BOOL.decode(reader)
-            4 -> max_speakers = ProtoAdapter.INT32.decode(reader)
-            5 -> vocabulary_list.add(ProtoAdapter.STRING.decode(reader))
+            3 -> diarize = ProtoAdapter.BOOL.decode(reader)
+            4 -> speakers_expected = ProtoAdapter.INT32.decode(reader)
             6 -> enable_word_timestamps = ProtoAdapter.BOOL.decode(reader)
-            7 -> beam_size = ProtoAdapter.INT32.decode(reader)
-            8 -> language_code = ProtoAdapter.STRING.decode(reader)
-            9 -> detect_language = ProtoAdapter.BOOL.decode(reader)
-            10 -> try {
-              audio_format = AudioFormat.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            11 -> sample_rate = ProtoAdapter.INT32.decode(reader)
-            12 -> max_alternatives = ProtoAdapter.INT32.decode(reader)
-            13 -> chunk_duration_ms = ProtoAdapter.INT32.decode(reader)
-            14 -> endpoint_silence_ms = ProtoAdapter.INT32.decode(reader)
-            15 -> suppress_blank = ProtoAdapter.BOOL.decode(reader)
-            16 -> translate_to_english = ProtoAdapter.BOOL.decode(reader)
+            14 -> silence_duration_ms = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return STTOptions(
           language = language,
           enable_punctuation = enable_punctuation,
-          enable_diarization = enable_diarization,
-          max_speakers = max_speakers,
-          vocabulary_list = vocabulary_list,
+          diarize = diarize,
+          speakers_expected = speakers_expected,
           enable_word_timestamps = enable_word_timestamps,
-          beam_size = beam_size,
-          language_code = language_code,
-          detect_language = detect_language,
-          audio_format = audio_format,
-          sample_rate = sample_rate,
-          max_alternatives = max_alternatives,
-          chunk_duration_ms = chunk_duration_ms,
-          endpoint_silence_ms = endpoint_silence_ms,
-          suppress_blank = suppress_blank,
-          translate_to_english = translate_to_english,
+          silence_duration_ms = silence_duration_ms,
           unknownFields = unknownFields
         )
       }

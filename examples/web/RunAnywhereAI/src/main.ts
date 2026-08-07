@@ -10,15 +10,7 @@ import './styles/design-system.css';
 import './styles/commons.css';
 import './styles/components.css';
 import { buildAppShell } from './app';
-import {
-  environmentDescription,
-  environmentShouldSendTelemetry,
-  RunAnywhere,
-  Cloud,
-  modelInfoIsAvailableForUse,
-  modelInfoIsDownloadedOnDisk,
-} from '@runanywhere/web';
-import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
+import { RunAnywhere, type Environment } from '@runanywhere/web';
 import { registerAll as registerModelCatalogAll } from './services/model-catalog';
 import {
   notifyCatalogRegistered,
@@ -42,9 +34,7 @@ type AppReadinessStep =
   | 'initializing-sdk'
   | 'registering-llamacpp'
   | 'registering-onnx'
-  | 'phase2-services'
   | 'catalog'
-  | 'identity'
   | 'building-shell'
   | 'interactive'
   | 'error';
@@ -94,14 +84,13 @@ let appReadinessState: AppReadinessState = 'booting';
 let readinessStep: AppReadinessStep = 'booting';
 
 interface RuntimeConfiguration {
-  environment: SDKEnvironment;
+  environment: Environment;
   apiKey?: string;
-  baseURL?: string;
+  baseUrl?: string;
 }
 
 let activeRuntimeConfiguration: RuntimeConfiguration | null = null;
 let runtimeReconfigurationPromise: Promise<APIConfigurationApplyResult> | null = null;
-let unsubscribeAccelerationBadge: (() => void) | null = null;
 
 setAPIConfigurationApplyHandler(applyAPIConfiguration);
 
@@ -396,10 +385,14 @@ async function initializeSDK(): Promise<void> {
     const hostedConfiguration = getHostedAPIConfiguration();
     const configuration: RuntimeConfiguration = hostedConfiguration
       ? {
-          ...hostedConfiguration,
-          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+          apiKey: hostedConfiguration.apiKey,
+          // APIConfiguration exposes `baseURL`; the SDK's initialize() reads
+          // `baseUrl`. Map explicitly so the URL isn't silently dropped (which
+          // made production init fail with "URL required").
+          baseUrl: hostedConfiguration.baseURL,
+          environment: 'production',
         }
-      : { environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT };
+      : { environment: 'development' };
     await startRuntime(configuration, hostedConfiguration !== null);
     activeRuntimeConfiguration = configuration;
     sdkReadinessState = 'ready';
@@ -429,10 +422,10 @@ async function startRuntime(
   const localRestored = await withTimeout(
     'restoring local storage',
     60_000,
-    RunAnywhere.storage.restoreLocalStorage(),
+    RunAnywhere.storage.restore(),
   );
   if (localRestored) {
-    appLogger.info('[RunAnywhere] Local storage restored:', RunAnywhere.storage.localStorageDirectoryName);
+    appLogger.info('[RunAnywhere] Local storage restored:', RunAnywhere.storage.directoryName);
   }
 
   let activeAcceleration: 'cpu' | 'webgpu' = 'cpu';
@@ -498,18 +491,6 @@ async function startRuntime(
       diagnostics: ONNX.lastWorkerDiagnostics,
       speech,
     };
-    // Hybrid cloud STT is optional: the current artifact may omit the cloud
-    // engine, and credentials are supplied separately through Cloud.register().
-    // Never let this capability probe make local ONNX/Sherpa unavailable.
-    try {
-      const cloudRegistered = Cloud.registerBackend();
-      appLogger.info('[RunAnywhere] cloud STT backend registration:', cloudRegistered);
-    } catch (err) {
-      appLogger.warning(
-        '[RunAnywhere] cloud STT backend is unavailable; hybrid cloud routing is disabled:',
-        err,
-      );
-    }
   } catch (err) {
     const message = formatError(err);
     backendErrors.push(`onnx/sherpa: ${message}`);
@@ -525,16 +506,6 @@ async function startRuntime(
     throw new Error(`Backend registration failed (${backendErrors.join('; ')})`);
   }
 
-  // Backend registration installs the active WASM transport. Phase 2 is
-  // explicit and bounded so a cloud-service failure cannot make a successful
-  // local backend registration appear pending forever.
-  publishReadinessStep('phase2-services');
-  await withTimeout(
-    'initializing Phase 2 services',
-    60_000,
-    RunAnywhere.completeServicesInitialization(),
-  );
-
   publishReadinessStep('catalog');
   const registeredCount = await withTimeout(
     'registering the model catalog',
@@ -548,21 +519,14 @@ async function startRuntime(
   // Hydrate OPFS → registry *before* notifying the picker. Otherwise the UI
   // seeds every row as "Download" and can miss the later models.hydrated
   // refresh (collapsed families / sheet opened from stale rowStates).
-  await withTimeout('hydrating the model registry', 60_000, RunAnywhere.hydrateModelRegistry());
+  await withTimeout('hydrating the model registry', 60_000, RunAnywhere.storage.refresh());
   await withTimeout('refreshing SDK catalogs', 60_000, refreshSDKCatalogs());
   notifyCatalogRegistered(registeredCount);
 
-  // Production identity is cloud-dependent and must not delay an otherwise
-  // usable local shell. Its status remains observable through readiness data.
-  if (configuration.environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION) {
-    identityReadinessState = 'pending';
-    identityInitializationError = undefined;
-    publishReadinessStep('identity');
-    void completeProductionIdentityInBackground();
-  } else {
-    identityReadinessState = 'not-required';
-    identityInitializationError = undefined;
-  }
+  // Identity is cloud-dependent and the SDK completes it in the background
+  // after initialize() returns, so the shell never waits on it.
+  identityReadinessState = 'not-required';
+  identityInitializationError = undefined;
 
   appLogger.info(
     '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
@@ -570,64 +534,6 @@ async function startRuntime(
   );
 
   showAccelerationBadge(activeAcceleration);
-  unsubscribeAccelerationBadge?.();
-  unsubscribeAccelerationBadge = RunAnywhere.events.on('sdk.accelerationMode', ({ mode }) => {
-    showAccelerationBadge(mode);
-  });
-  RunAnywhere.events.on('sdk.speechAcceleration', () => {
-    showAccelerationBadge(
-      RunAnywhere.runtime.active === 'webgpu' || RunAnywhere.runtime.active === 'cpu'
-        ? RunAnywhere.runtime.active
-        : activeAcceleration,
-    );
-  });
-}
-
-async function completeProductionIdentityInBackground(): Promise<void> {
-  try {
-    await withTimeout('completing production identity', 60_000, requireProductionIdentity());
-    identityReadinessState = 'ready';
-    identityInitializationError = undefined;
-    appLogger.info('[RunAnywhere] Production identity is ready');
-  } catch (err) {
-    identityReadinessState = 'unavailable';
-    identityInitializationError = formatError(err);
-    appLogger.warning('[RunAnywhere] Production identity is unavailable; local inference remains ready:', err);
-  }
-  publishReadiness(appReadinessState);
-}
-
-async function requireProductionIdentity(): Promise<void> {
-  const deadline = Date.now() + 60_000;
-  let latest = {
-    authenticated: false,
-    deviceRegistered: false,
-    hasUserId: false,
-    hasOrganizationId: false,
-  };
-  while (Date.now() < deadline) {
-    latest = {
-      authenticated: RunAnywhere.isAuthenticated,
-      deviceRegistered: RunAnywhere.isDeviceRegistered(),
-      hasUserId: Boolean(RunAnywhere.getUserId()),
-      hasOrganizationId: Boolean(RunAnywhere.getOrganizationId()),
-    };
-    if (
-      latest.authenticated
-      && latest.deviceRegistered
-      && (latest.hasUserId || latest.hasOrganizationId)
-    ) {
-      return;
-    }
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 500));
-  }
-  throw new Error(
-    'Production authentication or device registration did not complete '
-    + `(authenticated=${latest.authenticated}, `
-    + `deviceRegistered=${latest.deviceRegistered}, `
-    + `userIdAvailable=${latest.hasUserId}, `
-    + `organizationIdAvailable=${latest.hasOrganizationId})`,
-  );
 }
 
 /**
@@ -642,8 +548,9 @@ function applyAPIConfiguration(
 
   runtimeReconfigurationPromise = (async () => {
     const next: RuntimeConfiguration = {
-      ...configuration,
-      environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+      apiKey: configuration.apiKey,
+      baseUrl: configuration.baseURL,
+      environment: 'production',
     };
     const previous = activeRuntimeConfiguration;
 
@@ -660,16 +567,15 @@ function applyAPIConfiguration(
       sdkReadinessState = 'ready';
       sdkInitializationError = undefined;
       return {
-        environment: environmentDescription(next.environment),
-        telemetryEnabled: environmentShouldSendTelemetry(next.environment),
+        environment: next.environment,
+        telemetryEnabled: next.environment === 'production',
       };
     } catch (err) {
       const applyError = formatError(err);
       let restored = false;
       try {
         await teardownRuntime();
-        const fallback = previous
-          ?? { environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT };
+        const fallback: RuntimeConfiguration = previous ?? { environment: 'development' };
         await startRuntime(fallback, false);
         activeRuntimeConfiguration = fallback;
         sdkReadinessState = 'ready';
@@ -695,28 +601,7 @@ function applyAPIConfiguration(
 
 /** Backends own native registrations, so release them before core shutdown. */
 async function teardownRuntime(): Promise<void> {
-  unsubscribeAccelerationBadge?.();
-  unsubscribeAccelerationBadge = null;
   resetCatalogRegistrationState();
-
-  // The split-WASM RAG provider owns an in-memory vector index and can have
-  // an embeddings/LLM operation in flight. Drop that provider before either
-  // underlying module is unregistered.
-  try {
-    await RunAnywhere.ragDestroyPipeline();
-  } catch (err) {
-    appLogger.warning('[RunAnywhere] RAG teardown failed:', err);
-  }
-
-  // Voice orchestration can own a Sherpa VAD handle and an in-flight llama
-  // generation across the two backend modules. Release it while both modules
-  // are still registered; otherwise a later runtime lifetime could try to
-  // destroy the stale numeric handle against the newly loaded ONNX module.
-  try {
-    await RunAnywhere.cleanupVoiceAgent();
-  } catch (err) {
-    appLogger.warning('[RunAnywhere] voice-agent teardown failed:', err);
-  }
 
   try {
     const { ONNX } = await import('@runanywhere/web-onnx');
@@ -732,7 +617,9 @@ async function teardownRuntime(): Promise<void> {
     appLogger.warning('[RunAnywhere] llamacpp teardown failed:', err);
   }
 
-  await RunAnywhere.shutdown();
+  // `reset()` closes every open session (RAG index, voice pipeline) before it
+  // releases the WASM modules, so views never need to unwind them here.
+  await RunAnywhere.reset();
 }
 
 /**
@@ -741,26 +628,20 @@ async function teardownRuntime(): Promise<void> {
  */
 async function refreshSDKCatalogs(): Promise<void> {
   appLogger.info('[RunAnywhere] Refreshing SDK model registry...');
+  await RunAnywhere.storage.refresh();
 
-  RunAnywhere.refreshModelRegistry();
-
-  const list = RunAnywhere.listModels();
-  if (list) {
-    const models = list.models;
-    const downloaded = models.filter((m) => modelInfoIsDownloadedOnDisk(m)).length;
-    const available = models.filter((m) => modelInfoIsAvailableForUse(m)).length;
-    appLogger.info(
-      `[RunAnywhere] Model registry: registered=${models.length}, downloaded=${downloaded}, available=${available}`,
-    );
-  } else {
-    appLogger.warning('[RunAnywhere] Model registry refresh incomplete: list unavailable');
-  }
+  const catalog = RunAnywhere.models.list();
+  const downloaded = RunAnywhere.models.list({ downloadedOnly: true }).length;
+  const available = RunAnywhere.models.list({ availableOnly: true }).length;
+  appLogger.info(
+    `[RunAnywhere] Model registry: registered=${catalog.length}, downloaded=${downloaded}, available=${available}`,
+  );
 
   try {
-    const adapters = await RunAnywhere.lora.allRegistered();
-    appLogger.info(`[RunAnywhere] LoRA registry: ${adapters.length} entries`);
+    const { applied } = await RunAnywhere.lora.list();
+    appLogger.info(`[RunAnywhere] LoRA adapters applied: ${applied.length}`);
   } catch (err) {
-    appLogger.warning('[RunAnywhere] LoRA catalog unavailable:', err);
+    appLogger.warning('[RunAnywhere] LoRA state unavailable:', err);
   }
 }
 
@@ -776,7 +657,6 @@ function showAccelerationBadge(llmMode: string): void {
   const mods = RunAnywhere.runtime.modalities;
   const llmGPU = llmMode === 'webgpu' || mods.llm.acceleration === 'webgpu';
   const speech = RunAnywhere.runtime.speech;
-  const speechAccel = speech.acceleration === 'webgpu' ? 'WebGPU' : 'CPU';
   const speechGPU = speech.acceleration === 'webgpu';
   const fmt = (id: keyof typeof mods) => {
     const m = mods[id];

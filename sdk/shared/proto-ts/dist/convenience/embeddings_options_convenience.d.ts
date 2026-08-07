@@ -1,4 +1,3 @@
-import { EmbeddingsConfiguration, EmbeddingsOptions } from '../embeddings_options';
-export declare const embeddingsConfigurationDefaults: () => EmbeddingsConfiguration;
-export declare const validateEmbeddingsConfiguration: (m: EmbeddingsConfiguration) => void;
+import { EmbeddingsOptions } from '../embeddings_options';
 export declare const embeddingsOptionsDefaults: () => EmbeddingsOptions;
+export declare const validateEmbeddingsOptions: (m: EmbeddingsOptions) => void;

@@ -31,7 +31,7 @@ import {
   getModelFrameworks,
   getPrimaryFramework,
 } from '../../utils/modelDisplay';
-import { RunAnywhere } from '@runanywhere/core';
+import { formatFramework, RunAnywhere, usagePercentage } from '@runanywhere/core';
 import {
   InferenceFramework,
   ModelCategory,
@@ -43,10 +43,9 @@ import {
 } from '../../services/NpuModelCatalog';
 import { RAG_EMBEDDING_FRAMEWORKS } from '../../services/EmbeddingCatalogPolicy';
 import { listVisibleCatalogModels } from '../../services/ModelRegistryQueries';
+import { isModelDownloaded } from '../../utils/modelDisplay';
 
-const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
-
-type StorageSnapshot = Awaited<ReturnType<typeof RunAnywhere.getStorageInfo>>;
+type StorageSnapshot = Awaited<ReturnType<typeof RunAnywhere.storage.info>>;
 
 // Opens tall (long model lists); drag up to near-full.
 const SNAP_POINTS = ['60%', '92%'];
@@ -131,8 +130,7 @@ const isRAGContext = (context: ModelSelectionContext): boolean =>
   context === ModelSelectionContext.RagEmbedding ||
   context === ModelSelectionContext.RagLLM;
 
-const isOnDevice = (model: SDKModelInfo): boolean =>
-  Boolean(model.isDownloaded || model.localPath);
+const isOnDevice = (model: SDKModelInfo): boolean => isModelDownloaded(model);
 
 const formatBytes = (bytes: number): string => {
   if (!bytes || bytes <= 0) return '0 B';
@@ -144,7 +142,7 @@ const formatBytes = (bytes: number): string => {
 
 const modelSubtitle = (model: SDKModelInfo): string => {
   const size = getModelDownloadSizeBytes(model);
-  const framework = RunAnywhere.formatFramework(
+  const framework = formatFramework(
     getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK)
   );
   return [
@@ -194,12 +192,12 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     try {
       const [allModels, storageInfo, loraCatalog] = await Promise.all([
         listVisibleCatalogModels(npuCatalogSnapshot.registeredModelIds),
-        RunAnywhere.getStorageInfo().catch(() => null),
-        RunAnywhere.lora.listCatalog().catch(() => null),
+        RunAnywhere.storage.info().catch(() => null),
+        RunAnywhere.lora.catalog.list().catch(() => null),
       ]);
       setStorage(storageInfo);
 
-      if (loraCatalog?.success) {
+      if (loraCatalog && !loraCatalog.error) {
         const ids = new Set<string>();
         for (const entry of loraCatalog.entries) {
           entry.compatibleModels.forEach((id) => ids.add(id));
@@ -278,18 +276,26 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const handleDownload = useCallback(
     async (model: SDKModelInfo) => {
       setDownloading((prev) => ({ ...prev, [model.id]: 0 }));
+      const iter = RunAnywhere.models
+        .download(model.id)
+        [Symbol.asyncIterator]();
       try {
-        const iter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();
         let step = await iter.next();
         while (!step.done) {
-          const p = step.value.stageProgress ?? 0;
-          setDownloading((prev) => ({ ...prev, [model.id]: p }));
+          const event = step.value;
+          if (event.type === 'progress') {
+            setDownloading((prev) => ({
+              ...prev,
+              [model.id]: event.percent / 100,
+            }));
+          }
           step = await iter.next();
         }
         await loadData();
       } catch (error) {
         console.error('[ModelSelectionSheet] download failed:', error);
       } finally {
+        await iter.return?.();
         setDownloading((prev) => {
           const next = { ...prev };
           delete next[model.id];
@@ -549,7 +555,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                     styles.usageFill,
                     {
                       backgroundColor: colors.primary,
-                      width: `${Math.min(100, Math.max(0, storage?.device?.usedPercent ?? 0))}%`,
+                      width: `${Math.min(100, Math.max(0, storage?.device ? usagePercentage(storage.device) : 0))}%`,
                     },
                   ]}
                 />

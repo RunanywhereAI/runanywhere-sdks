@@ -10,8 +10,8 @@ import os
 // MARK: - Model Catalog Bootstrap
 //
 // Mirrors Android `ModelBootstrap.seedCuratedCatalog` and Flutter
-// `_registerModulesAndModels()`. Uses the canonical `RunAnywhere.registerModel`
-// async public API including multi-file and archive-with-structure overloads.
+// `_registerModulesAndModels()`. Uses the canonical `RunAnywhere.models.register`
+// async public API including multi-file and archive-with-structure registrations.
 // Safe to re-run on every cold launch — commons merges runtime fields on
 // re-registration (see `register_model_from_url.cpp` header).
 enum ModelCatalogBootstrap {
@@ -70,6 +70,10 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             memoryRequirement: 2_500_000_000
         )
+        // ONE quantization per model. The Q8_0 sibling of this row was removed
+        // deliberately: two quants of the same 350M model differ only in bytes
+        // (229 MB vs 379 MB), so the second row costs a catalog slot and a
+        // "which one do I pick?" decision without adding a capability.
         await registerLLM(
             id: "lfm2-350m-q4_k_m",
             name: "LiquidAI LFM2 350M Q4_K_M",
@@ -77,12 +81,17 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             memoryRequirement: 250_000_000
         )
+        // LFM2.5-230M on the CPU. Q4_K_M, not the fractionally smaller Q4_0
+        // (149 MB vs 153 MB): 4 MB buys K-quant mixed precision on the
+        // attention/embedding tensors, and Q4_K_M is the quantization every
+        // other GGUF row in this catalog uses.
         await registerLLM(
-            id: "lfm2-350m-q8_0",
-            name: "LiquidAI LFM2 350M Q8_0",
-            url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+            id: "lfm2.5-230m-q4_k_m",
+            name: "LiquidAI LFM2.5 230M Q4_K_M",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/main/LFM2.5-230M-Q4_K_M.gguf",
             framework: .llamaCpp,
-            memoryRequirement: 400_000_000
+            // 153,406,304 B of weights plus KV cache and runtime overhead.
+            memoryRequirement: 190_000_000
         )
         await registerLLM(
             id: "lfm2.5-1.2b-instruct-q4_k_m",
@@ -445,6 +454,19 @@ enum ModelCatalogBootstrap {
             framework: .mlx,
             memoryRequirement: 900_000_000
         )
+        // A PLAIN REPO ref, not a `/4bit` subfolder ref like LFM2.5-2.6B-MLX
+        // below. LiquidAI publishes one precision per repo here — the 4-bit
+        // weights sit at the repo ROOT alongside config.json and tokenizer.json
+        // — so appending a precision segment would 404.
+        await registerLLM(
+            id: "mlx-lfm2.5-230m-4bit",
+            name: "MLX LFM2.5 230M 4bit",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-230M-MLX-4bit",
+            framework: .mlx,
+            // 150,867,598 B for the whole repo (146 MB of that is
+            // model.safetensors) plus KV cache and Metal runtime overhead.
+            memoryRequirement: 200_000_000
+        )
         await registerLLM(
             id: "mlx-lfm2-350m",
             name: "MLX LFM2 350M",
@@ -602,6 +624,24 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             modality: .multimodal,
             memoryRequirement: 600_000_000
+        )
+        // Fara1.5 — Computer-Use Agent profile model, mirrors the Android
+        // catalog row (`ModelCatalog.kt`) so `RunAnywhere.CUA` has a
+        // drivable model on both platforms. `cuaProfile` lands on
+        // `ModelInfo.cuaProfile` (PR #605 review issue 9).
+        await registerMultiFile(
+            id: "fara1.5-4b-q4_k_m",
+            name: "Fara1.5 4B Computer-Use Agent Q4_K_M",
+            files: [
+                ("https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf",
+                 "Fara1.5-4B-Q4_K_M.gguf"),
+                ("https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf",
+                 "mmproj-Fara1.5-4B-f16.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 3_300_000_000,
+            cuaProfile: RunAnywhere.CUA.faraProfile
         )
         logger.info("VLM models registered")
         #endif
@@ -1258,6 +1298,54 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 3_450_000_000,
             supportsThinking: true
         )
+
+        // The two small siblings, same engine, same folder-ref rules as above.
+        //
+        // `int8/` is a PRECISION SIBLING DIR, not a variant probed at runtime.
+        // Unlike QHexRT (where v75/v79/v81 is arch-pinned and resolved on
+        // device), one Core ML bundle runs on every Apple device, so the
+        // precision is a quality/size choice the CATALOG makes — see
+        // engines/neurt/neurt_bundle_policy.h, `resolve_variant` is NULL on
+        // purpose. Point at `fp16/` instead to A/B the reference bundle.
+        //
+        // int8 is chosen over fp16 on measurement, not on size alone: linear
+        // per-channel int8 scored equal-or-better than fp16 on teacher-forced
+        // parity for both models AND had the LOWER on-ANE error floor, because
+        // narrowing the weight range narrows what flows into the ANE's fp16
+        // accumulation. It is also ~2x the decode rate at half the bytes.
+        //
+        // Each bundle is TWO graphs (`chunk0` + `lmhead`) and no more: both
+        // models are small enough that chunk planning returns a single body
+        // chunk, so there are no per-token host round-trips between chunks the
+        // way the 6-chunk 2.6B has. Every graph is far inside the size tier
+        // measured 100% reliable on an iPhone (Gate P PASS for both).
+        //
+        // supportsThinking is FALSE for both, deliberately. Their chat template
+        // has no `enable_thinking` switch — it only PRESERVES thinking already
+        // present in history — and the 230M card explicitly rules out
+        // reasoning-heavy use. Declaring it true would make the app offer a
+        // toggle that prepends /no_think to a model that never emits <think>.
+        await registerLLM(
+            id: "lfm2.5-230m-ane",
+            name: "LFM2.5 230M (NeuRT / Neural Engine)",
+            url: "hf.co/runanywhere/LFM2.5-230M_ANE/int8",
+            framework: .coreml,
+            modality: .language,
+            // Peak RSS with ~15% headroom, measured under `neurt_generate` on
+            // Apple silicon: 449 MB resident for a full prefill+decode. NOT a
+            // download claim — the live HF folder total (369 MB) is what the
+            // post-download size floor compares against for a folder ref.
+            memoryRequirement: 520_000_000
+        )
+        await registerLLM(
+            id: "lfm2.5-350m-ane",
+            name: "LFM2.5 350M (NeuRT / Neural Engine)",
+            url: "hf.co/runanywhere/LFM2.5-350M_ANE/int8",
+            framework: .coreml,
+            modality: .language,
+            // Measured 575 MB peak RSS + ~15%; HF folder total is 494 MB.
+            memoryRequirement: 660_000_000
+        )
         logger.info("Apple Neural Engine models registered")
 
         // --- The SAME model on the other two accelerators -----------------------
@@ -1303,22 +1391,37 @@ enum ModelCatalogBootstrap {
         logger.info("All modules and models registered")
     }
 
-    /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the
-    /// catalog entry plus its downloadable artifact record (no bytes fetched);
-    /// safe to re-run on every cold launch.
+    /// Seed the curated LoRA adapter catalog. `RALoraAdapterCatalogEntry` no
+    /// longer carries url/filename/size/description (idl/lora_options.proto:
+    /// "everything generic about the artifact ... lives on the ModelInfo
+    /// record for this adapter"), so the downloadable bytes are described by
+    /// a companion `RAModelInfo` artifact registered under the SDK's
+    /// `lora-adapter:{id}` convention. `registerArtifact` registers both the
+    /// catalog entry and that artifact record (no bytes fetched); safe to
+    /// re-run on every cold launch.
     private static func registerLoraAdapters() async {
         var adapter = RALoraAdapterCatalogEntry()
         adapter.id = "abliterated-lora"
         adapter.name = "Abliterated LoRA (F16)"
-        adapter.description_p = "Removes refusal behavior — model answers directly without disclaimers"
-        adapter.url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf"
-        adapter.filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf"
         adapter.compatibleModels = ["qwen2.5-0.5b-instruct-q6_k"]
-        adapter.sizeBytes = 17_620_224
         adapter.defaultScale = 1.0
 
+        let downloadURL = URL(
+            string: "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf"
+        )
+        let artifact = RAModelInfo.make(
+            id: adapter.loraArtifactModelID,
+            name: adapter.name,
+            category: .language,
+            format: .gguf,
+            framework: .llamaCpp,
+            downloadURL: downloadURL,
+            downloadSizeBytes: 17_620_224,
+            description: "Removes refusal behavior — model answers directly without disclaimers"
+        )
+
         do {
-            _ = try await RunAnywhere.lora.registerArtifact(adapter)
+            _ = try await RunAnywhere.lora.registerArtifact(adapter, artifact: artifact)
         } catch {
             logger.warning(
                 "Failed to register LoRA adapter: \(error.localizedDescription, privacy: .public)"
@@ -1411,15 +1514,17 @@ enum ModelCatalogBootstrap {
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
-            _ = try await RunAnywhere.registerModel(
-                id: id,
-                name: name,
-                url: url,
-                framework: framework,
-                modality: modality,
-                memoryRequirement: memoryRequirement,
-                supportsThinking: supportsThinking,
-                supportsLora: supportsLora
+            _ = try await RunAnywhere.models.register(
+                .url(
+                    url,
+                    name: name,
+                    framework: framework,
+                    category: modality,
+                    id: id,
+                    memoryRequirementBytes: memoryRequirement,
+                    supportsThinking: supportsThinking,
+                    supportsLora: supportsLora
+                )
             )
         } catch {
             logger.warning("Failed to register model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -1438,15 +1543,17 @@ enum ModelCatalogBootstrap {
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
-            _ = try await RunAnywhere.registerModel(
-                archive: url,
-                structure: structure,
-                id: id,
-                name: name,
-                framework: framework,
-                modality: modality,
-                archiveType: archive,
-                memoryRequirement: memoryRequirement
+            _ = try await RunAnywhere.models.register(
+                .archive(
+                    url,
+                    structure: structure,
+                    name: name,
+                    framework: framework,
+                    category: modality,
+                    archiveType: archive,
+                    id: id,
+                    memoryRequirementBytes: memoryRequirement
+                )
             )
         } catch {
             logger.warning("Failed to register archive model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -1462,7 +1569,8 @@ enum ModelCatalogBootstrap {
         memoryRequirement: Int64,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async {
         await registerMultiFile(
             id: id,
@@ -1473,7 +1581,8 @@ enum ModelCatalogBootstrap {
             memoryRequirement: memoryRequirement,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
-            downloadSize: downloadSize
+            downloadSize: downloadSize,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -1486,7 +1595,8 @@ enum ModelCatalogBootstrap {
         memoryRequirement: Int64,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         let descriptors = files.compactMap { makeDescriptor(for: $0, modality: modality) }
@@ -1495,16 +1605,19 @@ enum ModelCatalogBootstrap {
             return
         }
         do {
-            _ = try await RunAnywhere.registerModel(
-                multiFile: descriptors,
-                id: id,
-                name: name,
-                framework: framework,
-                modality: modality,
-                memoryRequirement: memoryRequirement,
-                contextLength: contextLength,
-                supportsThinking: supportsThinking,
-                downloadSize: downloadSize
+            _ = try await RunAnywhere.models.register(
+                .multiFile(
+                    descriptors,
+                    id: id,
+                    name: name,
+                    framework: framework,
+                    category: modality,
+                    memoryRequirementBytes: memoryRequirement,
+                    downloadSizeBytes: downloadSize,
+                    contextLength: contextLength,
+                    supportsThinking: supportsThinking,
+                    cuaProfile: cuaProfile
+                )
             )
         } catch {
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")

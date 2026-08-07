@@ -243,6 +243,10 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSttTranscribeLifecycleProto(requestProto: ByteArray): ByteArray?
 
+    /** Snapshot the lifecycle STT service state as serialized STTServiceState bytes. */
+    @JvmStatic
+    external fun racSttStateLifecycleProto(): ByteArray?
+
     @JvmStatic
     external fun racSttTranscribeStreamLifecycleProto(
         requestProto: ByteArray,
@@ -398,6 +402,10 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTtsListVoicesLifecycleProto(): ByteArray?
 
+    /** Snapshot the lifecycle TTS service state as serialized TTSServiceState bytes. */
+    @JvmStatic
+    external fun racTtsStateLifecycleProto(): ByteArray?
+
     /**
      * Stop an in-flight lifecycle-owned TTS synthesis. Mirrors iOS Swift's
      * `rac_tts_stop_lifecycle_proto` path — the v2 lifecycle TTS stack does
@@ -434,11 +442,15 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVadComponentConfigureProto(handle: Long, configProto: ByteArray): Int
 
+    /**
+     * Run VAD over one serialized VADProcessRequest (audio bytes + encoding +
+     * options bundled in the request). Returns serialized VADProcessResult
+     * bytes, or null on failure.
+     */
     @JvmStatic
     external fun racVadComponentProcessProto(
         handle: Long,
-        samples: FloatArray,
-        optionsProto: ByteArray?,
+        requestProto: ByteArray,
     ): ByteArray?
 
     @JvmStatic
@@ -1196,24 +1208,21 @@ object RunAnywhereBridge {
     ): Int
 
     /**
-     * Feed raw mic frames (16 kHz mono PCM16) into the in-core segmenter. The
-     * core accumulates frames, performs energy-based utterance endpointing, and
-     * on each completed utterance runs the full VAD→STT→LLM→TTS turn pipeline.
-     * Returns serialized VoiceAgentResult bytes — carrying the synthesized
-     * reply (WAV) when a turn completed this call, or an empty result
-     * otherwise. Per-stage VoiceEvents fan out to the handle callback (so
-     * streamVoiceAgent() collectors observe them). Throws a native-proto
-     * failure on error. Pass [isFinal] = true to flush an in-progress
-     * utterance.
+     * Feed raw mic frames into the in-core segmenter as one serialized
+     * VoiceAgentAudioFrame (audio_data, sample_rate, channels, encoding,
+     * is_final). The core accumulates frames, performs energy-based utterance
+     * endpointing, and on each completed utterance runs the full
+     * VAD→STT→LLM→TTS turn pipeline. Returns serialized VoiceAgentResult
+     * bytes — carrying the synthesized reply (WAV) when a turn completed this
+     * call, or an empty result otherwise. Per-stage VoiceEvents fan out to
+     * the handle callback (so streamVoiceAgent() collectors observe them).
+     * Throws a native-proto failure on error. Set `is_final` on the frame to
+     * flush an in-progress utterance.
      */
     @JvmStatic
     external fun racVoiceAgentFeedAudioProto(
         handle: Long,
-        audioData: ByteArray,
-        sampleRateHz: Int,
-        channels: Int,
-        encoding: Int,
-        isFinal: Boolean,
+        frameProto: ByteArray,
     ): ByteArray?
 
     // TOOL-CALLING SESSION (rac_tool_calling.h)
@@ -1372,6 +1381,16 @@ object RunAnywhereBridge {
     /** Request-scoped query wrapper used by cancellable Kotlin calls. */
     @JvmStatic external fun racRagQueryRequestProto(requestId: Long, handle: Long, queryProto: ByteArray): ByteArray?
 
+    /** Retrieval-only search; returns serialized RAGSearchResponse bytes. Null on error. */
+    @JvmStatic external fun racRagSearchProto(handle: Long, requestProto: ByteArray): ByteArray?
+
+    /** Request-scoped search wrapper used by cancellable Kotlin calls. */
+    @JvmStatic external fun racRagSearchRequestProto(
+        requestId: Long,
+        handle: Long,
+        requestProto: ByteArray,
+    ): ByteArray?
+
     /**
      * Request-scoped streaming query: blocks on the calling thread, invoking
      * [listener] with each serialized RAGStreamEvent (TOKEN…, then COMPLETED or
@@ -1422,6 +1441,42 @@ object RunAnywhereBridge {
     external fun racLoraCatalogMarkDownloadCompletedProto(requestProto: ByteArray): ByteArray?
 
     @JvmStatic external fun racLoraAdapterImportProto(requestProto: ByteArray): ByteArray?
+
+    // COMPUTER-USE AGENT (CUA) SCAFFOLD (rac/features/cua/rac_cua.h)
+    //
+    // Stateless, profile-driven bridge that turns a VLM into a drivable
+    // computer-use agent without baking any single model into the SDK.
+    // Mirrors Swift's `RunAnywhere.CUA` facade (RunAnywhere+CUA.swift). The
+    // parse thunk serializes a `runanywhere.v1.CuaAction`; the public facade
+    // decodes it with Wire into the structured `CuaAction` value type — the
+    // same proto-byte bridging every other modality uses.
+
+    /**
+     * Render `profileId`'s system prompt for a declared coordinate space
+     * (`displayW` x `displayH`; pass the profile's native space, e.g.
+     * 1000x1000 for Fara). Forwards to `rac_cua_system_prompt`.
+     *
+     * @return the prompt string, or null for an unknown profile.
+     */
+    @JvmStatic
+    external fun racCuaSystemPrompt(profileId: String, displayW: Int, displayH: Int): String?
+
+    /**
+     * Parse a CUA model's raw output, rescaling coordinates from the profile's
+     * model space to the caller's viewport. Forwards to
+     * `rac_cua_parse_action_proto`.
+     *
+     * @return serialized `runanywhere.v1.CuaAction` bytes (inspect `parse_ok`
+     *         for whether a valid tool call was found), or null for an unknown
+     *         profile.
+     */
+    @JvmStatic
+    external fun racCuaParseAction(
+        profileId: String,
+        modelOutput: String,
+        viewportW: Int,
+        viewportH: Int,
+    ): ByteArray?
 
     // PLUGIN LOADER (rac/router/rac_plugin_loader.h)
     //
@@ -1606,14 +1661,6 @@ object RunAnywhereBridge {
     external fun racStructuredOutputSchemaToJsonProto(schemaProto: ByteArray): ByteArray?
 
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h)
-    //
-    // ENGINE ROUTER — CAPABILITY QUERIES
-    //
-    // `rac_router_frameworks_for_capability_proto` consumes a serialized
-    // `runanywhere.v1.FrameworksForCapabilityRequest` and returns a serialized
-    // `runanywhere.v1.FrameworksForCapabilityResponse`. Replaces the local
-    // SDKComponent → ModelCategory → framework mapping that used to live in
-    // Kotlin.
 
     // VAD COMPONENT METADATA (Swift-alignment)
 

@@ -91,7 +91,7 @@ struct MessageBubbleView: View {
                 Spacer(minLength: AppSpacing.padding60)
             }
 
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: AppSpacing.smallMedium) {
                 if message.role == .assistant && loadedModelSupportsThinking && (isStreamingTail || hasThinking) {
                     ReasoningDisclosureView(
                         reasoning: message.thinkingContent ?? "",
@@ -109,7 +109,7 @@ struct MessageBubbleView: View {
             }
 
             if message.role != .user {
-                Spacer(minLength: AppSpacing.padding60)
+                Spacer(minLength: AppSpacing.large)
             }
         }
         .adaptiveSheet(isPresented: $showToolCallSheet) {
@@ -234,45 +234,26 @@ struct ReasoningDisclosureView: View {
         return isExpanded ? "Hide reasoning" : "Show reasoning"
     }
 
-    private var reasoningContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                    if hasReasoning {
-                        Text(reasoning)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.leading)
-                    } else {
-                        HStack(spacing: AppSpacing.smallMedium) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Waiting for model output…")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
-
-                    Color.clear
-                        .frame(height: 1)
-                        .id("reasoning-stream-end")
-                }
+    // Sizes to its content instead of reserving a fixed-height scroll box; the
+    // outer chat list already scrolls to the latest reasoning while streaming.
+    @ViewBuilder private var reasoningContent: some View {
+        if hasReasoning {
+            Text(reasoning.trimmingCharacters(in: .whitespacesAndNewlines))
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+        } else {
+            HStack(spacing: AppSpacing.smallMedium) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Waiting for model output…")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
             }
-            .frame(maxHeight: AppSpacing.minFrameHeight)
-            .onAppear {
-                scrollToLatestReasoning(using: proxy)
-            }
-            .onChange(of: reasoning) { _, _ in
-                scrollToLatestReasoning(using: proxy)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private func scrollToLatestReasoning(using proxy: ScrollViewProxy) {
-        guard isStreaming else { return }
-        proxy.scrollTo("reasoning-stream-end", anchor: .bottom)
     }
 
     private var headerBackground: some View {
@@ -304,9 +285,7 @@ extension MessageBubbleView {
     @ViewBuilder var timestampAndAnalyticsSection: some View {
         // Only show timestamp for assistant messages when content exists and not generating
         if message.role == .assistant && !message.content.isEmpty && !isGenerating {
-            HStack(spacing: 6) {
-                Spacer()
-
+            HStack(spacing: AppSpacing.small) {
                 Text(message.timestamp, style: .time)
                     .font(AppTypography.caption2)
                     .foregroundColor(AppColors.textSecondary)
@@ -315,7 +294,9 @@ extension MessageBubbleView {
                     analyticsContent(analytics)
                 }
             }
-            .padding(.leading, AppSpacing.mediumLarge)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -413,7 +394,7 @@ extension MessageBubbleView {
                 if message.role == .assistant {
                     VStack(alignment: .leading, spacing: 0) {
                         AdaptiveMarkdownText(
-                            message.content,
+                            message.content.trimmingCharacters(in: .whitespacesAndNewlines),
                             font: AppTypography.body,
                             color: AppColors.textPrimary
                         )

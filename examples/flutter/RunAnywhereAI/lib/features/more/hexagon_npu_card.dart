@@ -13,10 +13,10 @@ class HexagonNpuCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final npu = QHexRT.isAvailable ? QHexRT.probeNpu() : NpuCapability();
-    final supported = npu.qhexrtSupported;
+    final supported = npu.supported;
     final subtitle = supported
         ? '${npu.socModel.isEmpty ? 'Snapdragon' : npu.socModel} · '
-              'Hexagon ${npu.archName} — NPU models available'
+              'Hexagon ${npu.hexagonArch.name} — NPU models available'
         : 'Requires Hexagon v75+ — NPU models hidden'
               '${npu.socModel.isEmpty ? '' : ' (${npu.socModel})'}';
 

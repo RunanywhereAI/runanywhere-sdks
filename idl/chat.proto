@@ -88,8 +88,6 @@ message ChatMessage {
     // distinguish multiple users in a multi-party conversation.
     optional string name       = 5;
 
-    reserved 6;
-
     // Optional tool-call ID this message is responding to (only set when
     // role == MESSAGE_ROLE_TOOL).
     optional string tool_call_id = 7;
@@ -120,58 +118,3 @@ message ChatGenerationRequest {
     map<string, string> metadata = 6;
 }
 
-message ChatGenerationResult {
-    string conversation_id = 1;
-    ChatMessage message = 2;
-    optional LLMGenerationResult generation = 3;
-    repeated ToolCall tool_calls = 4;
-    repeated ToolResult tool_results = 5;
-    optional string error_message = 6;
-    int32 error_code = 7;
-}
-
-enum ChatStreamEventKind {
-    CHAT_STREAM_EVENT_KIND_UNSPECIFIED = 0;
-    CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED = 1;
-    CHAT_STREAM_EVENT_KIND_TOKEN = 2;
-    CHAT_STREAM_EVENT_KIND_TOOL_CALL = 3;
-    CHAT_STREAM_EVENT_KIND_TOOL_RESULT = 4;
-    CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED = 5;
-    CHAT_STREAM_EVENT_KIND_ERROR = 6;
-}
-
-message ChatStreamEvent {
-    uint64 seq = 1;
-    int64 timestamp_us = 2;
-    string request_id = 3;
-    string conversation_id = 4;
-    ChatStreamEventKind kind = 5;
-    optional string token = 6;
-    optional ChatMessage message = 7;
-    optional ToolCall tool_call = 8;
-    optional ToolResult tool_result = 9;
-    optional LLMGenerationResult final_result = 10;
-    optional string error_message = 11;
-    int32 error_code = 12;
-}
-
-message ChatConversationState {
-    string conversation_id = 1;
-    repeated ChatMessage messages = 2;
-    int64 created_at_ms = 3;
-    int64 updated_at_ms = 4;
-    map<string, string> metadata = 5;
-}
-
-// Logical chat service contract. Host conversation state, UI rendering, and
-// backend execution remain adapter-owned; this service describes only the
-// portable Generate / Stream entry points over generated messages.
-service Chat {
-    // Non-streaming generation: returns the completed assistant message and
-    // optional LLMGenerationResult/ToolCall aggregates in one response.
-    rpc Generate(ChatGenerationRequest) returns (ChatGenerationResult);
-
-    // Server-streaming generation: emits per-token, tool-call, tool-result,
-    // and completion events until the turn terminates.
-    rpc Stream(ChatGenerationRequest) returns (stream ChatStreamEvent);
-}

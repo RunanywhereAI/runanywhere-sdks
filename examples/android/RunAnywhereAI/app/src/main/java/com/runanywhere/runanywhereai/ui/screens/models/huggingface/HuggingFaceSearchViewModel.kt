@@ -9,8 +9,9 @@ import com.runanywhere.runanywhereai.data.hf.HfSearchKind
 import com.runanywhere.runanywhereai.data.hf.HuggingFaceHubClient
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.downloadModelStream
-import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.api.DownloadEvent
+import com.runanywhere.sdk.public.api.ModelRegistration
+import com.runanywhere.sdk.public.api.models
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -124,19 +125,26 @@ class HuggingFaceSearchViewModel : ViewModel() {
             val url = "https://huggingface.co/$repoId/resolve/main/${file.path}"
             _state.update { it.copy(downloadingPath = file.path, downloadProgress = 0, error = null) }
             try {
-                val model = RunAnywhere.registerModel(
-                    name = name,
-                    url = url,
-                    framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-                    memoryRequirement = file.sizeBytes.takeIf { it > 0 },
+                val model = RunAnywhere.models.register(
+                    ModelRegistration.url(
+                        name = name,
+                        url = url,
+                        framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+                        memoryBytes = file.sizeBytes.takeIf { it > 0 },
+                    ),
                 )
-                RunAnywhere.downloadModelStream(model).collect { p ->
-                    val pct = if (p.total_bytes > 0) {
-                        (p.bytes_downloaded * 100 / p.total_bytes).toInt()
-                    } else {
-                        (p.stage_progress.coerceIn(0f, 1f) * 100).toInt()
+                RunAnywhere.models.download(model.id).collect { event ->
+                    val pct = when (event) {
+                        is DownloadEvent.Progress ->
+                            if (event.bytesTotal > 0) {
+                                (event.bytesDone * 100 / event.bytesTotal).toInt()
+                            } else {
+                                null
+                            }
+                        is DownloadEvent.Completed -> 100
+                        else -> null
                     }
-                    _state.update { it.copy(downloadProgress = pct) }
+                    if (pct != null) _state.update { it.copy(downloadProgress = pct) }
                 }
                 _state.update {
                     it.copy(downloadingPath = null, downloadProgress = null, addedModelId = model.id)

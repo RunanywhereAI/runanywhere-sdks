@@ -15,7 +15,7 @@ import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
 /**
- * Human-readable label for UI / documentation surfaces.
+ * Human-readable label for UI and docs.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(

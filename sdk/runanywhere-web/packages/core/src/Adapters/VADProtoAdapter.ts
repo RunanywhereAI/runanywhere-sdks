@@ -1,14 +1,13 @@
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
   SpeechActivityEvent,
   VADConfiguration,
-  VADAudioEncoding,
   VADOptions,
   VADProcessRequest,
   VADResult,
   VADServiceState,
   VADStatistics,
   VADStreamEvent,
-  VADStreamEventKind,
   type SpeechActivityEvent as ProtoSpeechActivityEvent,
   type VADConfiguration as ProtoVADConfiguration,
   type VADOptions as ProtoVADOptions,
@@ -114,16 +113,14 @@ export class VADProtoAdapter {
     sampleRate = audioCaptureDefaults.micSampleRateHz,
   ): Promise<ProtoVADResult | null> {
     const request = VADProcessRequest.create({
-      requestId: lifecycleRequestId(),
       audio: {
         audioData: float32ToLittleEndianBytes(samples),
-        encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+        encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
         sampleRate,
         channels: 1,
         frameOffsetMs: 0,
       },
       options,
-      metadata: {},
     });
     const host = requireLiveOnnxWorkerOrMain('vad.processLifecycle');
     if (host) {
@@ -192,29 +189,35 @@ export class VADProtoAdapter {
     handle: number,
     samples: Float32Array,
     options: ProtoVADOptions,
+    sampleRate = audioCaptureDefaults.micSampleRateHz,
   ): ProtoVADResult | null {
     if (!ensureExports(this.module, 'vad.process', ['_rac_vad_component_process_proto'])) {
       return null;
     }
-    const sampleBytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
-    const optionsBytes = VADOptions.encode(options).finish();
-    const bridge = this.bridge();
-    return bridge.withHeapBytes(sampleBytes, (samplesPtr) => (
-      bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-        bridge.callResultProto(
-          VADResult,
-          (outResult) => this.module._rac_vad_component_process_proto!(
-            handle,
-            samplesPtr,
-            samples.length,
-            optionsPtr,
-            optionsSize,
-            outResult,
-          ),
-          'rac_vad_component_process_proto',
+    const request = VADProcessRequest.create({
+      audio: {
+        audioData: float32ToLittleEndianBytes(samples),
+        encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
+        sampleRate,
+        channels: 1,
+        frameOffsetMs: 0,
+      },
+      options,
+    });
+    return this.bridge().withEncodedRequest(
+      request,
+      VADProcessRequest,
+      VADResult,
+      (requestPtr, requestSize, outResult) => (
+        this.module._rac_vad_component_process_proto!(
+          handle,
+          requestPtr,
+          requestSize,
+          outResult,
         )
-      ))
-    ));
+      ),
+      'rac_vad_component_process_proto',
+    );
   }
 
   /**
@@ -353,15 +356,8 @@ export class VADProtoAdapter {
 
             const emitted = events.splice(0, events.length);
             for (const event of emitted) {
-              if (
-                event.kind === VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR
-                || event.errorCode !== 0
-              ) {
-                throw SDKException.fromRACResult(
-                  event.errorCode || -1,
-                  event.errorMessage || 'VAD stream emitted an error event',
-                  { module, logger },
-                );
+              if (event.error) {
+                throw new SDKException(event.error);
               }
               if (event.result) yield event.result;
             }
@@ -495,11 +491,4 @@ function float32ToLittleEndianBytes(samples: Float32Array): Uint8Array {
     view.setFloat32(index * Float32Array.BYTES_PER_ELEMENT, samples[index] ?? 0, true);
   }
   return new Uint8Array(buffer);
-}
-
-function lifecycleRequestId(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID();
-  }
-  return `vad-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }

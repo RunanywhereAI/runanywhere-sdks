@@ -50,10 +50,8 @@ import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.fromFilePath
-import com.runanywhere.sdk.public.extensions.processImage
-import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.sdk.public.api.ImageInput
+import com.runanywhere.sdk.public.api.vlm
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import kotlinx.coroutines.CancellationException
@@ -119,26 +117,27 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
                             FileOutputStream(file).use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) }
                             file.absolutePath
                         }
-                        val image = RAVLMImage.fromFilePath(path)
+                        val image = ImageInput.file(path)
                         // Honor the app-wide system prompt for persona, but keep a tight
                         // token cap so each frame analyzes quickly.
                         val s = SettingsRepository.settings
                         val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.VLM)
                         val opts = VisionGenerationPolicy.options(
-                            prompt = "Describe what you see in one sentence.",
                             model = activeModel.model,
                             mode = VisionAnswerMode.LIVE_CAPTION,
                             userLimit = s.maxTokens,
                             systemPrompt = s.systemPrompt,
                         )
-                        // Non-streaming process(): some VLM engines complete the stream
+                        // Non-streaming generate(): some VLM engines complete the stream
                         // path with 0 incremental tokens, which leaves the caption blank;
-                        // process() returns the full result text reliably.
-                        val result = withContext(Dispatchers.Default) {
-                            RunAnywhere.processImage(image, opts)
-                        }
+                        // generate() returns the full result text reliably.
+                        val result = RunAnywhere.vlm.generate(
+                            image,
+                            "Describe what you see in one sentence.",
+                            opts,
+                        )
                         if (result.text.isNotBlank()) caption = result.text
-                        tps = String.format(Locale.US, "%.1f", result.tokens_per_second)
+                        tps = String.format(Locale.US, "%.1f", result.tokensPerSecond)
                         error = null
                     } catch (e: CancellationException) {
                         throw e
@@ -151,12 +150,7 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
                 delay(LIVE_INTERVAL_MS)
             }
         } finally {
-            // Leaving Live mode or switching its model must stop the native VLM
-            // request too. Cancelling only the coroutine leaves a blocking JNI
-            // inference in flight and makes the next screen/model fail as busy.
-            withContext(NonCancellable) {
-                runCatching { RunAnywhere.cancelVLMGeneration() }
-            }
+            analyzing = false
         }
     }
 

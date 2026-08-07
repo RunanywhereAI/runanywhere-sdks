@@ -37,15 +37,15 @@ class DartBridgeLora {
   // MARK: - LoRA Adapter Management
 
   /// Apply one or more LoRA adapters to the current model.
-  LoRAApplyResult apply(LoRAApplyRequest request) {
+  LoraApplyResult apply(LoraApplyRequest request) {
     final fn = RacNative.bindings.rac_lora_apply_proto;
     if (fn == null) {
       throw UnsupportedError('rac_lora_apply_proto is unavailable');
     }
-    final result = DartBridgeProtoUtils.callRequest<LoRAApplyResult>(
+    final result = DartBridgeProtoUtils.callRequest<LoraApplyResult>(
       request: request,
       invoke: fn,
-      decode: LoRAApplyResult.fromBuffer,
+      decode: LoraApplyResult.fromBuffer,
       symbol: 'rac_lora_apply_proto',
     );
     _logger.info('LoRA apply completed: ${result.adapters.length} adapters');
@@ -53,15 +53,15 @@ class DartBridgeLora {
   }
 
   /// Remove one or more LoRA adapters, or clear all adapters.
-  LoRAState remove(LoRARemoveRequest request) {
+  LoraState remove(LoraRemoveRequest request) {
     final fn = RacNative.bindings.rac_lora_remove_proto;
     if (fn == null) {
       throw UnsupportedError('rac_lora_remove_proto is unavailable');
     }
-    final result = DartBridgeProtoUtils.callRequest<LoRAState>(
+    final result = DartBridgeProtoUtils.callRequest<LoraState>(
       request: request,
       invoke: fn,
-      decode: LoRAState.fromBuffer,
+      decode: LoraState.fromBuffer,
       symbol: 'rac_lora_remove_proto',
     );
     _logger.info('LoRA remove completed');
@@ -69,35 +69,35 @@ class DartBridgeLora {
   }
 
   /// Get info about all currently loaded LoRA adapters.
-  LoRAState list([LoRAState? request]) {
+  LoraState list([LoraState? request]) {
     final fn = RacNative.bindings.rac_lora_list_proto;
     if (fn == null) {
       throw UnsupportedError('rac_lora_list_proto is unavailable');
     }
-    return DartBridgeProtoUtils.callRequest<LoRAState>(
-      request: request ?? LoRAState(),
+    return DartBridgeProtoUtils.callRequest<LoraState>(
+      request: request ?? LoraState(),
       invoke: fn,
-      decode: LoRAState.fromBuffer,
+      decode: LoraState.fromBuffer,
       symbol: 'rac_lora_list_proto',
     );
   }
 
   /// Get the LoRA service state reported by commons.
-  LoRAState state([LoRAState? request]) {
+  LoraState state([LoraState? request]) {
     final fn = RacNative.bindings.rac_lora_state_proto;
     if (fn == null) {
       throw UnsupportedError('rac_lora_state_proto is unavailable');
     }
-    return DartBridgeProtoUtils.callRequest<LoRAState>(
-      request: request ?? LoRAState(),
+    return DartBridgeProtoUtils.callRequest<LoraState>(
+      request: request ?? LoraState(),
       invoke: fn,
-      decode: LoRAState.fromBuffer,
+      decode: LoraState.fromBuffer,
       symbol: 'rac_lora_state_proto',
     );
   }
 
   /// Check if the current backend supports a LoRA adapter.
-  LoraCompatibilityResult checkCompatibility(LoRAAdapterConfig config) {
+  LoraCompatibilityResult checkCompatibility(LoraAdapterConfig config) {
     final fn = RacNative.bindings.rac_lora_compatibility_proto;
     if (fn == null) {
       throw UnsupportedError('rac_lora_compatibility_proto is unavailable');
@@ -139,9 +139,6 @@ class DartBridgeLoraRegistry {
   static LoraAdapterCatalogGetResult Function(
     LoraAdapterCatalogGetRequest,
   )? _getCatalogEntryForTesting;
-  static LoraAdapterDownloadCompletedResult Function(
-    LoraAdapterDownloadCompletedRequest,
-  )? _markDownloadCompletedForTesting;
 
   static void setRegisterProtoForTesting(
     LoraAdapterCatalogEntry Function(LoraAdapterCatalogEntry)? override,
@@ -167,14 +164,6 @@ class DartBridgeLoraRegistry {
         override,
   ) {
     _getCatalogEntryForTesting = override;
-  }
-
-  static void setMarkDownloadCompletedProtoForTesting(
-    LoraAdapterDownloadCompletedResult Function(
-      LoraAdapterDownloadCompletedRequest,
-    )? override,
-  ) {
-    _markDownloadCompletedForTesting = override;
   }
 
   // MARK: - Registry Operations
@@ -272,49 +261,16 @@ class DartBridgeLoraRegistry {
     );
   }
 
-  /// Record native-owned LoRA download/import completion in commons catalog
-  /// state. Download bytes, permissions, and file handles stay native-owned.
-  LoraAdapterDownloadCompletedResult markDownloadCompleted(
-    LoraAdapterDownloadCompletedRequest request,
-  ) {
-    final override = _markDownloadCompletedForTesting;
-    if (override != null) {
-      return override(request);
-    }
-
-    final fn =
-        RacNative.bindings.rac_lora_catalog_mark_download_completed_proto;
-    if (fn == null) {
-      throw UnsupportedError(
-        'rac_lora_catalog_mark_download_completed_proto is unavailable',
-      );
-    }
-    return DartBridgeProtoUtils.callRequestWithHandle<
-        LoraAdapterDownloadCompletedResult>(
-      handle: _registryHandle('rac_lora_catalog_mark_download_completed_proto'),
-      request: request,
-      invoke: fn,
-      decode: LoraAdapterDownloadCompletedResult.fromBuffer,
-      symbol: 'rac_lora_catalog_mark_download_completed_proto',
-    );
-  }
-
-  /// Import a user-picked local adapter file through the canonical commons
-  /// entry point. Commons owns matching, placement, artifact registration,
-  /// and catalog completion; Dart only supplies the readable source path.
-  LoraAdapterImportResult importAdapter(LoraAdapterImportRequest request) {
-    final fn = RacNative.bindings.rac_lora_adapter_import_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_lora_adapter_import_proto is unavailable');
-    }
-    return DartBridgeProtoUtils.callRequestWithHandle<LoraAdapterImportResult>(
-      handle: _registryHandle('rac_lora_adapter_import_proto'),
-      request: request,
-      invoke: fn,
-      decode: LoraAdapterImportResult.fromBuffer,
-      symbol: 'rac_lora_adapter_import_proto',
-    );
-  }
+  // `markDownloadCompleted`/`importAdapter` are gone: the two catalog-
+  // bookkeeping ABI symbols they called are permanently-retired stubs
+  // (idl/lora_options.proto, lora-delete-download-import-bookkeeping —
+  // `LoraAdapterDownloadCompletedRequest/Result` and
+  // `LoraAdapterImportRequest/Result` were deleted outright with no
+  // replacement message). Adapter files are now acquired exclusively through
+  // the models domain's generic download/import verbs (see
+  // `RunAnywhereLoRACapability.download`/`registerArtifact` and
+  // `RunAnywhereStorage.importModel`, mirroring Swift's
+  // `RunAnywhere+LoRADownload.swift`).
 
   /// Get all registered LoRA adapters compatible with a model.
   List<LoraAdapterCatalogEntry> getForModel(String modelId) {

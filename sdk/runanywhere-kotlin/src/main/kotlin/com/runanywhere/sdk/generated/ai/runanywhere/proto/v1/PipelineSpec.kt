@@ -32,14 +32,9 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * A pipeline is a labelled DAG of operators connected by typed edges. There
- * are no cycles. Every input edge has a resolvable producer; every output
- * edge has at least one consumer.
- */
 public class PipelineSpec(
   /**
-   * Human-readable, e.g. "voice_agent_basic"
+   * e.g. "voice_agent_basic".
    */
   @field:WireField(
     tag = 1,

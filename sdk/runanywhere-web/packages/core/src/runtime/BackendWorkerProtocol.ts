@@ -32,6 +32,7 @@ export type BackendWorkerInferenceKind =
   | 'rag.sessionCreate'
   | 'rag.ingest'
   | 'rag.query'
+  | 'rag.search'
   | 'rag.clear'
   | 'rag.stats'
   | 'rag.sessionDestroy'

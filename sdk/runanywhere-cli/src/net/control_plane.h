@@ -69,7 +69,11 @@ struct LoginSummary {
     std::string backend_device_id;   // control-plane device row id (auth response)
     std::string persistent_device_id;  // SDK persistent UUID (device fingerprint)
     int64_t token_expires_at = 0;    // unix seconds
-    bool device_registered = false;
+    // SdkInitResult.device_registered was deleted outright (idl API
+    // realignment); has_completed_http_setup is the closest surviving
+    // cross-phase signal ("HTTP/auth setup completed", not literally "a
+    // device row exists"), so it is what this now reports.
+    bool has_completed_http_setup = false;
     uint32_t assignment_count = 0;
     std::string warning;             // non-fatal phase-2 notes
 };

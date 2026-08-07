@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from ._generated_errors import ErrorCategory, ErrorCode
 
@@ -118,6 +118,32 @@ class SDKException(Exception):
         )
 
     @staticmethod
+    def from_proto(err: Any) -> "SDKException":
+        """Build an SDKException from an ``SDKError`` proto submessage.
+
+        Mirrors the proto-backed constructor every other SDK exposes
+        (Swift ``SDKException(proto:)``): the carried failure now lives in the
+        structured ``SDKError`` rather than a loose success/message/code triad.
+        """
+        try:
+            code = ErrorCode(err.code)
+        except ValueError:
+            code = ErrorCode.UNKNOWN
+        try:
+            category = ErrorCategory(err.category)
+        except ValueError:
+            category = None
+        field_path = err.param if err.HasField("param") else None
+        return SDKException.of(
+            code,
+            err.message,
+            category=category,
+            c_abi_code=err.c_abi_code if err.HasField("c_abi_code") else None,
+            nested_message=err.nested_message if err.HasField("nested_message") else None,
+            field_path=field_path,
+        )
+
+    @staticmethod
     def not_initialized(component: str | None = None) -> "SDKException":
         return SDKException.of(
             ErrorCode.NOT_INITIALIZED,
@@ -192,6 +218,20 @@ class SDKException(Exception):
         return SDKException.of(
             ErrorCode.NOT_IMPLEMENTED,
             f"{feature} not implemented" if feature else "Not implemented",
+        )
+
+    @staticmethod
+    def unsupported_capability(name: str, reason: str) -> "SDKException":
+        """A public v4 operation that is honestly absent on this platform/build.
+
+        Thrown at preflight, before any work starts. The same ``name``/``reason``
+        pair also appears in :func:`runanywhere.capabilities`'s ``unavailable`` list,
+        so callers can discover the gap without triggering the exception first.
+        """
+        return SDKException.of(
+            ErrorCode.FEATURE_NOT_AVAILABLE,
+            f"{name} is not supported: {reason}",
+            category=ErrorCategory.CONFIGURATION,
         )
 
     @staticmethod

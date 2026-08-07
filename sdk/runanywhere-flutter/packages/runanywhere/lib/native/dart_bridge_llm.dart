@@ -19,6 +19,8 @@ import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent;
+import 'package:runanywhere/generated/llm_service.pbenum.dart'
+    show LLMStreamEventKind;
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
@@ -213,9 +215,15 @@ class DartBridgeLLM {
         if (controller.isClosed) return;
         try {
           final event = LLMStreamEvent.fromBuffer(message);
-          sawTerminalEvent = sawTerminalEvent || event.isFinal;
+          // `LLMStreamEvent.isFinal`/`.kind` were renamed `event_kind`
+          // (idl/llm_service.proto; reserved list explicitly includes
+          // `is_final`/`kind`) — terminal-ness is now `COMPLETED`/`ERROR`.
+          final isTerminal =
+              event.eventKind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED ||
+              event.eventKind == LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR;
+          sawTerminalEvent = sawTerminalEvent || isTerminal;
           controller.add(event);
-          if (event.isFinal) {
+          if (isTerminal) {
             unawaited(controller.close());
           }
         } catch (e, st) {
@@ -262,11 +270,13 @@ class DartBridgeLLM {
       }),
     );
 
-    // Cancel sets the per-token lifecycle cancel flag; the worker's blocking
-    // call returns shortly after, emits a terminal "cancelled" event
-    // (dropped — the controller is closing) and the rc sentinel closes the
-    // port.
-    controller.onCancel = cancelProto;
+    // Only cancel a still-running generation: onCancel also fires on normal
+    // completion (the consumer stops after the terminal event), and an
+    // unconditional cancel there makes commons publish a spurious cancellation
+    // event after every finished stream.
+    controller.onCancel = () {
+      if (!sawTerminalEvent) cancelProto();
+    };
 
     return controller.stream;
   }

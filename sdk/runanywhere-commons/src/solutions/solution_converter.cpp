@@ -59,14 +59,14 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg, PipelineSp
     if (cfg.chunk_ms() > 0) {
         (*vad->mutable_params())["chunk_ms"] = std::to_string(cfg.chunk_ms());
     }
-    if (!cfg.system_prompt().empty()) {
-        (*llm->mutable_params())["system_prompt"] = cfg.system_prompt();
+    if (cfg.has_generation() && !cfg.generation().system_prompt().empty()) {
+        (*llm->mutable_params())["system_prompt"] = cfg.generation().system_prompt();
     }
     if (cfg.max_context_tokens() > 0) {
         (*llm->mutable_params())["max_context_tokens"] = std::to_string(cfg.max_context_tokens());
     }
-    if (cfg.temperature() != 0.0f) {
-        (*llm->mutable_params())["temperature"] = std::to_string(cfg.temperature());
+    if (cfg.has_generation() && cfg.generation().temperature() != 0.0f) {
+        (*llm->mutable_params())["temperature"] = std::to_string(cfg.generation().temperature());
     }
     (*tts->mutable_params())["emit_partials"] = cfg.emit_partials() ? "true" : "false";
 

@@ -100,13 +100,12 @@ bool registry_status_is_downloaded(ModelRegistryStatus status) {
            status == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED;
 }
 
+// ModelInfo.is_downloaded (tag 32) was deleted: a bool cannot express
+// DOWNLOADING. registry_status is now the ONLY downloaded-ness signal; a
+// non-empty local_path is location data, not state (it stays populated for
+// an entry whose files were deleted). A model with no registry_status set
+// yet (never normalized) is treated as not-downloaded.
 bool model_is_downloaded_from_fields(const ModelInfo& model) {
-    if (has_nonempty_local_path(model)) {
-        return true;
-    }
-    if (model.has_is_downloaded()) {
-        return model.is_downloaded();
-    }
     if (model.has_registry_status()) {
         return registry_status_is_downloaded(model.registry_status());
     }
@@ -117,9 +116,8 @@ ModelRegistryStatus effective_registry_status(const ModelInfo& model) {
     if (model.has_registry_status()) {
         return model.registry_status();
     }
-    return model_is_downloaded_from_fields(model)
-               ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
-               : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED;
+    return has_nonempty_local_path(model) ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+                                          : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED;
 }
 
 void normalize_model_registry_state(ModelInfo* model) {
@@ -134,16 +132,13 @@ void normalize_model_registry_state(ModelInfo* model) {
         return;
     }
 
-    const bool downloaded = model_is_downloaded_from_fields(*model);
-    if (!model->has_is_downloaded()) {
-        model->set_is_downloaded(downloaded);
-    }
-    if (!model->has_is_available()) {
-        model->set_is_available(downloaded);
-    }
     if (!model->has_registry_status()) {
+        const bool downloaded = model_is_downloaded_from_fields(*model);
         model->set_registry_status(downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
                                               : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    }
+    if (!model->has_is_available()) {
+        model->set_is_available(model_is_downloaded_from_fields(*model));
     }
 }
 
@@ -153,7 +148,6 @@ void overwrite_download_state_from_local_path(ModelInfo* model) {
     }
 
     const bool downloaded = has_nonempty_local_path(*model);
-    model->set_is_downloaded(downloaded);
     model->set_is_available(downloaded);
 
     const ModelRegistryStatus current = effective_registry_status(*model);

@@ -2,7 +2,7 @@
  * VAD Tab — voice activity detection through the public SDK surface.
  *
  * Mirrors iOS `VADViewModel`: mic chunks are fed straight into the SDK's
- * `RunAnywhere.streamVAD` session — the SDK owns model framing, no app-side
+ * `RunAnywhere.vad.detectStream` session — the SDK owns model framing, no app-side
  * buffer math (iOS parity: VADViewModel.swift:30-33, :175-203). Speech
  * state transitions are logged into an activity list capped at 50 entries
  * (iOS parity: VADViewModel.swift:212-220).
@@ -16,7 +16,8 @@ import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
   RunAnywhere,
-  type VADResult,
+  type AudioInput,
+  type VadEvent,
 } from '@runanywhere/web';
 import { AudioCapture } from '@runanywhere/web/browser';
 import {
@@ -41,7 +42,7 @@ let unmounted = false;
 let audioCapture: AudioCapture | null = null;
 let isListening = false;
 let isSpeechDetected = false;
-let lastResult: VADResult | null = null;
+let lastResult: Extract<VadEvent, { type: 'activity' }> | null = null;
 let lastError: string | null = null;
 let activityLog: ActivityLogEntry[] = [];
 let unsubscribeState: (() => void) | null = null;
@@ -92,7 +93,7 @@ function renderVad(): void {
       <div class="docs-section">
         <h3>Voice activity detection</h3>
         <p class="text-secondary">Mic chunks are fed into
-        <code>RunAnywhere.streamVAD(...)</code>; the SDK owns model framing
+        <code>RunAnywhere.vad.detectStream(...)</code>; the SDK owns model framing
         and emits one result per chunk.</p>
         <div class="toolbar-actions">
           <button class="btn btn-primary" id="vad-toggle-btn" ${canListen ? '' : 'disabled'}>
@@ -112,9 +113,8 @@ function renderVad(): void {
           </span>
         </div>
         <ul class="feature-unavailable__list" id="vad-stats">
-          <li><strong>Confidence:</strong> <code id="vad-confidence">${lastResult ? lastResult.confidence.toFixed(3) : '-'}</code></li>
-          <li><strong>Energy (RMS):</strong> <code id="vad-energy">${lastResult ? lastResult.energy.toFixed(4) : '-'}</code></li>
-          <li><strong>Frame:</strong> <code id="vad-frame">${lastResult ? `${lastResult.durationMs} ms` : '-'}</code></li>
+          <li><strong>Confidence:</strong> <code id="vad-confidence">${lastResult ? lastResult.probability.toFixed(3) : '-'}</code></li>
+          <li><strong>Frame:</strong> <code id="vad-frame">${lastResult ? `${lastResult.timestampMs} ms` : '-'}</code></li>
         </ul>
       </div>
 
@@ -203,11 +203,11 @@ function stopListening(): void {
 }
 
 /** Bridge the push-style mic callback into the SDK's pull-style iterable. */
-async function* micChunks(): AsyncIterable<Float32Array> {
+async function* micChunks(): AsyncIterable<AudioInput> {
   while (!streamDone) {
     const next = chunkQueue.shift();
     if (next) {
-      yield next;
+      yield RunAnywhere.AudioInput.float32(next);
       continue;
     }
     await new Promise<void>((resolve) => {
@@ -218,33 +218,32 @@ async function* micChunks(): AsyncIterable<Float32Array> {
 }
 
 /**
- * Consume the SDK's streaming VAD session: one `VADResult` per mic chunk,
- * with speech-state transitions logged for the activity list (iOS parity:
- * VADViewModel.swift:175-203 `startDetectionStream`).
+ * Consume the SDK's streaming VAD session. The SDK emits the speech-state
+ * transitions directly, so the activity list no longer derives them.
  */
 async function consumeDetectionStream(): Promise<void> {
-  let wasSpeechActive = false;
   try {
-    for await (const result of RunAnywhere.streamVAD(micChunks())) {
+    for await (const event of RunAnywhere.vad.detectStream(micChunks())) {
       if (unmounted || !isListening) break;
 
-      if (result.errorMessage) {
-        lastError = result.errorMessage;
+      if (event.type === 'speechStarted') {
+        addLogEntry('Speech Started');
         continue;
       }
-
-      lastResult = result;
-      isSpeechDetected = result.isSpeech;
-      updateStatusRegions();
-
-      // Log state transitions (iOS parity: VADViewModel.swift:193-200).
-      if (result.isSpeech && !wasSpeechActive) {
-        addLogEntry('Speech Started');
-        wasSpeechActive = true;
-      } else if (!result.isSpeech && wasSpeechActive) {
+      if (event.type === 'speechEnded') {
         addLogEntry('Speech Ended');
-        wasSpeechActive = false;
+        continue;
       }
+      if (event.type === 'failed') {
+        lastError = `VAD stream failed: ${formatError(event.error)}`;
+        stopListening();
+        renderVad();
+        continue;
+      }
+      if (event.type !== 'activity') continue;
+      lastResult = event;
+      isSpeechDetected = event.isSpeech;
+      updateStatusRegions();
     }
   } catch (err) {
     if (!unmounted) {
@@ -270,10 +269,8 @@ function updateStatusRegions(): void {
   }
   if (lastResult) {
     const conf = container.querySelector('#vad-confidence');
-    if (conf) conf.textContent = lastResult.confidence.toFixed(3);
-    const energy = container.querySelector('#vad-energy');
-    if (energy) energy.textContent = lastResult.energy.toFixed(4);
+    if (conf) conf.textContent = lastResult.probability.toFixed(3);
     const frame = container.querySelector('#vad-frame');
-    if (frame) frame.textContent = `${lastResult.durationMs} ms`;
+    if (frame) frame.textContent = `${lastResult.timestampMs} ms`;
   }
 }

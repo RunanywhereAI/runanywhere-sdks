@@ -28,14 +28,13 @@ extension RunAnywhere {
     ///
     /// Sorted by descending model count so the UI surfaces the most useful
     /// frameworks first. This is example-app-specific UI plumbing — it
-    /// composes the canonical `RunAnywhere.listModels()` proto API into the
+    /// composes the canonical `RunAnywhere.models.list(filter:)` API into the
     /// shape the Models tab and Add-from-URL flow want, but does not belong
     /// in the SDK public surface.
     static func getRegisteredFrameworks() async -> [RAInferenceFramework] {
-        let result = await listModels()
-        guard result.success else { return [] }
+        guard let models = try? await RunAnywhere.models.list() else { return [] }
         var counts: [RAInferenceFramework: Int] = [:]
-        for model in result.models.models where model.framework != .unspecified {
+        for model in models where model.framework != .unspecified {
             counts[model.framework, default: 0] += 1
         }
         let frameworks = counts.sorted { lhs, rhs in

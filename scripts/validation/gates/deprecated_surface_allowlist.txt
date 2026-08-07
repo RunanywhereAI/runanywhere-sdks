@@ -18,6 +18,8 @@ sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/MLXRuntime/MLX.swift|swift:json-bridge
+# Typed reader for the external Hugging Face model config.json boundary.
+sdk/runanywhere-swift/Sources/MLXRuntime/MLXVLMResolutionPolicy.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/MLXRuntime/Nemotron.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+WebSearchTool.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:json-bridge
@@ -36,6 +38,10 @@ sdk/runanywhere-react-native/packages/core/src/Public/Extensions/Hybrid/CloudSTT
 sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts|web:ts-json-serialisation
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/CloudSttProvider.ts|web:ts-json-serialisation
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/Cloud.ts|web:ts-json-serialisation
+# ToolDefinition.parameters is a JSON-Schema string by proto design
+# (idl/tool_calling.proto) -- the structured ToolParameter list was deleted
+# outright. Mirrors the already-allowlisted Swift/Kotlin web-search tools.
+sdk/runanywhere-web/packages/core/src/Public/Helpers/registerDuckDuckGoSearchTool.ts|web:ts-json-serialisation
 sdk/runanywhere-web/packages/core/src/Adapters/ProtoAdapterTypes.ts|web:hand-written-types-ts
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts|web:hand-written-types-ts
 
@@ -68,3 +74,77 @@ sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h|cpp:json-param-in-
 sdk/runanywhere-commons/include/rac/cloud/rac_cloud_stt_provider.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/infrastructure/telemetry/rac_telemetry_manager.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/router/hybrid/rac_stt_hybrid_router.h|cpp:json-param-in-public-api
+
+# ---------------------------------------------------------------------------
+# v3 public-API migration (PR #605): the old flat verbs remain for one release
+# as @available(*, deprecated) / @Deprecated forwarders per
+# thoughts/shared/plans/public_api_spec.md ("Deprecation"), and the new value
+# result/mapping types carry typed JSON (de)serialization at the SDK boundary.
+# These are intentional, documented surfaces — not regressions toward hand DTOs.
+# ---------------------------------------------------------------------------
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/RunAnywhere.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Diarization/RunAnywhereDiarization.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Diffusion/RunAnywhereDiffusion.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Embeddings/RunAnywhereEmbeddings.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereLoRA.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereStructuredOutput.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereTextGeneration.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereToolCalling.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Models/RunAnywhereModelLifecycle.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Models/RunAnywhereModelRegistry.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/RAG/RunAnywhereRAG.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Rerank/RunAnywhereRerank.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/STT/RunAnywhereSTT.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Segmentation/RunAnywhereSegmentation.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Storage/RunAnywhereDownload.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/Storage/RunAnywhereStorage.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/TTS/RunAnywhereTTS.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/VAD/RunAnywhereVAD.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/VLM/RunAnywhereVisionLanguage.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/VoiceAgent/RunAnywhereVoiceAgent.kt|kotlin:deprecated-declaration
+sdk/runanywhere-react-native/packages/core/src/Public/Api/Bridge.ts|rn:bridge-ts-file
+sdk/runanywhere-react-native/packages/core/src/Public/Api/Results.ts|rn:ts-json-serialisation
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Results.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Audio/RunAnywhere+Diarization.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Diffusion/RunAnywhere+Diffusion.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Embeddings/RunAnywhere+Embeddings.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Events/RunAnywhere+SDKEvents.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+StructuredOutput.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+TextGeneration.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/RunAnywhere+ModelLifecycle.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/RunAnywhere+ModelRegistry.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RunAnywhere+RAG.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Rerank/RunAnywhere+Rerank.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/STT/RunAnywhere+STT.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Storage/RunAnywhere+Storage.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/TTS/RunAnywhere+TTS.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VAD/RunAnywhere+VAD.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VLM/RunAnywhere+VisionLanguage.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Vision/RunAnywhere+Segmentation.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift|swift:deprecated-declaration
+sdk/runanywhere-web/packages/core/src/Public/API/Deprecated.ts|web:deprecated-declaration
+sdk/runanywhere-web/packages/core/src/Public/API/Mapping.ts|web:ts-json-serialisation
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/TtsNamespace.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/VadNamespace.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/ModelsNamespace.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/SttNamespace.kt|kotlin:deprecated-declaration
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/api/LoraNamespace.kt|kotlin:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Features/Downloads/BackgroundDownloadCoordinator.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Options.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Rag/RagSession.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/STTNamespace.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/ModelsNamespace.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LoraNamespace.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/TTSNamespace.swift|swift:deprecated-declaration
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/VADNamespace.swift|swift:deprecated-declaration
+sdk/runanywhere-flutter/packages/runanywhere/lib/public/api/types/events.dart|flutter:deprecated-declaration
+sdk/runanywhere-flutter/packages/runanywhere/lib/public/api/namespaces/stt.dart|flutter:deprecated-declaration
+sdk/runanywhere-flutter/packages/runanywhere/lib/public/api/namespaces/vad.dart|flutter:deprecated-declaration
+sdk/runanywhere-react-native/packages/core/src/Public/Api/Types.ts|rn:deprecated-declaration
+sdk/runanywhere-react-native/packages/core/src/Public/Api/Tts.ts|rn:deprecated-declaration
+sdk/runanywhere-web/packages/core/src/Public/API/Namespaces/stt.ts|web:deprecated-declaration
+sdk/runanywhere-web/packages/core/src/Public/API/Namespaces/vad.ts|web:deprecated-declaration
+sdk/runanywhere-web/packages/core/src/Public/API/Namespaces/lora.ts|web:deprecated-declaration
+sdk/runanywhere-web/packages/core/src/Public/API/Namespaces/tts.ts|web:deprecated-declaration
+sdk/runanywhere-web/packages/core/src/Public/API/Options.ts|web:deprecated-declaration

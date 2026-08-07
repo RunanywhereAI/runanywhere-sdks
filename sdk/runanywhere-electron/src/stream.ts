@@ -64,7 +64,7 @@ export async function* streamWithMetrics(
  * iterator ends when the promise resolves and rejects if it rejects.
  */
 export function toAsyncIterable(
-  start: (onToken: (t: string) => void) => Promise<void>
+  start: (onToken: (t: string) => void) => Promise<unknown>
 ): AsyncIterableIterator<string> {
   const queue: string[] = [];
   let done = false;

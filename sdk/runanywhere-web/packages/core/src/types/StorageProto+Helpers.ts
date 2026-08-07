@@ -36,7 +36,6 @@ export function makeDeviceStorageInfo(
     totalBytes,
     freeBytes,
     usedBytes,
-    usedPercent: totalBytes > 0 ? (usedBytes / totalBytes) * 100.0 : 0.0,
   });
 }
 
@@ -84,7 +83,6 @@ export function emptyStorageInfo(): StorageInfo {
     app: AppStorageInfo.fromPartial({}),
     device: DeviceStorageInfo.fromPartial({}),
     models: [],
-    totalModels: 0,
     totalModelsBytes: 0,
   });
 }
@@ -141,18 +139,18 @@ export function storageInfoModelCount(info: StorageInfo): number {
 
 /**
  * Build a `ModelStorageMetrics` row.
- * Swift parity: `RAModelStorageMetrics.init(modelID:sizeOnDiskBytes:lastUsedMs:)`
- * (StorageProto+Helpers.swift:97-102).
+ * Swift parity: `RAModelStorageMetrics.init(modelID:sizeOnDiskBytes:)`
+ * (StorageProto+Helpers.swift:97-102). `lastUsedMs` was deleted outright
+ * from the wire message -- ModelInfo.lastUsedAtUnixMs is the sole
+ * last-used signal now.
  */
 export function makeModelStorageMetrics(
   modelId: string,
   sizeOnDiskBytes: number,
-  lastUsedMs?: number,
 ): ModelStorageMetrics {
   return ModelStorageMetrics.fromPartial({
     modelId,
     sizeOnDiskBytes,
-    lastUsedMs,
   });
 }
 

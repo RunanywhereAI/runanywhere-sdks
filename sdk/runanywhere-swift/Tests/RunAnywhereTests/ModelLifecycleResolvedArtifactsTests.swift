@@ -84,7 +84,6 @@ final class ModelLifecycleResolvedArtifactsTests: XCTestCase {
         artifacts: [RAModelFileDescriptor]
     ) -> RAModelLoadResult {
         var result = RAModelLoadResult()
-        result.success = true
         result.modelID = modelId
         result.category = category
         result.framework = .llamaCpp

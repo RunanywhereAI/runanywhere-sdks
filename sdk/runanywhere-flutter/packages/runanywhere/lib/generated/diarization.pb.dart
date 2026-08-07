@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -18,6 +17,7 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'diarization.pbenum.dart';
 import 'errors.pb.dart' as $0;
+import 'model_types.pbenum.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -25,20 +25,22 @@ export 'diarization.pbenum.dart';
 
 class DiarizationOptions extends $pb.GeneratedMessage {
   factory DiarizationOptions({
-    $core.int? sampleRateHz,
-    $core.int? channelCount,
-    DiarizationAudioEncoding? encoding,
+    $core.int? sampleRate,
+    $core.int? channels,
+    $1.AudioEncoding? encoding,
     $core.double? threshold,
     $fixnum.Int64? minimumDurationMs,
     $fixnum.Int64? mergeGapMs,
+    $core.int? maxSpeakers,
   }) {
     final result = create();
-    if (sampleRateHz != null) result.sampleRateHz = sampleRateHz;
-    if (channelCount != null) result.channelCount = channelCount;
+    if (sampleRate != null) result.sampleRate = sampleRate;
+    if (channels != null) result.channels = channels;
     if (encoding != null) result.encoding = encoding;
     if (threshold != null) result.threshold = threshold;
     if (minimumDurationMs != null) result.minimumDurationMs = minimumDurationMs;
     if (mergeGapMs != null) result.mergeGapMs = mergeGapMs;
+    if (maxSpeakers != null) result.maxSpeakers = maxSpeakers;
     return result;
   }
 
@@ -55,13 +57,14 @@ class DiarizationOptions extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DiarizationOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'sampleRateHz')
-    ..aI(2, _omitFieldNames ? '' : 'channelCount')
-    ..aE<DiarizationAudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
-        enumValues: DiarizationAudioEncoding.values)
+    ..aI(1, _omitFieldNames ? '' : 'sampleRate')
+    ..aI(2, _omitFieldNames ? '' : 'channels')
+    ..aE<$1.AudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
+        enumValues: $1.AudioEncoding.values)
     ..aD(4, _omitFieldNames ? '' : 'threshold', fieldType: $pb.PbFieldType.OF)
     ..aInt64(5, _omitFieldNames ? '' : 'minimumDurationMs')
     ..aInt64(6, _omitFieldNames ? '' : 'mergeGapMs')
+    ..aI(8, _omitFieldNames ? '' : 'maxSpeakers')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -83,28 +86,35 @@ class DiarizationOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<DiarizationOptions>(create);
   static DiarizationOptions? _defaultInstance;
 
+  /// Only 16 kHz is accepted: the engine does not resample, and any other
+  /// rate fails with RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED.
   @$pb.TagNumber(1)
-  $core.int get sampleRateHz => $_getIZ(0);
+  $core.int get sampleRate => $_getIZ(0);
   @$pb.TagNumber(1)
-  set sampleRateHz($core.int value) => $_setSignedInt32(0, value);
+  set sampleRate($core.int value) => $_setSignedInt32(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasSampleRateHz() => $_has(0);
+  $core.bool hasSampleRate() => $_has(0);
   @$pb.TagNumber(1)
-  void clearSampleRateHz() => $_clearField(1);
+  void clearSampleRate() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get channelCount => $_getIZ(1);
+  $core.int get channels => $_getIZ(1);
   @$pb.TagNumber(2)
-  set channelCount($core.int value) => $_setSignedInt32(1, value);
+  set channels($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasChannelCount() => $_has(1);
+  $core.bool hasChannels() => $_has(1);
   @$pb.TagNumber(2)
-  void clearChannelCount() => $_clearField(2);
+  void clearChannels() => $_clearField(2);
 
+  /// Byte layout of audio_data. ONLY AUDIO_ENCODING_PCM_F32_LE and
+  /// AUDIO_ENCODING_PCM_S16_LE are accepted; commons normalizes either to
+  /// float samples before dispatching to an engine. AUDIO_ENCODING_CONTAINER
+  /// and AUDIO_ENCODING_UNSPECIFIED are rejected with
+  /// RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED — strip container headers first.
   @$pb.TagNumber(3)
-  DiarizationAudioEncoding get encoding => $_getN(2);
+  $1.AudioEncoding get encoding => $_getN(2);
   @$pb.TagNumber(3)
-  set encoding(DiarizationAudioEncoding value) => $_setField(3, value);
+  set encoding($1.AudioEncoding value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasEncoding() => $_has(2);
   @$pb.TagNumber(3)
@@ -136,6 +146,20 @@ class DiarizationOptions extends $pb.GeneratedMessage {
   $core.bool hasMergeGapMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearMergeGapMs() => $_clearField(6);
+
+  /// Speaker-count hint: an upper bound, not an exact count. Unset =
+  /// auto-detect. An engine that detects more than max_speakers speakers
+  /// ranks them by total active duration, drops the weakest, and re-densifies
+  /// the speaker indices. Values above the loaded model's speaker capacity
+  /// are clamped.
+  @$pb.TagNumber(8)
+  $core.int get maxSpeakers => $_getIZ(6);
+  @$pb.TagNumber(8)
+  set maxSpeakers($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(8)
+  $core.bool hasMaxSpeakers() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearMaxSpeakers() => $_clearField(8);
 }
 
 class DiarizationRequest extends $pb.GeneratedMessage {
@@ -521,25 +545,6 @@ class DiarizationStreamEvent extends $pb.GeneratedMessage {
   void clearError() => $_clearField(6);
   @$pb.TagNumber(6)
   $0.SDKError ensureError() => $_ensure(5);
-}
-
-/// Logical capability contract. Native SDKs use the proto-byte C ABI; this
-/// declaration keeps generated API documentation and future transports aligned.
-/// For Stream, each client message is one audio feed and closing the client side
-/// requests the final snapshot; transport cancellation cancels the session.
-class DiarizationApi {
-  final $pb.RpcClient _client;
-
-  DiarizationApi(this._client);
-
-  $async.Future<DiarizationResult> diarize(
-          $pb.ClientContext? ctx, DiarizationRequest request) =>
-      _client.invoke<DiarizationResult>(
-          ctx, 'Diarization', 'Diarize', request, DiarizationResult());
-  $async.Future<DiarizationStreamEvent> stream(
-          $pb.ClientContext? ctx, DiarizationRequest request) =>
-      _client.invoke<DiarizationStreamEvent>(
-          ctx, 'Diarization', 'Stream', request, DiarizationStreamEvent());
 }
 
 const $core.bool _omitFieldNames =

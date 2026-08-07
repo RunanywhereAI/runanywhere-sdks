@@ -1,27 +1,32 @@
 import { afterEach, describe, expect, it } from 'vitest';
+// idl/structured_output.proto (API-realignment so-p2) deleted the dedicated
+// `StructuredOutputRequest` / `StructuredOutputValidationRequest` messages
+// outright: `StructuredOutputParseRequest` (requestId, text, options,
+// metadata) is now the sole request envelope shared by parse/validate/
+// prepare-prompt. `StructuredOutputMode` and the `StructuredOutputStreamEvent`
+// / `StructuredOutputStreamEventKind` proto types were deleted outright too
+// -- `generateStructuredStream` now yields a Web-local discriminated union
+// (see RunAnywhere+TextGeneration.ts's `StructuredOutputStreamEvent`
+// re-export) instead of a proto message.
 import {
   StructuredOutputParseRequest,
   StructuredOutputPromptResult,
-  StructuredOutputRequest,
   StructuredOutputResult,
-  StructuredOutputStreamEventKind,
   StructuredOutputValidation,
-  StructuredOutputValidationRequest,
-  StructuredOutputMode,
   type StructuredOutputParseRequest as ProtoStructuredOutputParseRequest,
   type StructuredOutputPromptResult as ProtoStructuredOutputPromptResult,
-  type StructuredOutputRequest as ProtoStructuredOutputRequest,
   type StructuredOutputResult as ProtoStructuredOutputResult,
-  type StructuredOutputStreamEvent as ProtoStructuredOutputStreamEvent,
   type StructuredOutputValidation as ProtoStructuredOutputValidation,
-  type StructuredOutputValidationRequest as ProtoStructuredOutputValidationRequest,
 } from '@runanywhere/proto-ts/structured_output';
 import {
   LLMGenerateRequest,
   LLMStreamEvent,
+  LLMStreamEventKind,
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
+import { FinishReason } from '@runanywhere/proto-ts/llm_options';
+import { MessageRole } from '@runanywhere/proto-ts/chat';
 
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { SDKException } from '../../../../src/Foundation/SDKException';
@@ -30,7 +35,10 @@ import {
   registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
-import { StructuredOutput } from '../../../../src/Public/Extensions/RunAnywhere+StructuredOutput';
+import {
+  StructuredOutput,
+  type StructuredOutputStreamEvent,
+} from '../../../../src/Public/Extensions/RunAnywhere+StructuredOutput';
 import { extractStructuredOutput, generateStructuredStream } from '../../../../src/Public/Extensions/RunAnywhere+TextGeneration';
 import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule.js';
 
@@ -40,10 +48,13 @@ const OFF_SIZE = 4;
 const OFF_STATUS = 8;
 const OFF_ERROR = 12;
 
+// `StructuredOutputParseRequest` is the sole request envelope shared by
+// parse/prepare-prompt/validate now (the dedicated `StructuredOutputRequest`
+// / `StructuredOutputValidationRequest` messages were deleted outright).
 type StructuredOutputHandlers = {
   parse: (request: ProtoStructuredOutputParseRequest) => ProtoStructuredOutputResult;
-  prepare?: (request: ProtoStructuredOutputRequest) => ProtoStructuredOutputPromptResult;
-  validate?: (request: ProtoStructuredOutputValidationRequest) => ProtoStructuredOutputValidation;
+  prepare?: (request: ProtoStructuredOutputParseRequest) => ProtoStructuredOutputPromptResult;
+  validate?: (request: ProtoStructuredOutputParseRequest) => ProtoStructuredOutputValidation;
 };
 
 function makeStructuredOutputModule(
@@ -140,7 +151,7 @@ function makeStructuredOutputModule(
       outResult: number,
     ): number => {
       const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
-      const request = StructuredOutputRequest.decode(requestBytes);
+      const request = StructuredOutputParseRequest.decode(requestBytes);
       const resultBytes = StructuredOutputPromptResult.encode(handlers.prepare!(request)).finish();
       writeResult(outResult, resultBytes);
       return 0;
@@ -153,7 +164,7 @@ function makeStructuredOutputModule(
       outResult: number,
     ): number => {
       const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
-      const request = StructuredOutputValidationRequest.decode(requestBytes);
+      const request = StructuredOutputParseRequest.decode(requestBytes);
       const resultBytes = StructuredOutputValidation.encode(handlers.validate!(request)).finish();
       writeResult(outResult, resultBytes);
       return 0;
@@ -202,12 +213,16 @@ function makeStructuredOutputModule(
     ModalityProtoModule & EmscriptenRunanywhereModule;
 }
 
+// `LLMStreamEvent.isFinal` (boolean) was replaced by the `eventKind` enum,
+// and `finishReason`/`errorCode` moved onto the FinishReason enum + optional
+// `error: SDKError` field.
 function streamingTokenEvent(token: string, isFinal = false): ProtoLLMStreamEvent {
   return LLMStreamEvent.fromPartial({
     token,
-    isFinal,
-    finishReason: isFinal ? 'stop' : '',
-    errorCode: 0,
+    eventKind: isFinal
+      ? LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED
+      : LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+    finishReason: isFinal ? FinishReason.FINISH_REASON_STOP : FinishReason.FINISH_REASON_UNSPECIFIED,
   });
 }
 
@@ -219,10 +234,15 @@ describe('extractStructuredOutput', () => {
 
   it('routes StructuredOutput.Parse through generated proto bytes', () => {
     let captured: ProtoStructuredOutputParseRequest | undefined;
+    // `StructuredOutputResult.parsedJson`→`.json` (a plain string, not
+    // bytes); `.errorCode` was deleted outright (optional `error: SDKError`
+    // replaced it). `StructuredOutputOptions.jsonSchema`→`.schema` (a oneof
+    // arm alongside `.grammar`/`.regex`), and `.mode` was deleted outright
+    // -- the oneof arm itself is the sole constraint-kind signal now.
     const module = makeStructuredOutputModule((request) => {
       captured = request;
       return {
-        parsedJson: new TextEncoder().encode('{"city":"San Francisco"}'),
+        json: '{"city":"San Francisco"}',
         rawText: request.text,
         validation: {
           isValid: true,
@@ -232,7 +252,6 @@ describe('extractStructuredOutput', () => {
           validationErrors: [],
           validationTimeMs: 0,
         },
-        errorCode: 0,
       };
     });
     ModalityProtoAdapter.registerModuleCapabilities(['llm', 'structured-output'], module);
@@ -243,11 +262,8 @@ describe('extractStructuredOutput', () => {
     );
 
     expect(captured?.text).toBe('prefix {"city":"San Francisco"} suffix');
-    expect(captured?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
-    expect(captured?.options?.mode).toBe(
-      StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-    );
-    expect(new TextDecoder().decode(result.parsedJson)).toBe('{"city":"San Francisco"}');
+    expect(captured?.options?.schema).toBe('{"type":"object","required":["city"]}');
+    expect(result.json).toBe('{"city":"San Francisco"}');
     expect(result.validation?.isValid).toBe(true);
   });
 
@@ -263,17 +279,20 @@ describe('StructuredOutput facade prepare/validate', () => {
     clearRunanywhereModule();
   });
 
-  it('routes prompt preparation through generated StructuredOutputRequest bytes', () => {
-    let captured: ProtoStructuredOutputRequest | undefined;
+  it('routes prompt preparation through generated StructuredOutputParseRequest bytes', () => {
+    // `StructuredOutputRequest` was deleted outright -- prompt preparation
+    // now shares `StructuredOutputParseRequest` (text/options/metadata) with
+    // parse/validate. `StructuredOutputOptions.mode`/`.repairJson`/
+    // `.maxRetries` were all deleted outright too; `jsonSchema`→`.schema`.
+    let captured: ProtoStructuredOutputParseRequest | undefined;
     const module = makeStructuredOutputModule({
-      parse: () => StructuredOutputResult.fromPartial({ errorCode: 0 }),
+      parse: () => StructuredOutputResult.fromPartial({}),
       prepare(request) {
         captured = request;
         return StructuredOutputPromptResult.fromPartial({
-          preparedPrompt: `PREPARED:${request.prompt}`,
+          preparedPrompt: `PREPARED:${request.text}`,
           systemPrompt: 'Output JSON.',
-          jsonSchema: request.options?.jsonSchema,
-          errorCode: 0,
+          jsonSchema: request.options?.schema,
         });
       },
     });
@@ -281,29 +300,28 @@ describe('StructuredOutput facade prepare/validate', () => {
 
     const result = StructuredOutput.preparePrompt({
       requestId: 'req_1',
-      prompt: 'weather in SF',
+      text: 'weather in SF',
       options: {
         includeSchemaInPrompt: true,
-        jsonSchema: '{"type":"object","required":["city"]}',
-        mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-        repairJson: false,
-        maxRetries: 0,
+        schema: '{"type":"object","required":["city"]}',
       },
       metadata: { source: 'test' },
     });
 
     expect(captured?.requestId).toBe('req_1');
-    expect(captured?.prompt).toBe('weather in SF');
-    expect(captured?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
+    expect(captured?.text).toBe('weather in SF');
+    expect(captured?.options?.schema).toBe('{"type":"object","required":["city"]}');
     expect(captured?.metadata.source).toBe('test');
     expect(result.preparedPrompt).toBe('PREPARED:weather in SF');
     expect(result.systemPrompt).toBe('Output JSON.');
   });
 
-  it('routes structured validation through generated StructuredOutputValidationRequest bytes', () => {
-    let captured: ProtoStructuredOutputValidationRequest | undefined;
+  it('routes structured validation through generated StructuredOutputParseRequest bytes', () => {
+    // `StructuredOutputValidationRequest` was deleted outright -- validation
+    // shares `StructuredOutputParseRequest` too.
+    let captured: ProtoStructuredOutputParseRequest | undefined;
     const module = makeStructuredOutputModule({
-      parse: () => StructuredOutputResult.fromPartial({ errorCode: 0 }),
+      parse: () => StructuredOutputResult.fromPartial({}),
       validate(request) {
         captured = request;
         return StructuredOutputValidation.fromPartial({
@@ -324,18 +342,15 @@ describe('StructuredOutput facade prepare/validate', () => {
     );
 
     expect(captured?.text).toBe('prefix {"city":"San Francisco"} suffix');
-    expect(captured?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
+    expect(captured?.options?.schema).toBe('{"type":"object","required":["city"]}');
     expect(captured?.options?.includeSchemaInPrompt).toBe(true);
-    expect(captured?.options?.mode).toBe(
-      StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-    );
     expect(result.isValid).toBe(true);
     expect(result.extractedJson).toBe('{"city":"San Francisco"}');
   });
 
   it('does not fall back when prompt preparation or validation proto exports are absent', () => {
     const module = makeStructuredOutputModule({
-      parse: () => StructuredOutputResult.fromPartial({ errorCode: 0 }),
+      parse: () => StructuredOutputResult.fromPartial({}),
     });
     registerWasmModule(['llm', 'structured-output'], module);
 
@@ -368,11 +383,13 @@ describe('generateStructuredStream', () => {
   it('streams token events then parses the accumulated text into a terminal COMPLETED event', async () => {
     let capturedGenerate: ProtoLLMGenerateRequest | undefined;
     let capturedParse: ProtoStructuredOutputParseRequest | undefined;
+    // `StructuredOutputResult.parsedJson`→`.json`; `.errorCode` was deleted
+    // outright.
     const module = makeStructuredOutputModule(
       (request) => {
         capturedParse = request;
         return {
-          parsedJson: new TextEncoder().encode('{"city":"San Francisco"}'),
+          json: '{"city":"San Francisco"}',
           rawText: request.text,
           validation: {
             isValid: true,
@@ -382,7 +399,6 @@ describe('generateStructuredStream', () => {
             validationErrors: [],
             validationTimeMs: 0,
           },
-          errorCode: 0,
         };
       },
       (request, emit) => {
@@ -396,11 +412,17 @@ describe('generateStructuredStream', () => {
     );
     ModalityProtoAdapter.registerModuleCapabilities(['llm', 'structured-output'], module);
 
-    const events: ProtoStructuredOutputStreamEvent[] = [];
+    // `StructuredOutputStreamEvent`/`StructuredOutputStreamEventKind` proto
+    // types were deleted outright -- `generateStructuredStream` now yields
+    // the Web-local `StructuredOutputStreamEvent` union
+    // (`{kind:'token',token}` | `{kind:'completed',result}`), imported from
+    // RunAnywhere+StructuredOutput.ts (re-exported from
+    // RunAnywhere+TextGeneration.ts).
+    const events: StructuredOutputStreamEvent[] = [];
     for await (const event of generateStructuredStream(
       'weather in SF',
       { jsonSchema: '{"type":"object","required":["city"]}' },
-      { maxTokens: 64 },
+      { maxOutputTokens: 64 },
     )) {
       events.push(event);
     }
@@ -409,38 +431,44 @@ describe('generateStructuredStream', () => {
     // mapped from the structured-output options (Swift
     // RALLMTypes+CppBridge.swift:66-74 parity) and the Swift defaults
     // (RALLMTypes+CppBridge.swift:13-21) filling the unset knobs.
-    expect(capturedGenerate?.prompt).toBe('weather in SF');
-    expect(capturedGenerate?.options?.streamingEnabled).toBe(true);
-    expect(capturedGenerate?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
-    expect(capturedGenerate?.options?.responseFormat).toBe('json_schema');
-    expect(capturedGenerate?.options?.maxTokens).toBe(64);
-    expect(capturedGenerate?.options?.temperature).toBeCloseTo(0.8);
+    // `LLMGenerateRequest.prompt` was deleted outright -- the prompt rides
+    // the last entry of `messages: ChatMessage[]` now.
+    expect(capturedGenerate?.messages.at(-1)?.content).toBe('weather in SF');
+    expect(capturedGenerate?.messages.at(-1)?.role).toBe(MessageRole.MESSAGE_ROLE_USER);
+    expect(capturedGenerate?.options?.structuredOutput?.includeSchemaInPrompt).toBe(true);
+    expect(capturedGenerate?.options?.structuredOutput?.schema).toBe('{"type":"object","required":["city"]}');
+    expect(capturedGenerate?.options?.maxOutputTokens).toBe(64);
+    expect(capturedGenerate?.options?.temperature).toBeCloseTo(0.7);
     expect(capturedGenerate?.options?.topP).toBeCloseTo(1.0);
-    expect(capturedGenerate?.options?.repetitionPenalty).toBeCloseTo(1.0);
+    // repeat_penalty defaults to 1.1 (idl/llm_options.proto), matching
+    // llama.cpp/Ollama convention -- not the old repetition_penalty field's
+    // 1.0 default.
+    expect(capturedGenerate?.options?.repeatPenalty).toBeCloseTo(1.1);
 
-    // Three TOKEN events stream through before the terminal COMPLETED event;
-    // `seq` is monotonically increasing across the whole stream.
+    // Three token events stream through before the terminal completed event.
     expect(events).toHaveLength(4);
     expect(events.map((event) => event.kind)).toEqual([
-      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
-      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
-      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
-      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
+      'token',
+      'token',
+      'token',
+      'completed',
     ]);
-    expect(events.slice(0, 3).map((event) => event.token)).toEqual([
+    expect(
+      events.slice(0, 3).map((event) => (event.kind === 'token' ? event.token : undefined)),
+    ).toEqual([
       'prefix ',
       '{"city":"San Francisco"}',
       ' suffix',
     ]);
-    expect(events.map((event) => event.seq)).toEqual([1, 2, 3, 4]);
 
     // The accumulated transcript is parsed through StructuredOutput.Parse
     // proto bytes and carried on the terminal event's `result`.
     expect(capturedParse?.text).toBe('prefix {"city":"San Francisco"} suffix');
-    expect(capturedParse?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
+    expect(capturedParse?.options?.schema).toBe('{"type":"object","required":["city"]}');
     const terminal = events[3]!;
-    expect(terminal.result).toBeDefined();
-    expect(new TextDecoder().decode(terminal.result!.parsedJson)).toBe('{"city":"San Francisco"}');
-    expect(terminal.result!.validation?.isValid).toBe(true);
+    expect(terminal.kind).toBe('completed');
+    if (terminal.kind !== 'completed') throw new Error('expected a completed event');
+    expect(terminal.result.json).toBe('{"city":"San Francisco"}');
+    expect(terminal.result.validation?.isValid).toBe(true);
   });
 });

@@ -32,6 +32,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
+#include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
@@ -58,8 +59,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_diar
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum DiarizationAudioEncoding : int;
-extern const uint32_t DiarizationAudioEncoding_internal_data_[];
 enum DiarizationStreamEventKind : int;
 extern const uint32_t DiarizationStreamEventKind_internal_data_[];
 class DiarizationOptions;
@@ -107,9 +106,6 @@ extern const DiarizationStreamEventGlobalsTypeInternal DiarizationStreamEvent_gl
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::DiarizationAudioEncoding_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::DiarizationAudioEncoding>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::DiarizationStreamEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::DiarizationStreamEventKind>;
 }  // namespace protobuf
@@ -117,47 +113,6 @@ internal::EnumTraitsT<::runanywhere::v1::DiarizationStreamEventKind_internal_dat
 
 namespace runanywhere {
 namespace v1 {
-enum DiarizationAudioEncoding : int {
-  DIARIZATION_AUDIO_ENCODING_UNSPECIFIED = 0,
-  DIARIZATION_AUDIO_ENCODING_PCM_F32_LE = 1,
-  DIARIZATION_AUDIO_ENCODING_PCM_S16_LE = 2,
-  DiarizationAudioEncoding_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  DiarizationAudioEncoding_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t DiarizationAudioEncoding_internal_data_[];
-inline constexpr DiarizationAudioEncoding DiarizationAudioEncoding_MIN =
-    static_cast<DiarizationAudioEncoding>(0);
-inline constexpr DiarizationAudioEncoding DiarizationAudioEncoding_MAX =
-    static_cast<DiarizationAudioEncoding>(2);
-[[nodiscard]] inline bool DiarizationAudioEncoding_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int DiarizationAudioEncoding_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DiarizationAudioEncoding_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(DiarizationAudioEncoding) {
-  return DiarizationAudioEncoding_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& DiarizationAudioEncoding_Name(T value) {
-  static_assert(::std::is_same<T, DiarizationAudioEncoding>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to DiarizationAudioEncoding_Name().");
-  return DiarizationAudioEncoding_Name(static_cast<DiarizationAudioEncoding>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& DiarizationAudioEncoding_Name(DiarizationAudioEncoding value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<DiarizationAudioEncoding_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool DiarizationAudioEncoding_Parse(
-    ::absl::string_view name, DiarizationAudioEncoding* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<DiarizationAudioEncoding>(DiarizationAudioEncoding_descriptor(), name,
-                                           value);
-}
 enum DiarizationStreamEventKind : int {
   DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
   DIARIZATION_STREAM_EVENT_KIND_STARTED = 1,
@@ -599,47 +554,48 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
 
   // accessors -------------------------------------------------------
   enum : int {
-    kSampleRateHzFieldNumber = 1,
-    kChannelCountFieldNumber = 2,
+    kSampleRateFieldNumber = 1,
+    kChannelsFieldNumber = 2,
     kEncodingFieldNumber = 3,
     kThresholdFieldNumber = 4,
     kMinimumDurationMsFieldNumber = 5,
     kMergeGapMsFieldNumber = 6,
+    kMaxSpeakersFieldNumber = 8,
   };
-  // optional int32 sample_rate_hz = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
-  [[nodiscard]] bool has_sample_rate_hz()
+  // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
+  [[nodiscard]] bool has_sample_rate()
       const;
-  void clear_sample_rate_hz() ;
-  [[nodiscard]] ::int32_t sample_rate_hz() const;
-  void set_sample_rate_hz(::int32_t value);
+  void clear_sample_rate() ;
+  [[nodiscard]] ::int32_t sample_rate() const;
+  void set_sample_rate(::int32_t value);
 
   private:
-  ::int32_t _internal_sample_rate_hz() const;
-  void _internal_set_sample_rate_hz(::int32_t value);
+  ::int32_t _internal_sample_rate() const;
+  void _internal_set_sample_rate(::int32_t value);
 
   public:
-  // optional int32 channel_count = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
-  [[nodiscard]] bool has_channel_count()
+  // optional int32 channels = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
+  [[nodiscard]] bool has_channels()
       const;
-  void clear_channel_count() ;
-  [[nodiscard]] ::int32_t channel_count() const;
-  void set_channel_count(::int32_t value);
+  void clear_channels() ;
+  [[nodiscard]] ::int32_t channels() const;
+  void set_channels(::int32_t value);
 
   private:
-  ::int32_t _internal_channel_count() const;
-  void _internal_set_channel_count(::int32_t value);
+  ::int32_t _internal_channels() const;
+  void _internal_set_channels(::int32_t value);
 
   public:
-  // optional .runanywhere.v1.DiarizationAudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"];
+  // optional .runanywhere.v1.AudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "AUDIO_ENCODING_PCM_F32_LE"];
   [[nodiscard]] bool has_encoding()
       const;
   void clear_encoding() ;
-  [[nodiscard]] ::runanywhere::v1::DiarizationAudioEncoding encoding() const;
-  void set_encoding(::runanywhere::v1::DiarizationAudioEncoding value);
+  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
+  void set_encoding(::runanywhere::v1::AudioEncoding value);
 
   private:
-  ::runanywhere::v1::DiarizationAudioEncoding _internal_encoding() const;
-  void _internal_set_encoding(::runanywhere::v1::DiarizationAudioEncoding value);
+  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
+  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
 
   public:
   // optional float threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
@@ -674,11 +630,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
   void _internal_set_merge_gap_ms(::int64_t value);
 
   public:
+  // optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+  [[nodiscard]] bool has_max_speakers()
+      const;
+  void clear_max_speakers() ;
+  [[nodiscard]] ::int32_t max_speakers() const;
+  void set_max_speakers(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_speakers() const;
+  void _internal_set_max_speakers(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.DiarizationOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<3, 7,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -707,12 +675,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
         const DiarizationOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::int32_t sample_rate_hz_;
-    ::int32_t channel_count_;
+    ::int32_t sample_rate_;
+    ::int32_t channels_;
     int encoding_;
     float threshold_;
     ::int64_t minimum_duration_ms_;
     ::int64_t merge_gap_ms_;
+    ::int32_t max_speakers_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1497,63 +1466,63 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationStreamEvent final : publ
 
 // DiarizationOptions
 
-// optional int32 sample_rate_hz = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
-inline bool DiarizationOptions::has_sample_rate_hz() const {
+// optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 16000, (.runanywhere.v1.rac_max) = 16000];
+inline bool DiarizationOptions::has_sample_rate() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   return value;
 }
-inline void DiarizationOptions::clear_sample_rate_hz() {
+inline void DiarizationOptions::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_hz_ = 0;
+  _impl_.sample_rate_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline ::int32_t DiarizationOptions::sample_rate_hz() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.sample_rate_hz)
-  return _internal_sample_rate_hz();
+inline ::int32_t DiarizationOptions::sample_rate() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.sample_rate)
+  return _internal_sample_rate();
 }
-inline void DiarizationOptions::set_sample_rate_hz(::int32_t value) {
-  _internal_set_sample_rate_hz(value);
+inline void DiarizationOptions::set_sample_rate(::int32_t value) {
+  _internal_set_sample_rate(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.sample_rate_hz)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.sample_rate)
 }
-inline ::int32_t DiarizationOptions::_internal_sample_rate_hz() const {
+inline ::int32_t DiarizationOptions::_internal_sample_rate() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.sample_rate_hz_;
+  return _impl_.sample_rate_;
 }
-inline void DiarizationOptions::_internal_set_sample_rate_hz(::int32_t value) {
+inline void DiarizationOptions::_internal_set_sample_rate(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_hz_ = value;
+  _impl_.sample_rate_ = value;
 }
 
-// optional int32 channel_count = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
-inline bool DiarizationOptions::has_channel_count() const {
+// optional int32 channels = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
+inline bool DiarizationOptions::has_channels() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   return value;
 }
-inline void DiarizationOptions::clear_channel_count() {
+inline void DiarizationOptions::clear_channels() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.channel_count_ = 0;
+  _impl_.channels_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
-inline ::int32_t DiarizationOptions::channel_count() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.channel_count)
-  return _internal_channel_count();
+inline ::int32_t DiarizationOptions::channels() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.channels)
+  return _internal_channels();
 }
-inline void DiarizationOptions::set_channel_count(::int32_t value) {
-  _internal_set_channel_count(value);
+inline void DiarizationOptions::set_channels(::int32_t value) {
+  _internal_set_channels(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.channel_count)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.channels)
 }
-inline ::int32_t DiarizationOptions::_internal_channel_count() const {
+inline ::int32_t DiarizationOptions::_internal_channels() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.channel_count_;
+  return _impl_.channels_;
 }
-inline void DiarizationOptions::_internal_set_channel_count(::int32_t value) {
+inline void DiarizationOptions::_internal_set_channels(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.channel_count_ = value;
+  _impl_.channels_ = value;
 }
 
-// optional .runanywhere.v1.DiarizationAudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"];
+// optional .runanywhere.v1.AudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "AUDIO_ENCODING_PCM_F32_LE"];
 inline bool DiarizationOptions::has_encoding() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   return value;
@@ -1563,20 +1532,20 @@ inline void DiarizationOptions::clear_encoding() {
   _impl_.encoding_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::runanywhere::v1::DiarizationAudioEncoding DiarizationOptions::encoding() const {
+inline ::runanywhere::v1::AudioEncoding DiarizationOptions::encoding() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.encoding)
   return _internal_encoding();
 }
-inline void DiarizationOptions::set_encoding(::runanywhere::v1::DiarizationAudioEncoding value) {
+inline void DiarizationOptions::set_encoding(::runanywhere::v1::AudioEncoding value) {
   _internal_set_encoding(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.encoding)
 }
-inline ::runanywhere::v1::DiarizationAudioEncoding DiarizationOptions::_internal_encoding() const {
+inline ::runanywhere::v1::AudioEncoding DiarizationOptions::_internal_encoding() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::DiarizationAudioEncoding>(_impl_.encoding_);
+  return static_cast<::runanywhere::v1::AudioEncoding>(_impl_.encoding_);
 }
-inline void DiarizationOptions::_internal_set_encoding(::runanywhere::v1::DiarizationAudioEncoding value) {
+inline void DiarizationOptions::_internal_set_encoding(::runanywhere::v1::AudioEncoding value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = value;
 }
@@ -1655,6 +1624,34 @@ inline ::int64_t DiarizationOptions::_internal_merge_gap_ms() const {
 inline void DiarizationOptions::_internal_set_merge_gap_ms(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.merge_gap_ms_ = value;
+}
+
+// optional int32 max_speakers = 8 [(.runanywhere.v1.rac_min) = 1];
+inline bool DiarizationOptions::has_max_speakers() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void DiarizationOptions::clear_max_speakers() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speakers_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline ::int32_t DiarizationOptions::max_speakers() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.max_speakers)
+  return _internal_max_speakers();
+}
+inline void DiarizationOptions::set_max_speakers(::int32_t value) {
+  _internal_set_max_speakers(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.max_speakers)
+}
+inline ::int32_t DiarizationOptions::_internal_max_speakers() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.max_speakers_;
+}
+inline void DiarizationOptions::_internal_set_max_speakers(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_speakers_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -2461,12 +2458,6 @@ inline void DiarizationStreamEvent::set_allocated_error(::runanywhere::v1::SDKEr
 namespace google {
 namespace protobuf {
 
-template <>
-struct is_proto_enum<::runanywhere::v1::DiarizationAudioEncoding> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::DiarizationAudioEncoding>() {
-  return ::runanywhere::v1::DiarizationAudioEncoding_descriptor();
-}
 template <>
 struct is_proto_enum<::runanywhere::v1::DiarizationStreamEventKind> : std::true_type {};
 template <>

@@ -17,81 +17,27 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * Scheduler / sampler algorithm — *forward-looking union*.
- *
- * Pre-IDL sources all expose the same eight cases (DPM++ 2M Karras, DPM++ 2M,
- * DPM++ 2M SDE, DDIM, Euler, Euler Ancestral, PNDM, LMS); see:
- *   Swift   DiffusionTypes.swift:184    (.dpmPP2MKarras .. .lms)
- *   Kotlin  DiffusionTypes.kt:155       (DPM_PP_2M_KARRAS .. LMS)
- *   RN      DiffusionTypes.ts:48        (DPMPP2MKarras .. LMS)
- *   Web     DiffusionTypes.ts:3         (numeric DPM_PP_2M_Karras .. LMS, matches C ABI)
- *   C ABI   rac_diffusion_types.h:31    (RAC_DIFFUSION_SCHEDULER_*)
- *
- * This proto enum extends that with two values that downstream backends are
- * expected to grow into but no SDK exposes yet:
- *   - DDPM   — original Ho et al. 2020 sampler
- *   - LCM    — Latent Consistency Model sampler (paired with the LCM model
- *              variant; today Swift/Kotlin reuse DPM++ 2M Karras for LCM
- *              models because no LCM scheduler case exists).
- * And it intentionally omits DPMPP_2M_SDE, which exists in every SDK today
- * but is being collapsed back into DPMPP_2M for the v1 IDL surface (the SDE
- * variant is purely an algorithmic toggle on DPM++ 2M; backends accept
- * either tag).
- *
- * Drift reconciliation:
- *   - Swift/Kotlin/RN/Web/C-ABI carriers of DPMPP_2M_SDE must round-trip
- *     that case to DIFFUSION_SCHEDULER_DPMPP_2M (lossy in name, equivalent
- *     in semantics — the SDE flag is a backend implementation detail).
- *   - DDPM and LCM are *new* slots; SDKs that don't yet recognize them must
- *     fall back to DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS (the recommended
- *     default).
- * ---------------------------------------------------------------------------
+ * Only values with a C carrier are listed. UNSPECIFIED = the model's
+ * configured scheduler, which is what every engine does.
  */
 public enum class DiffusionScheduler(
   override val `value`: Int,
 ) : WireEnum {
   DIFFUSION_SCHEDULER_UNSPECIFIED(0),
-  /**
-   * Swift/Kotlin/RN/Web/C-ABI
-   */
   DIFFUSION_SCHEDULER_DPMPP_2M(1),
   /**
-   * Swift/Kotlin/RN/Web/C-ABI (recommended default)
+   * recommended default
    */
   DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS(2),
-  /**
-   * Swift/Kotlin/RN/Web/C-ABI
-   */
   DIFFUSION_SCHEDULER_DDIM(3),
+  DIFFUSION_SCHEDULER_EULER(4),
   /**
-   * forward-looking — no SDK exposes this yet
+   * Euler Ancestral
    */
-  DIFFUSION_SCHEDULER_DDPM(4),
-  /**
-   * Swift/Kotlin/RN/Web/C-ABI
-   */
-  DIFFUSION_SCHEDULER_EULER(5),
-  /**
-   * Swift/Kotlin/RN/Web/C-ABI ("Euler Ancestral")
-   */
-  DIFFUSION_SCHEDULER_EULER_A(6),
-  /**
-   * Swift/Kotlin/RN/Web/C-ABI
-   */
-  DIFFUSION_SCHEDULER_PNDM(7),
-  /**
-   * Swift/Kotlin/RN/Web/C-ABI
-   */
-  DIFFUSION_SCHEDULER_LMS(8),
-  /**
-   * forward-looking — pairs with the LCM model variant
-   */
-  DIFFUSION_SCHEDULER_LCM(9),
-  /**
-   * Swift/Kotlin/RN/Web/C-ABI
-   */
-  DIFFUSION_SCHEDULER_DPMPP_2M_SDE(10),
+  DIFFUSION_SCHEDULER_EULER_A(5),
+  DIFFUSION_SCHEDULER_PNDM(6),
+  DIFFUSION_SCHEDULER_LMS(7),
+  DIFFUSION_SCHEDULER_DPMPP_2M_SDE(8),
   ;
 
   public companion object {
@@ -110,13 +56,11 @@ public enum class DiffusionScheduler(
       1 -> DIFFUSION_SCHEDULER_DPMPP_2M
       2 -> DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS
       3 -> DIFFUSION_SCHEDULER_DDIM
-      4 -> DIFFUSION_SCHEDULER_DDPM
-      5 -> DIFFUSION_SCHEDULER_EULER
-      6 -> DIFFUSION_SCHEDULER_EULER_A
-      7 -> DIFFUSION_SCHEDULER_PNDM
-      8 -> DIFFUSION_SCHEDULER_LMS
-      9 -> DIFFUSION_SCHEDULER_LCM
-      10 -> DIFFUSION_SCHEDULER_DPMPP_2M_SDE
+      4 -> DIFFUSION_SCHEDULER_EULER
+      5 -> DIFFUSION_SCHEDULER_EULER_A
+      6 -> DIFFUSION_SCHEDULER_PNDM
+      7 -> DIFFUSION_SCHEDULER_LMS
+      8 -> DIFFUSION_SCHEDULER_DPMPP_2M_SDE
       else -> null
     }
   }

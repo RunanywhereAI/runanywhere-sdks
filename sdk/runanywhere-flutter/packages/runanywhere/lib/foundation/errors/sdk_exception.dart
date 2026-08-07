@@ -2,9 +2,14 @@
 //
 // `SDKException` is the Dart-throwable wrapper around the canonical proto
 // `SDKError` (`generated/errors.pb.dart`). The proto type carries the
-// machine-readable shape (code/category/message/context/cAbiCode); this
-// class adds the `implements Exception` marker plus ergonomic factory
-// constructors while flowing proto messages end-to-end.
+// machine-readable shape (code/category/message/cAbiCode); this class adds
+// the `implements Exception` marker plus ergonomic factory constructors
+// while flowing proto messages end-to-end.
+//
+// `SDKError.context` (`ErrorContext`, the typed field-path carrier) was
+// deleted outright (idl/errors.proto) — [fieldPath] is stored Dart-side only
+// now (folded into the human-readable message on the wire) rather than
+// round-tripped through a proto field.
 
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/generated/errors.pb.dart' as pb;
@@ -13,13 +18,20 @@ import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 /// Throwable wrapper around the canonical [pb.SDKError] proto.
 class SDKException implements Exception {
-  /// Underlying proto carrying code, category, message, context, ABI code.
+  /// Underlying proto carrying code, category, message, ABI code.
   final pb.SDKError error;
 
   /// Optional underlying cause.
   final Object? underlyingError;
 
-  SDKException(this.error, {this.underlyingError});
+  /// Dot-separated path to the field that triggered a validation failure
+  /// (e.g. `"STTOptions.sampleRate"`), when this exception was built by
+  /// [validationFailed]. `SDKError.context` (the former wire carrier) was
+  /// deleted outright (idl/errors.proto), so this is Dart-local only —
+  /// callers on other SDKs read the equivalent info out of the message text.
+  final String? fieldPath;
+
+  SDKException(this.error, {this.underlyingError, this.fieldPath});
 
   /// Convenience: human-readable message from the underlying proto.
   String get message => error.message;
@@ -29,20 +41,6 @@ class SDKException implements Exception {
 
   /// Convenience: error category from the underlying proto.
   pb_enum.ErrorCategory get category => error.category;
-
-  /// Dot-separated path to the field that triggered a validation failure
-  /// (e.g. `"STTOptions.sampleRate"`). Populated by the generated
-  /// `validate()` helpers under `lib/generated/convenience/` so callers can
-  /// programmatically identify the failing field without parsing the
-  /// human-readable message.
-  ///
-  /// Backed by the typed `error.context.fieldPath` proto field — the
-  /// wire-canonical carrier shared with Swift / Kotlin / TS.
-  String? get fieldPath {
-    if (!error.hasContext()) return null;
-    final fieldPath = error.context.fieldPath;
-    return fieldPath.isNotEmpty ? fieldPath : null;
-  }
 
   @override
   String toString() => 'SDKException(${error.code.name}): ${error.message}';
@@ -65,10 +63,11 @@ class SDKException implements Exception {
     if (raw > 0 && raw <= 899) {
       err.cAbiCode = -raw;
     }
-    if (fieldPath != null) {
-      err.context = pb.ErrorContext(fieldPath: fieldPath);
-    }
-    return SDKException(err, underlyingError: underlyingError);
+    return SDKException(
+      err,
+      underlyingError: underlyingError,
+      fieldPath: fieldPath,
+    );
   }
 
   static SDKException notInitialized([String? message]) => _build(
@@ -283,9 +282,9 @@ class SDKException implements Exception {
 
   /// Validation failure.
   ///
-  /// [fieldPath] (e.g. `"STTOptions.sampleRate"`) is stored on the typed
-  /// `error.context.fieldPath` proto field, matching the generated validation
-  /// shape across Swift, Kotlin, Dart, and TypeScript.
+  /// [fieldPath] (e.g. `"STTOptions.sampleRate"`) is stored Dart-local on
+  /// [SDKException.fieldPath] — `SDKError.context` (the former wire carrier)
+  /// was deleted outright (idl/errors.proto).
   static SDKException validationFailed(
     String reason, {
     required String fieldPath,

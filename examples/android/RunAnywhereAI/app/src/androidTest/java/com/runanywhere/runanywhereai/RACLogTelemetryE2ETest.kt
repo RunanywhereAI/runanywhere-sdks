@@ -53,7 +53,12 @@ class RACLogTelemetryE2ETest {
 
             assertEquals(EventCategory.EVENT_CATEGORY_FAILURE, event.category)
             assertEquals(ErrorCode.ERROR_CODE_PROCESSING_FAILED, event.error?.code)
-            assertEquals(true, event.failure?.recoverable)
+            // FailureEvent was deleted outright (idl/sdk_events.proto, commit 07907b273):
+            // "every field already exists on the envelope -- component -> SDKEvent.component,
+            // operation -> SDKEvent.operation_id, error -> SDKEvent.error, recoverable ->
+            // SDKError.retryable." commons' rac_sdk_event_publish_failure wires the boolean
+            // straight into SDKError.retryable, so this is the exact successor field.
+            assertEquals(true, event.error?.retryable)
             assertEquals("raclog.warning", event.operation_id)
             assertEquals(expectedDiagnostic, event.error?.message)
             assertTrue(

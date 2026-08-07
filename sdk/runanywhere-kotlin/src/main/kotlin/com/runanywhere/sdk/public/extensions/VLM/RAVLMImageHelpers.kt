@@ -6,79 +6,59 @@
  *
  * Mirrors Swift RAVLMImage+Helpers.swift. This SDK is an Android library, so
  * the Android Bitmap factory lives alongside the platform-agnostic factories.
+ *
+ * RAVLMConfiguration and RAVLMGenerationOptions were both deleted outright
+ * (idl/vlm_options.proto): VLMConfiguration had no commons adapter at all,
+ * and VLMGenerationOptions's 11 sampling fields were name-for-name copies of
+ * LLMGenerationOptions with drifted defaults. Sampling now lives on
+ * VLMGenerationRequest.options (LLMGenerationOptions, shared with the text
+ * path); the four genuinely vision-specific knobs survive on
+ * VLMVisionOptions.
  */
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.VLMConfiguration
-import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
-import ai.runanywhere.proto.v1.VLMImageFormat
 import android.graphics.Bitmap
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import okio.ByteString.Companion.toByteString
-import com.runanywhere.sdk.generated.convenience.defaults as generatedDefaults
-
-// MARK: - VLMConfiguration
-
-/**
- * Default VLM component configuration mirroring Swift `RAVLMConfiguration.defaults`.
- *
- * Only load-bearing identification + limits cross the IDL boundary
- * (model_id, max_image_size_px, max_tokens). Per-request sampling
- * parameters live on [VLMGenerationOptions].
- */
-fun VLMConfiguration.Companion.defaults(modelId: String = ""): VLMConfiguration =
-    VLMConfiguration(
-        model_id = modelId,
-        max_image_size_px = 1_024,
-        max_tokens = 0,
-    )
-
-// MARK: - VLMGenerationOptions
-
-/**
- * [VLMGenerationOptions.defaults] with a prompt filled in.
- *
- * Sampling values come from generated/convenience/RAConvenience.kt, emitted from
- * the rac_default annotations in idl/vlm_options.proto. The table this replaced
- * capped max_tokens at 256 against the C layer's 2048 and set top_k=40 where the
- * C layer disables it.
- */
-fun VLMGenerationOptions.Companion.defaults(prompt: String = ""): RAVLMGenerationOptions =
-    generatedDefaults().copy(prompt = prompt)
 
 // MARK: - VLMImage factories (platform-agnostic)
 
 /**
  * Create a [VLMImage] from an encoded JPEG / PNG / WebP byte buffer.
+ *
+ * `img.format`/`.encoded` were deleted along with `VLMImageFormat`
+ * (idl/vlm_options.proto): the oneof case name (`data`) now carries the same
+ * discrimination the old `format` enum did, and [mediaType] (a plain MIME
+ * string) replaces the closed format enum entirely so a new container type
+ * is not a proto change.
  */
 fun VLMImage.Companion.fromEncoded(
     data: ByteArray,
-    format: VLMImageFormat,
+    mediaType: String,
 ): RAVLMImage =
     RAVLMImage(
-        encoded = data.toByteString(),
-        format = format,
+        data_ = data.toByteString(),
+        media_type = mediaType,
     )
 
 /**
  * Create a [VLMImage] from an on-disk file path.
  */
 fun VLMImage.Companion.fromFilePath(path: String): RAVLMImage =
-    RAVLMImage(
-        file_path = path,
-        format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
-    )
+    RAVLMImage(file_path = path)
 
 /**
  * Create a [VLMImage] from a base64-encoded string.
  */
-fun VLMImage.Companion.fromBase64(base64: String): RAVLMImage =
+fun VLMImage.Companion.fromBase64(
+    base64: String,
+    mediaType: String,
+): RAVLMImage =
     RAVLMImage(
         base64 = base64,
-        format = VLMImageFormat.VLM_IMAGE_FORMAT_BASE64,
+        media_type = mediaType,
     )
 
 /**
@@ -93,13 +73,13 @@ fun VLMImage.Companion.fromRawRGB(
         raw_rgb = data.toByteString(),
         width = width,
         height = height,
-        format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
     )
 
 /**
  * Create a [VLMImage] from raw RGBA bytes (4 bytes per pixel, no padding).
  *
- * Stored in the same `raw_rgb` oneof slot as RGB; [format] disambiguates.
+ * `raw_rgba` is now its own oneof arm (idl/vlm_options.proto field 12), not a
+ * shared `raw_rgb` slot distinguished by a format flag.
  */
 fun VLMImage.Companion.fromRawRGBA(
     data: ByteArray,
@@ -107,10 +87,9 @@ fun VLMImage.Companion.fromRawRGBA(
     height: Int,
 ): RAVLMImage =
     RAVLMImage(
-        raw_rgb = data.toByteString(),
+        raw_rgba = data.toByteString(),
         width = width,
         height = height,
-        format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA,
     )
 
 /**

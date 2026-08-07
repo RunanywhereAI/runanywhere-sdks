@@ -98,6 +98,10 @@ public nonisolated struct RASegmentationOptions: Sendable {
   /// canonical class_mask_u16_le remains the machine-readable result.
   public var includeDiagnosticRgba: Bool = false
 
+  /// When true, also return confidence_mask_u8: the model's probability for
+  /// the class it chose, per pixel. Costs width * height extra bytes.
+  public var includeConfidence: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -126,14 +130,32 @@ public nonisolated struct RASegmentationRequest: Sendable {
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
   public mutating func clearOptions() {self._options = nil}
 
+  /// Registry id, catalog id, or absolute path. Unset = use the resident
+  /// semantic-segmentation model. Mirrors EmbeddingsRequest.model_id and
+  /// VLMGenerationRequest.model_id.
+  public var modelID: String {
+    get {_modelID ?? String()}
+    set {_modelID = newValue}
+  }
+  /// Returns true if `modelID` has been explicitly set.
+  public var hasModelID: Bool {self._modelID != nil}
+  /// Clears the value of `modelID`. Subsequent reads from it will return its default value.
+  public mutating func clearModelID() {self._modelID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _image: RASegmentationImage? = nil
   fileprivate var _options: RASegmentationOptions? = nil
+  fileprivate var _modelID: String? = nil
 }
 
+/// Coverage share of a class is pixel_count / (SegmentationResult.width *
+/// SegmentationResult.height). Commons rejects any result whose pixel_counts
+/// do not sum to that product before encoding it into a SegmentationResult, so
+/// within this message the summaries partition the image and the division is
+/// exact.
 public nonisolated struct RASegmentationClassSummary: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -142,8 +164,6 @@ public nonisolated struct RASegmentationClassSummary: Sendable {
   public var classID: UInt32 = 0
 
   public var pixelCount: UInt64 = 0
-
-  public var fraction: Float = 0
 
   public var label: String = String()
 
@@ -180,11 +200,25 @@ public nonisolated struct RASegmentationResult: Sendable {
 
   public var modelID: String = String()
 
+  /// Confidence of the class in class_mask_u16_le, one byte per pixel,
+  /// 0..255 == probability 0.0..1.0. Same row-major order and dimensions as
+  /// the class mask. Present iff SegmentationOptions.include_confidence was
+  /// set, and then exactly width * height bytes.
+  public var confidenceMaskU8: Data {
+    get {_confidenceMaskU8 ?? Data()}
+    set {_confidenceMaskU8 = newValue}
+  }
+  /// Returns true if `confidenceMaskU8` has been explicitly set.
+  public var hasConfidenceMaskU8: Bool {self._confidenceMaskU8 != nil}
+  /// Clears the value of `confidenceMaskU8`. Subsequent reads from it will return its default value.
+  public mutating func clearConfidenceMaskU8() {self._confidenceMaskU8 = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _diagnosticRgba: Data? = nil
+  fileprivate var _confidenceMaskU8: Data? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -242,7 +276,7 @@ nonisolated extension RASegmentationImage: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RASegmentationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SegmentationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_diagnostic_rgba\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_diagnostic_rgba\0\u{3}include_confidence\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -251,6 +285,7 @@ nonisolated extension RASegmentationOptions: SwiftProtobuf.Message, SwiftProtobu
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBoolField(value: &self.includeDiagnosticRgba) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeConfidence) }()
       default: break
       }
     }
@@ -260,11 +295,15 @@ nonisolated extension RASegmentationOptions: SwiftProtobuf.Message, SwiftProtobu
     if self.includeDiagnosticRgba != false {
       try visitor.visitSingularBoolField(value: self.includeDiagnosticRgba, fieldNumber: 1)
     }
+    if self.includeConfidence != false {
+      try visitor.visitSingularBoolField(value: self.includeConfidence, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASegmentationOptions, rhs: RASegmentationOptions) -> Bool {
     if lhs.includeDiagnosticRgba != rhs.includeDiagnosticRgba {return false}
+    if lhs.includeConfidence != rhs.includeConfidence {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -272,7 +311,7 @@ nonisolated extension RASegmentationOptions: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RASegmentationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SegmentationRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}options\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}options\0\u{3}model_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -282,6 +321,7 @@ nonisolated extension RASegmentationRequest: SwiftProtobuf.Message, SwiftProtobu
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._image) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
       default: break
       }
     }
@@ -298,12 +338,16 @@ nonisolated extension RASegmentationRequest: SwiftProtobuf.Message, SwiftProtobu
     try { if let v = self._options {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
+    try { if let v = self._modelID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASegmentationRequest, rhs: RASegmentationRequest) -> Bool {
     if lhs._image != rhs._image {return false}
     if lhs._options != rhs._options {return false}
+    if lhs._modelID != rhs._modelID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -311,7 +355,7 @@ nonisolated extension RASegmentationRequest: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SegmentationClassSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}class_id\0\u{3}pixel_count\0\u{1}fraction\0\u{1}label\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}class_id\0\u{3}pixel_count\0\u{1}label\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -321,8 +365,7 @@ nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftPr
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self.classID) }()
       case 2: try { try decoder.decodeSingularUInt64Field(value: &self.pixelCount) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.fraction) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.label) }()
       default: break
       }
     }
@@ -335,11 +378,8 @@ nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftPr
     if self.pixelCount != 0 {
       try visitor.visitSingularUInt64Field(value: self.pixelCount, fieldNumber: 2)
     }
-    if self.fraction.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.fraction, fieldNumber: 3)
-    }
     if !self.label.isEmpty {
-      try visitor.visitSingularStringField(value: self.label, fieldNumber: 4)
+      try visitor.visitSingularStringField(value: self.label, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -347,7 +387,6 @@ nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftPr
   public static func ==(lhs: RASegmentationClassSummary, rhs: RASegmentationClassSummary) -> Bool {
     if lhs.classID != rhs.classID {return false}
     if lhs.pixelCount != rhs.pixelCount {return false}
-    if lhs.fraction != rhs.fraction {return false}
     if lhs.label != rhs.label {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -356,7 +395,7 @@ nonisolated extension RASegmentationClassSummary: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension RASegmentationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SegmentationResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}width\0\u{1}height\0\u{3}class_mask_u16_le\0\u{3}diagnostic_rgba\0\u{3}class_summaries\0\u{3}processing_time_ms\0\u{3}model_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}width\0\u{1}height\0\u{3}class_mask_u16_le\0\u{3}diagnostic_rgba\0\u{3}class_summaries\0\u{3}processing_time_ms\0\u{3}model_id\0\u{3}confidence_mask_u8\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -371,6 +410,7 @@ nonisolated extension RASegmentationResult: SwiftProtobuf.Message, SwiftProtobuf
       case 5: try { try decoder.decodeRepeatedMessageField(value: &self.classSummaries) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self.processingTimeMs) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 8: try { try decoder.decodeSingularBytesField(value: &self._confidenceMaskU8) }()
       default: break
       }
     }
@@ -402,6 +442,9 @@ nonisolated extension RASegmentationResult: SwiftProtobuf.Message, SwiftProtobuf
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 7)
     }
+    try { if let v = self._confidenceMaskU8 {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -413,6 +456,7 @@ nonisolated extension RASegmentationResult: SwiftProtobuf.Message, SwiftProtobuf
     if lhs.classSummaries != rhs.classSummaries {return false}
     if lhs.processingTimeMs != rhs.processingTimeMs {return false}
     if lhs.modelID != rhs.modelID {return false}
+    if lhs._confidenceMaskU8 != rhs._confidenceMaskU8 {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

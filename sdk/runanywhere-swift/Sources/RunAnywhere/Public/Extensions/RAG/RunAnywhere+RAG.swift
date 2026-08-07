@@ -2,20 +2,19 @@
 //  RunAnywhere+RAG.swift
 //  RunAnywhere SDK
 //
-//  Public API for Retrieval-Augmented Generation (RAG) operations.
-//  Delegates all pipeline work to CppBridge.RAG, publishes events to EventBus.
+//  Deprecated flat RAG verbs, all driving the single shared pipeline they
+//  always drove. The v3 surface is `RunAnywhere.rag.open(...)`, which hands
+//  back an independent `RagSession`.
 //
 
 import Foundation
 
-// MARK: - RAG Operations
-
 public extension RunAnywhere {
 
-    // MARK: - Pipeline Lifecycle
+    // MARK: - Pipeline lifecycle
 
-    /// Build a generated RAG configuration from registry models by using
-    /// commons lifecycle resolution for primary and sidecar artifacts.
+    /// Build a RAG configuration from registry models via lifecycle resolution.
+    @available(*, deprecated, renamed: "rag.open(embeddingModel:llmModel:config:)")
     static func ragResolvedConfiguration(
         embeddingModel: RAModelInfo,
         llmModel: RAModelInfo,
@@ -34,77 +33,73 @@ public extension RunAnywhere {
         return try baseConfiguration.resolvingLifecycleArtifacts(embedding: embedding, llm: llm)
     }
 
-    /// Create the RAG pipeline from registry models. Model artifact layout is
-    /// resolved by commons lifecycle rather than by Swift file-name heuristics.
+    /// Create the shared RAG pipeline from registry models.
+    @available(*, deprecated, renamed: "rag.open(embeddingModel:llmModel:config:)")
     static func ragCreatePipeline(
         embeddingModel: RAModelInfo,
         llmModel: RAModelInfo,
         baseConfiguration: RARAGConfiguration = .defaults()
     ) async throws {
-        let config = try await ragResolvedConfiguration(
-            embeddingModel: embeddingModel,
-            llmModel: llmModel,
-            baseConfiguration: baseConfiguration
+        let embedding = try await loadRAGArtifactModel(
+            embeddingModel,
+            fallbackCategory: .embedding,
+            errorLabel: "Embedding"
         )
-        try await ragCreatePipeline(config: config)
+        let llm = try await loadRAGArtifactModel(
+            llmModel,
+            fallbackCategory: .language,
+            errorLabel: "LLM"
+        )
+        let config = try baseConfiguration.resolvingLifecycleArtifacts(embedding: embedding, llm: llm)
+        try await ragCreatePipelineInternal(config: config)
     }
 
-    /// Create the RAG pipeline with the given configuration.
-    ///
-    /// Must be called before ingesting documents or running queries.
-    ///
-    /// - Parameter config: RAG pipeline configuration (model paths, tuning parameters)
-    /// - Throws: `SDKException` if the SDK is not initialized or pipeline creation fails
+    /// Create the shared RAG pipeline with the given configuration.
+    @available(*, deprecated, renamed: "rag.open(embeddingModel:llmModel:config:)")
     static func ragCreatePipeline(config: RARAGConfiguration) async throws {
-        guard isInitialized else {
+        try await ragCreatePipelineInternal(config: config)
+    }
+
+    internal static func ragCreatePipelineInternal(config: RARAGConfiguration) async throws {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
-
         try await CppBridge.RAG.shared.replacePipeline(config)
     }
 
-    /// Destroy the RAG pipeline and release all resources.
+    /// Destroy the shared RAG pipeline and release its resources.
+    @available(*, deprecated, renamed: "RagSession.close()")
     static func ragDestroyPipeline() async {
         await CppBridge.RAG.shared.destroy()
     }
 
-    // MARK: - Document Ingestion
+    // MARK: - Document ingestion
 
-    /// Ingest a generated-proto document through the C++ RAG ABI.
+    /// Ingest one document into the shared pipeline.
     @discardableResult
+    @available(*, deprecated, renamed: "RagSession.ingest(document:)")
     static func ragIngest(_ document: RARAGDocument) async throws -> RARAGStatistics {
-        guard isInitialized else {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
-
         return try await CppBridge.RAG.shared.ingest(document)
     }
 
-    /// Ingest multiple text documents into the RAG pipeline in a single batch.
-    ///
-    /// Equivalent to calling `ragIngest` for each document but more efficient because
-    /// the C++ layer can embed all documents in a single pass.
-    ///
-    /// - Parameter documents: Array of `RARAGDocument` values.
-    /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails.
+    /// Ingest several documents into the shared pipeline in one batch.
+    @available(*, deprecated, renamed: "RagSession.ingest(documents:)")
     static func ragAddDocumentsBatch(documents: [RARAGDocument]) async throws {
-        guard isInitialized else {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         guard !documents.isEmpty else { return }
         try await ensureServicesReady()
-
         try await CppBridge.RAG.shared.ingest(documents)
     }
 
-    /// Get the number of indexed document chunks in the pipeline as a function call.
-    ///
-    /// This is the canonical `ragGetDocumentCount()` form required by the spec (§9).
-    /// The computed var `ragDocumentCount` is retained as a convenience accessor.
-    ///
-    /// - Returns: Number of indexed chunks in the pipeline, or 0 if not initialized.
+    /// Number of indexed chunks in the shared pipeline, or 0 when unavailable.
+    @available(*, deprecated, renamed: "RagSession.stats()")
     static func ragGetDocumentCount() async -> Int {
         if let stats = try? await CppBridge.RAG.shared.statistics() {
             return Int(stats.indexedChunks)
@@ -112,98 +107,92 @@ public extension RunAnywhere {
         return 0
     }
 
-    /// Get RAG pipeline statistics.
-    ///
-    /// Returns an `RARAGStatistics` proto with `indexedDocuments`, `indexedChunks`,
-    /// `totalTokensIndexed`, `lastUpdatedMs`, and `indexPath`.
-    ///
-    /// - Throws: `SDKException` if the SDK is not initialized or the pipeline is not ready.
+    /// Statistics for the shared pipeline.
+    @available(*, deprecated, renamed: "RagSession.stats()")
     static func ragGetStatistics() async throws -> RARAGStatistics {
-        guard isInitialized else {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         return try await CppBridge.RAG.shared.statistics()
     }
 
-    /// Clear all previously ingested documents from the pipeline.
-    ///
-    /// - Throws: `SDKException` if the SDK is not initialized or the pipeline is not ready
+    /// Clear all ingested documents from the shared pipeline.
+    @available(*, deprecated, renamed: "RagSession.clear()")
     static func ragClearDocuments() async throws {
-        guard isInitialized else {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         _ = try await CppBridge.RAG.shared.clearDocuments()
     }
 
-    /// The current number of indexed document chunks in the pipeline.
+    /// Current number of indexed chunks in the shared pipeline.
+    @available(*, deprecated, renamed: "RagSession.stats()")
     static var ragDocumentCount: Int {
         get async {
-            await ragGetDocumentCount()
+            if let stats = try? await CppBridge.RAG.shared.statistics() {
+                return Int(stats.indexedChunks)
+            }
+            return 0
         }
     }
 
     // MARK: - Query
 
-    /// Query the RAG pipeline with a natural-language question.
-    ///
-    /// Retrieves the most relevant chunks from the vector index and uses the
-    /// on-device LLM to generate a grounded answer.
-    ///
-    /// - Parameters:
-    ///   - question: The user's question
-    ///   - options: Optional query parameters (temperature, max tokens, etc.).
-    ///              Pass `nil` to use defaults derived from the question.
-    /// - Returns: A `RARAGResult` containing the generated answer and retrieved chunks
-    /// - Throws: `SDKException` if the SDK or pipeline is not ready, or the query fails
+    /// Query the shared pipeline with a natural-language question.
+    @available(*, deprecated, renamed: "RagSession.query(question:options:)")
     static func ragQuery(question: String, options: RARAGQueryOptions? = nil) async throws -> RARAGResult {
         var queryOptions = options ?? RARAGQueryOptions.defaults(question: question)
-        if queryOptions.question.isEmpty {
-            queryOptions.question = question
+        if queryOptions.query.isEmpty {
+            queryOptions.query = question
         }
-        return try await ragQuery(queryOptions)
+        return try await ragQueryInternal(queryOptions)
     }
 
-    /// Query through the generated-proto C++ RAG ABI.
+    /// Query the shared pipeline through the generated-proto ABI.
+    @available(*, deprecated, renamed: "RagSession.query(question:options:)")
     static func ragQuery(_ options: RARAGQueryOptions) async throws -> RARAGResult {
-        guard isInitialized else {
+        try await ragQueryInternal(options)
+    }
+
+    internal static func ragQueryInternal(_ options: RARAGQueryOptions) async throws -> RARAGResult {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
-
         return try await CppBridge.RAG.shared.runQuery(options)
     }
 
-    /// Streaming RAG query. Emits a `RARAGStreamEvent` per generated token
-    /// (kind = TOKEN) as the answer is produced, then a terminal COMPLETED event
-    /// carrying the full `RARAGResult` (answer + retrieved chunks), or an ERROR.
-    ///
-    /// Because tokens surface as they generate, callers render progress live and
-    /// do not need a wall-clock timeout. Breaking out of the stream stops the
-    /// native query via backpressure.
-    static func ragQueryStream(question: String, options: RARAGQueryOptions? = nil) async throws -> AsyncStream<RARAGStreamEvent> {
+    /// Streaming query against the shared pipeline.
+    @available(*, deprecated, renamed: "RagSession.queryStream(question:options:)")
+    static func ragQueryStream(
+        question: String,
+        options: RARAGQueryOptions? = nil
+    ) async throws -> AsyncStream<RARAGStreamEvent> {
         var queryOptions = options ?? RARAGQueryOptions.defaults(question: question)
-        if queryOptions.question.isEmpty {
-            queryOptions.question = question
+        if queryOptions.query.isEmpty {
+            queryOptions.query = question
         }
-        return try await ragQueryStream(queryOptions)
+        return try await ragQueryStreamInternal(queryOptions)
     }
 
-    /// Streaming query through the generated-proto C++ RAG ABI.
+    /// Streaming query against the shared pipeline through the generated-proto ABI.
+    @available(*, deprecated, renamed: "RagSession.queryStream(question:options:)")
     static func ragQueryStream(_ options: RARAGQueryOptions) async throws -> AsyncStream<RARAGStreamEvent> {
-        guard isInitialized else {
+        try await ragQueryStreamInternal(options)
+    }
+
+    internal static func ragQueryStreamInternal(
+        _ options: RARAGQueryOptions
+    ) async throws -> AsyncStream<RARAGStreamEvent> {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
-
         return try await CppBridge.RAG.shared.runQueryStream(options)
     }
 
-    /// Immediately request cancellation of the active RAG query on the shared
-    /// session. Session-scoped, backed by `rac_rag_cancel_proto`: the in-flight
-    /// unary or streaming query ends with an ERROR event carrying the
-    /// cancellation status. Breaking out of a `ragQueryStream` already cancels
-    /// cooperatively — this is the explicit imperative form and mirrors the
-    /// cross-SDK `ragCancelQuery()` surface (Kotlin/React Native/Web).
+    /// Cancel the query running on the shared pipeline.
+    @available(*, deprecated, message: "Cancel the Task consuming RagSession.queryStream instead")
     static func ragCancelQuery() async {
         await CppBridge.RAG.shared.cancelActiveQuery()
     }
@@ -231,11 +220,9 @@ private extension RunAnywhere {
         if model.framework != .unspecified {
             request.framework = model.framework
         }
-        let result = await loadModel(request)
-        guard result.success else {
-            let message = result.errorMessage.isEmpty
-                ? "\(errorLabel) model lifecycle artifact resolution failed"
-                : result.errorMessage
+        let result = await performLoad(request)
+        guard !result.hasError else {
+            let message = result.error.message
             let code: RAErrorCode = message.contains(NativeProtoABI.unavailableMessage)
                 ? .featureNotAvailable
                 : .modelLoadFailed

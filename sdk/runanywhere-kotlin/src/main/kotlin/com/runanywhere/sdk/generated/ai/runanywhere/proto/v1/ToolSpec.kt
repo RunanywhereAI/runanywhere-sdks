@@ -45,7 +45,7 @@ public class ToolSpec(
   )
   public val description: String = "",
   /**
-   * Parameters schema, OpenAI-compatible
+   * OpenAI-compatible parameters schema.
    */
   @field:WireField(
     tag = 3,

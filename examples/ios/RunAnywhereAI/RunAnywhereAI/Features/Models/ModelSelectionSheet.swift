@@ -679,43 +679,20 @@ extension ModelSelectionSheet {
     }
 
     private func loadModelForContext(_ model: RAModelInfo) async throws {
-        let category: RAModelCategory
         switch context {
-        case .llm: category = .language
-        case .stt: category = .speechRecognition
-        case .tts: category = .speechSynthesis
-        case .vad: category = .voiceActivityDetection
-        case .voice: category = voiceContextCategory(for: model)
-        case .vlm: category = .multimodal
-        case .diarization: category = .speakerDiarization
-        case .segmentation: category = .semanticSegmentation
         case .ragEmbedding, .ragLLM:
             // RAG models are referenced by local file path at pipeline creation time,
             // not pre-loaded into memory via the SDK model loader.
             return
-        }
-        try await loadViaCanonicalAPI(modelID: model.id, category: category)
-    }
-
-    private func voiceContextCategory(for model: RAModelInfo) -> RAModelCategory {
-        switch model.category {
-        case .speechRecognition: return .speechRecognition
-        case .speechSynthesis: return .speechSynthesis
-        default: return .language
+        default:
+            try await loadViaCanonicalAPI(modelID: model.id)
         }
     }
 
-    private func loadViaCanonicalAPI(modelID: String, category: RAModelCategory) async throws {
-        var request = RAModelLoadRequest()
-        request.modelID = modelID
-        request.category = category
-        let result = await RunAnywhere.loadModel(request)
-        if !result.success {
-            throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
-        }
-        let resolvedID = result.modelID.isEmpty ? modelID : result.modelID
+    private func loadViaCanonicalAPI(modelID: String) async throws {
+        try await RunAnywhere.models.load(id: modelID)
         Logger(subsystem: "com.runanywhere", category: "Models").info(
-            "Model load succeeded for \(resolvedID, privacy: .public)"
+            "Model load succeeded for \(modelID, privacy: .public)"
         )
     }
 
@@ -723,7 +700,7 @@ extension ModelSelectionSheet {
         let isLLM = context == .llm ||
             (context == .voice && [.language, .multimodal].contains(model.category))
 
-        // `RunAnywhere.loadModel` already published the canonical
+        // `RunAnywhere.models.load` already published the canonical
         // component-lifecycle event the LLM/VLM ViewModels subscribe to, so the
         // app only updates its own shared selection state here.
         if isLLM {

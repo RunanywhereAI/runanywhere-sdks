@@ -42,8 +42,10 @@ public extension HandleStreamAdapter where Handle == rac_handle_t, Event == RALL
     /// Wires the LLM-specific C registration symbols
     /// (`rac_llm_set_stream_proto_callback` /
     /// `rac_llm_unset_stream_proto_callback`), the teardown quiesce symbol
-    /// (`rac_llm_proto_quiesce`), and the LLM terminal-event predicate
-    /// (`event.isFinal`) into the generic fan-out adapter.
+    /// (`rac_llm_proto_quiesce`), and the LLM terminal-event predicate into
+    /// the generic fan-out adapter. `RALLMStreamEvent.isFinal` was deleted
+    /// (idl/llm_service.proto): `eventKind == .completed` (or `.error`) is
+    /// now the sole terminal discriminator.
     convenience init(handle: rac_handle_t) {
         self.init(
             handle: handle,
@@ -51,7 +53,7 @@ public extension HandleStreamAdapter where Handle == rac_handle_t, Event == RALL
             register: { handle, cb, ud in rac_llm_set_stream_proto_callback(handle, cb, ud) },
             unregister: { handle in _ = rac_llm_unset_stream_proto_callback(handle) },
             quiesce: { rac_llm_proto_quiesce() },
-            isTerminalEvent: { $0.isFinal }
+            isTerminalEvent: { $0.eventKind == .completed || $0.eventKind == .error }
         )
     }
 }

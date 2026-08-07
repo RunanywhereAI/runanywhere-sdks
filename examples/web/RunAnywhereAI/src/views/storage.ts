@@ -3,9 +3,9 @@
  * view that surfaces registry state via proto-byte adapters.
  *
  * Mirrors iOS `StorageViewModel` (StorageViewModel.swift:28-103):
- *   - `RunAnywhere.getStorageInfo(request)` drives the used/free header.
- *   - Clear Cache / Clean Temp delegate to the SDK verbs.
- *   - Per-model Delete goes through `RunAnywhere.deleteModel(modelId)`.
+ *   - `RunAnywhere.models.state()` drives the used/free header.
+ *   - Clear Caches delegates to `RunAnywhere.storage.clearCaches()`.
+ *   - Per-model Delete goes through `RunAnywhere.models.delete(id)`.
  *
  * The storage-location switcher (OPFS vs local folder) is justified web
  * platform code — browsers expose two storage backends, iOS has one.
@@ -14,18 +14,10 @@
 
 import type { TabLifecycle } from '../app';
 import { showToast } from '../components/dialogs';
+import { RunAnywhere } from '@runanywhere/web';
+import type { ModelsState } from '@runanywhere/web';
 import {
-  RunAnywhere,
-  deviceStorageUsagePercentage,
-  storageInfoAppStorage,
-  storageInfoDeviceStorage,
-  storageInfoTotalModelsSize,
-} from '@runanywhere/web';
-import type { ModelInfo, StorageInfo } from '@runanywhere/web';
-import {
-  StorageInfoRequest,
-} from '@runanywhere/proto-ts/storage_types';
-import {
+  findLoadedModelForCategory,
   onModelStateChange,
   openSheet as openModelSheet,
   refreshModelSelectionState,
@@ -42,7 +34,7 @@ import {
 
 let container: HTMLElement;
 let unsubscribeState: (() => void) | null = null;
-let lastStorageInfo: StorageInfo | null = null;
+let lastStorageInfo: ModelsState | null = null;
 let storageInfoError: string | null = null;
 
 export function initStorageTab(el: HTMLElement): TabLifecycle {
@@ -51,8 +43,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     <div class="toolbar">
       <div class="toolbar-title">Storage</div>
       <div class="toolbar-actions">
-        <button class="btn btn-secondary" id="storage-clear-cache-btn" style="font-size: 0.8rem;">Clear Cache</button>
-        <button class="btn btn-secondary" id="storage-clean-temp-btn" style="font-size: 0.8rem;">Clean Temp</button>
+        <button class="btn btn-secondary" id="storage-clear-cache-btn" style="font-size: 0.8rem;">Clear Caches</button>
       </div>
     </div>
     <div class="scroll-area" id="storage-scroll">
@@ -85,37 +76,23 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
 
   container.querySelector('#storage-clear-cache-btn')!.addEventListener('click', () => {
     void (async () => {
-    // iOS parity: StorageViewModel.swift:68-75 `clearCache()`.
     try {
-      await RunAnywhere.clearCache();
-      showToast('Cache cleared', 'success');
+      await RunAnywhere.storage.clearCaches();
+      showToast('Caches cleared', 'success');
     } catch (err) {
-      showToast(`Failed to clear cache: ${formatError(err)}`, 'warning');
+      showToast(`Failed to clear caches: ${formatError(err)}`, 'warning');
     }
-      refreshStorageInfo();
-    })();
-  });
-
-  container.querySelector('#storage-clean-temp-btn')!.addEventListener('click', () => {
-    void (async () => {
-    // iOS parity: StorageViewModel.swift:77-84 `cleanTempFiles()`.
-    try {
-      await RunAnywhere.cleanTempFiles();
-      showToast('Temporary files cleaned', 'success');
-    } catch (err) {
-      showToast(`Failed to clean temporary files: ${formatError(err)}`, 'warning');
-    }
-      refreshStorageInfo();
+      void refreshStorageInfo();
     })();
   });
 
   container.querySelector('#storage-choose-dir-btn')!.addEventListener('click', () => {
     void (async () => {
     try {
-      const ok = await RunAnywhere.storage.chooseLocalStorageDirectory();
+      const ok = await RunAnywhere.storage.chooseDirectory();
       if (ok) {
         refreshModelSelectionState();
-        showToast(`Using folder: ${RunAnywhere.storage.localStorageDirectoryName ?? 'selected'}`, 'success');
+        showToast(`Using folder: ${RunAnywhere.storage.directoryName ?? 'selected'}`, 'success');
       } else {
         showToast('Folder selection cancelled or unsupported', 'info');
       }
@@ -128,7 +105,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
 
   container.querySelector('#storage-reauth-btn')!.addEventListener('click', () => {
     void (async () => {
-      const ok = await RunAnywhere.storage.requestLocalStorageAccess();
+      const ok = await RunAnywhere.storage.requestAccess();
       if (ok) refreshModelSelectionState();
       showToast(ok ? 'Access re-authorized' : 'Access not granted', ok ? 'success' : 'warning');
       updateStorageLocationUI();
@@ -138,18 +115,18 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
   container.querySelector('#storage-open-selection-btn')!.addEventListener('click', () => {
     openModelSheet();
   });
-  refreshStorageInfo();
+  void refreshStorageInfo();
   updateStorageLocationUI();
   renderModelList();
 
   unsubscribeState = onModelStateChange(() => {
-    refreshStorageInfo();
+    void refreshStorageInfo();
     renderModelList();
   });
 
   return {
     onActivate(): void {
-      refreshStorageInfo();
+      void refreshStorageInfo();
       updateStorageLocationUI();
       renderModelList();
     },
@@ -168,21 +145,11 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
 // Storage info header (iOS parity: StorageViewModel.swift:28-62 loadData)
 // ---------------------------------------------------------------------------
 
-function refreshStorageInfo(): void {
+async function refreshStorageInfo(): Promise<void> {
   storageInfoError = null;
   lastStorageInfo = null;
   try {
-    const result = RunAnywhere.getStorageInfo(StorageInfoRequest.fromPartial({
-      includeDevice: true,
-      includeApp: true,
-      includeModels: true,
-      includeCache: true,
-    }));
-    if (!result.success) {
-      storageInfoError = result.errorMessage || 'Failed to load storage data';
-    } else {
-      lastStorageInfo = result.info ?? null;
-    }
+    lastStorageInfo = await RunAnywhere.models.state();
   } catch (err) {
     storageInfoError = formatError(err);
   }
@@ -202,19 +169,21 @@ function renderStorageInfoHeader(): void {
     return;
   }
 
-  const app = storageInfoAppStorage(lastStorageInfo);
-  const device = storageInfoDeviceStorage(lastStorageInfo);
-  const modelsSize = storageInfoTotalModelsSize(lastStorageInfo);
-  const usedPct = deviceStorageUsagePercentage(device);
+  const { storageUsedBytes, storageFreeBytes } = lastStorageInfo;
+  const modelsSize = RunAnywhere.models
+    .list({ downloadedOnly: true })
+    .reduce((total, model) => total + Number(model.downloadSizeBytes ?? 0), 0);
+  const quota = storageUsedBytes + storageFreeBytes;
+  const usedPct = quota > 0 ? (storageUsedBytes / quota) * 100 : 0;
 
   host.innerHTML = `
     <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 6px;">Storage</div>
     <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 0.85rem;">
-      <div><strong>App used:</strong> ${formatBytes(app.totalBytes)}</div>
+      <div><strong>Origin used:</strong> ${formatBytes(storageUsedBytes)}</div>
       <div><strong>Models:</strong> ${formatBytes(modelsSize)}</div>
-      <div><strong>Device free:</strong> ${formatBytes(device.freeBytes)}</div>
+      <div><strong>Origin free:</strong> ${formatBytes(storageFreeBytes)}</div>
     </div>
-    ${device.totalBytes > 0
+    ${quota > 0
       ? `<div class="progress-bar" style="margin-top: 8px;">
           <div class="progress-fill" style="width:${Math.min(100, Math.round(usedPct))}%"></div>
         </div>`
@@ -231,15 +200,15 @@ function updateStorageLocationUI(): void {
   const chooseDirBtn = container.querySelector('#storage-choose-dir-btn') as HTMLElement;
   const reauthBtn = container.querySelector('#storage-reauth-btn') as HTMLElement;
 
-  if (RunAnywhere.storage.isLocalStorageReady) {
-    const safeName = escapeHtml(RunAnywhere.storage.localStorageDirectoryName ?? 'Unknown');
+  if (RunAnywhere.storage.isReady) {
+    const safeName = escapeHtml(RunAnywhere.storage.directoryName ?? 'Unknown');
     label.innerHTML = `<strong>Local Folder:</strong> ~/${safeName}/`
       + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files &mdash; visible in Finder, persists forever</span>`;
     label.style.color = 'var(--color-success, #4caf50)';
     chooseDirBtn.textContent = 'Change Folder';
     chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
-  } else if (RunAnywhere.storage.hasLocalStorageHandle) {
+  } else if (RunAnywhere.storage.directoryName !== null) {
     label.innerHTML = 'Local folder configured &mdash; needs re-authorization'
       + `<br><span style="font-size:0.75rem;opacity:0.5">Click "Re-authorize" to reconnect</span>`;
     label.style.color = 'var(--color-warning, #ff9800)';
@@ -249,7 +218,7 @@ function updateStorageLocationUI(): void {
     label.innerHTML = '<strong>Persistent model storage unavailable</strong>'
       + '<br><span style="font-size:0.75rem;opacity:0.5">Model downloads require OPFS or an approved local folder in the split-WASM SDK.</span>';
     label.style.color = 'var(--color-warning, #ff9800)';
-    chooseDirBtn.style.display = RunAnywhere.storage.isLocalStorageSupported ? '' : 'none';
+    chooseDirBtn.style.display = RunAnywhere.storage.isSupported ? '' : 'none';
     reauthBtn.style.display = 'none';
   } else {
     label.innerHTML = '<strong>Browser Storage (OPFS)</strong>'
@@ -274,31 +243,17 @@ function renderModelList(): void {
     return;
   }
 
-  const downloadedIds = new Set<string>();
-  try {
-    const downloaded = RunAnywhere.downloadedModels();
-    for (const m of downloaded?.models ?? []) downloadedIds.add(m.id);
-  } catch {
-    // tolerate — adapter may not be installed
-  }
-
-  const loadedIds = new Set<string>();
-  const categories = new Set(catalog.map((entry) => entry.category));
-  for (const category of categories) {
-    try {
-      const current = RunAnywhere.currentModel({
-        category,
-        includeModelMetadata: false,
-      });
-      if (current?.modelId) loadedIds.add(current.modelId);
-    } catch {
-      // A backend may not support every category; keep checking the others.
-    }
-  }
+  const downloadedIds = new Set(
+    RunAnywhere.models.list({ downloadedOnly: true }).map((model) => model.id),
+  );
+  const loadedIds = new Set(
+    [...new Set(catalog.map((entry) => entry.category))]
+      .map((category) => findLoadedModelForCategory(category)?.id)
+      .filter((id): id is string => Boolean(id)),
+  );
 
   host.innerHTML = catalog.map((entry) => {
-    const registryInfo = lookupModelInfo(entry.id);
-    const isDownloaded = downloadedIds.has(entry.id) || Boolean(registryInfo?.isDownloaded);
+    const isDownloaded = downloadedIds.has(entry.id);
     const isLoaded = loadedIds.has(entry.id);
     const statusLabel = isLoaded
       ? '<span class="badge badge-green">Loaded</span>'
@@ -331,27 +286,14 @@ function renderModelList(): void {
   });
 }
 
-/** iOS parity: StorageViewModel.swift:86-103 `deleteModel(_:)`. */
 async function deleteModel(modelId: string): Promise<void> {
   try {
-    const result = await RunAnywhere.deleteModel(modelId);
-    if (!result.success) {
-      showToast(result.errorMessage || 'Failed to delete model', 'warning');
-      return;
-    }
+    await RunAnywhere.models.delete(modelId);
     refreshModelSelectionState();
     showToast(`Deleted ${modelId}`, 'success');
   } catch (err) {
     showToast(`Failed to delete model: ${formatError(err)}`, 'warning');
   }
-  refreshStorageInfo();
+  await refreshStorageInfo();
   renderModelList();
-}
-
-function lookupModelInfo(modelId: string): ModelInfo | null {
-  try {
-    return RunAnywhere.getModel(modelId);
-  } catch {
-    return null;
-  }
 }

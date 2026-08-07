@@ -30,6 +30,7 @@
 #include "google/protobuf/repeated_field.h"  // IWYU pragma: export
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
 #include "google/protobuf/unknown_field_set.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -55,14 +56,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_rera
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-class RerankCandidate;
-struct RerankCandidateGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern RerankCandidateGlobalsTypeInternal RerankCandidate_globals_;
-extern const ::google::protobuf::internal::ClassDataFull RerankCandidate_class_data_;
-#else
-extern const RerankCandidateGlobalsTypeInternal RerankCandidate_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
 class RerankOptions;
 struct RerankOptionsGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -166,7 +159,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankScoredItem final : public ::g
   [[nodiscard]] static const RerankScoredItem& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RerankScoredItem>(&RerankScoredItem_globals_);
   }
-  static constexpr int kIndexInFileMessages = 3;
+  static constexpr int kIndexInFileMessages = 2;
   friend void swap(RerankScoredItem& a, RerankScoredItem& b) { a.Swap(&b); }
   inline void Swap(RerankScoredItem* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -258,62 +251,35 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankScoredItem final : public ::g
 
   // accessors -------------------------------------------------------
   enum : int {
-    kIdFieldNumber = 1,
-    kScoreFieldNumber = 2,
-    kOriginalIndexFieldNumber = 3,
-    kRankFieldNumber = 4,
+    kRelevanceScoreFieldNumber = 2,
+    kIndexFieldNumber = 3,
   };
-  // string id = 1;
-  void clear_id() ;
-  [[nodiscard]] const ::std::string& id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_id();
-  void set_allocated_id(::std::string* PROTOBUF_NULLABLE value);
+  // float relevance_score = 2;
+  void clear_relevance_score() ;
+  [[nodiscard]] float relevance_score() const;
+  void set_relevance_score(float value);
 
   private:
-  const ::std::string& _internal_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_id();
+  float _internal_relevance_score() const;
+  void _internal_set_relevance_score(float value);
 
   public:
-  // float score = 2;
-  void clear_score() ;
-  [[nodiscard]] float score() const;
-  void set_score(float value);
+  // uint32 index = 3;
+  void clear_index() ;
+  [[nodiscard]] ::uint32_t index() const;
+  void set_index(::uint32_t value);
 
   private:
-  float _internal_score() const;
-  void _internal_set_score(float value);
-
-  public:
-  // uint32 original_index = 3;
-  void clear_original_index() ;
-  [[nodiscard]] ::uint32_t original_index() const;
-  void set_original_index(::uint32_t value);
-
-  private:
-  ::uint32_t _internal_original_index() const;
-  void _internal_set_original_index(::uint32_t value);
-
-  public:
-  // uint32 rank = 4;
-  void clear_rank() ;
-  [[nodiscard]] ::uint32_t rank() const;
-  void set_rank(::uint32_t value);
-
-  private:
-  ::uint32_t _internal_rank() const;
-  void _internal_set_rank(::uint32_t value);
+  ::uint32_t _internal_index() const;
+  void _internal_set_index(::uint32_t value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.RerankScoredItem)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
-                          0, 42,
+      ::google::protobuf::internal::TcParseTable<1, 2,
+                          0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -341,10 +307,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankScoredItem final : public ::g
         const RerankScoredItem& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr id_;
-    float score_;
-    ::uint32_t original_index_;
-    ::uint32_t rank_;
+    float relevance_score_;
+    ::uint32_t index_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -408,7 +372,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankOptions final : public ::goog
   [[nodiscard]] static const RerankOptions& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RerankOptions>(&RerankOptions_globals_);
   }
-  static constexpr int kIndexInFileMessages = 1;
+  static constexpr int kIndexInFileMessages = 0;
   friend void swap(RerankOptions& a, RerankOptions& b) { a.Swap(&b); }
   inline void Swap(RerankOptions* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -501,8 +465,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankOptions final : public ::goog
   // accessors -------------------------------------------------------
   enum : int {
     kTopNFieldNumber = 1,
+    kMaxTokensPerDocFieldNumber = 2,
   };
-  // uint32 top_n = 1;
+  // uint32 top_n = 1 [(.runanywhere.v1.rac_default) = "0"];
   void clear_top_n() ;
   [[nodiscard]] ::uint32_t top_n() const;
   void set_top_n(::uint32_t value);
@@ -512,11 +477,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankOptions final : public ::goog
   void _internal_set_top_n(::uint32_t value);
 
   public:
+  // uint32 max_tokens_per_doc = 2 [(.runanywhere.v1.rac_default) = "0"];
+  void clear_max_tokens_per_doc() ;
+  [[nodiscard]] ::uint32_t max_tokens_per_doc() const;
+  void set_max_tokens_per_doc(::uint32_t value);
+
+  private:
+  ::uint32_t _internal_max_tokens_per_doc() const;
+  void _internal_set_max_tokens_per_doc(::uint32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.RerankOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<0, 1,
+      ::google::protobuf::internal::TcParseTable<1, 2,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -546,229 +521,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankOptions final : public ::goog
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::uint32_t top_n_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_rerank_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankCandidate final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.RerankCandidate) */ {
- public:
-  inline RerankCandidate() : RerankCandidate(nullptr) {}
-  ~RerankCandidate() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(RerankCandidate* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(RerankCandidate));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr RerankCandidate(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline RerankCandidate(const RerankCandidate& from) : RerankCandidate(nullptr, from) {}
-  inline RerankCandidate(RerankCandidate&& from) noexcept : RerankCandidate(nullptr, ::std::move(from)) {}
-  inline RerankCandidate& operator=(const RerankCandidate& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline RerankCandidate& operator=(RerankCandidate&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const RerankCandidate& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RerankCandidate>(&RerankCandidate_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 0;
-  friend void swap(RerankCandidate& a, RerankCandidate& b) { a.Swap(&b); }
-  inline void Swap(RerankCandidate* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(RerankCandidate* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] RerankCandidate* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<RerankCandidate>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const RerankCandidate& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const RerankCandidate& from) { RerankCandidate::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(RerankCandidate* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.RerankCandidate"; }
-
-  explicit RerankCandidate(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  RerankCandidate(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const RerankCandidate& from);
-  RerankCandidate(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, RerankCandidate&& from) noexcept
-      : RerankCandidate(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kIdFieldNumber = 1,
-    kTextFieldNumber = 2,
-  };
-  // string id = 1;
-  void clear_id() ;
-  [[nodiscard]] const ::std::string& id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_id();
-  void set_allocated_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_id();
-
-  public:
-  // string text = 2;
-  void clear_text() ;
-  [[nodiscard]] const ::std::string& text() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_text(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_text();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_text();
-  void set_allocated_text(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_text() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_text(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.RerankCandidate)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 2,
-                          0, 45,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const RerankCandidate& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr id_;
-    ::google::protobuf::internal::ArenaStringPtr text_;
+    ::uint32_t max_tokens_per_doc_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -832,7 +585,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankResult final : public ::googl
   [[nodiscard]] static const RerankResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RerankResult>(&RerankResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 4;
+  static constexpr int kIndexInFileMessages = 3;
   friend void swap(RerankResult& a, RerankResult& b) { a.Swap(&b); }
   inline void Swap(RerankResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1073,7 +826,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankRequest final : public ::goog
   [[nodiscard]] static const RerankRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RerankRequest>(&RerankRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 2;
+  static constexpr int kIndexInFileMessages = 1;
   friend void swap(RerankRequest& a, RerankRequest& b) { a.Swap(&b); }
   inline void Swap(RerankRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1165,32 +918,39 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankRequest final : public ::goog
 
   // accessors -------------------------------------------------------
   enum : int {
-    kCandidatesFieldNumber = 2,
+    kDocumentsFieldNumber = 4,
     kQueryFieldNumber = 1,
+    kModelIdFieldNumber = 5,
     kOptionsFieldNumber = 3,
   };
-  // repeated .runanywhere.v1.RerankCandidate candidates = 2;
-  [[nodiscard]] int candidates_size()
+  // repeated string documents = 4;
+  [[nodiscard]] int documents_size()
       const;
   private:
-  int _internal_candidates_size() const;
+  int _internal_documents_size() const;
 
   public:
-  void clear_candidates() ;
-  [[nodiscard]] const ::runanywhere::v1::RerankCandidate& candidates(int index) const;
-  [[nodiscard]] ::runanywhere::v1::RerankCandidate* PROTOBUF_NONNULL mutable_candidates(int index);
-  ::runanywhere::v1::RerankCandidate* PROTOBUF_NONNULL add_candidates();
-  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>&
-  candidates() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>* PROTOBUF_NONNULL
-  mutable_candidates();
+  void clear_documents() ;
+  [[nodiscard]] const ::std::string& documents(int index) const;
+  ::std::string* PROTOBUF_NONNULL mutable_documents(int index);
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_documents(int index, Arg_&& value, Args_... args);
+  ::std::string* PROTOBUF_NONNULL add_documents();
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void add_documents(Arg_&& value, Args_... args);
+  [[nodiscard]] const
+      ::google::protobuf::RepeatedPtrField<::std::string>&
+      documents() const;
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
+      PROTOBUF_NONNULL
+      mutable_documents();
 
   private:
-  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>& _internal_candidates() const;
-  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>* PROTOBUF_NONNULL _internal_mutable_candidates();
+  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_documents() const;
+  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_documents();
 
   public:
-  // string query = 1;
+  // string query = 1 [(.runanywhere.v1.rac_required) = true];
   void clear_query() ;
   [[nodiscard]] const ::std::string& query() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -1203,6 +963,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankRequest final : public ::goog
   const ::std::string& _internal_query() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_query(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_query();
+
+  public:
+  // optional string model_id = 5;
+  [[nodiscard]] bool has_model_id()
+      const;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
   // optional .runanywhere.v1.RerankOptions options = 3;
@@ -1225,8 +1002,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankRequest final : public ::goog
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
-                          2, 42,
+      ::google::protobuf::internal::TcParseTable<3, 4,
+                          1, 59,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1254,8 +1031,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankRequest final : public ::goog
         const RerankRequest& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::RerankCandidate > candidates_;
+    ::google::protobuf::RepeatedPtrField<::std::string> documents_;
     ::google::protobuf::internal::ArenaStringPtr query_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::runanywhere::v1::RerankOptions* PROTOBUF_NULLABLE options_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -1277,141 +1055,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RerankRequest final : public ::goog
 #endif  // __GNUC__
 // -------------------------------------------------------------------
 
-// RerankCandidate
-
-// string id = 1;
-inline void RerankCandidate::clear_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& RerankCandidate::id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankCandidate.id)
-  return _internal_id();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void RerankCandidate::set_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankCandidate.id)
-}
-inline ::std::string* PROTOBUF_NONNULL RerankCandidate::mutable_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RerankCandidate.id)
-  return _s;
-}
-inline const ::std::string& RerankCandidate::_internal_id() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.id_.Get();
-}
-inline void RerankCandidate::_internal_set_id(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL RerankCandidate::_internal_mutable_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE RerankCandidate::release_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.RerankCandidate.id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void RerankCandidate::set_allocated_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.id_.IsDefault()) {
-    _impl_.id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RerankCandidate.id)
-}
-
-// string text = 2;
-inline void RerankCandidate::clear_text() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.text_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& RerankCandidate::text() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankCandidate.text)
-  return _internal_text();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void RerankCandidate::set_text(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.text_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankCandidate.text)
-}
-inline ::std::string* PROTOBUF_NONNULL RerankCandidate::mutable_text()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_text();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RerankCandidate.text)
-  return _s;
-}
-inline const ::std::string& RerankCandidate::_internal_text() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.text_.Get();
-}
-inline void RerankCandidate::_internal_set_text(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.text_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL RerankCandidate::_internal_mutable_text() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.text_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE RerankCandidate::release_text() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.RerankCandidate.text)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.text_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.text_.Set("", GetArena());
-  }
-  return released;
-}
-inline void RerankCandidate::set_allocated_text(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.text_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.text_.IsDefault()) {
-    _impl_.text_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RerankCandidate.text)
-}
-
-// -------------------------------------------------------------------
-
 // RerankOptions
 
-// uint32 top_n = 1;
+// uint32 top_n = 1 [(.runanywhere.v1.rac_default) = "0"];
 inline void RerankOptions::clear_top_n() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_n_ = 0u;
@@ -1435,11 +1081,35 @@ inline void RerankOptions::_internal_set_top_n(::uint32_t value) {
   _impl_.top_n_ = value;
 }
 
+// uint32 max_tokens_per_doc = 2 [(.runanywhere.v1.rac_default) = "0"];
+inline void RerankOptions::clear_max_tokens_per_doc() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_tokens_per_doc_ = 0u;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline ::uint32_t RerankOptions::max_tokens_per_doc() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankOptions.max_tokens_per_doc)
+  return _internal_max_tokens_per_doc();
+}
+inline void RerankOptions::set_max_tokens_per_doc(::uint32_t value) {
+  _internal_set_max_tokens_per_doc(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankOptions.max_tokens_per_doc)
+}
+inline ::uint32_t RerankOptions::_internal_max_tokens_per_doc() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.max_tokens_per_doc_;
+}
+inline void RerankOptions::_internal_set_max_tokens_per_doc(::uint32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_tokens_per_doc_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // RerankRequest
 
-// string query = 1;
+// string query = 1 [(.runanywhere.v1.rac_required) = true];
 inline void RerankRequest::clear_query() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.query_.ClearToEmpty();
@@ -1503,71 +1173,16 @@ inline void RerankRequest::set_allocated_query(::std::string* PROTOBUF_NULLABLE 
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RerankRequest.query)
 }
 
-// repeated .runanywhere.v1.RerankCandidate candidates = 2;
-inline int RerankRequest::_internal_candidates_size() const {
-  return _internal_candidates().size();
-}
-inline int RerankRequest::candidates_size() const {
-  return _internal_candidates_size();
-}
-inline void RerankRequest::clear_candidates() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.candidates_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::runanywhere::v1::RerankCandidate& RerankRequest::candidates(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankRequest.candidates)
-  return _internal_candidates().Get(index);
-}
-inline ::runanywhere::v1::RerankCandidate* PROTOBUF_NONNULL RerankRequest::mutable_candidates(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RerankRequest.candidates)
-  return _internal_mutable_candidates()->Mutable(index);
-}
-inline ::runanywhere::v1::RerankCandidate* PROTOBUF_NONNULL RerankRequest::add_candidates()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::runanywhere::v1::RerankCandidate* _add =
-      _internal_mutable_candidates()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.RerankRequest.candidates)
-  return _add;
-}
-inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>& RerankRequest::candidates() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.RerankRequest.candidates)
-  return _internal_candidates();
-}
-inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>* PROTOBUF_NONNULL
-RerankRequest::mutable_candidates() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.RerankRequest.candidates)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_candidates();
-}
-inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>&
-RerankRequest::_internal_candidates() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.candidates_;
-}
-inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::RerankCandidate>* PROTOBUF_NONNULL
-RerankRequest::_internal_mutable_candidates() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.candidates_;
-}
-
 // optional .runanywhere.v1.RerankOptions options = 3;
 inline bool RerankRequest::has_options() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
   PROTOBUF_ASSUME(!value || _impl_.options_ != nullptr);
   return value;
 }
 inline void RerankRequest::clear_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.options_ != nullptr) _impl_.options_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline const ::runanywhere::v1::RerankOptions& RerankRequest::_internal_options() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1586,16 +1201,16 @@ inline void RerankRequest::unsafe_arena_set_allocated_options(
   }
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::RerankOptions*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.RerankRequest.options)
 }
 inline ::runanywhere::v1::RerankOptions* PROTOBUF_NULLABLE RerankRequest::release_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::RerankOptions* released = _impl_.options_;
   _impl_.options_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -1615,7 +1230,7 @@ inline ::runanywhere::v1::RerankOptions* PROTOBUF_NULLABLE RerankRequest::unsafe
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.RerankRequest.options)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::RerankOptions* temp = _impl_.options_;
   _impl_.options_ = nullptr;
   return temp;
@@ -1630,7 +1245,7 @@ inline ::runanywhere::v1::RerankOptions* PROTOBUF_NONNULL RerankRequest::_intern
 }
 inline ::runanywhere::v1::RerankOptions* PROTOBUF_NONNULL RerankRequest::mutable_options()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::runanywhere::v1::RerankOptions* _msg = _internal_mutable_options();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.RerankRequest.options)
   return _msg;
@@ -1647,153 +1262,205 @@ inline void RerankRequest::set_allocated_options(::runanywhere::v1::RerankOption
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
 
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::RerankOptions*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RerankRequest.options)
 }
 
+// repeated string documents = 4;
+inline int RerankRequest::_internal_documents_size() const {
+  return _internal_documents().size();
+}
+inline int RerankRequest::documents_size() const {
+  return _internal_documents_size();
+}
+inline void RerankRequest::clear_documents() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.documents_.Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline ::std::string* PROTOBUF_NONNULL RerankRequest::add_documents()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::std::string* _s =
+      _internal_mutable_documents()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.RerankRequest.documents)
+  return _s;
+}
+inline const ::std::string& RerankRequest::documents(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankRequest.documents)
+  return _internal_documents().Get(index);
+}
+inline ::std::string* PROTOBUF_NONNULL RerankRequest::mutable_documents(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RerankRequest.documents)
+  return _internal_mutable_documents()->Mutable(index);
+}
+template <typename Arg_, typename... Args_>
+inline void RerankRequest::set_documents(int index, Arg_&& value, Args_... args) {
+  ::google::protobuf::internal::AssignToString(
+      *_internal_mutable_documents()->Mutable(index),
+      ::std::forward<Arg_>(value), args... );
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankRequest.documents)
+}
+template <typename Arg_, typename... Args_>
+inline void RerankRequest::add_documents(Arg_&& value, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::google::protobuf::internal::AddToRepeatedPtrField(
+      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
+      *_internal_mutable_documents(), ::std::forward<Arg_>(value),
+      args... );
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.RerankRequest.documents)
+}
+inline const ::google::protobuf::RepeatedPtrField<::std::string>& RerankRequest::documents()
+    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.RerankRequest.documents)
+  return _internal_documents();
+}
+inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
+RerankRequest::mutable_documents() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.RerankRequest.documents)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_documents();
+}
+inline const ::google::protobuf::RepeatedPtrField<::std::string>&
+RerankRequest::_internal_documents() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.documents_;
+}
+inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
+RerankRequest::_internal_mutable_documents() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.documents_;
+}
+
+// optional string model_id = 5;
+inline bool RerankRequest::has_model_id() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
+inline void RerankRequest::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+inline const ::std::string& RerankRequest::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankRequest.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void RerankRequest::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankRequest.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL RerankRequest::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RerankRequest.model_id)
+  return _s;
+}
+inline const ::std::string& RerankRequest::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void RerankRequest::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL RerankRequest::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE RerankRequest::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RerankRequest.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void RerankRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RerankRequest.model_id)
+}
+
 // -------------------------------------------------------------------
 
 // RerankScoredItem
 
-// string id = 1;
-inline void RerankScoredItem::clear_id() {
+// float relevance_score = 2;
+inline void RerankScoredItem::clear_relevance_score() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.id_.ClearToEmpty();
+  _impl_.relevance_score_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline const ::std::string& RerankScoredItem::id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankScoredItem.id)
-  return _internal_id();
+inline float RerankScoredItem::relevance_score() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankScoredItem.relevance_score)
+  return _internal_relevance_score();
 }
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void RerankScoredItem::set_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
+inline void RerankScoredItem::set_relevance_score(float value) {
+  _internal_set_relevance_score(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankScoredItem.id)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankScoredItem.relevance_score)
 }
-inline ::std::string* PROTOBUF_NONNULL RerankScoredItem::mutable_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RerankScoredItem.id)
-  return _s;
-}
-inline const ::std::string& RerankScoredItem::_internal_id() const {
+inline float RerankScoredItem::_internal_relevance_score() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.id_.Get();
+  return _impl_.relevance_score_;
 }
-inline void RerankScoredItem::_internal_set_id(const ::std::string& value) {
+inline void RerankScoredItem::_internal_set_relevance_score(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL RerankScoredItem::_internal_mutable_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE RerankScoredItem::release_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.RerankScoredItem.id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void RerankScoredItem::set_allocated_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.id_.IsDefault()) {
-    _impl_.id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RerankScoredItem.id)
+  _impl_.relevance_score_ = value;
 }
 
-// float score = 2;
-inline void RerankScoredItem::clear_score() {
+// uint32 index = 3;
+inline void RerankScoredItem::clear_index() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.score_ = 0;
+  _impl_.index_ = 0u;
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
-inline float RerankScoredItem::score() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankScoredItem.score)
-  return _internal_score();
+inline ::uint32_t RerankScoredItem::index() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankScoredItem.index)
+  return _internal_index();
 }
-inline void RerankScoredItem::set_score(float value) {
-  _internal_set_score(value);
+inline void RerankScoredItem::set_index(::uint32_t value) {
+  _internal_set_index(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankScoredItem.score)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankScoredItem.index)
 }
-inline float RerankScoredItem::_internal_score() const {
+inline ::uint32_t RerankScoredItem::_internal_index() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.score_;
+  return _impl_.index_;
 }
-inline void RerankScoredItem::_internal_set_score(float value) {
+inline void RerankScoredItem::_internal_set_index(::uint32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.score_ = value;
-}
-
-// uint32 original_index = 3;
-inline void RerankScoredItem::clear_original_index() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.original_index_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline ::uint32_t RerankScoredItem::original_index() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankScoredItem.original_index)
-  return _internal_original_index();
-}
-inline void RerankScoredItem::set_original_index(::uint32_t value) {
-  _internal_set_original_index(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankScoredItem.original_index)
-}
-inline ::uint32_t RerankScoredItem::_internal_original_index() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.original_index_;
-}
-inline void RerankScoredItem::_internal_set_original_index(::uint32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.original_index_ = value;
-}
-
-// uint32 rank = 4;
-inline void RerankScoredItem::clear_rank() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rank_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline ::uint32_t RerankScoredItem::rank() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RerankScoredItem.rank)
-  return _internal_rank();
-}
-inline void RerankScoredItem::set_rank(::uint32_t value) {
-  _internal_set_rank(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RerankScoredItem.rank)
-}
-inline ::uint32_t RerankScoredItem::_internal_rank() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.rank_;
-}
-inline void RerankScoredItem::_internal_set_rank(::uint32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rank_ = value;
+  _impl_.index_ = value;
 }
 
 // -------------------------------------------------------------------

@@ -20,8 +20,10 @@ function l2(values: number[]): number {
  *
  * Mirrors Swift `RAEmbeddingVector.cosineSimilarity(with:)`
  * (EmbeddingsProto+Helpers.swift:18-26): returns 0 for mismatched lengths,
- * empty vectors, or zero norms; uses the backend-provided `norm` when
- * present and recomputes the L2 norm otherwise.
+ * empty vectors, or zero norms.
+ *
+ * `EmbeddingVector.norm` is deleted outright — the message carries only
+ * `values`/`inputIndex` now, so the L2 norm is always recomputed here.
  */
 export function cosineSimilarity(
   a: EmbeddingVector,
@@ -32,8 +34,8 @@ export function cosineSimilarity(
   for (let i = 0; i < a.values.length; i++) {
     dot += a.values[i]! * b.values[i]!;
   }
-  const aNorm = a.norm !== undefined ? a.norm : l2(a.values);
-  const bNorm = b.norm !== undefined ? b.norm : l2(b.values);
+  const aNorm = l2(a.values);
+  const bNorm = l2(b.values);
   if (aNorm <= 0 || bNorm <= 0) return 0;
   return dot / (aNorm * bNorm);
 }

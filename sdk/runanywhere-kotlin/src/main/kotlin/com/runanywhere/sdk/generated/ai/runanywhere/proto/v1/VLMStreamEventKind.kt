@@ -16,39 +16,17 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * VLM error codes — canonical SDK-facing surface.
- * Sources pre-IDL:
- *   Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
- *                                    processingFailed=3, invalidImage=4,
- *                                    cancelled=5)
- *   Dart   vlm_types.dart:164       (notInitialized=1, modelLoadFailed=2,
- *                                    processingFailed=3, invalidImage=4,
- *                                    cancelled=5)
- *   RN     VLMTypes.ts:44           (NotInitialized=1, ModelLoadFailed=2,
- *                                    ProcessingFailed=3, InvalidImage=4,
- *                                    Cancelled=5)
- *   Kotlin / Web                    (no enum declared pre-IDL)
- *
- * VLMErrorCode deleted. All VLM error codes now route through the
- * canonical `ErrorCode` taxonomy defined in `errors.proto`:
- *   - ERROR_CODE_MODEL_NOT_LOADED    = 116 (Swift/Dart/RN notInitialized +
- *                                          modelLoadFailed)
- *   - ERROR_CODE_CANCELLED           = 380 (Swift/Dart/RN cancelled)
- *   - ERROR_CODE_PROCESSING_FAILED   = 234 (Swift/Dart/RN processingFailed)
- *   - ERROR_CODE_INVALID_INPUT       = 251 (Swift/Dart/RN invalidImage)
- *   - ERROR_CODE_INVALID_FORMAT      = 252 (VLMImageFormat backend cannot decode)
- *   - ERROR_CODE_NOT_INITIALIZED     = 100
- *   - ERROR_CODE_MODEL_LOAD_FAILED   = 111
- *   - ERROR_CODE_VALIDATION_FAILED   = 250 (image exceeds max_image_size_px)
- * ---------------------------------------------------------------------------
- */
 public enum class VLMStreamEventKind(
   override val `value`: Int,
 ) : WireEnum {
   VLM_STREAM_EVENT_KIND_UNSPECIFIED(0),
   VLM_STREAM_EVENT_KIND_STARTED(1),
+  /**
+   * Emitted when the vision encoder finishes and decoding begins -- the
+   * cue for a UI to switch from "analysing image" to "writing". Emitted
+   * where the backend measures the encode boundary
+   * (VLMResult.image_encode_time_ms comes from the same measurement).
+   */
   VLM_STREAM_EVENT_KIND_IMAGE_ENCODED(2),
   VLM_STREAM_EVENT_KIND_TOKEN(3),
   VLM_STREAM_EVENT_KIND_COMPLETED(4),

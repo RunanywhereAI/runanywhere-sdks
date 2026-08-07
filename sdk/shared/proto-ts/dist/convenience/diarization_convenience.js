@@ -14,29 +14,28 @@
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateDiarizationOptions = exports.diarizationOptionsDefaults = void 0;
-/* eslint-disable */
-const diarization_1 = require("../diarization");
+const model_types_1 = require("../model_types");
 const _errors_1 = require("./_errors");
 const diarizationOptionsDefaults = () => ({
-    sampleRateHz: 16000,
-    channelCount: 1,
-    encoding: diarization_1.DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE,
+    sampleRate: 16000,
+    channels: 1,
+    encoding: model_types_1.AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
     threshold: 0.5,
     minimumDurationMs: 0,
     mergeGapMs: 0,
 });
 exports.diarizationOptionsDefaults = diarizationOptionsDefaults;
 const validateDiarizationOptions = (m) => {
-    if (m.sampleRateHz !== undefined && (m.sampleRateHz < 8000 || m.sampleRateHz > 48000)) {
+    if (m.sampleRate !== undefined && (m.sampleRate < 16000 || m.sampleRate > 16000)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'DiarizationOptions.sample_rate_hz',
-            message: `sample_rate_hz must be in 8000...48000 (got ${m.sampleRateHz})`,
+            fieldPath: 'DiarizationOptions.sample_rate',
+            message: `sample_rate must be in 16000...16000 (got ${m.sampleRate})`,
         });
     }
-    if (m.channelCount !== undefined && (m.channelCount < 1 || m.channelCount > 1)) {
+    if (m.channels !== undefined && (m.channels < 1 || m.channels > 1)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'DiarizationOptions.channel_count',
-            message: `channel_count must be in 1...1 (got ${m.channelCount})`,
+            fieldPath: 'DiarizationOptions.channels',
+            message: `channels must be in 1...1 (got ${m.channels})`,
         });
     }
     if (m.threshold !== undefined && (!Number.isFinite(m.threshold) || m.threshold < 0.0 || m.threshold > 1.0)) {
@@ -55,6 +54,12 @@ const validateDiarizationOptions = (m) => {
         throw new _errors_1.ValidationError({
             fieldPath: 'DiarizationOptions.merge_gap_ms',
             message: `merge_gap_ms must be >= 0 (got ${m.mergeGapMs})`,
+        });
+    }
+    if (m.maxSpeakers !== undefined && (m.maxSpeakers < 1)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'DiarizationOptions.max_speakers',
+            message: `max_speakers must be >= 1 (got ${m.maxSpeakers})`,
         });
     }
 };

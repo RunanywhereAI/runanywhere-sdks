@@ -13,58 +13,58 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateLLMGenerationOptions = exports.lLMGenerationOptionsDefaults = void 0;
+exports.lLMConfigurationDefaults = exports.validateLLMGenerationOptions = exports.lLMGenerationOptionsDefaults = void 0;
 const _errors_1 = require("./_errors");
 const lLMGenerationOptionsDefaults = () => ({
-    maxTokens: 100,
-    temperature: 0.8,
+    maxOutputTokens: 512,
+    temperature: 0.7,
     topP: 1.0,
-    topK: 0,
-    repetitionPenalty: 1.0,
+    topK: 40,
+    repeatPenalty: 1.1,
     stopSequences: [],
-    streamingEnabled: false,
     preferredFramework: 0,
-    enableRealTimeTracking: false,
     seed: 0,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
+    frequencyPenalty: 0.0,
+    presencePenalty: 0.0,
     repeatLastN: 0,
-    minP: 0,
+    minP: 0.05,
     echoPrompt: false,
-    nThreads: 0,
-    disableThinking: false,
 });
 exports.lLMGenerationOptionsDefaults = lLMGenerationOptionsDefaults;
 const validateLLMGenerationOptions = (m) => {
-    if (m.maxTokens < 0) {
+    if (m.maxOutputTokens !== undefined && (m.maxOutputTokens < 0)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'LLMGenerationOptions.max_tokens',
-            message: `max_tokens must be >= 0 (got ${m.maxTokens})`,
+            fieldPath: 'LLMGenerationOptions.max_output_tokens',
+            message: `max_output_tokens must be >= 0 (got ${m.maxOutputTokens})`,
         });
     }
-    if (!Number.isFinite(m.temperature) || m.temperature < 0.0 || m.temperature > 2.0) {
+    if (m.temperature !== undefined && (!Number.isFinite(m.temperature) || m.temperature < 0.0 || m.temperature > 2.0)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'LLMGenerationOptions.temperature',
             message: `temperature must be in 0.0...2.0 (got ${m.temperature})`,
         });
     }
-    if (!Number.isFinite(m.topP) || m.topP < 0.0 || m.topP > 1.0) {
+    if (m.topP !== undefined && (!Number.isFinite(m.topP) || m.topP < 0.0 || m.topP > 1.0)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'LLMGenerationOptions.top_p',
             message: `top_p must be in 0.0...1.0 (got ${m.topP})`,
         });
     }
-    if (m.topK < 0) {
+    if (m.topK !== undefined && (m.topK < 0)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'LLMGenerationOptions.top_k',
             message: `top_k must be >= 0 (got ${m.topK})`,
         });
     }
-    if (!Number.isFinite(m.repetitionPenalty) || m.repetitionPenalty < 0.0) {
+    if (m.repeatPenalty !== undefined && (!Number.isFinite(m.repeatPenalty) || m.repeatPenalty < 0.0)) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'LLMGenerationOptions.repetition_penalty',
-            message: `repetition_penalty must be >= 0.0 (got ${m.repetitionPenalty})`,
+            fieldPath: 'LLMGenerationOptions.repeat_penalty',
+            message: `repeat_penalty must be >= 0.0 (got ${m.repeatPenalty})`,
         });
     }
 };
 exports.validateLLMGenerationOptions = validateLLMGenerationOptions;
+const lLMConfigurationDefaults = () => ({
+    contextLength: 2048,
+});
+exports.lLMConfigurationDefaults = lLMConfigurationDefaults;

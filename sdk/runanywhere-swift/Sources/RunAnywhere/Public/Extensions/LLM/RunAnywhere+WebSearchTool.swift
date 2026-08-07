@@ -18,7 +18,7 @@ public extension RunAnywhere {
 
     /// Register the built-in web search tool helper.
     static func registerWebSearchTool() async {
-        await registerTool(WebSearchTool.definition, executor: WebSearchTool.executor)
+        await llm.tools.register(WebSearchTool.definition, executor: WebSearchTool.executor)
     }
 }
 
@@ -78,7 +78,7 @@ private enum WebSearchTool {
         name: Tool.name,
         description: Tool.description,
         parameters: [
-            RAToolParameter(
+            ToolParameter(
                 name: Parameter.query,
                 type: .string,
                 description: Parameter.queryDescription

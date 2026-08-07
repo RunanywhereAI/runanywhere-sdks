@@ -2,25 +2,22 @@
 
 import 'dart:io';
 
-import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
-import 'package:runanywhere/runanywhere.dart'
+import 'package:runanywhere/runanywhere_protos.dart'
     show
-        LoRAAdapterConfig,
-        LoRAAdapterInfo,
-        LoRAApplyRequest,
-        LoRAApplyResult,
-        LoRARemoveRequest,
-        LoRAState,
         LoraAdapterCatalogEntry,
         LoraAdapterCatalogGetRequest,
         LoraAdapterCatalogGetResult,
         LoraAdapterCatalogListRequest,
         LoraAdapterCatalogListResult,
         LoraAdapterCatalogQuery,
-        LoraAdapterDownloadCompletedRequest,
-        LoraAdapterDownloadCompletedResult;
+        LoraAdapterConfig,
+        LoraAdapterInfo,
+        LoraApplyRequest,
+        LoraApplyResult,
+        LoraRemoveRequest,
+        LoraState;
 
 void main() {
   tearDown(() {
@@ -28,124 +25,105 @@ void main() {
     DartBridgeLoraRegistry.setListCatalogProtoForTesting(null);
     DartBridgeLoraRegistry.setQueryCatalogProtoForTesting(null);
     DartBridgeLoraRegistry.setGetCatalogEntryProtoForTesting(null);
-    DartBridgeLoraRegistry.setMarkDownloadCompletedProtoForTesting(null);
   });
 
   group('LoRA proto shape', () {
     test('uses generated apply request/result contracts', () {
-      final config = LoRAAdapterConfig(
+      final config = LoraAdapterConfig(
         adapterId: 'style-a',
         adapterPath: '/models/style-a.gguf',
         scale: 0.75,
-        targetModules: const ['q_proj'],
-        metadata: <String, String>{'rank': '8'}.entries,
       );
-      final request = LoRAApplyRequest(
+      // `LoraApplyRequest.replaceExisting` was renamed `keepExisting` — an
+      // inverted-polarity field (idl/lora_options.proto): SET semantics
+      // (`keepExisting: false`) is the old `replaceExisting: true`.
+      final request = LoraApplyRequest(
         requestId: 'apply-1',
         adapters: [config],
-        replaceExisting: true,
+        keepExisting: false,
       );
 
-      final roundTrip = LoRAApplyRequest.fromBuffer(request.writeToBuffer());
+      final roundTrip = LoraApplyRequest.fromBuffer(request.writeToBuffer());
 
       expect(roundTrip.requestId, 'apply-1');
       expect(roundTrip.adapters, hasLength(1));
       expect(roundTrip.adapters.single.adapterId, 'style-a');
       expect(roundTrip.adapters.single.adapterPath, '/models/style-a.gguf');
       expect(roundTrip.adapters.single.scale, closeTo(0.75, 0.0001));
-      expect(roundTrip.adapters.single.targetModules, contains('q_proj'));
-      expect(roundTrip.adapters.single.metadata['rank'], '8');
-      expect(roundTrip.replaceExisting, isTrue);
+      expect(roundTrip.keepExisting, isFalse);
 
-      final result = LoRAApplyResult(
+      final result = LoraApplyResult(
         requestId: roundTrip.requestId,
         adapters: [
-          LoRAAdapterInfo(
+          LoraAdapterInfo(
             adapterId: 'style-a',
             adapterPath: '/models/style-a.gguf',
             scale: 0.75,
             applied: true,
           ),
         ],
-        success: true,
       );
 
-      final resultRoundTrip =
-          LoRAApplyResult.fromBuffer(result.writeToBuffer());
+      final resultRoundTrip = LoraApplyResult.fromBuffer(
+        result.writeToBuffer(),
+      );
 
       expect(resultRoundTrip.requestId, 'apply-1');
-      expect(resultRoundTrip.success, isTrue);
+      expect(resultRoundTrip.hasError(), isFalse);
       expect(resultRoundTrip.adapters.single.applied, isTrue);
     });
 
     test('uses generated remove request and state contracts', () {
-      final request = LoRARemoveRequest(
-        requestId: 'remove-1',
+      final request = LoraRemoveRequest(
         adapterIds: const ['style-a'],
-        adapterPaths: const ['/models/style-a.gguf'],
         clearAll: true,
       );
 
-      final roundTrip = LoRARemoveRequest.fromBuffer(request.writeToBuffer());
+      final roundTrip = LoraRemoveRequest.fromBuffer(request.writeToBuffer());
 
-      expect(roundTrip.requestId, 'remove-1');
       expect(roundTrip.adapterIds, contains('style-a'));
-      expect(roundTrip.adapterPaths, contains('/models/style-a.gguf'));
       expect(roundTrip.clearAll, isTrue);
 
-      final state = LoRAState(
+      final state = LoraState(
         loadedAdapters: [
-          LoRAAdapterInfo(
+          LoraAdapterInfo(
             adapterId: 'style-a',
             adapterPath: '/models/style-a.gguf',
             scale: 0.75,
             applied: true,
           ),
         ],
-        hasActiveAdapters: true,
         baseModelId: 'base-model',
       );
 
-      final stateRoundTrip = LoRAState.fromBuffer(state.writeToBuffer());
+      final stateRoundTrip = LoraState.fromBuffer(state.writeToBuffer());
 
       expect(stateRoundTrip.loadedAdapters.single.adapterId, 'style-a');
-      expect(stateRoundTrip.hasActiveAdapters, isTrue);
       expect(stateRoundTrip.baseModelId, 'base-model');
     });
 
-    test('uses generated catalog query/get/download-completion contracts', () {
+    test('uses generated catalog query/get contracts', () {
+      // Everything generic about the artifact (url, filename, size,
+      // checksum, author, license, description) moved to `ModelInfo`
+      // (idl/lora_options.proto) — the catalog entry now carries only the
+      // adapter-specific facts.
       final entry = LoraAdapterCatalogEntry(
         id: 'style-a',
         name: 'Style A',
-        description: 'style adapter',
-        url: 'https://example.com/style-a.gguf',
-        filename: 'style-a.gguf',
         compatibleModels: const ['base-a', 'base-b'],
-        sizeBytes: fixnum.Int64(1234),
-        author: 'RunAnywhere',
         defaultScale: 0.7,
-        checksumSha256: 'abc123',
-        license: 'Apache-2.0',
         tags: const ['style', 'demo'],
-        metadata: <String, String>{'rank': '8'}.entries,
         localPath: '/models/lora/style-a.gguf',
-        isDownloaded: true,
-        downloadedAtUnixMs: fixnum.Int64(9999),
-        isImported: false,
-        statusMessage: 'ready',
       );
 
-      final entryRoundTrip =
-          LoraAdapterCatalogEntry.fromBuffer(entry.writeToBuffer());
+      final entryRoundTrip = LoraAdapterCatalogEntry.fromBuffer(
+        entry.writeToBuffer(),
+      );
 
       expect(entryRoundTrip.id, 'style-a');
       expect(entryRoundTrip.compatibleModels, contains('base-b'));
-      expect(entryRoundTrip.sizeBytes.toInt(), 1234);
       expect(entryRoundTrip.defaultScale, closeTo(0.7, 0.0001));
       expect(entryRoundTrip.localPath, '/models/lora/style-a.gguf');
-      expect(entryRoundTrip.isDownloaded, isTrue);
-      expect(entryRoundTrip.downloadedAtUnixMs.toInt(), 9999);
-      expect(entryRoundTrip.metadata['rank'], '8');
 
       final query = LoraAdapterCatalogQuery(
         adapterId: 'style-a',
@@ -154,27 +132,23 @@ void main() {
         searchQuery: 'style',
         tags: const ['demo'],
       );
-      final listRequest = LoraAdapterCatalogListRequest(
-        query: query,
-        includeCounts: true,
-      );
+      final listRequest = LoraAdapterCatalogListRequest(query: query);
       final listResult = LoraAdapterCatalogListResult(
-        success: true,
         entries: [entryRoundTrip],
         totalCount: 1,
-        filteredCount: 1,
         downloadedCount: 1,
       );
 
-      final requestRoundTrip =
-          LoraAdapterCatalogListRequest.fromBuffer(listRequest.writeToBuffer());
-      final resultRoundTrip =
-          LoraAdapterCatalogListResult.fromBuffer(listResult.writeToBuffer());
+      final requestRoundTrip = LoraAdapterCatalogListRequest.fromBuffer(
+        listRequest.writeToBuffer(),
+      );
+      final resultRoundTrip = LoraAdapterCatalogListResult.fromBuffer(
+        listResult.writeToBuffer(),
+      );
 
       expect(requestRoundTrip.query.modelId, 'base-a');
       expect(requestRoundTrip.query.downloadedOnly, isTrue);
-      expect(requestRoundTrip.includeCounts, isTrue);
-      expect(resultRoundTrip.success, isTrue);
+      expect(resultRoundTrip.hasError(), isFalse);
       expect(resultRoundTrip.entries.single.id, 'style-a');
       expect(resultRoundTrip.downloadedCount, 1);
 
@@ -196,39 +170,11 @@ void main() {
         ).entry.id,
         'style-a',
       );
-
-      final completed = LoraAdapterDownloadCompletedRequest(
-        adapterId: 'style-a',
-        localPath: '/models/lora/style-a.gguf',
-        sizeBytes: fixnum.Int64(1234),
-        checksumSha256: 'abc123',
-        completedAtUnixMs: fixnum.Int64(9999),
-        imported: true,
-        statusMessage: 'ready',
-      );
-      final completedResult = LoraAdapterDownloadCompletedResult(
-        success: true,
-        entry: entryRoundTrip,
-        persisted: true,
-      );
-
-      expect(
-        LoraAdapterDownloadCompletedRequest.fromBuffer(
-          completed.writeToBuffer(),
-        ).localPath,
-        '/models/lora/style-a.gguf',
-      );
-      expect(
-        LoraAdapterDownloadCompletedResult.fromBuffer(
-          completedResult.writeToBuffer(),
-        ).persisted,
-        isTrue,
-      );
     });
   });
 
   group('LoRA catalog bridge behavior', () {
-    test('forwards generated catalog list/query/get/completion messages', () {
+    test('forwards generated catalog list/query/get messages', () {
       final entry = LoraAdapterCatalogEntry(
         id: 'style-a',
         name: 'Style A',
@@ -238,28 +184,22 @@ void main() {
       late LoraAdapterCatalogListRequest seenList;
       DartBridgeLoraRegistry.setListCatalogProtoForTesting((request) {
         seenList = request;
-        return LoraAdapterCatalogListResult(
-          success: true,
-          entries: [entry],
-          totalCount: 1,
-        );
+        return LoraAdapterCatalogListResult(entries: [entry], totalCount: 1);
       });
 
       final list = DartBridgeLoraRegistry.shared.listCatalog(
         LoraAdapterCatalogListRequest(
           query: LoraAdapterCatalogQuery(modelId: 'base-a'),
-          includeCounts: true,
         ),
       );
 
       expect(seenList.query.modelId, 'base-a');
-      expect(seenList.includeCounts, isTrue);
       expect(list.entries.single.id, 'style-a');
 
       late LoraAdapterCatalogQuery seenQuery;
       DartBridgeLoraRegistry.setQueryCatalogProtoForTesting((query) {
         seenQuery = query;
-        return LoraAdapterCatalogListResult(success: true, entries: [entry]);
+        return LoraAdapterCatalogListResult(entries: [entry]);
       });
 
       final queryResult = DartBridgeLoraRegistry.shared.queryCatalog(
@@ -283,47 +223,18 @@ void main() {
       expect(seenGet.adapterId, 'style-a');
       expect(getResult.found, isTrue);
       expect(getResult.entry.id, 'style-a');
-
-      late LoraAdapterDownloadCompletedRequest seenCompleted;
-      DartBridgeLoraRegistry.setMarkDownloadCompletedProtoForTesting(
-        (request) {
-          seenCompleted = request;
-          return LoraAdapterDownloadCompletedResult(
-            success: true,
-            entry: entry,
-            persisted: true,
-          );
-        },
-      );
-
-      final completedResult =
-          DartBridgeLoraRegistry.shared.markDownloadCompleted(
-        LoraAdapterDownloadCompletedRequest(
-          adapterId: 'style-a',
-          localPath: '/native-owned/style-a.gguf',
-          imported: true,
-        ),
-      );
-
-      expect(seenCompleted.adapterId, 'style-a');
-      expect(seenCompleted.localPath, '/native-owned/style-a.gguf');
-      expect(completedResult.persisted, isTrue);
     });
 
     test('compatibility helpers use generated list and query ABI', () {
       DartBridgeLoraRegistry.setQueryCatalogProtoForTesting((query) {
         expect(query.modelId, 'base-a');
         return LoraAdapterCatalogListResult(
-          success: true,
-          entries: [
-            LoraAdapterCatalogEntry(id: 'style-a', name: 'Style A'),
-          ],
+          entries: [LoraAdapterCatalogEntry(id: 'style-a', name: 'Style A')],
         );
       });
       DartBridgeLoraRegistry.setListCatalogProtoForTesting((request) {
         expect(request.hasQuery(), isFalse);
         return LoraAdapterCatalogListResult(
-          success: true,
           entries: [
             LoraAdapterCatalogEntry(id: 'style-a', name: 'Style A'),
             LoraAdapterCatalogEntry(id: 'tone-a', name: 'Tone A'),
@@ -349,7 +260,6 @@ void main() {
         'rac_lora_catalog_list_proto',
         'rac_lora_catalog_query_proto',
         'rac_lora_catalog_get_proto',
-        'rac_lora_catalog_mark_download_completed_proto',
       ]) {
         expect(bindings, contains(symbol));
         expect(bridge, contains(symbol));
@@ -360,6 +270,12 @@ void main() {
         'rac_get_lora_for_model',
         'rac_lora_registry_get_all',
         'rac_lora_entry_array_free',
+        // `rac_lora_catalog_mark_download_completed_proto` and
+        // `rac_lora_adapter_import_proto` are permanently-retired stubs
+        // (idl/lora_options.proto, lora-delete-download-import-bookkeeping)
+        // — the bridge no longer calls either.
+        'rac_lora_catalog_mark_download_completed_proto',
+        'rac_lora_adapter_import_proto',
       ]) {
         expect(bridge, isNot(contains(stale)));
       }

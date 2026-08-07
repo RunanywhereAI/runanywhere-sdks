@@ -8,6 +8,7 @@ import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/sdk_init.pb.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
+import 'package:runanywhere/native/dart_bridge_cua.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_embeddings.dart';
@@ -188,7 +189,10 @@ class DartBridge {
     try {
       DartBridgeSdkInit.phase1(
         SdkInitPhase1Request(
-          environment: _toSdkInitEnvironment(environment),
+          // `SdkInitEnvironment` was consolidated away — model_types.proto's
+          // `SDKEnvironment` is the single environment vocabulary now
+          // (idl/sdk_init.proto), so no separate mapping is needed.
+          environment: environment,
           apiKey: apiKey,
           baseUrl: baseURL,
           deviceId: deviceId,
@@ -250,15 +254,16 @@ class DartBridge {
   /// [apiKey] API key for production/staging
   /// [baseURL] Backend URL for production/staging
   /// [deviceId] Device identifier
+  // `force_refresh_assignments`/`flush_telemetry`/
+  // `discover_downloaded_models`/`rescan_local_models` were deleted outright
+  // from `SdkInitPhase2Request` (idl/sdk_init.proto): "Telemetry flushing and
+  // registry/local-file reconciliation are commons behaviour, not per-call
+  // hints" — commons now always performs them during Phase 2.
   static Future<SdkInitResult?> initializeServices({
     String? apiKey,
     String? baseURL,
     String? deviceId,
     String? buildToken,
-    bool forceRefreshAssignments = false,
-    bool flushTelemetry = true,
-    bool discoverDownloadedModels = true,
-    bool rescanLocalModels = true,
   }) async {
     if (!_isInitialized) {
       throw StateError('Must call initialize() before initializeServices()');
@@ -320,24 +325,19 @@ class DartBridge {
     SdkInitResult? phase2Result;
     try {
       final result = DartBridgeSdkInit.phase2(
-        SdkInitPhase2Request(
-          buildToken: buildToken ?? '',
-          forceRefreshAssignments: forceRefreshAssignments,
-          flushTelemetry: flushTelemetry,
-          discoverDownloadedModels: discoverDownloadedModels,
-          rescanLocalModels: rescanLocalModels,
-        ),
+        SdkInitPhase2Request(buildToken: buildToken ?? ''),
       );
       phase2Result = result;
+      // `http_configured`/`device_registered`/`discovered_orphans`/
+      // `duration_ms` were all deleted outright (idl/sdk_init.proto) —
+      // `has_completed_http_setup`/`http_applicable`/`linked_models_count`/
+      // `warning` are the only fields left to log.
       _logger.debug(
         'SDK Phase 2 (proto) complete',
         metadata: {
-          'httpConfigured': result.httpConfigured,
-          'deviceRegistered': result.deviceRegistered,
           'linkedModelsCount': result.linkedModelsCount,
-          'discoveredOrphans': result.discoveredOrphans,
           'hasCompletedHttpSetup': result.hasCompletedHttpSetup,
-          'durationMs': result.durationMs.toInt(),
+          'httpApplicable': result.httpApplicable,
           'hasWarning': result.hasWarning(),
         },
       );
@@ -483,6 +483,9 @@ class DartBridge {
   /// Authentication bridge
   static DartBridgeAuth get auth => DartBridgeAuth.instance;
 
+  /// Computer-Use-Agent (CUA) scaffold bridge
+  static DartBridgeCua get cua => DartBridgeCua.shared;
+
   /// Device bridge
   static DartBridgeDevice get device => DartBridgeDevice.instance;
 
@@ -583,16 +586,4 @@ class DartBridge {
     }
   }
 
-  /// Map the public Dart [SDKEnvironment] to the proto-generated
-  /// [SdkInitEnvironment] consumed by `rac_sdk_init_phase1_proto`. Mirrors
-  /// Swift's `CppBridge.SdkInit.mapEnvironment`.
-  static SdkInitEnvironment _toSdkInitEnvironment(SDKEnvironment env) {
-    switch (env) {
-      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-        return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
-      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-      default:
-        return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
-    }
-  }
 }

@@ -55,6 +55,15 @@ ToolCallGrammar build_tool_call_grammar(const runanywhere::v1::ToolCallingOption
                                         runanywhere::v1::ToolChoiceMode tool_choice,
                                         const std::string& forced_tool_name, bool parallel);
 
+// Resolves the tool-call wire format when the caller left it UNSPECIFIED: the
+// loaded model id decides the dialect (LiquidAI/LFM2 → LFM2, everything else →
+// JSON). An explicit non-UNSPECIFIED `requested` is returned unchanged. This is
+// the single place that repairs prompt + grammar + parser alignment for models
+// whose native tool-call dialect isn't the JSON default (#607 shipped without
+// per-model derivation, which garbled LFM2 tool calls).
+runanywhere::v1::ToolCallFormatName resolve_tool_call_format_for_model(
+    runanywhere::v1::ToolCallFormatName requested, const std::string& model_id);
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace rac::llm::tool_calling

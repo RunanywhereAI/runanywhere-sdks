@@ -56,13 +56,7 @@ class BenchmarkViewModel extends ChangeNotifier {
   /// state (mirrors iOS `reloadAvailableModels`).
   Future<void> _reloadAvailableModels() async {
     try {
-      await sdk.RunAnywhere.models.refreshModelRegistry();
-      final listResult = await sdk.RunAnywhere.models.list();
-      if (!listResult.success) {
-        availableModels = {};
-        return;
-      }
-      final allModels = listResult.models.models;
+      final allModels = await sdk.RunAnywhere.models.list();
       final grouped = <BenchmarkCategory, List<sdk.ModelInfo>>{};
       for (final category in BenchmarkCategory.values) {
         final models = BenchmarkRunner.downloadedModels(category, allModels);

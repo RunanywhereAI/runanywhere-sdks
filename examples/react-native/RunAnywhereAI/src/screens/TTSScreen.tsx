@@ -19,10 +19,9 @@ import {
 } from '../components/model';
 
 import { RunAnywhere } from '@runanywhere/core';
+import type { TtsOptions } from '@runanywhere/core';
 import {
-  AudioFormat,
   ModelCategory,
-  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
@@ -31,6 +30,7 @@ import {
 } from '../utils/runAnywhereLifecycle';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
+import { isModelDownloaded } from '../utils/modelDisplay';
 
 const SURPRISE_PHRASES = [
   'The quick brown fox jumps over the lazy dog.',
@@ -39,8 +39,6 @@ const SURPRISE_PHRASES = [
   'Elementary, my dear Watson.',
   'May the force be with you.',
 ];
-
-const loadModelWithRequest = RunAnywhere.loadModel;
 
 // ─── Voice card ────────────────────────────────────────────────────────────
 
@@ -153,8 +151,6 @@ export const TTSScreen: React.FC = () => {
 
   const [text, setText] = useState('');
   const [speed, setSpeed] = useState(1.0);
-  const [pitch, _setPitch] = useState(1.0);
-  const [volume, setVolume] = useState(1.0);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
@@ -170,7 +166,7 @@ export const TTSScreen: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      RunAnywhere.stopSpeaking().catch(() => {});
+      RunAnywhere.tts.stop().catch(() => {});
     };
   }, []);
 
@@ -181,7 +177,7 @@ export const TTSScreen: React.FC = () => {
         (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
       );
       setAvailableModels(ttsModels);
-      const loaded = await RunAnywhere.modelInfoForCategory(
+      const loaded = await RunAnywhere.models.loaded(
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
       );
       setCurrentModel(visibleNativeNpuCatalogModelOrNull(loaded));
@@ -204,7 +200,7 @@ export const TTSScreen: React.FC = () => {
     try {
       setIsModelLoading(true);
       setError(null);
-      if (!model.isDownloaded && !model.localPath) {
+      if (!isModelDownloaded(model)) {
         Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }
@@ -214,23 +210,11 @@ export const TTSScreen: React.FC = () => {
       } catch (unloadErr) {
         console.warn('[TTSScreen] Error unloading previous model (ignoring):', unloadErr);
       }
-      const result = await loadModelWithRequest(
-        ModelLoadRequest.fromPartial({
-          modelId: model.id,
-          category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-          forceReload: false,
-          validateAvailability: true,
-        })
+      await RunAnywhere.models.load(model.id);
+      const loaded = await RunAnywhere.models.loaded(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
+      setCurrentModel(
+        visibleNativeNpuCatalogModelOrNull(loaded) ?? model
       );
-      if (result.success) {
-        const loaded = await RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
-        setCurrentModel(
-          visibleNativeNpuCatalogModelOrNull(loaded) ?? model
-        );
-      } else {
-        const msg = result.errorMessage || 'Native model lifecycle returned an unsuccessful load result';
-        Alert.alert('Error', `Failed to load model: ${msg}`);
-      }
     } catch (err) {
       console.error('[TTSScreen] Error loading model:', err);
       Alert.alert('Error', `Failed to load model: ${err}`);
@@ -252,42 +236,57 @@ export const TTSScreen: React.FC = () => {
     setText(phrase);
   }, []);
 
-  const handleSpeak = useCallback(async () => {
-    if (!text.trim() || !currentModel) return;
-    await RunAnywhere.stopSpeaking().catch(() => {});
+  const ensureModelReady = useCallback(async (): Promise<boolean> => {
     const isLoaded = await isModelLoadedForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
     if (!isLoaded) {
       Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
-      return;
+      return false;
     }
+    return true;
+  }, []);
+
+  const synthesisOptions = useCallback((): TtsOptions => ({ speed }), [speed]);
+
+  const handleSpeak = useCallback(async () => {
+    if (!text.trim() || !currentModel) return;
+    await RunAnywhere.tts.stop().catch(() => {});
+    if (!(await ensureModelReady())) return;
     setIsSpeaking(true);
     setError(null);
     try {
-      const sdkConfig = {
-        voice: 'default',
-        languageCode: '',
-        speakingRate: speed,
-        pitch,
-        volume,
-        enableSsml: false,
-        audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-      };
-      const result = await RunAnywhere.speak(text, sdkConfig);
-      setLastMetrics({
-        durationMs: result.durationMs,
-        sampleRate: result.sampleRate,
-        audioSizeBytes: result.audioSizeBytes,
-      });
+      await RunAnywhere.tts.speak(text, synthesisOptions());
     } catch (err) {
       console.error('[TTSScreen] Speech error:', err);
       setError(`Failed to speak: ${err}`);
     } finally {
       setIsSpeaking(false);
     }
-  }, [text, speed, pitch, volume, currentModel]);
+  }, [text, currentModel, ensureModelReady, synthesisOptions]);
+
+  // Synthesis without playback: the only path that reports audio metrics,
+  // since tts.speak() resolves with nothing.
+  const handleGenerate = useCallback(async () => {
+    if (!text.trim() || !currentModel) return;
+    if (!(await ensureModelReady())) return;
+    setIsGenerating(true);
+    setError(null);
+    try {
+      const audio = await RunAnywhere.tts.synthesize(text, synthesisOptions());
+      setLastMetrics({
+        durationMs: audio.durationMs,
+        sampleRate: audio.sampleRate,
+        audioSizeBytes: audio.data.byteLength,
+      });
+    } catch (err) {
+      console.error('[TTSScreen] Synthesis error:', err);
+      setError(`Failed to synthesize: ${err}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [text, currentModel, ensureModelReady, synthesisOptions]);
 
   const handleStop = useCallback(async () => {
-    await RunAnywhere.stopSpeaking().catch(() => {});
+    await RunAnywhere.tts.stop().catch(() => {});
     setIsSpeaking(false);
     setIsGenerating(false);
   }, []);
@@ -377,15 +376,7 @@ export const TTSScreen: React.FC = () => {
                 opacity: busy || !hasText ? 0.45 : 1,
               },
             ]}
-            onPress={async () => {
-              if (!currentModel || busy) return;
-              setIsGenerating(true);
-              try {
-                await handleSpeak();
-              } finally {
-                setIsGenerating(false);
-              }
-            }}
+            onPress={handleGenerate}
             disabled={busy || !hasText}
             activeOpacity={0.7}
           >

@@ -76,6 +76,26 @@ struct ConsumerAdvancedHubView: View {
             }
             #endif
 
+            Section("Agents") {
+                NavigationLink(destination: VoiceAssistantView()) {
+                    AdvancedFeatureRow(
+                        icon: "mic.circle",
+                        color: AppColors.primaryAccent,
+                        title: "Voice Assistant",
+                        subtitle: "Talk to the model (speech → answer → speech)"
+                    )
+                }
+
+                NavigationLink(destination: ComputerUseAgentView()) {
+                    AdvancedFeatureRow(
+                        icon: "cursorarrow.rays",
+                        color: AppColors.primaryAccent,
+                        title: "Computer Use",
+                        subtitle: "Fara1.5 reads a screenshot and picks the next action"
+                    )
+                }
+            }
+
             Section {
                 NavigationLink(destination: BenchmarkDashboardView()) {
                     AdvancedFeatureRow(

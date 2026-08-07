@@ -1,6 +1,7 @@
 /**
  * @file cmd_rm.cpp
- * @brief `rcli rm <model>` — delete downloaded files + unregister.
+ * @brief `rcli models delete <model>` (alias `rcli rm`) — delete downloaded
+ *        files + unregister.
  *
  * File deletion is CLI-owned (registry remove only unregisters, per the
  * rac_model_registry_remove contract). Deletion targets come from the
@@ -171,9 +172,7 @@ int run_rm(const GlobalOptions &options, const std::string &ref, bool force) {
 
 } // namespace
 
-void register_rm(CLI::App &app, GlobalOptions &options) {
-  CLI::App *cmd = app.add_subcommand("rm", "Delete a downloaded model");
-  cmd->alias("remove");
+void configure_models_delete(CLI::App *cmd, GlobalOptions &options) {
   auto ref = std::make_shared<std::string>();
   auto force = std::make_shared<bool>(false);
   cmd->add_option("model", *ref, "Model id or alias")->required();

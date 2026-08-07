@@ -35,18 +35,12 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
 
   // --- Subscription / idempotency state -------------------------------------
 
-  StreamSubscription<sdk.ModelLifecycleChange>? _lifecycleSubscription;
+  StreamSubscription<sdk.SdkEvent>? _lifecycleSubscription;
   bool _isInitialized = false;
   bool _hasSubscribedToSDKEvents = false;
   bool _disposed = false;
 
   // --- Component identity (override in subclasses) --------------------------
-
-  /// SDK component this ViewModel tracks (e.g. `SDK_COMPONENT_STT`).
-  sdk.SDKComponent get component;
-
-  /// Event category that carries this component's lifecycle events.
-  sdk.EventCategory get eventCategory;
 
   /// Model category used to query the initial loaded model.
   ModelCategory get modelCategory;
@@ -87,7 +81,7 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   /// Shared by every voice-component screen; subclasses wrap it only to
   /// toggle their busy flag.
   Future<bool> loadModel(ModelInfo model) async {
-    debugPrint('Loading $component model: ${model.name}');
+    debugPrint('Loading $modelCategory model: ${model.name}');
     errorMessage = null;
     notify();
 
@@ -116,24 +110,16 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
     }
     _hasSubscribedToSDKEvents = true;
 
-    _lifecycleSubscription = sdk.RunAnywhere.events.modelLifecycle.listen((
-      change,
-    ) {
-      if (change.component != component &&
-          change.event.category != eventCategory) {
-        return;
-      }
-      switch (change.kind) {
-        case sdk.ModelLifecycleChangeKind.loaded:
-          // Resolve from the event payload rather than doing extra snapshot
-          // work inside the lifecycle handler. The change carries the model
-          // id; resolve the rest from the catalog and apply through
-          // `applyLoadedModel` so the subclass
-          // overrides (STT live-mode, TTS system-voice) still run.
-          applyLoadedModel(resolveLoadedModel(change.modelId));
-        case sdk.ModelLifecycleChangeKind.unloaded:
-          clearLoadedModel();
-          debugPrint('Voice component model unloaded');
+    _lifecycleSubscription = sdk.RunAnywhere.events.listen((event) {
+      if (event is sdk.SdkModelLoaded) {
+        if (event.category != modelCategory) return;
+        // Resolve the rest from the catalog rather than re-querying the SDK,
+        // so the subclass overrides (STT live-mode, TTS system-voice) run.
+        applyLoadedModel(resolveLoadedModel(event.id));
+      } else if (event is sdk.SdkModelUnloaded) {
+        if (event.id != selectedModelId) return;
+        clearLoadedModel();
+        debugPrint('Voice component model unloaded');
       }
     });
   }
@@ -152,20 +138,10 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   /// payload instead so it does not perform redundant SDK snapshot work.
   @protected
   Future<void> applyCurrentModelSnapshot(String reason) async {
-    final result = await sdk.RunAnywhere.modelLifecycle.current(
-      sdk.CurrentModelRequest(
-        category: modelCategory,
-        includeModelMetadata: true,
-      ),
-    );
-    if (_disposed || !result.found) return;
+    final state = await sdk.RunAnywhere.models.state();
+    final model = state.loaded[modelCategory];
+    if (_disposed || model == null) return;
 
-    // When the snapshot omits model metadata, `model.id` is empty; fall back
-    // to the top-level `modelId` so the id is always populated.
-    final model = result.model.deepCopy();
-    if (model.id.isEmpty) {
-      model.id = result.modelId;
-    }
     applyLoadedModel(model);
     debugPrint('Voice component model $reason: ${model.id}');
   }

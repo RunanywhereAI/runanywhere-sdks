@@ -17,14 +17,7 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * Model category / modality class. Sources pre-IDL:
- *   Swift ModelTypes.swift:39         (9 cases incl. voiceActivityDetection + audio)
- *   Kotlin ModelTypes.kt:147          (8 cases, no VAD)
- *   Dart  model_types.dart:55         (8 cases, no VAD)
- *   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
- *   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
- * ---------------------------------------------------------------------------
+ * What a model does.
  */
 public enum class ModelCategory(
   override val `value`: Int,
@@ -56,6 +49,8 @@ public enum class ModelCategory(
   MODEL_CATEGORY_SPEAKER_DIARIZATION(10),
   @RacWireStringOption("semantic-segmentation")
   MODEL_CATEGORY_SEMANTIC_SEGMENTATION(11),
+  @RacWireStringOption("rerank")
+  MODEL_CATEGORY_RERANK(12),
   ;
 
   public companion object {
@@ -82,6 +77,7 @@ public enum class ModelCategory(
       9 -> MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
       10 -> MODEL_CATEGORY_SPEAKER_DIARIZATION
       11 -> MODEL_CATEGORY_SEMANTIC_SEGMENTATION
+      12 -> MODEL_CATEGORY_RERANK
       else -> null
     }
   }

@@ -40,18 +40,11 @@ public class DownloadProgress(
   )
   public val model_id: String = "",
   @field:WireField(
-    tag = 2,
-    adapter = "ai.runanywhere.proto.v1.DownloadStage#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
-  public val stage: DownloadStage = DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED,
-  @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "bytesDownloaded",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val bytes_downloaded: Long = 0L,
   /**
@@ -62,7 +55,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalBytes",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val total_bytes: Long = 0L,
   /**
@@ -73,33 +66,37 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "stageProgress",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val stage_progress: Float = 0f,
+  /**
+   * Bytes per second. Absent means unknown -- no sentinel that collides
+   * with a real value.
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "overallSpeedBps",
-    schemaIndex = 5,
+    jsonName = "bytesPerSecond",
+    schemaIndex = 4,
   )
-  public val overall_speed_bps: Float = 0f,
-  /**
-   * -1 if unknown
-   */
+  public val bytes_per_second: Float = 0f,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "etaSeconds",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
-  public val eta_seconds: Long = 0L,
+  public val eta_seconds: Long? = null,
+  /**
+   * The single phase of this transfer. `error` (21) is populated exactly
+   * when state == DOWNLOAD_STATE_FAILED and is meaningless otherwise.
+   */
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.DownloadState#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val state: DownloadState = DownloadState.DOWNLOAD_STATE_UNSPECIFIED,
   /**
@@ -110,26 +107,15 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "retryAttempt",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val retry_attempt: Int = 0,
-  /**
-   * populated when state == FAILED
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 9,
-  )
-  public val error_message: String = "",
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "taskId",
-    schemaIndex = 10,
+    schemaIndex = 8,
   )
   public val task_id: String = "",
   /**
@@ -140,7 +126,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "currentFileIndex",
-    schemaIndex = 11,
+    schemaIndex = 9,
   )
   public val current_file_index: Int = 0,
   @field:WireField(
@@ -148,7 +134,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalFiles",
-    schemaIndex = 12,
+    schemaIndex = 10,
   )
   public val total_files: Int = 0,
   /**
@@ -159,7 +145,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "storageKey",
-    schemaIndex = 13,
+    schemaIndex = 11,
   )
   public val storage_key: String = "",
   /**
@@ -170,7 +156,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "localPath",
-    schemaIndex = 14,
+    schemaIndex = 12,
   )
   public val local_path: String = "",
   /**
@@ -181,7 +167,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "overallProgress",
-    schemaIndex = 15,
+    schemaIndex = 13,
   )
   public val overall_progress: Float = 0f,
   @field:WireField(
@@ -189,7 +175,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "startedAtUnixMs",
-    schemaIndex = 16,
+    schemaIndex = 14,
   )
   public val started_at_unix_ms: Long = 0L,
   @field:WireField(
@@ -197,7 +183,7 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "updatedAtUnixMs",
-    schemaIndex = 17,
+    schemaIndex = 15,
   )
   public val updated_at_unix_ms: Long = 0L,
   @field:WireField(
@@ -205,20 +191,15 @@ public class DownloadProgress(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "currentFileName",
-    schemaIndex = 18,
+    schemaIndex = 16,
   )
   public val current_file_name: String = "",
-  /**
-   * logical resume marker, not a native handle
-   */
   @field:WireField(
-    tag = 20,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "resumeToken",
-    schemaIndex = 19,
+    tag = 21,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 17,
   )
-  public val resume_token: String = "",
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadProgress, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -232,15 +213,13 @@ public class DownloadProgress(
     if (other !is DownloadProgress) return false
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
-    if (stage != other.stage) return false
     if (bytes_downloaded != other.bytes_downloaded) return false
     if (total_bytes != other.total_bytes) return false
     if (stage_progress != other.stage_progress) return false
-    if (overall_speed_bps != other.overall_speed_bps) return false
+    if (bytes_per_second != other.bytes_per_second) return false
     if (eta_seconds != other.eta_seconds) return false
     if (state != other.state) return false
     if (retry_attempt != other.retry_attempt) return false
-    if (error_message != other.error_message) return false
     if (task_id != other.task_id) return false
     if (current_file_index != other.current_file_index) return false
     if (total_files != other.total_files) return false
@@ -250,7 +229,7 @@ public class DownloadProgress(
     if (started_at_unix_ms != other.started_at_unix_ms) return false
     if (updated_at_unix_ms != other.updated_at_unix_ms) return false
     if (current_file_name != other.current_file_name) return false
-    if (resume_token != other.resume_token) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -259,15 +238,13 @@ public class DownloadProgress(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + stage.hashCode()
       result = result * 37 + bytes_downloaded.hashCode()
       result = result * 37 + total_bytes.hashCode()
       result = result * 37 + stage_progress.hashCode()
-      result = result * 37 + overall_speed_bps.hashCode()
-      result = result * 37 + eta_seconds.hashCode()
+      result = result * 37 + bytes_per_second.hashCode()
+      result = result * 37 + (eta_seconds?.hashCode() ?: 0)
       result = result * 37 + state.hashCode()
       result = result * 37 + retry_attempt.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + task_id.hashCode()
       result = result * 37 + current_file_index.hashCode()
       result = result * 37 + total_files.hashCode()
@@ -277,7 +254,7 @@ public class DownloadProgress(
       result = result * 37 + started_at_unix_ms.hashCode()
       result = result * 37 + updated_at_unix_ms.hashCode()
       result = result * 37 + current_file_name.hashCode()
-      result = result * 37 + resume_token.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -286,15 +263,13 @@ public class DownloadProgress(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
-    result += """stage=$stage"""
     result += """bytes_downloaded=$bytes_downloaded"""
     result += """total_bytes=$total_bytes"""
     result += """stage_progress=$stage_progress"""
-    result += """overall_speed_bps=$overall_speed_bps"""
-    result += """eta_seconds=$eta_seconds"""
+    result += """bytes_per_second=$bytes_per_second"""
+    if (eta_seconds != null) result += """eta_seconds=$eta_seconds"""
     result += """state=$state"""
     result += """retry_attempt=$retry_attempt"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """task_id=${sanitize(task_id)}"""
     result += """current_file_index=$current_file_index"""
     result += """total_files=$total_files"""
@@ -304,21 +279,19 @@ public class DownloadProgress(
     result += """started_at_unix_ms=$started_at_unix_ms"""
     result += """updated_at_unix_ms=$updated_at_unix_ms"""
     result += """current_file_name=${sanitize(current_file_name)}"""
-    result += """resume_token=${sanitize(resume_token)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "DownloadProgress{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     model_id: String = this.model_id,
-    stage: DownloadStage = this.stage,
     bytes_downloaded: Long = this.bytes_downloaded,
     total_bytes: Long = this.total_bytes,
     stage_progress: Float = this.stage_progress,
-    overall_speed_bps: Float = this.overall_speed_bps,
-    eta_seconds: Long = this.eta_seconds,
+    bytes_per_second: Float = this.bytes_per_second,
+    eta_seconds: Long? = this.eta_seconds,
     state: DownloadState = this.state,
     retry_attempt: Int = this.retry_attempt,
-    error_message: String = this.error_message,
     task_id: String = this.task_id,
     current_file_index: Int = this.current_file_index,
     total_files: Int = this.total_files,
@@ -328,9 +301,9 @@ public class DownloadProgress(
     started_at_unix_ms: Long = this.started_at_unix_ms,
     updated_at_unix_ms: Long = this.updated_at_unix_ms,
     current_file_name: String = this.current_file_name,
-    resume_token: String = this.resume_token,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadProgress = DownloadProgress(model_id, stage, bytes_downloaded, total_bytes, stage_progress, overall_speed_bps, eta_seconds, state, retry_attempt, error_message, task_id, current_file_index, total_files, storage_key, local_path, overall_progress, started_at_unix_ms, updated_at_unix_ms, current_file_name, resume_token, unknownFields)
+  ): DownloadProgress = DownloadProgress(model_id, bytes_downloaded, total_bytes, stage_progress, bytes_per_second, eta_seconds, state, retry_attempt, task_id, current_file_index, total_files, storage_key, local_path, overall_progress, started_at_unix_ms, updated_at_unix_ms, current_file_name, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -347,9 +320,6 @@ public class DownloadProgress(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
-        if (value.stage != ai.runanywhere.proto.v1.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED) {
-          size += DownloadStage.ADAPTER.encodedSizeWithTag(2, value.stage)
-        }
         if (value.bytes_downloaded != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.bytes_downloaded)
         }
@@ -359,20 +329,15 @@ public class DownloadProgress(
         if (!value.stage_progress.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.stage_progress)
         }
-        if (!value.overall_speed_bps.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.overall_speed_bps)
+        if (!value.bytes_per_second.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.bytes_per_second)
         }
-        if (value.eta_seconds != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.eta_seconds)
-        }
+        size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.eta_seconds)
         if (value.state != ai.runanywhere.proto.v1.DownloadState.DOWNLOAD_STATE_UNSPECIFIED) {
           size += DownloadState.ADAPTER.encodedSizeWithTag(8, value.state)
         }
         if (value.retry_attempt != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.retry_attempt)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.error_message)
         }
         if (value.task_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.task_id)
@@ -401,9 +366,7 @@ public class DownloadProgress(
         if (value.current_file_name != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.current_file_name)
         }
-        if (value.resume_token != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(20, value.resume_token)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(21, value.error)
         return size
       }
 
@@ -411,9 +374,6 @@ public class DownloadProgress(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
-        if (value.stage != ai.runanywhere.proto.v1.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED) {
-          DownloadStage.ADAPTER.encodeWithTag(writer, 2, value.stage)
-        }
         if (value.bytes_downloaded != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.bytes_downloaded)
         }
@@ -423,20 +383,15 @@ public class DownloadProgress(
         if (!value.stage_progress.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.stage_progress)
         }
-        if (!value.overall_speed_bps.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.overall_speed_bps)
+        if (!value.bytes_per_second.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.bytes_per_second)
         }
-        if (value.eta_seconds != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.eta_seconds)
-        }
+        ProtoAdapter.INT64.encodeWithTag(writer, 7, value.eta_seconds)
         if (value.state != ai.runanywhere.proto.v1.DownloadState.DOWNLOAD_STATE_UNSPECIFIED) {
           DownloadState.ADAPTER.encodeWithTag(writer, 8, value.state)
         }
         if (value.retry_attempt != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.retry_attempt)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
         }
         if (value.task_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 11, value.task_id)
@@ -465,17 +420,13 @@ public class DownloadProgress(
         if (value.current_file_name != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 19, value.current_file_name)
         }
-        if (value.resume_token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.resume_token)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 21, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadProgress) {
         writer.writeBytes(value.unknownFields)
-        if (value.resume_token != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 20, value.resume_token)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 21, value.error)
         if (value.current_file_name != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 19, value.current_file_name)
         }
@@ -503,20 +454,15 @@ public class DownloadProgress(
         if (value.task_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 11, value.task_id)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
-        }
         if (value.retry_attempt != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.retry_attempt)
         }
         if (value.state != ai.runanywhere.proto.v1.DownloadState.DOWNLOAD_STATE_UNSPECIFIED) {
           DownloadState.ADAPTER.encodeWithTag(writer, 8, value.state)
         }
-        if (value.eta_seconds != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 7, value.eta_seconds)
-        }
-        if (!value.overall_speed_bps.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.overall_speed_bps)
+        ProtoAdapter.INT64.encodeWithTag(writer, 7, value.eta_seconds)
+        if (!value.bytes_per_second.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.bytes_per_second)
         }
         if (!value.stage_progress.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.stage_progress)
@@ -526,9 +472,6 @@ public class DownloadProgress(
         }
         if (value.bytes_downloaded != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.bytes_downloaded)
-        }
-        if (value.stage != ai.runanywhere.proto.v1.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED) {
-          DownloadStage.ADAPTER.encodeWithTag(writer, 2, value.stage)
         }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
@@ -537,15 +480,13 @@ public class DownloadProgress(
 
       override fun decode(reader: ProtoReader): DownloadProgress {
         var model_id: String = ""
-        var stage: DownloadStage = DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED
         var bytes_downloaded: Long = 0L
         var total_bytes: Long = 0L
         var stage_progress: Float = 0f
-        var overall_speed_bps: Float = 0f
-        var eta_seconds: Long = 0L
+        var bytes_per_second: Float = 0f
+        var eta_seconds: Long? = null
         var state: DownloadState = DownloadState.DOWNLOAD_STATE_UNSPECIFIED
         var retry_attempt: Int = 0
-        var error_message: String = ""
         var task_id: String = ""
         var current_file_index: Int = 0
         var total_files: Int = 0
@@ -555,19 +496,14 @@ public class DownloadProgress(
         var started_at_unix_ms: Long = 0L
         var updated_at_unix_ms: Long = 0L
         var current_file_name: String = ""
-        var resume_token: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
-            2 -> try {
-              stage = DownloadStage.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
             3 -> bytes_downloaded = ProtoAdapter.INT64.decode(reader)
             4 -> total_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> stage_progress = ProtoAdapter.FLOAT.decode(reader)
-            6 -> overall_speed_bps = ProtoAdapter.FLOAT.decode(reader)
+            6 -> bytes_per_second = ProtoAdapter.FLOAT.decode(reader)
             7 -> eta_seconds = ProtoAdapter.INT64.decode(reader)
             8 -> try {
               state = DownloadState.ADAPTER.decode(reader)
@@ -575,7 +511,6 @@ public class DownloadProgress(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             9 -> retry_attempt = ProtoAdapter.INT32.decode(reader)
-            10 -> error_message = ProtoAdapter.STRING.decode(reader)
             11 -> task_id = ProtoAdapter.STRING.decode(reader)
             12 -> current_file_index = ProtoAdapter.INT32.decode(reader)
             13 -> total_files = ProtoAdapter.INT32.decode(reader)
@@ -585,21 +520,19 @@ public class DownloadProgress(
             17 -> started_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             18 -> updated_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             19 -> current_file_name = ProtoAdapter.STRING.decode(reader)
-            20 -> resume_token = ProtoAdapter.STRING.decode(reader)
+            21 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DownloadProgress(
           model_id = model_id,
-          stage = stage,
           bytes_downloaded = bytes_downloaded,
           total_bytes = total_bytes,
           stage_progress = stage_progress,
-          overall_speed_bps = overall_speed_bps,
+          bytes_per_second = bytes_per_second,
           eta_seconds = eta_seconds,
           state = state,
           retry_attempt = retry_attempt,
-          error_message = error_message,
           task_id = task_id,
           current_file_index = current_file_index,
           total_files = total_files,
@@ -609,12 +542,13 @@ public class DownloadProgress(
           started_at_unix_ms = started_at_unix_ms,
           updated_at_unix_ms = updated_at_unix_ms,
           current_file_name = current_file_name,
-          resume_token = resume_token,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: DownloadProgress): DownloadProgress = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

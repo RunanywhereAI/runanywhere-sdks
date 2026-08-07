@@ -32,15 +32,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * A single structured log record. Mirrors the per-SDK LogEntry shape.
- * ---------------------------------------------------------------------------
- */
 public class LogEntry(
-  /**
-   * Wall-clock epoch milliseconds.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -57,7 +49,7 @@ public class LogEntry(
   )
   public val level: LogLevel = LogLevel.LOG_LEVEL_TRACE,
   /**
-   * Subsystem/tag (e.g. "STT", "Download").
+   * Subsystem tag, e.g. "STT".
    */
   @field:WireField(
     tag = 3,
@@ -75,9 +67,8 @@ public class LogEntry(
   public val message: String = "",
   metadata: Map<String, String> = emptyMap(),
   /**
-   * Optional source location + context (Kotlin LogEntry carries these as
-   * first-class fields; other SDKs leave them empty). `line`/`error_code`
-   * use 0 as "unset".
+   * Kotlin carries these as first-class fields; other SDKs leave them empty.
+   * 0 means unset for line and error_code.
    */
   @field:WireField(
     tag = 6,
@@ -101,9 +92,6 @@ public class LogEntry(
     schemaIndex = 7,
   )
   public val function: String = "",
-  /**
-   * SDKError code, when the record describes an error.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -122,16 +110,13 @@ public class LogEntry(
   public val model_id: String = "",
   @field:WireField(
     tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 10,
   )
-  public val framework: String = "",
+  public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LogEntry, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Optional structured context.
-   */
   @field:WireField(
     tag = 5,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -196,7 +181,7 @@ public class LogEntry(
     result += """function=${sanitize(function)}"""
     result += """error_code=$error_code"""
     result += """model_id=${sanitize(model_id)}"""
-    result += """framework=${sanitize(framework)}"""
+    result += """framework=$framework"""
     return result.joinToString(prefix = "LogEntry{", separator = ", ", postfix = "}")
   }
 
@@ -211,7 +196,7 @@ public class LogEntry(
     function: String = this.function,
     error_code: Int = this.error_code,
     model_id: String = this.model_id,
-    framework: String = this.framework,
+    framework: InferenceFramework = this.framework,
     unknownFields: ByteString = this.unknownFields,
   ): LogEntry = LogEntry(timestamp_unix_ms, level, category, message, metadata, file_, line, function, error_code, model_id, framework, unknownFields)
 
@@ -258,8 +243,8 @@ public class LogEntry(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.model_id)
         }
-        if (value.framework != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          size += InferenceFramework.ADAPTER.encodedSizeWithTag(11, value.framework)
         }
         return size
       }
@@ -293,16 +278,16 @@ public class LogEntry(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.model_id)
         }
-        if (value.framework != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.framework)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LogEntry) {
         writer.writeBytes(value.unknownFields)
-        if (value.framework != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.framework)
+        if (value.framework != ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED) {
+          InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.framework)
         }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.model_id)
@@ -345,7 +330,7 @@ public class LogEntry(
         var function: String = ""
         var error_code: Int = 0
         var model_id: String = ""
-        var framework: String = ""
+        var framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> timestamp_unix_ms = ProtoAdapter.INT64.decode(reader)
@@ -362,7 +347,11 @@ public class LogEntry(
             8 -> function = ProtoAdapter.STRING.decode(reader)
             9 -> error_code = ProtoAdapter.INT32.decode(reader)
             10 -> model_id = ProtoAdapter.STRING.decode(reader)
-            11 -> framework = ProtoAdapter.STRING.decode(reader)
+            11 -> try {
+              framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }

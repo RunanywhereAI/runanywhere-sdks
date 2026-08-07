@@ -126,6 +126,17 @@ class RAGBackend {
                        std::function<bool(const std::string&)> on_token = nullptr,
                        const QueryOverrides* overrides = nullptr);
 
+    /**
+     * @brief Retrieval-only search (no answer generation).
+     *
+     * Embed-only sessions are supported. Multi-query expansion and session
+     * LLM rerank require an LLM and return RAC_ERROR_INVALID_STATE without one.
+     * On success, `out_sources` holds the retrieved chunks (may be empty).
+     */
+    rac_result_t retrieve(const std::string& question, std::vector<SearchResult>& out_sources,
+                          double* out_retrieval_ms = nullptr,
+                          const QueryOverrides* overrides = nullptr);
+
     /** Request cancellation without taking the corpus mutex. */
     rac_result_t cancel_query();
 

@@ -21,23 +21,24 @@ describe('EmbeddingsProtoAdapter lifecycle routing', () => {
   it('uses the handle-less lifecycle ABI instead of treating zero as a handle', async () => {
     const harness = fakeEmbeddingsModule();
     const adapter = new EmbeddingsProtoAdapter(harness.module);
+    // `EmbeddingsRequest.metadata` was deleted outright.
     const request = EmbeddingsRequest.create({
       texts: ['Project Meridian'],
       requestId: 'embed-request',
       modelId: 'all-minilm-l6-v2',
-      metadata: {},
     });
 
     expect(adapter.supportsProtoEmbeddings()).toBe(true);
     expect(adapter.supportsLifecycleProtoEmbeddings()).toBe(true);
+    // `EmbeddingVector` is `{ values, inputIndex }` only now -- `.text`/
+    // `.dimension`/`.norm` were deleted outright (dimension lives solely on
+    // the enclosing EmbeddingsResult).
     await expect(adapter.embedBatchLifecycle(request)).resolves.toMatchObject({
       dimension: 2,
       modelId: 'all-minilm-l6-v2',
       requestId: 'embed-request',
       vectors: [{
         values: [0.25, 0.75],
-        text: 'Project Meridian',
-        dimension: 2,
         inputIndex: 0,
       }],
     });
@@ -79,7 +80,6 @@ describe('EmbeddingsProtoAdapter lifecycle routing', () => {
     await llamaAdapter!.embedBatchLifecycle(EmbeddingsRequest.create({
       texts: ['NVIDIA embedding'],
       modelId: 'nemotron-3-embed-1b-q4_k_m',
-      metadata: {},
     }));
     expect(llama.lifecycleCalls).toBe(1);
     expect(onnx.lifecycleCalls).toBe(0);
@@ -87,7 +87,6 @@ describe('EmbeddingsProtoAdapter lifecycle routing', () => {
     await onnxAdapter!.embedBatchLifecycle(EmbeddingsRequest.create({
       texts: ['ONNX embedding'],
       modelId: 'all-minilm-l6-v2',
-      metadata: {},
     }));
     expect(llama.lifecycleCalls).toBe(1);
     expect(onnx.lifecycleCalls).toBe(1);
@@ -183,22 +182,19 @@ function fakeEmbeddingsModule(): FakeEmbeddingsHarness {
         heapU8.slice(requestPointer, requestPointer + requestSize),
       );
       requests.push(request);
+      // `EmbeddingVector.norm`/`.text`/`.dimension`/`.metadata` and
+      // `EmbeddingsResult.errorCode` were all deleted outright.
       writeResult(
         outResult,
         EmbeddingsResult.encode(EmbeddingsResult.create({
           vectors: [{
             values: [0.25, 0.75],
-            norm: Math.sqrt(0.625),
-            text: request.texts[0],
-            dimension: 2,
             inputIndex: 0,
-            metadata: {},
           }],
           dimension: 2,
           processingTimeMs: 3,
           tokensUsed: 2,
           modelId: request.modelId,
-          errorCode: 0,
           requestId: request.requestId,
         })).finish(),
       );

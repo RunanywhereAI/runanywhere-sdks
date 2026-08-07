@@ -81,18 +81,14 @@ export interface EmscriptenRunanywhereModule {
 
   _rac_stt_component_transcribe_proto?(
     handle: number,
-    audioData: number,
-    audioSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   _rac_stt_component_transcribe_stream_proto?(
     handle: number,
-    audioData: number,
-    audioSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     callbackPtr: number,
     userData: number,
   ): number;
@@ -107,6 +103,7 @@ export interface EmscriptenRunanywhereModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_stt_state_lifecycle_proto?(outResult: number): number;
 
   _rac_tts_component_list_voices_proto?(
     handle: number,
@@ -141,6 +138,7 @@ export interface EmscriptenRunanywhereModule {
   ): number;
   _rac_tts_stop_lifecycle_proto?(outResult: number): number;
   _rac_tts_list_voices_lifecycle_proto?(outResult: number): number;
+  _rac_tts_state_lifecycle_proto?(outResult: number): number;
 
   _rac_vad_component_configure_proto?(
     handle: number,
@@ -149,10 +147,8 @@ export interface EmscriptenRunanywhereModule {
   ): number;
   _rac_vad_component_process_proto?(
     handle: number,
-    samples: number,
-    numSamples: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   _rac_vad_component_get_statistics_proto?(
@@ -267,6 +263,12 @@ export interface EmscriptenRunanywhereModule {
     queryBytes: number,
     querySize: number,
     outResult: number,
+  ): number;
+  _rac_rag_search_proto?(
+    session: number,
+    requestBytes: number,
+    requestSize: number,
+    outResponse: number,
   ): number;
   _rac_rag_query_stream_proto?(
     session: number,
@@ -647,6 +649,46 @@ export interface EmscriptenRunanywhereModule {
    * shared commons helper rac_result_to_proto_error.
    */
   _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
+
+  // -----------------------------------------------------------------------------
+  // Computer-Use Agent (CUA) — `rac/features/cua/rac_cua.h`
+  // -----------------------------------------------------------------------------
+  // Stateless, model-agnostic profile ABI (pairs with rac_vlm_*). `profileId`
+  // and `modelOutput` are NUL-terminated C strings the caller writes into the
+  // heap; the parse result crosses back as a serialized `runanywhere.v1.CuaAction`
+  // in a `rac_proto_buffer_t` (the shared proto-buffer helpers above) — the same
+  // proto-byte bridging every other modality uses.
+
+  /**
+   * `int rac_cua_system_prompt(const char* profile_id, uint32_t display_w,
+   *    uint32_t display_h, char* out, size_t out_size);`
+   *
+   * Returns the full length excluding NUL (>= out_size means truncated), or -1
+   * for an unknown profile. Pass `out=0, out_size=0` to size the buffer first.
+   */
+  _rac_cua_system_prompt?(
+    profileIdPtr: number,
+    displayW: number,
+    displayH: number,
+    outPtr: number,
+    outSize: number,
+  ): number;
+
+  /**
+   * `rac_result_t rac_cua_parse_action_proto(const char* profile_id,
+   *    const char* model_output, uint32_t viewport_w, uint32_t viewport_h,
+   *    rac_proto_buffer_t* out);`
+   *
+   * Serializes a `runanywhere.v1.CuaAction` into `out` (inspect the decoded
+   * `parseOk` field), or returns an error for an unknown profile / NULL args.
+   */
+  _rac_cua_parse_action_proto?(
+    profileIdPtr: number,
+    modelOutputPtr: number,
+    viewportW: number,
+    viewportH: number,
+    outBufferPtr: number,
+  ): number;
 
   // -----------------------------------------------------------------------------
   // Storage analyzer proto-byte ABI

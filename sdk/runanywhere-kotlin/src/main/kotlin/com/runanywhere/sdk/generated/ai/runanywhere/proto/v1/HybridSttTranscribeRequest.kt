@@ -28,14 +28,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Request handed to the JNI transcribe thunk. Audio bytes are passed
- * verbatim to the chosen backend; each engine is responsible for parsing
- * the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
- * file part; sherpa decodes the WAV/PCM bytes).
- * ---------------------------------------------------------------------------
- */
 public class HybridSttTranscribeRequest(
   @field:WireField(
     tag = 1,
@@ -47,16 +39,9 @@ public class HybridSttTranscribeRequest(
   public val audio_bytes: ByteString = ByteString.EMPTY,
   @field:WireField(
     tag = 2,
-    adapter = "ai.runanywhere.proto.v1.HybridRoutingContext#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
-  public val context: HybridRoutingContext? = null,
-  @field:WireField(
-    tag = 3,
     adapter = "ai.runanywhere.proto.v1.HybridSttTranscribeOptions#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val options: HybridSttTranscribeOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -72,7 +57,6 @@ public class HybridSttTranscribeRequest(
     if (other !is HybridSttTranscribeRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (audio_bytes != other.audio_bytes) return false
-    if (context != other.context) return false
     if (options != other.options) return false
     return true
   }
@@ -82,7 +66,6 @@ public class HybridSttTranscribeRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + audio_bytes.hashCode()
-      result = result * 37 + (context?.hashCode() ?: 0)
       result = result * 37 + (options?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -92,17 +75,15 @@ public class HybridSttTranscribeRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """audio_bytes=$audio_bytes"""
-    if (context != null) result += """context=$context"""
     if (options != null) result += """options=$options"""
     return result.joinToString(prefix = "HybridSttTranscribeRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     audio_bytes: ByteString = this.audio_bytes,
-    context: HybridRoutingContext? = this.context,
     options: HybridSttTranscribeOptions? = this.options,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridSttTranscribeRequest = HybridSttTranscribeRequest(audio_bytes, context, options, unknownFields)
+  ): HybridSttTranscribeRequest = HybridSttTranscribeRequest(audio_bytes, options, unknownFields)
 
   public companion object {
     @JvmField
@@ -120,11 +101,8 @@ public class HybridSttTranscribeRequest(
         if (value.audio_bytes != okio.ByteString.EMPTY) {
           size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.audio_bytes)
         }
-        if (value.context != null) {
-          size += HybridRoutingContext.ADAPTER.encodedSizeWithTag(2, value.context)
-        }
         if (value.options != null) {
-          size += HybridSttTranscribeOptions.ADAPTER.encodedSizeWithTag(3, value.options)
+          size += HybridSttTranscribeOptions.ADAPTER.encodedSizeWithTag(2, value.options)
         }
         return size
       }
@@ -133,11 +111,8 @@ public class HybridSttTranscribeRequest(
         if (value.audio_bytes != okio.ByteString.EMPTY) {
           ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_bytes)
         }
-        if (value.context != null) {
-          HybridRoutingContext.ADAPTER.encodeWithTag(writer, 2, value.context)
-        }
         if (value.options != null) {
-          HybridSttTranscribeOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
+          HybridSttTranscribeOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
         }
         writer.writeBytes(value.unknownFields)
       }
@@ -145,10 +120,7 @@ public class HybridSttTranscribeRequest(
       override fun encode(writer: ReverseProtoWriter, `value`: HybridSttTranscribeRequest) {
         writer.writeBytes(value.unknownFields)
         if (value.options != null) {
-          HybridSttTranscribeOptions.ADAPTER.encodeWithTag(writer, 3, value.options)
-        }
-        if (value.context != null) {
-          HybridRoutingContext.ADAPTER.encodeWithTag(writer, 2, value.context)
+          HybridSttTranscribeOptions.ADAPTER.encodeWithTag(writer, 2, value.options)
         }
         if (value.audio_bytes != okio.ByteString.EMPTY) {
           ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_bytes)
@@ -157,26 +129,22 @@ public class HybridSttTranscribeRequest(
 
       override fun decode(reader: ProtoReader): HybridSttTranscribeRequest {
         var audio_bytes: ByteString = ByteString.EMPTY
-        var context: HybridRoutingContext? = null
         var options: HybridSttTranscribeOptions? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> audio_bytes = ProtoAdapter.BYTES.decode(reader)
-            2 -> context = HybridRoutingContext.ADAPTER.decode(reader)
-            3 -> options = HybridSttTranscribeOptions.ADAPTER.decode(reader)
+            2 -> options = HybridSttTranscribeOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return HybridSttTranscribeRequest(
           audio_bytes = audio_bytes,
-          context = context,
           options = options,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: HybridSttTranscribeRequest): HybridSttTranscribeRequest = value.copy(
-        context = value.context?.let(HybridRoutingContext.ADAPTER::redact),
         options = value.options?.let(HybridSttTranscribeOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )

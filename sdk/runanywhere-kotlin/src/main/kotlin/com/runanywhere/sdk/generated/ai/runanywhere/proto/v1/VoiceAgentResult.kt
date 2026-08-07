@@ -29,22 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * One-shot voice-turn result.
- *
- * Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
- * `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
- * `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
- * Returned by the `processVoiceTurn` ergonomic API where a single audio
- * blob produces transcription + assistant response + synthesized audio in
- * one call (as opposed to the streaming path served by the Stream rpc).
- * ---------------------------------------------------------------------------
- */
 public class VoiceAgentResult(
-  /**
-   * Whether the input audio passed VAD's speech-detected check.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -53,19 +38,12 @@ public class VoiceAgentResult(
     schemaIndex = 0,
   )
   public val speech_detected: Boolean = false,
-  /**
-   * Transcribed text from STT. Unset when speech_detected=false.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 1,
   )
   public val transcription: String? = null,
-  /**
-   * Generated assistant response text from the LLM. Unset when STT
-   * produced no transcription or LLM was skipped.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -73,11 +51,6 @@ public class VoiceAgentResult(
     schemaIndex = 2,
   )
   public val assistant_response: String? = null,
-  /**
-   * Thinking content extracted from `<think>...</think>` tags
-   * (qwen3, deepseek-r1). Unset when the active LLM does not emit
-   * a chain-of-thought trace.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -85,11 +58,6 @@ public class VoiceAgentResult(
     schemaIndex = 3,
   )
   public val thinking_content: String? = null,
-  /**
-   * Synthesized audio data from TTS. Encoding follows AudioFrameEvent
-   * conventions (typically PCM-F32-LE, sample rate per voice). Unset
-   * when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -97,11 +65,6 @@ public class VoiceAgentResult(
     schemaIndex = 4,
   )
   public val synthesized_audio: ByteString? = null,
-  /**
-   * Component states captured at the end of the turn — useful for UIs
-   * surfacing readiness / partial-failure breakdowns alongside the
-   * final result. Unset when the caller does not ask for it.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.VoiceAgentComponentStates#ADAPTER",
@@ -109,97 +72,6 @@ public class VoiceAgentResult(
     schemaIndex = 5,
   )
   public val final_state: VoiceAgentComponentStates? = null,
-  /**
-   * Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
-   * or unknown.
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "synthesizedAudioSampleRateHz",
-    schemaIndex = 6,
-  )
-  public val synthesized_audio_sample_rate_hz: Int = 0,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "synthesizedAudioChannels",
-    schemaIndex = 7,
-  )
-  public val synthesized_audio_channels: Int = 0,
-  @field:WireField(
-    tag = 9,
-    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "synthesizedAudioEncoding",
-    schemaIndex = 8,
-  )
-  public val synthesized_audio_encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sessionId",
-    schemaIndex = 9,
-  )
-  public val session_id: String = "",
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "turnId",
-    schemaIndex = 10,
-  )
-  public val turn_id: String = "",
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sttTimeMs",
-    schemaIndex = 11,
-  )
-  public val stt_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "llmTimeMs",
-    schemaIndex = 12,
-  )
-  public val llm_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "ttsTimeMs",
-    schemaIndex = 13,
-  )
-  public val tts_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "totalTimeMs",
-    schemaIndex = 14,
-  )
-  public val total_time_ms: Long = 0L,
-  @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 15,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 16,
-  )
-  public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -218,17 +90,6 @@ public class VoiceAgentResult(
     if (thinking_content != other.thinking_content) return false
     if (synthesized_audio != other.synthesized_audio) return false
     if (final_state != other.final_state) return false
-    if (synthesized_audio_sample_rate_hz != other.synthesized_audio_sample_rate_hz) return false
-    if (synthesized_audio_channels != other.synthesized_audio_channels) return false
-    if (synthesized_audio_encoding != other.synthesized_audio_encoding) return false
-    if (session_id != other.session_id) return false
-    if (turn_id != other.turn_id) return false
-    if (stt_time_ms != other.stt_time_ms) return false
-    if (llm_time_ms != other.llm_time_ms) return false
-    if (tts_time_ms != other.tts_time_ms) return false
-    if (total_time_ms != other.total_time_ms) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
     return true
   }
 
@@ -242,17 +103,6 @@ public class VoiceAgentResult(
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
       result = result * 37 + (synthesized_audio?.hashCode() ?: 0)
       result = result * 37 + (final_state?.hashCode() ?: 0)
-      result = result * 37 + synthesized_audio_sample_rate_hz.hashCode()
-      result = result * 37 + synthesized_audio_channels.hashCode()
-      result = result * 37 + synthesized_audio_encoding.hashCode()
-      result = result * 37 + session_id.hashCode()
-      result = result * 37 + turn_id.hashCode()
-      result = result * 37 + stt_time_ms.hashCode()
-      result = result * 37 + llm_time_ms.hashCode()
-      result = result * 37 + tts_time_ms.hashCode()
-      result = result * 37 + total_time_ms.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
       super.hashCode = result
     }
     return result
@@ -266,17 +116,6 @@ public class VoiceAgentResult(
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     if (synthesized_audio != null) result += """synthesized_audio=$synthesized_audio"""
     if (final_state != null) result += """final_state=$final_state"""
-    result += """synthesized_audio_sample_rate_hz=$synthesized_audio_sample_rate_hz"""
-    result += """synthesized_audio_channels=$synthesized_audio_channels"""
-    result += """synthesized_audio_encoding=$synthesized_audio_encoding"""
-    result += """session_id=${sanitize(session_id)}"""
-    result += """turn_id=${sanitize(turn_id)}"""
-    result += """stt_time_ms=$stt_time_ms"""
-    result += """llm_time_ms=$llm_time_ms"""
-    result += """tts_time_ms=$tts_time_ms"""
-    result += """total_time_ms=$total_time_ms"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
     return result.joinToString(prefix = "VoiceAgentResult{", separator = ", ", postfix = "}")
   }
 
@@ -287,19 +126,8 @@ public class VoiceAgentResult(
     thinking_content: String? = this.thinking_content,
     synthesized_audio: ByteString? = this.synthesized_audio,
     final_state: VoiceAgentComponentStates? = this.final_state,
-    synthesized_audio_sample_rate_hz: Int = this.synthesized_audio_sample_rate_hz,
-    synthesized_audio_channels: Int = this.synthesized_audio_channels,
-    synthesized_audio_encoding: AudioEncoding = this.synthesized_audio_encoding,
-    session_id: String = this.session_id,
-    turn_id: String = this.turn_id,
-    stt_time_ms: Long = this.stt_time_ms,
-    llm_time_ms: Long = this.llm_time_ms,
-    tts_time_ms: Long = this.tts_time_ms,
-    total_time_ms: Long = this.total_time_ms,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentResult = VoiceAgentResult(speech_detected, transcription, assistant_response, thinking_content, synthesized_audio, final_state, synthesized_audio_sample_rate_hz, synthesized_audio_channels, synthesized_audio_encoding, session_id, turn_id, stt_time_ms, llm_time_ms, tts_time_ms, total_time_ms, error_message, error_code, unknownFields)
+  ): VoiceAgentResult = VoiceAgentResult(speech_detected, transcription, assistant_response, thinking_content, synthesized_audio, final_state, unknownFields)
 
   public companion object {
     @JvmField
@@ -321,37 +149,6 @@ public class VoiceAgentResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.thinking_content)
         size += ProtoAdapter.BYTES.encodedSizeWithTag(5, value.synthesized_audio)
         size += VoiceAgentComponentStates.ADAPTER.encodedSizeWithTag(6, value.final_state)
-        if (value.synthesized_audio_sample_rate_hz != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.synthesized_audio_sample_rate_hz)
-        }
-        if (value.synthesized_audio_channels != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.synthesized_audio_channels)
-        }
-        if (value.synthesized_audio_encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          size += AudioEncoding.ADAPTER.encodedSizeWithTag(9, value.synthesized_audio_encoding)
-        }
-        if (value.session_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.session_id)
-        }
-        if (value.turn_id != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.turn_id)
-        }
-        if (value.stt_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(12, value.stt_time_ms)
-        }
-        if (value.llm_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(13, value.llm_time_ms)
-        }
-        if (value.tts_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(14, value.tts_time_ms)
-        }
-        if (value.total_time_ms != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.total_time_ms)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(17, value.error_code)
-        }
         return size
       }
 
@@ -364,73 +161,11 @@ public class VoiceAgentResult(
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.thinking_content)
         ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.synthesized_audio)
         VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 6, value.final_state)
-        if (value.synthesized_audio_sample_rate_hz != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.synthesized_audio_sample_rate_hz)
-        }
-        if (value.synthesized_audio_channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.synthesized_audio_channels)
-        }
-        if (value.synthesized_audio_encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          AudioEncoding.ADAPTER.encodeWithTag(writer, 9, value.synthesized_audio_encoding)
-        }
-        if (value.session_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.session_id)
-        }
-        if (value.turn_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.turn_id)
-        }
-        if (value.stt_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 12, value.stt_time_ms)
-        }
-        if (value.llm_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 13, value.llm_time_ms)
-        }
-        if (value.tts_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 14, value.tts_time_ms)
-        }
-        if (value.total_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.total_time_ms)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.error_code)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.error_message)
-        if (value.total_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.total_time_ms)
-        }
-        if (value.tts_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 14, value.tts_time_ms)
-        }
-        if (value.llm_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 13, value.llm_time_ms)
-        }
-        if (value.stt_time_ms != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 12, value.stt_time_ms)
-        }
-        if (value.turn_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.turn_id)
-        }
-        if (value.session_id != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.session_id)
-        }
-        if (value.synthesized_audio_encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          AudioEncoding.ADAPTER.encodeWithTag(writer, 9, value.synthesized_audio_encoding)
-        }
-        if (value.synthesized_audio_channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.synthesized_audio_channels)
-        }
-        if (value.synthesized_audio_sample_rate_hz != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.synthesized_audio_sample_rate_hz)
-        }
         VoiceAgentComponentStates.ADAPTER.encodeWithTag(writer, 6, value.final_state)
         ProtoAdapter.BYTES.encodeWithTag(writer, 5, value.synthesized_audio)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.thinking_content)
@@ -448,17 +183,6 @@ public class VoiceAgentResult(
         var thinking_content: String? = null
         var synthesized_audio: ByteString? = null
         var final_state: VoiceAgentComponentStates? = null
-        var synthesized_audio_sample_rate_hz: Int = 0
-        var synthesized_audio_channels: Int = 0
-        var synthesized_audio_encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
-        var session_id: String = ""
-        var turn_id: String = ""
-        var stt_time_ms: Long = 0L
-        var llm_time_ms: Long = 0L
-        var tts_time_ms: Long = 0L
-        var total_time_ms: Long = 0L
-        var error_message: String? = null
-        var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> speech_detected = ProtoAdapter.BOOL.decode(reader)
@@ -467,21 +191,6 @@ public class VoiceAgentResult(
             4 -> thinking_content = ProtoAdapter.STRING.decode(reader)
             5 -> synthesized_audio = ProtoAdapter.BYTES.decode(reader)
             6 -> final_state = VoiceAgentComponentStates.ADAPTER.decode(reader)
-            7 -> synthesized_audio_sample_rate_hz = ProtoAdapter.INT32.decode(reader)
-            8 -> synthesized_audio_channels = ProtoAdapter.INT32.decode(reader)
-            9 -> try {
-              synthesized_audio_encoding = AudioEncoding.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            10 -> session_id = ProtoAdapter.STRING.decode(reader)
-            11 -> turn_id = ProtoAdapter.STRING.decode(reader)
-            12 -> stt_time_ms = ProtoAdapter.INT64.decode(reader)
-            13 -> llm_time_ms = ProtoAdapter.INT64.decode(reader)
-            14 -> tts_time_ms = ProtoAdapter.INT64.decode(reader)
-            15 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
-            16 -> error_message = ProtoAdapter.STRING.decode(reader)
-            17 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -492,17 +201,6 @@ public class VoiceAgentResult(
           thinking_content = thinking_content,
           synthesized_audio = synthesized_audio,
           final_state = final_state,
-          synthesized_audio_sample_rate_hz = synthesized_audio_sample_rate_hz,
-          synthesized_audio_channels = synthesized_audio_channels,
-          synthesized_audio_encoding = synthesized_audio_encoding,
-          session_id = session_id,
-          turn_id = turn_id,
-          stt_time_ms = stt_time_ms,
-          llm_time_ms = llm_time_ms,
-          tts_time_ms = tts_time_ms,
-          total_time_ms = total_time_ms,
-          error_message = error_message,
-          error_code = error_code,
           unknownFields = unknownFields
         )
       }

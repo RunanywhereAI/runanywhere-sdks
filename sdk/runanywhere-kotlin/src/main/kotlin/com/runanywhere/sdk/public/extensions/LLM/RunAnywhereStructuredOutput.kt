@@ -11,32 +11,24 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
-import ai.runanywhere.proto.v1.StructuredOutputRequest
-import ai.runanywhere.proto.v1.StructuredOutputStreamEvent
-import ai.runanywhere.proto.v1.StructuredOutputStreamEventKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RAJSONSchema
+import com.runanywhere.sdk.public.api.JsonSchema
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RAStructuredOutputResult
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
 // MARK: - Structured Output
 
+@Deprecated("Use RunAnywhere.llm.generateStructured(prompt, schema, options).")
 suspend fun RunAnywhere.generateStructured(
     prompt: String,
-    schema: RAJSONSchema,
+    schema: JsonSchema,
     options: RALLMGenerationOptions? = null,
 ): RAStructuredOutputResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
@@ -50,6 +42,7 @@ suspend fun RunAnywhere.generateStructured(
     return extractStructuredOutput(generation.text, schema)
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStructured(prompt, schema, options).")
 suspend fun RunAnywhere.generateWithStructuredOutput(
     prompt: String,
     structuredOutput: StructuredOutputOptions,
@@ -59,34 +52,34 @@ suspend fun RunAnywhere.generateWithStructuredOutput(
         (options ?: RALLMGenerationOptions.defaults()).copy(
             structured_output = structuredOutput,
         )
-    if (structuredOutput.include_schema_in_prompt) {
+    if (structuredOutput.include_schema_in_prompt == true) {
+        // StructuredOutputRequest was deleted outright (idl/structured_output.proto,
+        // so-p2): StructuredOutputParseRequest (request_id, text, options, metadata)
+        // is now the sole request envelope shared by parse/validate/prepare-prompt;
+        // `text` plays the role the old `prompt` field did.
         val promptResult =
             withContext(Dispatchers.IO) {
                 CppBridgeStructuredOutput.preparePrompt(
-                    StructuredOutputRequest(
+                    StructuredOutputParseRequest(
                         request_id = UUID.randomUUID().toString(),
-                        prompt = prompt,
+                        text = prompt,
                         options = structuredOutput,
                     ),
                 )
             }
-        if (promptResult.error_code != 0) {
-            throw SDKException.operation(
-                promptResult.error_message
-                    ?: "Structured output prompt preparation failed: ${promptResult.error_code}",
-            )
-        }
+        promptResult.error?.let { throw SDKException(it) }
         promptResult.system_prompt?.let { sys ->
             internalOptions = internalOptions.copy(system_prompt = sys)
         }
     }
-    val request = internalOptions.copy(streaming_enabled = false).toRALLMGenerateRequest(prompt)
+    val request = internalOptions.toRALLMGenerateRequest(prompt)
     return generate(request)
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStructured(prompt, schema, options).")
 suspend fun RunAnywhere.extractStructuredOutput(
     text: String,
-    schema: RAJSONSchema,
+    schema: JsonSchema,
 ): RAStructuredOutputResult {
     val request =
         StructuredOutputParseRequest(
@@ -99,51 +92,11 @@ suspend fun RunAnywhere.extractStructuredOutput(
     }
 }
 
-fun RunAnywhere.generateStructuredStream(
-    prompt: String,
-    schema: RAJSONSchema,
-    options: RALLMGenerationOptions? = null,
-): Flow<StructuredOutputStreamEvent> {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-
-    val internalOptions =
-        (options ?: RALLMGenerationOptions.defaults()).copy(
-            structured_output = StructuredOutputOptions.defaults(schema = schema),
-        )
-    val request = internalOptions.copy(streaming_enabled = true).toRALLMGenerateRequest(prompt)
-
-    return flow {
-        var accumulated = ""
-        var seq = 0L
-        generateStream(request).collect { event ->
-            if (event.token.isNotEmpty()) {
-                accumulated += event.token
-                seq += 1
-                emit(
-                    StructuredOutputStreamEvent(
-                        kind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
-                        token = event.token,
-                        seq = seq,
-                    ),
-                )
-            }
-        }
-
-        seq += 1
-        val parsed = extractStructuredOutput(accumulated, schema)
-        emit(
-            StructuredOutputStreamEvent(
-                kind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
-                result = parsed,
-                seq = seq,
-            ),
-        )
-    }.onCompletion { cause ->
-        // Mirrors Swift's `continuation.onTermination`: fire the native cancel
-        // only on consumer cancellation, never on normal/error completion —
-        // cancelling there would race a follow-up `generate(...)` call.
-        if (cause is CancellationException) {
-            withContext(NonCancellable) { cancelGeneration() }
-        }
-    }.flowOn(Dispatchers.IO)
-}
+// generateStructuredStream(_:schema:options:) is deleted: its return type,
+// StructuredOutputStreamEvent (and StructuredOutputStreamEventKind), was
+// removed outright from idl/structured_output.proto (so-p2) with no
+// replacement -- structured GENERATION now streams through the ordinary
+// `RunAnywhere.llm.generateStream`/`generateStream(request)` path with
+// `LLMGenerationOptions.structured_output` set, using the surviving
+// LLMStreamEvent shape. Had zero live callers at the time of the API
+// realignment (verified against the example app and this module's tests).

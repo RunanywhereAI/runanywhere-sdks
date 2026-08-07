@@ -12,6 +12,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.TTSServiceState
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.features.TTS.Services.TtsAudioPlayback
@@ -55,6 +56,20 @@ internal suspend fun RunAnywhere.availableTTSVoicesInternal(): List<TTSVoiceInfo
     return CppBridgeTTS.voices()
 }
 
+/**
+ * Snapshot the lifecycle TTS service state (readiness, current voice,
+ * available voices). Mirrors Swift `RunAnywhere.ttsState()`.
+ */
+@Deprecated("Use RunAnywhere.tts.voices() and RunAnywhere.models.state().")
+suspend fun RunAnywhere.ttsState(): TTSServiceState {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    ensureServicesReady()
+    return CppBridgeTTS.state()
+}
+
+@Deprecated("Use RunAnywhere.tts.synthesize(text, options).")
 suspend fun RunAnywhere.synthesize(
     text: String,
     options: RATTSOptions = RATTSOptions.defaults(),
@@ -85,6 +100,7 @@ suspend fun RunAnywhere.synthesize(
     return result
 }
 
+@Deprecated("Use RunAnywhere.tts.synthesizeStream(text, options).")
 fun RunAnywhere.synthesizeStream(
     text: String,
     options: RATTSOptions = RATTSOptions.defaults(),
@@ -161,10 +177,12 @@ fun RunAnywhere.synthesizeStream(
         }
     }
 
+@Deprecated("Use RunAnywhere.tts.stop().")
 suspend fun RunAnywhere.stopSynthesis() {
     CppBridgeTTS.stop()
 }
 
+@Deprecated("Use RunAnywhere.tts.speak(text, options).")
 suspend fun RunAnywhere.speak(
     text: String,
     options: RATTSOptions = RATTSOptions.defaults(),
@@ -182,7 +200,7 @@ suspend fun RunAnywhere.speak(
         when {
             output.sample_rate > 0 -> output.sample_rate
             options.sample_rate > 0 -> options.sample_rate
-            else -> 22_050
+            else -> RATTSOptions.defaults().sample_rate
         }
     val wavData = convertPcmToWav(output.audio_data.toByteArray(), sampleRate)
 
@@ -223,6 +241,7 @@ private fun convertPcmToWav(pcmData: ByteArray, sampleRate: Int): ByteArray {
         ?: throw SDKException.tts("Failed to convert PCM to WAV")
 }
 
+@Deprecated("Use RunAnywhere.tts.stop().")
 suspend fun RunAnywhere.stopSpeaking() {
     ttsAudioPlayback.stop()
     stopSynthesis()

@@ -722,8 +722,8 @@ TestResult test_mlx_catalog_registration() {
         processor_registered || file.filename() == "processor_config.json";
     companion_registered =
         companion_registered ||
-        (!file.is_required() && (file.filename() == "processing_fastvlm.py" ||
-                                 file.filename() == "llava_qwen.py"));
+        (file.is_optional() && (file.filename() == "processing_fastvlm.py" ||
+                                file.filename() == "llava_qwen.py"));
   }
   if (fastvlm.category() != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
       fastvlm.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
@@ -1031,8 +1031,8 @@ TestResult test_diarize_arg_surface() {
     return result;
   }
   if (cmd->get_description() !=
-      "Speaker diarization of a WAV file (who spoke when)") {
-    result.expected = "Speaker diarization of a WAV file (who spoke when)";
+      "Label who spoke when in an audio file") {
+    result.expected = "Label who spoke when in an audio file";
     result.actual = cmd->get_description();
     return result;
   }

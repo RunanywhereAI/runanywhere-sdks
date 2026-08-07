@@ -31,6 +31,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class STTAudioSource(
+  /**
+   * Audio bytes, in-process.
+   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -39,6 +42,9 @@ public class STTAudioSource(
     schemaIndex = 0,
   )
   public val audio_data: ByteString? = null,
+  /**
+   * Local path or file:// URI, read and decoded by the platform adapter.
+   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -48,26 +54,18 @@ public class STTAudioSource(
   )
   public val file_uri: String? = null,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "adapterHandle",
-    oneofName = "source",
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val adapter_handle: String? = null,
-  @field:WireField(
-    tag = 4,
-    adapter = "ai.runanywhere.proto.v1.STTAudioEncoding#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val encoding: STTAudioEncoding = STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED,
+  public val encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioFormat",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
   @field:WireField(
@@ -75,37 +73,33 @@ public class STTAudioSource(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sampleRate",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val sample_rate: Int = 0,
+  /**
+   * Interleaved channel count; 0 or 1 = mono. Non-mono audio is downmixed
+   * before decoding and MUST be divided out of the duration estimate.
+   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val channels: Int = 0,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "bitsPerSample",
-    schemaIndex = 7,
-  )
-  public val bits_per_sample: Int = 0,
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "durationMs",
-    schemaIndex = 8,
+    schemaIndex = 6,
   )
   public val duration_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTAudioSource, Nothing>(ADAPTER, unknownFields) {
   init {
-    require(countNonNull(audio_data, file_uri, adapter_handle) <= 1) {
-      "At most one of audio_data, file_uri, adapter_handle may be non-null"
+    require(countNonNull(audio_data, file_uri) <= 1) {
+      "At most one of audio_data, file_uri may be non-null"
     }
   }
 
@@ -121,12 +115,10 @@ public class STTAudioSource(
     if (unknownFields != other.unknownFields) return false
     if (audio_data != other.audio_data) return false
     if (file_uri != other.file_uri) return false
-    if (adapter_handle != other.adapter_handle) return false
     if (encoding != other.encoding) return false
     if (audio_format != other.audio_format) return false
     if (sample_rate != other.sample_rate) return false
     if (channels != other.channels) return false
-    if (bits_per_sample != other.bits_per_sample) return false
     if (duration_ms != other.duration_ms) return false
     return true
   }
@@ -137,12 +129,10 @@ public class STTAudioSource(
       result = unknownFields.hashCode()
       result = result * 37 + (audio_data?.hashCode() ?: 0)
       result = result * 37 + (file_uri?.hashCode() ?: 0)
-      result = result * 37 + (adapter_handle?.hashCode() ?: 0)
       result = result * 37 + encoding.hashCode()
       result = result * 37 + audio_format.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + channels.hashCode()
-      result = result * 37 + bits_per_sample.hashCode()
       result = result * 37 + duration_ms.hashCode()
       super.hashCode = result
     }
@@ -153,12 +143,10 @@ public class STTAudioSource(
     val result = mutableListOf<String>()
     if (audio_data != null) result += """audio_data=$audio_data"""
     if (file_uri != null) result += """file_uri=${sanitize(file_uri)}"""
-    if (adapter_handle != null) result += """adapter_handle=${sanitize(adapter_handle)}"""
     result += """encoding=$encoding"""
     result += """audio_format=$audio_format"""
     result += """sample_rate=$sample_rate"""
     result += """channels=$channels"""
-    result += """bits_per_sample=$bits_per_sample"""
     result += """duration_ms=$duration_ms"""
     return result.joinToString(prefix = "STTAudioSource{", separator = ", ", postfix = "}")
   }
@@ -166,15 +154,13 @@ public class STTAudioSource(
   public fun copy(
     audio_data: ByteString? = this.audio_data,
     file_uri: String? = this.file_uri,
-    adapter_handle: String? = this.adapter_handle,
-    encoding: STTAudioEncoding = this.encoding,
+    encoding: AudioEncoding = this.encoding,
     audio_format: AudioFormat = this.audio_format,
     sample_rate: Int = this.sample_rate,
     channels: Int = this.channels,
-    bits_per_sample: Int = this.bits_per_sample,
     duration_ms: Long = this.duration_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): STTAudioSource = STTAudioSource(audio_data, file_uri, adapter_handle, encoding, audio_format, sample_rate, channels, bits_per_sample, duration_ms, unknownFields)
+  ): STTAudioSource = STTAudioSource(audio_data, file_uri, encoding, audio_format, sample_rate, channels, duration_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -190,9 +176,8 @@ public class STTAudioSource(
         var size = value.unknownFields.size
         size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.audio_data)
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.file_uri)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.adapter_handle)
-        if (value.encoding != ai.runanywhere.proto.v1.STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED) {
-          size += STTAudioEncoding.ADAPTER.encodedSizeWithTag(4, value.encoding)
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          size += AudioEncoding.ADAPTER.encodedSizeWithTag(4, value.encoding)
         }
         if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
           size += AudioFormat.ADAPTER.encodedSizeWithTag(5, value.audio_format)
@@ -203,9 +188,6 @@ public class STTAudioSource(
         if (value.channels != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.channels)
         }
-        if (value.bits_per_sample != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.bits_per_sample)
-        }
         if (value.duration_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.duration_ms)
         }
@@ -213,8 +195,8 @@ public class STTAudioSource(
       }
 
       override fun encode(writer: ProtoWriter, `value`: STTAudioSource) {
-        if (value.encoding != ai.runanywhere.proto.v1.STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED) {
-          STTAudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
         }
         if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
           AudioFormat.ADAPTER.encodeWithTag(writer, 5, value.audio_format)
@@ -225,28 +207,20 @@ public class STTAudioSource(
         if (value.channels != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.channels)
         }
-        if (value.bits_per_sample != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.bits_per_sample)
-        }
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
         }
         ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.file_uri)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.adapter_handle)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTAudioSource) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.adapter_handle)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.file_uri)
         ProtoAdapter.BYTES.encodeWithTag(writer, 1, value.audio_data)
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
-        }
-        if (value.bits_per_sample != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.bits_per_sample)
         }
         if (value.channels != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.channels)
@@ -257,28 +231,25 @@ public class STTAudioSource(
         if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
           AudioFormat.ADAPTER.encodeWithTag(writer, 5, value.audio_format)
         }
-        if (value.encoding != ai.runanywhere.proto.v1.STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED) {
-          STTAudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
         }
       }
 
       override fun decode(reader: ProtoReader): STTAudioSource {
         var audio_data: ByteString? = null
         var file_uri: String? = null
-        var adapter_handle: String? = null
-        var encoding: STTAudioEncoding = STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED
+        var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
         var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
         var sample_rate: Int = 0
         var channels: Int = 0
-        var bits_per_sample: Int = 0
         var duration_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> audio_data = ProtoAdapter.BYTES.decode(reader)
             2 -> file_uri = ProtoAdapter.STRING.decode(reader)
-            3 -> adapter_handle = ProtoAdapter.STRING.decode(reader)
             4 -> try {
-              encoding = STTAudioEncoding.ADAPTER.decode(reader)
+              encoding = AudioEncoding.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
@@ -289,7 +260,6 @@ public class STTAudioSource(
             }
             6 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             7 -> channels = ProtoAdapter.INT32.decode(reader)
-            8 -> bits_per_sample = ProtoAdapter.INT32.decode(reader)
             9 -> duration_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
@@ -297,12 +267,10 @@ public class STTAudioSource(
         return STTAudioSource(
           audio_data = audio_data,
           file_uri = file_uri,
-          adapter_handle = adapter_handle,
           encoding = encoding,
           audio_format = audio_format,
           sample_rate = sample_rate,
           channels = channels,
-          bits_per_sample = bits_per_sample,
           duration_ms = duration_ms,
           unknownFields = unknownFields
         )

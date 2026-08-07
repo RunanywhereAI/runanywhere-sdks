@@ -21,7 +21,9 @@ import {
   ErrorSeverity,
   errorSeverityFromJSON,
   errorSeverityToJSON,
+  SDKError,
 } from "./errors";
+import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 import { VADStreamEventKind, vADStreamEventKindFromJSON, vADStreamEventKindToJSON } from "./vad_options";
 
 export const protobufPackage = "runanywhere.v1";
@@ -150,45 +152,6 @@ export function tokenKindToJSON(object: TokenKind): string {
     case TokenKind.TOKEN_KIND_TOOL_CALL:
       return "TOKEN_KIND_TOOL_CALL";
     case TokenKind.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum AudioEncoding {
-  AUDIO_ENCODING_UNSPECIFIED = 0,
-  AUDIO_ENCODING_PCM_F32_LE = 1,
-  AUDIO_ENCODING_PCM_S16_LE = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function audioEncodingFromJSON(object: any): AudioEncoding {
-  switch (object) {
-    case 0:
-    case "AUDIO_ENCODING_UNSPECIFIED":
-      return AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
-    case 1:
-    case "AUDIO_ENCODING_PCM_F32_LE":
-      return AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
-    case 2:
-    case "AUDIO_ENCODING_PCM_S16_LE":
-      return AudioEncoding.AUDIO_ENCODING_PCM_S16_LE;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return AudioEncoding.UNRECOGNIZED;
-  }
-}
-
-export function audioEncodingToJSON(object: AudioEncoding): string {
-  switch (object) {
-    case AudioEncoding.AUDIO_ENCODING_UNSPECIFIED:
-      return "AUDIO_ENCODING_UNSPECIFIED";
-    case AudioEncoding.AUDIO_ENCODING_PCM_F32_LE:
-      return "AUDIO_ENCODING_PCM_F32_LE";
-    case AudioEncoding.AUDIO_ENCODING_PCM_S16_LE:
-      return "AUDIO_ENCODING_PCM_S16_LE";
-    case AudioEncoding.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -338,57 +301,6 @@ export function pipelineStateToJSON(object: PipelineState): string {
   }
 }
 
-export enum SpeechTurnDetectionEventKind {
-  SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0,
-  SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1,
-  SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED = 2,
-  SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED = 3,
-  SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function speechTurnDetectionEventKindFromJSON(object: any): SpeechTurnDetectionEventKind {
-  switch (object) {
-    case 0:
-    case "SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED":
-      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED;
-    case 1:
-    case "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED":
-      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED;
-    case 2:
-    case "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED":
-      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED;
-    case 3:
-    case "SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED":
-      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED;
-    case 4:
-    case "SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS":
-      return SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return SpeechTurnDetectionEventKind.UNRECOGNIZED;
-  }
-}
-
-export function speechTurnDetectionEventKindToJSON(object: SpeechTurnDetectionEventKind): string {
-  switch (object) {
-    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED:
-      return "SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED";
-    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED:
-      return "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED";
-    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED:
-      return "SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED";
-    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED:
-      return "SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED";
-    case SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS:
-      return "SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS";
-    case SpeechTurnDetectionEventKind.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
 export enum TurnLifecycleEventKind {
   TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED = 0,
   TURN_LIFECYCLE_EVENT_KIND_STARTED = 1,
@@ -482,10 +394,10 @@ export interface VoiceEvent {
    */
   seq: number;
   /**
-   * Wall-clock timestamp captured at the C++ edge, in microseconds since
+   * Wall-clock timestamp captured at the C++ edge, in milliseconds since
    * Unix epoch. Frontends may re-timestamp for UI display.
    */
-  timestampUs: number;
+  timestampMs: number;
   category: EventCategory;
   severity: ErrorSeverity;
   component: VoicePipelineComponent;
@@ -495,30 +407,21 @@ export interface VoiceEvent {
   vad?: VADEvent | undefined;
   interrupted?: InterruptedEvent | undefined;
   state?: StateChangeEvent | undefined;
-  error?: ErrorEvent | undefined;
-  metrics?:
-    | MetricsEvent
+  metrics?: MetricsEvent | undefined;
+  componentStateChanged?:
+    | VoiceAgentComponentStates
+    | undefined;
+  /** The one error payload in this domain. */
+  sessionError?:
+    | VoiceSessionError
     | undefined;
   /**
-   * Voice agent lifecycle events. Mirror Swift VoiceSessionError /
-   * VoiceAgentComponentStates and the AsyncSequence-style lifecycle
-   * signals consumed by the cross-platform VoiceAgent extensions
-   * (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
-   * VoiceAgentTypes.ts, Web VoiceAgentCTypes.ts, Flutter
-   * voice_agent_types.dart).
+   * Agent-response start/complete and user-speech start/end are
+   * TurnLifecycleEventKind values, not separate arms. Session start and
+   * stop are PipelineState transitions on StateChangeEvent.
    */
-  componentStateChanged?: VoiceAgentComponentStates | undefined;
-  sessionError?: VoiceSessionError | undefined;
-  sessionStarted?: SessionStartedEvent | undefined;
-  sessionStopped?: SessionStoppedEvent | undefined;
-  agentResponseStarted?: AgentResponseStartedEvent | undefined;
-  agentResponseCompleted?: AgentResponseCompletedEvent | undefined;
-  speechTurnDetection?: SpeechTurnDetectionEvent | undefined;
-  turnLifecycle?: TurnLifecycleEvent | undefined;
-  wakewordDetected?: WakeWordDetectedEvent | undefined;
-  audioLevel?: AudioLevelEvent | undefined;
-  componentProgress?:
-    | ComponentProgressEvent
+  turnLifecycle?:
+    | TurnLifecycleEvent
     | undefined;
   /** Correlation fields shared by streaming and one-shot voice turns. */
   sessionId: string;
@@ -538,9 +441,17 @@ export interface UserSaidEvent {
   isFinal: boolean;
   /** 0.0..1.0, engine-dependent */
   confidence: number;
-  audioStartUs: number;
-  audioEndUs: number;
-  languageCode: string;
+  /**
+   * Milliseconds from the start of ALL audio fed this session, matching
+   * OpenAI input_audio_buffer.speech_started.audio_start_ms.
+   */
+  audioStartMs: number;
+  audioEndMs: number;
+  /**
+   * Detected language, BCP-47. One spelling across this domain and
+   * stt_options.proto.
+   */
+  language: string;
   segmentIndex: number;
 }
 
@@ -583,8 +494,10 @@ export interface AudioFrameEvent {
  */
 export interface VADEvent {
   type: VADStreamEventKind;
-  frameOffsetUs: number;
-  confidence: number;
+  /** Position of the analyzed frame on the session timeline, in ms. */
+  frameOffsetMs: number;
+  /** Same scale and caveats as VADResult.probability. */
+  probability: number;
   isSpeech: boolean;
   speechDurationMs: number;
   silenceDurationMs: number;
@@ -606,21 +519,6 @@ export interface StateChangeEvent {
   current: PipelineState;
 }
 
-/**
- * Terminal or recoverable error in the pipeline. Frontends map these to
- * their native error types.
- */
-export interface ErrorEvent {
-  /** See ra_status_t in core/abi/ra_primitives.h */
-  code: number;
-  message: string;
-  /** "llm", "stt", "tts", "vad", "pipeline", ... */
-  component: string;
-  isRecoverable: boolean;
-  operation: string;
-  detailsJson: string;
-}
-
 /** Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop. */
 export interface MetricsEvent {
   sttFinalMs: number;
@@ -635,33 +533,10 @@ export interface MetricsEvent {
    * dashboards without re-computing the threshold themselves.
    */
   isOverBudget: boolean;
-  /**
-   * Monotonic producer-side timestamp in nanoseconds. Set by the
-   * producer (C++ dispatcher) at event-emit time; read by consumers
-   * (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
-   * latency without relying on wall-clock sync. Encoded as int64 so
-   * std::chrono::steady_clock::now().time_since_epoch() values fit
-   * directly (2^63 ns ≈ 292 years of runtime headroom).
-   */
-  createdAtNs: number;
   vadFirstSpeechMs: number;
   sttFirstPartialMs: number;
   llmTotalMs: number;
   ttsTotalMs: number;
-}
-
-export interface AudioLevelEvent {
-  rms: number;
-  peak: number;
-  noiseFloorDb: number;
-  isSpeech: boolean;
-}
-
-export interface ComponentProgressEvent {
-  component: VoicePipelineComponent;
-  operation: string;
-  progress: number;
-  message: string;
 }
 
 /**
@@ -693,43 +568,23 @@ export interface VoiceAgentComponentStates {
    */
   anyLoading: boolean;
   wakewordState: ComponentLifecycleState;
-  errorMessage?: string | undefined;
+  error?: SDKError | undefined;
 }
 
 export interface VoiceSessionError {
   code: ErrorCode;
   message: string;
-  failedComponent?: string | undefined;
+  failedComponent?:
+    | string
+    | undefined;
+  /**
+   * The raw ra_status_t (core/abi/ra_primitives.h), preserved for
+   * diagnostics alongside the canonical `code`.
+   */
   cAbiCode: number;
   recoverable: boolean;
-}
-
-export interface SessionStartedEvent {
-  sessionId: string;
-}
-
-export interface SessionStoppedEvent {
-  sessionId: string;
-  reason: string;
-}
-
-export interface AgentResponseStartedEvent {
-  turnId: string;
-}
-
-export interface AgentResponseCompletedEvent {
-  turnId: string;
-  responseDurationMs: number;
-}
-
-export interface SpeechTurnDetectionEvent {
-  kind: SpeechTurnDetectionEventKind;
-  speakerId: string;
-  turnStartUs: number;
-  turnEndUs: number;
-  confidence: number;
-  speechDurationMs: number;
-  silenceDurationMs: number;
+  /** The operation that failed, e.g. "transcribe", "generate", "synthesize". */
+  operation?: string | undefined;
 }
 
 export interface TurnLifecycleEvent {
@@ -738,24 +593,16 @@ export interface TurnLifecycleEvent {
   sessionId: string;
   transcript: string;
   response: string;
-  error: string;
+  /** Set on KIND_FAILED. Same payload as VoiceEvent.session_error. */
+  error?: VoiceSessionError | undefined;
   startedAtMs: number;
   completedAtMs: number;
-}
-
-export interface WakeWordDetectedEvent {
-  wakeWord: string;
-  confidence: number;
-  timestampMs: number;
-  modelId: string;
-  modelIndex: number;
-  durationMs: number;
 }
 
 function createBaseVoiceEvent(): VoiceEvent {
   return {
     seq: 0,
-    timestampUs: 0,
+    timestampMs: 0,
     category: 0,
     severity: 0,
     component: 0,
@@ -765,19 +612,10 @@ function createBaseVoiceEvent(): VoiceEvent {
     vad: undefined,
     interrupted: undefined,
     state: undefined,
-    error: undefined,
     metrics: undefined,
     componentStateChanged: undefined,
     sessionError: undefined,
-    sessionStarted: undefined,
-    sessionStopped: undefined,
-    agentResponseStarted: undefined,
-    agentResponseCompleted: undefined,
-    speechTurnDetection: undefined,
     turnLifecycle: undefined,
-    wakewordDetected: undefined,
-    audioLevel: undefined,
-    componentProgress: undefined,
     sessionId: "",
     turnId: "",
     requestId: "",
@@ -790,8 +628,8 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
     if (message.seq !== 0) {
       writer.uint32(8).uint64(message.seq);
     }
-    if (message.timestampUs !== 0) {
-      writer.uint32(16).int64(message.timestampUs);
+    if (message.timestampMs !== 0) {
+      writer.uint32(16).int64(message.timestampMs);
     }
     if (message.category !== 0) {
       writer.uint32(24).int32(message.category);
@@ -820,56 +658,29 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
     if (message.state !== undefined) {
       StateChangeEvent.encode(message.state, writer.uint32(122).fork()).join();
     }
-    if (message.error !== undefined) {
-      ErrorEvent.encode(message.error, writer.uint32(130).fork()).join();
-    }
     if (message.metrics !== undefined) {
-      MetricsEvent.encode(message.metrics, writer.uint32(138).fork()).join();
+      MetricsEvent.encode(message.metrics, writer.uint32(130).fork()).join();
     }
     if (message.componentStateChanged !== undefined) {
-      VoiceAgentComponentStates.encode(message.componentStateChanged, writer.uint32(146).fork()).join();
+      VoiceAgentComponentStates.encode(message.componentStateChanged, writer.uint32(138).fork()).join();
     }
     if (message.sessionError !== undefined) {
-      VoiceSessionError.encode(message.sessionError, writer.uint32(154).fork()).join();
-    }
-    if (message.sessionStarted !== undefined) {
-      SessionStartedEvent.encode(message.sessionStarted, writer.uint32(162).fork()).join();
-    }
-    if (message.sessionStopped !== undefined) {
-      SessionStoppedEvent.encode(message.sessionStopped, writer.uint32(170).fork()).join();
-    }
-    if (message.agentResponseStarted !== undefined) {
-      AgentResponseStartedEvent.encode(message.agentResponseStarted, writer.uint32(178).fork()).join();
-    }
-    if (message.agentResponseCompleted !== undefined) {
-      AgentResponseCompletedEvent.encode(message.agentResponseCompleted, writer.uint32(186).fork()).join();
-    }
-    if (message.speechTurnDetection !== undefined) {
-      SpeechTurnDetectionEvent.encode(message.speechTurnDetection, writer.uint32(194).fork()).join();
+      VoiceSessionError.encode(message.sessionError, writer.uint32(146).fork()).join();
     }
     if (message.turnLifecycle !== undefined) {
-      TurnLifecycleEvent.encode(message.turnLifecycle, writer.uint32(202).fork()).join();
-    }
-    if (message.wakewordDetected !== undefined) {
-      WakeWordDetectedEvent.encode(message.wakewordDetected, writer.uint32(210).fork()).join();
-    }
-    if (message.audioLevel !== undefined) {
-      AudioLevelEvent.encode(message.audioLevel, writer.uint32(218).fork()).join();
-    }
-    if (message.componentProgress !== undefined) {
-      ComponentProgressEvent.encode(message.componentProgress, writer.uint32(226).fork()).join();
+      TurnLifecycleEvent.encode(message.turnLifecycle, writer.uint32(154).fork()).join();
     }
     if (message.sessionId !== "") {
-      writer.uint32(242).string(message.sessionId);
+      writer.uint32(162).string(message.sessionId);
     }
     if (message.turnId !== "") {
-      writer.uint32(250).string(message.turnId);
+      writer.uint32(170).string(message.turnId);
     }
     if (message.requestId !== "") {
-      writer.uint32(258).string(message.requestId);
+      writer.uint32(178).string(message.requestId);
     }
     globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
-      VoiceEvent_MetadataEntry.encode({ key: key as any, value }, writer.uint32(266).fork()).join();
+      VoiceEvent_MetadataEntry.encode({ key: key as any, value }, writer.uint32(186).fork()).join();
     });
     return writer;
   },
@@ -894,7 +705,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.timestampUs = longToNumber(reader.int64());
+          message.timestampMs = longToNumber(reader.int64());
           continue;
         }
         case 3: {
@@ -974,7 +785,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.error = ErrorEvent.decode(reader, reader.uint32());
+          message.metrics = MetricsEvent.decode(reader, reader.uint32());
           continue;
         }
         case 17: {
@@ -982,7 +793,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.metrics = MetricsEvent.decode(reader, reader.uint32());
+          message.componentStateChanged = VoiceAgentComponentStates.decode(reader, reader.uint32());
           continue;
         }
         case 18: {
@@ -990,7 +801,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.componentStateChanged = VoiceAgentComponentStates.decode(reader, reader.uint32());
+          message.sessionError = VoiceSessionError.decode(reader, reader.uint32());
           continue;
         }
         case 19: {
@@ -998,7 +809,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.sessionError = VoiceSessionError.decode(reader, reader.uint32());
+          message.turnLifecycle = TurnLifecycleEvent.decode(reader, reader.uint32());
           continue;
         }
         case 20: {
@@ -1006,7 +817,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.sessionStarted = SessionStartedEvent.decode(reader, reader.uint32());
+          message.sessionId = reader.string();
           continue;
         }
         case 21: {
@@ -1014,7 +825,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.sessionStopped = SessionStoppedEvent.decode(reader, reader.uint32());
+          message.turnId = reader.string();
           continue;
         }
         case 22: {
@@ -1022,7 +833,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.agentResponseStarted = AgentResponseStartedEvent.decode(reader, reader.uint32());
+          message.requestId = reader.string();
           continue;
         }
         case 23: {
@@ -1030,81 +841,9 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
             break;
           }
 
-          message.agentResponseCompleted = AgentResponseCompletedEvent.decode(reader, reader.uint32());
-          continue;
-        }
-        case 24: {
-          if (tag !== 194) {
-            break;
-          }
-
-          message.speechTurnDetection = SpeechTurnDetectionEvent.decode(reader, reader.uint32());
-          continue;
-        }
-        case 25: {
-          if (tag !== 202) {
-            break;
-          }
-
-          message.turnLifecycle = TurnLifecycleEvent.decode(reader, reader.uint32());
-          continue;
-        }
-        case 26: {
-          if (tag !== 210) {
-            break;
-          }
-
-          message.wakewordDetected = WakeWordDetectedEvent.decode(reader, reader.uint32());
-          continue;
-        }
-        case 27: {
-          if (tag !== 218) {
-            break;
-          }
-
-          message.audioLevel = AudioLevelEvent.decode(reader, reader.uint32());
-          continue;
-        }
-        case 28: {
-          if (tag !== 226) {
-            break;
-          }
-
-          message.componentProgress = ComponentProgressEvent.decode(reader, reader.uint32());
-          continue;
-        }
-        case 30: {
-          if (tag !== 242) {
-            break;
-          }
-
-          message.sessionId = reader.string();
-          continue;
-        }
-        case 31: {
-          if (tag !== 250) {
-            break;
-          }
-
-          message.turnId = reader.string();
-          continue;
-        }
-        case 32: {
-          if (tag !== 258) {
-            break;
-          }
-
-          message.requestId = reader.string();
-          continue;
-        }
-        case 33: {
-          if (tag !== 266) {
-            break;
-          }
-
-          const entry33 = VoiceEvent_MetadataEntry.decode(reader, reader.uint32());
-          if (entry33.value !== undefined) {
-            message.metadata[entry33.key] = entry33.value;
+          const entry23 = VoiceEvent_MetadataEntry.decode(reader, reader.uint32());
+          if (entry23.value !== undefined) {
+            message.metadata[entry23.key] = entry23.value;
           }
           continue;
         }
@@ -1120,10 +859,10 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
   fromJSON(object: any): VoiceEvent {
     return {
       seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
-      timestampUs: isSet(object.timestampUs)
-        ? globalThis.Number(object.timestampUs)
-        : isSet(object.timestamp_us)
-        ? globalThis.Number(object.timestamp_us)
+      timestampMs: isSet(object.timestampMs)
+        ? globalThis.Number(object.timestampMs)
+        : isSet(object.timestamp_ms)
+        ? globalThis.Number(object.timestamp_ms)
         : 0,
       category: isSet(object.category) ? eventCategoryFromJSON(object.category) : 0,
       severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
@@ -1142,7 +881,6 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
       vad: isSet(object.vad) ? VADEvent.fromJSON(object.vad) : undefined,
       interrupted: isSet(object.interrupted) ? InterruptedEvent.fromJSON(object.interrupted) : undefined,
       state: isSet(object.state) ? StateChangeEvent.fromJSON(object.state) : undefined,
-      error: isSet(object.error) ? ErrorEvent.fromJSON(object.error) : undefined,
       metrics: isSet(object.metrics) ? MetricsEvent.fromJSON(object.metrics) : undefined,
       componentStateChanged: isSet(object.componentStateChanged)
         ? VoiceAgentComponentStates.fromJSON(object.componentStateChanged)
@@ -1154,50 +892,10 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
         : isSet(object.session_error)
         ? VoiceSessionError.fromJSON(object.session_error)
         : undefined,
-      sessionStarted: isSet(object.sessionStarted)
-        ? SessionStartedEvent.fromJSON(object.sessionStarted)
-        : isSet(object.session_started)
-        ? SessionStartedEvent.fromJSON(object.session_started)
-        : undefined,
-      sessionStopped: isSet(object.sessionStopped)
-        ? SessionStoppedEvent.fromJSON(object.sessionStopped)
-        : isSet(object.session_stopped)
-        ? SessionStoppedEvent.fromJSON(object.session_stopped)
-        : undefined,
-      agentResponseStarted: isSet(object.agentResponseStarted)
-        ? AgentResponseStartedEvent.fromJSON(object.agentResponseStarted)
-        : isSet(object.agent_response_started)
-        ? AgentResponseStartedEvent.fromJSON(object.agent_response_started)
-        : undefined,
-      agentResponseCompleted: isSet(object.agentResponseCompleted)
-        ? AgentResponseCompletedEvent.fromJSON(object.agentResponseCompleted)
-        : isSet(object.agent_response_completed)
-        ? AgentResponseCompletedEvent.fromJSON(object.agent_response_completed)
-        : undefined,
-      speechTurnDetection: isSet(object.speechTurnDetection)
-        ? SpeechTurnDetectionEvent.fromJSON(object.speechTurnDetection)
-        : isSet(object.speech_turn_detection)
-        ? SpeechTurnDetectionEvent.fromJSON(object.speech_turn_detection)
-        : undefined,
       turnLifecycle: isSet(object.turnLifecycle)
         ? TurnLifecycleEvent.fromJSON(object.turnLifecycle)
         : isSet(object.turn_lifecycle)
         ? TurnLifecycleEvent.fromJSON(object.turn_lifecycle)
-        : undefined,
-      wakewordDetected: isSet(object.wakewordDetected)
-        ? WakeWordDetectedEvent.fromJSON(object.wakewordDetected)
-        : isSet(object.wakeword_detected)
-        ? WakeWordDetectedEvent.fromJSON(object.wakeword_detected)
-        : undefined,
-      audioLevel: isSet(object.audioLevel)
-        ? AudioLevelEvent.fromJSON(object.audioLevel)
-        : isSet(object.audio_level)
-        ? AudioLevelEvent.fromJSON(object.audio_level)
-        : undefined,
-      componentProgress: isSet(object.componentProgress)
-        ? ComponentProgressEvent.fromJSON(object.componentProgress)
-        : isSet(object.component_progress)
-        ? ComponentProgressEvent.fromJSON(object.component_progress)
         : undefined,
       sessionId: isSet(object.sessionId)
         ? globalThis.String(object.sessionId)
@@ -1231,8 +929,8 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
     if (message.seq !== 0) {
       obj.seq = Math.round(message.seq);
     }
-    if (message.timestampUs !== 0) {
-      obj.timestampUs = Math.round(message.timestampUs);
+    if (message.timestampMs !== 0) {
+      obj.timestampMs = Math.round(message.timestampMs);
     }
     if (message.category !== 0) {
       obj.category = eventCategoryToJSON(message.category);
@@ -1261,9 +959,6 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
     if (message.state !== undefined) {
       obj.state = StateChangeEvent.toJSON(message.state);
     }
-    if (message.error !== undefined) {
-      obj.error = ErrorEvent.toJSON(message.error);
-    }
     if (message.metrics !== undefined) {
       obj.metrics = MetricsEvent.toJSON(message.metrics);
     }
@@ -1273,32 +968,8 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
     if (message.sessionError !== undefined) {
       obj.sessionError = VoiceSessionError.toJSON(message.sessionError);
     }
-    if (message.sessionStarted !== undefined) {
-      obj.sessionStarted = SessionStartedEvent.toJSON(message.sessionStarted);
-    }
-    if (message.sessionStopped !== undefined) {
-      obj.sessionStopped = SessionStoppedEvent.toJSON(message.sessionStopped);
-    }
-    if (message.agentResponseStarted !== undefined) {
-      obj.agentResponseStarted = AgentResponseStartedEvent.toJSON(message.agentResponseStarted);
-    }
-    if (message.agentResponseCompleted !== undefined) {
-      obj.agentResponseCompleted = AgentResponseCompletedEvent.toJSON(message.agentResponseCompleted);
-    }
-    if (message.speechTurnDetection !== undefined) {
-      obj.speechTurnDetection = SpeechTurnDetectionEvent.toJSON(message.speechTurnDetection);
-    }
     if (message.turnLifecycle !== undefined) {
       obj.turnLifecycle = TurnLifecycleEvent.toJSON(message.turnLifecycle);
-    }
-    if (message.wakewordDetected !== undefined) {
-      obj.wakewordDetected = WakeWordDetectedEvent.toJSON(message.wakewordDetected);
-    }
-    if (message.audioLevel !== undefined) {
-      obj.audioLevel = AudioLevelEvent.toJSON(message.audioLevel);
-    }
-    if (message.componentProgress !== undefined) {
-      obj.componentProgress = ComponentProgressEvent.toJSON(message.componentProgress);
     }
     if (message.sessionId !== "") {
       obj.sessionId = message.sessionId;
@@ -1327,7 +998,7 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
   fromPartial<I extends Exact<DeepPartial<VoiceEvent>, I>>(object: I): VoiceEvent {
     const message = createBaseVoiceEvent();
     message.seq = object.seq ?? 0;
-    message.timestampUs = object.timestampUs ?? 0;
+    message.timestampMs = object.timestampMs ?? 0;
     message.category = object.category ?? 0;
     message.severity = object.severity ?? 0;
     message.component = object.component ?? 0;
@@ -1347,9 +1018,6 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
     message.state = (object.state !== undefined && object.state !== null)
       ? StateChangeEvent.fromPartial(object.state)
       : undefined;
-    message.error = (object.error !== undefined && object.error !== null)
-      ? ErrorEvent.fromPartial(object.error)
-      : undefined;
     message.metrics = (object.metrics !== undefined && object.metrics !== null)
       ? MetricsEvent.fromPartial(object.metrics)
       : undefined;
@@ -1360,33 +1028,8 @@ export const VoiceEvent: MessageFns<VoiceEvent> = {
     message.sessionError = (object.sessionError !== undefined && object.sessionError !== null)
       ? VoiceSessionError.fromPartial(object.sessionError)
       : undefined;
-    message.sessionStarted = (object.sessionStarted !== undefined && object.sessionStarted !== null)
-      ? SessionStartedEvent.fromPartial(object.sessionStarted)
-      : undefined;
-    message.sessionStopped = (object.sessionStopped !== undefined && object.sessionStopped !== null)
-      ? SessionStoppedEvent.fromPartial(object.sessionStopped)
-      : undefined;
-    message.agentResponseStarted = (object.agentResponseStarted !== undefined && object.agentResponseStarted !== null)
-      ? AgentResponseStartedEvent.fromPartial(object.agentResponseStarted)
-      : undefined;
-    message.agentResponseCompleted =
-      (object.agentResponseCompleted !== undefined && object.agentResponseCompleted !== null)
-        ? AgentResponseCompletedEvent.fromPartial(object.agentResponseCompleted)
-        : undefined;
-    message.speechTurnDetection = (object.speechTurnDetection !== undefined && object.speechTurnDetection !== null)
-      ? SpeechTurnDetectionEvent.fromPartial(object.speechTurnDetection)
-      : undefined;
     message.turnLifecycle = (object.turnLifecycle !== undefined && object.turnLifecycle !== null)
       ? TurnLifecycleEvent.fromPartial(object.turnLifecycle)
-      : undefined;
-    message.wakewordDetected = (object.wakewordDetected !== undefined && object.wakewordDetected !== null)
-      ? WakeWordDetectedEvent.fromPartial(object.wakewordDetected)
-      : undefined;
-    message.audioLevel = (object.audioLevel !== undefined && object.audioLevel !== null)
-      ? AudioLevelEvent.fromPartial(object.audioLevel)
-      : undefined;
-    message.componentProgress = (object.componentProgress !== undefined && object.componentProgress !== null)
-      ? ComponentProgressEvent.fromPartial(object.componentProgress)
       : undefined;
     message.sessionId = object.sessionId ?? "";
     message.turnId = object.turnId ?? "";
@@ -1481,7 +1124,7 @@ export const VoiceEvent_MetadataEntry: MessageFns<VoiceEvent_MetadataEntry> = {
 };
 
 function createBaseUserSaidEvent(): UserSaidEvent {
-  return { text: "", isFinal: false, confidence: 0, audioStartUs: 0, audioEndUs: 0, languageCode: "", segmentIndex: 0 };
+  return { text: "", isFinal: false, confidence: 0, audioStartMs: 0, audioEndMs: 0, language: "", segmentIndex: 0 };
 }
 
 export const UserSaidEvent: MessageFns<UserSaidEvent> = {
@@ -1495,14 +1138,14 @@ export const UserSaidEvent: MessageFns<UserSaidEvent> = {
     if (message.confidence !== 0) {
       writer.uint32(29).float(message.confidence);
     }
-    if (message.audioStartUs !== 0) {
-      writer.uint32(32).int64(message.audioStartUs);
+    if (message.audioStartMs !== 0) {
+      writer.uint32(32).int64(message.audioStartMs);
     }
-    if (message.audioEndUs !== 0) {
-      writer.uint32(40).int64(message.audioEndUs);
+    if (message.audioEndMs !== 0) {
+      writer.uint32(40).int64(message.audioEndMs);
     }
-    if (message.languageCode !== "") {
-      writer.uint32(50).string(message.languageCode);
+    if (message.language !== "") {
+      writer.uint32(50).string(message.language);
     }
     if (message.segmentIndex !== 0) {
       writer.uint32(56).int32(message.segmentIndex);
@@ -1546,7 +1189,7 @@ export const UserSaidEvent: MessageFns<UserSaidEvent> = {
             break;
           }
 
-          message.audioStartUs = longToNumber(reader.int64());
+          message.audioStartMs = longToNumber(reader.int64());
           continue;
         }
         case 5: {
@@ -1554,7 +1197,7 @@ export const UserSaidEvent: MessageFns<UserSaidEvent> = {
             break;
           }
 
-          message.audioEndUs = longToNumber(reader.int64());
+          message.audioEndMs = longToNumber(reader.int64());
           continue;
         }
         case 6: {
@@ -1562,7 +1205,7 @@ export const UserSaidEvent: MessageFns<UserSaidEvent> = {
             break;
           }
 
-          message.languageCode = reader.string();
+          message.language = reader.string();
           continue;
         }
         case 7: {
@@ -1591,21 +1234,17 @@ export const UserSaidEvent: MessageFns<UserSaidEvent> = {
         ? globalThis.Boolean(object.is_final)
         : false,
       confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      audioStartUs: isSet(object.audioStartUs)
-        ? globalThis.Number(object.audioStartUs)
-        : isSet(object.audio_start_us)
-        ? globalThis.Number(object.audio_start_us)
+      audioStartMs: isSet(object.audioStartMs)
+        ? globalThis.Number(object.audioStartMs)
+        : isSet(object.audio_start_ms)
+        ? globalThis.Number(object.audio_start_ms)
         : 0,
-      audioEndUs: isSet(object.audioEndUs)
-        ? globalThis.Number(object.audioEndUs)
-        : isSet(object.audio_end_us)
-        ? globalThis.Number(object.audio_end_us)
+      audioEndMs: isSet(object.audioEndMs)
+        ? globalThis.Number(object.audioEndMs)
+        : isSet(object.audio_end_ms)
+        ? globalThis.Number(object.audio_end_ms)
         : 0,
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : "",
+      language: isSet(object.language) ? globalThis.String(object.language) : "",
       segmentIndex: isSet(object.segmentIndex)
         ? globalThis.Number(object.segmentIndex)
         : isSet(object.segment_index)
@@ -1625,14 +1264,14 @@ export const UserSaidEvent: MessageFns<UserSaidEvent> = {
     if (message.confidence !== 0) {
       obj.confidence = message.confidence;
     }
-    if (message.audioStartUs !== 0) {
-      obj.audioStartUs = Math.round(message.audioStartUs);
+    if (message.audioStartMs !== 0) {
+      obj.audioStartMs = Math.round(message.audioStartMs);
     }
-    if (message.audioEndUs !== 0) {
-      obj.audioEndUs = Math.round(message.audioEndUs);
+    if (message.audioEndMs !== 0) {
+      obj.audioEndMs = Math.round(message.audioEndMs);
     }
-    if (message.languageCode !== "") {
-      obj.languageCode = message.languageCode;
+    if (message.language !== "") {
+      obj.language = message.language;
     }
     if (message.segmentIndex !== 0) {
       obj.segmentIndex = Math.round(message.segmentIndex);
@@ -1648,9 +1287,9 @@ export const UserSaidEvent: MessageFns<UserSaidEvent> = {
     message.text = object.text ?? "";
     message.isFinal = object.isFinal ?? false;
     message.confidence = object.confidence ?? 0;
-    message.audioStartUs = object.audioStartUs ?? 0;
-    message.audioEndUs = object.audioEndUs ?? 0;
-    message.languageCode = object.languageCode ?? "";
+    message.audioStartMs = object.audioStartMs ?? 0;
+    message.audioEndMs = object.audioEndMs ?? 0;
+    message.language = object.language ?? "";
     message.segmentIndex = object.segmentIndex ?? 0;
     return message;
   },
@@ -1991,8 +1630,8 @@ export const AudioFrameEvent: MessageFns<AudioFrameEvent> = {
 function createBaseVADEvent(): VADEvent {
   return {
     type: 0,
-    frameOffsetUs: 0,
-    confidence: 0,
+    frameOffsetMs: 0,
+    probability: 0,
     isSpeech: false,
     speechDurationMs: 0,
     silenceDurationMs: 0,
@@ -2005,20 +1644,20 @@ export const VADEvent: MessageFns<VADEvent> = {
     if (message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
-    if (message.frameOffsetUs !== 0) {
-      writer.uint32(16).int64(message.frameOffsetUs);
+    if (message.frameOffsetMs !== 0) {
+      writer.uint32(16).int64(message.frameOffsetMs);
     }
-    if (message.confidence !== 0) {
-      writer.uint32(29).float(message.confidence);
+    if (message.probability !== 0) {
+      writer.uint32(29).float(message.probability);
     }
     if (message.isSpeech !== false) {
       writer.uint32(32).bool(message.isSpeech);
     }
     if (message.speechDurationMs !== 0) {
-      writer.uint32(41).double(message.speechDurationMs);
+      writer.uint32(40).int32(message.speechDurationMs);
     }
     if (message.silenceDurationMs !== 0) {
-      writer.uint32(49).double(message.silenceDurationMs);
+      writer.uint32(48).int32(message.silenceDurationMs);
     }
     if (message.noiseFloorDb !== 0) {
       writer.uint32(57).double(message.noiseFloorDb);
@@ -2046,7 +1685,7 @@ export const VADEvent: MessageFns<VADEvent> = {
             break;
           }
 
-          message.frameOffsetUs = longToNumber(reader.int64());
+          message.frameOffsetMs = longToNumber(reader.int64());
           continue;
         }
         case 3: {
@@ -2054,7 +1693,7 @@ export const VADEvent: MessageFns<VADEvent> = {
             break;
           }
 
-          message.confidence = reader.float();
+          message.probability = reader.float();
           continue;
         }
         case 4: {
@@ -2066,19 +1705,19 @@ export const VADEvent: MessageFns<VADEvent> = {
           continue;
         }
         case 5: {
-          if (tag !== 41) {
+          if (tag !== 40) {
             break;
           }
 
-          message.speechDurationMs = reader.double();
+          message.speechDurationMs = reader.int32();
           continue;
         }
         case 6: {
-          if (tag !== 49) {
+          if (tag !== 48) {
             break;
           }
 
-          message.silenceDurationMs = reader.double();
+          message.silenceDurationMs = reader.int32();
           continue;
         }
         case 7: {
@@ -2101,12 +1740,12 @@ export const VADEvent: MessageFns<VADEvent> = {
   fromJSON(object: any): VADEvent {
     return {
       type: isSet(object.type) ? vADStreamEventKindFromJSON(object.type) : 0,
-      frameOffsetUs: isSet(object.frameOffsetUs)
-        ? globalThis.Number(object.frameOffsetUs)
-        : isSet(object.frame_offset_us)
-        ? globalThis.Number(object.frame_offset_us)
+      frameOffsetMs: isSet(object.frameOffsetMs)
+        ? globalThis.Number(object.frameOffsetMs)
+        : isSet(object.frame_offset_ms)
+        ? globalThis.Number(object.frame_offset_ms)
         : 0,
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+      probability: isSet(object.probability) ? globalThis.Number(object.probability) : 0,
       isSpeech: isSet(object.isSpeech)
         ? globalThis.Boolean(object.isSpeech)
         : isSet(object.is_speech)
@@ -2135,20 +1774,20 @@ export const VADEvent: MessageFns<VADEvent> = {
     if (message.type !== 0) {
       obj.type = vADStreamEventKindToJSON(message.type);
     }
-    if (message.frameOffsetUs !== 0) {
-      obj.frameOffsetUs = Math.round(message.frameOffsetUs);
+    if (message.frameOffsetMs !== 0) {
+      obj.frameOffsetMs = Math.round(message.frameOffsetMs);
     }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
+    if (message.probability !== 0) {
+      obj.probability = message.probability;
     }
     if (message.isSpeech !== false) {
       obj.isSpeech = message.isSpeech;
     }
     if (message.speechDurationMs !== 0) {
-      obj.speechDurationMs = message.speechDurationMs;
+      obj.speechDurationMs = Math.round(message.speechDurationMs);
     }
     if (message.silenceDurationMs !== 0) {
-      obj.silenceDurationMs = message.silenceDurationMs;
+      obj.silenceDurationMs = Math.round(message.silenceDurationMs);
     }
     if (message.noiseFloorDb !== 0) {
       obj.noiseFloorDb = message.noiseFloorDb;
@@ -2162,8 +1801,8 @@ export const VADEvent: MessageFns<VADEvent> = {
   fromPartial<I extends Exact<DeepPartial<VADEvent>, I>>(object: I): VADEvent {
     const message = createBaseVADEvent();
     message.type = object.type ?? 0;
-    message.frameOffsetUs = object.frameOffsetUs ?? 0;
-    message.confidence = object.confidence ?? 0;
+    message.frameOffsetMs = object.frameOffsetMs ?? 0;
+    message.probability = object.probability ?? 0;
     message.isSpeech = object.isSpeech ?? false;
     message.speechDurationMs = object.speechDurationMs ?? 0;
     message.silenceDurationMs = object.silenceDurationMs ?? 0;
@@ -2324,154 +1963,6 @@ export const StateChangeEvent: MessageFns<StateChangeEvent> = {
   },
 };
 
-function createBaseErrorEvent(): ErrorEvent {
-  return { code: 0, message: "", component: "", isRecoverable: false, operation: "", detailsJson: "" };
-}
-
-export const ErrorEvent: MessageFns<ErrorEvent> = {
-  encode(message: ErrorEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.code !== 0) {
-      writer.uint32(8).int32(message.code);
-    }
-    if (message.message !== "") {
-      writer.uint32(18).string(message.message);
-    }
-    if (message.component !== "") {
-      writer.uint32(26).string(message.component);
-    }
-    if (message.isRecoverable !== false) {
-      writer.uint32(32).bool(message.isRecoverable);
-    }
-    if (message.operation !== "") {
-      writer.uint32(42).string(message.operation);
-    }
-    if (message.detailsJson !== "") {
-      writer.uint32(50).string(message.detailsJson);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ErrorEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseErrorEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.code = reader.int32();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.message = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.component = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.isRecoverable = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.operation = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.detailsJson = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ErrorEvent {
-    return {
-      code: isSet(object.code) ? globalThis.Number(object.code) : 0,
-      message: isSet(object.message) ? globalThis.String(object.message) : "",
-      component: isSet(object.component) ? globalThis.String(object.component) : "",
-      isRecoverable: isSet(object.isRecoverable)
-        ? globalThis.Boolean(object.isRecoverable)
-        : isSet(object.is_recoverable)
-        ? globalThis.Boolean(object.is_recoverable)
-        : false,
-      operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
-      detailsJson: isSet(object.detailsJson)
-        ? globalThis.String(object.detailsJson)
-        : isSet(object.details_json)
-        ? globalThis.String(object.details_json)
-        : "",
-    };
-  },
-
-  toJSON(message: ErrorEvent): unknown {
-    const obj: any = {};
-    if (message.code !== 0) {
-      obj.code = Math.round(message.code);
-    }
-    if (message.message !== "") {
-      obj.message = message.message;
-    }
-    if (message.component !== "") {
-      obj.component = message.component;
-    }
-    if (message.isRecoverable !== false) {
-      obj.isRecoverable = message.isRecoverable;
-    }
-    if (message.operation !== "") {
-      obj.operation = message.operation;
-    }
-    if (message.detailsJson !== "") {
-      obj.detailsJson = message.detailsJson;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ErrorEvent>, I>>(base?: I): ErrorEvent {
-    return ErrorEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ErrorEvent>, I>>(object: I): ErrorEvent {
-    const message = createBaseErrorEvent();
-    message.code = object.code ?? 0;
-    message.message = object.message ?? "";
-    message.component = object.component ?? "";
-    message.isRecoverable = object.isRecoverable ?? false;
-    message.operation = object.operation ?? "";
-    message.detailsJson = object.detailsJson ?? "";
-    return message;
-  },
-};
-
 function createBaseMetricsEvent(): MetricsEvent {
   return {
     sttFinalMs: 0,
@@ -2481,7 +1972,6 @@ function createBaseMetricsEvent(): MetricsEvent {
     tokensGenerated: 0,
     audioSamplesPlayed: 0,
     isOverBudget: false,
-    createdAtNs: 0,
     vadFirstSpeechMs: 0,
     sttFirstPartialMs: 0,
     llmTotalMs: 0,
@@ -2512,20 +2002,17 @@ export const MetricsEvent: MessageFns<MetricsEvent> = {
     if (message.isOverBudget !== false) {
       writer.uint32(56).bool(message.isOverBudget);
     }
-    if (message.createdAtNs !== 0) {
-      writer.uint32(64).int64(message.createdAtNs);
-    }
     if (message.vadFirstSpeechMs !== 0) {
-      writer.uint32(73).double(message.vadFirstSpeechMs);
+      writer.uint32(65).double(message.vadFirstSpeechMs);
     }
     if (message.sttFirstPartialMs !== 0) {
-      writer.uint32(81).double(message.sttFirstPartialMs);
+      writer.uint32(73).double(message.sttFirstPartialMs);
     }
     if (message.llmTotalMs !== 0) {
-      writer.uint32(89).double(message.llmTotalMs);
+      writer.uint32(81).double(message.llmTotalMs);
     }
     if (message.ttsTotalMs !== 0) {
-      writer.uint32(97).double(message.ttsTotalMs);
+      writer.uint32(89).double(message.ttsTotalMs);
     }
     return writer;
   },
@@ -2594,11 +2081,11 @@ export const MetricsEvent: MessageFns<MetricsEvent> = {
           continue;
         }
         case 8: {
-          if (tag !== 64) {
+          if (tag !== 65) {
             break;
           }
 
-          message.createdAtNs = longToNumber(reader.int64());
+          message.vadFirstSpeechMs = reader.double();
           continue;
         }
         case 9: {
@@ -2606,7 +2093,7 @@ export const MetricsEvent: MessageFns<MetricsEvent> = {
             break;
           }
 
-          message.vadFirstSpeechMs = reader.double();
+          message.sttFirstPartialMs = reader.double();
           continue;
         }
         case 10: {
@@ -2614,19 +2101,11 @@ export const MetricsEvent: MessageFns<MetricsEvent> = {
             break;
           }
 
-          message.sttFirstPartialMs = reader.double();
+          message.llmTotalMs = reader.double();
           continue;
         }
         case 11: {
           if (tag !== 89) {
-            break;
-          }
-
-          message.llmTotalMs = reader.double();
-          continue;
-        }
-        case 12: {
-          if (tag !== 97) {
             break;
           }
 
@@ -2679,11 +2158,6 @@ export const MetricsEvent: MessageFns<MetricsEvent> = {
         : isSet(object.is_over_budget)
         ? globalThis.Boolean(object.is_over_budget)
         : false,
-      createdAtNs: isSet(object.createdAtNs)
-        ? globalThis.Number(object.createdAtNs)
-        : isSet(object.created_at_ns)
-        ? globalThis.Number(object.created_at_ns)
-        : 0,
       vadFirstSpeechMs: isSet(object.vadFirstSpeechMs)
         ? globalThis.Number(object.vadFirstSpeechMs)
         : isSet(object.vad_first_speech_ms)
@@ -2730,9 +2204,6 @@ export const MetricsEvent: MessageFns<MetricsEvent> = {
     if (message.isOverBudget !== false) {
       obj.isOverBudget = message.isOverBudget;
     }
-    if (message.createdAtNs !== 0) {
-      obj.createdAtNs = Math.round(message.createdAtNs);
-    }
     if (message.vadFirstSpeechMs !== 0) {
       obj.vadFirstSpeechMs = message.vadFirstSpeechMs;
     }
@@ -2760,235 +2231,10 @@ export const MetricsEvent: MessageFns<MetricsEvent> = {
     message.tokensGenerated = object.tokensGenerated ?? 0;
     message.audioSamplesPlayed = object.audioSamplesPlayed ?? 0;
     message.isOverBudget = object.isOverBudget ?? false;
-    message.createdAtNs = object.createdAtNs ?? 0;
     message.vadFirstSpeechMs = object.vadFirstSpeechMs ?? 0;
     message.sttFirstPartialMs = object.sttFirstPartialMs ?? 0;
     message.llmTotalMs = object.llmTotalMs ?? 0;
     message.ttsTotalMs = object.ttsTotalMs ?? 0;
-    return message;
-  },
-};
-
-function createBaseAudioLevelEvent(): AudioLevelEvent {
-  return { rms: 0, peak: 0, noiseFloorDb: 0, isSpeech: false };
-}
-
-export const AudioLevelEvent: MessageFns<AudioLevelEvent> = {
-  encode(message: AudioLevelEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.rms !== 0) {
-      writer.uint32(13).float(message.rms);
-    }
-    if (message.peak !== 0) {
-      writer.uint32(21).float(message.peak);
-    }
-    if (message.noiseFloorDb !== 0) {
-      writer.uint32(29).float(message.noiseFloorDb);
-    }
-    if (message.isSpeech !== false) {
-      writer.uint32(32).bool(message.isSpeech);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AudioLevelEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAudioLevelEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 13) {
-            break;
-          }
-
-          message.rms = reader.float();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.peak = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 29) {
-            break;
-          }
-
-          message.noiseFloorDb = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.isSpeech = reader.bool();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): AudioLevelEvent {
-    return {
-      rms: isSet(object.rms) ? globalThis.Number(object.rms) : 0,
-      peak: isSet(object.peak) ? globalThis.Number(object.peak) : 0,
-      noiseFloorDb: isSet(object.noiseFloorDb)
-        ? globalThis.Number(object.noiseFloorDb)
-        : isSet(object.noise_floor_db)
-        ? globalThis.Number(object.noise_floor_db)
-        : 0,
-      isSpeech: isSet(object.isSpeech)
-        ? globalThis.Boolean(object.isSpeech)
-        : isSet(object.is_speech)
-        ? globalThis.Boolean(object.is_speech)
-        : false,
-    };
-  },
-
-  toJSON(message: AudioLevelEvent): unknown {
-    const obj: any = {};
-    if (message.rms !== 0) {
-      obj.rms = message.rms;
-    }
-    if (message.peak !== 0) {
-      obj.peak = message.peak;
-    }
-    if (message.noiseFloorDb !== 0) {
-      obj.noiseFloorDb = message.noiseFloorDb;
-    }
-    if (message.isSpeech !== false) {
-      obj.isSpeech = message.isSpeech;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<AudioLevelEvent>, I>>(base?: I): AudioLevelEvent {
-    return AudioLevelEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<AudioLevelEvent>, I>>(object: I): AudioLevelEvent {
-    const message = createBaseAudioLevelEvent();
-    message.rms = object.rms ?? 0;
-    message.peak = object.peak ?? 0;
-    message.noiseFloorDb = object.noiseFloorDb ?? 0;
-    message.isSpeech = object.isSpeech ?? false;
-    return message;
-  },
-};
-
-function createBaseComponentProgressEvent(): ComponentProgressEvent {
-  return { component: 0, operation: "", progress: 0, message: "" };
-}
-
-export const ComponentProgressEvent: MessageFns<ComponentProgressEvent> = {
-  encode(message: ComponentProgressEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.component !== 0) {
-      writer.uint32(8).int32(message.component);
-    }
-    if (message.operation !== "") {
-      writer.uint32(18).string(message.operation);
-    }
-    if (message.progress !== 0) {
-      writer.uint32(29).float(message.progress);
-    }
-    if (message.message !== "") {
-      writer.uint32(34).string(message.message);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ComponentProgressEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseComponentProgressEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.component = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.operation = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 29) {
-            break;
-          }
-
-          message.progress = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.message = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ComponentProgressEvent {
-    return {
-      component: isSet(object.component) ? voicePipelineComponentFromJSON(object.component) : 0,
-      operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
-      progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-      message: isSet(object.message) ? globalThis.String(object.message) : "",
-    };
-  },
-
-  toJSON(message: ComponentProgressEvent): unknown {
-    const obj: any = {};
-    if (message.component !== 0) {
-      obj.component = voicePipelineComponentToJSON(message.component);
-    }
-    if (message.operation !== "") {
-      obj.operation = message.operation;
-    }
-    if (message.progress !== 0) {
-      obj.progress = message.progress;
-    }
-    if (message.message !== "") {
-      obj.message = message.message;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ComponentProgressEvent>, I>>(base?: I): ComponentProgressEvent {
-    return ComponentProgressEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ComponentProgressEvent>, I>>(object: I): ComponentProgressEvent {
-    const message = createBaseComponentProgressEvent();
-    message.component = object.component ?? 0;
-    message.operation = object.operation ?? "";
-    message.progress = object.progress ?? 0;
-    message.message = object.message ?? "";
     return message;
   },
 };
@@ -3002,7 +2248,7 @@ function createBaseVoiceAgentComponentStates(): VoiceAgentComponentStates {
     ready: false,
     anyLoading: false,
     wakewordState: 0,
-    errorMessage: undefined,
+    error: undefined,
   };
 }
 
@@ -3029,8 +2275,8 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
     if (message.wakewordState !== 0) {
       writer.uint32(56).int32(message.wakewordState);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -3098,12 +2344,12 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
           message.wakewordState = reader.int32() as any;
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -3148,11 +2394,7 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
         : isSet(object.wakeword_state)
         ? componentLifecycleStateFromJSON(object.wakeword_state)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -3179,8 +2421,8 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
     if (message.wakewordState !== 0) {
       obj.wakewordState = componentLifecycleStateToJSON(message.wakewordState);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -3197,13 +2439,15 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
     message.ready = object.ready ?? false;
     message.anyLoading = object.anyLoading ?? false;
     message.wakewordState = object.wakewordState ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseVoiceSessionError(): VoiceSessionError {
-  return { code: 0, message: "", failedComponent: undefined, cAbiCode: 0, recoverable: false };
+  return { code: 0, message: "", failedComponent: undefined, cAbiCode: 0, recoverable: false, operation: undefined };
 }
 
 export const VoiceSessionError: MessageFns<VoiceSessionError> = {
@@ -3222,6 +2466,9 @@ export const VoiceSessionError: MessageFns<VoiceSessionError> = {
     }
     if (message.recoverable !== false) {
       writer.uint32(40).bool(message.recoverable);
+    }
+    if (message.operation !== undefined) {
+      writer.uint32(50).string(message.operation);
     }
     return writer;
   },
@@ -3273,6 +2520,14 @@ export const VoiceSessionError: MessageFns<VoiceSessionError> = {
           message.recoverable = reader.bool();
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.operation = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3297,6 +2552,7 @@ export const VoiceSessionError: MessageFns<VoiceSessionError> = {
         ? globalThis.Number(object.c_abi_code)
         : 0,
       recoverable: isSet(object.recoverable) ? globalThis.Boolean(object.recoverable) : false,
+      operation: isSet(object.operation) ? globalThis.String(object.operation) : undefined,
     };
   },
 
@@ -3317,6 +2573,9 @@ export const VoiceSessionError: MessageFns<VoiceSessionError> = {
     if (message.recoverable !== false) {
       obj.recoverable = message.recoverable;
     }
+    if (message.operation !== undefined) {
+      obj.operation = message.operation;
+    }
     return obj;
   },
 
@@ -3330,482 +2589,7 @@ export const VoiceSessionError: MessageFns<VoiceSessionError> = {
     message.failedComponent = object.failedComponent ?? undefined;
     message.cAbiCode = object.cAbiCode ?? 0;
     message.recoverable = object.recoverable ?? false;
-    return message;
-  },
-};
-
-function createBaseSessionStartedEvent(): SessionStartedEvent {
-  return { sessionId: "" };
-}
-
-export const SessionStartedEvent: MessageFns<SessionStartedEvent> = {
-  encode(message: SessionStartedEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sessionId !== "") {
-      writer.uint32(10).string(message.sessionId);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SessionStartedEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSessionStartedEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.sessionId = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SessionStartedEvent {
-    return {
-      sessionId: isSet(object.sessionId)
-        ? globalThis.String(object.sessionId)
-        : isSet(object.session_id)
-        ? globalThis.String(object.session_id)
-        : "",
-    };
-  },
-
-  toJSON(message: SessionStartedEvent): unknown {
-    const obj: any = {};
-    if (message.sessionId !== "") {
-      obj.sessionId = message.sessionId;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<SessionStartedEvent>, I>>(base?: I): SessionStartedEvent {
-    return SessionStartedEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SessionStartedEvent>, I>>(object: I): SessionStartedEvent {
-    const message = createBaseSessionStartedEvent();
-    message.sessionId = object.sessionId ?? "";
-    return message;
-  },
-};
-
-function createBaseSessionStoppedEvent(): SessionStoppedEvent {
-  return { sessionId: "", reason: "" };
-}
-
-export const SessionStoppedEvent: MessageFns<SessionStoppedEvent> = {
-  encode(message: SessionStoppedEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sessionId !== "") {
-      writer.uint32(10).string(message.sessionId);
-    }
-    if (message.reason !== "") {
-      writer.uint32(18).string(message.reason);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SessionStoppedEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSessionStoppedEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.sessionId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.reason = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SessionStoppedEvent {
-    return {
-      sessionId: isSet(object.sessionId)
-        ? globalThis.String(object.sessionId)
-        : isSet(object.session_id)
-        ? globalThis.String(object.session_id)
-        : "",
-      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
-    };
-  },
-
-  toJSON(message: SessionStoppedEvent): unknown {
-    const obj: any = {};
-    if (message.sessionId !== "") {
-      obj.sessionId = message.sessionId;
-    }
-    if (message.reason !== "") {
-      obj.reason = message.reason;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<SessionStoppedEvent>, I>>(base?: I): SessionStoppedEvent {
-    return SessionStoppedEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SessionStoppedEvent>, I>>(object: I): SessionStoppedEvent {
-    const message = createBaseSessionStoppedEvent();
-    message.sessionId = object.sessionId ?? "";
-    message.reason = object.reason ?? "";
-    return message;
-  },
-};
-
-function createBaseAgentResponseStartedEvent(): AgentResponseStartedEvent {
-  return { turnId: "" };
-}
-
-export const AgentResponseStartedEvent: MessageFns<AgentResponseStartedEvent> = {
-  encode(message: AgentResponseStartedEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.turnId !== "") {
-      writer.uint32(10).string(message.turnId);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AgentResponseStartedEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAgentResponseStartedEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.turnId = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): AgentResponseStartedEvent {
-    return {
-      turnId: isSet(object.turnId)
-        ? globalThis.String(object.turnId)
-        : isSet(object.turn_id)
-        ? globalThis.String(object.turn_id)
-        : "",
-    };
-  },
-
-  toJSON(message: AgentResponseStartedEvent): unknown {
-    const obj: any = {};
-    if (message.turnId !== "") {
-      obj.turnId = message.turnId;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<AgentResponseStartedEvent>, I>>(base?: I): AgentResponseStartedEvent {
-    return AgentResponseStartedEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<AgentResponseStartedEvent>, I>>(object: I): AgentResponseStartedEvent {
-    const message = createBaseAgentResponseStartedEvent();
-    message.turnId = object.turnId ?? "";
-    return message;
-  },
-};
-
-function createBaseAgentResponseCompletedEvent(): AgentResponseCompletedEvent {
-  return { turnId: "", responseDurationMs: 0 };
-}
-
-export const AgentResponseCompletedEvent: MessageFns<AgentResponseCompletedEvent> = {
-  encode(message: AgentResponseCompletedEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.turnId !== "") {
-      writer.uint32(10).string(message.turnId);
-    }
-    if (message.responseDurationMs !== 0) {
-      writer.uint32(16).int64(message.responseDurationMs);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AgentResponseCompletedEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAgentResponseCompletedEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.turnId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.responseDurationMs = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): AgentResponseCompletedEvent {
-    return {
-      turnId: isSet(object.turnId)
-        ? globalThis.String(object.turnId)
-        : isSet(object.turn_id)
-        ? globalThis.String(object.turn_id)
-        : "",
-      responseDurationMs: isSet(object.responseDurationMs)
-        ? globalThis.Number(object.responseDurationMs)
-        : isSet(object.response_duration_ms)
-        ? globalThis.Number(object.response_duration_ms)
-        : 0,
-    };
-  },
-
-  toJSON(message: AgentResponseCompletedEvent): unknown {
-    const obj: any = {};
-    if (message.turnId !== "") {
-      obj.turnId = message.turnId;
-    }
-    if (message.responseDurationMs !== 0) {
-      obj.responseDurationMs = Math.round(message.responseDurationMs);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(base?: I): AgentResponseCompletedEvent {
-    return AgentResponseCompletedEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(object: I): AgentResponseCompletedEvent {
-    const message = createBaseAgentResponseCompletedEvent();
-    message.turnId = object.turnId ?? "";
-    message.responseDurationMs = object.responseDurationMs ?? 0;
-    return message;
-  },
-};
-
-function createBaseSpeechTurnDetectionEvent(): SpeechTurnDetectionEvent {
-  return {
-    kind: 0,
-    speakerId: "",
-    turnStartUs: 0,
-    turnEndUs: 0,
-    confidence: 0,
-    speechDurationMs: 0,
-    silenceDurationMs: 0,
-  };
-}
-
-export const SpeechTurnDetectionEvent: MessageFns<SpeechTurnDetectionEvent> = {
-  encode(message: SpeechTurnDetectionEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.kind !== 0) {
-      writer.uint32(8).int32(message.kind);
-    }
-    if (message.speakerId !== "") {
-      writer.uint32(18).string(message.speakerId);
-    }
-    if (message.turnStartUs !== 0) {
-      writer.uint32(24).int64(message.turnStartUs);
-    }
-    if (message.turnEndUs !== 0) {
-      writer.uint32(32).int64(message.turnEndUs);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(45).float(message.confidence);
-    }
-    if (message.speechDurationMs !== 0) {
-      writer.uint32(49).double(message.speechDurationMs);
-    }
-    if (message.silenceDurationMs !== 0) {
-      writer.uint32(57).double(message.silenceDurationMs);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SpeechTurnDetectionEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSpeechTurnDetectionEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.kind = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.speakerId = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.turnStartUs = longToNumber(reader.int64());
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.turnEndUs = longToNumber(reader.int64());
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-        case 6: {
-          if (tag !== 49) {
-            break;
-          }
-
-          message.speechDurationMs = reader.double();
-          continue;
-        }
-        case 7: {
-          if (tag !== 57) {
-            break;
-          }
-
-          message.silenceDurationMs = reader.double();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SpeechTurnDetectionEvent {
-    return {
-      kind: isSet(object.kind) ? speechTurnDetectionEventKindFromJSON(object.kind) : 0,
-      speakerId: isSet(object.speakerId)
-        ? globalThis.String(object.speakerId)
-        : isSet(object.speaker_id)
-        ? globalThis.String(object.speaker_id)
-        : "",
-      turnStartUs: isSet(object.turnStartUs)
-        ? globalThis.Number(object.turnStartUs)
-        : isSet(object.turn_start_us)
-        ? globalThis.Number(object.turn_start_us)
-        : 0,
-      turnEndUs: isSet(object.turnEndUs)
-        ? globalThis.Number(object.turnEndUs)
-        : isSet(object.turn_end_us)
-        ? globalThis.Number(object.turn_end_us)
-        : 0,
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      speechDurationMs: isSet(object.speechDurationMs)
-        ? globalThis.Number(object.speechDurationMs)
-        : isSet(object.speech_duration_ms)
-        ? globalThis.Number(object.speech_duration_ms)
-        : 0,
-      silenceDurationMs: isSet(object.silenceDurationMs)
-        ? globalThis.Number(object.silenceDurationMs)
-        : isSet(object.silence_duration_ms)
-        ? globalThis.Number(object.silence_duration_ms)
-        : 0,
-    };
-  },
-
-  toJSON(message: SpeechTurnDetectionEvent): unknown {
-    const obj: any = {};
-    if (message.kind !== 0) {
-      obj.kind = speechTurnDetectionEventKindToJSON(message.kind);
-    }
-    if (message.speakerId !== "") {
-      obj.speakerId = message.speakerId;
-    }
-    if (message.turnStartUs !== 0) {
-      obj.turnStartUs = Math.round(message.turnStartUs);
-    }
-    if (message.turnEndUs !== 0) {
-      obj.turnEndUs = Math.round(message.turnEndUs);
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    if (message.speechDurationMs !== 0) {
-      obj.speechDurationMs = message.speechDurationMs;
-    }
-    if (message.silenceDurationMs !== 0) {
-      obj.silenceDurationMs = message.silenceDurationMs;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<SpeechTurnDetectionEvent>, I>>(base?: I): SpeechTurnDetectionEvent {
-    return SpeechTurnDetectionEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SpeechTurnDetectionEvent>, I>>(object: I): SpeechTurnDetectionEvent {
-    const message = createBaseSpeechTurnDetectionEvent();
-    message.kind = object.kind ?? 0;
-    message.speakerId = object.speakerId ?? "";
-    message.turnStartUs = object.turnStartUs ?? 0;
-    message.turnEndUs = object.turnEndUs ?? 0;
-    message.confidence = object.confidence ?? 0;
-    message.speechDurationMs = object.speechDurationMs ?? 0;
-    message.silenceDurationMs = object.silenceDurationMs ?? 0;
+    message.operation = object.operation ?? undefined;
     return message;
   },
 };
@@ -3817,7 +2601,7 @@ function createBaseTurnLifecycleEvent(): TurnLifecycleEvent {
     sessionId: "",
     transcript: "",
     response: "",
-    error: "",
+    error: undefined,
     startedAtMs: 0,
     completedAtMs: 0,
   };
@@ -3840,8 +2624,8 @@ export const TurnLifecycleEvent: MessageFns<TurnLifecycleEvent> = {
     if (message.response !== "") {
       writer.uint32(42).string(message.response);
     }
-    if (message.error !== "") {
-      writer.uint32(50).string(message.error);
+    if (message.error !== undefined) {
+      VoiceSessionError.encode(message.error, writer.uint32(50).fork()).join();
     }
     if (message.startedAtMs !== 0) {
       writer.uint32(56).int64(message.startedAtMs);
@@ -3904,7 +2688,7 @@ export const TurnLifecycleEvent: MessageFns<TurnLifecycleEvent> = {
             break;
           }
 
-          message.error = reader.string();
+          message.error = VoiceSessionError.decode(reader, reader.uint32());
           continue;
         }
         case 7: {
@@ -3947,7 +2731,7 @@ export const TurnLifecycleEvent: MessageFns<TurnLifecycleEvent> = {
         : "",
       transcript: isSet(object.transcript) ? globalThis.String(object.transcript) : "",
       response: isSet(object.response) ? globalThis.String(object.response) : "",
-      error: isSet(object.error) ? globalThis.String(object.error) : "",
+      error: isSet(object.error) ? VoiceSessionError.fromJSON(object.error) : undefined,
       startedAtMs: isSet(object.startedAtMs)
         ? globalThis.Number(object.startedAtMs)
         : isSet(object.started_at_ms)
@@ -3978,8 +2762,8 @@ export const TurnLifecycleEvent: MessageFns<TurnLifecycleEvent> = {
     if (message.response !== "") {
       obj.response = message.response;
     }
-    if (message.error !== "") {
-      obj.error = message.error;
+    if (message.error !== undefined) {
+      obj.error = VoiceSessionError.toJSON(message.error);
     }
     if (message.startedAtMs !== 0) {
       obj.startedAtMs = Math.round(message.startedAtMs);
@@ -4000,169 +2784,11 @@ export const TurnLifecycleEvent: MessageFns<TurnLifecycleEvent> = {
     message.sessionId = object.sessionId ?? "";
     message.transcript = object.transcript ?? "";
     message.response = object.response ?? "";
-    message.error = object.error ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? VoiceSessionError.fromPartial(object.error)
+      : undefined;
     message.startedAtMs = object.startedAtMs ?? 0;
     message.completedAtMs = object.completedAtMs ?? 0;
-    return message;
-  },
-};
-
-function createBaseWakeWordDetectedEvent(): WakeWordDetectedEvent {
-  return { wakeWord: "", confidence: 0, timestampMs: 0, modelId: "", modelIndex: 0, durationMs: 0 };
-}
-
-export const WakeWordDetectedEvent: MessageFns<WakeWordDetectedEvent> = {
-  encode(message: WakeWordDetectedEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.wakeWord !== "") {
-      writer.uint32(10).string(message.wakeWord);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(21).float(message.confidence);
-    }
-    if (message.timestampMs !== 0) {
-      writer.uint32(24).int64(message.timestampMs);
-    }
-    if (message.modelId !== "") {
-      writer.uint32(34).string(message.modelId);
-    }
-    if (message.modelIndex !== 0) {
-      writer.uint32(40).int32(message.modelIndex);
-    }
-    if (message.durationMs !== 0) {
-      writer.uint32(48).int64(message.durationMs);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): WakeWordDetectedEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseWakeWordDetectedEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.wakeWord = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.timestampMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.modelId = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.modelIndex = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.durationMs = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): WakeWordDetectedEvent {
-    return {
-      wakeWord: isSet(object.wakeWord)
-        ? globalThis.String(object.wakeWord)
-        : isSet(object.wake_word)
-        ? globalThis.String(object.wake_word)
-        : "",
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      timestampMs: isSet(object.timestampMs)
-        ? globalThis.Number(object.timestampMs)
-        : isSet(object.timestamp_ms)
-        ? globalThis.Number(object.timestamp_ms)
-        : 0,
-      modelId: isSet(object.modelId)
-        ? globalThis.String(object.modelId)
-        : isSet(object.model_id)
-        ? globalThis.String(object.model_id)
-        : "",
-      modelIndex: isSet(object.modelIndex)
-        ? globalThis.Number(object.modelIndex)
-        : isSet(object.model_index)
-        ? globalThis.Number(object.model_index)
-        : 0,
-      durationMs: isSet(object.durationMs)
-        ? globalThis.Number(object.durationMs)
-        : isSet(object.duration_ms)
-        ? globalThis.Number(object.duration_ms)
-        : 0,
-    };
-  },
-
-  toJSON(message: WakeWordDetectedEvent): unknown {
-    const obj: any = {};
-    if (message.wakeWord !== "") {
-      obj.wakeWord = message.wakeWord;
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    if (message.timestampMs !== 0) {
-      obj.timestampMs = Math.round(message.timestampMs);
-    }
-    if (message.modelId !== "") {
-      obj.modelId = message.modelId;
-    }
-    if (message.modelIndex !== 0) {
-      obj.modelIndex = Math.round(message.modelIndex);
-    }
-    if (message.durationMs !== 0) {
-      obj.durationMs = Math.round(message.durationMs);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<WakeWordDetectedEvent>, I>>(base?: I): WakeWordDetectedEvent {
-    return WakeWordDetectedEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<WakeWordDetectedEvent>, I>>(object: I): WakeWordDetectedEvent {
-    const message = createBaseWakeWordDetectedEvent();
-    message.wakeWord = object.wakeWord ?? "";
-    message.confidence = object.confidence ?? 0;
-    message.timestampMs = object.timestampMs ?? 0;
-    message.modelId = object.modelId ?? "";
-    message.modelIndex = object.modelIndex ?? 0;
-    message.durationMs = object.durationMs ?? 0;
     return message;
   },
 };

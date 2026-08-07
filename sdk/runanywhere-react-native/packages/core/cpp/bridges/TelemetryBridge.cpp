@@ -296,7 +296,13 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
   // Build full URL based on environment
   // Matches Swift HTTPService logic
   std::string baseURL;
+  // Split-header model (mirrors Kotlin's HTTPClientAdapter): apiKey always
+  // travels in `apikey`; accessToken (a JWT) only becomes
+  // `Authorization: Bearer` when the caller required auth. Neither is a
+  // substitute for the other.
   std::string apiKey;
+  std::string accessToken;
+  const bool requiresAuthBool = requiresAuth == RAC_TRUE;
 
   {
     // Effective config from commons state (baked OSS URL fills development when empty)
@@ -308,21 +314,18 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
                   ? config::trim(stateURL)
                   : config::trim(InitBridge::shared().getBaseURL());
 
-    // For production mode, prefer JWT access token (from authentication)
-    // over raw API key. This matches Swift/Kotlin behavior.
-    std::string accessToken = AuthBridge::shared().getAccessToken();
-    if (config::isUsableSecret(accessToken)) {
-      apiKey = accessToken; // Use JWT for Authorization header
-      LOGD("Telemetry using JWT access token");
-    } else {
-      // Fall back to the commons-state key. Staging clears it (keyless):
-      // the POST goes out with no Authorization header and the backend
-      // attributes it to the PUBLIC org — a stale app key would 401.
-      const char *stateKey = rac_state_get_api_key();
-      apiKey = config::trim(stateKey != nullptr ? stateKey : "");
-      LOGD("Telemetry using %s (not authenticated)",
-           apiKey.empty() ? "keyless mode" : "API key");
+    accessToken = AuthBridge::shared().getAccessToken();
+    if (!config::isUsableSecret(accessToken)) {
+      accessToken.clear();
     }
+    const char *stateKey = rac_state_get_api_key();
+    apiKey = config::trim(stateKey != nullptr ? stateKey : "");
+    if (!config::isUsableSecret(apiKey)) {
+      apiKey.clear();
+    }
+    LOGD("Telemetry auth: apikey=%s accessToken=%s requiresAuth=%d",
+         apiKey.empty() ? "absent" : "present",
+         accessToken.empty() ? "absent" : "present", requiresAuthBool);
 
     // Keyless staging is valid: the request goes out unauthenticated and
     // the backend attributes it to the PUBLIC org. Only a usable URL is
@@ -331,9 +334,6 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
       LOGI("Skipping telemetry/device registration: no usable config");
       rac_telemetry_manager_http_complete(manager, RAC_TRUE, "{}", nullptr);
       return;
-    }
-    if (!config::isUsableSecret(apiKey)) {
-      apiKey.clear();
     }
 
     LOGD("Telemetry using configured production/staging endpoint");
@@ -345,7 +345,8 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
 
   // Use shared native C++ HTTP transport (same as device registration).
   auto [success, statusCode, responseBody, errorMessage] =
-      InitBridge::shared().httpPostSync(fullURL, json, apiKey);
+      InitBridge::shared().httpPostSync(fullURL, json, apiKey, accessToken,
+                                        requiresAuthBool);
   (void)errorMessage;
 
   if (success) {

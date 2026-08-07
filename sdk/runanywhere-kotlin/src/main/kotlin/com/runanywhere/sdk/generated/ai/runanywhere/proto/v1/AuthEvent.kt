@@ -30,6 +30,8 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * StorageLifecycleEvent was deleted: its kinds moved into StorageEventKind
+ * and its result oneof into StorageEvent.result (see above).
  * ===========================================================================
  * SECTION 11 — INFRA
  * ===========================================================================

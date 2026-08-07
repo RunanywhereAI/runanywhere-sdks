@@ -38,11 +38,7 @@ object CppBridgeToolCalling {
 
     private fun formattedPrompt(request: ToolPromptFormatRequest): String {
         val result = formatPrompt(request)
-        if (result.error_code != 0) {
-            throw SDKException.operation(
-                result.error_message ?: "Tool prompt formatting failed: ${result.error_code}",
-            )
-        }
+        result.error_message?.let { throw SDKException.operation(it) }
         return result.formatted_prompt
     }
 

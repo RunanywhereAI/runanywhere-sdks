@@ -635,19 +635,22 @@ int test_format_prompt_proto_round_trip() {
         auto* tool = options->add_tools();
         tool->set_name("typed_tool");
         tool->set_description("Exercise every portable parameter type");
-        const auto add_parameter = [tool](const char* name,
-                                          runanywhere::v1::ToolParameterType type) {
-            auto* parameter = tool->add_parameters();
-            parameter->set_name(name);
-            parameter->set_type(type);
-            parameter->set_required(true);
-        };
-        add_parameter("text", runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-        add_parameter("score", runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER);
-        add_parameter("enabled", runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN);
-        add_parameter("metadata", runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT);
-        add_parameter("items", runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY);
-        add_parameter("fallback", runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED);
+        // ToolDefinition.parameters is now ONE JSON Schema object string
+        // (idl/tool_calling.proto, tools-one-json-schema) — the typed
+        // ToolParameter message / ToolParameterType enum were deleted
+        // outright. "unspecified" has no JSON Schema `type` keyword
+        // equivalent, so the fallback parameter is declared with no type
+        // (schema-valid: any value), matching what the old UNSPECIFIED enum
+        // value meant (no type constraint).
+        tool->set_parameters(
+            R"({"type":"object","properties":{)"
+            R"("text":{"type":"string"},)"
+            R"("score":{"type":"number"},)"
+            R"("enabled":{"type":"boolean"},)"
+            R"("metadata":{"type":"object"},)"
+            R"("items":{"type":"array"},)"
+            R"("fallback":{}},)"
+            R"("required":["text","score","enabled","metadata","items","fallback"]})");
 
         std::string request_bytes;
         ASSERT_TRUE(request.SerializeToString(&request_bytes));
@@ -786,16 +789,14 @@ int test_validate_proto_round_trip() {
     auto* tool = options->add_tools();
     tool->set_name("set_mode");
     tool->set_description("Set runtime mode");
-    auto* enabled = tool->add_parameters();
-    enabled->set_name("enabled");
-    enabled->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN);
-    enabled->set_required(true);
-    auto* mode = tool->add_parameters();
-    mode->set_name("mode");
-    mode->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    mode->set_required(true);
-    mode->add_enum_values("fast");
-    mode->add_enum_values("safe");
+    // ToolDefinition.parameters is now ONE JSON Schema object string
+    // (idl/tool_calling.proto, tools-one-json-schema) — the typed
+    // ToolParameter message / ToolParameterType enum were deleted outright.
+    tool->set_parameters(
+        R"({"type":"object","properties":{)"
+        R"("enabled":{"type":"boolean"},)"
+        R"("mode":{"type":"string","enum":["fast","safe"]}},)"
+        R"("required":["enabled","mode"]})");
 
     std::string request_bytes;
     ASSERT_TRUE(request.SerializeToString(&request_bytes));
@@ -850,10 +851,10 @@ runanywhere::v1::ToolDefinition make_named_tool(const char* name) {
     runanywhere::v1::ToolDefinition tool;
     tool.set_name(name);
     tool.set_description("test tool");
-    auto* p = tool.add_parameters();
-    p->set_name("q");
-    p->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
-    p->set_required(true);
+    // ToolDefinition.parameters is now ONE JSON Schema object string
+    // (idl/tool_calling.proto, tools-one-json-schema).
+    tool.set_parameters(R"({"type":"object","properties":{"q":{"type":"string"}},)"
+                        R"("required":["q"]})");
     return tool;
 }
 #endif

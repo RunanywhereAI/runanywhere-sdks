@@ -288,10 +288,10 @@ static TestResult test_full_voice_turn_real_models() {
                          std::to_string(parsed.synthesized_audio().size());
     } else {
         result.passed = true;
+        // total_time_ms was reserved (deleted from VoiceAgentResult, no replacement).
         result.details = "transcription=\"" + parsed.transcription() + "\", response_bytes=" +
                          std::to_string(parsed.assistant_response().size()) + ", audio_bytes=" +
-                         std::to_string(parsed.synthesized_audio().size()) + ", total_ms=" +
-                         std::to_string(parsed.total_time_ms());
+                         std::to_string(parsed.synthesized_audio().size());
     }
 
     rac_proto_buffer_free(&out);

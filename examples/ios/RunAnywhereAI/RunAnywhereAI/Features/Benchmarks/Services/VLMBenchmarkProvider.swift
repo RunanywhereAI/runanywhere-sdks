@@ -28,77 +28,56 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
         #if canImport(UIKit)
         var metrics = BenchmarkMetrics()
 
-        // Ensure clean state: unload any VLM model left over from Camera or a previous run
-        var vlmUnloadRequest = RAModelUnloadRequest()
-        vlmUnloadRequest.category = .multimodal
-        _ = await RunAnywhere.unloadModel(vlmUnloadRequest)
-        // Also unload any lingering LLM model to free memory headroom
-        var llmUnloadRequest = RAModelUnloadRequest()
-        llmUnloadRequest.category = .language
-        _ = await RunAnywhere.unloadModel(llmUnloadRequest)
+        // Ensure clean state: unload the VLM left over from Camera or a previous
+        // run, plus any lingering LLM, to free memory headroom.
+        try? await RunAnywhere.models.unload(category: .multimodal)
+        try? await RunAnywhere.models.unload(category: .language)
         // Brief pause to let iOS reclaim GPU/Metal memory from the previous model
         try await Task.sleep(nanoseconds: 500_000_000) // 0.5s
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
         do {
-            // Load (canonical proto-request form)
             let loadStart = Date()
-            var loadRequest = RAModelLoadRequest()
-            loadRequest.modelID = model.id
-            loadRequest.category = .multimodal
-            let loadResult = await RunAnywhere.loadModel(loadRequest)
-            guard loadResult.success else {
-                throw SDKException(code: .unknown, message: loadResult.errorMessage, category: .internal)
-            }
+            try await RunAnywhere.models.load(id: model.id)
             metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
-            // Generate a small synthetic image inside an autoreleasepool so CoreGraphics
-            // intermediates are released promptly before we allocate the vision encoder.
-            let maybeVLMImage = autoreleasepool {
-                let image = SyntheticInputGenerator.gradientImage()
-                return RAVLMImage.fromUIImage(image)
-            }
-            guard let vlmImage = maybeVLMImage else {
-                throw NSError(
-                    domain: "RunAnywhereAI.VLMBenchmark",
-                    code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to convert synthetic image to VLM input"]
-                )
+            // Build the synthetic image inside an autoreleasepool so CoreGraphics
+            // intermediates are released before the vision encoder allocates.
+            let image = try autoreleasepool {
+                try ImageInput.uiImage(SyntheticInputGenerator.gradientImage())
             }
 
             // Warmup: single token to prime the pipeline without large KV allocation
             let warmupStart = Date()
-            var warmupOptions = RAVLMGenerationOptions()
-            warmupOptions.prompt = "Hi"
-            warmupOptions.maxTokens = 1
-            warmupOptions.temperature = 0.0
-            _ = try await RunAnywhere.processImage(vlmImage, options: warmupOptions)
+            _ = try await RunAnywhere.vlm.generate(
+                image: image,
+                prompt: "Hi",
+                options: LlmOptions(maxOutputTokens: 1, temperature: 0.0)
+            )
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
 
-            // Cancel to flush any lingering generation state / KV cache before the real run
-            await RunAnywhere.cancelVLMGeneration()
-
-            // Benchmark
-            var benchOptions = RAVLMGenerationOptions()
-            benchOptions.prompt = "Describe this image in detail."
-            benchOptions.maxTokens = 128
-            benchOptions.temperature = 0.0
-            let result = try await RunAnywhere.processImage(vlmImage, options: benchOptions)
-            metrics.endToEndLatencyMs = Double(result.processingTimeMs)
-            metrics.tokensPerSecond = Double(result.tokensPerSecond)
-            metrics.promptTokens = Int(result.promptTokens)
-            metrics.completionTokens = Int(result.completionTokens)
+            let benchStart = Date()
+            let result = try await RunAnywhere.vlm.generate(
+                image: image,
+                prompt: "Describe this image in detail.",
+                options: LlmOptions(maxOutputTokens: 128, temperature: 0.0)
+            )
+            metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
+            metrics.ttftMs = result.timeToFirstTokenMs > 0 ? Double(result.timeToFirstTokenMs) : nil
+            metrics.tokensPerSecond = result.tokensPerSecond > 0 ? Double(result.tokensPerSecond) : nil
+            metrics.inputTokens = result.inputTokens > 0 ? result.inputTokens : nil
+            metrics.outputTokens = result.outputTokens > 0 ? result.outputTokens : nil
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            _ = await RunAnywhere.unloadModel(vlmUnloadRequest)
+            try? await RunAnywhere.models.unload(category: .multimodal)
             // Give iOS time to release GPU/Metal buffers before the next model loads
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
             return metrics
         } catch {
-            _ = await RunAnywhere.unloadModel(vlmUnloadRequest)
+            try? await RunAnywhere.models.unload(category: .multimodal)
             try? await Task.sleep(nanoseconds: 300_000_000)
             throw error
         }

@@ -15,16 +15,13 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// ---------------------------------------------------------------------------
-/// Hardware acceleration preference for inference. Canonical single enum —
-/// previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
-/// file and `AccelerationPreference` in model_types.proto. Consolidated here
-/// because it is a pure hardware concept and
-/// hardware_profile.proto has no imports (model_types.proto already imports
-/// this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
-///   Web    enums.ts:165   (Auto / WebGPU / CPU)
-///   Swift  extensions     (CPU / GPU / NPU / Metal)
-///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
-/// Canonicalized union below.
+/// Hardware acceleration preference for inference. Device CLASS, not graphics
+/// API. A hint, never a hard requirement — the runtime may fall back.
+/// UNSPECIFIED means "you choose".
+///
+/// Canonical single enum. It lives in this file rather than model_types.proto
+/// because model_types.proto already imports this file; placing it here avoids
+/// a cyclic import.
 /// ---------------------------------------------------------------------------
 class AccelerationPreference extends $pb.ProtobufEnum {
   static const AccelerationPreference ACCELERATION_PREFERENCE_UNSPECIFIED =
@@ -42,15 +39,6 @@ class AccelerationPreference extends $pb.ProtobufEnum {
   static const AccelerationPreference ACCELERATION_PREFERENCE_NPU =
       AccelerationPreference._(
           4, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_NPU');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_WEBGPU =
-      AccelerationPreference._(
-          5, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_WEBGPU');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_METAL =
-      AccelerationPreference._(
-          6, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_METAL');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_VULKAN =
-      AccelerationPreference._(
-          7, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_VULKAN');
 
   static const $core.List<AccelerationPreference> values =
       <AccelerationPreference>[
@@ -59,28 +47,16 @@ class AccelerationPreference extends $pb.ProtobufEnum {
     ACCELERATION_PREFERENCE_CPU,
     ACCELERATION_PREFERENCE_GPU,
     ACCELERATION_PREFERENCE_NPU,
-    ACCELERATION_PREFERENCE_WEBGPU,
-    ACCELERATION_PREFERENCE_METAL,
-    ACCELERATION_PREFERENCE_VULKAN,
   ];
 
   static final $core.List<AccelerationPreference?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 7);
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
   static AccelerationPreference? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const AccelerationPreference._(super.value, super.name);
 }
 
-/// Logical hardware service contract. Mirrors the C ABI in
-/// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
-///   - rac_hardware_profile_get → GetProfile
-///   - rac_hardware_get_accelerators → GetAccelerators
-///   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
-///
-/// Native device probes (chip detection, neural engine queries, GPU
-/// discovery, memory/cores) remain platform-adapter owned. C++ caches and
-/// serves the normalized HardwareProfile/AcceleratorInfo messages.
 /// Pre-flight Qualcomm Hexagon NPU probe. Mirrors QHexRT's engine-owned C ABI
 /// (`rac/qhexrt/rac_qhexrt.h`) and is serialized by
 /// rac_qhexrt_probe_proto(). Enum values equal the Hexagon HTP version number

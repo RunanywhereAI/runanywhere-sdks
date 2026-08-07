@@ -108,8 +108,7 @@ extension CppBridge {
             query: String,
             options: RALLMGenerationOptions? = nil
         ) async throws -> RALLMGenerationResult {
-            var request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: query)
-            request.options.streamingEnabled = false
+            let request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: query)
             return try NativeProtoABI.invoke(
                 request,
                 symbol: LLMAdaptiveContextABI.generateFromContext,

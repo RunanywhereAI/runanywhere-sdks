@@ -193,7 +193,10 @@ std::string make_sdk_event_bytes() {
 std::string make_voice_event_bytes() {
     runanywhere::v1::VoiceEvent event;
     event.set_seq(1);
-    event.set_timestamp_us(1);
+    // timestamp_us -> timestamp_ms (units changed, not just renamed); this
+    // test uses a placeholder value of 1 with no downstream unit-dependent
+    // arithmetic, so the rename alone is sufficient here.
+    event.set_timestamp_ms(1);
     event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);

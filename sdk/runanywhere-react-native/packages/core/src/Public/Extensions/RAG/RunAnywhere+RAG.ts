@@ -17,6 +17,8 @@ import type {
   RAGConfiguration,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchRequest,
+  RAGSearchResponse,
   RAGStatistics,
   RAGStreamEvent as RAGStreamEventType,
 } from '@runanywhere/proto-ts/rag';
@@ -34,6 +36,8 @@ import {
   RAGDocument,
   RAGQueryOptions as RAGQueryOptionsMessage,
   RAGResult as RAGResultMessage,
+  RAGSearchRequest as RAGSearchRequestMessage,
+  RAGSearchResponse as RAGSearchResponseMessage,
   RAGStatistics as RAGStatisticsMessage,
   RAGStreamEvent as RAGStreamEventMessage,
   RAGStreamEventKind,
@@ -171,13 +175,13 @@ export async function ragAddDocumentsBatch(
  * Query the RAG pipeline with a question.
  *
  * Matches Swift: `RunAnywhere.ragQuery(_:options:)` — the options message is
- * forwarded verbatim (including `retrievalTopK`, `similarityThreshold`,
- * `stream`, and `disableThinking`). Unset numeric fields encode as proto3
+ * forwarded verbatim (including the nested `retrieval` (`topK`,
+ * `scoreThreshold`) and `generation`). Unset numeric fields encode as proto3
  * zeros, which commons maps to the canonical `rac_default` values.
  */
 export async function ragQuery(
   question: string,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): Promise<RAGResult>;
 /**
  * Query through the proto options message directly.
@@ -187,7 +191,7 @@ export async function ragQuery(
 export async function ragQuery(options: RAGQueryOptions): Promise<RAGResult>;
 export async function ragQuery(
   questionOrOptions: string | RAGQueryOptions,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): Promise<RAGResult> {
   // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:191-193).
   requireInitialized();
@@ -198,19 +202,48 @@ export async function ragQuery(
     typeof questionOrOptions === 'string'
       ? RAGQueryOptionsMessage.fromPartial({
           ...options,
-          // Defaults mirror Swift RARAGQueryOptions.defaults(question:)
-          // (generated from IDL rac_default annotations): maxTokens 512,
-          // temperature 0.7, topP 1.0. Caller-provided options override.
-          maxTokens: options?.maxTokens ?? 512,
-          temperature: options?.temperature ?? 0.7,
-          topP: options?.topP ?? 1.0,
-          question: questionOrOptions,
+          // Answer-generation knobs travel in `options.generation`; RAG
+          // defaults (max_output_tokens 512, temperature 0.7) are applied by
+          // the pipeline when unset, not re-declared here.
+          query: questionOrOptions,
         })
       : questionOrOptions;
   const resultBytes = await native.ragQueryProto(
     encodeProtoMessage(queryOptions, RAGQueryOptionsMessage)
   );
   return decodeRequired(resultBytes, RAGResultMessage.decode, 'ragQueryProto');
+}
+
+/**
+ * Retrieval-only search via `rac_rag_search_proto` — no LLM generation.
+ *
+ * Matches Swift: `RagSession.search` / `CppBridge.RAG.search`.
+ *
+ * @throws SDKException.featureNotAvailable when the native module predates
+ *   `ragSearchProto` / `rac_rag_search_proto`.
+ */
+export async function ragSearch(
+  request: RAGSearchRequest
+): Promise<RAGSearchResponse> {
+  requireInitialized();
+  const native = ensureNative();
+  if (typeof native.ragSearchProto !== 'function') {
+    throw SDKException.featureNotAvailable(
+      'rag.search (rac_rag_search_proto)'
+    );
+  }
+  await ensureServicesReady();
+  const resultBytes = await native.ragSearchProto(
+    encodeProtoMessage(
+      RAGSearchRequestMessage.fromPartial(request),
+      RAGSearchRequestMessage
+    )
+  );
+  return decodeRequired(
+    resultBytes,
+    RAGSearchResponseMessage.decode,
+    'ragSearchProto'
+  );
 }
 
 /**
@@ -226,14 +259,14 @@ export async function ragQuery(
  */
 export function ragQueryStream(
   question: string,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): AsyncIterable<RAGStreamEventType>;
 export function ragQueryStream(
   options: RAGQueryOptions
 ): AsyncIterable<RAGStreamEventType>;
 export function ragQueryStream(
   questionOrOptions: string | RAGQueryOptions,
-  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+  options?: Partial<Omit<RAGQueryOptions, 'query'>>
 ): AsyncIterable<RAGStreamEventType> {
   requireInitialized();
   const native = ensureNative();
@@ -241,10 +274,7 @@ export function ragQueryStream(
     typeof questionOrOptions === 'string'
       ? RAGQueryOptionsMessage.fromPartial({
           ...options,
-          maxTokens: options?.maxTokens ?? 512,
-          temperature: options?.temperature ?? 0.7,
-          topP: options?.topP ?? 1.0,
-          question: questionOrOptions,
+          query: questionOrOptions,
         })
       : questionOrOptions;
   const requestBytes = encodeProtoMessage(queryOptions, RAGQueryOptionsMessage);
@@ -290,9 +320,9 @@ export function ragQueryStream(
               );
               if (
                 event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR &&
-                event.errorMessage
+                event.error
               ) {
-                streamError = new Error(event.errorMessage);
+                streamError = new SDKException(event.error);
               }
               push(event);
               if (isTerminal(event)) {
@@ -444,13 +474,8 @@ async function loadRAGArtifactModel(
       : {}),
   });
   const result = await loadModel(request);
-  if (!result.success) {
-    const message =
-      result.errorMessage ||
-      `${errorLabel} model lifecycle artifact resolution failed`;
-    throw SDKException.modelLoadFailed(
-      `${errorLabel} model '${model.id}': ${message}`
-    );
+  if (result.error) {
+    throw new SDKException(result.error);
   }
   return result;
 }

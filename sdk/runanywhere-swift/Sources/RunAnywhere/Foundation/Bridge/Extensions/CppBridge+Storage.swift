@@ -88,8 +88,11 @@ extension CppBridge {
                 )
             } catch {
                 var result = RAStorageInfoResult()
-                result.success = false
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }
@@ -103,8 +106,11 @@ extension CppBridge {
                 )
             } catch {
                 var result = RAStorageDeleteResult()
-                result.success = false
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }

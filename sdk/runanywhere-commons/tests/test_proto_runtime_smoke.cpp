@@ -143,7 +143,7 @@ int test_storage_info_proto_is_active() {
     runanywhere::v1::StorageInfoResult result;
     CHECK(rc == RAC_SUCCESS, "storage info proto returns success");
     CHECK(parse_buffer(out, &result), "storage info proto parses");
-    CHECK(result.success(), "storage info reports success");
+    CHECK(result.has_error() == false, "storage info reports success");
     CHECK(result.info().device().total_bytes() == fixture.total,
           "storage info carries device total");
     CHECK(result.info().device().free_bytes() == fixture.free, "storage info carries device free");
@@ -178,7 +178,11 @@ int test_llm_no_model_returns_typed_domain_error() {
     rac_model_lifecycle_reset();
 
     runanywhere::v1::LLMGenerateRequest request;
-    request.set_prompt("hello");
+    // LLMGenerateRequest.prompt was deleted in favor of `repeated ChatMessage
+    // messages` (idl/llm_service.proto): the current turn is the last message.
+    auto* message = request.add_messages();
+    message->set_role(runanywhere::v1::MESSAGE_ROLE_USER);
+    message->set_content("hello");
     std::vector<uint8_t> request_bytes;
     CHECK(serialize(request, &request_bytes), "LLM request serializes");
 

@@ -19,8 +19,10 @@
  *     create op. The provider (e.g. "sarvam") is data in the config, not a
  *     distinct engine.
  *
- * Backend dispatch keys off the structured [HybridBackendKind] proto enum
- * (via [HybridModel.backend]) — never a raw string. Mirrors Swift's
+ * Backend dispatch keys off [HybridModel.backend] -- a free-form
+ * plugin-registry engine name (`HybridBackendKind` the enum is deleted
+ * outright, idl/hybrid_router.proto), matched against the well-known
+ * [HybridBackendKinds] constants. Mirrors Swift's
  * HybridSTTRouter.createService(for:) semantics over the JNI handle ABI.
  */
 
@@ -48,14 +50,14 @@ internal object HybridRouterBridgeAdapter {
     fun createService(model: HybridModel): Long {
         val handle =
             when (model.backend) {
-                HybridBackendKind.HYBRID_BACKEND_SHERPA -> {
+                HybridBackendKinds.SHERPA -> {
                     requireSherpaRegistered()
                     // The model-registry path-resolution lives in
                     // racSttServiceCreate; it routes the create through the same
                     // plugin registry (hint "sherpa") as the online side.
                     RunAnywhereBridge.racSttServiceCreate(model.id)
                 }
-                HybridBackendKind.HYBRID_BACKEND_CLOUD ->
+                HybridBackendKinds.CLOUD ->
                     RunAnywhereBridge.racSttHybridRouterCreateService(
                         engineHint = CLOUD_ENGINE_HINT,
                         // Cloud engine takes everything via config_json; no model path.

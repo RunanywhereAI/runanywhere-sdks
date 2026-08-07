@@ -46,6 +46,7 @@
 #include "features/stt/rac_stt_stream_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/features/stt/rac_stt_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -354,66 +355,7 @@ int64_t now_us() {
         .count();
 }
 
-const char* stt_language_code(runanywhere::v1::STTLanguage language) {
-    switch (language) {
-        case runanywhere::v1::STT_LANGUAGE_EN:
-            return "en";
-        case runanywhere::v1::STT_LANGUAGE_ES:
-            return "es";
-        case runanywhere::v1::STT_LANGUAGE_FR:
-            return "fr";
-        case runanywhere::v1::STT_LANGUAGE_DE:
-            return "de";
-        case runanywhere::v1::STT_LANGUAGE_ZH:
-            return "zh";
-        case runanywhere::v1::STT_LANGUAGE_JA:
-            return "ja";
-        case runanywhere::v1::STT_LANGUAGE_KO:
-            return "ko";
-        case runanywhere::v1::STT_LANGUAGE_IT:
-            return "it";
-        case runanywhere::v1::STT_LANGUAGE_PT:
-            return "pt";
-        case runanywhere::v1::STT_LANGUAGE_AR:
-            return "ar";
-        case runanywhere::v1::STT_LANGUAGE_RU:
-            return "ru";
-        case runanywhere::v1::STT_LANGUAGE_HI:
-            return "hi";
-        default:
-            return nullptr;
-    }
-}
 
-runanywhere::v1::STTLanguage stt_language_from_code(const char* code) {
-    if (!code || code[0] == '\0')
-        return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-    if (std::strncmp(code, "en", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_EN;
-    if (std::strncmp(code, "es", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_ES;
-    if (std::strncmp(code, "fr", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_FR;
-    if (std::strncmp(code, "de", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_DE;
-    if (std::strncmp(code, "zh", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_ZH;
-    if (std::strncmp(code, "ja", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_JA;
-    if (std::strncmp(code, "ko", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_KO;
-    if (std::strncmp(code, "it", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_IT;
-    if (std::strncmp(code, "pt", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_PT;
-    if (std::strncmp(code, "ar", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_AR;
-    if (std::strncmp(code, "ru", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_RU;
-    if (std::strncmp(code, "hi", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_HI;
-    return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-}
 #endif
 
 }  // namespace
@@ -437,7 +379,7 @@ namespace {
 
 struct StreamBridgeContext {
     rac_handle_t handle;
-    runanywhere::v1::STTLanguage language;
+    std::string language;
     uint64_t session_id;
 };
 
@@ -448,15 +390,18 @@ void dispatch_stream_result(const char* text, rac_bool_t is_final, void* opaque)
         partial.set_text(text);
     }
     partial.set_is_final(is_final == RAC_TRUE);
-    partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
-    partial.set_language(context->language);
+    if (!context->language.empty()) {
+        partial.set_language(context->language);
+    }
 
     if (is_final == RAC_TRUE) {
         runanywhere::v1::STTOutput final_output;
         if (text) {
             final_output.set_text(text);
         }
-        final_output.set_language(context->language);
+        if (!context->language.empty()) {
+            final_output.set_language(context->language);
+        }
         rac::stt::dispatch_stt_stream_event(
             context->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
             /*error_message=*/nullptr, /*error_code=*/0, context->session_id);
@@ -476,7 +421,7 @@ rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64
     }
 
     StreamBridgeContext context{.handle = component_handle,
-                                .language = stt_language_from_code(options.language),
+                                .language = options.language ? options.language : "",
                                 .session_id = session_id};
 
     const rac_result_t rc = rac_stt_component_transcribe_stream(
@@ -530,7 +475,7 @@ void publish_session_summary(const SessionCleanupSnapshot& snapshot,
         }
     }
     voice.set_is_streaming(true);
-    voice.set_audio_size_bytes(static_cast<int32_t>(snapshot.audio_bytes));
+    voice.set_input_audio_bytes(static_cast<int32_t>(snapshot.audio_bytes));
     if (snapshot.started_at_ms > 0 && now_ms > snapshot.started_at_ms) {
         voice.set_duration_ms(now_ms - snapshot.started_at_ms);
     }
@@ -640,8 +585,7 @@ rac_result_t finalize_terminated_session(uint64_t session_id,
     } else if (run_persistent_stop_flush) {
         StreamBridgeContext context{
             .handle = snapshot.component_handle,
-            .language = stt_language_from_code(
-                snapshot.language.empty() ? nullptr : snapshot.language.c_str()),
+            .language = snapshot.language,
             .session_id = session_id};
         StopDrainDispatchScope drain_scope(session_id);
         flush_rc = rac_stt_component_stream_feed_audio_chunk(
@@ -1066,77 +1010,21 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.started_at_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                               std::chrono::system_clock::now().time_since_epoch())
                               .count();
-        // Honor every STTOptions field
-        // the C ABI's rac_stt_options_t can carry. Previously this dropped
-        // language_code, sample_rate, audio_format, and detect_language
-        // before they could reach the backend stream_create / feed_audio
-        // calls, which made the streaming path silently inconsistent with
-        // the one-shot rac_stt_component_process_proto path.
-        if (parsed.language() == runanywhere::v1::STT_LANGUAGE_AUTO) {
-            s.detect_language = true;
-        } else if (const char* code = stt_language_code(parsed.language())) {
-            s.language = code;
-        }
-        // The free-form BCP-47 language_code wins over the enum-derived
-        // language when set, matching the proto comment ("consumers should
-        // prefer this over the base-language enum").
-        if (!parsed.language_code().empty()) {
-            s.language = parsed.language_code();
-        }
-        // Explicit detect_language flag overrides the STT_LANGUAGE_AUTO
-        // shorthand so generated-only consumers can request auto-detect
-        // alongside a hint language.
-        if (parsed.detect_language()) {
+        // Language is one BCP-47 string; unset/empty/"auto" = auto-detect.
+        if (parsed.has_language() && !parsed.language().empty() &&
+            parsed.language() != "auto") {
+            s.language = parsed.language();
+        } else {
             s.detect_language = true;
         }
         s.enable_punctuation = parsed.enable_punctuation();
-        s.enable_diarization = parsed.enable_diarization();
-        s.max_speakers = parsed.max_speakers();
+        s.enable_diarization = parsed.diarize();
+        s.max_speakers = parsed.has_speakers_expected() ? parsed.speakers_expected() : 0;
         s.enable_timestamps = parsed.enable_word_timestamps();
-        // Fall back to defaults when the proto field is unset (0 for
-        // sample_rate, AUDIO_FORMAT_UNSPECIFIED for audio_format).
-        s.sample_rate =
-            parsed.sample_rate() > 0 ? parsed.sample_rate() : RAC_STT_DEFAULT_SAMPLE_RATE;
-        switch (parsed.audio_format()) {
-            case runanywhere::v1::AUDIO_FORMAT_WAV:
-                s.audio_format = RAC_AUDIO_FORMAT_WAV;
-                s.accepts_raw_pcm_s16le = false;
-                break;
-            case runanywhere::v1::AUDIO_FORMAT_MP3:
-                s.audio_format = RAC_AUDIO_FORMAT_MP3;
-                s.accepts_raw_pcm_s16le = false;
-                break;
-            case runanywhere::v1::AUDIO_FORMAT_OPUS:
-                s.audio_format = RAC_AUDIO_FORMAT_OPUS;
-                s.accepts_raw_pcm_s16le = false;
-                break;
-            case runanywhere::v1::AUDIO_FORMAT_AAC:
-                s.audio_format = RAC_AUDIO_FORMAT_AAC;
-                s.accepts_raw_pcm_s16le = false;
-                break;
-            case runanywhere::v1::AUDIO_FORMAT_FLAC:
-                s.audio_format = RAC_AUDIO_FORMAT_FLAC;
-                s.accepts_raw_pcm_s16le = false;
-                break;
-            case runanywhere::v1::AUDIO_FORMAT_OGG:
-            case runanywhere::v1::AUDIO_FORMAT_M4A:
-                // No C enum equivalents exist. Preserve the public C options
-                // default while retaining the proto format as unsupported for
-                // raw stream ingestion via the explicit policy flag.
-                s.audio_format = RAC_AUDIO_FORMAT_PCM;
-                s.accepts_raw_pcm_s16le = false;
-                break;
-            case runanywhere::v1::AUDIO_FORMAT_PCM:
-            case runanywhere::v1::AUDIO_FORMAT_PCM_S16LE:
-            case runanywhere::v1::AUDIO_FORMAT_UNSPECIFIED:
-                s.audio_format = RAC_AUDIO_FORMAT_PCM;
-                s.accepts_raw_pcm_s16le = true;
-                break;
-            default:
-                s.audio_format = RAC_AUDIO_FORMAT_PCM;
-                s.accepts_raw_pcm_s16le = false;
-                break;
-        }
+        // Audio properties live on STTAudioSource now; the persistent session
+        // feeds raw PCM at the component default rate until the stream-start
+        // request grows its own audio-source envelope (task: layer matrix).
+        s.sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE;
         // STTOptions.beam_size and .max_alternatives have no equivalent slots
         // on rac_stt_options_t today; backends that need them must surface
         // them through STTConfiguration.
@@ -1344,7 +1232,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             std::memcpy(aligned_samples.data(), audio_bytes, audio_size);
 
             StreamBridgeContext context{.handle = component_handle,
-                                        .language = stt_language_from_code(options.language),
+                                        .language = options.language ? options.language : "",
                                         .session_id = session_id};
 
             rac_result_t feed_rc = rac_stt_component_stream_feed_audio_chunk(
@@ -1496,11 +1384,13 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     if (final_output) {
         *proto_event.mutable_final_output() = *final_output;
     }
-    if (error_message && error_message[0] != '\0') {
-        proto_event.set_error_message(error_message);
-    }
-    if (error_code != 0) {
-        proto_event.set_error_code(error_code);
+    if (error_code != 0 || (error_message && error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            proto_event.mutable_error(),
+            error_code != 0 ? static_cast<rac_result_t>(error_code) : RAC_ERROR_UNKNOWN);
+        if (error_message && error_message[0] != '\0') {
+            proto_event.mutable_error()->set_message(error_message);
+        }
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());

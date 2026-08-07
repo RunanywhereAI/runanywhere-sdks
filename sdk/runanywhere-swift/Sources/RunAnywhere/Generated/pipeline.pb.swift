@@ -8,11 +8,10 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere v2 IDL — pipeline configuration passed from frontends to core.
+// RunAnywhere IDL — pipeline graph specification.
 //
-// Frontends never construct DAGs directly. They pass a PipelineSpec (usually
-// loaded from a YAML template bundled with the solution package) to the core,
-// which validates it and compiles it into a live streaming graph.
+// Consumed as the shape of the YAML pipeline config read by config_loader.cpp,
+// not as a wire message.
 
 import SwiftProtobuf
 
@@ -33,8 +32,9 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
   case cpu // = 2
   case gpu // = 3
 
-  /// Apple Neural Engine
-  case ane // = 4
+  /// Vendor-neutral neural accelerator: Apple Neural Engine, Qualcomm
+  /// Hexagon NPU, etc. The YAML loader already accepts "npu" for this value.
+  case npu // = 4
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -47,7 +47,7 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
     case 1: self = .any
     case 2: self = .cpu
     case 3: self = .gpu
-    case 4: self = .ane
+    case 4: self = .npu
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -58,7 +58,7 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
     case .any: return 1
     case .cpu: return 2
     case .gpu: return 3
-    case .ane: return 4
+    case .npu: return 4
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -69,7 +69,7 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
     .any,
     .cpu,
     .gpu,
-    .ane,
+    .npu,
   ]
 
 }
@@ -77,14 +77,8 @@ public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable
 public nonisolated enum RAEdgePolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
-
-  /// Producer blocks when channel is full (default, safest).
   case block // = 1
-
-  /// Oldest item is dropped when channel is full (audio routing only).
   case dropOldest // = 2
-
-  /// Newest item is dropped when channel is full (pager coalescing).
   case dropNewest // = 3
   case UNRECOGNIZED(Int)
 
@@ -122,56 +116,12 @@ public nonisolated enum RAEdgePolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// ---------------------------------------------------------------------------
-/// Pipeline lifecycle status — shared by compile/start/stop results.
-/// ---------------------------------------------------------------------------
-public nonisolated enum RAPipelineStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case ok // = 1
-  case failed // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .ok
-    case 2: self = .failed
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .ok: return 1
-    case .failed: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAPipelineStatus] = [
-    .unspecified,
-    .ok,
-    .failed,
-  ]
-
-}
-
-/// A pipeline is a labelled DAG of operators connected by typed edges. There
-/// are no cycles. Every input edge has a resolvable producer; every output
-/// edge has at least one consumer.
 public nonisolated struct RAPipelineSpec: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Human-readable, e.g. "voice_agent_basic"
+  /// e.g. "voice_agent_basic".
   public var name: String = String()
 
   public var operators: [RAOperatorSpec] = []
@@ -199,29 +149,17 @@ public nonisolated struct RAOperatorSpec: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Unique within the spec, used as the prefix in edge endpoints like
-  /// "stt.final" or "llm.token".
   public var name: String = String()
 
-  /// The primitive the operator implements: "generate_text", "transcribe",
-  /// "synthesize", "detect_voice", "embed", "rerank", "tokenize", "window",
-  /// or a solution-declared custom operator ("AudioSource", "AudioSink",
-  /// "SentenceDetector", "VectorSearch", "ContextBuild").
   public var type: String = String()
 
-  /// Free-form parameters interpreted by the operator. The C++ loader
-  /// validates required keys per type before instantiating.
   public var params: Dictionary<String,String> = [:]
 
-  /// Optional override of the engine that will serve this operator. When
-  /// empty, the L3 router picks based on capability + model format.
+  /// Bypasses priority-based engine selection.
   public var pinnedEngine: String = String()
 
-  /// Optional model identifier (resolved against the model registry).
   public var modelID: String = String()
 
-  /// Affinity hint: run this operator on CPU, GPU, or Neural Engine. The
-  /// scheduler may override if the requested device is unavailable.
   public var device: RADeviceAffinity = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -234,19 +172,11 @@ public nonisolated struct RAEdgeSpec: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Endpoints are formatted "<operator_name>.<port_name>".
-  /// Source port names are operator-specific output channels; sink port
-  /// names are operator-specific input channels. Typing is enforced by the
-  /// pipeline validator.
   public var from: String = String()
 
   public var to: String = String()
 
-  /// Channel depth override. Proto3 scalars have no presence bit, so the
-  /// sentinel value 0 means "use the per-edge default (16 for PCM, 256 for
-  /// tokens, 32 for sentences)". uint32 keeps the wire representation
-  /// identical to int32 on the happy path while making negative inputs
-  /// statically unrepresentable.
+  /// Queue depth, and what happens when it fills.
   public var capacity: UInt32 = 0
 
   public var policy: RAEdgePolicy = .unspecified
@@ -261,16 +191,11 @@ public nonisolated struct RAPipelineOptions: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Maximum end-to-end latency budget in milliseconds. The pipeline emits
-  /// a MetricsEvent with is_over_budget=true if exceeded.
   public var latencyBudgetMs: Int32 = 0
 
-  /// When true, the pipeline emits MetricsEvent on every VAD barge-in and
-  /// on pipeline stop.
   public var emitMetrics: Bool = false
 
-  /// When true, the pipeline validates the DAG for deadlocks and
-  /// disconnected edges before running.
+  /// Reject a spec with unknown operators instead of skipping them.
   public var strictValidation: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -278,119 +203,16 @@ public nonisolated struct RAPipelineOptions: Sendable {
   public init() {}
 }
 
-/// Result of compiling a PipelineSpec into a runnable graph.
-public nonisolated struct RAPipelineCompileResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Opaque compiled-graph identifier. Empty on failure.
-  public var handleID: String = String()
-
-  public var status: RAPipelineStatus = .unspecified
-
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
-  }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
-
-  public var errorCode: Int32 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _errorMessage: String? = nil
-}
-
-/// Request to start a previously compiled pipeline.
-public nonisolated struct RAPipelineStartRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Identifier returned by Compile. Required.
-  public var handleID: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// Live pipeline instance handle.
-public nonisolated struct RAPipelineHandle: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Stable identifier for the started pipeline instance.
-  public var handleID: String = String()
-
-  public var status: RAPipelineStatus = .unspecified
-
-  /// Optional engine-specific state string (e.g. "running", "stopped").
-  public var state: String {
-    get {_state ?? String()}
-    set {_state = newValue}
-  }
-  /// Returns true if `state` has been explicitly set.
-  public var hasState: Bool {self._state != nil}
-  /// Clears the value of `state`. Subsequent reads from it will return its default value.
-  public mutating func clearState() {self._state = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _state: String? = nil
-}
-
-/// Result of stopping a pipeline instance.
-public nonisolated struct RAPipelineStopResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var handleID: String = String()
-
-  public var status: RAPipelineStatus = .unspecified
-
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
-  }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
-
-  public var errorCode: Int32 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _errorMessage: String? = nil
-}
-
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RADeviceAffinity: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DEVICE_AFFINITY_UNSPECIFIED\0\u{1}DEVICE_AFFINITY_ANY\0\u{1}DEVICE_AFFINITY_CPU\0\u{1}DEVICE_AFFINITY_GPU\0\u{1}DEVICE_AFFINITY_ANE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DEVICE_AFFINITY_UNSPECIFIED\0\u{1}DEVICE_AFFINITY_ANY\0\u{1}DEVICE_AFFINITY_CPU\0\u{1}DEVICE_AFFINITY_GPU\0\u{1}DEVICE_AFFINITY_NPU\0")
 }
 
 nonisolated extension RAEdgePolicy: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EDGE_POLICY_UNSPECIFIED\0\u{1}EDGE_POLICY_BLOCK\0\u{1}EDGE_POLICY_DROP_OLDEST\0\u{1}EDGE_POLICY_DROP_NEWEST\0")
-}
-
-nonisolated extension RAPipelineStatus: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PIPELINE_STATUS_UNSPECIFIED\0\u{1}PIPELINE_STATUS_OK\0\u{1}PIPELINE_STATUS_FAILED\0")
 }
 
 nonisolated extension RAPipelineSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -577,178 +399,6 @@ nonisolated extension RAPipelineOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.latencyBudgetMs != rhs.latencyBudgetMs {return false}
     if lhs.emitMetrics != rhs.emitMetrics {return false}
     if lhs.strictValidation != rhs.strictValidation {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAPipelineCompileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".PipelineCompileResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0\u{1}status\0\u{3}error_message\0\u{3}error_code\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.handleID) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.status) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.handleID.isEmpty {
-      try visitor.visitSingularStringField(value: self.handleID, fieldNumber: 1)
-    }
-    if self.status != .unspecified {
-      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 2)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 4)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAPipelineCompileResult, rhs: RAPipelineCompileResult) -> Bool {
-    if lhs.handleID != rhs.handleID {return false}
-    if lhs.status != rhs.status {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAPipelineStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".PipelineStartRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.handleID) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.handleID.isEmpty {
-      try visitor.visitSingularStringField(value: self.handleID, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAPipelineStartRequest, rhs: RAPipelineStartRequest) -> Bool {
-    if lhs.handleID != rhs.handleID {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAPipelineHandle: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".PipelineHandle"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0\u{1}status\0\u{1}state\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.handleID) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.status) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._state) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.handleID.isEmpty {
-      try visitor.visitSingularStringField(value: self.handleID, fieldNumber: 1)
-    }
-    if self.status != .unspecified {
-      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 2)
-    }
-    try { if let v = self._state {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAPipelineHandle, rhs: RAPipelineHandle) -> Bool {
-    if lhs.handleID != rhs.handleID {return false}
-    if lhs.status != rhs.status {return false}
-    if lhs._state != rhs._state {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAPipelineStopResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".PipelineStopResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0\u{1}status\0\u{3}error_message\0\u{3}error_code\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.handleID) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.status) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.handleID.isEmpty {
-      try visitor.visitSingularStringField(value: self.handleID, fieldNumber: 1)
-    }
-    if self.status != .unspecified {
-      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 2)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 4)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAPipelineStopResult, rhs: RAPipelineStopResult) -> Bool {
-    if lhs.handleID != rhs.handleID {return false}
-    if lhs.status != rhs.status {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

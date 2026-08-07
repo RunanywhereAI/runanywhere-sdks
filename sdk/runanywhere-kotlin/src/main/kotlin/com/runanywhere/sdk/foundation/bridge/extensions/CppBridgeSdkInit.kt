@@ -19,7 +19,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.SdkInitEnvironment
 import ai.runanywhere.proto.v1.SdkInitPhase1Request
 import ai.runanywhere.proto.v1.SdkInitPhase2Request
 import ai.runanywhere.proto.v1.SdkInitResult
@@ -35,6 +34,11 @@ object CppBridgeSdkInit {
     /**
      * Drive Phase 1 (synchronous core init) through the canonical C ABI.
      * Validates inputs and runs `rac_state_initialize` inside commons.
+     *
+     * `SdkInitEnvironment` is deleted outright (idl/sdk_init.proto):
+     * `SdkInitPhase1Request.environment` is typed model_types.proto's
+     * `SDKEnvironment` directly (Kotlin's own `SDKEnvironment` is already a
+     * typealias for it), so no enum-to-enum bridge is needed here any more.
      */
     fun phase1(
         environment: SDKEnvironment,
@@ -44,7 +48,7 @@ object CppBridgeSdkInit {
     ): SdkInitResult {
         val request =
             SdkInitPhase1Request(
-                environment = environment.toSdkInitEnvironment(),
+                environment = environment,
                 api_key = apiKey,
                 base_url = baseURL,
                 device_id = deviceId,
@@ -62,25 +66,19 @@ object CppBridgeSdkInit {
 
     /**
      * Drive Phase 2 (services init step list) through the canonical C ABI.
-     * Surfaces `http_configured`, `device_registered`, `linked_models_count`
-     * and warning flags. Failures in individual sub-steps are non-fatal — the
-     * C ABI reports `success=true` with flags off.
+     *
+     * `forceRefreshAssignments`/`flushTelemetry`/`discoverDownloadedModels`/
+     * `rescanLocalModels` are deleted outright from `SdkInitPhase2Request`
+     * (idl/sdk_init.proto): the deterministic step list -- fetch cached
+     * assignments, always flush telemetry, always reconcile the registry
+     * and rescan local files -- now runs unconditionally in commons with no
+     * per-call opt-out. Surfaces `linked_models_count` and warning flags so
+     * the caller can decide which UI affordances to enable. Failures in
+     * individual sub-steps are non-fatal -- the C ABI reports success with
+     * warnings appended.
      */
-    fun phase2(
-        buildToken: String? = null,
-        forceRefreshAssignments: Boolean = false,
-        flushTelemetry: Boolean = true,
-        discoverDownloadedModels: Boolean = true,
-        rescanLocalModels: Boolean = true,
-    ): SdkInitResult {
-        val request =
-            SdkInitPhase2Request(
-                build_token = buildToken.orEmpty(),
-                force_refresh_assignments = forceRefreshAssignments,
-                flush_telemetry = flushTelemetry,
-                discover_downloaded_models = discoverDownloadedModels,
-                rescan_local_models = rescanLocalModels,
-            )
+    fun phase2(buildToken: String? = null): SdkInitResult {
+        val request = SdkInitPhase2Request(build_token = buildToken.orEmpty())
         val result =
             decode(
                 RunAnywhereBridge.racSdkInitPhase2Proto(
@@ -116,19 +114,10 @@ object CppBridgeSdkInit {
     /**
      * Throw the embedded SDKError when the C ABI signals a hard failure
      * (validation/parse/state init). Soft failures (offline mode) come back
-     * with `success=true` plus warnings — the caller decides how to react.
-     * Mirrors Swift's `assertSuccess`.
+     * with no error submessage plus warnings — the caller decides how to
+     * react to those. Mirrors Swift's `assertSuccess`.
      */
     private fun assertSuccess(result: SdkInitResult) {
-        if (result.success) return
         result.error?.let { throw SDKException(it) }
-        throw SDKException.operation(
-            "SDK init phase ${result.phase} failed without error detail",
-        )
     }
-
-    private fun SDKEnvironment.toSdkInitEnvironment(): SdkInitEnvironment =
-        when (this) {
-            else -> SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT
-        }
 }

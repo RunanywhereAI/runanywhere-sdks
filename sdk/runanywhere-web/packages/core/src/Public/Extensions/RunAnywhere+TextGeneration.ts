@@ -14,20 +14,18 @@ import {
   type LLMGenerateRequest,
   type LLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
-import type { ChatMessage } from '@runanywhere/proto-ts/chat';
+import { ChatMessage as ChatMessageMessage, MessageRole, type ChatMessage } from '@runanywhere/proto-ts/chat';
 import {
+  FinishReason,
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
   type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import type { ToolCall } from '@runanywhere/proto-ts/tool_calling';
-import {
-  StructuredOutputMode,
-  StructuredOutputStreamEvent as StructuredOutputStreamEventMessage,
-  StructuredOutputStreamEventKind,
-  type StructuredOutputOptions,
-  type StructuredOutputResult,
-  type StructuredOutputStreamEvent,
+import type {
+  StructuredOutputOptions,
+  StructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
 import {
   inferenceFrameworkToJSON,
@@ -46,7 +44,19 @@ import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
-export type { StructuredOutputResult, StructuredOutputStreamEvent };
+export type { StructuredOutputResult };
+
+/**
+ * A discriminated structured-output stream event. `StructuredOutputStreamEvent`
+ * and `StructuredOutputStreamEventKind` were deleted outright from
+ * idl/structured_output.proto (API-realignment so-p2) — structured
+ * generation now rides the ordinary LLM stream
+ * (`LLMGenerationOptions.structuredOutput`), so this is a Web-local type
+ * describing the token/completed events `generateStructuredStream` yields.
+ */
+export type StructuredOutputStreamEvent =
+  | { kind: 'token'; token: string }
+  | { kind: 'completed'; result: StructuredOutputResult };
 
 export type TextGenerationOptions = Partial<LLMGenerationOptions> & {
   prompt: string;
@@ -70,53 +80,24 @@ export interface JSONSchemaDescriptor {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Structured-output mapping parity with Swift `toRALLMGenerateRequest`
- * (RALLMTypes+CppBridge.swift:66-74): when `structuredOutput` is set, the
- * request's `responseFormat` derives from its mode — `"json_object"` for
- * `STRUCTURED_OUTPUT_MODE_JSON_OBJECT`, `"json_schema"` for every other mode.
- */
-function structuredOutputResponseFormat(
-  structuredOutput: StructuredOutputOptions | undefined,
-): string {
-  if (structuredOutput == null) return '';
-  return structuredOutput.mode === StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT
-    ? 'json_object'
-    : 'json_schema';
-}
-
 function buildLLMGenerateRequest(
   prompt: string,
   options: Omit<TextGenerationOptions, 'prompt'> = {},
-  streamingEnabled = false,
 ): LLMGenerateRequest {
   const { history, conversationId, ...generationOptions } = options;
   const canonicalOptions = LLMGenerationOptionsMessage.fromPartial({
+    ...lLMGenerationOptionsDefaults(),
     ...generationOptions,
-    maxTokens: options.maxTokens ?? 100,
-    temperature: options.temperature ?? 0.8,
-    topP: options.topP ?? 1.0,
-    topK: options.topK ?? 0,
-    repetitionPenalty: options.repetitionPenalty ?? 1.0,
-    streamingEnabled,
-    jsonSchema: options.jsonSchema ?? options.structuredOutput?.jsonSchema,
-    grammar: options.grammar ?? options.structuredOutput?.grammar,
-    responseFormat: options.responseFormat
-      ?? structuredOutputResponseFormat(options.structuredOutput),
   });
+  const messages: ChatMessage[] = [
+    ...(history ?? []),
+    ChatMessageMessage.fromPartial({ role: MessageRole.MESSAGE_ROLE_USER, content: prompt }),
+  ];
   return {
-    prompt,
-    // Emit typed thinking events unless the caller explicitly disabled
-    // thinking. `thinkingPattern` remains an additional opt-in for custom
-    // delimiters; disableThinking is the commons no-think directive.
-    emitThoughts: options.disableThinking === true
-      ? false
-      : (options.thinkingPattern != null || options.disableThinking === false),
     requestId: '',
     modelId: '',
     conversationId: conversationId ?? '',
-    history: history ?? [],
-    metadata: {},
+    messages,
     options: canonicalOptions,
   };
 }
@@ -132,24 +113,17 @@ function isLLMGenerateRequest(
 
 function normalizeLLMGenerateRequest(
   requestOrOptions: LLMGenerateRequest | TextGenerationOptions,
-  streamingEnabled: boolean,
 ): LLMGenerateRequest {
   if (isLLMGenerateRequest(requestOrOptions)) {
-    const requestOptions = requestOrOptions.options;
     return {
       ...requestOrOptions,
       options: LLMGenerationOptionsMessage.fromPartial({
-        maxTokens: requestOptions?.maxTokens ?? 100,
-        temperature: requestOptions?.temperature ?? 0.8,
-        topP: requestOptions?.topP ?? 1.0,
-        topK: requestOptions?.topK ?? 0,
-        repetitionPenalty: requestOptions?.repetitionPenalty ?? 1.0,
-        ...requestOptions,
-        streamingEnabled,
+        ...lLMGenerationOptionsDefaults(),
+        ...requestOrOptions.options,
       }),
     };
   }
-  return buildLLMGenerateRequest(requestOrOptions.prompt, requestOrOptions, streamingEnabled);
+  return buildLLMGenerateRequest(requestOrOptions.prompt, requestOrOptions);
 }
 
 function structuredOutputOptionsFromSchema(
@@ -157,10 +131,7 @@ function structuredOutputOptionsFromSchema(
 ): StructuredOutputOptions {
   return {
     includeSchemaInPrompt: true,
-    jsonSchema: schema.jsonSchema,
-    mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-    repairJson: false,
-    maxRetries: 0,
+    schema: schema.jsonSchema,
   };
 }
 
@@ -206,9 +177,8 @@ function streamingResultFromEvents(
             if (event.toolCall) {
               accumulatedToolCalls.push(event.toolCall);
             }
-            if (event.errorMessage) {
-              // Swift taxonomy: failed operations throw `.processingFailed`.
-              throw SDKException.processingFailed(event.errorMessage);
+            if (event.error) {
+              throw new SDKException(event.error);
             }
           }
           queue.complete();
@@ -268,9 +238,9 @@ function finalLLMResult(
   streamedToolCalls: ToolCall[] = [],
 ): LLMGenerationResult {
   const final = finalEvent?.result;
-  const generationTimeMs = final?.totalTimeMs ?? performance.now() - startedAt;
-  const inputTokens = final?.promptTokens ?? 0;
-  const tokensGenerated = final?.completionTokens ?? tokenCount;
+  const generationTimeMs = final?.generationTimeMs ?? performance.now() - startedAt;
+  const inputTokens = final?.usage?.inputTokens ?? 0;
+  const outputTokens = final?.usage?.outputTokens ?? tokenCount;
   // Prefer tool_calls from the final LLMGenerationResult (whole-call snapshot)
   // when present; otherwise fall back to the per-event accumulator so callers
   // still see streamed tool calls on backends that don't emit a final result.
@@ -280,22 +250,27 @@ function finalLLMResult(
   // text so UI consumers never remain stuck on an empty answer channel.
   const answerText = (final?.text ?? fullText).trim();
   const text = answerText || thinkingContent || '';
+  const decodeMs = generationTimeMs - (final?.promptEvalTimeMs ?? 0);
   return {
     text,
     thinkingContent: answerText ? thinkingContent : undefined,
-    inputTokens,
-    tokensGenerated,
     modelUsed: '',
     generationTimeMs,
-    ttftMs: final?.timeToFirstTokenMs,
-    tokensPerSecond: final?.tokensPerSecond
-      ?? (generationTimeMs > 0 ? (tokensGenerated / generationTimeMs) * 1000 : 0),
-    finishReason: finalEvent?.finishReason || final?.finishReason || '',
+    finishReason: finalEvent?.finishReason
+      || final?.finishReason
+      || FinishReason.FINISH_REASON_UNSPECIFIED,
     thinkingTokens: 0,
-    responseTokens: tokensGenerated,
-    totalTokens: final?.totalTokens ?? inputTokens + tokensGenerated,
-    errorMessage: finalEvent?.errorMessage || undefined,
-    errorCode: final?.errorCode ?? finalEvent?.errorCode ?? 0,
+    responseTokens: outputTokens,
+    usage: {
+      inputTokens,
+      outputTokens,
+      totalTokens: final?.usage?.totalTokens ?? inputTokens + outputTokens,
+      decodeTokensPerSecond: final?.usage?.decodeTokensPerSecond
+        ?? (decodeMs > 0 ? (outputTokens / decodeMs) * 1000 : 0),
+      prefillMs: final?.usage?.prefillMs ?? 0,
+      ttftMs: final?.usage?.ttftMs ?? 0,
+    },
+    error: final?.error ?? finalEvent?.error,
     cachedPromptTokens: 0,
     promptEvalTimeMs: final?.promptEvalTimeMs ?? 0,
     decodeTimeMs: final?.decodeTimeMs ?? 0,
@@ -335,7 +310,7 @@ async function generate(
   requestOrOptions: LLMGenerateRequest | TextGenerationOptions,
 ): Promise<LLMGenerationResult> {
   const adapter = requireProtoLLM('TextGeneration.generate');
-  const result = await adapter.generate(normalizeLLMGenerateRequest(requestOrOptions, false));
+  const result = await adapter.generate(normalizeLLMGenerateRequest(requestOrOptions));
   if (!result) {
     throw SDKException.backendNotAvailable(
       'TextGeneration.generate',
@@ -358,7 +333,7 @@ async function generateStream(
   requestOrOptions: LLMGenerateRequest | TextGenerationOptions,
 ): Promise<LLMStreamingResult> {
   const adapter = requireProtoLLM('TextGeneration.generateStream');
-  const events = adapter.generateStream(normalizeLLMGenerateRequest(requestOrOptions, true));
+  const events = adapter.generateStream(normalizeLLMGenerateRequest(requestOrOptions));
   return streamingResultFromEvents(events, () => {
     adapter.cancel();
   });
@@ -377,7 +352,7 @@ async function generateStream(
  * separate aggregated transcripts, then awaits the
  * terminal aggregate and applies the Swift fallback chain: `text` falls back
  * to the concatenated tokens, `inputTokens` to the `max(1, prompt/4)`
- * estimate, `totalTokens` to `inputTokens + tokensGenerated`, timing and
+ * estimate, `totalTokens` to `inputTokens + outputTokens`, timing and
  * throughput to local wall-clock measurements, while `promptEvalTimeMs` /
  * `decodeTimeMs` carry the backend's terminal metrics (0 when absent).
  * `modelUsed`/`framework` resolve from the currently-loaded language model
@@ -440,24 +415,29 @@ export async function aggregateStream(
   // Swift parity (RunAnywhere+TextGeneration.swift:179-182): estimate
   // inputTokens as max(1, prompt/4) when the backend did not report them and
   // recompute totalTokens from that estimate when absent.
-  const inputTokens = result.inputTokens || Math.max(1, Math.floor(prompt.length / 4));
-  const tokensGenerated = result.tokensGenerated || tokenCount;
+  const inputTokens = (result.usage?.inputTokens ?? 0) || Math.max(1, Math.floor(prompt.length / 4));
+  const outputTokens = (result.usage?.outputTokens ?? 0) || tokenCount;
+  const generationTimeMs = result.generationTimeMs || totalLatencyMs;
+  const decodeMs = generationTimeMs - (result.promptEvalTimeMs ?? 0);
   return {
     ...result,
     text: result.text || fullResponse,
     thinkingContent: result.thinkingContent || fullThinking || undefined,
-    inputTokens,
-    tokensGenerated,
-    responseTokens: tokensGenerated,
-    totalTokens: result.totalTokens || inputTokens + tokensGenerated,
+    responseTokens: outputTokens,
+    usage: {
+      inputTokens,
+      outputTokens,
+      totalTokens: (result.usage?.totalTokens ?? 0) || inputTokens + outputTokens,
+      decodeTokensPerSecond: (result.usage?.decodeTokensPerSecond ?? 0)
+        || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
+      prefillMs: result.usage?.prefillMs ?? 0,
+      ttftMs: result.usage?.ttftMs ?? (ttftMs ?? 0),
+    },
     modelUsed: model?.id ?? '',
     framework: model ? inferenceFrameworkToJSON(model.framework) : '',
-    generationTimeMs: result.generationTimeMs || totalLatencyMs,
-    tokensPerSecond: result.tokensPerSecond
-      || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
-    ttftMs: result.ttftMs ?? ttftMs,
+    generationTimeMs,
     promptEvalTimeMs: result.promptEvalTimeMs ?? 0,
-    decodeTimeMs: result.decodeTimeMs ?? 0,
+    decodeTimeMs: result.decodeTimeMs || decodeMs,
   };
 }
 
@@ -498,29 +478,18 @@ export async function* generateStructuredStream(
   });
 
   let accumulated = '';
-  let seq = 0;
   let nativeStreamDone = false;
   try {
     for await (const token of streaming.stream) {
       if (!token) continue;
       accumulated += token;
-      seq += 1;
-      yield StructuredOutputStreamEventMessage.fromPartial({
-        kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
-        token,
-        seq,
-      });
+      yield { kind: 'token', token };
     }
     nativeStreamDone = true;
     // Surface in-flight generation failures as throws before parsing.
     await streaming.result;
     const result = extractStructuredOutput(accumulated, schema);
-    seq += 1;
-    yield StructuredOutputStreamEventMessage.fromPartial({
-      kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
-      result,
-      seq,
-    });
+    yield { kind: 'completed', result };
   } catch (error) {
     // Producer self-terminated (stream/result/parse failure) — never fire
     // the native cancel for it. Swallow the duplicate rejection carried by

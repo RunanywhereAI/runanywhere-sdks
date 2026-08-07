@@ -93,28 +93,6 @@ class TokenKind extends $pb.ProtobufEnum {
   const TokenKind._(super.value, super.name);
 }
 
-class AudioEncoding extends $pb.ProtobufEnum {
-  static const AudioEncoding AUDIO_ENCODING_UNSPECIFIED =
-      AudioEncoding._(0, _omitEnumNames ? '' : 'AUDIO_ENCODING_UNSPECIFIED');
-  static const AudioEncoding AUDIO_ENCODING_PCM_F32_LE =
-      AudioEncoding._(1, _omitEnumNames ? '' : 'AUDIO_ENCODING_PCM_F32_LE');
-  static const AudioEncoding AUDIO_ENCODING_PCM_S16_LE =
-      AudioEncoding._(2, _omitEnumNames ? '' : 'AUDIO_ENCODING_PCM_S16_LE');
-
-  static const $core.List<AudioEncoding> values = <AudioEncoding>[
-    AUDIO_ENCODING_UNSPECIFIED,
-    AUDIO_ENCODING_PCM_F32_LE,
-    AUDIO_ENCODING_PCM_S16_LE,
-  ];
-
-  static final $core.List<AudioEncoding?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static AudioEncoding? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const AudioEncoding._(super.value, super.name);
-}
-
 class InterruptReason extends $pb.ProtobufEnum {
   static const InterruptReason INTERRUPT_REASON_UNSPECIFIED = InterruptReason._(
       0, _omitEnumNames ? '' : 'INTERRUPT_REASON_UNSPECIFIED');
@@ -193,51 +171,6 @@ class PipelineState extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const PipelineState._(super.value, super.name);
-}
-
-class SpeechTurnDetectionEventKind extends $pb.ProtobufEnum {
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED =
-      SpeechTurnDetectionEventKind._(0,
-          _omitEnumNames ? '' : 'SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED =
-      SpeechTurnDetectionEventKind._(
-          1,
-          _omitEnumNames
-              ? ''
-              : 'SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED =
-      SpeechTurnDetectionEventKind._(2,
-          _omitEnumNames ? '' : 'SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED =
-      SpeechTurnDetectionEventKind._(
-          3,
-          _omitEnumNames
-              ? ''
-              : 'SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED');
-  static const SpeechTurnDetectionEventKind
-      SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS =
-      SpeechTurnDetectionEventKind._(4,
-          _omitEnumNames ? '' : 'SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS');
-
-  static const $core.List<SpeechTurnDetectionEventKind> values =
-      <SpeechTurnDetectionEventKind>[
-    SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED,
-    SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS,
-  ];
-
-  static final $core.List<SpeechTurnDetectionEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
-  static SpeechTurnDetectionEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const SpeechTurnDetectionEventKind._(super.value, super.name);
 }
 
 class TurnLifecycleEventKind extends $pb.ProtobufEnum {

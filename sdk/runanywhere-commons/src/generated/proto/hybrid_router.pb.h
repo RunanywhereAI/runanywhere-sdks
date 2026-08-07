@@ -21,7 +21,6 @@
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/arena.h"
 #include "google/protobuf/arenastring.h"
-#include "google/protobuf/generated_message_bases.h"
 #include "google/protobuf/generated_message_tctable_decl.h"
 #include "google/protobuf/generated_message_util.h"
 #include "google/protobuf/metadata_lite.h"
@@ -32,6 +31,8 @@
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -57,14 +58,8 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_hybr
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum HybridBackendKind : int;
-extern const uint32_t HybridBackendKind_internal_data_[];
-enum HybridCapability : int;
-extern const uint32_t HybridCapability_internal_data_[];
-enum HybridModelType : int;
-extern const uint32_t HybridModelType_internal_data_[];
-enum HybridRank : int;
-extern const uint32_t HybridRank_internal_data_[];
+enum HybridInferenceMode : int;
+extern const uint32_t HybridInferenceMode_internal_data_[];
 class BatteryFilter;
 struct BatteryFilterGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -129,14 +124,6 @@ extern const ::google::protobuf::internal::ClassDataFull HybridRoutedMetadata_cl
 #else
 extern const HybridRoutedMetadataGlobalsTypeInternal HybridRoutedMetadata_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
-class HybridRoutingContext;
-struct HybridRoutingContextGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern HybridRoutingContextGlobalsTypeInternal HybridRoutingContext_globals_;
-extern const ::google::protobuf::internal::ClassDataFull HybridRoutingContext_class_data_;
-#else
-extern const HybridRoutingContextGlobalsTypeInternal HybridRoutingContext_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
 class HybridRoutingPolicy;
 struct HybridRoutingPolicyGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -174,189 +161,54 @@ extern const HybridSttTranscribeResponseGlobalsTypeInternal HybridSttTranscribeR
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::HybridBackendKind_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridBackendKind>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::HybridCapability_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridCapability>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::HybridModelType_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridModelType>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::HybridRank_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridRank>;
+internal::EnumTraitsT<::runanywhere::v1::HybridInferenceMode_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridInferenceMode>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
-enum HybridCapability : int {
-  HYBRID_CAPABILITY_UNSPECIFIED = 0,
-  HYBRID_CAPABILITY_LLM = 1,
-  HYBRID_CAPABILITY_VLM = 2,
-  HYBRID_CAPABILITY_STT = 3,
-  HYBRID_CAPABILITY_TTS = 4,
-  HYBRID_CAPABILITY_VAD = 5,
-  HybridCapability_INT_MIN_SENTINEL_DO_NOT_USE_ =
+enum HybridInferenceMode : int {
+  HYBRID_INFERENCE_MODE_UNSPECIFIED = 0,
+  HYBRID_INFERENCE_MODE_PREFER_ON_DEVICE = 1,
+  HYBRID_INFERENCE_MODE_ONLY_ON_DEVICE = 2,
+  HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD = 3,
+  HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD = 4,
+  HybridInferenceMode_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
-  HybridCapability_INT_MAX_SENTINEL_DO_NOT_USE_ =
+  HybridInferenceMode_INT_MAX_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::max(),
 };
 
-extern const uint32_t HybridCapability_internal_data_[];
-inline constexpr HybridCapability HybridCapability_MIN =
-    static_cast<HybridCapability>(0);
-inline constexpr HybridCapability HybridCapability_MAX =
-    static_cast<HybridCapability>(5);
-[[nodiscard]] inline bool HybridCapability_IsValid(int value) {
-  return 0 <= value && value <= 5;
-}
-inline constexpr int HybridCapability_ARRAYSIZE = 5 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridCapability_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridCapability) {
-  return HybridCapability_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& HybridCapability_Name(T value) {
-  static_assert(::std::is_same<T, HybridCapability>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to HybridCapability_Name().");
-  return HybridCapability_Name(static_cast<HybridCapability>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& HybridCapability_Name(HybridCapability value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<HybridCapability_descriptor, 0, 5>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool HybridCapability_Parse(
-    ::absl::string_view name, HybridCapability* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<HybridCapability>(HybridCapability_descriptor(), name,
-                                           value);
-}
-enum HybridBackendKind : int {
-  HYBRID_BACKEND_UNSPECIFIED = 0,
-  HYBRID_BACKEND_LLAMACPP = 1,
-  HYBRID_BACKEND_OPENROUTER = 2,
-  HYBRID_BACKEND_SHERPA = 3,
-  HYBRID_BACKEND_CLOUD = 4,
-  HybridBackendKind_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  HybridBackendKind_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t HybridBackendKind_internal_data_[];
-inline constexpr HybridBackendKind HybridBackendKind_MIN =
-    static_cast<HybridBackendKind>(0);
-inline constexpr HybridBackendKind HybridBackendKind_MAX =
-    static_cast<HybridBackendKind>(4);
-[[nodiscard]] inline bool HybridBackendKind_IsValid(int value) {
+extern const uint32_t HybridInferenceMode_internal_data_[];
+inline constexpr HybridInferenceMode HybridInferenceMode_MIN =
+    static_cast<HybridInferenceMode>(0);
+inline constexpr HybridInferenceMode HybridInferenceMode_MAX =
+    static_cast<HybridInferenceMode>(4);
+[[nodiscard]] inline bool HybridInferenceMode_IsValid(int value) {
   return 0 <= value && value <= 4;
 }
-inline constexpr int HybridBackendKind_ARRAYSIZE = 4 + 1;
+inline constexpr int HybridInferenceMode_ARRAYSIZE = 4 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridBackendKind_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridBackendKind) {
-  return HybridBackendKind_descriptor();
+HybridInferenceMode_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridInferenceMode) {
+  return HybridInferenceMode_descriptor();
 }
 template <typename T>
-[[nodiscard]] const ::std::string& HybridBackendKind_Name(T value) {
-  static_assert(::std::is_same<T, HybridBackendKind>::value ||
+[[nodiscard]] const ::std::string& HybridInferenceMode_Name(T value) {
+  static_assert(::std::is_same<T, HybridInferenceMode>::value ||
                     ::std::is_integral<T>::value,
-                "Incorrect type passed to HybridBackendKind_Name().");
-  return HybridBackendKind_Name(static_cast<HybridBackendKind>(value));
+                "Incorrect type passed to HybridInferenceMode_Name().");
+  return HybridInferenceMode_Name(static_cast<HybridInferenceMode>(value));
 }
 template <>
-[[nodiscard]] inline const ::std::string& HybridBackendKind_Name(HybridBackendKind value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<HybridBackendKind_descriptor, 0, 4>(
+[[nodiscard]] inline const ::std::string& HybridInferenceMode_Name(HybridInferenceMode value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<HybridInferenceMode_descriptor, 0, 4>(
       static_cast<int>(value));
 }
-[[nodiscard]] inline bool HybridBackendKind_Parse(
-    ::absl::string_view name, HybridBackendKind* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<HybridBackendKind>(HybridBackendKind_descriptor(), name,
-                                           value);
-}
-enum HybridModelType : int {
-  HYBRID_MODEL_TYPE_UNSPECIFIED = 0,
-  HYBRID_MODEL_TYPE_OFFLINE = 1,
-  HYBRID_MODEL_TYPE_ONLINE = 2,
-  HybridModelType_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  HybridModelType_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t HybridModelType_internal_data_[];
-inline constexpr HybridModelType HybridModelType_MIN =
-    static_cast<HybridModelType>(0);
-inline constexpr HybridModelType HybridModelType_MAX =
-    static_cast<HybridModelType>(2);
-[[nodiscard]] inline bool HybridModelType_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int HybridModelType_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridModelType_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridModelType) {
-  return HybridModelType_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& HybridModelType_Name(T value) {
-  static_assert(::std::is_same<T, HybridModelType>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to HybridModelType_Name().");
-  return HybridModelType_Name(static_cast<HybridModelType>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& HybridModelType_Name(HybridModelType value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<HybridModelType_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool HybridModelType_Parse(
-    ::absl::string_view name, HybridModelType* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<HybridModelType>(HybridModelType_descriptor(), name,
-                                           value);
-}
-enum HybridRank : int {
-  HYBRID_RANK_UNSPECIFIED = 0,
-  HYBRID_RANK_PREFER_LOCAL_FIRST = 1,
-  HYBRID_RANK_PREFER_ONLINE_FIRST = 2,
-  HybridRank_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  HybridRank_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t HybridRank_internal_data_[];
-inline constexpr HybridRank HybridRank_MIN =
-    static_cast<HybridRank>(0);
-inline constexpr HybridRank HybridRank_MAX =
-    static_cast<HybridRank>(2);
-[[nodiscard]] inline bool HybridRank_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int HybridRank_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridRank_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridRank) {
-  return HybridRank_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& HybridRank_Name(T value) {
-  static_assert(::std::is_same<T, HybridRank>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to HybridRank_Name().");
-  return HybridRank_Name(static_cast<HybridRank>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& HybridRank_Name(HybridRank value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<HybridRank_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool HybridRank_Parse(
-    ::absl::string_view name, HybridRank* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<HybridRank>(HybridRank_descriptor(), name,
+[[nodiscard]] inline bool HybridInferenceMode_Parse(
+    ::absl::string_view name, HybridInferenceMode* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<HybridInferenceMode>(HybridInferenceMode_descriptor(), name,
                                            value);
 }
 using ::google::protobuf::internal::generated_enum::AbslParseFlag;
@@ -423,7 +275,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeOptions final : 
   [[nodiscard]] static const HybridSttTranscribeOptions& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HybridSttTranscribeOptions>(&HybridSttTranscribeOptions_globals_);
   }
-  static constexpr int kIndexInFileMessages = 10;
+  static constexpr int kIndexInFileMessages = 9;
   friend void swap(HybridSttTranscribeOptions& a, HybridSttTranscribeOptions& b) { a.Swap(&b); }
   inline void Swap(HybridSttTranscribeOptions* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -544,14 +396,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeOptions final : 
   void _internal_set_sample_rate(::int32_t value);
 
   public:
-  // int32 audio_format = 3;
+  // .runanywhere.v1.AudioFormat audio_format = 3;
   void clear_audio_format() ;
-  [[nodiscard]] ::int32_t audio_format() const;
-  void set_audio_format(::int32_t value);
+  [[nodiscard]] ::runanywhere::v1::AudioFormat audio_format() const;
+  void set_audio_format(::runanywhere::v1::AudioFormat value);
 
   private:
-  ::int32_t _internal_audio_format() const;
-  void _internal_set_audio_format(::int32_t value);
+  ::runanywhere::v1::AudioFormat _internal_audio_format() const;
+  void _internal_set_audio_format(::runanywhere::v1::AudioFormat value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.HybridSttTranscribeOptions)
@@ -589,148 +441,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeOptions final : 
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr language_;
     ::int32_t sample_rate_;
-    ::int32_t audio_format_;
+    int audio_format_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
-  friend struct ::TableStruct_hybrid_5frouter_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingContext final : public ::google::protobuf::internal::ZeroFieldsBase
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.HybridRoutingContext) */ {
- public:
-  inline HybridRoutingContext() : HybridRoutingContext(nullptr) {}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(HybridRoutingContext* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(HybridRoutingContext));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr HybridRoutingContext(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline HybridRoutingContext(const HybridRoutingContext& from) : HybridRoutingContext(nullptr, from) {}
-  inline HybridRoutingContext(HybridRoutingContext&& from) noexcept : HybridRoutingContext(nullptr, ::std::move(from)) {}
-  inline HybridRoutingContext& operator=(const HybridRoutingContext& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline HybridRoutingContext& operator=(HybridRoutingContext&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const HybridRoutingContext& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HybridRoutingContext>(&HybridRoutingContext_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 8;
-  friend void swap(HybridRoutingContext& a, HybridRoutingContext& b) { a.Swap(&b); }
-  inline void Swap(HybridRoutingContext* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(HybridRoutingContext* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] HybridRoutingContext* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::internal::ZeroFieldsBase::DefaultConstruct<HybridRoutingContext>(arena);
-  }
-  using ::google::protobuf::internal::ZeroFieldsBase::CopyFrom;
-  inline void CopyFrom(const HybridRoutingContext& from) { ::google::protobuf::internal::ZeroFieldsBase::CopyImpl(*this, from); }
-  using ::google::protobuf::internal::ZeroFieldsBase::MergeFrom;
-  void MergeFrom(const HybridRoutingContext& from) { ::google::protobuf::internal::ZeroFieldsBase::MergeImpl(*this, from); }
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.HybridRoutingContext"; }
-
-  explicit HybridRoutingContext(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  HybridRoutingContext(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HybridRoutingContext& from);
-  HybridRoutingContext(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, HybridRoutingContext&& from) noexcept
-      : HybridRoutingContext(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.HybridRoutingContext)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<0, 0,
-                          0, 0,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
   friend struct ::TableStruct_hybrid_5frouter_2eproto;
 };
 // -------------------------------------------------------------------
@@ -885,9 +599,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutedMetadata final : public
   enum : int {
     kChosenModelIdFieldNumber = 1,
     kPrimaryErrorMessageFieldNumber = 5,
-    kWasFallbackFieldNumber = 2,
     kAttemptCountFieldNumber = 3,
     kPrimaryErrorCodeFieldNumber = 4,
+    kWasFallbackFieldNumber = 2,
+    kServedOnDeviceFieldNumber = 8,
     kConfidenceFieldNumber = 6,
     kPrimaryConfidenceFieldNumber = 7,
   };
@@ -921,16 +636,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutedMetadata final : public
   ::std::string* PROTOBUF_NONNULL _internal_mutable_primary_error_message();
 
   public:
-  // bool was_fallback = 2;
-  void clear_was_fallback() ;
-  [[nodiscard]] bool was_fallback() const;
-  void set_was_fallback(bool value);
-
-  private:
-  bool _internal_was_fallback() const;
-  void _internal_set_was_fallback(bool value);
-
-  public:
   // int32 attempt_count = 3;
   void clear_attempt_count() ;
   [[nodiscard]] ::int32_t attempt_count() const;
@@ -951,7 +656,29 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutedMetadata final : public
   void _internal_set_primary_error_code(::int32_t value);
 
   public:
-  // float confidence = 6;
+  // bool was_fallback = 2;
+  void clear_was_fallback() ;
+  [[nodiscard]] bool was_fallback() const;
+  void set_was_fallback(bool value);
+
+  private:
+  bool _internal_was_fallback() const;
+  void _internal_set_was_fallback(bool value);
+
+  public:
+  // bool served_on_device = 8;
+  void clear_served_on_device() ;
+  [[nodiscard]] bool served_on_device() const;
+  void set_served_on_device(bool value);
+
+  private:
+  bool _internal_served_on_device() const;
+  void _internal_set_served_on_device(bool value);
+
+  public:
+  // optional float confidence = 6;
+  [[nodiscard]] bool has_confidence()
+      const;
   void clear_confidence() ;
   [[nodiscard]] float confidence() const;
   void set_confidence(float value);
@@ -961,7 +688,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutedMetadata final : public
   void _internal_set_confidence(float value);
 
   public:
-  // float primary_confidence = 7;
+  // optional float primary_confidence = 7;
+  [[nodiscard]] bool has_primary_confidence()
+      const;
   void clear_primary_confidence() ;
   [[nodiscard]] float primary_confidence() const;
   void set_primary_confidence(float value);
@@ -975,8 +704,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutedMetadata final : public
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 7,
-                          0, 80,
+      ::google::protobuf::internal::TcParseTable<3, 8,
+                          0, 88,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1006,9 +735,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutedMetadata final : public
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr chosen_model_id_;
     ::google::protobuf::internal::ArenaStringPtr primary_error_message_;
-    bool was_fallback_;
     ::int32_t attempt_count_;
     ::int32_t primary_error_code_;
+    bool was_fallback_;
+    bool served_on_device_;
     float confidence_;
     float primary_confidence_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -1167,9 +897,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
   // accessors -------------------------------------------------------
   enum : int {
     kModelIdFieldNumber = 1,
-    kProviderFieldNumber = 4,
-    kModelTypeFieldNumber = 2,
-    kBackendFieldNumber = 3,
+    kEngineFieldNumber = 3,
+    kIsOnDeviceFieldNumber = 2,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -1186,47 +915,37 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
-  // string provider = 4;
-  void clear_provider() ;
-  [[nodiscard]] const ::std::string& provider() const;
+  // string engine = 3;
+  void clear_engine() ;
+  [[nodiscard]] const ::std::string& engine() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_provider(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_provider();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_provider();
-  void set_allocated_provider(::std::string* PROTOBUF_NULLABLE value);
+  void set_engine(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_engine();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_engine();
+  void set_allocated_engine(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_provider() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_provider(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_provider();
+  const ::std::string& _internal_engine() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_engine(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_engine();
 
   public:
-  // .runanywhere.v1.HybridModelType model_type = 2;
-  void clear_model_type() ;
-  [[nodiscard]] ::runanywhere::v1::HybridModelType model_type() const;
-  void set_model_type(::runanywhere::v1::HybridModelType value);
+  // bool is_on_device = 2;
+  void clear_is_on_device() ;
+  [[nodiscard]] bool is_on_device() const;
+  void set_is_on_device(bool value);
 
   private:
-  ::runanywhere::v1::HybridModelType _internal_model_type() const;
-  void _internal_set_model_type(::runanywhere::v1::HybridModelType value);
-
-  public:
-  // .runanywhere.v1.HybridBackendKind backend = 3;
-  void clear_backend() ;
-  [[nodiscard]] ::runanywhere::v1::HybridBackendKind backend() const;
-  void set_backend(::runanywhere::v1::HybridBackendKind value);
-
-  private:
-  ::runanywhere::v1::HybridBackendKind _internal_backend() const;
-  void _internal_set_backend(::runanywhere::v1::HybridBackendKind value);
+  bool _internal_is_on_device() const;
+  void _internal_set_is_on_device(bool value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.HybridModelDescriptor)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
-                          0, 61,
+      ::google::protobuf::internal::TcParseTable<2, 3,
+                          0, 59,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1255,9 +974,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr provider_;
-    int model_type_;
-    int backend_;
+    ::google::protobuf::internal::ArenaStringPtr engine_;
+    bool is_on_device_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1638,7 +1356,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConfidenceCascade final : public ::
   enum : int {
     kThresholdFieldNumber = 1,
   };
-  // float threshold = 1;
+  // float threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   void clear_threshold() ;
   [[nodiscard]] float threshold() const;
   void set_threshold(float value);
@@ -1745,7 +1463,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CloudSttBackendConfig final : publi
   [[nodiscard]] static const CloudSttBackendConfig& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<CloudSttBackendConfig>(&CloudSttBackendConfig_globals_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(CloudSttBackendConfig& a, CloudSttBackendConfig& b) { a.Swap(&b); }
   inline void Swap(CloudSttBackendConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2125,7 +1843,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED BatteryFilter final : public ::goog
   enum : int {
     kMinBatteryPercentFieldNumber = 1,
   };
-  // int32 min_battery_percent = 1;
+  // int32 min_battery_percent = 1 [(.runanywhere.v1.rac_default) = "20", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 100];
   void clear_min_battery_percent() ;
   [[nodiscard]] ::int32_t min_battery_percent() const;
   void set_min_battery_percent(::int32_t value);
@@ -2232,7 +1950,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeResponse final :
   [[nodiscard]] static const HybridSttTranscribeResponse& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HybridSttTranscribeResponse>(&HybridSttTranscribeResponse_globals_);
   }
-  static constexpr int kIndexInFileMessages = 12;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(HybridSttTranscribeResponse& a, HybridSttTranscribeResponse& b) { a.Swap(&b); }
   inline void Swap(HybridSttTranscribeResponse* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2326,7 +2044,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeResponse final :
   enum : int {
     kTextFieldNumber = 2,
     kDetectedLanguageFieldNumber = 3,
-    kErrorMsgFieldNumber = 5,
     kRoutingFieldNumber = 4,
     kRcFieldNumber = 1,
   };
@@ -2360,21 +2077,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeResponse final :
   ::std::string* PROTOBUF_NONNULL _internal_mutable_detected_language();
 
   public:
-  // string error_msg = 5;
-  void clear_error_msg() ;
-  [[nodiscard]] const ::std::string& error_msg() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_msg(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_msg();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_msg();
-  void set_allocated_error_msg(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_msg() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_msg(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_msg();
-
-  public:
   // .runanywhere.v1.HybridRoutedMetadata routing = 4;
   [[nodiscard]] bool has_routing()
       const;
@@ -2405,8 +2107,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeResponse final :
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 5,
-                          1, 81,
+      ::google::protobuf::internal::TcParseTable<2, 4,
+                          1, 72,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2436,7 +2138,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeResponse final :
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr text_;
     ::google::protobuf::internal::ArenaStringPtr detected_language_;
-    ::google::protobuf::internal::ArenaStringPtr error_msg_;
     ::runanywhere::v1::HybridRoutedMetadata* PROTOBUF_NULLABLE routing_;
     ::int32_t rc_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -2502,7 +2203,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeRequest final : 
   [[nodiscard]] static const HybridSttTranscribeRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HybridSttTranscribeRequest>(&HybridSttTranscribeRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 11;
+  static constexpr int kIndexInFileMessages = 10;
   friend void swap(HybridSttTranscribeRequest& a, HybridSttTranscribeRequest& b) { a.Swap(&b); }
   inline void Swap(HybridSttTranscribeRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2595,8 +2296,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeRequest final : 
   // accessors -------------------------------------------------------
   enum : int {
     kAudioBytesFieldNumber = 1,
-    kContextFieldNumber = 2,
-    kOptionsFieldNumber = 3,
+    kOptionsFieldNumber = 2,
   };
   // bytes audio_bytes = 1;
   void clear_audio_bytes() ;
@@ -2613,23 +2313,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeRequest final : 
   ::std::string* PROTOBUF_NONNULL _internal_mutable_audio_bytes();
 
   public:
-  // .runanywhere.v1.HybridRoutingContext context = 2;
-  [[nodiscard]] bool has_context()
-      const;
-  void clear_context() ;
-  [[nodiscard]] const ::runanywhere::v1::HybridRoutingContext& context() const;
-  [[nodiscard]] ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE release_context();
-  ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NONNULL mutable_context();
-  void set_allocated_context(::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_context(::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE unsafe_arena_release_context();
-
-  private:
-  const ::runanywhere::v1::HybridRoutingContext& _internal_context() const;
-  ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NONNULL _internal_mutable_context();
-
-  public:
-  // .runanywhere.v1.HybridSttTranscribeOptions options = 3;
+  // .runanywhere.v1.HybridSttTranscribeOptions options = 2;
   [[nodiscard]] bool has_options()
       const;
   void clear_options() ;
@@ -2649,8 +2333,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeRequest final : 
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
-                          2, 0,
+      ::google::protobuf::internal::TcParseTable<1, 2,
+                          1, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2679,7 +2363,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeRequest final : 
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr audio_bytes_;
-    ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE context_;
     ::runanywhere::v1::HybridSttTranscribeOptions* PROTOBUF_NULLABLE options_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -2746,9 +2429,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridFilter final : public ::googl
   }
   enum KindCase {
     kNetwork = 1,
-    kQualityTier = 3,
-    kBattery = 4,
-    kCustom = 5,
+    kBattery = 2,
+    kCustom = 3,
     KIND_NOT_SET = 0,
   };
   static constexpr int kIndexInFileMessages = 0;
@@ -2844,9 +2526,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridFilter final : public ::googl
   // accessors -------------------------------------------------------
   enum : int {
     kNetworkFieldNumber = 1,
-    kQualityTierFieldNumber = 3,
-    kBatteryFieldNumber = 4,
-    kCustomFieldNumber = 5,
+    kBatteryFieldNumber = 2,
+    kCustomFieldNumber = 3,
   };
   // bool network = 1;
   [[nodiscard]] bool has_network()
@@ -2860,19 +2541,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridFilter final : public ::googl
   void _internal_set_network(bool value);
 
   public:
-  // int32 quality_tier = 3;
-  [[nodiscard]] bool has_quality_tier()
-      const;
-  void clear_quality_tier() ;
-  [[nodiscard]] ::int32_t quality_tier() const;
-  void set_quality_tier(::int32_t value);
-
-  private:
-  ::int32_t _internal_quality_tier() const;
-  void _internal_set_quality_tier(::int32_t value);
-
-  public:
-  // .runanywhere.v1.BatteryFilter battery = 4;
+  // .runanywhere.v1.BatteryFilter battery = 2;
   [[nodiscard]] bool has_battery()
       const;
   private:
@@ -2892,7 +2561,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridFilter final : public ::googl
   ::runanywhere::v1::BatteryFilter* PROTOBUF_NONNULL _internal_mutable_battery();
 
   public:
-  // .runanywhere.v1.CustomFilter custom = 5;
+  // .runanywhere.v1.CustomFilter custom = 3;
   [[nodiscard]] bool has_custom()
       const;
   private:
@@ -2918,13 +2587,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridFilter final : public ::googl
  private:
   class _Internal;
   void set_has_network();
-  void set_has_quality_tier();
   void set_has_battery();
   void set_has_custom();
   [[nodiscard]] inline bool has_kind() const;
   inline void clear_has_kind();
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<0, 4,
+      ::google::protobuf::internal::TcParseTable<0, 3,
                           2, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -2955,7 +2623,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridFilter final : public ::googl
       constexpr KindUnion() : _constinit_{} {}
       ::google::protobuf::internal::ConstantInitialized _constinit_;
       bool network_;
-      ::int32_t quality_tier_;
       ::runanywhere::v1::BatteryFilter* PROTOBUF_NULLABLE battery_;
       ::runanywhere::v1::CustomFilter* PROTOBUF_NULLABLE custom_;
     } kind_;
@@ -3341,8 +3008,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingPolicy final : public 
   // accessors -------------------------------------------------------
   enum : int {
     kHardFiltersFieldNumber = 1,
+    kModelsFieldNumber = 5,
     kCascadeFieldNumber = 2,
-    kRankFieldNumber = 3,
+    kModeFieldNumber = 3,
+    kAttemptTimeoutMsFieldNumber = 4,
   };
   // repeated .runanywhere.v1.HybridFilter hard_filters = 1;
   [[nodiscard]] int hard_filters_size()
@@ -3365,6 +3034,27 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingPolicy final : public 
   ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridFilter>* PROTOBUF_NONNULL _internal_mutable_hard_filters();
 
   public:
+  // repeated .runanywhere.v1.HybridModelDescriptor models = 5;
+  [[nodiscard]] int models_size()
+      const;
+  private:
+  int _internal_models_size() const;
+
+  public:
+  void clear_models() ;
+  [[nodiscard]] const ::runanywhere::v1::HybridModelDescriptor& models(int index) const;
+  [[nodiscard]] ::runanywhere::v1::HybridModelDescriptor* PROTOBUF_NONNULL mutable_models(int index);
+  ::runanywhere::v1::HybridModelDescriptor* PROTOBUF_NONNULL add_models();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>&
+  models() const;
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>* PROTOBUF_NONNULL
+  mutable_models();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>& _internal_models() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>* PROTOBUF_NONNULL _internal_mutable_models();
+
+  public:
   // .runanywhere.v1.HybridCascade cascade = 2;
   [[nodiscard]] bool has_cascade()
       const;
@@ -3381,22 +3071,32 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingPolicy final : public 
   ::runanywhere::v1::HybridCascade* PROTOBUF_NONNULL _internal_mutable_cascade();
 
   public:
-  // .runanywhere.v1.HybridRank rank = 3;
-  void clear_rank() ;
-  [[nodiscard]] ::runanywhere::v1::HybridRank rank() const;
-  void set_rank(::runanywhere::v1::HybridRank value);
+  // .runanywhere.v1.HybridInferenceMode mode = 3;
+  void clear_mode() ;
+  [[nodiscard]] ::runanywhere::v1::HybridInferenceMode mode() const;
+  void set_mode(::runanywhere::v1::HybridInferenceMode value);
 
   private:
-  ::runanywhere::v1::HybridRank _internal_rank() const;
-  void _internal_set_rank(::runanywhere::v1::HybridRank value);
+  ::runanywhere::v1::HybridInferenceMode _internal_mode() const;
+  void _internal_set_mode(::runanywhere::v1::HybridInferenceMode value);
+
+  public:
+  // int32 attempt_timeout_ms = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+  void clear_attempt_timeout_ms() ;
+  [[nodiscard]] ::int32_t attempt_timeout_ms() const;
+  void set_attempt_timeout_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_attempt_timeout_ms() const;
+  void _internal_set_attempt_timeout_ms(::int32_t value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.HybridRoutingPolicy)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
-                          2, 0,
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          3, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -3425,8 +3125,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingPolicy final : public 
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::HybridFilter > hard_filters_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::HybridModelDescriptor > models_;
     ::runanywhere::v1::HybridCascade* PROTOBUF_NULLABLE cascade_;
-    int rank_;
+    int mode_;
+    ::int32_t attempt_timeout_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -3482,40 +3184,7 @@ inline bool HybridFilter::_internal_network() const {
   return false;
 }
 
-// int32 quality_tier = 3;
-inline bool HybridFilter::has_quality_tier() const {
-  return kind_case() == kQualityTier;
-}
-inline void HybridFilter::set_has_quality_tier() {
-  _impl_._oneof_case_[0] = kQualityTier;
-}
-inline void HybridFilter::clear_quality_tier() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (kind_case() == kQualityTier) {
-    _impl_.kind_.quality_tier_ = 0;
-    clear_has_kind();
-  }
-}
-inline ::int32_t HybridFilter::quality_tier() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridFilter.quality_tier)
-  return _internal_quality_tier();
-}
-inline void HybridFilter::set_quality_tier(::int32_t value) {
-  if (kind_case() != kQualityTier) {
-    clear_kind();
-    set_has_quality_tier();
-  }
-  _impl_.kind_.quality_tier_ = value;
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridFilter.quality_tier)
-}
-inline ::int32_t HybridFilter::_internal_quality_tier() const {
-  if (kind_case() == kQualityTier) {
-    return _impl_.kind_.quality_tier_;
-  }
-  return 0;
-}
-
-// .runanywhere.v1.BatteryFilter battery = 4;
+// .runanywhere.v1.BatteryFilter battery = 2;
 inline bool HybridFilter::has_battery() const {
   return kind_case() == kBattery;
 }
@@ -3597,7 +3266,7 @@ inline ::runanywhere::v1::BatteryFilter* PROTOBUF_NONNULL HybridFilter::mutable_
   return _msg;
 }
 
-// .runanywhere.v1.CustomFilter custom = 5;
+// .runanywhere.v1.CustomFilter custom = 3;
 inline bool HybridFilter::has_custom() const {
   return kind_case() == kCustom;
 }
@@ -3692,7 +3361,7 @@ inline HybridFilter::KindCase HybridFilter::kind_case() const {
 
 // BatteryFilter
 
-// int32 min_battery_percent = 1;
+// int32 min_battery_percent = 1 [(.runanywhere.v1.rac_default) = "20", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 100];
 inline void BatteryFilter::clear_min_battery_percent() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_battery_percent_ = 0;
@@ -3947,7 +3616,7 @@ inline HybridCascade::KindCase HybridCascade::kind_case() const {
 
 // ConfidenceCascade
 
-// float threshold = 1;
+// float threshold = 1 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline void ConfidenceCascade::clear_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.threshold_ = 0;
@@ -4032,14 +3701,14 @@ HybridRoutingPolicy::_internal_mutable_hard_filters() {
 
 // .runanywhere.v1.HybridCascade cascade = 2;
 inline bool HybridRoutingPolicy::has_cascade() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   PROTOBUF_ASSUME(!value || _impl_.cascade_ != nullptr);
   return value;
 }
 inline void HybridRoutingPolicy::clear_cascade() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.cascade_ != nullptr) _impl_.cascade_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::runanywhere::v1::HybridCascade& HybridRoutingPolicy::_internal_cascade() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -4058,16 +3727,16 @@ inline void HybridRoutingPolicy::unsafe_arena_set_allocated_cascade(
   }
   _impl_.cascade_ = reinterpret_cast<::runanywhere::v1::HybridCascade*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.HybridRoutingPolicy.cascade)
 }
 inline ::runanywhere::v1::HybridCascade* PROTOBUF_NULLABLE HybridRoutingPolicy::release_cascade() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::HybridCascade* released = _impl_.cascade_;
   _impl_.cascade_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -4087,7 +3756,7 @@ inline ::runanywhere::v1::HybridCascade* PROTOBUF_NULLABLE HybridRoutingPolicy::
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.HybridRoutingPolicy.cascade)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::HybridCascade* temp = _impl_.cascade_;
   _impl_.cascade_ = nullptr;
   return temp;
@@ -4102,7 +3771,7 @@ inline ::runanywhere::v1::HybridCascade* PROTOBUF_NONNULL HybridRoutingPolicy::_
 }
 inline ::runanywhere::v1::HybridCascade* PROTOBUF_NONNULL HybridRoutingPolicy::mutable_cascade()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::HybridCascade* _msg = _internal_mutable_cascade();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridRoutingPolicy.cascade)
   return _msg;
@@ -4119,37 +3788,116 @@ inline void HybridRoutingPolicy::set_allocated_cascade(::runanywhere::v1::Hybrid
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
 
   _impl_.cascade_ = reinterpret_cast<::runanywhere::v1::HybridCascade*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridRoutingPolicy.cascade)
 }
 
-// .runanywhere.v1.HybridRank rank = 3;
-inline void HybridRoutingPolicy::clear_rank() {
+// .runanywhere.v1.HybridInferenceMode mode = 3;
+inline void HybridRoutingPolicy::clear_mode() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rank_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.mode_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
-inline ::runanywhere::v1::HybridRank HybridRoutingPolicy::rank() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutingPolicy.rank)
-  return _internal_rank();
+inline ::runanywhere::v1::HybridInferenceMode HybridRoutingPolicy::mode() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutingPolicy.mode)
+  return _internal_mode();
 }
-inline void HybridRoutingPolicy::set_rank(::runanywhere::v1::HybridRank value) {
-  _internal_set_rank(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutingPolicy.rank)
+inline void HybridRoutingPolicy::set_mode(::runanywhere::v1::HybridInferenceMode value) {
+  _internal_set_mode(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutingPolicy.mode)
 }
-inline ::runanywhere::v1::HybridRank HybridRoutingPolicy::_internal_rank() const {
+inline ::runanywhere::v1::HybridInferenceMode HybridRoutingPolicy::_internal_mode() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::HybridRank>(_impl_.rank_);
+  return static_cast<::runanywhere::v1::HybridInferenceMode>(_impl_.mode_);
 }
-inline void HybridRoutingPolicy::_internal_set_rank(::runanywhere::v1::HybridRank value) {
+inline void HybridRoutingPolicy::_internal_set_mode(::runanywhere::v1::HybridInferenceMode value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rank_ = value;
+  _impl_.mode_ = value;
+}
+
+// int32 attempt_timeout_ms = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+inline void HybridRoutingPolicy::clear_attempt_timeout_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.attempt_timeout_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline ::int32_t HybridRoutingPolicy::attempt_timeout_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutingPolicy.attempt_timeout_ms)
+  return _internal_attempt_timeout_ms();
+}
+inline void HybridRoutingPolicy::set_attempt_timeout_ms(::int32_t value) {
+  _internal_set_attempt_timeout_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutingPolicy.attempt_timeout_ms)
+}
+inline ::int32_t HybridRoutingPolicy::_internal_attempt_timeout_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.attempt_timeout_ms_;
+}
+inline void HybridRoutingPolicy::_internal_set_attempt_timeout_ms(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.attempt_timeout_ms_ = value;
+}
+
+// repeated .runanywhere.v1.HybridModelDescriptor models = 5;
+inline int HybridRoutingPolicy::_internal_models_size() const {
+  return _internal_models().size();
+}
+inline int HybridRoutingPolicy::models_size() const {
+  return _internal_models_size();
+}
+inline void HybridRoutingPolicy::clear_models() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.models_.Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline const ::runanywhere::v1::HybridModelDescriptor& HybridRoutingPolicy::models(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutingPolicy.models)
+  return _internal_models().Get(index);
+}
+inline ::runanywhere::v1::HybridModelDescriptor* PROTOBUF_NONNULL HybridRoutingPolicy::mutable_models(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridRoutingPolicy.models)
+  return _internal_mutable_models()->Mutable(index);
+}
+inline ::runanywhere::v1::HybridModelDescriptor* PROTOBUF_NONNULL HybridRoutingPolicy::add_models()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::runanywhere::v1::HybridModelDescriptor* _add =
+      _internal_mutable_models()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.HybridRoutingPolicy.models)
+  return _add;
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>& HybridRoutingPolicy::models() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.HybridRoutingPolicy.models)
+  return _internal_models();
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>* PROTOBUF_NONNULL
+HybridRoutingPolicy::mutable_models() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.HybridRoutingPolicy.models)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_models();
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>&
+HybridRoutingPolicy::_internal_models() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.models_;
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::HybridModelDescriptor>* PROTOBUF_NONNULL
+HybridRoutingPolicy::_internal_mutable_models() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.models_;
 }
 
 // -------------------------------------------------------------------
@@ -4220,116 +3968,92 @@ inline void HybridModelDescriptor::set_allocated_model_id(::std::string* PROTOBU
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridModelDescriptor.model_id)
 }
 
-// .runanywhere.v1.HybridModelType model_type = 2;
-inline void HybridModelDescriptor::clear_model_type() {
+// bool is_on_device = 2;
+inline void HybridModelDescriptor::clear_is_on_device() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_type_ = 0;
+  _impl_.is_on_device_ = false;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::runanywhere::v1::HybridModelType HybridModelDescriptor::model_type() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.model_type)
-  return _internal_model_type();
+inline bool HybridModelDescriptor::is_on_device() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.is_on_device)
+  return _internal_is_on_device();
 }
-inline void HybridModelDescriptor::set_model_type(::runanywhere::v1::HybridModelType value) {
-  _internal_set_model_type(value);
+inline void HybridModelDescriptor::set_is_on_device(bool value) {
+  _internal_set_is_on_device(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.model_type)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.is_on_device)
 }
-inline ::runanywhere::v1::HybridModelType HybridModelDescriptor::_internal_model_type() const {
+inline bool HybridModelDescriptor::_internal_is_on_device() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::HybridModelType>(_impl_.model_type_);
+  return _impl_.is_on_device_;
 }
-inline void HybridModelDescriptor::_internal_set_model_type(::runanywhere::v1::HybridModelType value) {
+inline void HybridModelDescriptor::_internal_set_is_on_device(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_type_ = value;
+  _impl_.is_on_device_ = value;
 }
 
-// .runanywhere.v1.HybridBackendKind backend = 3;
-inline void HybridModelDescriptor::clear_backend() {
+// string engine = 3;
+inline void HybridModelDescriptor::clear_engine() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.backend_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline ::runanywhere::v1::HybridBackendKind HybridModelDescriptor::backend() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.backend)
-  return _internal_backend();
-}
-inline void HybridModelDescriptor::set_backend(::runanywhere::v1::HybridBackendKind value) {
-  _internal_set_backend(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.backend)
-}
-inline ::runanywhere::v1::HybridBackendKind HybridModelDescriptor::_internal_backend() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::HybridBackendKind>(_impl_.backend_);
-}
-inline void HybridModelDescriptor::_internal_set_backend(::runanywhere::v1::HybridBackendKind value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.backend_ = value;
-}
-
-// string provider = 4;
-inline void HybridModelDescriptor::clear_provider() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.provider_.ClearToEmpty();
+  _impl_.engine_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
-inline const ::std::string& HybridModelDescriptor::provider() const
+inline const ::std::string& HybridModelDescriptor::engine() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.provider)
-  return _internal_provider();
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.engine)
+  return _internal_engine();
 }
 template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void HybridModelDescriptor::set_provider(Arg_&& arg, Args_... args) {
+PROTOBUF_ALWAYS_INLINE void HybridModelDescriptor::set_engine(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.provider_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.provider)
+  _impl_.engine_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.engine)
 }
-inline ::std::string* PROTOBUF_NONNULL HybridModelDescriptor::mutable_provider()
+inline ::std::string* PROTOBUF_NONNULL HybridModelDescriptor::mutable_engine()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_provider();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridModelDescriptor.provider)
+  ::std::string* _s = _internal_mutable_engine();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridModelDescriptor.engine)
   return _s;
 }
-inline const ::std::string& HybridModelDescriptor::_internal_provider() const {
+inline const ::std::string& HybridModelDescriptor::_internal_engine() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.provider_.Get();
+  return _impl_.engine_.Get();
 }
-inline void HybridModelDescriptor::_internal_set_provider(const ::std::string& value) {
+inline void HybridModelDescriptor::_internal_set_engine(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.provider_.Set(value, GetArena());
+  _impl_.engine_.Set(value, GetArena());
 }
-inline ::std::string* PROTOBUF_NONNULL HybridModelDescriptor::_internal_mutable_provider() {
+inline ::std::string* PROTOBUF_NONNULL HybridModelDescriptor::_internal_mutable_engine() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.provider_.Mutable( GetArena());
+  return _impl_.engine_.Mutable( GetArena());
 }
-inline ::std::string* PROTOBUF_NULLABLE HybridModelDescriptor::release_provider() {
+inline ::std::string* PROTOBUF_NULLABLE HybridModelDescriptor::release_engine() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HybridModelDescriptor.provider)
+  // @@protoc_insertion_point(field_release:runanywhere.v1.HybridModelDescriptor.engine)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.provider_.Release();
+  auto* released = _impl_.engine_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.provider_.Set("", GetArena());
+    _impl_.engine_.Set("", GetArena());
   }
   return released;
 }
-inline void HybridModelDescriptor::set_allocated_provider(::std::string* PROTOBUF_NULLABLE value) {
+inline void HybridModelDescriptor::set_allocated_engine(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.provider_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.provider_.IsDefault()) {
-    _impl_.provider_.Set("", GetArena());
+  _impl_.engine_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.engine_.IsDefault()) {
+    _impl_.engine_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridModelDescriptor.provider)
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridModelDescriptor.engine)
 }
 
 // -------------------------------------------------------------------
@@ -4404,7 +4128,7 @@ inline void HybridRoutedMetadata::set_allocated_chosen_model_id(::std::string* P
 inline void HybridRoutedMetadata::clear_was_fallback() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.was_fallback_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline bool HybridRoutedMetadata::was_fallback() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutedMetadata.was_fallback)
@@ -4412,7 +4136,7 @@ inline bool HybridRoutedMetadata::was_fallback() const {
 }
 inline void HybridRoutedMetadata::set_was_fallback(bool value) {
   _internal_set_was_fallback(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutedMetadata.was_fallback)
 }
 inline bool HybridRoutedMetadata::_internal_was_fallback() const {
@@ -4428,7 +4152,7 @@ inline void HybridRoutedMetadata::_internal_set_was_fallback(bool value) {
 inline void HybridRoutedMetadata::clear_attempt_count() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.attempt_count_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::int32_t HybridRoutedMetadata::attempt_count() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutedMetadata.attempt_count)
@@ -4436,7 +4160,7 @@ inline ::int32_t HybridRoutedMetadata::attempt_count() const {
 }
 inline void HybridRoutedMetadata::set_attempt_count(::int32_t value) {
   _internal_set_attempt_count(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutedMetadata.attempt_count)
 }
 inline ::int32_t HybridRoutedMetadata::_internal_attempt_count() const {
@@ -4452,7 +4176,7 @@ inline void HybridRoutedMetadata::_internal_set_attempt_count(::int32_t value) {
 inline void HybridRoutedMetadata::clear_primary_error_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.primary_error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::int32_t HybridRoutedMetadata::primary_error_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutedMetadata.primary_error_code)
@@ -4460,7 +4184,7 @@ inline ::int32_t HybridRoutedMetadata::primary_error_code() const {
 }
 inline void HybridRoutedMetadata::set_primary_error_code(::int32_t value) {
   _internal_set_primary_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutedMetadata.primary_error_code)
 }
 inline ::int32_t HybridRoutedMetadata::_internal_primary_error_code() const {
@@ -4536,11 +4260,15 @@ inline void HybridRoutedMetadata::set_allocated_primary_error_message(::std::str
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridRoutedMetadata.primary_error_message)
 }
 
-// float confidence = 6;
+// optional float confidence = 6;
+inline bool HybridRoutedMetadata::has_confidence() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
 inline void HybridRoutedMetadata::clear_confidence() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline float HybridRoutedMetadata::confidence() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutedMetadata.confidence)
@@ -4548,7 +4276,7 @@ inline float HybridRoutedMetadata::confidence() const {
 }
 inline void HybridRoutedMetadata::set_confidence(float value) {
   _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutedMetadata.confidence)
 }
 inline float HybridRoutedMetadata::_internal_confidence() const {
@@ -4560,11 +4288,15 @@ inline void HybridRoutedMetadata::_internal_set_confidence(float value) {
   _impl_.confidence_ = value;
 }
 
-// float primary_confidence = 7;
+// optional float primary_confidence = 7;
+inline bool HybridRoutedMetadata::has_primary_confidence() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
 inline void HybridRoutedMetadata::clear_primary_confidence() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.primary_confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline float HybridRoutedMetadata::primary_confidence() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutedMetadata.primary_confidence)
@@ -4572,7 +4304,7 @@ inline float HybridRoutedMetadata::primary_confidence() const {
 }
 inline void HybridRoutedMetadata::set_primary_confidence(float value) {
   _internal_set_primary_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutedMetadata.primary_confidence)
 }
 inline float HybridRoutedMetadata::_internal_primary_confidence() const {
@@ -4584,9 +4316,29 @@ inline void HybridRoutedMetadata::_internal_set_primary_confidence(float value) 
   _impl_.primary_confidence_ = value;
 }
 
-// -------------------------------------------------------------------
-
-// HybridRoutingContext
+// bool served_on_device = 8;
+inline void HybridRoutedMetadata::clear_served_on_device() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.served_on_device_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline bool HybridRoutedMetadata::served_on_device() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutedMetadata.served_on_device)
+  return _internal_served_on_device();
+}
+inline void HybridRoutedMetadata::set_served_on_device(bool value) {
+  _internal_set_served_on_device(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutedMetadata.served_on_device)
+}
+inline bool HybridRoutedMetadata::_internal_served_on_device() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.served_on_device_;
+}
+inline void HybridRoutedMetadata::_internal_set_served_on_device(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.served_on_device_ = value;
+}
 
 // -------------------------------------------------------------------
 
@@ -5028,26 +4780,26 @@ inline void HybridSttTranscribeOptions::_internal_set_sample_rate(::int32_t valu
   _impl_.sample_rate_ = value;
 }
 
-// int32 audio_format = 3;
+// .runanywhere.v1.AudioFormat audio_format = 3;
 inline void HybridSttTranscribeOptions::clear_audio_format() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.audio_format_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::int32_t HybridSttTranscribeOptions::audio_format() const {
+inline ::runanywhere::v1::AudioFormat HybridSttTranscribeOptions::audio_format() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridSttTranscribeOptions.audio_format)
   return _internal_audio_format();
 }
-inline void HybridSttTranscribeOptions::set_audio_format(::int32_t value) {
+inline void HybridSttTranscribeOptions::set_audio_format(::runanywhere::v1::AudioFormat value) {
   _internal_set_audio_format(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridSttTranscribeOptions.audio_format)
 }
-inline ::int32_t HybridSttTranscribeOptions::_internal_audio_format() const {
+inline ::runanywhere::v1::AudioFormat HybridSttTranscribeOptions::_internal_audio_format() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.audio_format_;
+  return static_cast<::runanywhere::v1::AudioFormat>(_impl_.audio_format_);
 }
-inline void HybridSttTranscribeOptions::_internal_set_audio_format(::int32_t value) {
+inline void HybridSttTranscribeOptions::_internal_set_audio_format(::runanywhere::v1::AudioFormat value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.audio_format_ = value;
 }
@@ -5120,114 +4872,16 @@ inline void HybridSttTranscribeRequest::set_allocated_audio_bytes(::std::string*
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridSttTranscribeRequest.audio_bytes)
 }
 
-// .runanywhere.v1.HybridRoutingContext context = 2;
-inline bool HybridSttTranscribeRequest::has_context() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
-  PROTOBUF_ASSUME(!value || _impl_.context_ != nullptr);
-  return value;
-}
-inline void HybridSttTranscribeRequest::clear_context() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.context_ != nullptr) _impl_.context_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::runanywhere::v1::HybridRoutingContext& HybridSttTranscribeRequest::_internal_context() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  const ::runanywhere::v1::HybridRoutingContext* p = _impl_.context_;
-  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::HybridRoutingContext>(&::runanywhere::v1::HybridRoutingContext_globals_);
-}
-inline const ::runanywhere::v1::HybridRoutingContext& HybridSttTranscribeRequest::context() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridSttTranscribeRequest.context)
-  return _internal_context();
-}
-inline void HybridSttTranscribeRequest::unsafe_arena_set_allocated_context(
-    ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (GetArena() == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.context_);
-  }
-  _impl_.context_ = reinterpret_cast<::runanywhere::v1::HybridRoutingContext*>(value);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.HybridSttTranscribeRequest.context)
-}
-inline ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE HybridSttTranscribeRequest::release_context() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::HybridRoutingContext* released = _impl_.context_;
-  _impl_.context_ = nullptr;
-  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
-    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
-    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    if (GetArena() == nullptr) {
-      delete old;
-    }
-  } else {
-    if (GetArena() != nullptr) {
-      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
-    }
-  }
-  return released;
-}
-inline ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE HybridSttTranscribeRequest::unsafe_arena_release_context() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HybridSttTranscribeRequest.context)
-
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::HybridRoutingContext* temp = _impl_.context_;
-  _impl_.context_ = nullptr;
-  return temp;
-}
-inline ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NONNULL HybridSttTranscribeRequest::_internal_mutable_context() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.context_ == nullptr) {
-    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::HybridRoutingContext>(GetArena());
-    _impl_.context_ = reinterpret_cast<::runanywhere::v1::HybridRoutingContext*>(p);
-  }
-  return _impl_.context_;
-}
-inline ::runanywhere::v1::HybridRoutingContext* PROTOBUF_NONNULL HybridSttTranscribeRequest::mutable_context()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::runanywhere::v1::HybridRoutingContext* _msg = _internal_mutable_context();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridSttTranscribeRequest.context)
-  return _msg;
-}
-inline void HybridSttTranscribeRequest::set_allocated_context(::runanywhere::v1::HybridRoutingContext* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::Arena* message_arena = GetArena();
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (message_arena == nullptr) {
-    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.context_);
-  }
-
-  if (value != nullptr) {
-    ::google::protobuf::Arena* submessage_arena = value->GetArena();
-    if (message_arena != submessage_arena) {
-      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
-    }
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-
-  _impl_.context_ = reinterpret_cast<::runanywhere::v1::HybridRoutingContext*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridSttTranscribeRequest.context)
-}
-
-// .runanywhere.v1.HybridSttTranscribeOptions options = 3;
+// .runanywhere.v1.HybridSttTranscribeOptions options = 2;
 inline bool HybridSttTranscribeRequest::has_options() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.options_ != nullptr);
   return value;
 }
 inline void HybridSttTranscribeRequest::clear_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.options_ != nullptr) _impl_.options_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::runanywhere::v1::HybridSttTranscribeOptions& HybridSttTranscribeRequest::_internal_options() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -5246,16 +4900,16 @@ inline void HybridSttTranscribeRequest::unsafe_arena_set_allocated_options(
   }
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::HybridSttTranscribeOptions*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.HybridSttTranscribeRequest.options)
 }
 inline ::runanywhere::v1::HybridSttTranscribeOptions* PROTOBUF_NULLABLE HybridSttTranscribeRequest::release_options() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::HybridSttTranscribeOptions* released = _impl_.options_;
   _impl_.options_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -5275,7 +4929,7 @@ inline ::runanywhere::v1::HybridSttTranscribeOptions* PROTOBUF_NULLABLE HybridSt
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.HybridSttTranscribeRequest.options)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::HybridSttTranscribeOptions* temp = _impl_.options_;
   _impl_.options_ = nullptr;
   return temp;
@@ -5290,7 +4944,7 @@ inline ::runanywhere::v1::HybridSttTranscribeOptions* PROTOBUF_NONNULL HybridStt
 }
 inline ::runanywhere::v1::HybridSttTranscribeOptions* PROTOBUF_NONNULL HybridSttTranscribeRequest::mutable_options()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::HybridSttTranscribeOptions* _msg = _internal_mutable_options();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridSttTranscribeRequest.options)
   return _msg;
@@ -5307,9 +4961,9 @@ inline void HybridSttTranscribeRequest::set_allocated_options(::runanywhere::v1:
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
 
   _impl_.options_ = reinterpret_cast<::runanywhere::v1::HybridSttTranscribeOptions*>(value);
@@ -5324,7 +4978,7 @@ inline void HybridSttTranscribeRequest::set_allocated_options(::runanywhere::v1:
 inline void HybridSttTranscribeResponse::clear_rc() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.rc_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::int32_t HybridSttTranscribeResponse::rc() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridSttTranscribeResponse.rc)
@@ -5332,7 +4986,7 @@ inline ::int32_t HybridSttTranscribeResponse::rc() const {
 }
 inline void HybridSttTranscribeResponse::set_rc(::int32_t value) {
   _internal_set_rc(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridSttTranscribeResponse.rc)
 }
 inline ::int32_t HybridSttTranscribeResponse::_internal_rc() const {
@@ -5474,14 +5128,14 @@ inline void HybridSttTranscribeResponse::set_allocated_detected_language(::std::
 
 // .runanywhere.v1.HybridRoutedMetadata routing = 4;
 inline bool HybridSttTranscribeResponse::has_routing() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   PROTOBUF_ASSUME(!value || _impl_.routing_ != nullptr);
   return value;
 }
 inline void HybridSttTranscribeResponse::clear_routing() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.routing_ != nullptr) _impl_.routing_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::runanywhere::v1::HybridRoutedMetadata& HybridSttTranscribeResponse::_internal_routing() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -5500,16 +5154,16 @@ inline void HybridSttTranscribeResponse::unsafe_arena_set_allocated_routing(
   }
   _impl_.routing_ = reinterpret_cast<::runanywhere::v1::HybridRoutedMetadata*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.HybridSttTranscribeResponse.routing)
 }
 inline ::runanywhere::v1::HybridRoutedMetadata* PROTOBUF_NULLABLE HybridSttTranscribeResponse::release_routing() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::HybridRoutedMetadata* released = _impl_.routing_;
   _impl_.routing_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -5529,7 +5183,7 @@ inline ::runanywhere::v1::HybridRoutedMetadata* PROTOBUF_NULLABLE HybridSttTrans
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.HybridSttTranscribeResponse.routing)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::HybridRoutedMetadata* temp = _impl_.routing_;
   _impl_.routing_ = nullptr;
   return temp;
@@ -5544,7 +5198,7 @@ inline ::runanywhere::v1::HybridRoutedMetadata* PROTOBUF_NONNULL HybridSttTransc
 }
 inline ::runanywhere::v1::HybridRoutedMetadata* PROTOBUF_NONNULL HybridSttTranscribeResponse::mutable_routing()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::HybridRoutedMetadata* _msg = _internal_mutable_routing();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridSttTranscribeResponse.routing)
   return _msg;
@@ -5561,77 +5215,13 @@ inline void HybridSttTranscribeResponse::set_allocated_routing(::runanywhere::v1
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-  }
-
-  _impl_.routing_ = reinterpret_cast<::runanywhere::v1::HybridRoutedMetadata*>(value);
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridSttTranscribeResponse.routing)
-}
-
-// string error_msg = 5;
-inline void HybridSttTranscribeResponse::clear_error_msg() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_msg_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& HybridSttTranscribeResponse::error_msg() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridSttTranscribeResponse.error_msg)
-  return _internal_error_msg();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void HybridSttTranscribeResponse::set_error_msg(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.error_msg_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridSttTranscribeResponse.error_msg)
-}
-inline ::std::string* PROTOBUF_NONNULL HybridSttTranscribeResponse::mutable_error_msg()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_error_msg();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridSttTranscribeResponse.error_msg)
-  return _s;
-}
-inline const ::std::string& HybridSttTranscribeResponse::_internal_error_msg() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_msg_.Get();
-}
-inline void HybridSttTranscribeResponse::_internal_set_error_msg(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_msg_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL HybridSttTranscribeResponse::_internal_mutable_error_msg() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_msg_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE HybridSttTranscribeResponse::release_error_msg() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.HybridSttTranscribeResponse.error_msg)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.error_msg_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_msg_.Set("", GetArena());
-  }
-  return released;
-}
-inline void HybridSttTranscribeResponse::set_allocated_error_msg(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
-  _impl_.error_msg_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_msg_.IsDefault()) {
-    _impl_.error_msg_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridSttTranscribeResponse.error_msg)
+
+  _impl_.routing_ = reinterpret_cast<::runanywhere::v1::HybridRoutedMetadata*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridSttTranscribeResponse.routing)
 }
 
 #ifdef __GNUC__
@@ -5647,28 +5237,10 @@ namespace google {
 namespace protobuf {
 
 template <>
-struct is_proto_enum<::runanywhere::v1::HybridCapability> : std::true_type {};
+struct is_proto_enum<::runanywhere::v1::HybridInferenceMode> : std::true_type {};
 template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridCapability>() {
-  return ::runanywhere::v1::HybridCapability_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::HybridBackendKind> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridBackendKind>() {
-  return ::runanywhere::v1::HybridBackendKind_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::HybridModelType> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridModelType>() {
-  return ::runanywhere::v1::HybridModelType_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::HybridRank> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridRank>() {
-  return ::runanywhere::v1::HybridRank_descriptor();
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridInferenceMode>() {
+  return ::runanywhere::v1::HybridInferenceMode_descriptor();
 }
 
 }  // namespace protobuf

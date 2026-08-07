@@ -32,6 +32,14 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
+/**
+ * One-shot turn: audio in, transcription plus response plus audio out.
+ *
+ * audio_data must be PCM signed 16-bit little-endian, mono, 16 kHz. Commons
+ * rejects any other encoding, but it does NOT check or resample the sample
+ * rate or the channel count — feeding anything else yields a wrong transcript
+ * rather than an error.
+ */
 public class VoiceAgentTurnRequest(
   @field:WireField(
     tag = 1,
@@ -57,43 +65,25 @@ public class VoiceAgentTurnRequest(
     schemaIndex = 2,
   )
   public val audio_data: ByteString = ByteString.EMPTY,
+  /**
+   * BCP-47 STT language for this turn only. Overrides
+   * VoiceAgentComposeConfig.language. Unset means the session language, or
+   * model auto-detection when that is unset too.
+   */
   @field:WireField(
     tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sampleRateHz",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 3,
   )
-  public val sample_rate_hz: Int = 0,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val channels: Int = 0,
-  @field:WireField(
-    tag = 6,
-    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
-  )
-  public val encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
-  @field:WireField(
-    tag = 7,
-    adapter = "ai.runanywhere.proto.v1.VoiceSessionConfig#ADAPTER",
-    jsonName = "sessionConfig",
-    schemaIndex = 6,
-  )
-  public val session_config: VoiceSessionConfig? = null,
+  public val language: String? = null,
   metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentTurnRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
-    tag = 8,
+    tag = 5,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 7,
+    schemaIndex = 4,
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
@@ -110,10 +100,7 @@ public class VoiceAgentTurnRequest(
     if (request_id != other.request_id) return false
     if (session_id != other.session_id) return false
     if (audio_data != other.audio_data) return false
-    if (sample_rate_hz != other.sample_rate_hz) return false
-    if (channels != other.channels) return false
-    if (encoding != other.encoding) return false
-    if (session_config != other.session_config) return false
+    if (language != other.language) return false
     if (metadata != other.metadata) return false
     return true
   }
@@ -125,10 +112,7 @@ public class VoiceAgentTurnRequest(
       result = result * 37 + request_id.hashCode()
       result = result * 37 + session_id.hashCode()
       result = result * 37 + audio_data.hashCode()
-      result = result * 37 + sample_rate_hz.hashCode()
-      result = result * 37 + channels.hashCode()
-      result = result * 37 + encoding.hashCode()
-      result = result * 37 + (session_config?.hashCode() ?: 0)
+      result = result * 37 + (language?.hashCode() ?: 0)
       result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
@@ -140,10 +124,7 @@ public class VoiceAgentTurnRequest(
     result += """request_id=${sanitize(request_id)}"""
     result += """session_id=${sanitize(session_id)}"""
     result += """audio_data=$audio_data"""
-    result += """sample_rate_hz=$sample_rate_hz"""
-    result += """channels=$channels"""
-    result += """encoding=$encoding"""
-    if (session_config != null) result += """session_config=$session_config"""
+    if (language != null) result += """language=${sanitize(language)}"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "VoiceAgentTurnRequest{", separator = ", ", postfix = "}")
   }
@@ -152,13 +133,10 @@ public class VoiceAgentTurnRequest(
     request_id: String = this.request_id,
     session_id: String = this.session_id,
     audio_data: ByteString = this.audio_data,
-    sample_rate_hz: Int = this.sample_rate_hz,
-    channels: Int = this.channels,
-    encoding: AudioEncoding = this.encoding,
-    session_config: VoiceSessionConfig? = this.session_config,
+    language: String? = this.language,
     metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentTurnRequest = VoiceAgentTurnRequest(request_id, session_id, audio_data, sample_rate_hz, channels, encoding, session_config, metadata, unknownFields)
+  ): VoiceAgentTurnRequest = VoiceAgentTurnRequest(request_id, session_id, audio_data, language, metadata, unknownFields)
 
   public companion object {
     @JvmField
@@ -185,17 +163,8 @@ public class VoiceAgentTurnRequest(
         if (value.audio_data != okio.ByteString.EMPTY) {
           size += ProtoAdapter.BYTES.encodedSizeWithTag(3, value.audio_data)
         }
-        if (value.sample_rate_hz != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.sample_rate_hz)
-        }
-        if (value.channels != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.channels)
-        }
-        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          size += AudioEncoding.ADAPTER.encodedSizeWithTag(6, value.encoding)
-        }
-        size += VoiceSessionConfig.ADAPTER.encodedSizeWithTag(7, value.session_config)
-        size += metadataAdapter.encodedSizeWithTag(8, value.metadata)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.language)
+        size += metadataAdapter.encodedSizeWithTag(5, value.metadata)
         return size
       }
 
@@ -209,33 +178,15 @@ public class VoiceAgentTurnRequest(
         if (value.audio_data != okio.ByteString.EMPTY) {
           ProtoAdapter.BYTES.encodeWithTag(writer, 3, value.audio_data)
         }
-        if (value.sample_rate_hz != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.sample_rate_hz)
-        }
-        if (value.channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.channels)
-        }
-        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          AudioEncoding.ADAPTER.encodeWithTag(writer, 6, value.encoding)
-        }
-        VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 7, value.session_config)
-        metadataAdapter.encodeWithTag(writer, 8, value.metadata)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.language)
+        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentTurnRequest) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 8, value.metadata)
-        VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 7, value.session_config)
-        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
-          AudioEncoding.ADAPTER.encodeWithTag(writer, 6, value.encoding)
-        }
-        if (value.channels != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.channels)
-        }
-        if (value.sample_rate_hz != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.sample_rate_hz)
-        }
+        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.language)
         if (value.audio_data != okio.ByteString.EMPTY) {
           ProtoAdapter.BYTES.encodeWithTag(writer, 3, value.audio_data)
         }
@@ -251,25 +202,15 @@ public class VoiceAgentTurnRequest(
         var request_id: String = ""
         var session_id: String = ""
         var audio_data: ByteString = ByteString.EMPTY
-        var sample_rate_hz: Int = 0
-        var channels: Int = 0
-        var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
-        var session_config: VoiceSessionConfig? = null
+        var language: String? = null
         val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> request_id = ProtoAdapter.STRING.decode(reader)
             2 -> session_id = ProtoAdapter.STRING.decode(reader)
             3 -> audio_data = ProtoAdapter.BYTES.decode(reader)
-            4 -> sample_rate_hz = ProtoAdapter.INT32.decode(reader)
-            5 -> channels = ProtoAdapter.INT32.decode(reader)
-            6 -> try {
-              encoding = AudioEncoding.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            7 -> session_config = VoiceSessionConfig.ADAPTER.decode(reader)
-            8 -> metadata.putAll(metadataAdapter.decode(reader))
+            4 -> language = ProtoAdapter.STRING.decode(reader)
+            5 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -277,17 +218,13 @@ public class VoiceAgentTurnRequest(
           request_id = request_id,
           session_id = session_id,
           audio_data = audio_data,
-          sample_rate_hz = sample_rate_hz,
-          channels = channels,
-          encoding = encoding,
-          session_config = session_config,
+          language = language,
           metadata = metadata,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VoiceAgentTurnRequest): VoiceAgentTurnRequest = value.copy(
-        session_config = value.session_config?.let(VoiceSessionConfig.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

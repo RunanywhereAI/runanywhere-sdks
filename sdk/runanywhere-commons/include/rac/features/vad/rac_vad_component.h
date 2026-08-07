@@ -271,14 +271,14 @@ RAC_API rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
                                                        size_t config_proto_size);
 
 /**
- * @brief Process float PCM samples with serialized runanywhere.v1.VADOptions.
+ * @brief Process one serialized runanywhere.v1.VADProcessRequest (inline audio
+ *        in request.audio).
  *
  * Returns serialized runanywhere.v1.VADResult bytes in out_result.
  */
-RAC_API rac_result_t rac_vad_component_process_proto(rac_handle_t handle, const float* samples,
-                                                     size_t num_samples,
-                                                     const uint8_t* options_proto_bytes,
-                                                     size_t options_proto_size,
+RAC_API rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
+                                                     const uint8_t* request_proto_bytes,
+                                                     size_t request_proto_size,
                                                      rac_proto_buffer_t* out_result);
 
 /**

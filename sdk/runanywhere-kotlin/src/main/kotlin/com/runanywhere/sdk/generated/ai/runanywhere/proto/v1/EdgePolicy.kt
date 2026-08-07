@@ -20,17 +20,8 @@ public enum class EdgePolicy(
   override val `value`: Int,
 ) : WireEnum {
   EDGE_POLICY_UNSPECIFIED(0),
-  /**
-   * Producer blocks when channel is full (default, safest).
-   */
   EDGE_POLICY_BLOCK(1),
-  /**
-   * Oldest item is dropped when channel is full (audio routing only).
-   */
   EDGE_POLICY_DROP_OLDEST(2),
-  /**
-   * Newest item is dropped when channel is full (pager coalescing).
-   */
   EDGE_POLICY_DROP_NEWEST(3),
   ;
 

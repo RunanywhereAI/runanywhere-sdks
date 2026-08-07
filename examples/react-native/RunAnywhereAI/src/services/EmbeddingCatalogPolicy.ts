@@ -8,8 +8,8 @@ export type PortableEmbeddingCatalogEntry = Readonly<{
   name: string;
   url: string;
   framework: InferenceFramework;
-  modality: ModelCategory;
-  memoryRequirement: number;
+  category: ModelCategory;
+  memoryRequirementBytes: number;
 }>;
 
 // NOTE (known layering divergence): this NVIDIA portable-embedding metadata is
@@ -24,21 +24,21 @@ export const PORTABLE_NVIDIA_EMBEDDING_MODELS = [
     name: 'NVIDIA Nemotron 3 Embed 1B Q4_K_M',
     url: 'https://huggingface.co/zenmagnets/Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/06df1fde6f7009c91f6cc3cd520081921929a678/nemotron-3-embed-1b-q4_k_m.gguf',
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-    memoryRequirement: 749_352_096,
+    category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    memoryRequirementBytes: 749_352_096,
   },
   {
     id: 'llama-nemotron-embed-1b-v2-q4_k_m',
     name: 'NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M',
     url: 'https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/llama-nemotron-embed-1B-v2-Q4_K_M.gguf',
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-    memoryRequirement: 807_690_624,
+    category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    memoryRequirementBytes: 807_690_624,
   },
   {
     // Only NVIDIA embedder whose portable GGUF was previously HNPU-only.
     // 4.63 GB Q4_K_M — Web-excluded (exceeds the WASM 4 GiB heap).
-    // memoryRequirement below is the download size reused as the RAM figure.
+    // memoryRequirementBytes below is the download size reused as the RAM figure.
     // KNOWN DRIFT: the Android example catalog (ModelCatalog.kt) additionally
     // gates this row behind a separate mandatory 6 GiB available-RAM preflight
     // that this portable copy does not model — the copies are only reconciled on
@@ -48,8 +48,8 @@ export const PORTABLE_NVIDIA_EMBEDDING_MODELS = [
     name: 'NVIDIA Llama Embed Nemotron 8B Q4_K_M',
     url: 'https://huggingface.co/mradermacher/llama-embed-nemotron-8b-GGUF/resolve/e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25/llama-embed-nemotron-8b.Q4_K_M.gguf',
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-    memoryRequirement: 4_625_233_184,
+    category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    memoryRequirementBytes: 4_625_233_184,
   },
 ] as const satisfies readonly PortableEmbeddingCatalogEntry[];
 

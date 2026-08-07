@@ -31,15 +31,18 @@ import {
   getModelDownloadSizeBytes,
   getPrimaryFramework,
 } from '../utils/modelDisplay';
-import { registerDemoTools as registerSharedDemoTools } from '../utils/chatSampleTools';
+import {
+  registerDemoTools as registerSharedDemoTools,
+  toolParameterNames,
+} from '../utils/chatSampleTools';
 import { Icon, useTheme } from '../theme/system';
 
-import { RunAnywhere } from '@runanywhere/core';
+import { RunAnywhere, formatFramework } from '@runanywhere/core';
+import type { DownloadEvent } from '@runanywhere/core';
 import {
   ModelCategory,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
@@ -54,8 +57,6 @@ import {
   clearSessionAPIConfiguration,
   getSessionAPIConfiguration,
 } from '../services/APIConfiguration';
-
-const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 
 const STORAGE_KEYS = APP_STORAGE_KEYS;
 
@@ -336,7 +337,7 @@ const CatalogModelRow: React.FC<CatalogModelRowProps> = ({
   onAction,
 }) => {
   const { colors, typography, dimens } = useTheme();
-  const frameworkName = RunAnywhere.formatFramework(getPrimaryFramework(model));
+  const frameworkName = formatFramework(getPrimaryFramework(model));
   const sizeBytes = getModelDownloadSizeBytes(model);
 
   return (
@@ -470,7 +471,7 @@ export const SettingsScreen: React.FC = () => {
   >({});
   const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]);
   const downloadIteratorsRef = useRef<
-    Record<string, AsyncIterator<DownloadProgress>>
+    Record<string, AsyncIterator<DownloadEvent>>
   >({});
 
   const [toolCallingEnabled, setToolCallingEnabled] = useState(false);
@@ -478,7 +479,8 @@ export const SettingsScreen: React.FC = () => {
     Array<{
       name: string;
       description: string;
-      parameters: Array<{ name: string }>;
+      /** Property names parsed from the tool's JSON Schema `parameters` string. */
+      parameterNames: string[];
     }>
   >([]);
 
@@ -543,7 +545,7 @@ export const SettingsScreen: React.FC = () => {
     async (value: string, options: { showFeedback?: boolean } = {}) => {
       const trimmed = value.trim();
       try {
-        await RunAnywhere.setHfToken(trimmed);
+        await RunAnywhere.auth.setHuggingFaceToken(trimmed);
         await refreshNpuCatalog();
         setAvailableModels(await listVisibleCatalogModels());
         if (options.showFeedback) {
@@ -660,12 +662,12 @@ export const SettingsScreen: React.FC = () => {
   };
 
   const refreshRegisteredTools = async () => {
-    const tools = await RunAnywhere.getRegisteredTools();
+    const tools = await RunAnywhere.llm.tools.list();
     setRegisteredTools(
       tools.map((t) => ({
         name: t.name,
         description: t.description,
-        parameters: t.parameters || [],
+        parameterNames: toolParameterNames(t.parameters),
       }))
     );
   };
@@ -680,7 +682,7 @@ export const SettingsScreen: React.FC = () => {
       if (enabled) {
         await registerSharedDemoTools();
       } else {
-        await RunAnywhere.clearTools();
+        await RunAnywhere.llm.tools.clear();
       }
       await refreshRegisteredTools();
     } catch (error) {
@@ -700,7 +702,7 @@ export const SettingsScreen: React.FC = () => {
           onPress: () => {
             // eslint-disable-next-line no-void
             void (async () => {
-              await RunAnywhere.clearTools();
+              await RunAnywhere.llm.tools.clear();
               await refreshRegisteredTools();
             })();
           },
@@ -780,15 +782,8 @@ export const SettingsScreen: React.FC = () => {
     try {
       const version = RunAnywhere.version;
       setSdkVersion(version);
-      const isInit = await RunAnywhere.isInitialized;
       // eslint-disable-next-line no-console
-      console.log('[Settings] SDK isInitialized:', isInit);
-      const backendInfo = {
-        environment: RunAnywhere.environment,
-        servicesReady: RunAnywhere.areServicesReady,
-      };
-      // eslint-disable-next-line no-console
-      console.log('[Settings] Backend info:', backendInfo);
+      console.log('[Settings] SDK isReady:', RunAnywhere.isReady);
       const sttLoaded = await isModelLoadedForCategory(
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
@@ -826,7 +821,7 @@ export const SettingsScreen: React.FC = () => {
         console.warn('[Settings] Failed to get downloaded models:', err);
       }
       try {
-        const storage = await RunAnywhere.getStorageInfo();
+        const storage = await RunAnywhere.storage.info();
         console.warn('[Settings] Storage info:', storage);
         if (storage) {
           setStorageInfo({
@@ -880,8 +875,8 @@ export const SettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await RunAnywhere.clearCache();
-              await RunAnywhere.cleanTempFiles();
+              await RunAnywhere.storage.clearCache();
+              await RunAnywhere.storage.cleanTempFiles();
               Alert.alert('Success', 'Cache cleared successfully');
               loadData();
             } catch (err) {
@@ -912,18 +907,22 @@ export const SettingsScreen: React.FC = () => {
       }
       setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
       try {
-        const dlIter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();
+        const dlIter = RunAnywhere.models
+          .download(model.id)
+          [Symbol.asyncIterator]();
         downloadIteratorsRef.current[model.id] = dlIter;
         let dlResult = await dlIter.next();
         while (!dlResult.done) {
-          const progress = dlResult.value;
-          console.warn(
-            `[Settings] Download progress for ${model.id}: ${((progress.stageProgress ?? 0) * 100).toFixed(1)}%`
-          );
-          setDownloadingModels((prev) => ({
-            ...prev,
-            [model.id]: progress.stageProgress ?? 0,
-          }));
+          const event = dlResult.value;
+          if (event.type === 'progress') {
+            console.warn(
+              `[Settings] Download progress for ${model.id}: ${event.percent.toFixed(1)}%`
+            );
+            setDownloadingModels((prev) => ({
+              ...prev,
+              [model.id]: event.percent / 100,
+            }));
+          }
           dlResult = await dlIter.next();
         }
         setDownloadingModels((prev) => {
@@ -964,11 +963,7 @@ export const SettingsScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               try {
-                const result = await RunAnywhere.deleteModel(model.id);
-                if (!result.success)
-                  throw new Error(
-                    result.errorMessage || 'Storage delete failed'
-                  );
+                await RunAnywhere.models.delete(model.id);
                 Alert.alert('Deleted', `${model.name} has been deleted.`);
                 loadData();
               } catch (err) {
@@ -1387,11 +1382,11 @@ export const SettingsScreen: React.FC = () => {
                       >
                         {tool.description}
                       </Text>
-                      {tool.parameters.length > 0 && (
+                      {tool.parameterNames.length > 0 && (
                         <View style={styles.chipRow}>
-                          {tool.parameters.map((p) => (
+                          {tool.parameterNames.map((name) => (
                             <View
-                              key={p.name}
+                              key={name}
                               style={[
                                 styles.chip,
                                 {
@@ -1406,7 +1401,7 @@ export const SettingsScreen: React.FC = () => {
                                   { color: colors.onSecondaryContainer },
                                 ]}
                               >
-                                {p.name}
+                                {name}
                               </Text>
                             </View>
                           ))}

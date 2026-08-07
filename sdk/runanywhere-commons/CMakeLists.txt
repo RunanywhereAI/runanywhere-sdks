@@ -325,7 +325,9 @@ if(NOT BZIP2_FOUND)
     message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
     FetchContent_Declare(
         bzip2_src
-        URL https://sourceware.org/pub/bzip2/bzip2-${RAC_BZIP2_VERSION}.tar.gz
+        # sourceware.org is frequently unreachable from CI/dev networks; use a
+        # byte-identical GitHub-release mirror (SHA256 below still validates it).
+        URL https://github.com/Siddhesh2377/runanywhere-build-mirrors/releases/download/bzip2-1.0.8/bzip2-1.0.8.tar.gz
         URL_HASH SHA256=ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
     )
     FetchContent_MakeAvailable(bzip2_src)
@@ -451,6 +453,11 @@ if(ANDROID)
     set(HAVE_NL_LANGINFO 0 CACHE INTERNAL "nl_langinfo not declared in Android bionic (<API 26)")
     set(HAVE_LCHMOD 0 CACHE INTERNAL "lchmod not provided by Android bionic")
 endif()
+
+# libarchive turns -Werror on by default in Debug, and its own sources trip
+# gcc 14's -Wdiscarded-qualifiers. A dependency's warning policy must not fail
+# our Debug builds.
+set(ENABLE_WERROR OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libarchive)
 if(_HAD_BUILD_SHARED_LIBS)
@@ -751,8 +758,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.
     src/plugin/rac_runtime_registry.cpp
-    # Proto-serialised SDKComponent → [InferenceFramework] query.
-    src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_orchestrator.cpp
     # model_registry.cpp was split per SRP into five TUs (slim core + struct
     # CRUD, proto<->C conversion, proto-byte ABI, filesystem discovery, and
@@ -941,6 +946,9 @@ set(RAC_FEATURES_SOURCES
     # W4: unified module — merges vlm_component.cpp + rac_vlm_proto_abi.cpp.
     src/features/vlm/vlm_module.cpp
     src/features/vlm/rac_vlm_service.cpp
+    # CUA (computer-use-agent scaffold) — profile registry, system-prompt
+    # rendering, and model-agnostic tool_call action parsing + coord scaling.
+    src/features/cua/cua.cpp
     # Diffusion
     # W4: unified module — merges diffusion_component.cpp +
     # rac_diffusion_proto_abi.cpp + Diffusion slice of
@@ -1400,10 +1408,10 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/lora_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/voice_agent_service.pb.cc
     ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
-    ${_RAC_PROTO_GEN_DIR}/router.pb.cc
+    # Shared TokenUsage embedded by LLM/VLM/RAG result + metrics messages (D4).
+    ${_RAC_PROTO_GEN_DIR}/token_usage.pb.cc
     ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
     ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc
-    ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
     # Two-phase SDK init request/result envelope.
     ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
     # Hybrid LLM router wire shape: descriptor, policy, filter, cascade,
@@ -1423,6 +1431,9 @@ set(_RAC_PROTO_GENERATED_SOURCES
     # imported by codegen post-processors and several option protos. Required
     # at link time by every .pb.cc that imports rac_options.proto.
     ${_RAC_PROTO_GEN_DIR}/rac_options.pb.cc
+    # Computer-Use-Agent action wire type (CuaAction / CuaActionType) — the
+    # proto-byte variant serialized by rac_cua_parse_action_proto.
+    ${_RAC_PROTO_GEN_DIR}/cua.pb.cc
 )
 set(RAC_PROTOBUF_COMPILE_OPTIONS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

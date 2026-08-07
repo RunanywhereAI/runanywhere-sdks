@@ -28,16 +28,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Per-app storage breakdown by directory type. Mirrors the iOS notion of
- * Documents / Caches / Application Support; on Android these map to
- * filesDir / cacheDir / a stable app-support sub-directory; on Web they map
- * to OPFS / FSAccess buckets (collapsed to documents_bytes by default).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 public class AppStorageInfo(
   @field:WireField(
     tag = 1,

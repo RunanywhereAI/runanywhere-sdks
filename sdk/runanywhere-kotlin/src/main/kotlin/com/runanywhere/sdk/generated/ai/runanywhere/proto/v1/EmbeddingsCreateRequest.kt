@@ -29,16 +29,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Session/handle creation request envelope shared by every SDK.
- * The result carries an opaque uint64 handle the SDK uses for subsequent
- * embed / embed_batch invocations.
- * ---------------------------------------------------------------------------
- */
 public class EmbeddingsCreateRequest(
   /**
-   * Required. Model identifier (registry id) or absolute model path.
+   * Registry id or absolute model path.
    */
   @field:WireField(
     tag = 1,
@@ -49,25 +42,13 @@ public class EmbeddingsCreateRequest(
   )
   public val model_id: String = "",
   /**
-   * Optional component configuration. When unset, commons applies its
-   * defaults (RAC_EMBEDDINGS_*); when set, the named fields override
-   * the per-component defaults at create time.
+   * For backends needing companion file paths, e.g. {"vocab_path":"..."}.
    */
   @field:WireField(
     tag = 2,
-    adapter = "ai.runanywhere.proto.v1.EmbeddingsConfiguration#ADAPTER",
-    schemaIndex = 1,
-  )
-  public val configuration: EmbeddingsConfiguration? = null,
-  /**
-   * Provider-specific JSON config for backends that need companion file
-   * paths (e.g. {"vocab_path":"..."}).
-   */
-  @field:WireField(
-    tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "configJson",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val config_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -83,7 +64,6 @@ public class EmbeddingsCreateRequest(
     if (other !is EmbeddingsCreateRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
-    if (configuration != other.configuration) return false
     if (config_json != other.config_json) return false
     return true
   }
@@ -93,7 +73,6 @@ public class EmbeddingsCreateRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + (configuration?.hashCode() ?: 0)
       result = result * 37 + (config_json?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -103,17 +82,15 @@ public class EmbeddingsCreateRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
-    if (configuration != null) result += """configuration=$configuration"""
     if (config_json != null) result += """config_json=${sanitize(config_json)}"""
     return result.joinToString(prefix = "EmbeddingsCreateRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     model_id: String = this.model_id,
-    configuration: EmbeddingsConfiguration? = this.configuration,
     config_json: String? = this.config_json,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsCreateRequest = EmbeddingsCreateRequest(model_id, configuration, config_json, unknownFields)
+  ): EmbeddingsCreateRequest = EmbeddingsCreateRequest(model_id, config_json, unknownFields)
 
   public companion object {
     @JvmField
@@ -131,8 +108,7 @@ public class EmbeddingsCreateRequest(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
-        size += EmbeddingsConfiguration.ADAPTER.encodedSizeWithTag(2, value.configuration)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.config_json)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.config_json)
         return size
       }
 
@@ -140,15 +116,13 @@ public class EmbeddingsCreateRequest(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
-        EmbeddingsConfiguration.ADAPTER.encodeWithTag(writer, 2, value.configuration)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.config_json)
+        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.config_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingsCreateRequest) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.config_json)
-        EmbeddingsConfiguration.ADAPTER.encodeWithTag(writer, 2, value.configuration)
+        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.config_json)
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
@@ -156,26 +130,22 @@ public class EmbeddingsCreateRequest(
 
       override fun decode(reader: ProtoReader): EmbeddingsCreateRequest {
         var model_id: String = ""
-        var configuration: EmbeddingsConfiguration? = null
         var config_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
-            2 -> configuration = EmbeddingsConfiguration.ADAPTER.decode(reader)
-            3 -> config_json = ProtoAdapter.STRING.decode(reader)
+            2 -> config_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return EmbeddingsCreateRequest(
           model_id = model_id,
-          configuration = configuration,
           config_json = config_json,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: EmbeddingsCreateRequest): EmbeddingsCreateRequest = value.copy(
-        configuration = value.configuration?.let(EmbeddingsConfiguration.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

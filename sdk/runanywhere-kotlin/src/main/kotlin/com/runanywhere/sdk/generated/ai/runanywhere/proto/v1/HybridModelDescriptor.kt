@@ -29,11 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Descriptor for a single registered model on one side of the pair.
- * ---------------------------------------------------------------------------
- */
 public class HybridModelDescriptor(
   @field:WireField(
     tag = 1,
@@ -43,33 +38,30 @@ public class HybridModelDescriptor(
     schemaIndex = 0,
   )
   public val model_id: String = "",
+  /**
+   * True = this candidate runs ON DEVICE (and is exempt from the network and
+   * battery filters). False = it runs IN CLOUD. Firebase/Android vocabulary.
+   */
   @field:WireField(
     tag = 2,
-    adapter = "ai.runanywhere.proto.v1.HybridModelType#ADAPTER",
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "modelType",
+    jsonName = "isOnDevice",
     schemaIndex = 1,
   )
-  public val model_type: HybridModelType = HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED,
+  public val is_on_device: Boolean = false,
+  /**
+   * The plugin-registry engine name the runtime already pins on: "sherpa",
+   * "llamacpp", "onnx", "qhexrt", "mlx", "cloud", or any name passed to
+   * registerCloudProvider(). Empty = let the registry pick by priority.
+   */
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.HybridBackendKind#ADAPTER",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 2,
   )
-  public val backend: HybridBackendKind = HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED,
-  /**
-   * Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-   * "sarvam"). The cloud_stt engine reads it from config_json\["provider"\];
-   * empty defaults to "sarvam". Ignored for non-cloud backends.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val provider: String = "",
+  public val engine: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridModelDescriptor, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -83,9 +75,8 @@ public class HybridModelDescriptor(
     if (other !is HybridModelDescriptor) return false
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
-    if (model_type != other.model_type) return false
-    if (backend != other.backend) return false
-    if (provider != other.provider) return false
+    if (is_on_device != other.is_on_device) return false
+    if (engine != other.engine) return false
     return true
   }
 
@@ -94,9 +85,8 @@ public class HybridModelDescriptor(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + model_type.hashCode()
-      result = result * 37 + backend.hashCode()
-      result = result * 37 + provider.hashCode()
+      result = result * 37 + is_on_device.hashCode()
+      result = result * 37 + engine.hashCode()
       super.hashCode = result
     }
     return result
@@ -105,19 +95,17 @@ public class HybridModelDescriptor(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
-    result += """model_type=$model_type"""
-    result += """backend=$backend"""
-    result += """provider=${sanitize(provider)}"""
+    result += """is_on_device=$is_on_device"""
+    result += """engine=${sanitize(engine)}"""
     return result.joinToString(prefix = "HybridModelDescriptor{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     model_id: String = this.model_id,
-    model_type: HybridModelType = this.model_type,
-    backend: HybridBackendKind = this.backend,
-    provider: String = this.provider,
+    is_on_device: Boolean = this.is_on_device,
+    engine: String = this.engine,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridModelDescriptor = HybridModelDescriptor(model_id, model_type, backend, provider, unknownFields)
+  ): HybridModelDescriptor = HybridModelDescriptor(model_id, is_on_device, engine, unknownFields)
 
   public companion object {
     @JvmField
@@ -135,14 +123,11 @@ public class HybridModelDescriptor(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
-        if (value.model_type != ai.runanywhere.proto.v1.HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED) {
-          size += HybridModelType.ADAPTER.encodedSizeWithTag(2, value.model_type)
+        if (value.is_on_device != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.is_on_device)
         }
-        if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
-          size += HybridBackendKind.ADAPTER.encodedSizeWithTag(3, value.backend)
-        }
-        if (value.provider != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.provider)
+        if (value.engine != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.engine)
         }
         return size
       }
@@ -151,28 +136,22 @@ public class HybridModelDescriptor(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
-        if (value.model_type != ai.runanywhere.proto.v1.HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED) {
-          HybridModelType.ADAPTER.encodeWithTag(writer, 2, value.model_type)
+        if (value.is_on_device != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_on_device)
         }
-        if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
-          HybridBackendKind.ADAPTER.encodeWithTag(writer, 3, value.backend)
-        }
-        if (value.provider != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.provider)
+        if (value.engine != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.engine)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridModelDescriptor) {
         writer.writeBytes(value.unknownFields)
-        if (value.provider != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.provider)
+        if (value.engine != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.engine)
         }
-        if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
-          HybridBackendKind.ADAPTER.encodeWithTag(writer, 3, value.backend)
-        }
-        if (value.model_type != ai.runanywhere.proto.v1.HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED) {
-          HybridModelType.ADAPTER.encodeWithTag(writer, 2, value.model_type)
+        if (value.is_on_device != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_on_device)
         }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
@@ -181,31 +160,20 @@ public class HybridModelDescriptor(
 
       override fun decode(reader: ProtoReader): HybridModelDescriptor {
         var model_id: String = ""
-        var model_type: HybridModelType = HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED
-        var backend: HybridBackendKind = HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED
-        var provider: String = ""
+        var is_on_device: Boolean = false
+        var engine: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
-            2 -> try {
-              model_type = HybridModelType.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            3 -> try {
-              backend = HybridBackendKind.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            4 -> provider = ProtoAdapter.STRING.decode(reader)
+            2 -> is_on_device = ProtoAdapter.BOOL.decode(reader)
+            3 -> engine = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return HybridModelDescriptor(
           model_id = model_id,
-          model_type = model_type,
-          backend = backend,
-          provider = provider,
+          is_on_device = is_on_device,
+          engine = engine,
           unknownFields = unknownFields
         )
       }

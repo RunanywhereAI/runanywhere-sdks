@@ -2,6 +2,7 @@
 //
 // Proto-backed model/component lifecycle public API.
 
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/model_types.pb.dart'
     show
         CurrentModelRequest,
@@ -33,11 +34,10 @@ class RunAnywhereModelLifecycle {
   Future<ModelLoadResult> load(ModelLoadRequest request) {
     if (!DartBridge.isInitialized) {
       return Future.value(ModelLoadResult(
-        success: false,
         modelId: request.modelId,
         category: request.category,
         framework: request.framework,
-        errorMessage: 'SDK not initialized',
+        error: SDKException.notInitialized().error,
       ));
     }
     return DartBridge.modelLifecycle.load(request);
@@ -47,8 +47,7 @@ class RunAnywhereModelLifecycle {
   Future<ModelUnloadResult> unload(ModelUnloadRequest request) {
     if (!DartBridge.isInitialized) {
       return Future.value(ModelUnloadResult(
-        success: false,
-        errorMessage: 'SDK not initialized',
+        error: SDKException.notInitialized().error,
       ));
     }
     return DartBridge.modelLifecycle.unload(request);

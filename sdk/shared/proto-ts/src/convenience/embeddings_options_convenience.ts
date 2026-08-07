@@ -14,43 +14,27 @@
 
 /* eslint-disable */
 
-import { EmbeddingsConfiguration, EmbeddingsOptions } from '../embeddings_options';
+import { EmbeddingsOptions } from '../embeddings_options';
 import { ValidationError } from './_errors';
-
-export const embeddingsConfigurationDefaults = (): EmbeddingsConfiguration => ({
-  modelId: '',
-  embeddingDimension: 384,
-  maxSequenceLength: 512,
-  normalize: true,
-  maxTokens: 0,
-  normalizeMode: 0,
-  pooling: 0,
-});
-
-export const validateEmbeddingsConfiguration = (m: EmbeddingsConfiguration): void => {
-  if (m.modelId === '') {
-    throw new ValidationError({
-      fieldPath: 'EmbeddingsConfiguration.model_id',
-      message: 'model_id is required',
-    });
-  }
-  if (m.embeddingDimension < 1) {
-    throw new ValidationError({
-      fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
-      message: `embedding_dimension must be >= 1 (got ${m.embeddingDimension})`,
-    });
-  }
-  if (m.maxSequenceLength < 1) {
-    throw new ValidationError({
-      fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
-      message: `max_sequence_length must be >= 1 (got ${m.maxSequenceLength})`,
-    });
-  }
-};
 
 export const embeddingsOptionsDefaults = (): EmbeddingsOptions => ({
   normalize: true,
-  normalizeMode: 0,
   pooling: 0,
   nThreads: 0,
+  inputType: 0,
 });
+
+export const validateEmbeddingsOptions = (m: EmbeddingsOptions): void => {
+  if (m.batchSize !== undefined && (m.batchSize < 1 || m.batchSize > 8192)) {
+    throw new ValidationError({
+      fieldPath: 'EmbeddingsOptions.batch_size',
+      message: `batch_size must be in 1...8192 (got ${m.batchSize})`,
+    });
+  }
+  if (m.dimensions !== undefined && (m.dimensions < 1)) {
+    throw new ValidationError({
+      fieldPath: 'EmbeddingsOptions.dimensions',
+      message: `dimensions must be >= 1 (got ${m.dimensions})`,
+    });
+  }
+};

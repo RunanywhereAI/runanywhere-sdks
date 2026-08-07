@@ -35,11 +35,11 @@ import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter.
 import type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 import type {
   VoiceAgentComposeConfig,
-  VoiceAgentRequest,
+  VoiceAgentTurnRequest,
   VoiceAgentResult,
 } from '@runanywhere/proto-ts/voice_agent_service';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
-  AudioEncoding,
   PipelineState,
   TokenKind,
   VoicePipelineComponent,
@@ -52,6 +52,7 @@ import {
   MessageRole,
   type ChatMessage,
 } from '@runanywhere/proto-ts/chat';
+import { finishReasonToJSON } from '@runanywhere/proto-ts/llm_options';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
@@ -60,6 +61,12 @@ import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import { hasBackendWorkerOwnedModels } from '../../runtime/BackendWorkerModelOwnership.js';
 import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { vADConfigurationDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
+import {
+  ReasoningMode,
+  type ReasoningOptions,
+} from '@runanywhere/proto-ts/thinking_tag_pattern';
+import { ErrorCode } from '@runanywhere/proto-ts/errors';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
@@ -76,6 +83,15 @@ const VOICE_TEMPERATURE = voiceAgentDefaults.temperature;
 const VOICE_MAX_HISTORY_ENTRIES = 20;
 const DEFAULT_VAD_ENERGY_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
 const MODEL_VAD_PROBABILITY_THRESHOLD = 0.5;
+
+function voiceReasoning(thinkingModeEnabled: boolean): ReasoningOptions {
+  return {
+    mode: thinkingModeEnabled
+      ? ReasoningMode.REASONING_MODE_ON
+      : ReasoningMode.REASONING_MODE_OFF,
+    includeInOutput: false,
+  };
+}
 
 export type VoiceAgentAvailabilitySource =
   | 'provider'
@@ -368,10 +384,11 @@ export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       forceReload: false,
       validateAvailability: false,
+      backendPreferences: [],
     });
-    if (!result?.success) {
+    if (!result || result.error) {
       logger.warning(
-        `Default VAD '${targetID}' auto-load failed: ${result?.errorMessage ?? 'unknown error'} — voice agent will use energy fallback`,
+        `Default VAD '${targetID}' auto-load failed: ${result?.error?.message ?? 'unknown error'} — voice agent will use energy fallback`,
       );
       return false;
     }
@@ -578,7 +595,6 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       ready: this.initialized && sttReady && llmReady && ttsReady,
       anyLoading: false,
       wakewordState: notLoaded,
-      errorMessage: undefined,
     };
   }
 
@@ -590,12 +606,8 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     const lifecycleVersion = this.lifecycleVersion;
     const transport = this.transport;
     const config = this.config;
-    const startedAt = performance.now();
-    const sessionId = config.sessionId || 'web-voice-agent';
+    const sessionId = 'web-voice-agent';
     const turnId = createTurnID();
-    let sttTimeMs = 0;
-    let llmTimeMs = 0;
-    let ttsTimeMs = 0;
 
     try {
       const vad = await this.detectTurnSpeech(audio);
@@ -606,8 +618,8 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
           component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_VAD,
           vad: {
             type: VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
-            frameOffsetUs: 0,
-            confidence: vad.confidence,
+            frameOffsetMs: 0,
+            probability: vad.probability,
             isSpeech: true,
             speechDurationMs: vad.durationMs,
             silenceDurationMs: 0,
@@ -623,12 +635,10 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         transport,
         lifecycleVersion,
       );
-      const sttStarted = performance.now();
       const stt = await transcribe(audio, {
-        languageCode: config.sessionConfig?.languageCode ?? config.defaultLanguageCode,
+        language: config.language,
       });
       this.assertCurrent(lifecycleVersion);
-      sttTimeMs = performance.now() - sttStarted;
       const transcription = stt.text.trim();
 
       if (!transcription) {
@@ -641,10 +651,6 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         );
         return voiceTurnResult({
           speechDetected: vad.isSpeech,
-          sessionId,
-          turnId,
-          sttTimeMs,
-          totalTimeMs: performance.now() - startedAt,
           finalState: this.getVoiceAgentComponentStates(),
         });
       }
@@ -656,8 +662,8 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
           component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_VAD,
           vad: {
             type: VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
-            frameOffsetUs: Math.max(0, Math.round(stt.durationMs * 1000)),
-            confidence: vad.confidence,
+            frameOffsetMs: Math.max(0, Math.round(stt.durationMs)),
+            probability: vad.probability,
             isSpeech: false,
             speechDurationMs: vad.durationMs,
             silenceDurationMs: 0,
@@ -674,9 +680,9 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
           text: transcription,
           isFinal: true,
           confidence: stt.confidence,
-          audioStartUs: 0,
-          audioEndUs: Math.max(0, Math.round(stt.durationMs * 1000)),
-          languageCode: stt.languageCode ?? '',
+          audioStartMs: 0,
+          audioEndMs: Math.max(0, Math.round(stt.durationMs)),
+          language: stt.language ?? '',
           segmentIndex: stt.segmentIndex,
         },
       }));
@@ -688,19 +694,16 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         transport,
         lifecycleVersion,
       );
-      const llmStarted = performance.now();
-      const configuredMaxTokens = config.sessionConfig?.maxTokens ?? 0;
       const llm = await TextGeneration.generate({
         prompt: transcription,
-        maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
+        maxOutputTokens: VOICE_MAX_TOKENS,
         temperature: VOICE_TEMPERATURE,
         systemPrompt: VOICE_SYSTEM_PROMPT,
         history: voiceHistoryMessages(this.conversationHistory),
         conversationId: sessionId,
-        disableThinking: !(config.sessionConfig?.thinkingModeEnabled ?? false),
+        reasoning: voiceReasoning(false),
       });
       this.assertCurrent(lifecycleVersion);
-      llmTimeMs = performance.now() - llmStarted;
       const assistantResponse = llm.text.trim();
       this.conversationHistory.push({ user: transcription, assistant: assistantResponse });
       while (this.conversationHistory.length * 2 > VOICE_MAX_HISTORY_ENTRIES) {
@@ -717,7 +720,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
           kind: TokenKind.TOKEN_KIND_ANSWER,
           tokenId: 0,
           logprob: 0,
-          finishReason: llm.finishReason || 'stop',
+          finishReason: finishReasonToJSON(llm.finishReason),
         },
       }));
 
@@ -728,13 +731,11 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         transport,
         lifecycleVersion,
       );
-      const ttsStarted = performance.now();
       const tts = await synthesize(assistantResponse, {
-        voiceId: config.sessionConfig?.voiceId ?? config.ttsVoiceId,
-        languageCode: config.sessionConfig?.languageCode ?? config.defaultLanguageCode ?? '',
+        voiceId: config.ttsVoiceId,
+        languageCode: config.language ?? '',
       });
       this.assertCurrent(lifecycleVersion);
-      ttsTimeMs = performance.now() - ttsStarted;
       const audioBytes = copyBytes(tts.audioData);
       const encoding = voiceAudioEncoding(tts.audioFormat);
 
@@ -756,11 +757,8 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         }));
       }
 
-      const continueListening = config.sessionConfig?.continuousMode ?? true;
       this.emitState(
-        continueListening
-          ? PipelineState.PIPELINE_STATE_LISTENING
-          : PipelineState.PIPELINE_STATE_STOPPED,
+        PipelineState.PIPELINE_STATE_LISTENING,
         sessionId,
         turnId,
         transport,
@@ -772,15 +770,6 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         assistantResponse,
         thinkingContent: llm.thinkingContent,
         synthesizedAudio: audioBytes,
-        synthesizedAudioSampleRateHz: tts.sampleRate,
-        synthesizedAudioChannels: 1,
-        synthesizedAudioEncoding: encoding,
-        sessionId,
-        turnId,
-        sttTimeMs,
-        llmTimeMs,
-        ttsTimeMs,
-        totalTimeMs: performance.now() - startedAt,
         finalState: this.getVoiceAgentComponentStates(),
       });
     } catch (error) {
@@ -790,13 +779,12 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         sessionId,
         turnId,
         severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
-        error: {
-          code: -1,
+        sessionError: {
+          code: ErrorCode.ERROR_CODE_PROCESSING_FAILED,
           message,
-          component: 'voice-agent',
-          isRecoverable: true,
+          cAbiCode: -ErrorCode.ERROR_CODE_PROCESSING_FAILED,
+          recoverable: true,
           operation: 'processVoiceTurn',
-          detailsJson: '',
         },
       }));
       this.emitState(
@@ -815,15 +803,14 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
   }
 
   async voiceAgentGenerateResponse(prompt: string): Promise<string> {
-    const configuredMaxTokens = this.config.sessionConfig?.maxTokens ?? 0;
     return (await TextGeneration.generate({
       prompt,
-      maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
+      maxOutputTokens: VOICE_MAX_TOKENS,
       temperature: VOICE_TEMPERATURE,
       systemPrompt: VOICE_SYSTEM_PROMPT,
       history: voiceHistoryMessages(this.conversationHistory),
-      conversationId: this.config.sessionId ?? 'web-voice-agent',
-      disableThinking: !(this.config.sessionConfig?.thinkingModeEnabled ?? false),
+      conversationId: 'web-voice-agent',
+      reasoning: voiceReasoning(false),
     })).text;
   }
 
@@ -854,32 +841,34 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     audio: Float32Array | Uint8Array,
   ): Promise<TurnVADVerdict> {
     const samples = toFloat32Audio(audio);
-    const durationMs = (samples.length / (this.config.vadSampleRate || 16_000)) * 1000;
-    const energyThreshold = this.config.vadEnergyThreshold || DEFAULT_VAD_ENERGY_THRESHOLD;
+    const durationMs = (samples.length / (this.config.vadConfig?.sampleRate || 16_000)) * 1000;
+    const energyThreshold =
+      this.config.vadConfig?.activationThreshold || DEFAULT_VAD_ENERGY_THRESHOLD;
     const currentVAD = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       includeModelMetadata: false,
     });
     if (currentVAD?.modelId && VAD.supportsLifecycleProtoVAD()) {
       try {
-        const result = await VAD.detectVoiceAuto(samples, {
+        const result = await VAD.detectVoice(samples, {
           modelId: currentVAD.modelId,
           minSpeechDurationMs: 100,
-          minSilenceDurationMs: this.config.sessionConfig?.silenceDurationMs || 800,
-          maxSpeechDurationMs: this.config.sessionConfig?.maxRecordingDurationMs || 0,
+          minSilenceDurationMs: this.config.turnDetection?.silenceDurationMs || 800,
+          maxSpeechDurationMs: 0,
           config: {
-            sampleRate: this.config.vadSampleRate || 16_000,
-            frameLengthMs: Math.round((this.config.vadFrameLength || 0.1) * 1000),
-            // `vadEnergyThreshold` is an RMS amplitude threshold for the
-            // fallback detector. Model-backed Silero expects a posterior
-            // probability instead; forwarding 0.005 makes Sherpa reject its
-            // configuration because model thresholds must be at least 0.01.
-            threshold: MODEL_VAD_PROBABILITY_THRESHOLD,
+            sampleRate: this.config.vadConfig?.sampleRate || 16_000,
+            frameLengthMs: this.config.vadConfig?.frameLengthMs || 100,
+            // The compose config's activation threshold is an RMS amplitude
+            // threshold for the fallback detector. Model-backed Silero expects
+            // a posterior probability instead; forwarding 0.005 makes Sherpa
+            // reject its configuration because model thresholds must be at
+            // least 0.01.
+            activationThreshold: MODEL_VAD_PROBABILITY_THRESHOLD,
           },
         });
         return {
           isSpeech: result.isSpeech,
-          confidence: result.confidence,
+          probability: result.probability,
           durationMs: result.durationMs || durationMs,
           noiseFloorDb: amplitudeToDb(result.energy),
         };
@@ -893,7 +882,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     const energy = rmsAudio(samples);
     return {
       isSpeech: energy >= energyThreshold,
-      confidence: Math.min(1, energy / energyThreshold),
+      probability: Math.min(1, energy / energyThreshold),
       durationMs,
       noiseFloorDb: amplitudeToDb(energy),
     };
@@ -907,7 +896,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
 
   private emitState(
     next: PipelineState,
-    sessionId = this.config.sessionId || 'web-voice-agent',
+    sessionId = 'web-voice-agent',
     turnId = '',
     transport = this.transport,
     lifecycleVersion = this.lifecycleVersion,
@@ -925,11 +914,11 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
   private event(overrides: Partial<VoiceEvent>): VoiceEvent {
     return {
       seq: ++this.seq,
-      timestampUs: Date.now() * 1000,
+      timestampMs: Date.now(),
       category: EventCategory.EVENT_CATEGORY_VOICE_AGENT,
       severity: ErrorSeverity.ERROR_SEVERITY_INFO,
       component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT,
-      sessionId: this.config.sessionId || 'web-voice-agent',
+      sessionId: 'web-voice-agent',
       turnId: '',
       requestId: '',
       metadata: {},
@@ -941,25 +930,23 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
 class LocalVoiceAgentTransport implements VoiceAgentStreamTransport {
   private nextID = 0;
   private readonly subscribers = new Map<number, {
-    request: VoiceAgentRequest;
     onMessage: (event: VoiceEvent) => void;
     onDone: () => void;
   }>();
 
   subscribe(
-    request: VoiceAgentRequest,
+    _request: VoiceAgentTurnRequest,
     onMessage: (event: VoiceEvent) => void,
     _onError: (error: Error) => void,
     onDone: () => void,
   ): () => void {
     const id = ++this.nextID;
-    this.subscribers.set(id, { request, onMessage, onDone });
+    this.subscribers.set(id, { onMessage, onDone });
     return () => this.subscribers.delete(id);
   }
 
   emit(event: VoiceEvent): void {
     for (const subscriber of this.subscribers.values()) {
-      if (event.audio && !subscriber.request.includeAudio) continue;
       subscriber.onMessage(event);
     }
   }
@@ -973,7 +960,7 @@ class LocalVoiceAgentTransport implements VoiceAgentStreamTransport {
 
 interface TurnVADVerdict {
   isSpeech: boolean;
-  confidence: number;
+  probability: number;
   durationMs: number;
   noiseFloorDb: number;
 }
@@ -1080,8 +1067,16 @@ function ttsAudioToFloat32(bytes: Uint8Array, format: AudioFormat): Float32Array
   );
 }
 
+/**
+ * `VoiceAgentResult` carries no per-stage timing, session/turn id, or error
+ * field on the wire (idl/voice_agent_service.proto: speechDetected,
+ * transcription?, assistantResponse?, thinkingContent?, synthesizedAudio?,
+ * finalState? only). Per-stage timings and correlation ids are now
+ * Web-internal bookkeeping only, surfaced through the `VoiceEvent` stream
+ * (see `event()`/`transport.emit(...)` above), not this result.
+ */
 function voiceTurnResult(
-  values: Partial<VoiceAgentResult> & Pick<VoiceAgentResult, 'speechDetected' | 'sessionId' | 'turnId'>,
+  values: Pick<VoiceAgentResult, 'speechDetected'> & Partial<VoiceAgentResult>,
 ): VoiceAgentResult {
   return {
     speechDetected: values.speechDetected,
@@ -1090,18 +1085,6 @@ function voiceTurnResult(
     thinkingContent: values.thinkingContent,
     synthesizedAudio: values.synthesizedAudio,
     finalState: values.finalState,
-    synthesizedAudioSampleRateHz: values.synthesizedAudioSampleRateHz ?? 0,
-    synthesizedAudioChannels: values.synthesizedAudioChannels ?? 0,
-    synthesizedAudioEncoding: values.synthesizedAudioEncoding
-      ?? AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
-    sessionId: values.sessionId,
-    turnId: values.turnId,
-    sttTimeMs: values.sttTimeMs ?? 0,
-    llmTimeMs: values.llmTimeMs ?? 0,
-    ttsTimeMs: values.ttsTimeMs ?? 0,
-    totalTimeMs: values.totalTimeMs ?? 0,
-    errorMessage: values.errorMessage,
-    errorCode: values.errorCode ?? 0,
   };
 }
 
@@ -1130,22 +1113,22 @@ function modelNotLoadedException(message: string): SDKException {
     cAbiCode: -ProtoErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
     message,
     nestedMessage: undefined,
-    context: undefined,
     timestampMs: Date.now(),
     severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
     component: 'voice-agent',
     retryable: false,
-    remediationHint: '',
-    correlationId: '',
+    requestId: '',
   });
 }
 
 function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeConfig {
   return {
-    vadSampleRate: audioCaptureDefaults.micSampleRateHz,
-    vadFrameLength: 0.1,
-    vadEnergyThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
-    sessionId: 'web-voice-agent',
+    vadConfig: {
+      ...vADConfigurationDefaults(),
+      sampleRate: audioCaptureDefaults.micSampleRateHz,
+      frameLengthMs: 100,
+      activationThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
+    },
     ...(ttsVoiceID ? { ttsVoiceId: ttsVoiceID } : {}),
   };
 }
@@ -1277,13 +1260,11 @@ export async function cleanupVoiceAgent(): Promise<void> {
 }
 
 export function streamVoiceAgent(
-  req: VoiceAgentRequest = {
-    eventFilter: '',
+  req: VoiceAgentTurnRequest = {
+    requestId: '',
     sessionId: '',
-    categories: [],
-    minSeverity: 0,
-    replayFromSeq: 0,
-    includeAudio: false,
+    audioData: new Uint8Array(0),
+    metadata: {},
   },
   signal?: AbortSignal,
 ): AsyncIterable<VoiceEvent> {

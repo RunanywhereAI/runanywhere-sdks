@@ -25,15 +25,32 @@ export interface SegmentationOptions {
      * canonical class_mask_u16_le remains the machine-readable result.
      */
     includeDiagnosticRgba: boolean;
+    /**
+     * When true, also return confidence_mask_u8: the model's probability for
+     * the class it chose, per pixel. Costs width * height extra bytes.
+     */
+    includeConfidence: boolean;
 }
 export interface SegmentationRequest {
     image?: SegmentationImage | undefined;
     options?: SegmentationOptions | undefined;
+    /**
+     * Registry id, catalog id, or absolute path. Unset = use the resident
+     * semantic-segmentation model. Mirrors EmbeddingsRequest.model_id and
+     * VLMGenerationRequest.model_id.
+     */
+    modelId?: string | undefined;
 }
+/**
+ * Coverage share of a class is pixel_count / (SegmentationResult.width *
+ * SegmentationResult.height). Commons rejects any result whose pixel_counts
+ * do not sum to that product before encoding it into a SegmentationResult, so
+ * within this message the summaries partition the image and the division is
+ * exact.
+ */
 export interface SegmentationClassSummary {
     classId: number;
     pixelCount: number;
-    fraction: number;
     label: string;
 }
 export interface SegmentationResult {
@@ -48,6 +65,13 @@ export interface SegmentationResult {
     classSummaries: SegmentationClassSummary[];
     processingTimeMs: number;
     modelId: string;
+    /**
+     * Confidence of the class in class_mask_u16_le, one byte per pixel,
+     * 0..255 == probability 0.0..1.0. Same row-major order and dimensions as
+     * the class mask. Present iff SegmentationOptions.include_confidence was
+     * set, and then exactly width * height bytes.
+     */
+    confidenceMaskU8?: Uint8Array | undefined;
 }
 export declare const SegmentationImage: MessageFns<SegmentationImage>;
 export declare const SegmentationOptions: MessageFns<SegmentationOptions>;

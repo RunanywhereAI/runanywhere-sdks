@@ -25,6 +25,34 @@ const SDK_ROOT = path.join(__dirname, '..', '..', '..', 'sdk', 'runanywhere-elec
 const PREBUILDS = path.join(SDK_ROOT, 'prebuilds');
 const SELFTEST = process.env.RA_SELFTEST === '1';
 
+// Backend credentials for telemetry/auth, read from a gitignored .env (or the
+// environment). Mirrors the Android example's local.properties contract: with
+// both a base URL and an API key set, the SDK initializes in PRODUCTION
+// (org-scoped, authed telemetry); with neither, DEVELOPMENT (keyless).
+function backendConfig() {
+  const env = { ...process.env };
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith('#') || !t.includes('=')) continue;
+      const i = t.indexOf('=');
+      const key = t.slice(0, i).trim();
+      const val = t.slice(i + 1).trim().replace(/^['"]|['"]$/g, '');
+      if (key && env[key] === undefined) env[key] = val;
+    }
+  } catch {
+    // No .env is fine — fall back to process.env / keyless development.
+  }
+  const apiKey = (env.RUNANYWHERE_API_KEY || '').trim();
+  const baseUrl = (env.RUNANYWHERE_BASE_URL || '').trim();
+  return {
+    apiKey,
+    baseUrl,
+    environment: apiKey && baseUrl ? 'production' : 'development',
+  };
+}
+
 // Compute device: CPU by default. The CUDA prebuild is only used when explicitly
 // requested (RA_GPU=1 / --gpu) AND present — loading it without an NVIDIA driver
 // stack fails, so it must never be the silent default.
@@ -103,6 +131,9 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
     ipcMain.handle('store:settings:save', (_e, data) => writeJson('settings.json', data));
     ipcMain.handle('store:models:load', () => readJson('custom-models.json', []));
     ipcMain.handle('store:models:save', (_e, data) => writeJson('custom-models.json', data));
+    // Backend creds for telemetry/auth (read from .env in the main process — the
+    // sandboxed renderer has no filesystem access).
+    ipcMain.handle('app:backend-config', () => backendConfig());
 
     const ra = new RunAnywhereMain({
       hostPath: path.join(SDK_ROOT, 'dist', 'process', 'host.js'),

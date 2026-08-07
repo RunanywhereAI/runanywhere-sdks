@@ -1,6 +1,7 @@
 /**
  * @file cmd_show.cpp
- * @brief `rcli show <model>` — registry entry details.
+ * @brief `rcli models get <model>` (alias `rcli show`) — registry entry
+ *        details.
  */
 
 #include "commands/commands.h"
@@ -58,7 +59,8 @@ int run_show(const GlobalOptions &options, const std::string &ref) {
     return 1;
   }
 
-  const bool downloaded = model.is_downloaded() || !model.local_path().empty();
+  const bool downloaded = model.registry_status() == v1::MODEL_REGISTRY_STATUS_DOWNLOADED ||
+                         !model.local_path().empty();
 
   if (options.json) {
     out::JsonWriter json;
@@ -122,8 +124,7 @@ int run_show(const GlobalOptions &options, const std::string &ref) {
 
 } // namespace
 
-void register_show(CLI::App &app, GlobalOptions &options) {
-  CLI::App *cmd = app.add_subcommand("show", "Show model details");
+void configure_models_get(CLI::App *cmd, GlobalOptions &options) {
   auto ref = std::make_shared<std::string>();
   cmd->add_option("model", *ref, "Model id, alias or URL")->required();
   cmd->callback([&options, ref]() {

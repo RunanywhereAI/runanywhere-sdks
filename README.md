@@ -34,20 +34,23 @@
 
 ## What you can build
 
-Every capability below runs fully on-device, behind one API that is identical on all eight platforms:
+Every capability below runs fully on-device behind one semantic API across the eight SDKs.
+Call `RunAnywhere.capabilities()` (v4) to discover what the current package and device can
+actually execute — enum presence alone does not mean an engine is installed.
 
 - **LLM chat**: Llama, Qwen, Gemma, Phi, LFM, SmolLM, DeepSeek, and more, with token streaming, multi-turn history, and LoRA adapters
-- **Structured output**: JSON constrained by a grammar compiled from your schema, so the result always parses
-- **Tool calling**: grammar-constrained tool calls, parallel calls, and an agent loop
+- **Structured output**: schema-validated JSON; constrained decoding where the engine supports it (`generateStructured` + enforcement mode)
+- **Tool calling**: local function tools with stable call IDs and an agent loop (parallel calls when the engine/capability reports support)
 - **Vision (VLM)**: image understanding, live camera description, and photo Q&A
-- **Speech-to-Text**: Whisper and Moonshine transcription, streaming and batch
+- **Computer-use action parser (CUA)**: parse Fara1.5-style action strings into viewport-scaled coordinates — not a full autonomous agent framework
+- **Speech-to-Text**: Whisper and Moonshine transcription, batch and live frame streams
 - **Text-to-Speech**: neural voices from Piper, Kokoro, Kitten, MeloTTS, and Magpie
-- **Voice agents**: wake word, VAD, STT, LLM, and TTS in one pipeline, with sentence-streaming playback
+- **Voice agents**: VAD, STT, LLM, and TTS in one pipeline with `SpeechHandle`-scoped playback (wake-word detection is not implemented)
 - **Embeddings**: L2-normalized vectors for search and retrieval
 - **RAG**: local document ingestion and retrieval-augmented answers, with streaming
-- **Image generation**: Stable Diffusion on Core ML, plus inpainting on the Hexagon NPU
+- **Image generation**: Stable Diffusion on Core ML, plus inpainting on the Hexagon NPU (platform/backend gated)
 
-Your code never picks hardware. Engines register what they can run, and the highest-priority engine that fits the device wins: **QHexRT** on the Snapdragon Hexagon NPU, **MLX** on Apple silicon, **llama.cpp** everywhere (Metal on Apple, CUDA on NVIDIA as an opt-in build, WebGPU in the browser), **sherpa + ONNX** for speech and embeddings, and **Core ML** for diffusion, dispatching across CPU, GPU, and the Apple Neural Engine.
+Your code rarely picks hardware. Engines register what they can run, and the highest-priority engine that fits the device wins: **QHexRT** on the Snapdragon Hexagon NPU, **MLX** on Apple silicon, **llama.cpp** everywhere (Metal on Apple, CUDA on NVIDIA as an opt-in build, WebGPU in the browser), **sherpa + ONNX** for speech and embeddings, and **Core ML** for diffusion. LiteRT and ExecuTorch are reserved framework values only — they are not integrated runtimes yet.
 
 ---
 
@@ -96,11 +99,13 @@ pip install runanywhere
 ```
 
 ```python
-from runanywhere import RunAnywhere
+import runanywhere as ra
+from runanywhere import LlmOptions
 
-with RunAnywhere() as ra:
-    llm = ra.load_llm("qwen2.5-0.5b")  # downloads on first use
-    print(llm.generate_text("Explain on-device AI in one sentence."))
+ra.initialize()
+# downloads on first use
+print(ra.llm.generate("Explain on-device AI in one sentence.",
+                      LlmOptions(model="qwen2.5-0.5b")).text)
 ```
 
 Prefer a terminal? The same core ships as a CLI:
@@ -339,25 +344,28 @@ Install: build from source (Windows x64 preview), see the [SDK README](sdk/runan
 <br/>
 
 ```python
-from runanywhere import RunAnywhere
+import runanywhere as ra
+from runanywhere import LlmOptions
 
-with RunAnywhere() as ra:
-    # 1. Load a model (auto-downloads on first use)
-    llm = ra.load_llm("qwen2.5-0.5b")
+# 1. One call brings the SDK up
+ra.initialize()
 
-    # 2. Stream tokens (sync)
-    for token in llm.generate("What is the capital of France?"):
-        print(token, end="", flush=True)
+# 2. Stream tokens (the model auto-downloads and auto-loads)
+for event in ra.llm.generate_stream("What is the capital of France?",
+                                    LlmOptions(model="qwen2.5-0.5b")):
+    if event.is_token:
+        print(event.text, end="", flush=True)
 
-    # 2b. Or async
-    # async for token in llm.agenerate("..."):
-    #     ...
+# 2b. Or async
+# async for event in ra.llm.agenerate_stream("..."):
+#     ...
 
-    # 3. Or grab the full text
-    print(llm.generate_text("Capital of France? One word."))  # "Paris"
+# 3. Or grab the whole result, metrics included
+result = ra.llm.generate("Capital of France? One word.")
+print(result.text, result.tokens_per_second)   # "Paris" 41.2
 ```
 
-Every method has an async twin. LLM, VLM, STT, TTS, embeddings (numpy), VAD, voice agent, RAG, structured output, and tool calling, with prebuilt wheels that bundle the native runtime. CUDA is available as an opt-in source build.
+Namespaces per modality (`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rag`, `models`), an `a`-prefixed async twin for every blocking verb, structured output and tool calling, with prebuilt wheels that bundle the native runtime. CUDA is available as an opt-in source build.
 
 Install via pip:
 
@@ -425,17 +433,24 @@ All SDKs ship on one version line, currently **0.20.11**, from a single C++ core
 |---------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | LLM generation + streaming | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Vision language models (VLM) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Computer-use agent (CUA) | Yes | Yes | Yes | Yes | API only | n/a | n/a | n/a |
 | Speech-to-Text | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Text-to-Speech | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Voice activity detection | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Voice agent pipeline | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Wake word | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Voice agent pipeline | Yes | Yes | Yes | Yes | Yes | Yes | Stub | Yes |
+| Wake word | No | No | No | No | No | No | No | No |
 | Embeddings | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| RAG (with streaming) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | n/a |
+| RAG (with streaming) | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | n/a |
 | Structured output (JSON) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | n/a |
 | Tool calling | Yes | Yes | Yes | Yes | Yes | Yes | Yes | n/a |
-| Image generation (diffusion) | Yes | Yes | Yes | Yes | n/a | n/a | n/a | Yes |
-| LoRA adapters | Yes | Yes | Yes | Yes | Yes | n/a | n/a | Yes |
+| Image generation (diffusion) | Yes | Yes | Yes | Yes | n/a | n/a | Stub | Yes |
+| LoRA adapters | Yes | Yes | Yes | Yes | Yes | Partial | Stub | Yes |
+| Diarization (standalone) | Yes | Yes | Gated | Yes | Yes | n/a | Stub | n/a |
+| Segmentation | Yes | Yes | Gated | Yes | Yes | n/a | Stub | n/a |
+| `capabilities()` discovery | Yes | Yes | Yes | Yes | Yes | Partial | Yes | n/a |
+
+\* Web RAG may be limited to one session per process — check `capabilities().rag.multiSession`.
+`Stub` / `Gated` / `Partial` mean the verb is absent, preflight-fails, or only partially wired; call `capabilities()` for the installed build.
 | Hexagon NPU (QHexRT) | n/a | Yes | Yes | Yes | n/a | n/a | n/a | n/a |
 | MLX (Apple silicon) | Yes | n/a | Yes | Yes | n/a | n/a | n/a | Yes |
 | OpenAI-compatible server | n/a | n/a | n/a | n/a | n/a | n/a | Yes | Yes |
@@ -456,6 +471,9 @@ Connect lets a **macOS Swift app** host a loaded language model on the local net
 - **Lifecycle:** the host app selects and loads the model, starts hosting, and supplies generation; stopping the host disconnects clients
 - **Threat model:** **trusted LAN only** — no TLS, pairing PIN, or mutual auth in this release. Do not expose Connect across untrusted networks. Future work may add TLS/pairing, Windows hosting, or a daemon; those change lifecycle and security and are out of scope here
 - **Electron note:** `RunAnywhereMain.connect()` is **local MessagePort / utility-process IPC** inside one Electron app. It is unrelated to LAN Connect
+
+CUA on Web is "API only": the prompt/parse scaffold ships, but the catalogued
+Fara1.5-4B does not fit the 4 GB WASM32 heap, so no CUA model is seeded there.
 
 ---
 

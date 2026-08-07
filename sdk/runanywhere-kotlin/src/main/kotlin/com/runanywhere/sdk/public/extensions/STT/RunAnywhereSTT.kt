@@ -13,6 +13,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.STTServiceState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.generated.RADefaults
@@ -42,6 +43,20 @@ public typealias RASTTPartialResult = ai.runanywhere.proto.v1.STTPartialResult
 
 private val sttLogger = SDKLogger.stt
 
+/**
+ * Snapshot the lifecycle STT service state (readiness, current model,
+ * supported language codes). Mirrors Swift `RunAnywhere.sttState()`.
+ */
+@Deprecated("Use RunAnywhere.stt.state().")
+suspend fun RunAnywhere.sttState(): STTServiceState {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    ensureServicesReady()
+    return CppBridgeSTT.state()
+}
+
+@Deprecated("Use RunAnywhere.stt.transcribe(audio, options).")
 suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
     options: RASTTOptions = RASTTOptions.defaults(),
@@ -70,6 +85,7 @@ suspend fun RunAnywhere.transcribe(
     return result
 }
 
+@Deprecated("Use RunAnywhere.stt.transcribeStream(audio, options).")
 fun RunAnywhere.transcribeStream(
     audio: Flow<ByteArray>,
     options: RASTTOptions = RASTTOptions.defaults(),

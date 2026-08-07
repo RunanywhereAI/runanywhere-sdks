@@ -191,9 +191,10 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Private State
 
-    // Voice uses `RunAnywhere.streamVoiceAgent()`, the public proto-stream
-    // surface. The SDK wraps the raw C handle internally; this view model
-    // consumes `RAVoiceEvent`s and switches on `event.payload`.
+    // Voice runs on `RunAnywhere.voice.createSession(...)`. The session owns the
+    // pipeline and the microphone; this view model only drives UI state from the
+    // `VoiceEvent` stream.
+    private var session: VoiceSession?
     private var eventTask: Task<Void, Never>?
     /// True while `stopConversation` is tearing down the SDK voice agent. Blocks a
     /// restart until cleanup completes so we never run two mic drivers at once.
@@ -327,7 +328,7 @@ final class VoiceAgentViewModel: ObservableObject {
         }
         hasSubscribedToSDKEvents = true
 
-        let bus = RunAnywhere.events
+        let bus = RunAnywhere.eventBus
 
         bus.events(for: .component)
             .receive(on: DispatchQueue.main)
@@ -353,7 +354,7 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Handle the canonical component-lifecycle proto event published by
     /// `rac_model_lifecycle_load_proto` / `..._unload_proto`. This is how the
     /// STT "Use" action (and every other modality that routes through
-    /// `RunAnywhere.loadModel`) signals load/unload completion to the app.
+    /// `RunAnywhere.models.load`) signals load/unload completion to the app.
     private func handleComponentLifecycleEvent(_ event: RASDKEvent) {
         let lifecycle = event.componentLifecycle
         let modelId = lifecycle.modelID
@@ -390,15 +391,18 @@ final class VoiceAgentViewModel: ObservableObject {
         let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
         let errorMessage = event.model.error.isEmpty ? event.generation.error : event.model.error
 
+        // `GenerationEventKind.MODEL_LOADED`/`.MODEL_UNLOADED` were deleted
+        // outright (idl/sdk_events.proto: "Model load/unload -> ModelEventKind")
+        // -- `event.model.kind` is the sole load/unload signal now.
         switch (event.model.kind, event.generation.kind) {
         case (.loadStarted, _):
             llmModelState = .loading
-        case (.loadCompleted, _), (_, .modelLoaded):
+        case (.loadCompleted, _):
             llmModelState = .loaded
             updateModel(.llm, id: modelId)
         case (.loadFailed, _), (_, .failed):
             llmModelState = .error(errorMessage.isEmpty ? "Unknown error" : errorMessage)
-        case (.unloadCompleted, _), (_, .modelUnloaded):
+        case (.unloadCompleted, _):
             llmModelState = .notLoaded
             llmModel = nil
         default:
@@ -451,7 +455,7 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Commit the selected STT model to the Voice Agent pipeline.
     ///
     /// Called from the "Use" action in the STT picker after
-    /// `RunAnywhere.loadModel` has already loaded the model into the C++
+    /// `RunAnywhere.models.load` has already loaded the model into the C++
     /// lifecycle for `SDK_COMPONENT_STT`. This updates the Voice tab's
     /// pipeline slot and re-syncs `sttModelState` from the canonical
     /// component snapshot so the setup card transitions to "Loaded".
@@ -525,19 +529,19 @@ final class VoiceAgentViewModel: ObservableObject {
 
         if let stt = model(sttModel?.id) {
             pipelineSetupStatus = "Setting up speech recognition…"
-            await setup(stt, category: .speechRecognition) { [weak self] value in
+            await setup(stt) { [weak self] value in
                 self?.sttDownloadProgress = value
             }
         }
         if let llm = model(llmModel?.id) {
             pipelineSetupStatus = "Setting up the assistant…"
-            await setup(llm, category: .language) { [weak self] value in
+            await setup(llm) { [weak self] value in
                 self?.llmDownloadProgress = value
             }
         }
         if let tts = model(ttsModel?.id) {
             pipelineSetupStatus = "Setting up the voice…"
-            await setup(tts, category: .speechSynthesis) { [weak self] value in
+            await setup(tts) { [weak self] value in
                 self?.ttsDownloadProgress = value
             }
         }
@@ -558,10 +562,12 @@ final class VoiceAgentViewModel: ObservableObject {
             return
         }
         do {
-            try await RunAnywhere.downloadModel(model) { update in
-                await MainActor.run { progress(Double(update.overallProgress)) }
+            for try await event in try await RunAnywhere.models.download(id: model.id) {
+                if case .progress(_, _, _, _, let percent, _) = event {
+                    progress(Double(percent) / 100)
+                }
             }
-            await MainActor.run { progress(1) }
+            progress(1)
         } catch {
             let reason = error.localizedDescription
             logger.error("Voice component download failed for \(model.id, privacy: .public): \(reason, privacy: .public)")
@@ -572,42 +578,39 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Loading is by model id — the SDK resolves the freshly downloaded path.
     private func setup(
         _ model: RAModelInfo,
-        category: RAModelCategory,
         progress: @escaping (Double) -> Void
     ) async {
         await ensureDownloaded(model, progress: progress)
 
-        var request = RAModelLoadRequest()
-        request.modelID = model.id
-        request.category = category
-        let result = await RunAnywhere.loadModel(request)
-        if !result.success {
-            errorMessage = result.errorMessage.isEmpty
-                ? "Failed to set up \(model.name)."
-                : result.errorMessage
+        do {
+            try await RunAnywhere.models.load(id: model.id)
+        } catch {
+            errorMessage = "Failed to set up \(model.name): \(error.localizedDescription)"
         }
     }
 
     // MARK: - Conversation Control
 
-    /// Start a voice conversation using the canonical
-    /// `RunAnywhere.streamVoiceAgent()` proto-stream API.
+    /// Start a voice conversation through `RunAnywhere.voice.createSession(...)`.
     ///
-    /// The SDK owns the multi-step bootstrap (VAD auto-load + model
-    /// composition + initialization) via
-    /// `initializeVoiceAgentWithLoadedModels()`; this view-model only
-    /// drives UI state and consumes the resulting proto stream.
+    /// The session owns its prerequisites (VAD ensure, model loads, pipeline
+    /// wiring) and opens the microphone only on `start()`; this view model just
+    /// drives UI state from the event stream.
+    // swiftlint:disable:next function_body_length
     func startConversation() async {
-        guard allModelsLoaded else {
+        guard allModelsLoaded,
+              let sttId = sttModel?.id,
+              let llmId = llmModel?.id,
+              let ttsId = ttsModel?.id else {
             sessionState = .error("Models not ready")
             errorMessage = "Please ensure all models (STT, LLM, TTS) are loaded before starting"
-            logger.warning("Attempted to start conversation without all models loaded")
+            logger.warning("Attempted to start conversation without a loaded model trio")
             return
         }
 
         // Reentrancy guard: ignore a start while a session is already active/
         // connecting, or while a stop is still tearing down. Otherwise a second
-        // streamVoiceAgent() spins up a second mic driver → permanent hot mic.
+        // session spins up a second mic driver → permanent hot mic.
         switch sessionState {
         case .disconnected, .error:
             break
@@ -629,18 +632,28 @@ final class VoiceAgentViewModel: ObservableObject {
         assistantResponse = ""
 
         do {
-            try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
+            let session = try await RunAnywhere.voice.createSession(
+                stt: ModelRef(id: sttId),
+                llm: ModelRef(id: llmId),
+                tts: ModelRef(id: ttsId)
+            )
+            self.session = session
 
-            sessionState = .listening
-            currentStatus = "Listening..."
-
+            let events = session.events
             eventTask = Task { [weak self] in
-                for await event in RunAnywhere.streamVoiceAgent() {
-                    await MainActor.run { self?.handleProtoEvent(event) }
+                do {
+                    for try await event in events {
+                        await MainActor.run { self?.handleVoiceEvent(event) }
+                    }
+                } catch {
+                    await MainActor.run { self?.handleSessionFailure(error) }
                 }
             }
 
-            logger.info("Voice session started successfully (RunAnywhere.streamVoiceAgent)")
+            try session.start()
+            sessionState = .listening
+            currentStatus = "Listening..."
+            logger.info("Voice session started successfully")
         } catch {
             sessionState = .error(error.localizedDescription)
             currentStatus = "Error"
@@ -652,8 +665,8 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Stop the current voice conversation.
     ///
     /// Mirrors Android `VoiceViewModel.stop()`: cancel the event stream and
-    /// reset UI state first, then release the SDK's voice-agent resources.
-    /// `cleanupVoiceAgent()` never throws and is safe to call anytime.
+    /// reset UI state first, then close the session, which stops capture and
+    /// releases the native pipeline.
     func stopConversation() async {
         guard !isStopping else { return }
         isStopping = true
@@ -664,127 +677,76 @@ final class VoiceAgentViewModel: ObservableObject {
         currentStatus = "Ready"
         audioLevel = 0.0
         isSpeechDetected = false
-        await RunAnywhere.cleanupVoiceAgent()
+        let closing = session
+        session = nil
+        await closing?.close()
         isStopping = false
         logger.info("Voice session stopped")
     }
 
-    // MARK: - Proto Event Handling
+    // MARK: - Voice Event Handling
 
-    // swiftlint:disable cyclomatic_complexity function_body_length
+    /// Drive UI state from the session's `VoiceEvent` stream.
+    private func handleVoiceEvent(_ event: VoiceEvent) {
+        switch event {
+        case .agentStateChanged(let state):
+            apply(state)
 
-    /// Drive UI state from the canonical `RAVoiceEvent` proto.
-    ///
-    /// The old `handleSessionEvent(VoiceSessionEvent)` mapped 10 UX cases to
-    /// UI state. This version switches on the proto oneof `event.payload`
-    /// directly.
-    private func handleProtoEvent(_ event: RAVoiceEvent) {
-        switch event.payload {
-        case let .state(state):
-            switch state.current {
-            case .idle:
-                sessionState = .listening
-                currentStatus = "Listening..."
-            case .listening:
-                if sessionState != .listening && sessionState != .speaking && sessionState != .processing {
-                    sessionState = .listening
-                    currentStatus = "Listening..."
-                }
-            case .thinking:
-                sessionState = .processing
-                currentStatus = "Processing..."
-                isSpeechDetected = false
-            case .speaking:
-                sessionState = .speaking
-                currentStatus = "Speaking..."
-            case .stopped:
-                sessionState = .disconnected
-                currentStatus = "Ready"
-            default:
-                break
-            }
+        case .speechStarted:
+            isSpeechDetected = true
+            sessionState = .listening
+            currentStatus = "Listening..."
 
-        case let .vad(vad):
-            switch vad.type {
-            case .speechActivity:
-                if vad.isSpeech {
-                    isSpeechDetected = true
-                    currentStatus = "Listening..."
-                } else {
-                    sessionState = .processing
-                    currentStatus = "Processing..."
-                    isSpeechDetected = false
-                }
-            case .stopped:
-                sessionState = .processing
-                currentStatus = "Processing..."
-                isSpeechDetected = false
-            default:
-                break
-            }
+        case .speechEnded:
+            isSpeechDetected = false
+            sessionState = .processing
+            currentStatus = "Processing..."
 
-        case let .userSaid(userSaid):
-            currentTranscript = userSaid.text
+        case .userTranscribed(let text, _):
+            currentTranscript = text
 
-        case let .assistantToken(token):
-            // Append incrementally; proto emits per-token streaming.
-            assistantResponse += token.text
+        case .agentResponse(let text):
+            // Emitted per token; append as it streams.
+            assistantResponse += text
 
-        case .audio:
-            sessionState = .speaking
-            currentStatus = "Speaking..."
-
-        case let .error(err):
-            logger.error("Voice agent error: \(err.message)")
-            errorMessage = err.message
-            sessionState = .error(err.message)
-            currentStatus = "Error"
-
-        case let .sessionError(err):
-            logger.error("Voice session error: \(err.message)")
-            errorMessage = err.message
-            if !err.recoverable {
-                sessionState = .error(err.message)
+        case .error(let message, let recoverable):
+            logger.error("Voice session error: \(message)")
+            errorMessage = message
+            if !recoverable {
+                sessionState = .error(message)
                 currentStatus = "Error"
             }
-
-        case .sessionStopped:
-            sessionState = .disconnected
-            currentStatus = "Ready"
-            audioLevel = 0
-            isSpeechDetected = false
-
-        case .sessionStarted:
-            sessionState = .listening
-            currentStatus = "Listening..."
-
-        case .agentResponseStarted:
-            assistantResponse = ""
-            currentTranscript = ""
-
-        case .agentResponseCompleted:
-            sessionState = .listening
-            currentStatus = "Listening..."
-
-        case let .audioLevel(level):
-            audioLevel = min(max(level.rms, 0), 1)
-
-        case .wakewordDetected:
-            sessionState = .listening
-            currentStatus = "Listening..."
-            isSpeechDetected = false
-
-        case .interrupted, .metrics, .none:
-            break
-
-        case .componentStateChanged, .speechTurnDetection, .turnLifecycle:
-            break
-        default:
-            break
         }
     }
 
-    // swiftlint:enable cyclomatic_complexity function_body_length
+    private func apply(_ state: AgentState) {
+        switch state {
+        case .listening:
+            sessionState = .listening
+            currentStatus = "Listening..."
+            isSpeechDetected = false
+        case .thinking:
+            // A new turn starts here: drop the previous answer. The user
+            // transcript stays until the next `userTranscribed` replaces it.
+            assistantResponse = ""
+            sessionState = .processing
+            currentStatus = "Processing..."
+            isSpeechDetected = false
+        case .speaking:
+            sessionState = .speaking
+            currentStatus = "Speaking..."
+        }
+    }
+
+    /// The event stream threw, so the pipeline is no longer running.
+    private func handleSessionFailure(_ error: Error) {
+        guard !isStopping else { return }
+        logger.error("Voice session stream failed: \(error.localizedDescription)")
+        errorMessage = error.localizedDescription
+        sessionState = .error(error.localizedDescription)
+        currentStatus = "Error"
+        isSpeechDetected = false
+    }
 
     // MARK: - Cleanup
 
@@ -812,8 +774,10 @@ final class VoiceAgentViewModel: ObservableObject {
         assistantResponse = ""
         // VM teardown path (view's onDisappear) — Android's lifecycle
         // equivalent (`onCleared()` → `stop()`) also releases the agent here.
+        let closing = session
+        session = nil
         Task {
-            await RunAnywhere.cleanupVoiceAgent()
+            await closing?.close()
         }
         logger.info("VoiceAgentViewModel cleanup completed")
     }

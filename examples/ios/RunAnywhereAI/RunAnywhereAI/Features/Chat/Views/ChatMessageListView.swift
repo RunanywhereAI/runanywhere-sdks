@@ -257,27 +257,21 @@ struct ChatInputAreaView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                if settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking {
-                    thinkingModeBadge
-                }
+            if showsToolCallingLabel || showsLoraBadge {
+                HStack(spacing: 8) {
+                    if showsToolCallingLabel {
+                        toolCallingLabel
+                    }
 
-                if viewModel.useToolCalling && !viewModel.isUsingConnect {
-                    toolCallingBadge
-                }
+                    if showsLoraBadge {
+                        loraAdapterBadge
+                    }
 
-                if !viewModel.isUsingConnect && !viewModel.loraAdapters.isEmpty {
-                    loraAdapterBadge
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.top, AppSpacing.smallMedium)
             }
-            .padding(
-                .top,
-                ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking)
-                    || (viewModel.useToolCalling && !viewModel.isUsingConnect)
-                    || (!viewModel.isUsingConnect && !viewModel.loraAdapters.isEmpty)
-                    || imageAttachment != nil
-                    || documentAttachment != nil) ? 8 : 0
-            )
 
             if let imageAttachment {
                 ImageAttachmentPill(
@@ -318,23 +312,9 @@ struct ChatInputAreaView: View {
                     }
                     .submitLabel(.send)
 
-                toolToggleButton
+                thinkingToggleButton
 
-                Button {
-                    Haptics.light()
-                    onComposerAction(.talk)
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(AppColors.primaryAccent.opacity(0.12))
-                        Image(systemName: "waveform")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppColors.primaryAccent)
-                    }
-                    .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Talk")
+                toolToggleButton
 
                 sendOrStopButton
             }
@@ -357,9 +337,10 @@ struct ChatInputAreaView: View {
             .padding(.horizontal, AppSpacing.large)
             .padding(.top, AppSpacing.small)
             .padding(.bottom, AppSpacing.mediumLarge)
-            .background(AppColors.backgroundGrouped)
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
         }
+        .frame(maxWidth: .infinity)
+        .background(AppColors.backgroundGrouped)
     }
 
     /// Brand send button that morphs into a stop control while generating.
@@ -458,41 +439,52 @@ struct ChatInputAreaView: View {
 
     // MARK: - Badges
 
-    private var thinkingModeBadge: some View {
+    private var showsToolCallingLabel: Bool {
+        viewModel.useToolCalling && !viewModel.isUsingConnect
+    }
+
+    private var showsLoraBadge: Bool {
+        !viewModel.isUsingConnect && !viewModel.loraAdapters.isEmpty
+    }
+
+    private var isThinkingActive: Bool {
+        settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking
+    }
+
+    private var thinkingToggleButton: some View {
         Button {
             settingsViewModel.thinkingModeEnabled.toggle()
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "lightbulb.min.fill")
-                    .font(.system(size: 10))
-                Text("Thinking")
-                    .font(AppTypography.caption2)
+            ZStack {
+                Circle()
+                    .fill(isThinkingActive ? AppColors.primaryPurple.opacity(0.14) : AppColors.backgroundSecondary)
+                Image(systemName: "brain")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(isThinkingActive ? AppColors.primaryPurple : AppColors.textSecondary)
             }
-            .foregroundColor(AppColors.primaryPurple)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(AppColors.primaryPurple.opacity(0.1))
-            .cornerRadius(6)
-        }
-    }
-
-    private var toolCallingBadge: some View {
-        Button {
-            toolSettingsViewModel.toolCallingEnabled.toggle()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "safari")
-                    .font(.system(size: 10))
-                Text(toolSettingsViewModel.registeredTools.isEmpty ? "Setting up tools" : "Web/tools on")
-                    .font(AppTypography.caption2)
-            }
-            .foregroundColor(AppColors.primaryAccent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(AppColors.primaryAccent.opacity(0.1))
-            .cornerRadius(6)
+            .frame(width: 32, height: 32)
         }
         .buttonStyle(.plain)
+        .disabled(!viewModel.loadedModelSupportsThinking)
+        .opacity(viewModel.loadedModelSupportsThinking ? 1 : 0.4)
+        .accessibilityLabel(isThinkingActive ? "Disable thinking" : "Enable thinking")
+    }
+
+    // Non-interactive floating label; tool calling is toggled from the composer.
+    private var toolCallingLabel: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "safari")
+                .font(.system(size: 10, weight: .semibold))
+            Text(toolSettingsViewModel.registeredTools.isEmpty ? "Setting up tools…" : "Tool calling on")
+                .font(AppTypography.caption2)
+        }
+        .foregroundColor(AppColors.primaryAccent)
+        .padding(.horizontal, AppSpacing.medium)
+        .padding(.vertical, AppSpacing.small)
+        .background(
+            Capsule().fill(AppColors.primaryAccent.opacity(0.12))
+        )
+        .allowsHitTesting(false)
     }
 
     private var loraAdapterBadge: some View {

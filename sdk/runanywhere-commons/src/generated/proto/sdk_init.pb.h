@@ -29,9 +29,10 @@
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/repeated_field.h"  // IWYU pragma: export
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
-#include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
+#include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -57,10 +58,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_sdk_
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum SdkInitEnvironment : int;
-extern const uint32_t SdkInitEnvironment_internal_data_[];
-enum SdkInitPhase : int;
-extern const uint32_t SdkInitPhase_internal_data_[];
 class SdkInitPhase1Request;
 struct SdkInitPhase1RequestGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -89,101 +86,11 @@ extern const SdkInitResultGlobalsTypeInternal SdkInitResult_globals_;
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
-template <>
-internal::EnumTraitsT<::runanywhere::v1::SdkInitEnvironment_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::SdkInitEnvironment>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::SdkInitPhase_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::SdkInitPhase>;
 }  // namespace protobuf
 }  // namespace google
 
 namespace runanywhere {
 namespace v1 {
-enum SdkInitPhase : int {
-  SDK_INIT_PHASE_UNSPECIFIED = 0,
-  SDK_INIT_PHASE_ONE = 1,
-  SDK_INIT_PHASE_TWO = 2,
-  SDK_INIT_PHASE_RETRY_HTTP = 3,
-  SdkInitPhase_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  SdkInitPhase_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t SdkInitPhase_internal_data_[];
-inline constexpr SdkInitPhase SdkInitPhase_MIN =
-    static_cast<SdkInitPhase>(0);
-inline constexpr SdkInitPhase SdkInitPhase_MAX =
-    static_cast<SdkInitPhase>(3);
-[[nodiscard]] inline bool SdkInitPhase_IsValid(int value) {
-  return 0 <= value && value <= 3;
-}
-inline constexpr int SdkInitPhase_ARRAYSIZE = 3 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-SdkInitPhase_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(SdkInitPhase) {
-  return SdkInitPhase_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& SdkInitPhase_Name(T value) {
-  static_assert(::std::is_same<T, SdkInitPhase>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to SdkInitPhase_Name().");
-  return SdkInitPhase_Name(static_cast<SdkInitPhase>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& SdkInitPhase_Name(SdkInitPhase value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<SdkInitPhase_descriptor, 0, 3>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool SdkInitPhase_Parse(
-    ::absl::string_view name, SdkInitPhase* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<SdkInitPhase>(SdkInitPhase_descriptor(), name,
-                                           value);
-}
-enum SdkInitEnvironment : int {
-  SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0,
-  SDK_INIT_ENVIRONMENT_PRODUCTION = 2,
-  SdkInitEnvironment_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  SdkInitEnvironment_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t SdkInitEnvironment_internal_data_[];
-inline constexpr SdkInitEnvironment SdkInitEnvironment_MIN =
-    static_cast<SdkInitEnvironment>(0);
-inline constexpr SdkInitEnvironment SdkInitEnvironment_MAX =
-    static_cast<SdkInitEnvironment>(2);
-[[nodiscard]] inline bool SdkInitEnvironment_IsValid(int value) {
-  return 0 <= value && value <= 2 && ((5u >> value) & 1) != 0;
-}
-inline constexpr int SdkInitEnvironment_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-SdkInitEnvironment_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(SdkInitEnvironment) {
-  return SdkInitEnvironment_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& SdkInitEnvironment_Name(T value) {
-  static_assert(::std::is_same<T, SdkInitEnvironment>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to SdkInitEnvironment_Name().");
-  return SdkInitEnvironment_Name(static_cast<SdkInitEnvironment>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& SdkInitEnvironment_Name(SdkInitEnvironment value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<SdkInitEnvironment_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool SdkInitEnvironment_Parse(
-    ::absl::string_view name, SdkInitEnvironment* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<SdkInitEnvironment>(SdkInitEnvironment_descriptor(), name,
-                                           value);
-}
-using ::google::protobuf::internal::generated_enum::AbslParseFlag;
-using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 
 // ===================================================================
 
@@ -339,10 +246,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitPhase2Request final : public
   // accessors -------------------------------------------------------
   enum : int {
     kBuildTokenFieldNumber = 1,
-    kForceRefreshAssignmentsFieldNumber = 2,
-    kFlushTelemetryFieldNumber = 3,
-    kDiscoverDownloadedModelsFieldNumber = 4,
-    kRescanLocalModelsFieldNumber = 5,
   };
   // string build_token = 1;
   void clear_build_token() ;
@@ -359,51 +262,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitPhase2Request final : public
   ::std::string* PROTOBUF_NONNULL _internal_mutable_build_token();
 
   public:
-  // bool force_refresh_assignments = 2;
-  void clear_force_refresh_assignments() ;
-  [[nodiscard]] bool force_refresh_assignments() const;
-  void set_force_refresh_assignments(bool value);
-
-  private:
-  bool _internal_force_refresh_assignments() const;
-  void _internal_set_force_refresh_assignments(bool value);
-
-  public:
-  // bool flush_telemetry = 3;
-  void clear_flush_telemetry() ;
-  [[nodiscard]] bool flush_telemetry() const;
-  void set_flush_telemetry(bool value);
-
-  private:
-  bool _internal_flush_telemetry() const;
-  void _internal_set_flush_telemetry(bool value);
-
-  public:
-  // bool discover_downloaded_models = 4;
-  void clear_discover_downloaded_models() ;
-  [[nodiscard]] bool discover_downloaded_models() const;
-  void set_discover_downloaded_models(bool value);
-
-  private:
-  bool _internal_discover_downloaded_models() const;
-  void _internal_set_discover_downloaded_models(bool value);
-
-  public:
-  // bool rescan_local_models = 5;
-  void clear_rescan_local_models() ;
-  [[nodiscard]] bool rescan_local_models() const;
-  void set_rescan_local_models(bool value);
-
-  private:
-  bool _internal_rescan_local_models() const;
-  void _internal_set_rescan_local_models(bool value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SdkInitPhase2Request)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 5,
+      ::google::protobuf::internal::TcParseTable<0, 1,
                           0, 55,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -433,10 +296,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitPhase2Request final : public
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr build_token_;
-    bool force_refresh_assignments_;
-    bool flush_telemetry_;
-    bool discover_downloaded_models_;
-    bool rescan_local_models_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -598,6 +457,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitPhase1Request final : public
     kPlatformFieldNumber = 5,
     kSdkVersionFieldNumber = 6,
     kEnvironmentFieldNumber = 1,
+    kRequestTimeoutMsFieldNumber = 7,
+    kMaxRetriesFieldNumber = 8,
   };
   // string api_key = 2;
   void clear_api_key() ;
@@ -674,22 +535,46 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitPhase1Request final : public
   ::std::string* PROTOBUF_NONNULL _internal_mutable_sdk_version();
 
   public:
-  // .runanywhere.v1.SdkInitEnvironment environment = 1;
+  // .runanywhere.v1.SDKEnvironment environment = 1;
   void clear_environment() ;
-  [[nodiscard]] ::runanywhere::v1::SdkInitEnvironment environment() const;
-  void set_environment(::runanywhere::v1::SdkInitEnvironment value);
+  [[nodiscard]] ::runanywhere::v1::SDKEnvironment environment() const;
+  void set_environment(::runanywhere::v1::SDKEnvironment value);
 
   private:
-  ::runanywhere::v1::SdkInitEnvironment _internal_environment() const;
-  void _internal_set_environment(::runanywhere::v1::SdkInitEnvironment value);
+  ::runanywhere::v1::SDKEnvironment _internal_environment() const;
+  void _internal_set_environment(::runanywhere::v1::SDKEnvironment value);
+
+  public:
+  // optional int32 request_timeout_ms = 7 [(.runanywhere.v1.rac_min) = 1000];
+  [[nodiscard]] bool has_request_timeout_ms()
+      const;
+  void clear_request_timeout_ms() ;
+  [[nodiscard]] ::int32_t request_timeout_ms() const;
+  void set_request_timeout_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_request_timeout_ms() const;
+  void _internal_set_request_timeout_ms(::int32_t value);
+
+  public:
+  // optional int32 max_retries = 8 [(.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 10];
+  [[nodiscard]] bool has_max_retries()
+      const;
+  void clear_max_retries() ;
+  [[nodiscard]] ::int32_t max_retries() const;
+  void set_max_retries(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_retries() const;
+  void _internal_set_max_retries(::int32_t value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SdkInitPhase1Request)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
-                          0, 87,
+      ::google::protobuf::internal::TcParseTable<3, 8,
+                          0, 95,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -723,6 +608,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitPhase1Request final : public
     ::google::protobuf::internal::ArenaStringPtr platform_;
     ::google::protobuf::internal::ArenaStringPtr sdk_version_;
     int environment_;
+    ::int32_t request_timeout_ms_;
+    ::int32_t max_retries_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -878,19 +765,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
 
   // accessors -------------------------------------------------------
   enum : int {
-    kWarningFieldNumber = 8,
-    kErrorFieldNumber = 3,
-    kPhaseFieldNumber = 1,
-    kSuccessFieldNumber = 2,
-    kHttpConfiguredFieldNumber = 4,
-    kDeviceRegisteredFieldNumber = 5,
-    kHasCompletedHttpSetupFieldNumber = 10,
-    kLinkedModelsCountFieldNumber = 6,
-    kDiscoveredOrphansFieldNumber = 7,
-    kDurationMsFieldNumber = 9,
-    kHttpApplicableFieldNumber = 11,
+    kWarningFieldNumber = 3,
+    kErrorFieldNumber = 1,
+    kLinkedModelsCountFieldNumber = 2,
+    kHasCompletedHttpSetupFieldNumber = 4,
+    kHttpApplicableFieldNumber = 5,
   };
-  // string warning = 8;
+  // string warning = 3;
   void clear_warning() ;
   [[nodiscard]] const ::std::string& warning() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -905,7 +786,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
   ::std::string* PROTOBUF_NONNULL _internal_mutable_warning();
 
   public:
-  // .runanywhere.v1.SDKError error = 3;
+  // .runanywhere.v1.SDKError error = 1;
   [[nodiscard]] bool has_error()
       const;
   void clear_error() ;
@@ -921,57 +802,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
   ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
-  // .runanywhere.v1.SdkInitPhase phase = 1;
-  void clear_phase() ;
-  [[nodiscard]] ::runanywhere::v1::SdkInitPhase phase() const;
-  void set_phase(::runanywhere::v1::SdkInitPhase value);
-
-  private:
-  ::runanywhere::v1::SdkInitPhase _internal_phase() const;
-  void _internal_set_phase(::runanywhere::v1::SdkInitPhase value);
-
-  public:
-  // bool success = 2;
-  void clear_success() ;
-  [[nodiscard]] bool success() const;
-  void set_success(bool value);
-
-  private:
-  bool _internal_success() const;
-  void _internal_set_success(bool value);
-
-  public:
-  // bool http_configured = 4;
-  void clear_http_configured() ;
-  [[nodiscard]] bool http_configured() const;
-  void set_http_configured(bool value);
-
-  private:
-  bool _internal_http_configured() const;
-  void _internal_set_http_configured(bool value);
-
-  public:
-  // bool device_registered = 5;
-  void clear_device_registered() ;
-  [[nodiscard]] bool device_registered() const;
-  void set_device_registered(bool value);
-
-  private:
-  bool _internal_device_registered() const;
-  void _internal_set_device_registered(bool value);
-
-  public:
-  // bool has_completed_http_setup = 10;
-  void clear_has_completed_http_setup() ;
-  [[nodiscard]] bool has_completed_http_setup() const;
-  void set_has_completed_http_setup(bool value);
-
-  private:
-  bool _internal_has_completed_http_setup() const;
-  void _internal_set_has_completed_http_setup(bool value);
-
-  public:
-  // uint32 linked_models_count = 6;
+  // uint32 linked_models_count = 2;
   void clear_linked_models_count() ;
   [[nodiscard]] ::uint32_t linked_models_count() const;
   void set_linked_models_count(::uint32_t value);
@@ -981,27 +812,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
   void _internal_set_linked_models_count(::uint32_t value);
 
   public:
-  // uint32 discovered_orphans = 7;
-  void clear_discovered_orphans() ;
-  [[nodiscard]] ::uint32_t discovered_orphans() const;
-  void set_discovered_orphans(::uint32_t value);
+  // bool has_completed_http_setup = 4;
+  void clear_has_completed_http_setup() ;
+  [[nodiscard]] bool has_completed_http_setup() const;
+  void set_has_completed_http_setup(bool value);
 
   private:
-  ::uint32_t _internal_discovered_orphans() const;
-  void _internal_set_discovered_orphans(::uint32_t value);
+  bool _internal_has_completed_http_setup() const;
+  void _internal_set_has_completed_http_setup(bool value);
 
   public:
-  // int64 duration_ms = 9;
-  void clear_duration_ms() ;
-  [[nodiscard]] ::int64_t duration_ms() const;
-  void set_duration_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_duration_ms() const;
-  void _internal_set_duration_ms(::int64_t value);
-
-  public:
-  // bool http_applicable = 11;
+  // bool http_applicable = 5;
   void clear_http_applicable() ;
   [[nodiscard]] bool http_applicable() const;
   void set_http_applicable(bool value);
@@ -1015,8 +836,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 11,
-                          1, 52,
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          1, 44,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1046,14 +867,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr warning_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
-    int phase_;
-    bool success_;
-    bool http_configured_;
-    bool device_registered_;
-    bool has_completed_http_setup_;
     ::uint32_t linked_models_count_;
-    ::uint32_t discovered_orphans_;
-    ::int64_t duration_ms_;
+    bool has_completed_http_setup_;
     bool http_applicable_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -1077,26 +892,26 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
 
 // SdkInitPhase1Request
 
-// .runanywhere.v1.SdkInitEnvironment environment = 1;
+// .runanywhere.v1.SDKEnvironment environment = 1;
 inline void SdkInitPhase1Request::clear_environment() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.environment_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
-inline ::runanywhere::v1::SdkInitEnvironment SdkInitPhase1Request::environment() const {
+inline ::runanywhere::v1::SDKEnvironment SdkInitPhase1Request::environment() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitPhase1Request.environment)
   return _internal_environment();
 }
-inline void SdkInitPhase1Request::set_environment(::runanywhere::v1::SdkInitEnvironment value) {
+inline void SdkInitPhase1Request::set_environment(::runanywhere::v1::SDKEnvironment value) {
   _internal_set_environment(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitPhase1Request.environment)
 }
-inline ::runanywhere::v1::SdkInitEnvironment SdkInitPhase1Request::_internal_environment() const {
+inline ::runanywhere::v1::SDKEnvironment SdkInitPhase1Request::_internal_environment() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::SdkInitEnvironment>(_impl_.environment_);
+  return static_cast<::runanywhere::v1::SDKEnvironment>(_impl_.environment_);
 }
-inline void SdkInitPhase1Request::_internal_set_environment(::runanywhere::v1::SdkInitEnvironment value) {
+inline void SdkInitPhase1Request::_internal_set_environment(::runanywhere::v1::SDKEnvironment value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.environment_ = value;
 }
@@ -1421,6 +1236,62 @@ inline void SdkInitPhase1Request::set_allocated_sdk_version(::std::string* PROTO
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SdkInitPhase1Request.sdk_version)
 }
 
+// optional int32 request_timeout_ms = 7 [(.runanywhere.v1.rac_min) = 1000];
+inline bool SdkInitPhase1Request::has_request_timeout_ms() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void SdkInitPhase1Request::clear_request_timeout_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_timeout_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline ::int32_t SdkInitPhase1Request::request_timeout_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitPhase1Request.request_timeout_ms)
+  return _internal_request_timeout_ms();
+}
+inline void SdkInitPhase1Request::set_request_timeout_ms(::int32_t value) {
+  _internal_set_request_timeout_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitPhase1Request.request_timeout_ms)
+}
+inline ::int32_t SdkInitPhase1Request::_internal_request_timeout_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.request_timeout_ms_;
+}
+inline void SdkInitPhase1Request::_internal_set_request_timeout_ms(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_timeout_ms_ = value;
+}
+
+// optional int32 max_retries = 8 [(.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 10];
+inline bool SdkInitPhase1Request::has_max_retries() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
+inline void SdkInitPhase1Request::clear_max_retries() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_retries_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+}
+inline ::int32_t SdkInitPhase1Request::max_retries() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitPhase1Request.max_retries)
+  return _internal_max_retries();
+}
+inline void SdkInitPhase1Request::set_max_retries(::int32_t value) {
+  _internal_set_max_retries(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitPhase1Request.max_retries)
+}
+inline ::int32_t SdkInitPhase1Request::_internal_max_retries() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.max_retries_;
+}
+inline void SdkInitPhase1Request::_internal_set_max_retries(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_retries_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // SdkInitPhase2Request
@@ -1489,155 +1360,11 @@ inline void SdkInitPhase2Request::set_allocated_build_token(::std::string* PROTO
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SdkInitPhase2Request.build_token)
 }
 
-// bool force_refresh_assignments = 2;
-inline void SdkInitPhase2Request::clear_force_refresh_assignments() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.force_refresh_assignments_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline bool SdkInitPhase2Request::force_refresh_assignments() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitPhase2Request.force_refresh_assignments)
-  return _internal_force_refresh_assignments();
-}
-inline void SdkInitPhase2Request::set_force_refresh_assignments(bool value) {
-  _internal_set_force_refresh_assignments(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitPhase2Request.force_refresh_assignments)
-}
-inline bool SdkInitPhase2Request::_internal_force_refresh_assignments() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.force_refresh_assignments_;
-}
-inline void SdkInitPhase2Request::_internal_set_force_refresh_assignments(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.force_refresh_assignments_ = value;
-}
-
-// bool flush_telemetry = 3;
-inline void SdkInitPhase2Request::clear_flush_telemetry() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.flush_telemetry_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline bool SdkInitPhase2Request::flush_telemetry() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitPhase2Request.flush_telemetry)
-  return _internal_flush_telemetry();
-}
-inline void SdkInitPhase2Request::set_flush_telemetry(bool value) {
-  _internal_set_flush_telemetry(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitPhase2Request.flush_telemetry)
-}
-inline bool SdkInitPhase2Request::_internal_flush_telemetry() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.flush_telemetry_;
-}
-inline void SdkInitPhase2Request::_internal_set_flush_telemetry(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.flush_telemetry_ = value;
-}
-
-// bool discover_downloaded_models = 4;
-inline void SdkInitPhase2Request::clear_discover_downloaded_models() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.discover_downloaded_models_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline bool SdkInitPhase2Request::discover_downloaded_models() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitPhase2Request.discover_downloaded_models)
-  return _internal_discover_downloaded_models();
-}
-inline void SdkInitPhase2Request::set_discover_downloaded_models(bool value) {
-  _internal_set_discover_downloaded_models(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitPhase2Request.discover_downloaded_models)
-}
-inline bool SdkInitPhase2Request::_internal_discover_downloaded_models() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.discover_downloaded_models_;
-}
-inline void SdkInitPhase2Request::_internal_set_discover_downloaded_models(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.discover_downloaded_models_ = value;
-}
-
-// bool rescan_local_models = 5;
-inline void SdkInitPhase2Request::clear_rescan_local_models() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rescan_local_models_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline bool SdkInitPhase2Request::rescan_local_models() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitPhase2Request.rescan_local_models)
-  return _internal_rescan_local_models();
-}
-inline void SdkInitPhase2Request::set_rescan_local_models(bool value) {
-  _internal_set_rescan_local_models(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitPhase2Request.rescan_local_models)
-}
-inline bool SdkInitPhase2Request::_internal_rescan_local_models() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.rescan_local_models_;
-}
-inline void SdkInitPhase2Request::_internal_set_rescan_local_models(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rescan_local_models_ = value;
-}
-
 // -------------------------------------------------------------------
 
 // SdkInitResult
 
-// .runanywhere.v1.SdkInitPhase phase = 1;
-inline void SdkInitResult::clear_phase() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.phase_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline ::runanywhere::v1::SdkInitPhase SdkInitResult::phase() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.phase)
-  return _internal_phase();
-}
-inline void SdkInitResult::set_phase(::runanywhere::v1::SdkInitPhase value) {
-  _internal_set_phase(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.phase)
-}
-inline ::runanywhere::v1::SdkInitPhase SdkInitResult::_internal_phase() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::SdkInitPhase>(_impl_.phase_);
-}
-inline void SdkInitResult::_internal_set_phase(::runanywhere::v1::SdkInitPhase value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.phase_ = value;
-}
-
-// bool success = 2;
-inline void SdkInitResult::clear_success() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.success_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline bool SdkInitResult::success() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.success)
-  return _internal_success();
-}
-inline void SdkInitResult::set_success(bool value) {
-  _internal_set_success(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.success)
-}
-inline bool SdkInitResult::_internal_success() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.success_;
-}
-inline void SdkInitResult::_internal_set_success(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.success_ = value;
-}
-
-// .runanywhere.v1.SDKError error = 3;
+// .runanywhere.v1.SDKError error = 1;
 inline bool SdkInitResult::has_error() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
@@ -1730,59 +1457,11 @@ inline void SdkInitResult::set_allocated_error(::runanywhere::v1::SDKError* PROT
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SdkInitResult.error)
 }
 
-// bool http_configured = 4;
-inline void SdkInitResult::clear_http_configured() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.http_configured_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline bool SdkInitResult::http_configured() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.http_configured)
-  return _internal_http_configured();
-}
-inline void SdkInitResult::set_http_configured(bool value) {
-  _internal_set_http_configured(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.http_configured)
-}
-inline bool SdkInitResult::_internal_http_configured() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.http_configured_;
-}
-inline void SdkInitResult::_internal_set_http_configured(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.http_configured_ = value;
-}
-
-// bool device_registered = 5;
-inline void SdkInitResult::clear_device_registered() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.device_registered_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline bool SdkInitResult::device_registered() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.device_registered)
-  return _internal_device_registered();
-}
-inline void SdkInitResult::set_device_registered(bool value) {
-  _internal_set_device_registered(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.device_registered)
-}
-inline bool SdkInitResult::_internal_device_registered() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.device_registered_;
-}
-inline void SdkInitResult::_internal_set_device_registered(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.device_registered_ = value;
-}
-
-// uint32 linked_models_count = 6;
+// uint32 linked_models_count = 2;
 inline void SdkInitResult::clear_linked_models_count() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.linked_models_count_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::uint32_t SdkInitResult::linked_models_count() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.linked_models_count)
@@ -1790,7 +1469,7 @@ inline ::uint32_t SdkInitResult::linked_models_count() const {
 }
 inline void SdkInitResult::set_linked_models_count(::uint32_t value) {
   _internal_set_linked_models_count(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.linked_models_count)
 }
 inline ::uint32_t SdkInitResult::_internal_linked_models_count() const {
@@ -1802,31 +1481,7 @@ inline void SdkInitResult::_internal_set_linked_models_count(::uint32_t value) {
   _impl_.linked_models_count_ = value;
 }
 
-// uint32 discovered_orphans = 7;
-inline void SdkInitResult::clear_discovered_orphans() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.discovered_orphans_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
-}
-inline ::uint32_t SdkInitResult::discovered_orphans() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.discovered_orphans)
-  return _internal_discovered_orphans();
-}
-inline void SdkInitResult::set_discovered_orphans(::uint32_t value) {
-  _internal_set_discovered_orphans(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.discovered_orphans)
-}
-inline ::uint32_t SdkInitResult::_internal_discovered_orphans() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.discovered_orphans_;
-}
-inline void SdkInitResult::_internal_set_discovered_orphans(::uint32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.discovered_orphans_ = value;
-}
-
-// string warning = 8;
+// string warning = 3;
 inline void SdkInitResult::clear_warning() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.warning_.ClearToEmpty();
@@ -1890,35 +1545,11 @@ inline void SdkInitResult::set_allocated_warning(::std::string* PROTOBUF_NULLABL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SdkInitResult.warning)
 }
 
-// int64 duration_ms = 9;
-inline void SdkInitResult::clear_duration_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.duration_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
-}
-inline ::int64_t SdkInitResult::duration_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.duration_ms)
-  return _internal_duration_ms();
-}
-inline void SdkInitResult::set_duration_ms(::int64_t value) {
-  _internal_set_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.duration_ms)
-}
-inline ::int64_t SdkInitResult::_internal_duration_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.duration_ms_;
-}
-inline void SdkInitResult::_internal_set_duration_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.duration_ms_ = value;
-}
-
-// bool has_completed_http_setup = 10;
+// bool has_completed_http_setup = 4;
 inline void SdkInitResult::clear_has_completed_http_setup() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.has_completed_http_setup_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline bool SdkInitResult::has_completed_http_setup() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.has_completed_http_setup)
@@ -1926,7 +1557,7 @@ inline bool SdkInitResult::has_completed_http_setup() const {
 }
 inline void SdkInitResult::set_has_completed_http_setup(bool value) {
   _internal_set_has_completed_http_setup(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.has_completed_http_setup)
 }
 inline bool SdkInitResult::_internal_has_completed_http_setup() const {
@@ -1938,11 +1569,11 @@ inline void SdkInitResult::_internal_set_has_completed_http_setup(bool value) {
   _impl_.has_completed_http_setup_ = value;
 }
 
-// bool http_applicable = 11;
+// bool http_applicable = 5;
 inline void SdkInitResult::clear_http_applicable() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.http_applicable_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline bool SdkInitResult::http_applicable() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.http_applicable)
@@ -1950,7 +1581,7 @@ inline bool SdkInitResult::http_applicable() const {
 }
 inline void SdkInitResult::set_http_applicable(bool value) {
   _internal_set_http_applicable(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.http_applicable)
 }
 inline bool SdkInitResult::_internal_http_applicable() const {
@@ -1970,25 +1601,6 @@ inline void SdkInitResult::_internal_set_http_applicable(bool value) {
 }  // namespace v1
 }  // namespace runanywhere
 
-
-namespace google {
-namespace protobuf {
-
-template <>
-struct is_proto_enum<::runanywhere::v1::SdkInitPhase> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::SdkInitPhase>() {
-  return ::runanywhere::v1::SdkInitPhase_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::SdkInitEnvironment> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::SdkInitEnvironment>() {
-  return ::runanywhere::v1::SdkInitEnvironment_descriptor();
-}
-
-}  // namespace protobuf
-}  // namespace google
 
 // @@protoc_insertion_point(global_scope)
 

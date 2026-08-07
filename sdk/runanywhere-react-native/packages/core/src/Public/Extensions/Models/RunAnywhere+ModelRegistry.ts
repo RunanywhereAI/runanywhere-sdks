@@ -41,6 +41,7 @@ import {
   ModelListRequest,
   ModelListResult,
   ModelQuery,
+  ModelRegistryStatus,
   ModelSource,
   InferenceFramework,
   RegisterModelFromUrlRequest,
@@ -52,7 +53,6 @@ import {
   DownloadPlanRequest,
   DownloadFailureReason,
   DownloadPlanResult,
-  DownloadStage,
   DownloadState,
   type DownloadProgress,
   DownloadProgress as DownloadProgressCodec,
@@ -94,6 +94,12 @@ export interface RegisterModelInput {
   supportsThinking?: boolean;
   /** Optional LoRA adapter compatibility flag (Swift parity). */
   supportsLora?: boolean;
+  /**
+   * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
+   * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
+   * models are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 /**
@@ -119,6 +125,12 @@ export interface RegisterMultiFileModelInput {
   framework: InferenceFramework;
   modality?: ModelCategory;
   memoryRequirement?: number;
+  /**
+   * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
+   * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
+   * models are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +180,7 @@ export async function registerModel(
     ...(input.supportsThinking ? { supportsThinking: true } : {}),
     ...(input.supportsLora ? { supportsLora: true } : {}),
     ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
+    ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
   });
 
   const saved = arrayBufferToBytes(
@@ -220,6 +233,8 @@ export interface RegisterArchiveModelInput {
   memoryRequirement?: number;
   supportsThinking?: boolean;
   supportsLora?: boolean;
+  /** Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`). */
+  cuaProfile?: string;
 }
 
 /** Infer the archive type from a URL extension. Mirrors Swift `ArchiveType.from(url:)`. */
@@ -275,13 +290,15 @@ export async function registerArchiveModel(
     format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     downloadUrl: input.url,
     source: ModelSource.MODEL_SOURCE_REMOTE,
-    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE,
+    // `ModelInfo.artifactType` is deleted outright — the oneof arm
+    // (`archive` here) is itself the artifact-type signal now.
     archive,
     supportsThinking: input.supportsThinking ?? false,
     supportsLora: input.supportsLora ?? false,
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
       : {}),
+    ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     ...(input.supportsThinking
       ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
       : {}),
@@ -329,13 +346,18 @@ export async function registerMultiFileModel(
           memoryRequiredBytes: input.memoryRequirement,
         }
       : {}),
+    ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
+    // ModelFileDescriptor.isRequired was renamed isOptional — NOT a bare
+    // rename, the boolean polarity inverts too (required=true means
+    // optional=false). This is a confirmed live bug when passed through
+    // unchanged.
     files: input.files.map((file) => ({
       role:
         file.role ??
         (native.inferModelFileRole(file.filename, category) as ModelFileRole),
       url: file.url,
       filename: file.filename,
-      isRequired: file.isRequired,
+      isOptional: !file.isRequired,
     })),
   });
   const saved = arrayBufferToBytes(
@@ -371,14 +393,12 @@ export async function listModels(
   // (RunAnywhere+ModelRegistry.swift:11-16).
   if (!isSDKInitialized()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   // Swift parity: `try? await ensureServicesReady()` (ModelRegistry.swift:17).
@@ -393,8 +413,7 @@ export async function listModels(
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'getAvailableModelsProto returned an empty result',
+      error: SDKException.protoDecodeFailed('getAvailableModelsProto').proto,
     });
   }
   return modelListResult(ModelInfoList.decode(bytes));
@@ -408,14 +427,12 @@ export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
   // guard returns a failed result (RunAnywhere+ModelRegistry.swift:11-25).
   if (!isSDKInitialized()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   const native = requireNativeModule();
@@ -425,8 +442,7 @@ export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'queryModelsProto returned an empty result',
+      error: SDKException.protoDecodeFailed('queryModelsProto').proto,
     });
   }
   return modelListResult(ModelInfoList.decode(bytes));
@@ -441,13 +457,13 @@ export async function getModel(request: ModelGetRequest): Promise<ModelGetResult
   if (!isSDKInitialized()) {
     return ModelGetResult.fromPartial({
       found: false,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelGetResult.fromPartial({
       found: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   // Swift parity: `try? await ensureServicesReady()` (ModelRegistry.swift:34).
@@ -458,7 +474,7 @@ export async function getModel(request: ModelGetRequest): Promise<ModelGetResult
   if (bytes.byteLength === 0) {
     return ModelGetResult.fromPartial({
       found: false,
-      errorMessage: `Model not found: ${request.modelId}`,
+      error: SDKException.modelNotFound(request.modelId).proto,
     });
   }
   return ModelGetResult.fromPartial({
@@ -473,8 +489,7 @@ export async function getModel(request: ModelGetRequest): Promise<ModelGetResult
 export async function downloadedModels(): Promise<ModelListResult> {
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   const native = requireNativeModule();
@@ -482,11 +497,23 @@ export async function downloadedModels(): Promise<ModelListResult> {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'getDownloadedModelsProto returned an empty result',
+      error: SDKException.protoDecodeFailed('getDownloadedModelsProto').proto,
     });
   }
   return modelListResult(ModelInfoList.decode(bytes));
+}
+
+/**
+ * Remove a model's catalog record. Callers must already have unloaded and
+ * deleted its local artifacts.
+ */
+export async function removeModel(modelId: string): Promise<boolean> {
+  requireInitialized();
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  const native = requireNativeModule();
+  return native.removeModelProto(modelId);
 }
 
 /**
@@ -500,8 +527,7 @@ export async function importModel(
   requireInitialized();
   if (!isNativeModuleAvailable()) {
     return ModelImportResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
 
@@ -512,21 +538,23 @@ export async function importModel(
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelImportResult.fromPartial({
-      success: false,
-      errorMessage: 'importModelProto returned an empty result',
+      error: SDKException.protoDecodeFailed('importModelProto').proto,
     });
   }
   return ModelImportResult.decode(bytes);
 }
 
+/**
+ * `ModelListResult.totalCount`/`downloadedCount`/`availableCount`/
+ * `filteredCount` are deleted outright — the message now carries only
+ * `models`/`error`. `ModelInfo.isDownloaded` is likewise deleted;
+ * `registryStatus` (`MODEL_REGISTRY_STATUS_DOWNLOADED`/`_LOADED`) is the
+ * single downloaded-ness signal now (see `model_types.proto`'s
+ * `ModelInfo.registry_status` comment).
+ */
 function modelListResult(models: ModelInfoList): ModelListResult {
   return ModelListResult.fromPartial({
-    success: true,
     models,
-    totalCount: models.models.length,
-    downloadedCount: models.models.filter((model) => model.isDownloaded).length,
-    availableCount: models.models.filter((model) => model.isAvailable).length,
-    filteredCount: models.models.length,
   });
 }
 
@@ -617,22 +645,27 @@ async function unsubscribeFromDownloadProgress(
 // Download (canonical async iterable)
 // ---------------------------------------------------------------------------
 
+/**
+ * `DownloadStage` is deleted from `download_service.proto` outright —
+ * `DownloadProgress.state` (`DownloadState`) is the single phase signal now.
+ */
 function isTerminalProgress(progress: DownloadProgress): boolean {
   return (
     progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
     progress.state === DownloadState.DOWNLOAD_STATE_FAILED ||
-    progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED ||
-    progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
+    progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED
   );
 }
 
 function isCompletedProgress(progress: DownloadProgress): boolean {
   if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
-    throw SDKException.of(
-      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-      progress.errorMessage || 'Download failed',
-      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
-    );
+    throw progress.error
+      ? new SDKException(progress.error)
+      : SDKException.of(
+          ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+          'Download failed',
+          { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+        );
   }
   if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
     throw SDKException.of(
@@ -641,10 +674,7 @@ function isCompletedProgress(progress: DownloadProgress): boolean {
       { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
     );
   }
-  return (
-    progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
-    progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
-  );
+  return progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED;
 }
 
 /**
@@ -714,10 +744,12 @@ async function persistDownloadCompletion(
     );
   }
 
+  // ModelInfo.isDownloaded is deleted outright; registryStatus is the single
+  // downloaded-ness signal now.
   const importedModel = ModelInfoCodec.fromPartial({
     ...model,
     localPath,
-    isDownloaded: true,
+    registryStatus: ModelRegistryStatus.MODEL_REGISTRY_STATUS_DOWNLOADED,
     isAvailable: true,
     updatedAtUnixMs: Date.now(),
   });
@@ -732,12 +764,8 @@ async function persistDownloadCompletion(
     })
   );
 
-  if (!result.success) {
-    throw SDKException.of(
-      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-      result.errorMessage || 'Downloaded model could not be imported into the registry',
-      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
-    );
+  if (result.error) {
+    throw new SDKException(result.error);
   }
 }
 
@@ -834,26 +862,38 @@ export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadPro
           const model = ModelInfoCodec.decode(modelBytes);
           modelForImport = model;
           // Plan fields mirror Swift RunAnywhere+Storage.swift:183-188.
+          // `resumeExisting`/`verifyChecksums` are deleted outright:
+          // `validateExistingBytes` covers resume validation, and checksums
+          // are "verified whenever the catalog has one" by default — there
+          // is no separate opt-in field, only `skipChecksumVerification` to
+          // opt OUT.
           const planRequest = DownloadPlanRequest.fromPartial({
             modelId,
             model,
-            resumeExisting: true,
             validateExistingBytes: true,
-            verifyChecksums: (model.checksumSha256?.length ?? 0) > 0,
           });
           const plan = await planDownload(native, planRequest);
           if (!plan.canStart) {
-            streamError = new Error(
-              plan.errorMessage || `download plan rejected for ${modelId}`
-            );
+            streamError = plan.error
+              ? new SDKException(plan.error)
+              : new Error(`download plan rejected for ${modelId}`);
             await teardownSubscription();
             finish();
             return;
           }
+          // `update_registry_on_completion` was renamed
+          // `skip_registry_update`, with INVERTED polarity: the old field's
+          // zero value (false) meant "don't auto-update" (registry updates
+          // were opt-in); the new field's zero value (false) means "do
+          // update" (registry updates are opt-OUT via skip=true). This
+          // call site wants commons to skip its own auto-update because
+          // `persistDownloadCompletion` below does the registry write
+          // itself via `importModel` — i.e. the same "I'll handle it"
+          // intent as the old `false`, expressed here as `skip: true`.
           const startRequest = DownloadStartRequest.fromPartial({
             modelId,
             plan,
-            updateRegistryOnCompletion: false,
+            skipRegistryUpdate: true,
           });
           const startBytes = await native.downloadStartProto(
             encodeProtoMessage(startRequest, DownloadStartRequest)
@@ -862,9 +902,9 @@ export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadPro
             arrayBufferToBytes(startBytes)
           );
           if (!startResult.accepted) {
-            streamError = new Error(
-              startResult.errorMessage || `download not accepted for ${modelId}`
-            );
+            streamError = startResult.error
+              ? new SDKException(startResult.error)
+              : new Error(`download not accepted for ${modelId}`);
             await teardownSubscription();
             finish();
             return;

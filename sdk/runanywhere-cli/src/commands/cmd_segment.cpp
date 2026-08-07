@@ -1,6 +1,6 @@
 /**
  * @file cmd_segment.cpp
- * @brief `rcli segment <image.ppm> --model <path>` — semantic segmentation via
+ * @brief `rcli segment <image.ppm> --model <path>` — segmentation via
  *        the commons segmentation service (image-in → per-class mask summary).
  *
  * Mirrors cmd_image's structure (bootstrap → resolve model → one commons path →
@@ -100,7 +100,7 @@ void print_result(const GlobalOptions& options, const std::string& model_ref,
 }
 
 int run_segment(const GlobalOptions& options, const std::string& image_path,
-                const std::string& model_ref) {
+                const std::string& model_ref, const std::string& diagnostic_path) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
@@ -147,6 +147,7 @@ int run_segment(const GlobalOptions& options, const std::string& image_path,
     image.pixel_format = RAC_SEGMENTATION_PIXEL_FORMAT_RGB8;
 
     rac_segmentation_options_t seg_options = RAC_SEGMENTATION_OPTIONS_DEFAULT;
+    seg_options.include_diagnostic_rgba = diagnostic_path.empty() ? RAC_FALSE : RAC_TRUE;
     rac_segmentation_result_t result = {};
     rc = rac_segmentation_segment(handle, &image, &seg_options, &result);
     if (rc != RAC_SUCCESS) {
@@ -158,6 +159,19 @@ int run_segment(const GlobalOptions& options, const std::string& image_path,
     }
 
     print_result(options, model_ref, result);
+    if (!diagnostic_path.empty()) {
+        if (result.diagnostic_rgba == nullptr || result.diagnostic_rgba_size == 0) {
+            out::status_line("warning: engine returned no diagnostic image");
+        } else if (!image::write_png(diagnostic_path, result.diagnostic_rgba,
+                                     static_cast<int>(result.width),
+                                     static_cast<int>(result.height), &error)) {
+            out::error_line("failed to write " + diagnostic_path + ": " + error);
+            rac_segmentation_result_free(&result);
+            rac_segmentation_cleanup(handle);
+            rac_segmentation_destroy(handle);
+            return 1;
+        }
+    }
 
     rac_segmentation_result_free(&result);
     rac_segmentation_cleanup(handle);
@@ -168,16 +182,18 @@ int run_segment(const GlobalOptions& options, const std::string& image_path,
 }  // namespace
 
 void register_segment(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd =
-        app.add_subcommand("segment", "Semantic segmentation of an image (per-class mask summary)");
+    CLI::App* cmd = app.add_subcommand("segment", "Label every pixel of an image by class");
     auto image_path = std::make_shared<std::string>();
     auto model = std::make_shared<std::string>();
+    auto diagnostic = std::make_shared<std::string>();
     cmd->add_option("image", *image_path, "Input image (binary PPM / P6)")
         ->required()
         ->check(CLI::ExistingFile);
     cmd->add_option("--model,-m", *model, "Segmentation model id or on-disk path")->required();
-    cmd->callback([&options, image_path, model]() {
-        const int exit_code = run_segment(options, *image_path, *model);
+    cmd->add_option("--diagnostic-image", *diagnostic,
+                    "Also write the colored mask overlay to this PNG");
+    cmd->callback([&options, image_path, model, diagnostic]() {
+        const int exit_code = run_segment(options, *image_path, *model, *diagnostic);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

@@ -1,38 +1,51 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * A single candidate document/passage to be scored against the query. The id is
- * caller-supplied and echoed back on the scored item so callers can correlate
- * results with their own records without relying on ordering.
- */
-export interface RerankCandidate {
-    id: string;
-    text: string;
-}
 export interface RerankOptions {
     /**
      * When > 0, only the top_n highest-scoring candidates are returned (every
      * candidate is still scored). 0 = return all candidates, ranked.
+     * Industry name (Cohere rerank `top_n`).
      */
     topN: number;
+    /**
+     * Per-document token budget; longer documents are truncated (tail
+     * dropped) before scoring. 0 = the SDK default budget. This is the
+     * direct knob on peak memory and per-pair latency on device.
+     * Industry name (Cohere v2 / vLLM `max_tokens_per_doc`).
+     */
+    maxTokensPerDoc: number;
 }
 export interface RerankRequest {
     query: string;
-    candidates: RerankCandidate[];
     options?: RerankOptions | undefined;
+    /**
+     * The passages to score, in caller order. Results point back at these by
+     * index. Cost is LINEAR (one model pass per document), so this is a
+     * second-stage reranker over a retriever's output, not a corpus scan;
+     * commons rejects more than 100,000 entries with
+     * RAC_ERROR_INVALID_PARAMETER. Industry name (Cohere/Voyage/Jina `documents`).
+     */
+    documents: string[];
+    /**
+     * Registry id of the reranker to score with. Unset = whatever model is
+     * already resident under the rerank component. Mirrors
+     * EmbeddingsRequest.model_id and the industry-universal `model` field.
+     */
+    modelId?: string | undefined;
 }
 export interface RerankScoredItem {
-    /** Echo of RerankCandidate.id for correlation. */
-    id: string;
     /**
-     * Raw relevance score from the reranker (higher = more relevant). Not
-     * normalized to a fixed range; comparable only within one result set.
+     * Relevance of this document to the query, normalized to [0, 1] (sigmoid
+     * of the cross-encoder logit). Ordinal, not cardinal: 0.9 is not "twice
+     * as relevant" as 0.45, and scores are not comparable across models.
+     * Industry name (Cohere/Voyage `relevance_score`).
      */
-    score: number;
-    /** Index of this candidate in the original RerankRequest.candidates list. */
-    originalIndex: number;
-    /** 0-based position after sorting by score descending (0 = most relevant). */
-    rank: number;
+    relevanceScore: number;
+    /**
+     * Index of this document in the original RerankRequest.documents list.
+     * Industry name (`index`).
+     */
+    index: number;
 }
 export interface RerankResult {
     /**
@@ -43,7 +56,6 @@ export interface RerankResult {
     processingTimeMs: number;
     modelId: string;
 }
-export declare const RerankCandidate: MessageFns<RerankCandidate>;
 export declare const RerankOptions: MessageFns<RerankOptions>;
 export declare const RerankRequest: MessageFns<RerankRequest>;
 export declare const RerankScoredItem: MessageFns<RerankScoredItem>;

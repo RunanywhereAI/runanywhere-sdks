@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' show RunAnywhere, ToolDefinition;
@@ -831,6 +832,8 @@ class _ToolRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final parameterNames = _parameterNames(tool.parameters);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xSmall),
       child: Column(
@@ -859,7 +862,7 @@ class _ToolRow extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          if (tool.parameters.isNotEmpty) ...[
+          if (parameterNames.isNotEmpty) ...[
             const SizedBox(height: 4),
             Wrap(
               spacing: 4,
@@ -871,8 +874,8 @@ class _ToolRow extends StatelessWidget {
                     context,
                   ).copyWith(color: AppColors.textSecondary(context)),
                 ),
-                ...tool.parameters.map(
-                  (param) => Container(
+                ...parameterNames.map(
+                  (name) => Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
                       vertical: 2,
@@ -881,10 +884,7 @@ class _ToolRow extends StatelessWidget {
                       color: AppColors.backgroundTertiary(context),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(
-                      param.name,
-                      style: AppTypography.caption2(context),
-                    ),
+                    child: Text(name, style: AppTypography.caption2(context)),
                   ),
                 ),
               ],
@@ -893,5 +893,22 @@ class _ToolRow extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// `ToolDefinition.parameters` is a raw JSON-Schema object string, not a
+  /// structured list (idl/tool_calling.proto) — decode its top-level
+  /// `properties` keys for this read-only display. Malformed/absent schemas
+  /// (e.g. the `{}` a no-parameter tool serializes to) just show no chips.
+  static List<String> _parameterNames(String parametersJson) {
+    if (parametersJson.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(parametersJson);
+      if (decoded is! Map<String, dynamic>) return const [];
+      final properties = decoded['properties'];
+      if (properties is! Map<String, dynamic>) return const [];
+      return properties.keys.toList();
+    } catch (_) {
+      return const [];
+    }
   }
 }

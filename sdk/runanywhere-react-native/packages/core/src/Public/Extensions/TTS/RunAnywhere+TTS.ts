@@ -27,16 +27,18 @@ import {
   type TTSOptions,
   type TTSOutput,
   type TTSSpeakResult,
+  type TTSServiceState,
 } from '@runanywhere/proto-ts/tts_options';
 import {
   TTSOptions as TTSOptionsMessage,
   TTSOutput as TTSOutputMessage,
   TTSSpeakResult as TTSSpeakResultMessage,
+  TTSServiceState as TTSServiceStateMessage,
   TTSSynthesisRequest,
   TTSStreamEvent,
   TTSStreamEventKind,
 } from '@runanywhere/proto-ts/tts_options';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_options_convenience';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
@@ -65,14 +67,8 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 function buildTTSOptions(options?: Partial<TTSOptions>): TTSOptions {
   return TTSOptionsMessage.create({
-    voice: options?.voice ?? '',
-    languageCode: options?.languageCode ?? '',
-    speakingRate: options?.speakingRate ?? 1.0,
-    pitch: options?.pitch ?? 1.0,
-    volume: options?.volume ?? 1.0,
-    enableSsml: options?.enableSsml ?? false,
-    audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: options?.sampleRate ?? 0,
+    ...tTSOptionsDefaults(),
+    ...options,
   });
 }
 
@@ -85,11 +81,12 @@ function encodeTTSSynthesisRequest(
   text: string,
   options?: Partial<TTSOptions>
 ): ArrayBuffer {
+  // `TTSSynthesisRequest.metadata` is deleted outright — the message is
+  // now just `requestId`/`text`/`options`.
   const request = TTSSynthesisRequest.fromPartial({
     requestId: nextTTSRequestId(),
     text,
     options: buildTTSOptions(options),
-    metadata: {},
   });
   return encodeProtoMessage(request, TTSSynthesisRequest);
 }
@@ -100,6 +97,24 @@ function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {
     throw SDKException.protoDecodeFailed('ttsSynthesizeProto');
   }
   return TTSOutputMessage.decode(bytes);
+}
+
+/**
+ * Report the lifecycle-loaded TTS service's state (readiness, current voice,
+ * available voices, supported languages). Succeeds with `isReady = false`
+ * when no voice is loaded.
+ */
+export async function ttsState(): Promise<TTSServiceState> {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  await ensureServicesReady();
+  const native = requireNativeModule();
+  const bytes = arrayBufferToBytes(await native.ttsStateProto());
+  if (bytes.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('ttsStateProto');
+  }
+  return TTSServiceStateMessage.decode(bytes);
 }
 
 /**
@@ -131,8 +146,8 @@ export async function synthesize(
  *   - SDK not initialized / services not ready / no TTS voice loaded →
  *     the stream finishes silently.
  *   - A stream failure surfaces as a terminal error-marked `TTSOutput`
- *     (`isFinal=true`, non-empty `errorMessage`,
- *     `errorCode=RAC_ERROR_PROCESSING_FAILED`) followed by completion.
+ *     (`isFinal=true`, populated `error` SDKError with
+ *     `ERROR_CODE_PROCESSING_FAILED`) followed by completion.
  */
 export function synthesizeStream(
   text: string,
@@ -144,10 +159,6 @@ export function synthesizeStream(
 
   const native = requireNativeModule();
   const requestBytes = encodeTTSSynthesisRequest(text, options);
-
-  // RAC_ERROR_PROCESSING_FAILED — mirrors Swift's terminal failure marker
-  // (RunAnywhere+TTS.swift:84).
-  const RAC_ERROR_PROCESSING_FAILED = -234;
 
   return {
     [Symbol.asyncIterator](): AsyncIterator<TTSOutput> {
@@ -180,8 +191,8 @@ export function synthesizeStream(
           TTSOutputMessage.fromPartial({
             timestampMs: Date.now(),
             isFinal: true,
-            errorMessage: `TTS stream failed: ${message}`,
-            errorCode: RAC_ERROR_PROCESSING_FAILED,
+            error: SDKException.processingFailed(`TTS stream failed: ${message}`)
+              .proto,
           })
         );
         finish();
@@ -225,7 +236,7 @@ export function synthesizeStream(
                 try {
                   const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
                   if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
-                    failStream(event.errorMessage ?? 'unknown error');
+                    failStream(event.error?.message ?? 'unknown error');
                     return;
                   }
                   if (event.output) {

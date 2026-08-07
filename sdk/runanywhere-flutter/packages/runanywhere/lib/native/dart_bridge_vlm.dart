@@ -18,6 +18,8 @@ import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' show SDKEvent;
 import 'package:runanywhere/generated/vlm_options.pb.dart'
     show VLMGenerationRequest, VLMResult, VLMStreamEvent;
+import 'package:runanywhere/generated/vlm_options.pbenum.dart'
+    show VLMStreamEventKind;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
@@ -80,9 +82,14 @@ class DartBridgeVLM {
         if (controller.isClosed) return;
         try {
           final event = VLMStreamEvent.fromBuffer(message);
-          sawTerminalEvent = sawTerminalEvent || event.isFinal;
+          // `VLMStreamEvent.isFinal` was deleted (idl/vlm_options.proto);
+          // terminal-ness is now `kind == COMPLETED || kind == ERROR`.
+          final isTerminal =
+              event.kind == VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED ||
+              event.kind == VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR;
+          sawTerminalEvent = sawTerminalEvent || isTerminal;
           controller.add(event);
-          if (event.isFinal) {
+          if (isTerminal) {
             unawaited(controller.close());
           }
         } catch (e, st) {
@@ -126,9 +133,12 @@ class DartBridgeVLM {
       }),
     );
 
-    // Cancel sets the lifecycle cancel flag; the worker's blocking call returns
-    // shortly after and the rc sentinel closes the port.
-    controller.onCancel = cancel;
+    // Only cancel a still-running generation: onCancel also fires on normal
+    // completion, and an unconditional cancel there makes commons publish a
+    // spurious cancellation event after every finished stream.
+    controller.onCancel = () {
+      if (!sawTerminalEvent) cancel();
+    };
 
     return controller.stream;
   }

@@ -35,18 +35,12 @@ import RunAnywhere
 ///
 /// ```swift
 /// // Generate text via public API
-/// var req = RALLMGenerateRequest()
-/// req.prompt = "Hello!"
-/// let result = try await RunAnywhere.generate(req)
+/// let result = try await RunAnywhere.llm.generate(prompt: "Hello!")
 /// print(result.text)
 ///
 /// // Stream text via public API
-/// var streamReq = RALLMGenerateRequest()
-/// streamReq.prompt = "Tell me a story"
-/// for try await event in try await RunAnywhere.generateStream(streamReq) {
-///     if event.eventKind == .token {
-///         print(event.token, terminator: "")
-///     }
+/// for try await event in try await RunAnywhere.llm.generateStream(prompt: "Tell me a story") {
+///     if case .token(let text, _) = event { print(text, terminator: "") }
 /// }
 /// ```
 public enum LlamaCPP {

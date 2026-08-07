@@ -87,20 +87,14 @@ final class BenchmarkRunner {
     /// Checks which categories have downloaded models before running. This lets the UI
     /// inform the user which categories will be skipped.
     func preflight(categories: Set<BenchmarkCategory>) async throws -> BenchmarkPreflightResult {
-        await RunAnywhere.refreshModelRegistry()
+        await RunAnywhere.models.refresh()
 
         let allModels: [RAModelInfo]
-        let listResult = await RunAnywhere.listModels()
-        guard listResult.success else {
-            throw BenchmarkRunnerError.fetchModelsFailed(
-                underlying: SDKException(
-                    code: .processingFailed,
-                    message: listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage,
-                    category: .internal
-                )
-            )
+        do {
+            allModels = try await RunAnywhere.models.list()
+        } catch {
+            throw BenchmarkRunnerError.fetchModelsFailed(underlying: error)
         }
-        allModels = listResult.models.models
 
         var available: [BenchmarkCategory: [RAModelInfo]] = [:]
         var skipped: [BenchmarkCategory] = []
@@ -257,7 +251,11 @@ final class BenchmarkRunner {
         return workItems
     }
 
-    /// Models whose artifacts exist on disk (registry `isDownloaded` may be stale).
+    /// Models whose artifacts exist on disk. `ModelInfo.isDownloaded` was
+    /// deleted outright (idl/model_types.proto: "reserved 32; // was
+    /// is_downloaded: a bool cannot express DOWNLOADING") -- a non-empty
+    /// `localPath` is the simplest local proxy, same as every other read
+    /// site in the SDK (see ModelsNamespace.swift).
     static func downloadedModels(
         for category: BenchmarkCategory,
         in allModels: [RAModelInfo]
@@ -266,7 +264,7 @@ final class BenchmarkRunner {
             guard model.category == category.modelCategory, !model.isBuiltIn else { return false }
             if model.isDownloadedOnDisk { return true }
             // Post-download registry may mark downloaded before artifact probe catches up.
-            return model.isDownloaded && !model.localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return !model.localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 }

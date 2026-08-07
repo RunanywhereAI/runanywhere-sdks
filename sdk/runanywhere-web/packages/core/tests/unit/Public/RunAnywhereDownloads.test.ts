@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DownloadFailureReason } from '@runanywhere/proto-ts/download_service';
-import { __testing__ } from '../../../src/Public/RunAnywhere';
+import { __testing__ } from '../../../src/Public/SDKCore';
 import { Downloads } from '../../../src/Public/Extensions/RunAnywhere+Downloads';
 import { ProtoErrorCode } from '../../../src/Foundation/SDKException';
 

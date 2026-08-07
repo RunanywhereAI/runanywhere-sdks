@@ -5,7 +5,7 @@
  * been deleted; all throw sites now use SDKException. SDKException wraps the
  * canonical proto-ts `SDKError` shape from `@runanywhere/proto-ts/errors` so a
  * thrown error can carry the full proto envelope (category, code, message,
- * nested_message, c_abi_code, context) for wire interop while still behaving
+ * nested_message, c_abi_code, param) for wire interop while still behaving
  * like a plain `Error` to TS callers.
  *
  * Source of truth (wire shape): idl/errors.proto
@@ -121,13 +121,12 @@ export class SDKException extends Error {
         cAbiCode: code,
         message: msg,
         nestedMessage: details,
-        context: undefined,
         timestampMs: Date.now(),
         severity: severityForCode(code),
         component: componentForCode(code),
         retryable: false,
-        remediationHint: '',
-        correlationId: '',
+        requestId: '',
+        param: undefined,
       };
     } else {
       super(codeOrProto.message);
@@ -151,13 +150,13 @@ export class SDKException extends Error {
   /**
    * Structured validation field-path accessor.
    *
-   * Byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException. Reads the typed
-   * `context.fieldPath` (first-class proto field) so cross-SDK consumer code
+   * Byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException. Reads the
+   * proto `param` field ("<Message>.<field>") so cross-SDK consumer code
    * can rely on `e.fieldPath === 'X.y'` regardless of which SDK threw the
    * exception. Returns `undefined` when absent (e.g. non-validation exceptions).
    */
   get fieldPath(): string | undefined {
-    const typed = this.proto.context?.fieldPath;
+    const typed = this.proto.param;
     return typed && typed.length > 0 ? typed : undefined;
   }
 
@@ -237,6 +236,20 @@ export class SDKException extends Error {
     } else {
       logger.error(line);
     }
+  }
+
+  /**
+   * Normalize an arbitrary caught value into an `SDKException`. Used at the
+   * boundary of long-lived streams (`SttStream`, `VadStream`, generation
+   * streams) that surface in-flight failures as a typed `failed` event
+   * rather than throwing into the consumer.
+   */
+  static fromUnknown(error: unknown, fallbackMessage = 'Unknown error'): SDKException {
+    if (error instanceof SDKException) return error;
+    if (error instanceof Error) {
+      return SDKException.processingFailed(error.message, error.stack);
+    }
+    return SDKException.processingFailed(String(error ?? fallbackMessage));
   }
 
   /** Whether the result code indicates success (code === 0). */
@@ -346,13 +359,12 @@ export class SDKException extends Error {
       cAbiCode: code > 0 && code <= 899 ? -code : 0,
       message,
       nestedMessage: underlying ? String(underlying) : undefined,
-      context: undefined,
       timestampMs: Date.now(),
       severity: severityForCode(-code),
       component: componentForCode(-code),
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
+      param: undefined,
     };
     const ex = new SDKException(proto);
     if (shouldLog && !isExpected(code)) {
@@ -411,13 +423,12 @@ export class SDKException extends Error {
       cAbiCode: -ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
       message,
       nestedMessage: undefined,
-      context: undefined,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
       component: componentForCode(-ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED),
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
+      param: undefined,
     };
     return new SDKException(proto);
   }
@@ -437,13 +448,12 @@ export class SDKException extends Error {
       cAbiCode: -380,
       message,
       nestedMessage: undefined,
-      context: undefined,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
       component: 'sdk',
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
+      param: undefined,
     };
     return new SDKException(proto);
   }
@@ -471,6 +481,30 @@ export class SDKException extends Error {
   }
 
   /**
+   * A capability that is declared in the IDL but not packaged/executable on
+   * this platform build. Mirrors the v4 contract's `unsupportedCapability`
+   * preflight failure: `capabilities()` reports the same gap through
+   * `SDKCapabilities.unavailable`, so this exception and that snapshot never
+   * disagree about what a caller can reach.
+   */
+  static unsupportedCapability(feature: string, details?: string): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
+      code: ProtoErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED,
+      message: `Capability not supported: ${feature}`,
+      nestedMessage: details,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(-ProtoErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED),
+      retryable: false,
+      requestId: '',
+      param: undefined,
+    };
+    return new SDKException(proto);
+  }
+
+  /**
    * Failed operation.
    *
    * Mirrors the dominant Swift pairing
@@ -485,13 +519,12 @@ export class SDKException extends Error {
       cAbiCode: -ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
       message,
       nestedMessage: details,
-      context: undefined,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
       component: componentForCode(-ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED),
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
+      param: undefined,
     };
     return new SDKException(proto);
   }
@@ -512,13 +545,12 @@ export class SDKException extends Error {
       cAbiCode: -ProtoErrorCode.ERROR_CODE_INVALID_STATE,
       message,
       nestedMessage: details,
-      context: undefined,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
       component: componentForCode(-ProtoErrorCode.ERROR_CODE_INVALID_STATE),
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
+      param: undefined,
     };
     return new SDKException(proto);
   }
@@ -537,13 +569,12 @@ export class SDKException extends Error {
       cAbiCode: -ProtoErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE,
       message,
       nestedMessage: details,
-      context: undefined,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
       component: componentForCode(-ProtoErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE),
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
+      param: undefined,
     };
     return new SDKException(proto);
   }
@@ -553,7 +584,7 @@ export class SDKException extends Error {
    *
    * Byte-isomorphic with Swift/Kotlin/Flutter/RN
    * `SDKException.validationFailed(...)`. Encodes the structured field
-   * path into the typed `proto.context.fieldPath` so consumers can
+   * path into the proto `param` field so consumers can
    * read it back uniformly across SDKs via {@link fieldPath}.
    *
    * Recommended usage from generated `validate<Msg>` helpers:
@@ -589,13 +620,12 @@ export class SDKException extends Error {
         cAbiCode: -ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
         message: args,
         nestedMessage: undefined,
-        context: undefined,
         timestampMs: Date.now(),
         severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
         component: 'validation',
         retryable: false,
-        remediationHint: '',
-        correlationId: '',
+        requestId: '',
+        param: undefined,
       };
       return new SDKException(proto);
     }
@@ -605,21 +635,14 @@ export class SDKException extends Error {
       cAbiCode: -259,
       message: args.message,
       nestedMessage: args.cause?.message,
-      // ErrorContext.fieldPath carries the structured field path so the
+      // SDKError.param carries the structured field path so the
       // accessor `e.fieldPath` returns the value across SDKs.
-      context: {
-        metadata: {},
-        sourceFile: undefined,
-        sourceLine: undefined,
-        operation: undefined,
-        fieldPath: args.fieldPath,
-      },
+      param: args.fieldPath,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
       component: 'validation',
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
     };
     return new SDKException(proto);
   }
@@ -694,13 +717,12 @@ export class SDKException extends Error {
       cAbiCode: -protoCode,
       message,
       nestedMessage: undefined,
-      context: undefined,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
       component: componentForCode(-protoCode),
       retryable: false,
-      remediationHint: '',
-      correlationId: '',
+      requestId: '',
+      param: undefined,
     };
     return new SDKException(proto);
   }
@@ -724,7 +746,6 @@ export function isExpected(code: ProtoErrorCode): boolean {
 
 // Proto re-exports for advanced consumers needing the wire envelope shape.
 export type {
-  ErrorContext as ProtoErrorContext,
   SDKError as ProtoSDKError,
 } from '@runanywhere/proto-ts/errors';
 export {

@@ -164,7 +164,7 @@ typedef struct rac_llm_options {
  * n_threads=0. Engines apply each only when its non-disabled value is present.
  */
 static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
-    .max_tokens = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MAX_TOKENS,
+    .max_tokens = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MAX_OUTPUT_TOKENS,
     .temperature = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TEMPERATURE,
     .top_p = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_P,
     .stop_sequences = RAC_NULL,
@@ -172,7 +172,7 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
     .streaming_enabled = RAC_FALSE,
     .system_prompt = RAC_NULL,
     .top_k = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_K,
-    .repetition_penalty = RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPETITION_PENALTY,
+    .repetition_penalty = RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPEAT_PENALTY,
     .frequency_penalty = 0.0f,
     .presence_penalty = 0.0f,
     .min_p = 0.0f,
@@ -246,14 +246,21 @@ typedef struct rac_llm_info {
 /**
  * @brief LLM streaming callback
  *
- * Called for each generated token during streaming.
- * Mirrors Swift's onToken callback pattern.
+ * Called for each generated token during streaming, and once more with
+ * `is_final=true` when the engine reports a genuine terminal (EOS / stop /
+ * length / cancel / error). Non-final calls pass `finish_reason=NULL`; the
+ * terminal call passes an OpenAI-style reason string ("stop", "length",
+ * "cancelled", "error", or "unknown"). `token` may be empty on the terminal
+ * call.
  *
- * @param token The generated token string
+ * @param token The generated token string (may be empty on the final call)
+ * @param is_final RAC_TRUE on the terminal event
+ * @param finish_reason NULL until final; then a NUL-terminated reason string
  * @param user_data User-provided context
  * @return RAC_TRUE to continue, RAC_FALSE to stop generation
  */
-typedef rac_bool_t (*rac_llm_stream_callback_fn)(const char* token, void* user_data);
+typedef rac_bool_t (*rac_llm_stream_callback_fn)(const char* token, rac_bool_t is_final,
+                                                 const char* finish_reason, void* user_data);
 
 // =============================================================================
 // MEMORY MANAGEMENT

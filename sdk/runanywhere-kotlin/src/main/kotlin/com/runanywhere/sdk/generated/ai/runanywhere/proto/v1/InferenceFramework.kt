@@ -17,16 +17,8 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * Inference framework / runtime. Same name used across all SDKs (RN names it
- * LLMFramework; we canonicalize on InferenceFramework).
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
- *   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
- *   Dart   model_types.dart:106       (9 cases, matches Kotlin)
- *   RN     enums.ts:30 (LLMFramework) (16 cases)
- *   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
- * ---------------------------------------------------------------------------
+ * Engine that executes a model. Reached from ModelInfo.framework, so the
+ * reserved values below are manifest-critical.
  */
 public enum class InferenceFramework(
   override val `value`: Int,

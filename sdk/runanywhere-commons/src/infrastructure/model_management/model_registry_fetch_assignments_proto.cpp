@@ -19,6 +19,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -97,10 +98,7 @@ extern "C" rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t
         rac_model_info_array_free(models, count);
 
     if (rc != RAC_SUCCESS) {
-        const char* msg = rac_error_message(rc);
-        proto_result.set_success(false);
-        proto_result.set_error_code(static_cast<int32_t>(rc));
-        proto_result.set_error_message(msg ? msg : "fetch assignments failed");
+        rac::foundation::populate_sdk_error(proto_result.mutable_error(), rc);
         proto_result.set_fetched_at_unix_ms(now_ms());
         RAC_LOG_WARNING(LOG_CAT, "fetch returned %d", rc);
         return copy_proto(proto_result, out_result);
@@ -124,7 +122,6 @@ extern "C" rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t
         rac_model_registry_proto_free(list_bytes);
     }
 
-    proto_result.set_success(true);
     proto_result.set_model_count(static_cast<int32_t>(count));
     proto_result.set_fetched_at_unix_ms(now_ms());
 

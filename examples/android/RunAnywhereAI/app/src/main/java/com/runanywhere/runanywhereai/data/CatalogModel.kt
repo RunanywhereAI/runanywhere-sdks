@@ -11,7 +11,8 @@ import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.api.ModelRegistration
+import com.runanywhere.sdk.public.api.models
 
 private val QHEXRT = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
 private const val HNPU_DESCRIPTION = "Qualcomm Hexagon NPU model bundle."
@@ -61,17 +62,18 @@ internal data class SingleFileModel(
         if (framework == QHEXRT) {
             return QHexRT.registerModelForDevice(toQHexRTRegistrationRequest())
         }
-        return RunAnywhere.registerModel(
-            id = id,
-            name = name,
-            url = url,
-            framework = framework,
-            modality = category,
-            artifactType = null,
-            memoryRequirement = memoryBytes,
-            downloadSize = downloadBytes,
-            supportsThinking = supportsThinking,
-            supportsLora = supportsLora,
+        return RunAnywhere.models.register(
+            ModelRegistration.url(
+                id = id,
+                name = name,
+                url = url,
+                framework = framework,
+                category = category,
+                memoryBytes = memoryBytes,
+                downloadBytes = downloadBytes,
+                supportsThinking = supportsThinking,
+                supportsLora = supportsLora,
+            ),
         )
     }
 }
@@ -87,17 +89,17 @@ internal data class ArchiveModel(
     val structure: ArchiveStructure,
 ) : CatalogModel {
     override suspend fun register(): ModelInfo =
-        RunAnywhere.registerModel(
-            archiveUrl = url,
-            structure = structure,
-            id = id,
-            name = name,
-            framework = framework,
-            modality = category,
-            archiveType = archiveType,
-            memoryRequirement = memoryBytes,
-            supportsThinking = false,
-            supportsLora = false,
+        RunAnywhere.models.register(
+            ModelRegistration.archive(
+                id = id,
+                name = name,
+                url = url,
+                framework = framework,
+                structure = structure,
+                archiveType = archiveType,
+                category = category,
+                memoryBytes = memoryBytes,
+            ),
         )
 }
 
@@ -109,19 +111,21 @@ internal data class MultiFileModel(
     val memoryBytes: Long,
     val downloadBytes: Long = memoryBytes,
     val files: List<ModelFile>,
+    /** Computer-Use-Agent profile id (e.g. `"fara"`) for CUA-capable rows. */
+    val cuaProfile: String? = null,
 ) : CatalogModel {
     override suspend fun register(): ModelInfo =
-        RunAnywhere.registerModel(
-            multiFile = descriptors(),
-            id = id,
-            name = name,
-            framework = framework,
-            modality = category,
-            memoryRequirement = memoryBytes,
-            downloadSize = downloadBytes,
-            contextLength = null,
-            supportsThinking = false,
-            source = ModelSource.MODEL_SOURCE_REMOTE,
+        RunAnywhere.models.register(
+            ModelRegistration.multiFile(
+                id = id,
+                name = name,
+                framework = framework,
+                files = descriptors(),
+                category = category,
+                memoryBytes = memoryBytes,
+                downloadBytes = downloadBytes,
+                cuaProfile = cuaProfile,
+            ),
         )
 
     internal fun descriptors(): List<ModelFileDescriptor> =
@@ -129,7 +133,9 @@ internal data class MultiFileModel(
             ModelFileDescriptor(
                 url = file.url,
                 filename = file.filename,
-                is_required = true,
+                // Wire polarity: is_required -> is_optional (inverted). All
+                // catalog files here are required, so is_optional = false.
+                is_optional = false,
                 size_bytes = file.sizeBytes,
                 checksum_sha256 = file.checksumSha256,
                 role = if (idx == 0) {

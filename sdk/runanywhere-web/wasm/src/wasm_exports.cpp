@@ -55,6 +55,7 @@
 #endif
 
 // Features
+#include "rac/features/cua/rac_cua.h"
 #include "rac/features/diffusion/rac_diffusion.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings.h"
@@ -936,6 +937,17 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_status(void) {
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_error_message(void) {
   return (int)offsetof(rac_proto_buffer_t, error_message);
 }
+
+// =============================================================================
+// COMPUTER-USE AGENT (CUA)
+//
+// rac_cua_parse_action_proto serializes a runanywhere.v1.CuaAction into a
+// rac_proto_buffer_t, so the TypeScript CUA facade decodes it through the shared
+// proto-buffer helpers above — the same proto-byte bridging every other modality
+// uses. No struct sizeof/offset helpers are needed. rac_cua_system_prompt /
+// rac_cua_parse_action_proto are stateless commons exports (no model handle —
+// they pair with rac_vlm_*) listed in RAC_EXPORTED_FUNCTIONS_BASE.
+// =============================================================================
 
 // =============================================================================
 // FILE MANAGER WRAPPERS (clearCache / cleanTempFiles)

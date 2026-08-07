@@ -1,6 +1,6 @@
 /**
  * Model Catalog — example-app catalog seeded through the SDK's
- * `RunAnywhere.registerModel*` facades.
+ * `RunAnywhere.models.register` verb.
  *
  * Mirrors iOS `ModelCatalogBootstrap.registerAll()`
  * (examples/ios/RunAnywhereAI/RunAnywhereAI/Core/Services/ModelCatalogBootstrap.swift)
@@ -14,13 +14,19 @@
  * `SDKException(BackendNotAvailable)`; we log and continue so the app shell
  * still renders.
  *
+ * The catalog is organized by framework x modality, and within each section by
+ * model family (small -> large). ONE quantization per model: when two rows are
+ * the same model at different quants, only the smallest is kept.
+ *
  * iOS entries deliberately OMITTED from the Web catalog (WASM 32-bit heap is
  * capped at 4 GB and a single ArrayBuffer download must fit in memory, so
  * multi-GB GGUFs are not practical in the browser):
  *   - llama-2-7b-chat-q4_k_m        (~4.0 GB memory)
  *   - mistral-7b-instruct-q4_k_m    (~4.0 GB memory)
  *   - qwen2.5-1.5b-instruct-q4_k_m  (~2.5 GB memory)
- *   - lfm2-350m-q8_0                (near-duplicate of lfm2-350m-q4_k_m; list kept small)
+ *   - lfm2-350m-q8_0                (same model as lfm2-350m-q4_k_m at a bigger
+ *     quant — 379 MB vs 229 MB — so the one-quantization-per-model rule drops
+ *     it; the Q4_K_M row is the one kept)
  *   - lfm2.5-1.2b-instruct-q4_k_m   (~0.9 GB memory; list kept small)
  *   - lfm2-1.2b-tool-q4_k_m / -q8_0 (~0.8-1.4 GB memory)
  *   - qwen3-1.7b-q4_k_m             (~1.2 GB memory; qwen3-0.6b covers thinking demo)
@@ -34,7 +40,7 @@
 
 import {
   RunAnywhere,
-  type LoraAdapterCatalogEntry,
+  type ModelFileRegistration,
   type ModelInfo,
 } from '@runanywhere/web';
 import {
@@ -48,7 +54,7 @@ import { appLogger } from './app-logger';
 
 /**
  * Declarative description of a single catalog entry. Promoted to a full
- * `ModelInfo` proto by the SDK's `RunAnywhere.registerModel*` facades — never
+ * `ModelInfo` proto by the SDK's `RunAnywhere.models.register` verb — never
  * by this file. Kept as a flat shape so the catalog list reads as data.
  */
 export interface CatalogEntry {
@@ -110,7 +116,9 @@ const WASM32_ADDRESS_SPACE_BYTES = 2 ** 32;
 const MINIMUM_WASM_RUNTIME_HEADROOM_BYTES = 512 * 1024 * 1024;
 
 const CATALOG: readonly CatalogEntry[] = [
-  // ---------- Language (LLM) ----------
+  // ---------- LLM (llama.cpp) ----------
+
+  // --- SmolLM2 (HuggingFaceTB) ---
   {
     // Preserve the cross-SDK model ID while using the model author's official
     // instruction-tuned artifact; the historical base-model URL cannot
@@ -127,6 +135,8 @@ const CATALOG: readonly CatalogEntry[] = [
     memoryRequiredBytes: 500_000_000,
     contextLength: 2048,
   },
+
+  // --- Qwen (Alibaba) ---
   {
     // iOS parity: ModelCatalogBootstrap.swift:50-59 — Q6_K quant, base model
     // of the seeded abliterated LoRA adapter, hence supportsLora.
@@ -144,20 +154,6 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsLora: true,
   },
   {
-    // iOS parity: ModelCatalogBootstrap.swift:67-73
-    id: 'lfm2-350m-q4_k_m',
-    name: 'LiquidAI LFM2 350M Q4_K_M',
-    description: 'LiquidAI compact LLM tuned for fast on-device chat.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-    downloadSizeBytes: 229_309_376,
-    memoryRequiredBytes: 300_000_000,
-    contextLength: 2048,
-  },
-  {
     // iOS parity: ModelCatalogBootstrap.swift:102-109
     id: 'qwen3-0.6b-q4_k_m',
     name: 'Qwen3 0.6B Q4_K_M',
@@ -169,72 +165,6 @@ const CATALOG: readonly CatalogEntry[] = [
       'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
     downloadSizeBytes: 396_705_472,
     memoryRequiredBytes: 500_000_000,
-    contextLength: 4096,
-    supportsThinking: true,
-  },
-  // ---------- PrismML Bonsai (1-bit Q1_0) ----------
-  // Official lineup is 1.7B / 4B / 8B / 27B (there is no separate 1B GGUF).
-  // Needs the PrismML llama.cpp fork pinned in sdk/runanywhere-commons/VERSIONS.
-  {
-    id: 'bonsai-1.7b-q1_0',
-    name: 'PrismML Bonsai 1.7B 1-bit',
-    description:
-      'PrismML Bonsai 1-bit (Q1_0) — smallest in-browser size (~248 MB). Fast chat with thinking mode.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B-Q1_0.gguf',
-    downloadSizeBytes: 248_302_272,
-    memoryRequiredBytes: 350_000_000,
-    contextLength: 4096,
-    supportsThinking: true,
-  },
-  {
-    id: 'bonsai-4b-q1_0',
-    name: 'PrismML Bonsai 4B 1-bit',
-    description:
-      'PrismML Bonsai 1-bit (Q1_0) — balanced quality/size for the browser (~572 MB).',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/prism-ml/Bonsai-4B-gguf/resolve/main/Bonsai-4B-Q1_0.gguf',
-    downloadSizeBytes: 572_270_624,
-    memoryRequiredBytes: 700_000_000,
-    contextLength: 4096,
-    supportsThinking: true,
-  },
-  {
-    id: 'bonsai-8b-q1_0',
-    name: 'PrismML Bonsai 8B 1-bit',
-    description:
-      'PrismML Bonsai 1-bit (Q1_0) — larger reasoning model that still fits in-browser (~1.2 GB).',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B-Q1_0.gguf',
-    downloadSizeBytes: 1_158_654_496,
-    memoryRequiredBytes: 1_400_000_000,
-    contextLength: 4096,
-    supportsThinking: true,
-  },
-  {
-    // Flagship size. Download/load are gated by `webModelCompatibility`: even
-    // with WebGPU, this app's llama.cpp path must stage the full GGUF in a
-    // 4 GiB WASM32 heap before GPU upload, and 3.8 GB leaves no runtime room.
-    id: 'bonsai-27b-q1_0',
-    name: 'PrismML Bonsai 27B 1-bit',
-    description:
-      'PrismML Bonsai 1-bit flagship (~3.8 GB). Too large for this web app\'s WASM heap — see the in-picker reason for WebGPU details.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf',
-    downloadSizeBytes: 3_803_452_480,
-    memoryRequiredBytes: 4_000_000_000,
     contextLength: 4096,
     supportsThinking: true,
   },
@@ -253,6 +183,47 @@ const CATALOG: readonly CatalogEntry[] = [
     contextLength: 4096,
     supportsThinking: true,
   },
+
+  // --- LFM2 / LFM2.5 (Liquid AI) ---
+  {
+    // iOS parity: ModelCatalogBootstrap.swift:84-95. Q4_K_M, not the
+    // fractionally smaller Q4_0 (153 MB vs 149 MB): 4 MB buys K-quant mixed
+    // precision on the attention/embedding tensors, and Q4_K_M is the
+    // quantization every other GGUF row in this catalog uses.
+    id: 'lfm2.5-230m-q4_k_m',
+    name: 'LiquidAI LFM2.5 230M Q4_K_M',
+    description: 'LiquidAI LFM2.5 — smallest llama.cpp LLM in this catalog.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/main/LFM2.5-230M-Q4_K_M.gguf',
+    // Exact Content-Length of the LFS object.
+    downloadSizeBytes: 153_406_304,
+    memoryRequiredBytes: 190_000_000,
+    contextLength: 2048,
+  },
+  {
+    // iOS parity: ModelCatalogBootstrap.swift:67-73. ONE quantization per
+    // model: the Q8_0 sibling of this row is deliberately absent (see the
+    // omission list in the file header) — two quants of the same 350M model
+    // differ only in bytes (229 MB vs 379 MB), so the second row costs a
+    // catalog slot and a "which one do I pick?" decision without adding a
+    // capability.
+    id: 'lfm2-350m-q4_k_m',
+    name: 'LiquidAI LFM2 350M Q4_K_M',
+    description: 'LiquidAI compact LLM tuned for fast on-device chat.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+    downloadSizeBytes: 229_309_376,
+    memoryRequiredBytes: 300_000_000,
+    contextLength: 2048,
+  },
+
+  // --- Nemotron (NVIDIA) ---
   {
     // Exact P0 NVIDIA checkpoint. Both Web llama.cpp variants use the
     // PrismML fork pinned in sdk/runanywhere-commons/VERSIONS; that pin owns
@@ -275,15 +246,20 @@ const CATALOG: readonly CatalogEntry[] = [
     memoryRequiredBytes: 3_250_000_000,
     contextLength: 4096,
   },
+
+  // --- PrismML Bonsai (1-bit Q1_0) ---
+  // Official lineup is 1.7B / 4B / 8B / 27B (there is no separate 1B GGUF).
+  // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
+  // GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
+  // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it. The
+  // 1.7B / 4B / 8B sizes comfortably clear the WASM 4 GB heap gate with
+  // runtime/KV headroom to spare, so they are normal, fully-usable in-browser
+  // entries; only the 27B flagship is gated (see its entry below).
   {
-    // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
-    // GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
-    // sdk/runanywhere-commons/VERSIONS. Unlike the 27B sibling below, this
-    // size comfortably clears the WASM 4 GB heap gate with runtime/KV
-    // headroom to spare, so it's a normal, fully-usable in-browser entry.
     id: 'bonsai-1.7b-q1_0',
-    name: 'Bonsai-1.7B 1-bit Q1_0',
-    description: 'PrismML 1-bit 1.7B LLM. Small enough to run comfortably in-browser.',
+    name: 'PrismML Bonsai 1.7B 1-bit Q1_0',
+    description:
+      'PrismML Bonsai 1-bit (Q1_0) — smallest in-browser size (~248 MB). Fast chat with thinking mode.',
     category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,
@@ -295,11 +271,10 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsThinking: true,
   },
   {
-    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
-    // fork/quant details. Also clears the WASM heap gate comfortably.
     id: 'bonsai-4b-q1_0',
-    name: 'Bonsai-4B 1-bit Q1_0',
-    description: 'PrismML 1-bit 4B LLM. Runs comfortably in-browser.',
+    name: 'PrismML Bonsai 4B 1-bit Q1_0',
+    description:
+      'PrismML Bonsai 1-bit (Q1_0) — balanced quality/size for the browser (~572 MB).',
     category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,
@@ -311,11 +286,10 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsThinking: true,
   },
   {
-    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
-    // fork/quant details. Also clears the WASM heap gate comfortably.
     id: 'bonsai-8b-q1_0',
-    name: 'Bonsai-8B 1-bit Q1_0',
-    description: 'PrismML 1-bit 8B LLM. Runs comfortably in-browser.',
+    name: 'PrismML Bonsai 8B 1-bit Q1_0',
+    description:
+      'PrismML Bonsai 1-bit (Q1_0) — larger reasoning model that still fits in-browser (~1.2 GB).',
     category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,
@@ -327,19 +301,20 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsThinking: true,
   },
   {
-    // EXPERIMENTAL: PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant,
-    // qwen3_5 GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
-    // sdk/runanywhere-commons/VERSIONS. At ~3.8 GB the artifact sits at the
-    // WASM 4 GB heap ceiling and cannot leave the minimum runtime/KV-cache
-    // headroom required by this llama.cpp path. The catalog keeps the entry
-    // visible for cross-platform discovery, while `webModelCompatibility`
-    // prevents Web download/load and points users to a native app. PrismML's own browser demo
-    // ("Bonsai 27B WebGPU Kernels" HF Space) uses a separate custom kernel
-    // stack, not this WASM llama.cpp path.
+    // EXPERIMENTAL flagship size. Download/load are gated by
+    // `webModelCompatibility`: even with WebGPU, this app's llama.cpp path
+    // must stage the full GGUF in a 4 GiB WASM32 heap before GPU upload, and
+    // at ~3.8 GB the artifact sits at the WASM 4 GB heap ceiling and cannot
+    // leave the minimum runtime/KV-cache headroom this llama.cpp path
+    // requires. The catalog keeps the entry visible for cross-platform
+    // discovery, while `webModelCompatibility` prevents Web download/load and
+    // points users to a native app. PrismML's own browser demo ("Bonsai 27B
+    // WebGPU Kernels" HF Space) uses a separate custom kernel stack, not this
+    // WASM llama.cpp path.
     id: 'bonsai-27b-q1_0',
-    name: 'Bonsai-27B 1-bit Q1_0 (Experimental)',
+    name: 'PrismML Bonsai 27B 1-bit Q1_0 (Experimental)',
     description:
-      'PrismML 1-bit 27B LLM. ~3.8 GB download at the WASM heap limit — likely to run out of memory in-browser.',
+      'PrismML Bonsai 1-bit flagship (~3.8 GB). Too large for this web app\'s WASM heap — see the in-picker reason for WebGPU details.',
     category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,
@@ -351,7 +326,9 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsThinking: true,
   },
 
-  // ---------- Multimodal (VLM) ----------
+  // ---------- VLM (llama.cpp, multimodal) ----------
+
+  // --- SmolVLM (HuggingFaceTB) ---
   {
     // Web-only entry (not in the iOS catalog): smallest available VLM, kept
     // for WASM memory headroom on low-RAM devices and quick demo turnaround.
@@ -411,6 +388,8 @@ const CATALOG: readonly CatalogEntry[] = [
       },
     ],
   },
+
+  // --- LFM2-VL (Liquid AI) ---
   {
     // iOS parity: ModelCatalogBootstrap.swift:159-171 (multi-file)
     id: 'lfm2-vl-450m-q8_0',
@@ -440,22 +419,51 @@ const CATALOG: readonly CatalogEntry[] = [
     ],
   },
 
-  // ---------- Speech Recognition (STT) ----------
+  // ---------- STT (Sherpa-ONNX) ----------
+
+  // --- Nemotron (NVIDIA) ---
   {
-    // Preserve iOS catalog parity while using RunAnywhere's browser-CORS-
-    // compatible Hugging Face mirror. Size is the exact LFS object length.
-    id: 'sherpa-onnx-whisper-tiny.en',
-    name: 'Sherpa Whisper Tiny (ONNX)',
-    description: 'English speech-to-text via sherpa-onnx.',
+    id: 'sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8',
+    name: 'NVIDIA Nemotron 3.5 ASR Streaming 0.6B INT8 (Sherpa-ONNX)',
+    description:
+      'Exact multilingual 560 ms streaming transducer (~682 MB download). '
+      + 'Runs on CPU WASM in the browser (Speech: CPU · worker); large online '
+      + 'transducers are slower than Whisper Tiny / Canary on Web.',
     category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
-      'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
-    downloadSizeBytes: 152_777_070,
-    memoryRequiredBytes: 180_000_000,
-    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+      'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx',
+    downloadSizeBytes: 682_215_356,
+    memoryRequiredBytes: 900_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 657_601_403 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 14_978_075 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/joiner.int8.onnx', filename: 'joiner.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 9_504_438 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 131_440 },
+    ],
   },
+
+  // --- Canary (NVIDIA) ---
+  {
+    id: 'sherpa-nemo-canary-180m-flash-int8',
+    name: 'NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)',
+    description: 'Exact multilingual Canary offline ASR bundle (en/es/de/fr).',
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx',
+    downloadSizeBytes: 207_170_046,
+    memoryRequiredBytes: 300_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 132_678_643 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 74_437_848 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 53_555 },
+    ],
+  },
+
+  // --- Parakeet (NVIDIA) ---
   {
     id: 'sherpa-nemo-parakeet-tdt-0.6b-v2-int8',
     name: 'NVIDIA Parakeet TDT 0.6B v2 INT8 (Sherpa-ONNX)',
@@ -492,46 +500,27 @@ const CATALOG: readonly CatalogEntry[] = [
       { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 93_939 },
     ],
   },
+
+  // --- Whisper (OpenAI) ---
   {
-    id: 'sherpa-nemo-canary-180m-flash-int8',
-    name: 'NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)',
-    description: 'Exact multilingual Canary offline ASR bundle (en/es/de/fr).',
+    // Preserve iOS catalog parity while using RunAnywhere's browser-CORS-
+    // compatible Hugging Face mirror. Size is the exact LFS object length.
+    id: 'sherpa-onnx-whisper-tiny.en',
+    name: 'Sherpa Whisper Tiny (ONNX)',
+    description: 'English speech-to-text via sherpa-onnx.',
     category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
-      'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx',
-    downloadSizeBytes: 207_170_046,
-    memoryRequiredBytes: 300_000_000,
-    files: [
-      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 132_678_643 },
-      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 74_437_848 },
-      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 53_555 },
-    ],
-  },
-  {
-    id: 'sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8',
-    name: 'NVIDIA Nemotron 3.5 ASR Streaming 0.6B INT8 (Sherpa-ONNX)',
-    description:
-      'Exact multilingual 560 ms streaming transducer (~682 MB download). '
-      + 'Runs on CPU WASM in the browser (Speech: CPU · worker); large online '
-      + 'transducers are slower than Whisper Tiny / Canary on Web.',
-    category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-    format: ModelFormat.MODEL_FORMAT_ONNX,
-    downloadUrl:
-      'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx',
-    downloadSizeBytes: 682_215_356,
-    memoryRequiredBytes: 900_000_000,
-    files: [
-      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 657_601_403 },
-      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 14_978_075 },
-      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/joiner.int8.onnx', filename: 'joiner.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 9_504_438 },
-      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 131_440 },
-    ],
+      'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
+    downloadSizeBytes: 152_777_070,
+    memoryRequiredBytes: 180_000_000,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
 
-  // ---------- Speech Synthesis (TTS) ----------
+  // ---------- TTS (Sherpa-ONNX Piper VITS) ----------
+
+  // --- Piper VITS (Rhasspy) ---
   {
     // Preserve iOS catalog parity while using RunAnywhere's browser-CORS-
     // compatible Hugging Face mirror. Size is the exact LFS object length.
@@ -562,7 +551,7 @@ const CATALOG: readonly CatalogEntry[] = [
     artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
 
-  // ---------- VAD ----------
+  // ---------- VAD (Silero, ONNX) ----------
   {
     // Preserve iOS catalog parity while sourcing RunAnywhere's immutable,
     // browser-CORS-compatible Hugging Face artifact.
@@ -581,6 +570,8 @@ const CATALOG: readonly CatalogEntry[] = [
   },
 
   // ---------- Embeddings / RAG ----------
+
+  // --- Nemotron (NVIDIA) ---
   {
     // Exact P0 NVIDIA checkpoint. The shared llama.cpp plugin exposes the
     // embedding primitive for this GGUF and reports its native 2048-vector
@@ -612,6 +603,8 @@ const CATALOG: readonly CatalogEntry[] = [
     downloadSizeBytes: 807_690_624,
     memoryRequiredBytes: 1_100_000_000,
   },
+
+  // --- MiniLM (sentence-transformers) ---
   {
     // iOS parity: ModelCatalogBootstrap.swift:227-237
     id: 'all-minilm-l6-v2',
@@ -648,7 +641,19 @@ const CATALOG: readonly CatalogEntry[] = [
 // every cold launch.
 // ---------------------------------------------------------------------------
 
-const LORA_ADAPTERS: readonly LoraAdapterCatalogEntry[] = [
+/** One LoRA adapter offered by the demo, registered as a catalog artifact. */
+interface LoraCatalogEntry {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  filename: string;
+  compatibleModels: readonly string[];
+  sizeBytes: number;
+  defaultScale: number;
+}
+
+const LORA_ADAPTERS: readonly LoraCatalogEntry[] = [
   {
     id: 'abliterated-lora',
     name: 'Abliterated LoRA (F16)',
@@ -658,13 +663,11 @@ const LORA_ADAPTERS: readonly LoraAdapterCatalogEntry[] = [
     compatibleModels: ['qwen2.5-0.5b-instruct-q6_k'],
     sizeBytes: 17_620_224,
     defaultScale: 1.0,
-    tags: [],
-    metadata: {},
   },
 ];
 
 // ---------------------------------------------------------------------------
-// Registration — delegated to the SDK's `RunAnywhere.registerModel*` facades.
+// Registration — delegated to `RunAnywhere.models.register`.
 // ---------------------------------------------------------------------------
 
 /**
@@ -680,11 +683,10 @@ export async function registerAll(): Promise<number> {
 }
 
 /**
- * Seed the catalog through the SDK facade. Multi-file entries go to
- * `registerModelMultiFile`, archive entries to `registerModelArchive`, and
- * single-file entries to `registerModel`. Returns the count successfully
- * registered. `0` means the registry adapter is not installed yet (typically
- * because no backend WASM has loaded).
+ * Seed the catalog through `RunAnywhere.models.register`, which picks the
+ * single-file, archive, or multi-file path from the entry itself. Returns the
+ * count successfully registered. `0` means the registry adapter is not
+ * installed yet (typically because no backend WASM has loaded).
  */
 export function registerModelCatalog(): number {
   let registered = 0;
@@ -787,14 +789,22 @@ export function webSizeCompatibility(
 // ---------------------------------------------------------------------------
 
 async function registerLoraAdapters(): Promise<void> {
+  // Adapters are ordinary catalog artifacts in v3, so they register through
+  // the same verb as models and apply through `RunAnywhere.lora.apply(id)`.
   for (const adapter of LORA_ADAPTERS) {
     try {
-      await RunAnywhere.lora.registerArtifact(adapter);
+      RunAnywhere.models.register({
+        id: adapter.id,
+        name: adapter.name,
+        description: adapter.description,
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        format: ModelFormat.MODEL_FORMAT_GGUF,
+        category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        url: adapter.url,
+        sizeBytes: adapter.sizeBytes,
+      });
     } catch (err) {
-      appLogger.warning(
-        `[model-catalog] registerLoraArtifact(${adapter.id}) failed:`,
-        err,
-      );
+      appLogger.warning(`[model-catalog] LoRA register(${adapter.id}) failed:`, err);
     }
   }
 }
@@ -812,50 +822,46 @@ function tryRegister(entry: CatalogEntry): boolean {
   }
 }
 
-function registerViaFacade(entry: CatalogEntry): ModelInfo | null {
-  if (entry.files && entry.files.length > 0) {
-    return RunAnywhere.registerModelMultiFile({
-      id: entry.id,
-      name: entry.name,
-      framework: entry.framework,
-      files: entry.files,
-      description: entry.description,
-      format: entry.format,
-      modality: entry.category,
-      memoryRequirement: entry.memoryRequiredBytes,
-      downloadSizeBytes: entry.downloadSizeBytes,
-      contextLength: entry.contextLength,
-      supportsThinking: entry.supportsThinking,
-      supportsLora: entry.supportsLora,
-    });
-  }
+const ARCHIVE_KINDS: Partial<Record<ModelArtifactType, 'tarGz' | 'zip'>> = {
+  [ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE]: 'tarGz',
+  [ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE]: 'zip',
+};
 
-  const options = {
+const FILE_ROLE_NAMES: Partial<Record<ModelFileRole, ModelFileRegistration['role']>> = {
+  [ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL]: 'primary',
+  [ModelFileRole.MODEL_FILE_ROLE_COMPANION]: 'companion',
+  [ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR]: 'projector',
+  [ModelFileRole.MODEL_FILE_ROLE_TOKENIZER]: 'tokenizer',
+  [ModelFileRole.MODEL_FILE_ROLE_CONFIG]: 'config',
+  [ModelFileRole.MODEL_FILE_ROLE_VOCABULARY]: 'vocabulary',
+};
+
+function registerViaFacade(entry: CatalogEntry): ModelInfo | null {
+  return RunAnywhere.models.register({
     id: entry.id,
+    name: entry.name,
     description: entry.description,
+    framework: entry.framework,
     format: entry.format,
-    modality: entry.category,
-    memoryRequirement: entry.memoryRequiredBytes,
-    downloadSizeBytes: entry.downloadSizeBytes,
+    category: entry.category,
+    memoryRequiredBytes: entry.memoryRequiredBytes,
+    sizeBytes: entry.downloadSizeBytes,
     contextLength: entry.contextLength,
     supportsThinking: entry.supportsThinking,
     supportsLora: entry.supportsLora,
-  };
-
-  if (entry.artifactType && entry.artifactType !== ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE) {
-    return RunAnywhere.registerModelArchive(
-      entry.downloadUrl,
-      entry.name,
-      entry.framework,
-      entry.artifactType,
-      options,
-    );
-  }
-
-  return RunAnywhere.registerModel(
-    entry.downloadUrl,
-    entry.name,
-    entry.framework,
-    options,
-  );
+    ...(entry.files && entry.files.length > 0
+      ? {
+        files: entry.files.map((file) => ({
+          url: file.url,
+          filename: file.filename,
+          role: FILE_ROLE_NAMES[file.role],
+          sizeBytes: file.sizeBytes,
+          isRequired: file.isRequired,
+        })),
+      }
+      : {
+        url: entry.downloadUrl,
+        archive: entry.artifactType ? ARCHIVE_KINDS[entry.artifactType] : undefined,
+      }),
+  });
 }

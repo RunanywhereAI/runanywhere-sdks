@@ -29,19 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * On-disk metrics for a single downloaded model. The full ModelInfo is *not*
- * embedded here — callers cross-reference `model_id` against ModelInfo from
- * model_types.proto. This avoids circular embeds and keeps the wire payload
- * for storage queries small.
- *
- * `last_used_ms` supports LRU presentation and eviction without another type
- * round-trip.
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 public class ModelStorageMetrics(
   @field:WireField(
     tag = 1,
@@ -59,16 +46,6 @@ public class ModelStorageMetrics(
     schemaIndex = 1,
   )
   public val size_on_disk_bytes: Long = 0L,
-  /**
-   * Unix epoch ms of last load
-   */
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    jsonName = "lastUsedMs",
-    schemaIndex = 2,
-  )
-  public val last_used_ms: Long? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelStorageMetrics, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -83,7 +60,6 @@ public class ModelStorageMetrics(
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
     if (size_on_disk_bytes != other.size_on_disk_bytes) return false
-    if (last_used_ms != other.last_used_ms) return false
     return true
   }
 
@@ -93,7 +69,6 @@ public class ModelStorageMetrics(
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + size_on_disk_bytes.hashCode()
-      result = result * 37 + (last_used_ms?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -103,16 +78,14 @@ public class ModelStorageMetrics(
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
     result += """size_on_disk_bytes=$size_on_disk_bytes"""
-    if (last_used_ms != null) result += """last_used_ms=$last_used_ms"""
     return result.joinToString(prefix = "ModelStorageMetrics{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     model_id: String = this.model_id,
     size_on_disk_bytes: Long = this.size_on_disk_bytes,
-    last_used_ms: Long? = this.last_used_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelStorageMetrics = ModelStorageMetrics(model_id, size_on_disk_bytes, last_used_ms, unknownFields)
+  ): ModelStorageMetrics = ModelStorageMetrics(model_id, size_on_disk_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -133,7 +106,6 @@ public class ModelStorageMetrics(
         if (value.size_on_disk_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.size_on_disk_bytes)
         }
-        size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.last_used_ms)
         return size
       }
 
@@ -144,13 +116,11 @@ public class ModelStorageMetrics(
         if (value.size_on_disk_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.size_on_disk_bytes)
         }
-        ProtoAdapter.INT64.encodeWithTag(writer, 3, value.last_used_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelStorageMetrics) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.INT64.encodeWithTag(writer, 3, value.last_used_ms)
         if (value.size_on_disk_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.size_on_disk_bytes)
         }
@@ -162,19 +132,16 @@ public class ModelStorageMetrics(
       override fun decode(reader: ProtoReader): ModelStorageMetrics {
         var model_id: String = ""
         var size_on_disk_bytes: Long = 0L
-        var last_used_ms: Long? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> size_on_disk_bytes = ProtoAdapter.INT64.decode(reader)
-            3 -> last_used_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelStorageMetrics(
           model_id = model_id,
           size_on_disk_bytes = size_on_disk_bytes,
-          last_used_ms = last_used_ms,
           unknownFields = unknownFields
         )
       }

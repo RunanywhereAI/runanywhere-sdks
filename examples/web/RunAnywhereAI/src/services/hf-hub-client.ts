@@ -5,7 +5,7 @@
  * huggingface.co REST endpoints directly for repo search and file listing.
  *
  * Scope: discovery only. Registration + download stay in the SDK
- * (`RunAnywhere.registerModel` / `downloadModel`). No secrets are persisted; an
+ * (`RunAnywhere.models.register` / `models.download`). No secrets are persisted; an
  * optional token is attached to the request only for the lifetime of the call.
  *
  * Cross-app contract (see thoughts/shared/plans/add_from_huggingface_example_apps.md):

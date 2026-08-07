@@ -26,6 +26,9 @@ import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.util.readableWidth
 import com.runanywhere.sdk.public.types.RAToolDefinition
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 @Composable
 fun ToolsScreen(viewModel: ToolsViewModel = viewModel()) {
@@ -151,7 +154,8 @@ private fun ToolRow(tool: RAToolDefinition) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (tool.parameters.isNotEmpty()) {
+            val parameterNames = tool.parameterNames()
+            if (parameterNames.isNotEmpty()) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
@@ -161,13 +165,13 @@ private fun ToolRow(tool: RAToolDefinition) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    tool.parameters.forEach { param ->
+                    parameterNames.forEach { name ->
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceContainerHighest,
                             shape = RoundedCornerShape(dimens.radiusSm),
                         ) {
                             Text(
-                                text = param.name,
+                                text = name,
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.padding(horizontal = dimens.spacingSm, vertical = dimens.spacingXs),
                             )
@@ -177,4 +181,20 @@ private fun ToolRow(tool: RAToolDefinition) {
             }
         }
     }
+}
+
+private val toolParametersJson = Json { ignoreUnknownKeys = true }
+
+/**
+ * `ToolDefinition.parameters` is now a single raw JSON-Schema object string
+ * (idl/tool_calling.proto) rather than a typed parameter list -- read the
+ * `properties` object's keys for display, same as the JSON Schema every
+ * OpenAI/Anthropic/MCP tool definition already publishes.
+ */
+private fun RAToolDefinition.parameterNames(): List<String> {
+    if (parameters.isBlank()) return emptyList()
+    val root = runCatching { toolParametersJson.parseToJsonElement(parameters).jsonObject }.getOrNull()
+        ?: return emptyList()
+    val properties = (root["properties"] as? JsonObject) ?: return emptyList()
+    return properties.keys.toList()
 }

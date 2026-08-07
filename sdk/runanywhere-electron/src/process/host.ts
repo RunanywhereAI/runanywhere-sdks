@@ -4,6 +4,7 @@
 // inference runs here, isolated from the main + renderer processes. The request
 // routing itself lives in dispatch.ts (pure + unit-tested); this file only wires
 // the real addon + model resolver into it and manages the parent port.
+import { NativeBackend } from '../api/native-backend';
 import { addon } from '../bridge';
 import { isCatalogId } from '../catalog';
 import { resolveModel, isRemoteSource, assertRemoteSupported, ModelKind, modelStatus, pathExists } from '../download';
@@ -66,9 +67,22 @@ const parentPort = (process as unknown as { parentPort: ParentPort }).parentPort
 // Route addon methods to the native addon (bound so `this` is the addon), plus
 // a host-owned `downloadModel` that runs in this utility process (keeping the
 // renderer responsive); its onProgress is the injected stream callback.
+// The v3 surface's single source of native state. The renderer's RpcBackend
+// forwards each `v3.<op>` call straight to a method on this instance, so every
+// integer handle stays inside this process.
+const v3Backend = new NativeBackend(addon) as unknown as Record<
+  string,
+  (...a: unknown[]) => unknown
+>;
+
 const addonMap = addon as unknown as Record<string, (...a: unknown[]) => unknown>;
 const api = new Proxy(addonMap, {
   get(target, prop: string) {
+    if (prop.startsWith('v3.')) {
+      const op = prop.slice(3);
+      const fn = v3Backend[op];
+      return typeof fn === 'function' ? fn.bind(v3Backend) : undefined;
+    }
     if (prop === 'downloadModel') {
       return (idOrPath: unknown, onProgress: unknown) =>
         resolveModel(idOrPath as string, { onProgress: onProgress as (p: unknown) => void });

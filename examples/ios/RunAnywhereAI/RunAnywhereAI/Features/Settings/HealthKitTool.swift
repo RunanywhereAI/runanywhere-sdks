@@ -647,7 +647,7 @@ enum HealthKitTool {
                 number.
                 """,
             parameters: [
-                RAToolParameter(
+                ToolParameter(
                     name: "metric",
                     type: .string,
                     description: "Which health metric to retrieve",
@@ -660,7 +660,7 @@ enum HealthKitTool {
                         "mindful_minutes"
                     ]
                 ),
-                RAToolParameter(
+                ToolParameter(
                     name: "date",
                     type: .string,
                     description: """
@@ -676,7 +676,7 @@ enum HealthKitTool {
                         """,
                     required: false
                 ),
-                RAToolParameter(
+                ToolParameter(
                     name: "start_date",
                     type: .string,
                     description: """
@@ -687,7 +687,7 @@ enum HealthKitTool {
                         """,
                     required: false
                 ),
-                RAToolParameter(
+                ToolParameter(
                     name: "end_date",
                     type: .string,
                     description: """

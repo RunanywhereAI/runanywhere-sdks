@@ -20,8 +20,12 @@ import kotlin.math.sqrt
 /**
  * Cosine similarity between two embedding vectors. Returns 0 when either
  * vector is empty, when the dimensions differ, or when either L2 norm
- * is zero. When the proto carries a precomputed `norm`, that value is
- * used in place of recomputing — matching Swift's `hasNorm` behavior.
+ * is zero.
+ *
+ * `EmbeddingVector.norm` is deleted outright (idl/embeddings_options.proto)
+ * with no replacement -- there is no cached norm to read, so this always
+ * computes it fresh (cheap, O(dimension)). Mirrors Swift's
+ * `RAEmbeddingVector.cosineSimilarity(with:)`.
  */
 fun EmbeddingVector.cosineSimilarity(other: EmbeddingVector): Float {
     if (values.size != other.values.size || values.isEmpty()) return 0f
@@ -29,8 +33,8 @@ fun EmbeddingVector.cosineSimilarity(other: EmbeddingVector): Float {
     for (i in values.indices) {
         dot += values[i] * other.values[i]
     }
-    val aNorm = norm ?: l2(values)
-    val bNorm = other.norm ?: l2(other.values)
+    val aNorm = l2(values)
+    val bNorm = l2(other.values)
     if (aNorm <= 0f || bNorm <= 0f) return 0f
     return dot / (aNorm * bNorm)
 }

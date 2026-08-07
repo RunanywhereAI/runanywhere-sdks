@@ -154,8 +154,13 @@ void parse_descriptor(const uint8_t* bytes, size_t size, rac_hybrid_model_descri
     }
     const auto& id = msg.model_id();
     std::strncpy(out.model_id, id.c_str(), sizeof(out.model_id) - 1);
-    out.model_type = static_cast<rac_hybrid_model_type_t>(msg.model_type());
-    out.backend = static_cast<rac_hybrid_backend_kind_t>(msg.backend());
+    out.model_type =
+        msg.is_on_device() ? RAC_HYBRID_MODEL_TYPE_OFFLINE : RAC_HYBRID_MODEL_TYPE_ONLINE;
+    // `engine` (the plugin-registry name, e.g. "sherpa"/"cloud") replaced the
+    // deleted HybridBackendKind enum on the wire. The C descriptor has no
+    // slot for it (nothing here reads .backend beyond this assignment); the
+    // engine hint instead reaches the router directly as a parameter of
+    // rac_stt_hybrid_router_create_service.
 }
 
 bool parse_filter(const v1::HybridFilter& f, rac_hybrid_filter_t& out) {
@@ -164,10 +169,6 @@ bool parse_filter(const v1::HybridFilter& f, rac_hybrid_filter_t& out) {
         case v1::HybridFilter::kNetwork:
             out.kind = RAC_HYBRID_FILTER_NETWORK;
             out.data.network_required = f.network();
-            return true;
-        case v1::HybridFilter::kQualityTier:
-            out.kind = RAC_HYBRID_FILTER_QUALITY;
-            out.data.quality_tier = f.quality_tier();
             return true;
         case v1::HybridFilter::kBattery:
             out.kind = RAC_HYBRID_FILTER_BATTERY;
@@ -221,15 +222,20 @@ void parse_policy(const uint8_t* bytes, size_t size, std::vector<rac_hybrid_filt
                     policy.cascade.data.confidence.threshold = c.confidence().threshold();
                 }
             }
-            policy.rank = static_cast<rac_hybrid_rank_t>(msg.rank());
+            // HybridInferenceMode replaced the boolean prefer_local: ONLY_/PREFER_
+            // IN_CLOUD ranks online first, everything else (UNSPECIFIED,
+            // PREFER_/ONLY_ON_DEVICE) ranks on-device first.
+            policy.rank = (msg.mode() == v1::HYBRID_INFERENCE_MODE_PREFER_IN_CLOUD ||
+                          msg.mode() == v1::HYBRID_INFERENCE_MODE_ONLY_IN_CLOUD)
+                             ? RAC_HYBRID_RANK_PREFER_ONLINE_FIRST
+                             : RAC_HYBRID_RANK_PREFER_LOCAL_FIRST;
         }
     }
     policy.hard_filters = filters.empty() ? nullptr : filters.data();
     policy.hard_filter_count = static_cast<int32_t>(filters.size());
 }
 
-void build_context(const v1::HybridRoutingContext& /*proto_ctx*/,
-                   rac_hybrid_routing_context_t& out) {
+void build_context(rac_hybrid_routing_context_t& out) {
     std::memset(&out, 0, sizeof(out));
     rac_hybrid_device_state_snapshot_t snap{};
     if (rac_hybrid_get_device_state_snapshot(&snap) == RAC_SUCCESS) {
@@ -377,7 +383,7 @@ rac_result_t rac_stt_hybrid_router_transcribe_proto(rac_handle_t handle,
     }
 
     rac_hybrid_routing_context_t ctx{};
-    build_context(req.context(), ctx);
+    build_context(ctx);
 
     rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
     std::string language_storage;

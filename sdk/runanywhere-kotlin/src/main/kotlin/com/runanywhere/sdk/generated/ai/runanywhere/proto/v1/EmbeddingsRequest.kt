@@ -29,15 +29,10 @@ import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
 import kotlin.collections.List
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Request envelope for service-handle APIs. One text = embed, multiple texts =
- * embed_batch.
- * ---------------------------------------------------------------------------
+ * One text = embed, multiple texts = embed_batch.
  */
 public class EmbeddingsRequest(
   texts: List<String> = emptyList(),
@@ -62,7 +57,6 @@ public class EmbeddingsRequest(
     schemaIndex = 3,
   )
   public val model_id: String? = null,
-  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingsRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -72,14 +66,6 @@ public class EmbeddingsRequest(
     schemaIndex = 0,
   )
   public val texts: List<String> = immutableCopyOf("texts", texts)
-
-  @field:WireField(
-    tag = 5,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 4,
-  )
-  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -95,7 +81,6 @@ public class EmbeddingsRequest(
     if (options != other.options) return false
     if (request_id != other.request_id) return false
     if (model_id != other.model_id) return false
-    if (metadata != other.metadata) return false
     return true
   }
 
@@ -107,7 +92,6 @@ public class EmbeddingsRequest(
       result = result * 37 + (options?.hashCode() ?: 0)
       result = result * 37 + request_id.hashCode()
       result = result * 37 + (model_id?.hashCode() ?: 0)
-      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -119,7 +103,6 @@ public class EmbeddingsRequest(
     if (options != null) result += """options=$options"""
     result += """request_id=${sanitize(request_id)}"""
     if (model_id != null) result += """model_id=${sanitize(model_id)}"""
-    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "EmbeddingsRequest{", separator = ", ", postfix = "}")
   }
 
@@ -128,9 +111,8 @@ public class EmbeddingsRequest(
     options: EmbeddingsOptions? = this.options,
     request_id: String = this.request_id,
     model_id: String? = this.model_id,
-    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsRequest = EmbeddingsRequest(texts, options, request_id, model_id, metadata, unknownFields)
+  ): EmbeddingsRequest = EmbeddingsRequest(texts, options, request_id, model_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -142,9 +124,6 @@ public class EmbeddingsRequest(
       null, 
       "embeddings_options.proto"
     ) {
-      private val metadataAdapter: ProtoAdapter<Map<String, String>> by
-          lazy { ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
-
       override fun encodedSize(`value`: EmbeddingsRequest): Int {
         var size = value.unknownFields.size
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(1, value.texts)
@@ -153,7 +132,6 @@ public class EmbeddingsRequest(
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.request_id)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.model_id)
-        size += metadataAdapter.encodedSizeWithTag(5, value.metadata)
         return size
       }
 
@@ -164,13 +142,11 @@ public class EmbeddingsRequest(
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.request_id)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.model_id)
-        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingsRequest) {
         writer.writeBytes(value.unknownFields)
-        metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.model_id)
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.request_id)
@@ -184,14 +160,12 @@ public class EmbeddingsRequest(
         var options: EmbeddingsOptions? = null
         var request_id: String = ""
         var model_id: String? = null
-        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> texts.add(ProtoAdapter.STRING.decode(reader))
             2 -> options = EmbeddingsOptions.ADAPTER.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> model_id = ProtoAdapter.STRING.decode(reader)
-            5 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -200,7 +174,6 @@ public class EmbeddingsRequest(
           options = options,
           request_id = request_id,
           model_id = model_id,
-          metadata = metadata,
           unknownFields = unknownFields
         )
       }

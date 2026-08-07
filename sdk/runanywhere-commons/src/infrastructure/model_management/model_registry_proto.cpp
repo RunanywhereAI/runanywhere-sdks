@@ -18,6 +18,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_platform_capabilities.h"
@@ -62,8 +63,7 @@ bool model_matches_search_text(const ModelInfo& model, const std::string& needle
         contains_text_case_insensitive(model.name(), needle_lower) ||
         contains_text_case_insensitive(model.download_url(), needle_lower) ||
         contains_text_case_insensitive(model.local_path(), needle_lower) ||
-        contains_text_case_insensitive(model.checksum_sha256(), needle_lower) ||
-        contains_text_case_insensitive(model.status_message(), needle_lower)) {
+        contains_text_case_insensitive(model.checksum_sha256(), needle_lower)) {
         return true;
     }
 
@@ -82,23 +82,52 @@ bool model_matches_search_text(const ModelInfo& model, const std::string& needle
         }
     }
 
-    if (model.has_expected_files()) {
-        const auto& expected = model.expected_files();
-        if (contains_text_case_insensitive(expected.root_directory(), needle_lower) ||
-            contains_text_case_insensitive(expected.description(), needle_lower)) {
+    // ModelInfo.expected_files (top-level) was deleted; the manifest now
+    // lives solely on SingleFileArtifact.expected_files / ArchiveArtifact.
+    // expected_files inside the artifact oneof.
+    const runanywhere::v1::ExpectedModelFiles* expected = nullptr;
+    switch (model.artifact_case()) {
+        case runanywhere::v1::ModelInfo::kSingleFile:
+            if (model.single_file().has_expected_files()) {
+                expected = &model.single_file().expected_files();
+            }
+            break;
+        case runanywhere::v1::ModelInfo::kArchive:
+            if (model.archive().has_expected_files()) {
+                expected = &model.archive().expected_files();
+            }
+            break;
+        default:
+            break;
+    }
+    if (expected != nullptr) {
+        if (contains_text_case_insensitive(expected->root_directory(), needle_lower) ||
+            contains_text_case_insensitive(expected->description(), needle_lower)) {
             return true;
         }
-        for (const auto& pattern : expected.required_patterns()) {
+        for (const auto& pattern : expected->required_patterns()) {
             if (contains_text_case_insensitive(pattern, needle_lower)) {
                 return true;
             }
         }
-        for (const auto& pattern : expected.optional_patterns()) {
+        for (const auto& pattern : expected->optional_patterns()) {
             if (contains_text_case_insensitive(pattern, needle_lower)) {
                 return true;
             }
         }
-        for (const auto& file : expected.files()) {
+        for (const auto& file : expected->files()) {
+            if (contains_text_case_insensitive(file.url(), needle_lower) ||
+                contains_text_case_insensitive(file.filename(), needle_lower) ||
+                contains_text_case_insensitive(file.relative_path(), needle_lower) ||
+                contains_text_case_insensitive(file.destination_path(), needle_lower) ||
+                contains_text_case_insensitive(file.local_path(), needle_lower) ||
+                contains_text_case_insensitive(file.checksum_sha256(), needle_lower)) {
+                return true;
+            }
+        }
+    }
+    if (model.artifact_case() == runanywhere::v1::ModelInfo::kMultiFile) {
+        for (const auto& file : model.multi_file().files()) {
             if (contains_text_case_insensitive(file.url(), needle_lower) ||
                 contains_text_case_insensitive(file.filename(), needle_lower) ||
                 contains_text_case_insensitive(file.relative_path(), needle_lower) ||
@@ -113,66 +142,12 @@ bool model_matches_search_text(const ModelInfo& model, const std::string& needle
     return false;
 }
 
-int compare_strings(const std::string& lhs, const std::string& rhs) {
-    if (lhs < rhs) {
-        return -1;
-    }
-    if (rhs < lhs) {
-        return 1;
-    }
-    return 0;
-}
-
-template <typename T>
-int compare_values(T lhs, T rhs) {
-    if (lhs < rhs) {
-        return -1;
-    }
-    if (rhs < lhs) {
-        return 1;
-    }
-    return 0;
-}
-
-int compare_models_by_sort_field(const ModelInfo& lhs, const ModelInfo& rhs,
-                                 ModelQuerySortField sort_field) {
-    switch (sort_field) {
-        case runanywhere::v1::MODEL_QUERY_SORT_FIELD_NAME:
-            return compare_strings(lhs.name(), rhs.name());
-        case runanywhere::v1::MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS:
-            return compare_values(lhs.created_at_unix_ms(), rhs.created_at_unix_ms());
-        case runanywhere::v1::MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS:
-            return compare_values(lhs.updated_at_unix_ms(), rhs.updated_at_unix_ms());
-        case runanywhere::v1::MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES:
-            return compare_values(lhs.download_size_bytes(), rhs.download_size_bytes());
-        case runanywhere::v1::MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS:
-            return compare_values(lhs.last_used_at_unix_ms(), rhs.last_used_at_unix_ms());
-        case runanywhere::v1::MODEL_QUERY_SORT_FIELD_USAGE_COUNT:
-            return compare_values(lhs.usage_count(), rhs.usage_count());
-        case runanywhere::v1::MODEL_QUERY_SORT_FIELD_UNSPECIFIED:
-        default:
-            return 0;
-    }
-}
-
-bool query_has_supported_sort_field(const ModelQuery& query) {
-    return query.has_sort_field() &&
-           query.sort_field() != runanywhere::v1::MODEL_QUERY_SORT_FIELD_UNSPECIFIED;
-}
-
 }  // namespace
 
 namespace rac::infra::model_registry::detail {
 
 bool model_is_downloaded_proto(const ModelInfo& model) {
     return model_is_downloaded_from_fields(model);
-}
-
-bool model_is_available_proto(const ModelInfo& model) {
-    if (model.has_is_available()) {
-        return model.is_available();
-    }
-    return model_is_downloaded_proto(model);
 }
 
 bool model_matches_query(const ModelInfo& model, const ModelQuery& query) {
@@ -185,18 +160,16 @@ bool model_matches_query(const ModelInfo& model, const ModelQuery& query) {
     if (query.has_format() && model.format() != query.format()) {
         return false;
     }
-    if (query.has_source() && model.source() != query.source()) {
-        return false;
-    }
+    // available_only/source/sort_field/descending (tags 5, 8, 9, 10) were
+    // reserved off ModelQuery -- ordering is the client's job now (a local
+    // catalog is tens of rows), and `source`/`available_only` had no
+    // remaining filter consumer.
     if (query.has_registry_status() &&
         effective_registry_status(model) != query.registry_status()) {
         return false;
     }
     if (query.has_downloaded_only() && query.downloaded_only() &&
         !model_is_downloaded_proto(model)) {
-        return false;
-    }
-    if (query.has_available_only() && query.available_only() && !model_is_available_proto(model)) {
         return false;
     }
     if (query.has_max_size_bytes() && query.max_size_bytes() >= 0 &&
@@ -208,25 +181,10 @@ bool model_matches_query(const ModelInfo& model, const ModelQuery& query) {
     return model_matches_search_text(model, needle_lower);
 }
 
-void sort_query_results(const ModelQuery& query, std::vector<ModelInfo>* models) {
-    if (!models || !query_has_supported_sort_field(query)) {
-        return;
-    }
-
-    const ModelQuerySortField sort_field = query.sort_field();
-    const bool descending =
-        query.has_sort_order() &&
-        query.sort_order() == runanywhere::v1::MODEL_QUERY_SORT_ORDER_DESCENDING;
-
-    std::ranges::sort(*models,
-                      [sort_field, descending](const ModelInfo& lhs, const ModelInfo& rhs) {
-                          int result = compare_models_by_sort_field(lhs, rhs, sort_field);
-                          if (result == 0) {
-                              return lhs.id() < rhs.id();
-                          }
-                          return descending ? result > 0 : result < 0;
-                      });
-}
+// ModelQuerySortField was deleted: sorting is the client's responsibility
+// now. Kept as a no-op call site (rather than deleting every caller) so a
+// future ordering knob has one seam to land in.
+void sort_query_results(const ModelQuery& /*query*/, std::vector<ModelInfo>* /*models*/) {}
 
 void append_query_results_locked(rac_model_registry_handle_t handle, const ModelQuery& query,
                                  ModelInfoList* out) {
@@ -289,23 +247,6 @@ void move_models_to_list(std::vector<ModelInfo>* models, ModelInfoList* out) {
     for (ModelInfo& model : *models) {
         out->add_models()->Swap(&model);
     }
-}
-
-ModelCounts count_models(const std::vector<ModelInfo>& models) {
-    ModelCounts counts;
-    counts.total = static_cast<int32_t>(models.size());
-    for (const ModelInfo& model : models) {
-        if (model_is_downloaded_proto(model)) {
-            ++counts.downloaded;
-        }
-        if (model_is_available_proto(model)) {
-            ++counts.available;
-        }
-        if (effective_registry_status(model) == runanywhere::v1::MODEL_REGISTRY_STATUS_ERROR) {
-            ++counts.errors;
-        }
-    }
-    return counts;
 }
 
 }  // namespace rac::infra::model_registry::detail
@@ -796,18 +737,13 @@ rac_result_t rac_model_registry_remove_proto_buffer(rac_model_registry_handle_t 
                                   "registry handle and model_id are required");
     }
 
+    // files_deleted/registry_updated/was_loaded/warnings were reserved off
+    // ModelDeleteResult -- success is now the absence of `error`.
     ModelDeleteResult result;
     result.set_model_id(model_id);
     rac_result_t rc = rac_model_registry_remove(handle, model_id);
-    if (rc == RAC_SUCCESS) {
-        result.set_success(true);
-        result.set_registry_updated(true);
-        result.set_files_deleted(false);
-    } else {
-        result.set_success(false);
-        result.set_registry_updated(false);
-        result.set_files_deleted(false);
-        result.set_error_message(rac_error_message(rc));
+    if (rc != RAC_SUCCESS) {
+        rac::foundation::populate_sdk_error(result.mutable_error(), rc);
     }
     return serialize_proto_to_buffer(result, out_result);
 #endif
@@ -850,7 +786,8 @@ rac_result_t rac_model_registry_get_model_proto(rac_model_registry_handle_t hand
         result.mutable_model()->CopyFrom(model);
     } else {
         result.set_found(false);
-        result.set_error_message("model not found");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_MODEL_NOT_FOUND);
+        result.mutable_error()->set_message("model not found");
     }
     return serialize_proto_to_buffer(result, out_result);
 #endif
@@ -900,18 +837,11 @@ rac_result_t rac_model_registry_list_models_proto(rac_model_registry_handle_t ha
         filtered = all_models;
     }
 
-    const ModelCounts all_counts = count_models(all_models);
-    const ModelCounts filtered_counts = count_models(filtered);
-
+    // total_count/downloaded_count/available_count/filtered_count were
+    // reserved off ModelListResult: pure derivations over `models` that no
+    // facade ever read via include_counts (also reserved off ModelListRequest).
     ModelListResult result;
-    result.set_success(true);
     move_models_to_list(&filtered, result.mutable_models());
-    if (request.include_counts()) {
-        result.set_total_count(all_counts.total);
-        result.set_downloaded_count(filtered_counts.downloaded);
-        result.set_available_count(filtered_counts.available);
-        result.set_filtered_count(filtered_counts.total);
-    }
     return serialize_proto_to_buffer(result, out_result);
 #endif
 }
@@ -952,8 +882,10 @@ rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
     if (model.id().empty()) {
         const std::string base = strip_known_model_extension(basename_from_path(source_path));
         if (base.empty()) {
-            result.set_success(false);
-            result.set_error_message("ModelImportRequest.model.id or source_path is required");
+            rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                RAC_ERROR_INVALID_ARGUMENT);
+            result.mutable_error()->set_message(
+                "ModelImportRequest.model.id or source_path is required");
             return serialize_proto_to_buffer(result, out_result);
         }
         model.set_id(base);
@@ -979,7 +911,8 @@ rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
         for (const ModelFileDescriptor& file : request.files()) {
             model.mutable_multi_file()->add_files()->CopyFrom(file);
         }
-        model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
+        // artifact_type (top-level) was reserved -- the multi_file oneof arm
+        // set above is now the only declaration of bundle shape.
     }
     normalize_model_registry_state(&model);
     if (!source_path.empty()) {
@@ -989,10 +922,10 @@ rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
     ModelInfo existing;
     const bool exists = get_model_snapshot_by_id(handle, model.id(), &existing);
     if (exists && !request.overwrite_existing()) {
-        result.set_success(false);
         result.mutable_model()->CopyFrom(existing);
         result.set_local_path(existing.local_path());
-        result.set_error_message("model already exists");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+        result.mutable_error()->set_message("model already exists");
         result.set_registered(false);
         return serialize_proto_to_buffer(result, out_result);
     }
@@ -1027,7 +960,6 @@ rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
         return proto_buffer_error(out_result, RAC_ERROR_NOT_FOUND, "imported model was not found");
     }
 
-    result.set_success(true);
     result.mutable_model()->CopyFrom(saved);
     result.set_local_path(saved.local_path());
     result.set_imported_bytes(imported_size_for_request(request, saved));

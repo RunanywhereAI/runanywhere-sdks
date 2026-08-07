@@ -18,7 +18,7 @@ extension LLMViewModel {
     func subscribeToModelLifecycle() {
         // Typed lifecycle stream: the SDK folds all native load/unload
         // channels into one publisher.
-        lifecycleCancellable = RunAnywhere.events.modelLifecycle
+        lifecycleCancellable = RunAnywhere.eventBus.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 guard let self = self else { return }
@@ -29,7 +29,7 @@ extension LLMViewModel {
 
         // Generation analytics (TTFT, completion metrics) are chat-screen
         // analytics, not lifecycle — they stay on the raw event bus.
-        generationCancellable = RunAnywhere.events.events
+        generationCancellable = RunAnywhere.eventBus.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 guard let self = self else { return }
@@ -40,25 +40,14 @@ extension LLMViewModel {
     }
 
     func checkModelStatusFromSDK() async {
-        #if os(iOS)
-        guard !isUsingConnect else { return }
-        #endif
-
-        // Resolve currently-loaded LLM via canonical proto snapshot API.
-        var request = RACurrentModelRequest()
-        request.category = .language
-        let snapshot = RunAnywhere.currentModel(request)
-        let isLoaded = snapshot.found
-        let modelId = snapshot.found ? snapshot.modelID : nil
+        let loadedModelId = await RunAnywhere.models.state().loaded[.language]?.id
 
         await MainActor.run {
-            self.updateModelLoadedState(isLoaded: isLoaded)
-            if let id = modelId,
-               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
+            self.updateModelLoadedState(isLoaded: loadedModelId != nil)
+            if let loadedModelId,
+               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == loadedModelId }) {
                 self.updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
                 self.setLoadedModelSupportsThinking(matchingModel.supportsThinking)
-            } else if !isLoaded {
-                self.clearLoadedModelInfo()
             }
         }
     }
@@ -67,9 +56,6 @@ extension LLMViewModel {
 
     /// Apply a typed model load/unload change.
     private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
-        #if os(iOS)
-        guard !isUsingConnect else { return }
-        #endif
         guard change.component == .llm || change.event.category == .llm else { return }
 
         switch change.kind {
@@ -90,12 +76,19 @@ extension LLMViewModel {
 
         switch event.generation.kind {
         case .firstTokenGenerated:
-            let ttft = Double(event.generation.firstTokenLatencyMs)
+            // `firstTokenLatencyMs` was deleted outright (idl/sdk_events.proto):
+            // `timeToFirstTokenMs` ("Time to first token, whichever kind
+            // reports it.") is the single field for both FIRST_TOKEN_GENERATED
+            // and COMPLETED now.
+            let ttft = Double(event.generation.timeToFirstTokenMs)
             handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
 
-        case .completed, .streamCompleted:
-            let outputTokens = Int(event.generation.tokensUsed)
-            let durationMs = Double(event.generation.latencyMs)
+        case .completed:
+            // `tokensUsed`/`latencyMs` were renamed `outputTokens`/`totalDurationMs`
+            // (idl/sdk_events.proto); `streamCompleted` was deleted outright —
+            // `.completed` is the single success terminal for both paths now.
+            let outputTokens = Int(event.generation.outputTokens)
+            let durationMs = Double(event.generation.totalDurationMs)
             let tps = durationMs > 0 && outputTokens > 0
                 ? Double(outputTokens) / (durationMs / 1000.0)
                 : 0

@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: plugin_loader.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PluginInfoList = exports.PluginInfo = exports.protobufPackage = void 0;
+exports.PluginInfo = exports.protobufPackage = void 0;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
@@ -74,59 +74,6 @@ exports.PluginInfo = {
         const message = createBasePluginInfo();
         message.name = object.name ?? "";
         message.path = object.path ?? "";
-        return message;
-    },
-};
-function createBasePluginInfoList() {
-    return { plugins: [] };
-}
-exports.PluginInfoList = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        for (const v of message.plugins) {
-            exports.PluginInfo.encode(v, writer.uint32(10).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBasePluginInfoList();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.plugins.push(exports.PluginInfo.decode(reader, reader.uint32()));
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            plugins: globalThis.Array.isArray(object?.plugins) ? object.plugins.map((e) => exports.PluginInfo.fromJSON(e)) : [],
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.plugins?.length) {
-            obj.plugins = message.plugins.map((e) => exports.PluginInfo.toJSON(e));
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.PluginInfoList.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBasePluginInfoList();
-        message.plugins = object.plugins?.map((e) => exports.PluginInfo.fromPartial(e)) || [];
         return message;
     },
 };

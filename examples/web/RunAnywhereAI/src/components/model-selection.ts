@@ -11,11 +11,11 @@
  *      either one so the chat tab is considered interactive as soon as the
  *      user has a clear path to a model.
  *
- * Model actions flow through the flat Swift-named facade verbs:
+ * Model actions flow through the `models` namespace:
  *
- *   - `RunAnywhere.listModels()` / `getModel(...)` — catalog list / get
- *   - `RunAnywhere.downloadModel(...)` — download with progress callback
- *   - `RunAnywhere.loadModel(...)`     — load through the C++ lifecycle ABI
+ *   - `RunAnywhere.models.list()` / `models.get(...)` — catalog list / get
+ *   - `RunAnywhere.models.download(...)` — download events as an async iterable
+ *   - `RunAnywhere.models.load(...)`     — load through the C++ lifecycle ABI
  *
  * No legacy app-side registries or extension-point routing.
  */
@@ -29,10 +29,6 @@ import {
   ensureDownloadStorageReady,
   LARGE_DOWNLOAD_BYTES,
 } from '@runanywhere/web/browser';
-import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
-import {
-  DownloadState,
-} from '@runanywhere/proto-ts/download_service';
 import {
   getCatalog,
   webModelCompatibility,
@@ -87,7 +83,6 @@ let toolbarText: HTMLElement | null = null;
 let getStartedOverlay: HTMLElement | null = null;
 let getStartedBtn: HTMLButtonElement | null = null;
 let catalogRegistered = false;
-let hydratedSubscribed = false;
 const listeners: Array<() => void> = [];
 
 /**
@@ -136,42 +131,31 @@ export function notifyCatalogRegistered(registeredCount: number): void {
   if (catalogRegistered) {
     hydrateRowStatesFromRegistry();
   }
-  // Cold-start hydration (RunAnywhere.hydrateModelRegistry) runs asynchronously
-  // after phase-2 and may mark models downloaded *after* this initial seed.
-  // Subscribe once so the picker, toolbar pill, and per-view consumers refresh
-  // to Downloaded/Load instead of showing Download for already-present models.
-  if (!hydratedSubscribed) {
-    hydratedSubscribed = true;
-    try {
-      RunAnywhere.events.on('models.hydrated', () => {
-        hydrateRowStatesFromRegistry();
-        if (modalEl) renderRows();
-        refreshToolbarLabel();
-        refreshOverlayVisibility();
-        for (const listener of listeners) {
-          try {
-            listener();
-          } catch (err) {
-            appLogger.warning('[model-selection] hydrated listener threw', err);
-          }
-        }
-      });
-    } catch {
-      hydratedSubscribed = false; // EventBus unavailable; retry on next call
-    }
-  }
   refreshToolbarLabel();
   refreshOverlayVisibility();
 }
 
 /**
- * Clear the view's SDK-lifetime state before `RunAnywhere.shutdown()`.
- * Shutdown resets EventBus, so the next catalog registration must subscribe
- * to `models.hydrated` again even though this UI module stays loaded.
+ * Re-read on-disk state after `RunAnywhere.storage.refresh()` so rows show
+ * Load instead of Download for models already present from a previous session.
  */
+export function refreshFromRegistry(): void {
+  hydrateRowStatesFromRegistry();
+  if (modalEl) renderRows();
+  refreshToolbarLabel();
+  refreshOverlayVisibility();
+  for (const listener of listeners) {
+    try {
+      listener();
+    } catch (err) {
+      appLogger.warning('[model-selection] registry listener threw', err);
+    }
+  }
+}
+
+/** Clear the view's SDK-lifetime state before `RunAnywhere.reset()`. */
 export function resetCatalogRegistrationState(): void {
   catalogRegistered = false;
-  hydratedSubscribed = false;
   refreshToolbarLabel();
   refreshOverlayVisibility();
 }
@@ -296,15 +280,25 @@ export function refreshModelSelectionState(): void {
  * matching the Chat tab's pattern.
  */
 export function findLoadedModelForCategory(category: ModelCategory): ModelInfo | null {
+  return loadedByCategory.get(category) ?? null;
+}
+
+/**
+ * Loaded model per catalog category, refreshed on every registry hydrate and
+ * after each load/unload. `RunAnywhere.models.state()` is async, so the picker
+ * keeps this synchronous mirror for render paths.
+ */
+const loadedByCategory = new Map<ModelCategory, ModelInfo>();
+
+async function refreshLoadedByCategory(): Promise<void> {
   try {
-    const current = RunAnywhere.currentModel({
-      category,
-      includeModelMetadata: true,
-    });
-    if (!current?.found || !current.modelId) return null;
-    return current.model ?? RunAnywhere.getModel(current.modelId);
+    const { loaded } = await RunAnywhere.models.state();
+    loadedByCategory.clear();
+    for (const [category, model] of Object.entries(loaded)) {
+      if (model) loadedByCategory.set(Number(category) as ModelCategory, model);
+    }
   } catch {
-    return null;
+    // A modality without a registered backend must not clear the others.
   }
 }
 
@@ -1017,14 +1011,14 @@ async function startDownload(modelId: string): Promise<void> {
     }
   }
 
-  let model = RunAnywhere.getModel(modelId);
+  let model = RunAnywhere.models.get(modelId);
   if (!model && entry) {
     // Catalog UI can outlive a partial registry wipe (backend re-register).
     // Re-seed the declarative entry before failing the Download click.
     try {
       const { registerModelCatalog } = await import('../services/model-catalog');
       registerModelCatalog();
-      model = RunAnywhere.getModel(modelId);
+      model = RunAnywhere.models.get(modelId);
     } catch {
       /* fall through */
     }
@@ -1045,7 +1039,7 @@ async function startDownload(modelId: string): Promise<void> {
   // user gesture is still active, then verify origin quota.
   const storage = await ensureDownloadStorageReady({ requiredBytes });
   if (requiredBytes > 0 && !storage.sufficient) {
-    const fallbackMessage = RunAnywhere.storage.isLocalStorageSupported
+    const fallbackMessage = RunAnywhere.storage.isSupported
       ? 'Free space or open Storage → Choose Storage Folder.'
       : 'Please free up space in your browser.';
     showToast(
@@ -1064,8 +1058,8 @@ async function startDownload(modelId: string): Promise<void> {
   if (
     requiredBytes >= LARGE_DOWNLOAD_BYTES
     && !storage.persisted
-    && !RunAnywhere.storage.isLocalStorageReady
-    && RunAnywhere.storage.isLocalStorageSupported
+    && !RunAnywhere.storage.isReady
+    && RunAnywhere.storage.isSupported
   ) {
     showToast(
       'Storing this model in browser OPFS. For a durable disk folder, open Storage → Choose Storage Folder.',
@@ -1077,21 +1071,16 @@ async function startDownload(modelId: string): Promise<void> {
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
-    const progress = await RunAnywhere.downloadModel({
-      modelId,
-      model,
-      allowMeteredNetwork: true,
-      resumeExisting: true,
-      verifyChecksums: false,
-      validateExistingBytes: false,
-      updateRegistryOnCompletion: true,
-      storageNamespace: '',
-      availableStorageBytes: 0,
-      requiredFreeBytesAfterDownload: 0,
-      pollIntervalMs: 500,
-      onProgress: (next) => applyProgress(modelId, next),
-    });
-    applyProgress(modelId, progress);
+    for await (const event of RunAnywhere.models.download(modelId)) {
+      if (event.type === 'progress') {
+        const progress = event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0;
+        setRow(modelId, { status: 'downloading', progress });
+      } else if (event.type === 'extracting') {
+        setRow(modelId, { status: 'downloading', progress: 1 });
+      } else {
+        setRow(modelId, { status: 'downloaded' });
+      }
+    }
   } catch (err) {
     const message = formatError(err);
     setRow(modelId, { status: 'error', error: message });
@@ -1110,14 +1099,8 @@ async function loadModel(modelId: string): Promise<boolean> {
   }
   setRow(modelId, { status: 'loading' });
   try {
-    const result = await RunAnywhere.loadModel({
-      modelId,
-      forceReload: false,
-      validateAvailability: true,
-    });
-    if (!result || !result.success) {
-      throw new Error(result?.errorMessage || 'Model load failed');
-    }
+    await RunAnywhere.models.load(modelId);
+    await refreshLoadedByCategory();
     const loadedEntry = getCatalog().find((entry) => entry.id === modelId);
     if (loadedEntry) {
       // A category has one native "current" model. Downgrade the previous
@@ -1160,39 +1143,14 @@ function completeSheetSelection(
 
 async function unloadModel(modelId: string): Promise<void> {
   try {
-    const result = await RunAnywhere.unloadModel({
-      modelId,
-      unloadAll: false,
-    });
-    if (!result || !result.success) {
-      throw new Error(result?.errorMessage || 'Unload failed');
-    }
+    await RunAnywhere.models.unload(modelId);
+    await refreshLoadedByCategory();
     setRow(modelId, { status: 'downloaded' });
     showToast(`Unloaded ${modelId}`, 'info');
   } catch (err) {
     const message = formatError(err);
     showToast(`Unload failed: ${message}`, 'warning');
   }
-}
-
-function applyProgress(modelId: string, progress: DownloadProgress): void {
-  const fraction = Math.max(0, Math.min(1, progress.overallProgress));
-  if (progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED) {
-    setRow(modelId, { status: 'downloaded' });
-    return;
-  }
-  if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
-    setRow(modelId, { status: 'error', error: progress.errorMessage || 'Download failed' });
-    return;
-  }
-  if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
-    setRow(modelId, { status: 'registered' });
-    return;
-  }
-  setRow(modelId, {
-    status: 'downloading',
-    progress: fraction,
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1280,11 +1238,7 @@ function findLoadedModelForScope(
 }
 
 function lookupModelInfo(modelId: string): ModelInfo | null {
-  try {
-    return RunAnywhere.getModel(modelId);
-  } catch {
-    return null;
-  }
+  return RunAnywhere.models.get(modelId);
 }
 
 /**
@@ -1293,47 +1247,31 @@ function lookupModelInfo(modelId: string): ModelInfo | null {
  */
 function hydrateRowStatesFromRegistry(): void {
   const catalog = getCatalog();
-  const downloadedIds = new Set<string>();
-  try {
-    const downloaded = RunAnywhere.downloadedModels();
-    for (const model of downloaded?.models ?? []) {
-      downloadedIds.add(model.id);
-    }
-  } catch {
-    // ignore — listDownloaded may be unavailable in some WASM builds
-  }
+  const downloadedIds = new Set(
+    RunAnywhere.models.list({ downloadedOnly: true }).map((model) => model.id),
+  );
 
   // Refresh every stable row from the registry before overlaying loaded state.
   // In-progress download/load operations remain authoritative until they end.
   for (const entry of catalog) {
     const state = rowStates.get(entry.id);
     if (state?.status === 'downloading' || state?.status === 'loading') continue;
-    let isDownloaded = downloadedIds.has(entry.id);
-    if (!isDownloaded) {
-      try {
-        isDownloaded = Boolean(RunAnywhere.getModel(entry.id)?.isDownloaded);
-      } catch {
-        // The catalog entry may not have reached the native registry yet.
-      }
-    }
+    const isDownloaded = downloadedIds.has(entry.id);
     rowStates.set(entry.id, { status: isDownloaded ? 'downloaded' : 'registered' });
   }
 
-  // The native lifecycle tracks a current model per modality. Query every
-  // category represented by the catalog so loading STT/TTS/VAD/VLM models does
-  // not hide one another behind the legacy unscoped currentModel() result.
-  const categories = new Set(catalog.map((entry) => entry.category));
-  for (const category of categories) {
-    try {
-      const current = RunAnywhere.currentModel({
-        category,
-        includeModelMetadata: false,
-      });
-      if (current?.modelId) {
-        rowStates.set(current.modelId, { status: 'loaded' });
-      }
-    } catch {
-      // One unavailable modality must not prevent the others from hydrating.
-    }
+  // One current model per modality. The async snapshot is mirrored into
+  // `loadedByCategory`, so overlay from there and refresh it in the background.
+  for (const model of loadedByCategory.values()) {
+    rowStates.set(model.id, { status: 'loaded' });
   }
+  void refreshLoadedByCategory().then(() => {
+    for (const model of loadedByCategory.values()) {
+      if (rowStates.get(model.id)?.status === 'downloaded') {
+        rowStates.set(model.id, { status: 'loaded' });
+      }
+    }
+    if (modalEl) renderRows();
+    refreshToolbarLabel();
+  });
 }

@@ -13,43 +13,64 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateVADConfiguration = exports.vADConfigurationDefaults = void 0;
+exports.validateVADOptions = exports.vADOptionsDefaults = exports.validateVADConfiguration = exports.vADConfigurationDefaults = void 0;
 const _errors_1 = require("./_errors");
 const vADConfigurationDefaults = () => ({
     modelId: '',
     sampleRate: 16000,
     frameLengthMs: 100,
-    threshold: 0.015,
+    activationThreshold: 0.5,
     enableAutoCalibration: false,
     calibrationMultiplier: 2.0,
-    windowSizeSamples: 0,
-    maxSpeechDurationMs: 0,
 });
 exports.vADConfigurationDefaults = vADConfigurationDefaults;
 const validateVADConfiguration = (m) => {
-    if (m.sampleRate < 1 || m.sampleRate > 48000) {
+    if (m.sampleRate < 8000 || m.sampleRate > 48000) {
         throw new _errors_1.ValidationError({
             fieldPath: 'VADConfiguration.sample_rate',
-            message: `sample_rate must be in 1...48000 (got ${m.sampleRate})`,
+            message: `sample_rate must be in 8000...48000 (got ${m.sampleRate})`,
         });
     }
-    if (m.frameLengthMs < 1 || m.frameLengthMs > 1000) {
+    if (m.frameLengthMs < 20 || m.frameLengthMs > 1000) {
         throw new _errors_1.ValidationError({
             fieldPath: 'VADConfiguration.frame_length_ms',
-            message: `frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`,
+            message: `frame_length_ms must be in 20...1000 (got ${m.frameLengthMs})`,
         });
     }
-    if (!Number.isFinite(m.threshold) || m.threshold < 0.0 || m.threshold > 1.0) {
+    if (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'VADConfiguration.threshold',
-            message: `threshold must be in 0.0...1.0 (got ${m.threshold})`,
+            fieldPath: 'VADConfiguration.activation_threshold',
+            message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
         });
     }
-    if (!Number.isFinite(m.calibrationMultiplier) || m.calibrationMultiplier < 1.5 || m.calibrationMultiplier > 4.0) {
+    if (!Number.isFinite(m.calibrationMultiplier) || m.calibrationMultiplier < 1.2 || m.calibrationMultiplier > 4.0) {
         throw new _errors_1.ValidationError({
             fieldPath: 'VADConfiguration.calibration_multiplier',
-            message: `calibration_multiplier must be in 1.5...4.0 (got ${m.calibrationMultiplier})`,
+            message: `calibration_multiplier must be in 1.2...4.0 (got ${m.calibrationMultiplier})`,
         });
     }
 };
 exports.validateVADConfiguration = validateVADConfiguration;
+const vADOptionsDefaults = () => ({
+    activationThreshold: 0.5,
+    minSpeechDurationMs: 250,
+    minSilenceDurationMs: 500,
+    prefixPaddingMs: 300,
+    sampleRate: 16000,
+});
+exports.vADOptionsDefaults = vADOptionsDefaults;
+const validateVADOptions = (m) => {
+    if (m.activationThreshold !== undefined && (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'VADOptions.activation_threshold',
+            message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
+        });
+    }
+    if (m.sampleRate < 8000 || m.sampleRate > 48000) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'VADOptions.sample_rate',
+            message: `sample_rate must be in 8000...48000 (got ${m.sampleRate})`,
+        });
+    }
+};
+exports.validateVADOptions = validateVADOptions;

@@ -33,7 +33,6 @@ import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/diffusion_options.pb.dart'
     show
-        DiffusionConfiguration,
         DiffusionGenerationOptions,
         DiffusionGenerationRequest,
         DiffusionResult,
@@ -89,7 +88,10 @@ class RunAnywhereDiffusion {
   ///
   /// Reuses the canonical `RunAnywhere.loadModel` path with the image-generation
   /// component, exactly like every other modality (VLM/embeddings/…).
-  Future<void> load(String modelId, [DiffusionConfiguration? config]) async {
+  ///
+  /// `DiffusionConfiguration` was deleted outright (idl/diffusion_options.proto)
+  /// — there is no load-time configuration message left to accept.
+  Future<void> load(String modelId) async {
     _ensureInitialized();
     _ensureApplePlatform();
 
@@ -101,11 +103,11 @@ class RunAnywhereDiffusion {
         validateAvailability: true,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.modelLoadFailed(
         modelId,
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'Diffusion lifecycle load failed',
       );
     }
@@ -128,10 +130,10 @@ class RunAnywhereDiffusion {
         category: _diffusionCategory,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'Diffusion lifecycle unload failed',
       );
     }
@@ -181,13 +183,13 @@ class RunAnywhereDiffusion {
     } on SDKException catch (e) {
       yield DiffusionStreamEvent(
         kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
-        errorMessage: e.message,
+        error: e.error,
       );
       return;
     } catch (e) {
       yield DiffusionStreamEvent(
         kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
-        errorMessage: e.toString(),
+        error: SDKException.from(e).error,
       );
       return;
     }
@@ -219,10 +221,12 @@ class RunAnywhereDiffusion {
     DiffusionGenerationOptions options,
     String modelId,
   ) {
+    // `request_id`/`metadata` were deleted outright
+    // (idl/diffusion_options.proto) — `options`/`model_id` are the only
+    // fields left.
     return DiffusionGenerationRequest(
       modelId: modelId,
       options: options,
-      metadata: <String, String>{'model_id': modelId}.entries,
     );
   }
 

@@ -1,20 +1,38 @@
-"""CLI command handlers — thin wrappers over the SDK, mirroring the C++ rcli commands.
+"""CLI command handlers — thin wrappers over the SDK namespaces, mirroring the verbs.
 
-Each ``handle_*`` returns an exit code (0/1/2/130). Model loads auto-download on first use (the SDK
-resolves + fetches), so there's no separate auto-pull step. Errors are surfaced as SDKException ->
-exit 1; bad file paths -> exit 2.
+Each ``handle_*`` returns an exit code (0/1/2/130). Generation verbs auto-load and
+auto-download, so there is no separate pull step. Errors surface as SDKException -> exit 1;
+bad file paths -> exit 2.
 """
 from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import sys
 
-from ..audio import decode_wav, downsample, encode_wav, pcm16_bytes
-from ..catalog import CATALOG
-from ..download import model_status, models_root, resolve_model
-from ..errors import SDKException
+import runanywhere as ra
+from runanywhere import (
+    AudioFormat,
+    AudioInput,
+    ChatMessage,
+    DiarizationOptions,
+    EmbedOptions,
+    ImageInput,
+    LlmOptions,
+    ModelFilter,
+    ModelRef,
+    RagDocument,
+    RagQueryOptions,
+    ReasoningMode,
+    ReasoningOptions,
+    Role,
+    SDKException,
+    SegmentationOptions,
+    SttOptions,
+    TtsOptions,
+)
+
+from ..download import models_root
 from . import output
 
 DEFAULT_LLM = "qwen2.5-0.5b"
@@ -22,29 +40,26 @@ DEFAULT_VLM = "smolvlm-256m"
 DEFAULT_EMBEDDER = "minilm"
 DEFAULT_STT = "whisper-tiny"
 DEFAULT_TTS = "piper-lessac"
-_FRAME = 512  # VAD frame @ 16 kHz
 
 
 # --------------------------------------------------------------------------- helpers
-def _client(args: argparse.Namespace):
-    from ..client import RunAnywhere
+class _Sdk:
+    """Bring the SDK up for one command and tear it down afterwards."""
 
-    return RunAnywhere(base_dir=getattr(args, "home", None))
+    def __init__(self, args: argparse.Namespace) -> None:
+        home = getattr(args, "home", None)
+        if home:
+            os.environ["RUNANYWHERE_HOME"] = home
+
+    def __enter__(self) -> None:
+        ra.initialize()
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        ra.reset()
 
 
 def _dim(text: str) -> str:
     return f"\033[2m{text}\033[0m" if output.stderr_is_tty() else text
-
-
-def _dir_size(directory: str) -> int:
-    total = 0
-    for root, _dirs, files in os.walk(directory):
-        for f in files:
-            try:
-                total += os.path.getsize(os.path.join(root, f))
-            except OSError:
-                pass
-    return total
 
 
 def _memory_info():
@@ -75,30 +90,37 @@ def _memory_info():
     return None, None
 
 
-def _read_wav_16k(path: str):
-    with open(path, "rb") as f:
-        raw = f.read()
-    # decode_wav/downsample raise SDKException.invalid_input on a malformed or
-    # non-16-bit WAV. Prefix with the path so the CLI's `except SDKException`
-    # surfaces a clean `error:` + exit 1 instead of a raw traceback.
-    try:
-        rate, samples = decode_wav(raw)
-        if rate != 16000:
-            samples = downsample(samples, rate, 16000)
-    except SDKException as exc:
-        raise SDKException.invalid_input(f"{path}: {exc}") from exc
-    return samples
-
-
-def _gen_opts(args: argparse.Namespace) -> dict:
-    opts = {}
+def _llm_options(args: argparse.Namespace, model: str) -> LlmOptions:
+    options = LlmOptions(model=model)
     if getattr(args, "temperature", None) is not None:
-        opts["temperature"] = args.temperature
+        options.temperature = args.temperature
     if getattr(args, "max_tokens", None) is not None:
-        opts["max_tokens"] = args.max_tokens
+        options.max_output_tokens = args.max_tokens
     if getattr(args, "system", None):
-        opts["system_prompt"] = args.system
-    return opts
+        options.system_prompt = args.system
+    # --no-think suppresses thinking at the source; otherwise thoughts are requested so the
+    # CLI can render them dimmed.
+    if getattr(args, "no_think", False):
+        options.reasoning = ReasoningOptions(mode=ReasoningMode.OFF)
+    else:
+        options.reasoning = ReasoningOptions(include_in_output=True)
+    return options
+
+
+def _render(events, args: argparse.Namespace) -> tuple:
+    """Print a generation stream; returns (answer text, terminal result)."""
+    answer, result = [], None
+    for event in events:
+        if event.is_completed:
+            result = event.result
+        elif event.is_thought:
+            if not getattr(args, "no_think", False):
+                output.status_raw(_dim(event.text))
+        elif event.is_token:
+            answer.append(event.text)
+            if not args.json:
+                output.result_raw(event.text)
+    return "".join(answer), result
 
 
 # --------------------------------------------------------------------------- text
@@ -107,42 +129,34 @@ def handle_run(args: argparse.Namespace) -> int:
     if prompt is None and not sys.stdin.isatty():
         prompt = sys.stdin.read().strip() or None
     try:
-        with _client(args) as ra:
+        with _Sdk(args):
             if args.image:
-                vlm = ra.load_vlm(args.model or DEFAULT_VLM)
-                out = []
-                for tok in vlm.caption(args.image, prompt or "Describe the image."):
-                    out.append(tok)
-                    if not args.json:
-                        output.result_raw(tok)
+                model = args.model or DEFAULT_VLM
+                options = _llm_options(args, model)
+                events = ra.vlm.generate_stream(
+                    ImageInput.file(args.image), prompt or "Describe the image.", options
+                )
+                text, _result = _render(events, args)
                 if args.json:
-                    output.emit_json({"model": args.model or DEFAULT_VLM, "response": "".join(out)})
-                elif out:
+                    output.emit_json({"model": model, "response": text})
+                elif text:
                     output.result("")
                 return 0
 
             model = args.model or DEFAULT_LLM
-            llm = ra.load_llm(model)
+            options = _llm_options(args, model)
             if prompt is None:
-                return _repl(llm, _gen_opts(args), args, model)
-            answer, final = [], None
-            for ev in llm.generate_stream(prompt, **_gen_opts(args)):
-                if ev.is_final:
-                    final = ev.result
-                elif ev.is_thinking:
-                    if not args.no_think:
-                        output.status_raw(_dim(ev.token))
-                else:
-                    answer.append(ev.token)
-                    if not args.json:
-                        output.result_raw(ev.token)
-            text = "".join(answer)
+                return _repl(options, args, model)
+            text, result = _render(ra.llm.generate_stream(prompt, options), args)
             if args.json:
                 body = {"model": model, "response": text}
-                if final:
-                    body["usage"] = {"tokens": final.token_count, "tokens_per_second": final.tokens_per_second}
-                    if final.thinking_content:
-                        body["thinking"] = final.thinking_content
+                if result:
+                    body["usage"] = {
+                        "output_tokens": result.output_tokens,
+                        "tokens_per_second": result.tokens_per_second,
+                    }
+                    if result.thinking_text:
+                        body["thinking"] = result.thinking_text
                 output.emit_json(body)
             elif text:
                 output.result("")
@@ -152,7 +166,7 @@ def handle_run(args: argparse.Namespace) -> int:
         return 1
 
 
-def _repl(llm, opts: dict, args: argparse.Namespace, model: str) -> int:
+def _repl(options: LlmOptions, args: argparse.Namespace, model: str) -> int:
     output.status(f"run {model} — Ctrl-D or 'exit' to quit.")
     while True:
         try:
@@ -164,22 +178,19 @@ def _repl(llm, opts: dict, args: argparse.Namespace, model: str) -> int:
             return 0
         if not line.strip():
             continue
-        for ev in llm.generate_stream(line, **opts):
-            if ev.is_final:
-                continue
-            if ev.is_thinking:
-                if not args.no_think:
-                    output.status_raw(_dim(ev.token))
-            else:
-                output.result_raw(ev.token)
+        _render(ra.llm.generate_stream(line, options), args)
         output.result("")
 
 
 def handle_chat(args: argparse.Namespace) -> int:
+    model = args.model or DEFAULT_LLM
     try:
-        with _client(args) as ra:
-            chat = ra.create_chat(ra.load_llm(args.model or DEFAULT_LLM), system=args.system)
-            output.status(f"chat {args.model or DEFAULT_LLM} — Ctrl-D or 'exit' to quit.")
+        with _Sdk(args):
+            options = _llm_options(args, model)
+            history: list = []
+            if args.system:
+                history.append(ChatMessage(role=Role.SYSTEM, content=args.system))
+            output.status(f"chat {model} — Ctrl-D or 'exit' to quit.")
             while True:
                 try:
                     line = input("> ")
@@ -190,14 +201,9 @@ def handle_chat(args: argparse.Namespace) -> int:
                     return 0
                 if not line.strip():
                     continue
-                for ev in chat.send_stream(line):
-                    if ev.is_final:
-                        continue
-                    if ev.is_thinking:
-                        if not args.no_think:
-                            output.status_raw(_dim(ev.token))
-                    else:
-                        output.result_raw(ev.token)
+                history.append(ChatMessage(role=Role.USER, content=line))
+                text, _result = _render(ra.llm.generate_stream(history, options), args)
+                history.append(ChatMessage(role=Role.ASSISTANT, content=text.strip()))
                 output.result("")
     except (SDKException, OSError) as exc:
         output.error(str(exc))
@@ -206,19 +212,27 @@ def handle_chat(args: argparse.Namespace) -> int:
 
 # --------------------------------------------------------------------------- models
 def handle_list(args: argparse.Namespace) -> int:
-    status = model_status()
-    rows = []
-    for mid, entry in sorted(CATALOG.items()):
-        st = status.get(mid)
-        downloaded = bool(st and st.downloaded)
-        if not args.all and not downloaded:
-            continue
-        rows.append([mid, entry.type, f"{entry.size_mb} MB" if getattr(entry, "size_mb", None) else "-",
-                     "yes" if downloaded else "no"])
+    infos = ra.models.list(None if args.all else ModelFilter(downloaded=True))
+    rows = [
+        [
+            info.id,
+            info.category.name.lower(),
+            f"{info.size_bytes // (1024 * 1024)} MB" if info.size_bytes else "-",
+            "yes" if info.downloaded else "no",
+        ]
+        for info in infos
+    ]
     if args.json:
-        output.emit_json({"models": [{"id": r[0], "type": r[1], "downloaded": r[3] == "yes"} for r in rows]})
+        output.emit_json(
+            {
+                "models": [
+                    {"id": i.id, "category": i.category.name, "downloaded": i.downloaded}
+                    for i in infos
+                ]
+            }
+        )
     else:
-        output.table(["MODEL", "TYPE", "SIZE", "DOWNLOADED"], rows)
+        output.table(["MODEL", "CATEGORY", "SIZE", "DOWNLOADED"], rows)
     return 0
 
 
@@ -228,43 +242,50 @@ def handle_models(args: argparse.Namespace) -> int:
 
 
 def handle_pull(args: argparse.Namespace) -> int:
-    def on_progress(p):
-        if not (args.json or args.no_progress) and output.stderr_is_tty():
-            output.status_raw(f"\r{p.file} {p.percent}%   ")
-
     try:
-        resolved = resolve_model(args.model, on_progress=on_progress)
+        downloaded = None
+        for event in ra.models.download(args.model):
+            if event.kind.name == "PROGRESS" and not (args.json or args.no_progress):
+                if output.stderr_is_tty():
+                    output.status_raw(f"\r{event.file} {event.percent}%   ")
+            elif event.kind.name == "COMPLETED":
+                downloaded = event.model
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
     if not (args.json or args.no_progress):
         output.status("")
     if args.json:
-        output.emit_json({"id": resolved.id, "type": resolved.type, "local_path": resolved.primary})
+        output.emit_json(
+            {"id": args.model, "local_path": downloaded.local_path if downloaded else None}
+        )
     else:
-        output.result(f"pulled {resolved.id} -> {resolved.primary}")
+        output.result(f"pulled {args.model}")
     return 0
 
 
 def handle_show(args: argparse.Namespace) -> int:
-    entry = CATALOG.get(args.model)
-    if entry is None:
+    info = ra.models.get(args.model)
+    if info is None:
         output.error(f"model {args.model!r} not found")
         return 1
-    st = model_status().get(args.model)
-    info = {"id": args.model, "type": entry.type, "primary": entry.primary,
-            "params": getattr(entry, "params", None), "size_mb": getattr(entry, "size_mb", None),
-            "downloaded": bool(st and st.downloaded)}
+    body = {
+        "id": info.id,
+        "category": info.category.name,
+        "name": info.name,
+        "downloaded": info.downloaded,
+        "size_bytes": info.size_bytes,
+        "local_path": info.local_path,
+    }
     if args.json:
-        output.emit_json(info)
+        output.emit_json(body)
     else:
-        for k, v in info.items():
-            output.result(f"{k}: {v}")
+        for key, value in body.items():
+            output.result(f"{key}: {value}")
     return 0
 
 
 def handle_rm(args: argparse.Namespace) -> int:
-    # Confine to the models root: a model name like "../../x" must NOT delete outside it.
     root = os.path.realpath(models_root())
     directory = os.path.realpath(os.path.join(root, args.model))
     try:
@@ -282,8 +303,18 @@ def handle_rm(args: argparse.Namespace) -> int:
         if input().strip().lower() not in ("y", "yes"):
             output.status("aborted")
             return 0
-    freed = _dir_size(directory)
-    shutil.rmtree(directory, ignore_errors=True)
+    freed = 0
+    for walk_root, _dirs, files in os.walk(directory):
+        for name in files:
+            try:
+                freed += os.path.getsize(os.path.join(walk_root, name))
+            except OSError:
+                pass
+    try:
+        ra.models.delete(args.model)
+    except SDKException as exc:
+        output.error(str(exc))
+        return 1
     if args.json:
         output.emit_json({"id": args.model, "freed_bytes": freed})
     else:
@@ -300,51 +331,77 @@ def handle_embed(args: argparse.Namespace) -> int:
         return 2
     model = args.model or DEFAULT_EMBEDDER
     try:
-        with _client(args) as ra:
-            embedder = ra.load_embedder(model)
-            vecs = [embedder.embed(t) for t in texts]
+        with _Sdk(args):
+            vectors = ra.embeddings.embed(texts, EmbedOptions(model=model))
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
-    dim = int(vecs[0].shape[0]) if vecs else 0
+    dimension = int(vectors[0].vector.shape[0]) if vectors else 0
     if args.json:
-        output.emit_json({"model": model, "dimension": dim, "count": len(vecs),
-                          "vectors": [{"text": t, "values": [float(x) for x in v]} for t, v in zip(texts, vecs)]})
+        output.emit_json(
+            {
+                "model": model,
+                "dimension": dimension,
+                "count": len(vectors),
+                "vectors": [
+                    {"text": texts[v.index], "values": [float(x) for x in v.vector]}
+                    for v in vectors
+                ],
+            }
+        )
     else:
-        for t, v in zip(texts, vecs):
-            output.result(f"{t[:48]!r}: dim={int(v.shape[0])} [{v[0]:.4f}, {v[1]:.4f}, ...]")
+        for vector in vectors:
+            values = vector.vector
+            output.result(
+                f"{texts[vector.index][:48]!r}: dim={int(values.shape[0])} "
+                f"[{values[0]:.4f}, {values[1]:.4f}, ...]"
+            )
     return 0
 
 
 # --------------------------------------------------------------------------- audio
 def handle_stt(args: argparse.Namespace) -> int:
+    model = args.model or DEFAULT_STT
     try:
-        pcm = pcm16_bytes(_read_wav_16k(args.input))
-        with _client(args) as ra:
-            text = ra.load_stt(args.model or DEFAULT_STT).transcribe(pcm)
+        with _Sdk(args):
+            transcription = ra.stt.transcribe(
+                AudioInput.file(args.input), SttOptions(model=model)
+            )
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
     if args.json:
-        output.emit_json({"model": args.model or DEFAULT_STT, "text": text})
+        output.emit_json(
+            {
+                "model": model,
+                "text": transcription.text,
+                "duration_ms": transcription.duration_ms,
+            }
+        )
     else:
-        output.result(text)
+        output.result(transcription.text)
     return 0
 
 
 def handle_tts(args: argparse.Namespace) -> int:
+    voice = getattr(args, "model", None) or args.voice or DEFAULT_TTS
     try:
-        with _client(args) as ra:
-            synth = ra.load_tts(args.voice or DEFAULT_TTS).synthesize(args.text)
-        with open(args.output, "wb") as f:
-            f.write(encode_wav(synth.samples, synth.sample_rate))
+        with _Sdk(args):
+            audio = ra.tts.synthesize(args.text, TtsOptions(model=voice, format=AudioFormat.WAV))
+        with open(args.output, "wb") as handle:
+            handle.write(audio.data)
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
-    duration_ms = round(len(synth.samples) / synth.sample_rate * 1000)
     if args.json:
-        output.emit_json({"voice": args.voice or DEFAULT_TTS, "path": args.output,
-                          "sample_rate": synth.sample_rate, "duration_ms": duration_ms})
+        output.emit_json(
+            {
+                "voice": voice,
+                "path": args.output,
+                "sample_rate": audio.sample_rate,
+                "duration_ms": audio.duration_ms,
+            }
+        )
     else:
         output.result(args.output)
     return 0
@@ -352,107 +409,187 @@ def handle_tts(args: argparse.Namespace) -> int:
 
 def handle_vad(args: argparse.Namespace) -> int:
     try:
-        samples = _read_wav_16k(args.input)
-        with _client(args) as ra:
-            vad = ra.create_vad()
-            segs = []
-            in_speech = False
-            seg_start = 0.0
-            per_frame = _FRAME / 16000.0
-            n = 0
-            for i in range(0, len(samples) - _FRAME + 1, _FRAME):
-                speech = vad.detect(samples[i:i + _FRAME])
-                t = n * per_frame
-                if speech and not in_speech:
-                    seg_start, in_speech = t, True
-                elif not speech and in_speech:
-                    segs.append((seg_start, t))
-                    in_speech = False
-                n += 1
-            if in_speech:
-                segs.append((seg_start, len(samples) / 16000.0))
-            vad.close()
+        with _Sdk(args):
+            result = ra.vad.detect(AudioInput.file(args.input))
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
     if args.json:
-        output.emit_json({"model": args.model or "vad",
-                          "segments": [{"start_s": round(a, 3), "end_s": round(b, 3)} for a, b in segs]})
+        output.emit_json(
+            {
+                "is_speech": result.is_speech,
+                "segments": [
+                    {"start_ms": s.start_ms, "end_ms": s.end_ms} for s in result.segments
+                ],
+            }
+        )
     else:
-        output.table(["START", "END"], [[f"{a:.3f}", f"{b:.3f}"] for a, b in segs])
+        output.table(
+            ["START", "END"],
+            [[f"{s.start_ms / 1000:.3f}", f"{s.end_ms / 1000:.3f}"] for s in result.segments],
+        )
     return 0
 
 
 def handle_voice(args: argparse.Namespace) -> int:
+    """One voice turn over a WAV file: stt -> llm -> tts.
+
+    ``voice.create_session`` needs a microphone and the native voice agent, neither of which
+    this SDK has, so the CLI composes the three namespaces for this file-in / file-out demo.
+    """
     try:
-        pcm = pcm16_bytes(_read_wav_16k(args.input))
-        with _client(args) as ra:
-            agent = ra.create_voice_agent(
-                ra.load_stt(args.stt or DEFAULT_STT),
-                ra.load_llm(args.llm or DEFAULT_LLM),
-                ra.load_tts(args.tts or DEFAULT_TTS),
+        with _Sdk(args):
+            transcript = ra.stt.transcribe(
+                AudioInput.file(args.input), SttOptions(model=args.stt or DEFAULT_STT)
+            ).text.strip()
+            answer = ra.llm.generate(
+                transcript or "Say hello.",
+                LlmOptions(model=args.llm or DEFAULT_LLM, max_output_tokens=128),
+            ).text.strip()
+            audio = ra.tts.synthesize(
+                answer, TtsOptions(model=args.tts or DEFAULT_TTS, format=AudioFormat.WAV)
             )
-            turn = agent.process_turn(pcm)
         if args.output:
-            with open(args.output, "wb") as f:
-                f.write(encode_wav(turn.audio.samples, turn.audio.sample_rate))
+            with open(args.output, "wb") as handle:
+                handle.write(audio.data)
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
     if args.json:
-        output.emit_json({"transcription": turn.transcript, "response": turn.response,
-                          "reply_audio": args.output})
+        output.emit_json(
+            {"transcription": transcript, "response": answer, "reply_audio": args.output}
+        )
     else:
-        output.result(f"you: {turn.transcript}")
-        output.result(f"agent: {turn.response}")
+        output.result(f"you: {transcript}")
+        output.result(f"agent: {answer}")
         if args.output:
             output.result(f"audio: {args.output}")
+    return 0
+
+
+def handle_rag(args: argparse.Namespace) -> int:
+    """Ingest text files, then answer one question over them."""
+    try:
+        with _Sdk(args):
+            with ra.rag.open(
+                ModelRef(args.embedder or DEFAULT_EMBEDDER),
+                ModelRef(args.model or DEFAULT_LLM),
+            ) as session:
+                session.ingest([RagDocument.file(path) for path in args.files])
+                result = session.query(
+                    args.question,
+                    RagQueryOptions(generation=LlmOptions(max_output_tokens=192)),
+                )
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
+    if args.json:
+        output.emit_json(
+            {
+                "answer": result.answer,
+                "sources": [{"text": m.text, "score": m.score} for m in result.sources],
+            }
+        )
+    else:
+        output.result(result.answer.strip())
+        for match in result.sources:
+            output.status(f"  source (score {match.score:.2f}): {match.text[:70]}")
+    return 0
+
+
+# --------------------------------------------------------------------------- diarize / segment
+def handle_diarize(args: argparse.Namespace) -> int:
+    try:
+        with _Sdk(args):
+            result = ra.diarization.diarize(
+                AudioInput.file(args.input), DiarizationOptions(model=args.model or None)
+            )
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
+    if args.json:
+        output.emit_json(
+            {
+                "speaker_count": result.speaker_count,
+                "segments": [
+                    {"speaker_id": s.speaker_id, "start_ms": s.start_ms, "end_ms": s.end_ms}
+                    for s in result.segments
+                ],
+            }
+        )
+    else:
+        output.table(
+            ["SPEAKER", "START", "END"],
+            [[s.speaker_id, f"{s.start_ms / 1000:.3f}", f"{s.end_ms / 1000:.3f}"] for s in result.segments],
+        )
+    return 0
+
+
+def handle_segment(args: argparse.Namespace) -> int:
+    # The library segments raw RGB only (the SDK ships no image decoder), so the CLI takes
+    # packed 8-bit RGB bytes plus their dimensions.
+    try:
+        with open(args.input, "rb") as handle:
+            pixels = handle.read()
+        with _Sdk(args):
+            result = ra.segmentation.segment(
+                ImageInput.raw_rgb(pixels, args.width, args.height),
+                SegmentationOptions(model=args.model or None),
+            )
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
+    names = [getattr(c, "name", str(c)) for c in result.classes]
+    if args.json:
+        output.emit_json({"width": result.width, "height": result.height, "classes": names})
+    else:
+        output.result(f"{result.width}x{result.height}, {len(names)} classes: {', '.join(names[:12])}")
     return 0
 
 
 # --------------------------------------------------------------------------- info
 def handle_backends(args: argparse.Namespace) -> int:
     try:
-        with _client(args) as ra:
-            backends = ra.available_backends()
+        names = ra.backends()
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
     if args.json:
-        output.emit_json({"backends": backends})
+        output.emit_json({"backends": names})
     else:
-        for name in backends:
+        for name in names:
             output.result(name)
     return 0
 
 
 def handle_version(args: argparse.Namespace) -> int:
-    from .. import __version__
-
     if args.json:
-        output.emit_json({"runanywhere": __version__})
+        output.emit_json({"runanywhere": ra.__version__})
     else:
-        output.result(f"runanywhere {__version__}")
+        output.result(f"runanywhere {ra.__version__}")
     return 0
 
 
 def handle_info(args: argparse.Namespace) -> int:
-    from .. import __version__
-
     total, avail = _memory_info()
     try:
-        with _client(args) as ra:
-            backends = ra.available_backends()
+        names = ra.backends()
     except (SDKException, OSError) as exc:
         output.error(str(exc))
         return 1
-    info = {"runanywhere": __version__, "platform": sys.platform, "models_dir": models_root(),
-            "backends": backends, "memory_total_bytes": total, "memory_available_bytes": avail}
+    info = {
+        "runanywhere": ra.__version__,
+        "platform": sys.platform,
+        "models_dir": models_root(),
+        "backends": names,
+        "memory_total_bytes": total,
+        "memory_available_bytes": avail,
+    }
     if args.json:
         output.emit_json(info)
     else:
-        for k, v in info.items():
-            output.result(f"{k}: {v}")
+        for key, value in info.items():
+            output.result(f"{key}: {value}")
     return 0
 
 
@@ -527,6 +664,7 @@ def register(sub, gp: argparse.ArgumentParser) -> None:
 
     tt = add("tts", "synthesize speech (text-to-speech)")
     tt.add_argument("voice", nargs="?")
+    tt.add_argument("-m", "--model", help="voice model (same as the positional; -m for parity with other verbs)")
     tt.add_argument("-t", "--text", required=True)
     tt.add_argument("-o", "--output", required=True)
     tt.set_defaults(handler=handle_tts)
@@ -536,13 +674,32 @@ def register(sub, gp: argparse.ArgumentParser) -> None:
     v.add_argument("-i", "--input", required=True)
     v.set_defaults(handler=handle_vad)
 
-    vo = add("voice", "full voice turn (STT -> LLM -> TTS)")
+    vo = add("voice", "one voice turn (stt -> llm -> tts)")
     vo.add_argument("-i", "--input", required=True)
     vo.add_argument("--stt")
     vo.add_argument("--llm")
     vo.add_argument("--tts")
     vo.add_argument("-o", "--output")
     vo.set_defaults(handler=handle_voice)
+
+    rg = add("rag", "answer a question over local text files")
+    rg.add_argument("question")
+    rg.add_argument("files", nargs="+")
+    rg.add_argument("-m", "--model")
+    rg.add_argument("--embedder")
+    rg.set_defaults(handler=handle_rag)
+
+    dz = add("diarize", "label who spoke when in a WAV")
+    dz.add_argument("-i", "--input", required=True)
+    dz.add_argument("-m", "--model")
+    dz.set_defaults(handler=handle_diarize)
+
+    sg = add("segment", "label every pixel of a raw-RGB image by class")
+    sg.add_argument("-i", "--input", required=True, help="packed 8-bit RGB pixels, row-major")
+    sg.add_argument("--width", type=int, required=True)
+    sg.add_argument("--height", type=int, required=True)
+    sg.add_argument("-m", "--model")
+    sg.set_defaults(handler=handle_segment)
 
     b = add("backends", "list registered inference backends")
     b.set_defaults(handler=handle_backends)

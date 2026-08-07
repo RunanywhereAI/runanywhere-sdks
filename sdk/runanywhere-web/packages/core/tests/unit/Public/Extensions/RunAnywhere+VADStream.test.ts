@@ -204,9 +204,10 @@ function fakeVADModule(): FakeVADHarness {
       counters.sessionFeeds += 1;
       counters.fedByteLengths.push(audioSize);
 
+      // `VADResult.confidence` was renamed `.probability` on the wire.
       const result = VADResult.fromPartial({
         isSpeech: counters.sessionFeeds < 3,
-        confidence: counters.sessionFeeds < 3 ? 1 : 0,
+        probability: counters.sessionFeeds < 3 ? 1 : 0,
         energy: counters.sessionFeeds / 10,
         durationMs: counters.sessionFeeds * 10,
       });

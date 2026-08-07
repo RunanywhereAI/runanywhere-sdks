@@ -44,35 +44,54 @@ if(RAC_BUILD_ELECTRON_ADDON)
             "sdk/runanywhere-electron/native (node-addon-api + node-api-headers)")
     endif()
 
-    # node-gyp-provided dev files (headers + node.lib). Overridable; defaults to
-    # the node-gyp cache for the Node version on this machine. A real package
-    # build resolves these via cmake-js (CMAKE_JS_INC / CMAKE_JS_LIB) instead.
-    set(RAC_NODE_DEV_DIR "$ENV{LOCALAPPDATA}/node-gyp/Cache/24.15.0"
-        CACHE PATH "node-gyp dev files dir (contains include/node + <arch>/node.lib)")
-    set(RAC_NODE_LIB "${RAC_NODE_DEV_DIR}/x64/node.lib"
-        CACHE FILEPATH "Windows node import library (node.lib)")
-    if(NOT EXISTS "${RAC_NODE_LIB}")
-        message(FATAL_ERROR
-            "runanywhere-electron: node.lib not found at ${RAC_NODE_LIB} — run "
-            "`npx node-gyp install` or set -DRAC_NODE_DEV_DIR=<node-gyp cache ver dir>")
+    if(WIN32)
+        # node-gyp-provided dev files (headers + node.lib). Overridable; defaults to
+        # the node-gyp cache for the Node version on this machine. A real package
+        # build resolves these via cmake-js (CMAKE_JS_INC / CMAKE_JS_LIB) instead.
+        set(RAC_NODE_DEV_DIR "$ENV{LOCALAPPDATA}/node-gyp/Cache/24.15.0"
+            CACHE PATH "node-gyp dev files dir (contains include/node + <arch>/node.lib)")
+        set(RAC_NODE_LIB "${RAC_NODE_DEV_DIR}/x64/node.lib"
+            CACHE FILEPATH "Windows node import library (node.lib)")
+        if(NOT EXISTS "${RAC_NODE_LIB}")
+            message(FATAL_ERROR
+                "runanywhere-electron: node.lib not found at ${RAC_NODE_LIB} — run "
+                "`npx node-gyp install` or set -DRAC_NODE_DEV_DIR=<node-gyp cache ver dir>")
+        endif()
+        set(_ra_addon_platform_srcs
+            win32_platform_adapter.cpp
+            win_delay_load_hook.cc)  # vendored from cmake-js: redirect node imports to the host exe
+    else()
+        # POSIX: napi_* symbols resolve from the host executable (node/electron) at
+        # load time — undefined symbols in a shared lib are fine on Linux; macOS
+        # would need -undefined dynamic_lookup. Headers come from node-api-headers.
+        set(_ra_addon_platform_srcs posix_platform_adapter.cpp)
     endif()
 
-    add_library(runanywhere_native SHARED
-        addon.cpp
-        win32_platform_adapter.cpp
-        win_delay_load_hook.cc)  # vendored from cmake-js: redirect node imports to the host exe
+    add_library(runanywhere_native SHARED addon.cpp ${_ra_addon_platform_srcs})
     set_target_properties(runanywhere_native PROPERTIES PREFIX "" SUFFIX ".node")
 
     target_include_directories(runanywhere_native PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
-        "${RAC_NODE_DEV_DIR}/include/node"
         "${_ra_napi}/node-addon-api"
         "${_ra_napi}/node-api-headers/include")
     target_compile_definitions(runanywhere_native PRIVATE
         NAPI_VERSION=8 NODE_ADDON_API_DISABLE_DEPRECATED BUILDING_NODE_EXTENSION)
     target_compile_features(runanywhere_native PRIVATE cxx_std_20)
-    target_link_libraries(runanywhere_native PRIVATE rac_commons Crypt32 "${RAC_NODE_LIB}")
+    target_link_libraries(runanywhere_native PRIVATE rac_commons)
+    if(WIN32)
+        target_include_directories(runanywhere_native PRIVATE "${RAC_NODE_DEV_DIR}/include/node")
+        target_link_libraries(runanywhere_native PRIVATE Crypt32 "${RAC_NODE_LIB}")
+    elseif(APPLE)
+        target_link_options(runanywhere_native PRIVATE "-Wl,-undefined,dynamic_lookup")
+        set_target_properties(runanywhere_native PROPERTIES
+            BUILD_RPATH "@loader_path" INSTALL_RPATH "@loader_path")
+    else()
+        # Resolve sidecar .so files (onnxruntime, sherpa) beside the .node when it
+        # is bundled into prebuilds/; the build-tree absolute RUNPATH still applies.
+        set_target_properties(runanywhere_native PROPERTIES
+            BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
+    endif()
 
     # Link whichever engine backends this build enabled, and tell addon.cpp which
     # are present via RAC_HAVE_BACKEND_<X>. Default CPU build provides llamacpp +
@@ -91,6 +110,19 @@ if(RAC_BUILD_ELECTRON_ADDON)
         endif()
     endforeach()
     message(STATUS "runanywhere-electron: engine backends -> ${_ra_linked_backends}")
+
+    # Desktop control plane (telemetry + auth). When the desktop adapter is built
+    # into commons (RAC_DESKTOP_ADAPTER=ON), it carries the libcurl HTTP transport
+    # that auth/model-assignments/telemetry POST through; commons links CURL::libcurl
+    # PUBLIC, so our link on rac_commons inherits it. Tell addon.cpp the
+    # rac_desktop_* + two-phase-init surface is available.
+    if(RAC_DESKTOP_ADAPTER)
+        target_compile_definitions(runanywhere_native PRIVATE RAC_ELECTRON_HAVE_DESKTOP)
+        message(STATUS "runanywhere-electron: desktop control plane enabled (telemetry + auth)")
+    else()
+        message(STATUS "runanywhere-electron: desktop control plane OFF "
+                       "(pass -DRAC_DESKTOP_ADAPTER=ON to enable telemetry/auth)")
+    endif()
 
     if(MSVC)
         target_link_directories(runanywhere_native PRIVATE "${_ra_bundled_dir}")

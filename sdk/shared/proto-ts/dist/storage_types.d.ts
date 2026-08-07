@@ -1,123 +1,59 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * NPU chipset detected on the host device. Used to drive vendor-NPU
- * model-download URL selection and runtime backend wiring.
- * ---------------------------------------------------------------------------
- */
 export declare enum NPUChip {
     NPU_CHIP_UNSPECIFIED = 0,
-    /** NPU_CHIP_NONE - No NPU detected on this device */
     NPU_CHIP_NONE = 1,
-    /** NPU_CHIP_APPLE_NEURAL_ENGINE - Apple Neural Engine (A-series / M-series) */
+    /** NPU_CHIP_APPLE_NEURAL_ENGINE - A-series and M-series */
     NPU_CHIP_APPLE_NEURAL_ENGINE = 2,
-    /** NPU_CHIP_QUALCOMM_HEXAGON - Snapdragon 8 Elite, 8 Elite Gen 5, etc. */
     NPU_CHIP_QUALCOMM_HEXAGON = 3,
-    /** NPU_CHIP_MEDIATEK_APU - MediaTek Dimensity APU */
+    /** NPU_CHIP_MEDIATEK_APU - Dimensity APU */
     NPU_CHIP_MEDIATEK_APU = 4,
-    /** NPU_CHIP_GOOGLE_TPU - Pixel Tensor / TPU */
+    /** NPU_CHIP_GOOGLE_TPU - Pixel Tensor */
     NPU_CHIP_GOOGLE_TPU = 5,
-    /** NPU_CHIP_INTEL_NPU - Intel Core Ultra NPU */
+    /** NPU_CHIP_INTEL_NPU - Core Ultra */
     NPU_CHIP_INTEL_NPU = 6,
-    /** NPU_CHIP_OTHER - Detected NPU but vendor unmapped */
+    /** NPU_CHIP_OTHER - Detected but vendor unmapped */
     NPU_CHIP_OTHER = 99,
     UNRECOGNIZED = -1
 }
 export declare function nPUChipFromJSON(object: any): NPUChip;
 export declare function nPUChipToJSON(object: NPUChip): string;
-/**
- * ---------------------------------------------------------------------------
- * Whole-device storage capacity. Reported by the platform OS (e.g. iOS
- * `URLResourceKey.volumeAvailableCapacity*`, Android `StatFs`, browser
- * `navigator.storage.estimate()`).
- *
- * `used_percent` is materialized rather than computed at the receiver so
- * every binding (Swift, Kotlin, Dart, RN, Web) reports the same number even
- * when total_bytes == 0 (in which case used_percent MUST be 0.0).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 export interface DeviceStorageInfo {
     totalBytes: number;
     freeBytes: number;
+    /**
+     * Distinct from total-minus-free: this is the adapter's own reading of
+     * occupied space, not a derivation. Kept live.
+     */
     usedBytes: number;
-    /** 0.0 — 100.0; 0.0 if total_bytes == 0 */
-    usedPercent: number;
 }
-/**
- * ---------------------------------------------------------------------------
- * Per-app storage breakdown by directory type. Mirrors the iOS notion of
- * Documents / Caches / Application Support; on Android these map to
- * filesDir / cacheDir / a stable app-support sub-directory; on Web they map
- * to OPFS / FSAccess buckets (collapsed to documents_bytes by default).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 export interface AppStorageInfo {
     documentsBytes: number;
     cacheBytes: number;
     appSupportBytes: number;
     totalBytes: number;
 }
-/**
- * ---------------------------------------------------------------------------
- * On-disk metrics for a single downloaded model. The full ModelInfo is *not*
- * embedded here — callers cross-reference `model_id` against ModelInfo from
- * model_types.proto. This avoids circular embeds and keeps the wire payload
- * for storage queries small.
- *
- * `last_used_ms` supports LRU presentation and eviction without another type
- * round-trip.
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 export interface ModelStorageMetrics {
     modelId: string;
     sizeOnDiskBytes: number;
-    /** Unix epoch ms of last load */
-    lastUsedMs?: number | undefined;
 }
-/**
- * ---------------------------------------------------------------------------
- * Aggregate storage view: device capacity + app footprint + per-model rows.
- * `total_models` and `total_models_bytes` are denormalized for receivers that
- * would otherwise re-iterate `models` to compute them (Web binding, RN host).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 export interface StorageInfo {
     app?: AppStorageInfo | undefined;
     device?: DeviceStorageInfo | undefined;
     models: ModelStorageMetrics[];
-    totalModels: number;
+    /**
+     * total_models_bytes (5) is NOT a pure derivation -- kept live; see
+     * storage_event_publisher.cpp and two facade readers.
+     */
     totalModelsBytes: number;
 }
-/**
- * ---------------------------------------------------------------------------
- * Result of a "do I have room to download X bytes?" probe. SDKs use this to
- * pre-flight `downloadModel(...)` and surface user-facing warnings (e.g.
- * "you only have 1.2 GB free; this model needs 4 GB").
- *
- * `warning_message` and `recommendation` are independently optional —
- * `warning_message` describes the current shortfall, `recommendation`
- * suggests an action (delete cache, free models, etc.).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 export interface StorageAvailability {
     isAvailable: boolean;
     requiredBytes: number;
     availableBytes: number;
     warningMessage?: string | undefined;
     recommendation?: string | undefined;
-    shortfallBytes: number;
-    requiredToAvailableRatio: number;
 }
 export interface StorageInfoRequest {
     includeDevice: boolean;
@@ -126,30 +62,34 @@ export interface StorageInfoRequest {
     includeCache: boolean;
 }
 export interface StorageInfoResult {
-    success: boolean;
     info?: StorageInfo | undefined;
-    errorMessage: string;
     warnings: string[];
+    error?: SDKError | undefined;
 }
 export interface StorageAvailabilityRequest {
     modelId: string;
     requiredBytes: number;
-    safetyMargin: number;
+    /**
+     * Absolute headroom the device must still have after the write. Same
+     * unit and same name as DownloadPlanRequest.required_free_bytes_after_download.
+     */
+    requiredFreeBytesAfterDownload: number;
+    /** Count bytes already occupied by this model as reclaimable. */
     includeExistingModelBytes: boolean;
     includeDeletePlan: boolean;
     allowCacheReclamation: boolean;
 }
 export interface StorageAvailabilityResult {
-    success: boolean;
     availability?: StorageAvailability | undefined;
     warnings: string[];
-    errorMessage: string;
     deletePlan?: StorageDeletePlan | undefined;
+    error?: SDKError | undefined;
 }
 export interface StorageDeletePlanRequest {
     modelIds: string[];
     requiredBytes: number;
     includeCache: boolean;
+    /** Evict by least-recently-used rather than by size. */
     oldestFirst: boolean;
     allowLoadedModels: boolean;
     includeDownloadPartials: boolean;
@@ -157,45 +97,46 @@ export interface StorageDeletePlanRequest {
 export interface StorageDeleteCandidate {
     modelId: string;
     reclaimableBytes: number;
-    lastUsedMs?: number | undefined;
     isLoaded: boolean;
     localPath: string;
+    /** Deleting this needs an unload first, or a platform-side delete. */
     requiresUnload: boolean;
     requiresPlatformDelete: boolean;
     storageKey: string;
 }
+/** Non-destructive: describes what could be reclaimed without doing it. */
 export interface StorageDeletePlan {
     canReclaimRequiredBytes: boolean;
     requiredBytes: number;
     reclaimableBytes: number;
     candidates: StorageDeleteCandidate[];
     warnings: string[];
-    errorMessage: string;
     requiresUnload: boolean;
     requiresPlatformDelete: boolean;
-    candidateCount: number;
+    error?: SDKError | undefined;
 }
 export interface StorageDeleteRequest {
     modelIds: string[];
-    deleteFiles: boolean;
+    /** Files are deleted; set this only to opt OUT (catalog-only bookkeeping). */
+    keepFilesOnDisk: boolean;
     clearRegistryPaths: boolean;
     unloadIfLoaded: boolean;
     dryRun: boolean;
+    /** Refuse to execute if the plan no longer matches current state. */
     plan?: StorageDeletePlan | undefined;
     requirePlanMatch: boolean;
     allowPlatformDelete: boolean;
 }
 export interface StorageDeleteResult {
-    success: boolean;
     deletedBytes: number;
     deletedModelIds: string[];
     failedModelIds: string[];
     warnings: string[];
-    errorMessage: string;
     skippedModelIds: string[];
     dryRun: boolean;
     registryUpdated: boolean;
     filesDeleted: boolean;
+    error?: SDKError | undefined;
 }
 export declare const DeviceStorageInfo: MessageFns<DeviceStorageInfo>;
 export declare const AppStorageInfo: MessageFns<AppStorageInfo>;

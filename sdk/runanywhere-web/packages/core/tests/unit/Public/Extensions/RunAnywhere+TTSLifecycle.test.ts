@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
+import { SDKError } from '@runanywhere/proto-ts/errors';
 import {
   TTSOptions,
   TTSOutput,
@@ -12,7 +13,6 @@ import {
 } from '@runanywhere/proto-ts/tts_options';
 import { TTSProtoAdapter } from '../../../../src/Adapters/TTSProtoAdapter';
 import type { ModalityProtoModule } from '../../../../src/Adapters/ProtoAdapterTypes';
-import { flatFacade } from '../../../../src/Public/Extensions/RunAnywhere+FlatFacade';
 import {
   synthesize,
   TTS,
@@ -75,7 +75,7 @@ describe('lifecycle-owned Web TTS', () => {
 
     const output = await synthesize('Keep this voice loaded.', {
       voiceId: 'speaker-2',
-      speakingRate: 1.1,
+      speed: 1.1,
     });
 
     expect(new TextDecoder().decode(output.audioData)).toBe('lifecycle-audio');
@@ -86,7 +86,7 @@ describe('lifecycle-owned Web TTS', () => {
         voice: 'speaker-2',
       },
     });
-    expect(harness.lifecycleRequests[0]?.options?.speakingRate).toBeCloseTo(1.1);
+    expect(harness.lifecycleRequests[0]?.options?.speed).toBeCloseTo(1.1);
     expect(harness.counters).toMatchObject({
       lifecycleSyntheses: 1,
       componentCreates: 0,
@@ -95,7 +95,9 @@ describe('lifecycle-owned Web TTS', () => {
       componentDestroys: 0,
     });
 
-    expect(WebModelLifecycle.currentModel({})).toMatchObject({
+    // `CurrentModelRequest.includeModelMetadata` is a required boolean now
+    // (not optional); the default parameter covers the zero-arg call.
+    expect(WebModelLifecycle.currentModel()).toMatchObject({
       modelId: 'piper-en-us',
     });
   });
@@ -136,8 +138,10 @@ describe('lifecycle-owned Web TTS', () => {
     expect(failed).toHaveLength(1);
     expect(failed[0]).toMatchObject({
       isFinal: true,
-      errorCode: -42,
-      errorMessage: 'forced lifecycle stream failure',
+      error: {
+        cAbiCode: -42,
+        message: 'forced lifecycle stream failure',
+      },
     });
     expect(harness.counters).toMatchObject({
       lifecycleStreams: 2,
@@ -153,7 +157,7 @@ describe('lifecycle-owned Web TTS', () => {
     expect(TTS.listLoadedVoices()).toEqual([
       expect.objectContaining({ id: 'piper-en-us', displayName: 'Piper US' }),
     ]);
-    expect(flatFacade.stopSpeaking()).toBe(true);
+    expect(TTS.stopLoaded()).toBe(true);
     expect(harness.counters).toMatchObject({
       lifecycleVoiceLists: 1,
       lifecycleStops: 1,
@@ -309,8 +313,10 @@ function fakeTTSModule(): FakeTTSHarness {
       if (streamFailure) {
         emit(callbackPointer, TTSStreamEvent.create({
           kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR,
-          errorCode: -42,
-          errorMessage: 'forced lifecycle stream failure',
+          error: SDKError.create({
+            cAbiCode: -42,
+            message: 'forced lifecycle stream failure',
+          }),
         }));
         return -42;
       }

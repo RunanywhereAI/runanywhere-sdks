@@ -144,10 +144,7 @@ public actor HTTPClientAdapter {
             throw SDKException(code: .serviceNotAvailable, message: "HTTP adapter not configured", category: .network)
         }
         let urlString = Self.buildURL(base: configuration.baseURL, path: path).absoluteString
-        let token = try await resolveToken(
-            requiresAuth: requiresAuth,
-            fallbackAPIKey: configuration.apiKey
-        )
+        let token = try await resolveToken(requiresAuth: requiresAuth)
         guard configurationIsCurrent(generation: configuration.generation) else {
             throw SDKException(
                 code: .invalidState,
@@ -159,15 +156,26 @@ public actor HTTPClientAdapter {
             method: method,
             urlString: urlString,
             apiKey: configuration.apiKey,
-            authToken: token.isEmpty ? nil : token,
+            authToken: token,
             body: body,
             trustBoundary: .controlPlane,
             logger: logger
         )
     }
 
-    private func resolveToken(requiresAuth: Bool, fallbackAPIKey: String?) async throws -> String {
-        if !requiresAuth { return fallbackAPIKey ?? "" }
+    /// Resolve the bearer token for a request. Split-header model (mirrors
+    /// Kotlin's `HTTPClientAdapter.resolveToken`): the API key is never a
+    /// bearer substitute — it already travels in the `apikey` header, and
+    /// putting it in `Authorization: Bearer` turns a missing-token failure
+    /// into the backend's misleading "Invalid JWT token: Not enough
+    /// segments". `nil` means no `Authorization` header is sent, whether
+    /// because auth was not required, no JWT is available yet, or the
+    /// resolver/refresh attempt failed.
+    ///
+    /// Not `private` so `@testable import` can characterize this contract
+    /// directly against the real native auth state.
+    func resolveToken(requiresAuth: Bool) async throws -> String? {
+        if !requiresAuth { return nil }
         // `rac_auth_get_valid_token` encodes the "valid → return / expired
         // → signal refresh" handshake in one call.
         var tokenPtr: UnsafePointer<CChar>?
@@ -177,10 +185,30 @@ public actor HTTPClientAdapter {
             _ = try CppBridge.SdkInit.retryHTTP()
             status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         }
-        if status == 0, let ptr = tokenPtr { return String(cString: ptr) }
-        // Keyless staging: no token and no key means the request goes out
-        // unauthenticated (the backend attributes it to the PUBLIC org)
-        return fallbackAPIKey ?? ""
+        if status == 0, let ptr = tokenPtr {
+            let token = String(cString: ptr)
+            return token.isEmpty ? nil : token
+        }
+        return nil
+    }
+
+    /// Split-header auth overlay, pure and FFI-free so it is unit-testable
+    /// without a native client: `apikey` always travels independently of
+    /// `Authorization`, and `Authorization: Bearer` carries only [authToken]
+    /// (a JWT) — never [apiKey]. Mirrors Kotlin's
+    /// `HTTPClientAdapter.buildHeaders`.
+    ///
+    /// Not `private` so `@testable import` can exercise this contract
+    /// directly.
+    static func authHeaders(apiKey: String?, authToken: String?) -> [String: String] {
+        var headers: [String: String] = [:]
+        if let apiKey, !apiKey.isEmpty {
+            headers["apikey"] = apiKey
+        }
+        if let authToken, !authToken.isEmpty {
+            headers["Authorization"] = "Bearer \(authToken)"
+        }
+        return headers
     }
 
     private func clearConfiguration() {
@@ -263,11 +291,8 @@ public actor HTTPClientAdapter {
             }
         }
         headers["X-Platform"] = SDKConstants.platform
-        if let apiKey {
-            headers["apikey"] = apiKey
-        }
-        if let authToken {
-            headers["Authorization"] = "Bearer \(authToken)"
+        for (name, value) in authHeaders(apiKey: apiKey, authToken: authToken) {
+            headers[name] = value
         }
 
         // C-string backing storage for the duration of the request.

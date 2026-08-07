@@ -8,12 +8,17 @@
  * multiple collectors, and tears down lazily on last-detach (mirrors Swift
  * `VoiceAgentStreamAdapter`'s no-terminal-event semantics).
  *
+ * `VoiceEvent.session_started`/`SessionStartedEvent` are deleted outright
+ * (idl/voice_events.proto): session identity now lives on the envelope's own
+ * top-level `session_id` field, carried alongside any payload arm (here
+ * `user_said`), rather than a dedicated session-started oneof arm.
+ *
  * Uses the test-only `NativeBridge` SPI seam so no JNI symbol is required.
  */
 
 package com.runanywhere.sdk.adapters
 
-import ai.runanywhere.proto.v1.SessionStartedEvent
+import ai.runanywhere.proto.v1.UserSaidEvent
 import ai.runanywhere.proto.v1.VoiceEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -76,7 +81,7 @@ class VoiceAgentStreamAdapterTest {
             val job =
                 launch(Dispatchers.Default) {
                     adapter.stream().take(2).collect {
-                        received += it.session_started?.session_id ?: "<no-id>"
+                        received += it.session_id.ifEmpty { "<no-id>" }
                     }
                 }
 
@@ -84,8 +89,8 @@ class VoiceAgentStreamAdapterTest {
             assertTrue("register must run for first subscriber", installed)
 
             val cb = bridge.capturedCallback.get()!!
-            cb(VoiceEvent(session_started = SessionStartedEvent(session_id = "s1")).encode())
-            cb(VoiceEvent(session_started = SessionStartedEvent(session_id = "s2")).encode())
+            cb(VoiceEvent(session_id = "s1", user_said = UserSaidEvent(text = "hi")).encode())
+            cb(VoiceEvent(session_id = "s2", user_said = UserSaidEvent(text = "hi again")).encode())
 
             job.join()
             assertEquals(listOf("s1", "s2"), received)
@@ -102,11 +107,11 @@ class VoiceAgentStreamAdapterTest {
 
             val jobA =
                 launch(Dispatchers.Default) {
-                    adapter.stream().take(1).collect { a += it.session_started?.session_id ?: "" }
+                    adapter.stream().take(1).collect { a += it.session_id }
                 }
             val jobB =
                 launch(Dispatchers.Default) {
-                    adapter.stream().take(1).collect { b += it.session_started?.session_id ?: "" }
+                    adapter.stream().take(1).collect { b += it.session_id }
                 }
 
             val ready =
@@ -117,7 +122,7 @@ class VoiceAgentStreamAdapterTest {
 
             bridge.capturedCallback
                 .get()!!
-                .invoke(VoiceEvent(session_started = SessionStartedEvent(session_id = "shared")).encode())
+                .invoke(VoiceEvent(session_id = "shared", user_said = UserSaidEvent(text = "hi")).encode())
 
             jobA.join()
             jobB.join()
@@ -137,14 +142,33 @@ class VoiceAgentStreamAdapterTest {
             val handle: Long = 0xC3L
             val adapter = VoiceAgentStreamAdapter(handle, bridge)
 
+            // Per-collector observed-event counters. Waiting only on
+            // registerCount==1 is not enough: that fires as soon as the FIRST
+            // collector attaches, so cancelling then can race a late attacher
+            // into a SECOND cohort (register/unregister twice). We instead
+            // confirm all three share the one registration before detaching.
+            val seen = List(3) { AtomicInteger(0) }
             val jobs: MutableList<Job> = mutableListOf()
             for (i in 0 until 3) {
-                jobs += launch(Dispatchers.Default) { adapter.stream().collect { } }
+                jobs += launch(Dispatchers.Default) { adapter.stream().collect { seen[i].incrementAndGet() } }
             }
 
-            val installed = waitFor { bridge.registerCount.get() == 1 }
+            val installed =
+                waitFor { bridge.registerCount.get() == 1 && bridge.capturedCallback.get() != null }
             assertTrue("register must run once for the cohort", installed)
             assertEquals("no teardown before any detach", 0, bridge.unregisterCount.get())
+
+            // Drive events until every collector observes one: proof that all
+            // three attached to the SAME registration before we tear down.
+            val cohortReady =
+                waitFor(timeoutMs = 3000) {
+                    bridge.capturedCallback
+                        .get()
+                        ?.invoke(VoiceEvent(session_id = "warmup", user_said = UserSaidEvent(text = "x")).encode())
+                    seen.all { it.get() > 0 }
+                }
+            assertTrue("all three collectors must attach to the same registration", cohortReady)
+            assertEquals("cohort shares exactly one registration", 1, bridge.registerCount.get())
 
             for (j in jobs) j.cancel()
             for (j in jobs) j.join()
