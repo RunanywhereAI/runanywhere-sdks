@@ -39,7 +39,54 @@ let activeDocumentCancellation: AbortController | null = null;
 let activeImageStream: AsyncIterator<unknown> | null = null;
 let activeDocumentSession: RagSession | null = null;
 
+/**
+ * Document types the RAG ingest path can actually read.
+ *
+ * Kept as extensions as well as MIME types because a dropped or pasted file
+ * often arrives with an empty or wrong `type` — Finder and several editors hand
+ * over `.md` as `application/octet-stream`, and a strict MIME check would reject
+ * a file the ingest path reads perfectly well.
+ */
+const DOCUMENT_EXTENSIONS = ['.txt', '.md', '.markdown', '.json'];
+const DOCUMENT_MIME_TYPES = ['text/plain', 'text/markdown', 'application/json'];
+
+/**
+ * Which attachment mode a file belongs to, or `null` if neither can take it.
+ *
+ * Needed because a drop or a paste does not come from a file input, so there is
+ * no `accept` attribute doing the filtering and nothing has decided the mode yet
+ * — the file itself has to.
+ */
+export function kindForFile(file: File): ChatAttachmentKind | null {
+  if (file.type.startsWith('image/')) return 'image';
+  const name = file.name.toLowerCase();
+  if (DOCUMENT_MIME_TYPES.includes(file.type)) return 'document';
+  if (DOCUMENT_EXTENSIONS.some((ext) => name.endsWith(ext))) return 'document';
+  return null;
+}
+
+/**
+ * Reject a file the attachment path cannot handle, with a sentence saying why.
+ *
+ * Type is checked as well as size. The `accept` attribute on the hidden inputs
+ * only filters the *picker* — it is a convenience, not a guarantee: a user can
+ * switch the picker to "All Files", and a drop or a paste never consults it at
+ * all. Without this, a `.pdf` dropped on the composer would be sent to a text
+ * ingest path that cannot read it and would fail later with a decode error
+ * blamed on the model rather than on the file.
+ */
 export function validateChatAttachmentFile(kind: ChatAttachmentKind, file: File): string | null {
+  if (file.size === 0) {
+    return 'That file is empty.';
+  }
+
+  const actual = kindForFile(file);
+  if (actual !== kind) {
+    return kind === 'image'
+      ? 'That is not an image. Attach a PNG, JPEG, WebP, or GIF.'
+      : 'That file type is not supported. Attach a .txt, .md, or .json file.';
+  }
+
   const limit = kind === 'image' ? MAX_IMAGE_ATTACHMENT_BYTES : MAX_DOCUMENT_ATTACHMENT_BYTES;
   if (file.size <= limit) return null;
   return `${kind === 'image' ? 'Images' : 'Documents'} must be ${formatBytes(limit)} or smaller.`;

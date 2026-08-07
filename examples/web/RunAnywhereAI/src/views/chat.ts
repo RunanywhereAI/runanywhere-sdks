@@ -48,6 +48,7 @@ import {
   canAnswerImageAttachment,
   cancelActiveDocumentAttachmentAnswer,
   cancelActiveImageAttachmentAnswer,
+  kindForFile,
   validateChatAttachmentFile,
 } from '../services/chat-attachments';
 import { escapeHtml } from '../services/escape-html';
@@ -396,41 +397,108 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   });
   const closeAttachMenu = () => attachMenu.classList.add('hidden');
   document.addEventListener('click', closeAttachMenu, listenerOptions);
+  /**
+   * Validate one file and stage it as the pending attachment.
+   *
+   * The single funnel for all four ways a file can arrive — the image picker,
+   * the document picker, a drop on the composer, and a paste. Sharing it is what
+   * guarantees a dropped file is checked exactly as strictly as a picked one; the
+   * `accept` attribute only constrains the pickers, and drop and paste never
+   * consult it.
+   */
+  const stageAttachment = (kind: 'image' | 'document', file: File): boolean => {
+    const error = validateChatAttachmentFile(kind, file);
+    if (error) {
+      showToast(error, 'warning', 4200);
+      return false;
+    }
+    pendingAttachment = kind === 'image'
+      ? {
+        kind: 'image',
+        file,
+        name: file.name || 'Selected image',
+        description: 'Ask about this image',
+      }
+      : {
+        kind: 'document',
+        file,
+        name: file.name || 'Selected document',
+        description: 'Ask with sources from this document',
+      };
+    refreshAttachmentPill();
+    refreshSendButton();
+    return true;
+  };
+
   imageInput.addEventListener('change', () => {
     const file = imageInput.files?.[0] ?? null;
     imageInput.value = '';
-    if (!file) return;
-    const error = validateChatAttachmentFile('image', file);
-    if (error) {
-      showToast(error, 'warning', 4200);
-      return;
-    }
-    pendingAttachment = {
-      kind: 'image',
-      file,
-      name: file.name || 'Selected image',
-      description: 'Ask about this image',
-    };
-    refreshAttachmentPill();
-    refreshSendButton();
+    if (file) stageAttachment('image', file);
   }, listenerOptions);
   documentInput.addEventListener('change', () => {
     const file = documentInput.files?.[0] ?? null;
     documentInput.value = '';
-    if (!file) return;
-    const error = validateChatAttachmentFile('document', file);
-    if (error) {
-      showToast(error, 'warning', 4200);
+    if (file) stageAttachment('document', file);
+  }, listenerOptions);
+
+  /**
+   * Accept a file the user dropped or pasted, choosing the mode from the file.
+   *
+   * Dropping an image on a chat box and pasting a screenshot are both things a
+   * user simply expects to work — Documents already accepted drops and pastes,
+   * so the composer not accepting them was an inconsistency inside one app as
+   * well as across the four. `kindForFile` decides the mode, and an unsupported
+   * file says so rather than being silently ignored, which is indistinguishable
+   * from the feature being broken.
+   */
+  const acceptDroppedFile = (file: File): void => {
+    const kind = kindForFile(file);
+    if (!kind) {
+      showToast(
+        `${file.name || 'That file'} is not supported. Attach an image or a .txt, .md, or .json file.`,
+        'warning',
+        4200,
+      );
       return;
     }
-    pendingAttachment = {
-      kind: 'document',
-      file,
-      name: file.name || 'Selected document',
-      description: 'Ask with sources from this document',
-    };
-    refreshAttachmentPill();
-    refreshSendButton();
+    if (stageAttachment(kind, file)) inputEl.focus();
+  };
+
+  const composerShell = container.querySelector('.chat-composer-shell') as HTMLElement;
+  // `dragover` must be cancelled or the browser navigates away to the dropped
+  // file, discarding the conversation.
+  composerShell.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    composerShell.classList.add('chat-composer-shell--dropping');
+  }, listenerOptions);
+  // `dragleave` fires when crossing between child elements too, so the target
+  // check keeps the highlight from flickering as the pointer moves inside.
+  composerShell.addEventListener('dragleave', (event) => {
+    if (event.target === composerShell) {
+      composerShell.classList.remove('chat-composer-shell--dropping');
+    }
+  }, listenerOptions);
+  composerShell.addEventListener('drop', (event) => {
+    if (!event.dataTransfer?.files.length) return;
+    event.preventDefault();
+    composerShell.classList.remove('chat-composer-shell--dropping');
+    acceptDroppedFile(event.dataTransfer.files[0]);
+  }, listenerOptions);
+  inputEl.addEventListener('paste', (event) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind !== 'file') continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      // Only claim the paste once a file is actually found, so pasting ordinary
+      // text still lands in the textarea as normal.
+      event.preventDefault();
+      acceptDroppedFile(file);
+      return;
+    }
   }, listenerOptions);
   talkBtn.addEventListener('click', () => navigateTo('voice'), listenerOptions);
   const showConversation = (nextMessages: ChatMessage[]) => {
