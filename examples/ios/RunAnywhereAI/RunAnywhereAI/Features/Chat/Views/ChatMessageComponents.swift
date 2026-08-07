@@ -33,7 +33,8 @@ import AppKit
 
 /// Pulsing brand dot shown while tokens stream into the tail message.
 struct StreamingCursorDot: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
     @State private var pulsing = false
 
     var body: some View {
@@ -232,9 +233,15 @@ struct MessageBubbleView: View {
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
     }
 
-    /// One dot-separated run rather than eight sibling `Text`s: concatenated
-    /// `Text` wraps as a single paragraph, so a narrow phone in landscape breaks
-    /// it between metrics instead of clipping the last one.
+    /// One dot-separated run rather than several sibling `Text`s: concatenated
+    /// `Text` wraps as a single paragraph, so a narrow phone breaks it between
+    /// metrics instead of clipping the last one.
+    ///
+    /// Three metrics, not five. All five (`+ 351 tok + 12ms to first token`) ran
+    /// past the four action buttons on a 393pt phone and truncated to `351 to…`,
+    /// which is worse than not showing them — verified on an iPhone 17 Pro. Token
+    /// count and TTFT stay in the analytics sheet, where there is room to label
+    /// them properly; the summary keeps what a reader can act on.
     @ViewBuilder private var analyticsSummary: some View {
         if let analytics = message.analytics {
             Text(metricsRun(analytics))
@@ -245,6 +252,7 @@ struct MessageBubbleView: View {
                 // The numbers arrive in one step when the turn finalizes; without
                 // this they hard-cut in beside the timestamp.
                 .contentTransition(.numericText())
+                .accessibilityLabel(metricsAccessibilityLabel(analytics))
 
             if analytics.wasThinkingMode {
                 Image(systemName: "lightbulb.min")
@@ -262,17 +270,30 @@ struct MessageBubbleView: View {
 
     private func metricsRun(_ analytics: MessageAnalytics) -> String {
         var parts: [String] = [message.timestamp.formatted(date: .omitted, time: .shortened)]
-        parts.append(String(format: "%.1fs", analytics.totalGenerationTime))
         if analytics.averageTokensPerSecond > 0 {
             parts.append("\(Int(analytics.averageTokensPerSecond)) tok/s")
         }
+        parts.append(String(format: "%.1fs", analytics.totalGenerationTime))
+        return parts.joined(separator: " · ")
+    }
+
+    /// VoiceOver reads the numbers the row drops, since a screen reader has no
+    /// width limit and the analytics sheet is several taps away.
+    private func metricsAccessibilityLabel(_ analytics: MessageAnalytics) -> String {
+        var parts: [String] = [
+            "Replied at \(message.timestamp.formatted(date: .omitted, time: .shortened))"
+        ]
+        if analytics.averageTokensPerSecond > 0 {
+            parts.append("\(Int(analytics.averageTokensPerSecond)) tokens per second")
+        }
+        parts.append(String(format: "%.1f seconds", analytics.totalGenerationTime))
         if analytics.outputTokens > 0 {
-            parts.append("\(analytics.outputTokens) tok")
+            parts.append("\(analytics.outputTokens) tokens")
         }
         if let ttft = analytics.timeToFirstToken, ttft > 0 {
-            parts.append("\(Int(ttft * 1000))ms to first token")
+            parts.append("\(Int(ttft * 1000)) milliseconds to first token")
         }
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: ", ")
     }
 
     // MARK: - Actions
@@ -393,6 +414,10 @@ struct ReasoningDisclosureView: View {
     let isStreaming: Bool
     @State private var isUserExpanded = false
 
+    /// Roughly six lines — enough to read the model's current thought, small
+    /// enough that the answer below stays on screen on the shortest phone.
+    private static let streamingReasoningHeight: CGFloat = 132
+
     private var isExpanded: Bool { isStreaming || isUserExpanded }
 
     private var hasReasoning: Bool {
@@ -466,16 +491,33 @@ struct ReasoningDisclosureView: View {
         return isExpanded ? "Hide reasoning" : "Show reasoning"
     }
 
-    // Sizes to its content instead of reserving a fixed-height scroll box; the
-    // transcript already scrolls to the latest reasoning while streaming.
+    /// While streaming, the reasoning is capped and scrolls internally; once the
+    /// turn is done and the reader opens it deliberately, it sizes to its content.
+    ///
+    /// Uncapped streaming reasoning is what made the answer unreachable: a 0.6B
+    /// model emitted five paragraphs of thinking, the disclosure grew to fill the
+    /// viewport, and the reply arrived below the fold — verified on an iPhone 17
+    /// Pro. A bounded, bottom-anchored ticker shows the model is working without
+    /// taking the screen hostage.
     @ViewBuilder private var reasoningContent: some View {
         if hasReasoning {
-            Text(reasoning.trimmingCharacters(in: .whitespacesAndNewlines))
+            let text = Text(reasoning.trimmingCharacters(in: .whitespacesAndNewlines))
                 .appType(.secondary)
                 .foregroundStyle(AppColors.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
+
+            if isStreaming {
+                ScrollView {
+                    text
+                }
+                .frame(maxHeight: Self.streamingReasoningHeight)
+                .defaultScrollAnchor(.bottom)
+                .scrollIndicators(.hidden)
+            } else {
+                text
+            }
         } else {
             HStack(spacing: Space.sm) {
                 ProgressView().controlSize(.small)
