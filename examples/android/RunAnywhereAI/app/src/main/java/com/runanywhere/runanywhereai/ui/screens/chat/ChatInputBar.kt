@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,6 +88,12 @@ fun ChatInputBar(
     pendingAttachment: ComposerAttachment? = null,
     onClearAttachment: () -> Unit = {},
     compact: Boolean = false,
+    /**
+     * Lets the caller put the cursor in the editor. Editing a sent question is
+     * the case that needs it: the text arrives here from the transcript, and
+     * without focus and a keyboard it reads as though the tap did nothing.
+     */
+    focusRequester: FocusRequester? = null,
 ) {
     val dimens = LocalDimens.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -304,7 +312,8 @@ fun ChatInputBar(
                     onValueChange = onInputChange,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "Message input" },
+                        .semantics { contentDescription = "Message input" }
+                        .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier),
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),

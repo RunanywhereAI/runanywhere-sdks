@@ -1,11 +1,17 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,7 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,15 +47,41 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
 import java.io.File
+import kotlinx.coroutines.delay
+
+/**
+ * What a reader can do with one turn, by transcript position.
+ *
+ * A value of nullable callbacks rather than a [ChatViewModel] reference: the
+ * transcript stays a pure function of its messages, so a token landing in the
+ * tail cannot invalidate every earlier row. A null callback means the action is
+ * withheld — which is how a running generation hides everything that would
+ * renumber the list under an in-flight turn. Copy is not here because it mutates
+ * nothing and the row owns it outright.
+ *
+ * Positions, not identities: [ChatMessage] has no id, so the transcript is
+ * addressed by index exactly as `ChatViewModel` is.
+ */
+data class ChatMessageActions(
+    val onRegenerate: ((Int) -> Unit)? = null,
+    val onEdit: ((Int) -> Unit)? = null,
+    val onDelete: ((Int) -> Unit)? = null,
+)
 
 @Composable
 fun ChatMessageList(
@@ -56,6 +89,7 @@ fun ChatMessageList(
     listState: LazyListState,
     modifier: Modifier = Modifier,
     isGenerating: Boolean = false,
+    actions: ChatMessageActions = ChatMessageActions(),
 ) {
     val dimens = LocalDimens.current
 
@@ -64,22 +98,143 @@ fun ChatMessageList(
         return
     }
 
+    // The newest turn shows its actions unprompted — it is the one a reader wants
+    // to copy or retry — and any older turn reveals them on tap. Android has no
+    // hover to lean on, and a long press on a wall of text is undiscoverable, so
+    // tap-to-reveal is the affordance rather than a hidden context menu.
+    var revealedIndex by remember { mutableStateOf(-1) }
+
     LazyColumn(
         modifier = modifier,
         state = listState,
         contentPadding = PaddingValues(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        items(messages) { message ->
-            if (message.isUser) {
-                UserBubble(message)
-            } else {
-                AssistantMessage(
+        itemsIndexed(messages) { index, message ->
+            val isStreamingTail = isGenerating && index == messages.lastIndex
+            Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                if (message.isUser) {
+                    UserBubble(
+                        message = message,
+                        onToggleActions = {
+                            revealedIndex = if (revealedIndex == index) -1 else index
+                        },
+                    )
+                } else {
+                    AssistantMessage(
+                        message = message,
+                        isStreamingTail = isStreamingTail,
+                        onToggleActions = {
+                            revealedIndex = if (revealedIndex == index) -1 else index
+                        },
+                    )
+                }
+                // A turn still receiving tokens has nothing settled to act on: its
+                // text is moving and regenerating it would renumber the list the
+                // stream is writing into.
+                MessageActionRow(
                     message = message,
-                    isStreamingTail = isGenerating && message === messages.lastOrNull(),
+                    index = index,
+                    actions = actions,
+                    visible = !isStreamingTail &&
+                        (index == messages.lastIndex || revealedIndex == index) &&
+                        (message.text.isNotEmpty() || message.attachment != null),
                 )
             }
         }
+    }
+}
+
+/**
+ * Copy, plus whichever of retry / edit / delete [actions] offers for this turn.
+ *
+ * Copy reports itself in place: the clipboard gives no feedback of its own, and
+ * a Toast would duplicate the one Android 13+ already shows. The tick reverts
+ * after two seconds so the row stops claiming a copy from minutes ago is still
+ * what is on the clipboard.
+ */
+@Composable
+private fun MessageActionRow(
+    message: ChatMessage,
+    index: Int,
+    actions: ChatMessageActions,
+    visible: Boolean,
+) {
+    val dimens = LocalDimens.current
+    val context = LocalContext.current
+    var didCopy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(didCopy) {
+        if (didCopy) {
+            delay(2_000)
+            didCopy = false
+        }
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(AppMotion.tweenShort()),
+        exit = fadeOut(AppMotion.tweenExit()),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                MessageActionButton(
+                    icon = if (didCopy) RACIcons.Outline.Check else RACIcons.Outline.Copy,
+                    label = if (didCopy) "Copied" else "Copy",
+                ) {
+                    val clipboard =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Message", message.text))
+                    didCopy = true
+                }
+                if (!message.isUser) {
+                    actions.onRegenerate?.let { regenerate ->
+                        MessageActionButton(RACIcons.Outline.Refresh, "Regenerate") { regenerate(index) }
+                    }
+                }
+                if (message.isUser) {
+                    actions.onEdit?.let { edit ->
+                        MessageActionButton(RACIcons.Outline.Pencil, "Edit and resend") { edit(index) }
+                    }
+                }
+                actions.onDelete?.let { delete ->
+                    MessageActionButton(
+                        icon = RACIcons.Outline.Trash,
+                        label = if (message.isUser) "Delete exchange" else "Delete reply",
+                    ) { delete(index) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageActionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    val haptics = LocalHapticFeedback.current
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(dimens.radiusSm))
+            .clickable(role = Role.Button, onClickLabel = label) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(dimens.iconSm),
+        )
     }
 }
 
@@ -131,7 +286,7 @@ private fun EmptyChatHero(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun UserBubble(message: ChatMessage) {
+private fun UserBubble(message: ChatMessage, onToggleActions: () -> Unit = {}) {
     val dimens = LocalDimens.current
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Box(
@@ -146,6 +301,10 @@ private fun UserBubble(message: ChatMessage) {
                     )
                 )
                 .background(MaterialTheme.colorScheme.primary)
+                .clickable(
+                    onClickLabel = "Show message actions",
+                    onClick = onToggleActions,
+                )
                 .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingMd),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -267,6 +426,7 @@ private fun DocumentAttachmentPreview(attachment: ChatAttachment) {
 private fun AssistantMessage(
     message: ChatMessage,
     isStreamingTail: Boolean = false,
+    onToggleActions: () -> Unit = {},
 ) {
     val dimens = LocalDimens.current
     var showToolSheet by remember { mutableStateOf(false) }
@@ -296,6 +456,16 @@ private fun AssistantMessage(
                 markdown = message.text,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
+                // No indication: a ripple washing across a full-width wall of
+                // prose reads as a mis-tap, not as feedback. Links inside the
+                // markdown consume their own taps first, so following one never
+                // also toggles the action row.
+                modifier = Modifier.clickable(
+                    interactionSource = null,
+                    indication = null,
+                    onClickLabel = "Show message actions",
+                    onClick = onToggleActions,
+                ),
             )
         }
 
@@ -469,6 +639,11 @@ private fun ChatMessageListPreview(darkTheme: Boolean) {
                 messages = previewMessages,
                 listState = rememberLazyListState(),
                 modifier = Modifier.fillMaxSize(),
+                actions = ChatMessageActions(
+                    onRegenerate = {},
+                    onEdit = {},
+                    onDelete = {},
+                ),
             )
         }
     }

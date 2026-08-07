@@ -301,13 +301,30 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (!canSend) return
         val request = beginGeneration() ?: return
         val turn = ChatRequestPolicy.snapshot(input.trim(), messages)
-        val prompt = turn.prompt
         input = ""
-        messages += ChatMessage(text = prompt, isUser = true)
+        messages += ChatMessage(text = turn.prompt, isUser = true)
         val replyIndex = messages.size
         messages += ChatMessage("", isUser = false)
         activeReplyIndex = replyIndex
+        launchTextGeneration(request, turn, replyIndex)
+    }
 
+    /**
+     * Run one text turn against the loaded (or hosted) model and stream it into
+     * `messages[replyIndex]`.
+     *
+     * Extracted from [send] so [regenerateReply] reaches inference through the
+     * exact same path. A second launch site would be a second place for the
+     * `generationOwnership` bookkeeping to drift, and that bookkeeping is the
+     * only thing stopping a superseded stream from writing into a conversation
+     * the user has since replaced.
+     */
+    private fun launchTextGeneration(
+        request: ChatGenerationRequest,
+        turn: ChatTurnSnapshot,
+        replyIndex: Int,
+    ) {
+        val prompt = turn.prompt
         val titleToStop = cancelSmartTitle()
         val launched = viewModelScope.launch {
             try {
@@ -925,6 +942,107 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             finalizeVisibleReply = true,
             persistTerminalReply = true,
         )
+    }
+
+    /**
+     * Replace an assistant reply by re-asking the question above it.
+     *
+     * The reply and everything after it are dropped first, so the model sees a
+     * history ending at the question exactly as a fresh turn does — leaving the
+     * old answer in place would condition the retry on the answer it is meant to
+     * replace. Mirrors iOS `LLMViewModel.regenerateReply`.
+     */
+    fun regenerateReply(index: Int) {
+        if (isBusy) return
+        if (index !in messages.indices || messages[index].isUser) return
+        val questionIndex = (index - 1 downTo 0).firstOrNull { messages[it].isUser } ?: return
+        val prompt = messages[questionIndex].text.trim()
+        if (prompt.isEmpty()) return
+
+        val request = beginGeneration() ?: return
+        // Persist the trimmed transcript before regenerating so a force-quit
+        // mid-retry reopens the chat at the question rather than at an answer the
+        // user already rejected.
+        messages.removeRange(questionIndex + 1, messages.size)
+        persist()
+
+        val turn = ChatRequestPolicy.snapshot(prompt, messages)
+        val replyIndex = messages.size
+        messages += ChatMessage("", isUser = false)
+        activeReplyIndex = replyIndex
+        launchTextGeneration(request, turn, replyIndex)
+    }
+
+    /**
+     * Put a question back in the composer and rewind the transcript to just
+     * before it, so sending again continues from that point.
+     *
+     * Deliberately does not auto-send: the reason to edit is to change the
+     * wording, and an edit that fires immediately leaves nowhere to do that.
+     */
+    fun editQuestion(index: Int) {
+        if (isBusy) return
+        if (index !in messages.indices || !messages[index].isUser) return
+        input = messages[index].text
+        messages.removeRange(index, messages.size)
+        persistTrimmedTranscript()
+    }
+
+    /**
+     * Delete a message. Deleting a question also deletes the reply it produced.
+     *
+     * A question and its answer are one exchange: keeping the answer would leave
+     * a reply with nothing to reply to, and [ChatRequestPolicy.snapshot] would
+     * then hand the model an unanchored assistant turn. Deleting an answer alone
+     * is fine — the question stands and Retry is right there.
+     */
+    fun deleteMessage(index: Int) {
+        if (isBusy) return
+        if (index !in messages.indices) return
+        val last = if (messages[index].isUser && messages.getOrNull(index + 1)?.isUser == false) {
+            index + 1
+        } else {
+            index
+        }
+        messages.removeRange(index, last + 1)
+        persistTrimmedTranscript()
+    }
+
+    /**
+     * Write a transcript that just got shorter.
+     *
+     * [persist] rewrites the whole message list, so it expresses a deletion fine —
+     * except that it declines outright when no question remains. Removing the last
+     * exchange would therefore leave the old messages on disk and the chat would
+     * reappear in History with exactly what the user just deleted, so an emptied
+     * transcript drops the conversation instead of saving it.
+     */
+    private fun persistTrimmedTranscript() {
+        if (messages.any { it.isUser }) persist() else discardEmptyConversation()
+    }
+
+    /**
+     * Forget a conversation the user just emptied, without touching the composer.
+     *
+     * Deliberately not [clearChat]: that clears `input`, and editing the *first*
+     * question empties the transcript at the exact moment the question is sitting
+     * in the composer waiting to be reworded — so routing this through
+     * `clearChat` silently ate the text the edit had just placed there.
+     *
+     * There is no generation to cancel: both callers refuse to run while
+     * [isBusy]. The RAG corpus goes with the messages, since no remaining
+     * question is anchored to it.
+     */
+    private fun discardEmptyConversation() {
+        val discarded = conversationId
+        conversationId = null
+        createdAt = 0L
+        conversationModelName = null
+        activeReplyIndex = null
+        viewModelScope.launch {
+            discarded?.let { ConversationRepository.delete(it) }
+            RagPipelineCoordinator.release(ragPipelineOwner)
+        }
     }
 
     fun clearChat() {
