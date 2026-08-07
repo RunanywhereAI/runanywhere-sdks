@@ -142,14 +142,33 @@ class VoiceAgentStreamAdapterTest {
             val handle: Long = 0xC3L
             val adapter = VoiceAgentStreamAdapter(handle, bridge)
 
+            // Per-collector observed-event counters. Waiting only on
+            // registerCount==1 is not enough: that fires as soon as the FIRST
+            // collector attaches, so cancelling then can race a late attacher
+            // into a SECOND cohort (register/unregister twice). We instead
+            // confirm all three share the one registration before detaching.
+            val seen = List(3) { AtomicInteger(0) }
             val jobs: MutableList<Job> = mutableListOf()
             for (i in 0 until 3) {
-                jobs += launch(Dispatchers.Default) { adapter.stream().collect { } }
+                jobs += launch(Dispatchers.Default) { adapter.stream().collect { seen[i].incrementAndGet() } }
             }
 
-            val installed = waitFor { bridge.registerCount.get() == 1 }
+            val installed =
+                waitFor { bridge.registerCount.get() == 1 && bridge.capturedCallback.get() != null }
             assertTrue("register must run once for the cohort", installed)
             assertEquals("no teardown before any detach", 0, bridge.unregisterCount.get())
+
+            // Drive events until every collector observes one: proof that all
+            // three attached to the SAME registration before we tear down.
+            val cohortReady =
+                waitFor(timeoutMs = 3000) {
+                    bridge.capturedCallback
+                        .get()
+                        ?.invoke(VoiceEvent(session_id = "warmup", user_said = UserSaidEvent(text = "x")).encode())
+                    seen.all { it.get() > 0 }
+                }
+            assertTrue("all three collectors must attach to the same registration", cohortReady)
+            assertEquals("cohort shares exactly one registration", 1, bridge.registerCount.get())
 
             for (j in jobs) j.cancel()
             for (j in jobs) j.join()

@@ -364,6 +364,8 @@ struct ChatInputAreaView: View {
                     }
                     Spacer(minLength: 0)
                 }
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.top, AppSpacing.smallMedium)
             }
 
             if let imageAttachment {

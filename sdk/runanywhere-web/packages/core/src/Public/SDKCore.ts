@@ -226,29 +226,75 @@ function mapToRacEnvironment(env: SDKEnvironment): number {
   }
 }
 
-function invokeSdkInitProto(
+/**
+ * Async phase-1 invocation. Phase 1 authenticates over the network, and on the
+ * browser main thread commons' emscripten_fetch only works when the WASM call
+ * is entered via ccall({async:true}) so ASYNCIFY can suspend/resume around the
+ * fetch. A synchronous call makes emscripten_fetch return NULL (the browser
+ * forbids sync fetch on the main thread), killing auth/device-reg/telemetry.
+ * `rac_sdk_init_phase1_proto` is in the WASM ASYNCIFY list for exactly this.
+ */
+async function invokeSdkInitProtoAsync(
   module: SdkInitModule,
   bytes: Uint8Array,
-  fn: (requestBytes: number, requestSize: number, outResult: number) => number,
   functionName: string,
-): ProtoSdkInitResult | null {
-  return new ProtoWasmBridge(module, logger).withHeapBytes(bytes, (ptr, size) => (
-    new ProtoWasmBridge(module, logger).callResultProto(
+): Promise<ProtoSdkInitResult | null> {
+  const bridge = new ProtoWasmBridge(module, logger);
+  const asyncCcall = (module as unknown as {
+    ccall: (
+      name: string,
+      returnType: string | null,
+      argTypes: string[],
+      args: unknown[],
+      opts?: { async?: boolean },
+    ) => number | Promise<number>;
+  }).ccall;
+  return bridge.withHeapBytesAsync(bytes, (ptr, size) => (
+    bridge.callResultProtoAsync(
       SdkInitResult,
-      (outResult) => fn(ptr, size, outResult),
+      (outResult) => asyncCcall(functionName, 'number', ['number', 'number', 'number'], [ptr, size, outResult], {
+        async: true,
+      }),
       functionName,
     )
   ));
 }
 
-function invokeSdkResultProto(
+/** module.ccall accessor with the {async:true} overload typed. */
+function asyncCcallOf(module: SdkInitModule): (
+  name: string,
+  returnType: string | null,
+  argTypes: string[],
+  args: unknown[],
+  opts?: { async?: boolean },
+) => number | Promise<number> {
+  return (module as unknown as {
+    ccall: (
+      name: string,
+      returnType: string | null,
+      argTypes: string[],
+      args: unknown[],
+      opts?: { async?: boolean },
+    ) => number | Promise<number>;
+  }).ccall;
+}
+
+/**
+ * Async variant of invokeSdkResultProto for a no-input, out-result WASM call
+ * (rac_sdk_retry_http_proto). Like phase1/phase2 it authenticates/registers over
+ * the network, so on the main thread it must enter through ccall({async:true})
+ * for ASYNCIFY to suspend around the fetch. A synchronous ccall corrupts memory
+ * (out-of-bounds) when the transport suspends because JS never awaits the rewind.
+ */
+async function invokeSdkResultProtoAsync(
   module: SdkInitModule,
-  fn: (outResult: number) => number,
   functionName: string,
-): ProtoSdkInitResult | null {
-  return new ProtoWasmBridge(module, logger).callResultProto(
+): Promise<ProtoSdkInitResult | null> {
+  const bridge = new ProtoWasmBridge(module, logger);
+  const asyncCcall = asyncCcallOf(module);
+  return bridge.callResultProtoAsync(
     SdkInitResult,
-    (outResult) => fn(outResult),
+    (outResult) => asyncCcall(functionName, 'number', ['number'], [outResult], { async: true }),
     functionName,
   );
 }
@@ -283,7 +329,16 @@ async function completePendingDeviceRegistration(
       }
       module.stringToUTF8(token, tokenPtr, size);
     }
-    const result = register.call(module, mapToRacEnvironment(environment), tokenPtr);
+    // Device registration hits the network; on the main thread it must enter
+    // through ccall({async:true}) so ASYNCIFY can suspend around the fetch. A
+    // synchronous call corrupts memory when the transport suspends.
+    const result = await asyncCcallOf(module)(
+      'rac_device_manager_register_if_needed',
+      'number',
+      ['number', 'number'],
+      [mapToRacEnvironment(environment), tokenPtr],
+      { async: true },
+    );
     if (result !== 0) {
       logger.warning(`Device registration remained deferred (code ${result}).`);
     }
@@ -398,7 +453,7 @@ function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string):
   }
 }
 
-export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModule): void {
+export async function completeNativePhase1ForModule(module: EmscriptenRunanywhereModule): Promise<void> {
   if (_hasCompletedNativePhase1) return;
   const sdkModule = module as SdkInitModule;
   if (typeof sdkModule._rac_sdk_init_phase1_proto !== 'function') {
@@ -418,12 +473,7 @@ export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModul
     sdkVersion: nativeSdkVersion(sdkModule),
   }).finish();
 
-  const result = invokeSdkInitProto(
-    sdkModule,
-    bytes,
-    sdkModule._rac_sdk_init_phase1_proto.bind(sdkModule),
-    'rac_sdk_init_phase1_proto',
-  );
+  const result = await invokeSdkInitProtoAsync(sdkModule, bytes, 'rac_sdk_init_phase1_proto');
   throwIfSdkInitFailed(result, 'SDK Phase 1');
   configureWebClientInfo(sdkModule);
   _hasCompletedNativePhase1 = true;
@@ -891,11 +941,7 @@ async function retryHTTPSetup(): Promise<void> {
     );
   }
 
-  const result = invokeSdkResultProto(
-    module,
-    retry.bind(module),
-    'rac_sdk_retry_http_proto',
-  );
+  const result = await invokeSdkResultProtoAsync(module, 'rac_sdk_retry_http_proto');
   throwIfSdkInitFailed(result, 'SDK HTTP retry');
   _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? false;
   if (result?.warning) {
@@ -1209,7 +1255,7 @@ export const SDKCore = {
         }
 
         if (!_hasCompletedNativePhase1) {
-          completeNativePhase1ForModule(module);
+          await completeNativePhase1ForModule(module);
         }
 
         let httpConfigured = false;
@@ -1223,12 +1269,10 @@ export const SDKCore = {
             // outright -- SdkInitPhase2Request now carries only buildToken.
             buildToken: '',
           }).finish();
-          const result = invokeSdkInitProto(
-            module,
-            bytes,
-            module._rac_sdk_init_phase2_proto.bind(module),
-            'rac_sdk_init_phase2_proto',
-          );
+          // Async for the same reason as phase 1: phase 2 does network work
+          // (device registration / model assignment / telemetry flush) and must
+          // run through ASYNCIFY so main-thread emscripten_fetch resolves.
+          const result = await invokeSdkInitProtoAsync(module, bytes, 'rac_sdk_init_phase2_proto');
           throwIfSdkInitFailed(result, 'SDK Phase 2');
           await completePendingDeviceRegistration(
             module,

@@ -94,7 +94,8 @@ let readinessStep: AppReadinessStep = 'booting';
 interface RuntimeConfiguration {
   environment: Environment;
   apiKey?: string;
-  baseUrl?: string;
+  /** Spelled to match `SDKInitOptions.baseURL`; this object is passed to `initialize()` as-is. */
+  baseURL?: string;
 }
 
 let activeRuntimeConfiguration: RuntimeConfiguration | null = null;
@@ -417,7 +418,13 @@ async function initializeSDK(): Promise<void> {
     const hostedConfiguration = getHostedAPIConfiguration();
     const configuration: RuntimeConfiguration = hostedConfiguration
       ? {
-          ...hostedConfiguration,
+          apiKey: hostedConfiguration.apiKey,
+          // Mapped field-by-field rather than spread, because the spread's
+          // excess properties are invisible to the type checker: the name has
+          // to match `SDKInitOptions.baseURL` exactly or the URL is dropped at
+          // runtime while both sides still compile, and production init fails
+          // with "URL required".
+          baseURL: hostedConfiguration.baseURL,
           environment: 'production',
         }
       : { environment: 'development' };
@@ -588,7 +595,8 @@ function applyAPIConfiguration(
 
   runtimeReconfigurationPromise = (async () => {
     const next: RuntimeConfiguration = {
-      ...configuration,
+      apiKey: configuration.apiKey,
+      baseURL: configuration.baseURL,
       environment: 'production',
     };
     const previous = activeRuntimeConfiguration;

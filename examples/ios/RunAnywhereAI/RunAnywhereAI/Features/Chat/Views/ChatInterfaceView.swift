@@ -525,6 +525,10 @@ extension ChatInterfaceView {
     private var isModelLoading: Bool {
         modelListViewModel.isLoadingModel && viewModel.loadedModelName == nil
     }
+
+    private var isModelLoading: Bool {
+        modelListViewModel.isLoadingModel && viewModel.loadedModelName == nil
+    }
 }
 
 // MARK: - Helper Methods
