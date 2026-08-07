@@ -44,8 +44,17 @@ import {
   isModelLoaded,
   onModelStateChange,
   openSheet,
+  runEngineRetry,
 } from '../components/model-selection';
 import { renderModelSlot, type ModelSlotView } from '../components/model-slot';
+import {
+  canRetryEngines,
+  describeFailures,
+  failuresForEntries,
+  isRetryingForEntries,
+  onEngineStateChange,
+  type EngineFailure,
+} from '../services/engine-availability';
 
 // ---------------------------------------------------------------------------
 // View state
@@ -81,6 +90,7 @@ let voicePipeline: VoicePipelineSelection | null = null;
 let pipelineProbePending = false;
 let settingUpPipeline = false;
 let unsubscribeModelState: (() => void) | null = null;
+let unsubscribeEngineState: (() => void) | null = null;
 
 /** The ordered pipeline slots surfaced in the setup card. */
 interface PipelineSlot {
@@ -110,6 +120,32 @@ function slotView(slot: PipelineSlot): ModelSlotView {
 /** Required (non-VAD) slots that have a resolved model entry. */
 function requiredSlots(): PipelineSlot[] {
   return pipelineSlots().filter((slot) => !slot.optional && slot.entry);
+}
+
+/**
+ * Engine failures that actually block *this* pipeline.
+ *
+ * Scoped to the models the card names, so a llama.cpp failure is reported here
+ * only because the chat slot needs it — not because some other tab does.
+ */
+function pipelineFailures(): readonly EngineFailure[] {
+  return failuresForEntries(pipelineEntries());
+}
+
+function pipelineEntries(): CatalogEntry[] {
+  return pipelineSlots()
+    .map((slot) => slot.entry)
+    .filter((entry): entry is CatalogEntry => entry !== null);
+}
+
+/** True while a retry is re-checking an engine this pipeline needs. */
+function pipelineRechecking(): boolean {
+  return isRetryingForEntries(pipelineEntries());
+}
+
+/** Blocked, or mid-recheck after being blocked — either way, not startable. */
+function pipelineBlocked(): boolean {
+  return pipelineFailures().length > 0 || pipelineRechecking();
 }
 
 /** Whether every required pipeline model is downloaded + loaded. */
@@ -143,12 +179,18 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
         // Reflect download/load progress driven by the shared model registry.
         unsubscribeModelState = onModelStateChange(() => scheduleRender());
       }
+      if (!unsubscribeEngineState) {
+        // A retry that succeeds has to unblock this card without a tab switch.
+        unsubscribeEngineState = onEngineStateChange(() => scheduleRender());
+      }
       renderView();
     },
     onDeactivate: () => {
       unmounted = true;
       unsubscribeModelState?.();
       unsubscribeModelState = null;
+      unsubscribeEngineState?.();
+      unsubscribeEngineState = null;
       void stopSession({ silent: true });
     },
   };
@@ -205,6 +247,10 @@ function renderView(): void {
 
   const isActive = isActiveState(sessionState);
   const allReady = pipelineReady();
+  // "Needs setup" would be a lie while the engine is missing: no amount of
+  // setting up helps, and the sentence sends the user back to a button that
+  // cannot finish.
+  const blocked = pipelineBlocked();
 
   container.innerHTML = `
     <div class="toolbar">
@@ -225,7 +271,7 @@ function renderView(): void {
           <button
             class="btn btn-primary"
             id="voice-start-btn"
-            ${allReady && !isActive ? '' : 'disabled'}
+            ${allReady && !isActive && !blocked ? '' : 'disabled'}
           >${isActive ? 'Conversation active' : 'Start conversation'}</button>
           <button
             class="btn btn-secondary"
@@ -234,7 +280,7 @@ function renderView(): void {
           >Stop</button>
         </div>
         <div class="docs-status" role="status" aria-live="polite">
-          <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState, allReady)}">${prettyState(sessionState, allReady)}</span>
+          <span id="voice-state-pill" class="badge ${blocked ? 'badge-yellow' : stateBadgeClass(sessionState, allReady)}">${blocked ? (pipelineRechecking() ? 'Re-checking engine' : 'Engine unavailable') : prettyState(sessionState, allReady)}</span>
           ${isSpeechDetected ? '<span class="badge badge-green">Hearing you</span>' : ''}
         </div>
         ${lastError
@@ -279,12 +325,28 @@ function renderSetupCard(allReady: boolean): string {
   const slots = pipelineSlots().filter((slot) => slot.entry || !slot.optional);
   const rows = slots.map((slot) => renderModelSlot(slotView(slot))).join('');
 
-  const primary = allReady
-    ? `<div class="setup-card__ready"><span class="badge badge-green">Ready</span> Your voice assistant is set up.</div>`
-    : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
-         ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
-       </button>
-       <div class="setup-card__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
+  // A "Set up Voice AI" button that downloads models whose engine never loaded
+  // spends the user's bandwidth to arrive back at the same dead card. Offer the
+  // only action that can change the outcome instead.
+  const failures = pipelineFailures();
+  const rechecking = pipelineRechecking();
+  const primary = failures.length > 0 || rechecking
+    ? `<div class="setup-card__note">${escapeHtml(
+        rechecking
+          ? 'Re-checking the on-device AI engine…'
+          : describeFailures(failures),
+      )}</div>
+       ${canRetryEngines()
+         ? `<button class="btn btn-secondary btn-lg" id="voice-engine-retry" ${rechecking ? 'disabled' : ''}>
+              ${rechecking ? 'Re-checking…' : 'Retry setup'}
+            </button>`
+         : ''}`
+    : allReady
+      ? `<div class="setup-card__ready"><span class="badge badge-green">Ready</span> Your voice assistant is set up.</div>`
+      : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
+           ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
+         </button>
+         <div class="setup-card__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
 
   return `
     <div class="setup-card">
@@ -311,6 +373,7 @@ function attachHandlers(): void {
   container.querySelector('#voice-start-btn')?.addEventListener('click', () => void startSession());
   container.querySelector('#voice-stop-btn')?.addEventListener('click', () => void stopSession());
   container.querySelector('#voice-setup-btn')?.addEventListener('click', () => void setupPipeline());
+  container.querySelector('#voice-engine-retry')?.addEventListener('click', () => void runEngineRetry());
   container.querySelectorAll<HTMLElement>('[data-change]').forEach((el) => {
     el.addEventListener('click', () => {
       const slot = pipelineSlots().find((s) => s.key === el.dataset.change);

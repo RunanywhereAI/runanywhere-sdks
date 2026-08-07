@@ -24,6 +24,7 @@ import {
   modalityEmoji,
   modelDisplaySizeBytes,
 } from '../services/model-display';
+import { engineCompatibility } from '../services/engine-availability';
 import { getModelStatus, type ModelStatusSnapshot } from './model-selection';
 
 /** One role a surface needs filled, plus the entry currently filling it. */
@@ -90,8 +91,16 @@ export function renderModelSlot(slot: ModelSlotView): string {
     ? `<button type="button" class="model-slot__change" data-change="${escapeHtml(slot.key)}">Change</button>`
     : '';
 
+  // A slot whose engine never registered would otherwise read "Not set up" —
+  // an invitation to press a Set up button that cannot succeed. Say why
+  // instead, using the same reason string the picker shows for the same model.
+  // The card these rows sit in states the cause and the retry once, above, so
+  // the row itself stays to a single line.
+  const engine = engineCompatibility(entry);
+  const engineReason = engine.supported ? '' : engine.reason;
+
   return `
-    <div class="model-slot model-slot--${status.status}" data-slot="${escapeHtml(slot.key)}">
+    <div class="model-slot model-slot--${engineReason ? 'blocked' : status.status}" data-slot="${escapeHtml(slot.key)}">
       <div class="model-slot__icon">${modalityEmoji(slot.category)}</div>
       <div class="model-slot__body">
         <div class="model-slot__label">${escapeHtml(slot.label)}${optionalTag}</div>
@@ -100,12 +109,17 @@ export function renderModelSlot(slot: ModelSlotView): string {
           · ${formatBytes(modelDisplaySizeBytes(entry))}
           <span class="backend-pill">${escapeHtml(formatFramework(entry.framework))}</span>
         </div>
-        ${status.status === 'downloading'
+        ${engineReason
+          ? `<div class="model-slot__blocked">${escapeHtml(engineReason)}</div>`
+          : ''}
+        ${!engineReason && status.status === 'downloading'
           ? `<div class="progress-bar model-slot__progress"><div class="progress-fill" style="width:${Math.round(status.progress * 100)}%"></div></div>`
           : ''}
       </div>
       <div class="model-slot__aside">
-        ${renderModelSlotState(status)}
+        ${engineReason
+          ? '<span class="model-slot__state model-slot__state--blocked">Unavailable</span>'
+          : renderModelSlotState(status)}
         ${changeBtn}
       </div>
     </div>

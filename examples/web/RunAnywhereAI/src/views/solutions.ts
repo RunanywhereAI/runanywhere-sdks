@@ -40,8 +40,17 @@ import {
   getModelStatus,
   onModelStateChange,
   refreshModelSelectionState,
+  runEngineRetry,
 } from '../components/model-selection';
 import { renderModelSlot, type ModelSlotView } from '../components/model-slot';
+import {
+  canRetryEngines,
+  describeFailures,
+  failuresForEntries,
+  isRetryingForEntries,
+  onEngineStateChange,
+  type EngineFailure,
+} from '../services/engine-availability';
 
 // ---------------------------------------------------------------------------
 // Solution definitions
@@ -145,6 +154,7 @@ type RunOutcome =
 let container: HTMLElement;
 let unmounted = false;
 let unsubscribeModelState: (() => void) | null = null;
+let unsubscribeEngineState: (() => void) | null = null;
 const outcomes = new Map<string, RunOutcome>();
 /** Solutions whose models are being downloaded/loaded from this view. */
 const preparing = new Set<string>();
@@ -164,6 +174,32 @@ function missingRoles(solution: SolutionDef): SolutionRole[] {
 
 function isReady(solution: SolutionDef): boolean {
   return CONFIG_DRIFT === null && missingRoles(solution).length === 0;
+}
+
+/**
+ * Engine failures that block this solution's graph.
+ *
+ * Scoped per solution: the RAG pipeline and the voice-agent pipeline name
+ * different models, so one may be blocked while the other is not.
+ */
+function solutionFailures(solution: SolutionDef): readonly EngineFailure[] {
+  return failuresForEntries(solutionEntries(solution));
+}
+
+function solutionEntries(solution: SolutionDef): CatalogEntry[] {
+  return solution.roles
+    .map((role) => catalogEntry(role.modelId))
+    .filter((entry): entry is CatalogEntry => entry !== null);
+}
+
+/** True while a retry is re-checking an engine this solution needs. */
+function solutionRechecking(solution: SolutionDef): boolean {
+  return isRetryingForEntries(solutionEntries(solution));
+}
+
+/** Blocked, or mid-recheck after being blocked — either way, not runnable. */
+function solutionBlocked(solution: SolutionDef): boolean {
+  return solutionFailures(solution).length > 0 || solutionRechecking(solution);
 }
 
 function isBusy(solution: SolutionDef): boolean {
@@ -190,6 +226,13 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
           if (!unmounted) renderView();
         });
       }
+      if (!unsubscribeEngineState) {
+        // A successful retry has to turn the blocked cards back into Get/Run
+        // without a tab switch.
+        unsubscribeEngineState = onEngineStateChange(() => {
+          if (!unmounted) renderView();
+        });
+      }
       renderView();
     },
     onDeactivate: () => {
@@ -197,6 +240,8 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
       if (!container.isConnected) {
         unsubscribeModelState?.();
         unsubscribeModelState = null;
+        unsubscribeEngineState?.();
+        unsubscribeEngineState = null;
       }
     },
   };
@@ -247,14 +292,28 @@ function renderSolutionCard(solution: SolutionDef): string {
 
   // The primary action is "get the models" until they are all resident, then
   // "run". Two buttons that trade places, never one button that lies about
-  // being available.
-  const action = ready
-    ? `<button class="btn btn-primary" data-run="${solution.key}" ${busy ? 'disabled' : ''}>
-         ${busy ? 'Working…' : 'Run'}
-       </button>`
-    : `<button class="btn btn-primary" data-prepare="${solution.key}" ${busy ? 'disabled' : ''}>
-         ${busy ? 'Getting models…' : `Get ${missing.length} model${missing.length === 1 ? '' : 's'}`}
-       </button>`;
+  // being available — and neither, when the engine those models need is gone:
+  // downloading them would succeed and Run would still be unreachable.
+  const failures = solutionFailures(solution);
+  const rechecking = solutionRechecking(solution);
+  const action = failures.length > 0 || rechecking
+    ? `<div class="setup-card__note">${escapeHtml(
+        rechecking
+          ? 'Re-checking the on-device AI engine…'
+          : describeFailures(failures),
+      )}</div>
+       ${canRetryEngines()
+         ? `<button class="btn btn-secondary" data-engine-retry="${solution.key}" ${rechecking ? 'disabled' : ''}>
+              ${rechecking ? 'Re-checking…' : 'Retry setup'}
+            </button>`
+         : ''}`
+    : ready
+      ? `<button class="btn btn-primary" data-run="${solution.key}" ${busy ? 'disabled' : ''}>
+           ${busy ? 'Working…' : 'Run'}
+         </button>`
+      : `<button class="btn btn-primary" data-prepare="${solution.key}" ${busy ? 'disabled' : ''}>
+           ${busy ? 'Getting models…' : `Get ${missing.length} model${missing.length === 1 ? '' : 's'}`}
+         </button>`;
 
   return `
     <div class="setup-card setup-card--plain">
@@ -307,6 +366,10 @@ function renderOutcome(solution: SolutionDef): string {
     case 'failed':
       return `<div class="docs-status error">${escapeHtml(outcome.message)}</div>`;
     default:
+      // While the engine is missing, "get the models onto the device first"
+      // names the wrong prerequisite — the action block above already states
+      // the real one, so adding this would send the user after the wrong fix.
+      if (solutionBlocked(solution)) return '';
       return isReady(solution)
         ? '<div class="setup-card__note">Compiles the config into a graph, starts it, and tears it down. Nothing is recorded or played back.</div>'
         : '<div class="setup-card__note">Every model this pipeline names has to be on the device first.</div>';
@@ -329,6 +392,9 @@ function attachHandlers(): void {
       const solution = SOLUTIONS.find((s) => s.key === el.dataset.run);
       if (solution) void runSolution(solution);
     });
+  });
+  container.querySelectorAll<HTMLElement>('[data-engine-retry]').forEach((el) => {
+    el.addEventListener('click', () => void runEngineRetry());
   });
 }
 

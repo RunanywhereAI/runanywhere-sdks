@@ -27,6 +27,8 @@
 .accel-badge__line { display: block; white-space: nowrap; }
 .accel-badge--gpu { background: var(--badge-green); color: var(--color-green); }
 .accel-badge--cpu { background: var(--bg-tertiary); color: var(--text-tertiary); }
+/* No engine registered — the badge must not read like a live execution path. */
+.accel-badge--unavailable { background: var(--badge-yellow); color: var(--color-yellow); }
 
 /* =============================================================================
  * App Layout
@@ -1664,6 +1666,73 @@
 }
 
 /* =============================================================================
+ * Engine banner — replaces the device banner when an inference engine failed
+ * to register, so the picker never claims a device recommendation for a list
+ * where nothing can load. Same geometry as .device-banner (no layout shift),
+ * warning tone instead of the brand gradient.
+ * ============================================================================= */
+.engine-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md-lg);
+  padding: var(--space-md-lg) var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border-radius: var(--radius-card);
+  background: var(--badge-yellow);
+  border: 1px solid var(--color-yellow);
+}
+.engine-banner__glyph {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-regular);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-yellow);
+  background: var(--bg-secondary);
+  box-shadow: var(--elevation-sm);
+}
+.engine-banner__glyph svg { width: 22px; height: 22px; }
+.engine-banner__text { flex: 1; min-width: 0; }
+.engine-banner__title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-base);
+}
+.engine-banner__meta {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+}
+.engine-banner__details {
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-xs);
+}
+.engine-banner__details summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+  /* Roomy enough to hit on a phone without inflating the collapsed banner. */
+  padding: var(--space-xs) 0;
+}
+.engine-banner__details summary:hover { color: var(--text-secondary); }
+.engine-banner__diagnostic {
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  /* Upstream fetch/WASM diagnostics contain long unbroken URLs; wrap them
+     rather than letting the banner scroll sideways. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+/* =============================================================================
  * Model search field.
  * ============================================================================= */
 .model-search {
@@ -2154,6 +2223,14 @@
 .model-slot--loaded { border-color: var(--color-green); }
 .model-slot--error { border-color: var(--color-red); }
 .model-slot--missing { opacity: 0.6; }
+/*
+ * Blocked = the engine that runs this model never registered, so no action on
+ * this row can succeed. Yellow, not the red of `--error`: red is reserved for
+ * "this model's own download or load failed", which a retry of the same button
+ * can still fix. Same colour as the picker banner and the acceleration badge
+ * use for the identical condition, so one cause reads as one thing everywhere.
+ */
+.model-slot--blocked { border-color: var(--color-yellow); }
 
 .model-slot__icon {
   width: 36px;
@@ -2188,6 +2265,14 @@
   margin-top: var(--space-sm);
   max-width: 220px;
 }
+.model-slot__blocked {
+  margin-top: var(--space-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  /* Upstream diagnostics can carry long unbroken URLs. */
+  overflow-wrap: anywhere;
+}
 .model-slot__aside {
   display: flex;
   align-items: center;
@@ -2203,6 +2288,7 @@
 }
 .model-slot__state--ready { color: var(--color-green); }
 .model-slot__state--error { color: var(--color-red); }
+.model-slot__state--blocked { color: var(--color-yellow); }
 .model-slot__state--pending { color: var(--text-tertiary); }
 .model-slot__change {
   background: none;
@@ -2275,6 +2361,18 @@
   width: 40px;
   height: 40px;
 }
+/* The engine-failed variant of the same glyph well: warning tone, so the
+   overlay reads as a problem rather than an invitation. */
+.chat-model-overlay-glyph--warning {
+  background: var(--badge-yellow);
+  color: var(--color-yellow);
+}
+.chat-model-overlay-details {
+  width: 100%;
+  max-width: 340px;
+  margin-top: var(--space-lg);
+  text-align: left;
+}
 .chat-model-overlay-title {
   margin: 0 0 var(--space-md);
   font-size: var(--font-size-2xl);
@@ -2321,6 +2419,8 @@
    rule, so views that needed it fell back to the grey badge and rendered a
    failure in the same colour as an idle state. */
 .badge-red   { background: var(--badge-red);   color: var(--color-red); }
+/* Blocked-by-environment, as distinct from failed: see `.model-slot--blocked`. */
+.badge-yellow { background: var(--badge-yellow); color: var(--color-yellow); }
 
 .storage-model-list {
   display: flex;

@@ -90,6 +90,14 @@ export interface CatalogFileEntry {
  */
 export enum WebModelCompatibilityCode {
   WASM32_ADDRESS_SPACE = 'wasm32-address-space',
+  /**
+   * The engine package that runs this model failed to register this session, so
+   * the model cannot load no matter how small it is or how much memory the
+   * machine has. Produced by `services/engine-availability.ts`, which owns the
+   * per-engine registration outcome; kept in this enum so every "why this model
+   * is not actionable" reason the UI can render is one closed set.
+   */
+  ENGINE_UNAVAILABLE = 'engine-unavailable',
 }
 
 export type WebModelCompatibility =
