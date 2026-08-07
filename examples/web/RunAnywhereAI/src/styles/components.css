@@ -2812,16 +2812,42 @@
   gap: var(--space-sm-md);
 }
 
-/* Slider */
+/*
+ * Slider.
+ *
+ * The element was 4px tall — the track *was* the control, so grabbing the
+ * temperature meant hitting a 4px band. The element is now --hit-touch tall with
+ * a transparent background, and the visible 4px rail is drawn by the track
+ * pseudo-elements, which is what lets the hit area be 11x taller than the line
+ * you see. `height` on the input alone is not enough: without an explicit
+ * ::-*-slider-runnable-track the UA sizes the rail to the element.
+ */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 120px;
-  height: 4px;
-  background: var(--bg-gray5);
-  border-radius: var(--radius-full);
+  height: var(--hit-touch);
+  background: transparent;
   outline: none;
+  cursor: pointer;
+  /* The tall box would otherwise sit on the text baseline and push the row. */
+  display: block;
+  margin: 0;
 }
+
+/* Not --bg-gray5: an unfilled rail is a control boundary, and that grey measured
+   1.17:1 against the card — see --control-track-off. */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--control-track-off);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--control-track-off);
+}
+
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 18px;
@@ -2829,7 +2855,25 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: var(--radius-full);
   background: var(--color-primary);
   cursor: pointer;
+  /* Centres the 18px thumb on the 4px rail: (4 - 18) / 2. WebKit positions the
+     thumb against the track box, so without this it rides above the rail. */
+  margin-top: -7px;
+  /* Same 3:1 boundary rule as the switch knob — orange on a light card is
+     2.63:1, so the thumb carries its own edge. */
+  box-shadow: 0 0 0 1px var(--bg-primary);
 }
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--bg-primary);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  cursor: pointer;
+}
+
+input[type="range"]:focus-visible { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
+input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
 
 /* Toggle */
 /*
@@ -2846,9 +2890,9 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 0;
   border: none;
   border-radius: var(--radius-full);
-  /* Not a surface grey: see --switch-track-off. An off switch has to be visible
+  /* Not a surface grey: see --control-track-off. An off switch has to be visible
      as a control before it is touched. */
-  background: var(--switch-track-off);
+  background: var(--control-track-off);
   position: relative;
   cursor: pointer;
   transition: background var(--duration-fast);
@@ -4505,14 +4549,14 @@ input[type="range"]::-webkit-slider-thumb {
     padding: var(--space-xs);
   }
 
-  .composer-icon-btn,
-  .chat-panel-consumer .send-btn {
-    width: 36px;
-    height: 36px;
-  }
-
+  /*
+   * Deliberately no width/height shrink for .composer-icon-btn / .send-btn here.
+   * This block used to drop them to 36px, which made the composer's controls
+   * smallest on exactly the screens most likely to be driven by a thumb. The
+   * narrow viewport is regained through the tighter gap and padding above; the
+   * targets stay at their 44px finger size (see the Hit targets section).
+   */
   .chat-panel-consumer .chat-input {
-    min-height: 36px;
     padding: var(--space-sm-md) var(--space-md);
     font-size: var(--font-size-base);
   }
@@ -4520,4 +4564,108 @@ input[type="range"]::-webkit-slider-thumb {
   .chat-message--user .chat-bubble {
     max-width: 92%;
   }
+}
+
+/* =============================================================================
+ * Hit targets
+ *
+ * Kept as one block rather than 16 edits scattered through the file, because it
+ * is one rule — a control must be reachable — and stating it once is what stops
+ * the next control from drifting under the line. An audit of every view found 18
+ * distinct control signatures below 44px and two below WCAG 2.5.8's absolute
+ * 24px floor: the temperature slider (4px) and the model-slot "Change" link
+ * (22px).
+ *
+ * The technique is padding and ::after extensions, never `min-height` on the
+ * visible box, because the visual scale of this UI is deliberate: a small text
+ * button should keep looking small. Growing the boxes would have meant
+ * redesigning every dense row to fix an input problem.
+ * ============================================================================= */
+
+/* --- The 24px floor: all pointers, mice included (WCAG 2.5.8 AA) --- */
+
+/*
+ * An invisible centred extension. `::after` is free on every one of these
+ * (checked: only .toggle uses it, for the knob — which is why .toggle is absent
+ * here and gets its own rule below). The extension is centred with the
+ * translate pair so it grows symmetrically regardless of the control's size.
+ */
+.model-slot__change::after,
+.btn-sm::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: var(--hit-min);
+  min-width: var(--hit-min);
+  transform: translate(-50%, -50%);
+}
+
+/* `position: relative` is required for the extension to anchor, and is added
+   here rather than in each base rule so the pairing stays visible. */
+.model-slot__change,
+.btn-sm {
+  position: relative;
+}
+
+/* --- The 44px finger target, only where the pointer is a fingertip ---
+ *
+ * `(pointer: coarse)` rather than a width breakpoint: a 1024px tablet needs
+ * finger targets and a 700px-wide desktop window does not. Width was the wrong
+ * axis — the previous `max-width: 700px` rules actually *shrank* the composer
+ * buttons to 36px, making them smallest exactly where fingers are.
+ */
+@media (pointer: coarse) {
+  .shell-icon-btn,
+  .composer-icon-btn,
+  .send-btn,
+  .chat-panel-consumer .send-btn,
+  .btn-ghost {
+    min-width: var(--hit-touch);
+    min-height: var(--hit-touch);
+  }
+
+  /* Undo the width-keyed shrink above; it fought this rule and won on
+     specificity grounds for the composer pair. */
+  .composer-icon-btn,
+  .chat-panel-consumer .send-btn {
+    width: var(--hit-touch);
+    height: var(--hit-touch);
+  }
+
+  .btn,
+  .toolbar-model-btn,
+  .model-action-btn,
+  .consumer-new-chat,
+  .text-input,
+  .model-search__input,
+  .chat-input,
+  select.chat-input,
+  /* Qualified to match .chat-panel-consumer's own (0,2,1) rule, which sets a
+     40px min-height and would otherwise win on specificity. */
+  .chat-panel-consumer .chat-input {
+    min-height: var(--hit-touch);
+  }
+
+  /* A small button keeps its small type and its tight look; only the box it
+     occupies grows. */
+  .btn-sm {
+    min-height: var(--hit-touch);
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  /* The switch's ::after is the knob, so it cannot carry a hit extension, and
+     padding would move the knob. A transparent border grows the hit box while
+     `background-clip: content-box` keeps the painted track visually 48x28.
+     `content-box` sizing is essential: under this file's global `border-box` the
+     border would eat *into* the 48x28, painting a 32x12 stub instead. The knob
+     offsets shift by the border width to stay inside the painted track. */
+  .toggle {
+    box-sizing: content-box;
+    border: 8px solid transparent;
+    background-clip: content-box;
+  }
+  .toggle::after { top: 10px; left: 10px; }
 }
