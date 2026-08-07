@@ -48,9 +48,23 @@ enum Motion {
     static let standardFade = Animation.easeInOut(duration: standard)
     static let emphasisFade = Animation.easeInOut(duration: emphasis)
 
-    /// Token-speed continuous motion: waveforms, shimmer, breathing glows.
-    /// Linear because anything eased reads as a stutter when it repeats.
+    // MARK: - Ambient motion
+    //
+    // Repeating decorative motion is exempt from the duration tiers and is
+    // always `linear`: anything eased reads as a stutter when it loops, because
+    // the slow ends stack up at the seam. Three canonical periods, and no
+    // fourth — a breathe at 1.55s next to a breathe at 1.6s is just a bug that
+    // is hard to see.
+
+    /// Breathing / pulsing, 1.6s. Autoreverses: a breath has an out-breath.
     static let ambient = Animation.linear(duration: 1.6).repeatForever(autoreverses: true)
+
+    /// Shimmer sweep, 1.2s. Does not autoreverse — a highlight travels one way
+    /// and starts over; sliding it back is a different, wrong gesture.
+    static let shimmer = Animation.linear(duration: 1.2).repeatForever(autoreverses: false)
+
+    /// Indeterminate rotation, 1.0s per revolution. Never autoreverses.
+    static let spinner = Animation.linear(duration: 1.0).repeatForever(autoreverses: false)
 
     // MARK: - Reduce Motion
 
@@ -66,8 +80,12 @@ enum Motion {
 
     /// Repeating decorative motion is suppressed entirely under Reduce Motion —
     /// collapsing an infinite loop to a short fade still loops forever.
-    static func resolveAmbient(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : ambient
+    ///
+    /// Pass the period you want; the default is the 1.6s breathe. Returning
+    /// `nil` (rather than a very short animation) is what actually stops the
+    /// loop when handed to `.animation(_:value:)`.
+    static func resolveAmbient(_ animation: Animation = ambient, reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : animation
     }
 }
 

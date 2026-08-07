@@ -2,24 +2,51 @@
 //  MacSidebar.swift
 //  RunAnywhereAI
 //
-//  The Mac sidebar: conversations first, utilities second.
+//  The Mac sidebar: three destinations, and the document list belonging to the
+//  one that is open.
 //
 //  This replaces a modal drawer that slid over the chat and dimmed it. A drawer
 //  is a phone affordance — on a 1200pt window there is room for the list and the
 //  conversation at the same time, and a Mac user expects to switch chats without
-//  a mode change. Conversation *and* destination live in one `List(selection:)`
-//  so ↑/↓ walks the whole sidebar the way it does in Mail and Notes.
+//  a mode change. Destination *and* document live in one `List(selection:)` so
+//  ↑/↓ walks the whole sidebar the way it does in Mail and Notes.
+//
+//  The list is scoped to the open destination. A sidebar that offers "Search
+//  chats" and twelve conversation rows while the detail column is showing Models
+//  is describing a screen the user is not looking at: the search field cannot
+//  find anything they can see, and the bulk of the column is noise. So the
+//  conversation list and its search field appear under Chat and nowhere else,
+//  while the three destinations are always present — otherwise there would be no
+//  way back.
 //
 
 import SwiftUI
 
 #if os(macOS)
 
+/// Which destination owns the sidebar's list right now.
+enum MacSidebarScope: Hashable {
+    case chat
+    case models
+    case advanced
+}
+
 /// What the detail column is showing.
 enum MacSidebarSelection: Hashable {
+    /// The transcript, whichever conversation is current. Distinct from
+    /// `.conversation` so ⌘1 can return to the chat before anything is saved.
+    case chat
     case conversation(String)
     case models
     case advanced
+
+    var scope: MacSidebarScope {
+        switch self {
+        case .chat, .conversation: return .chat
+        case .models: return .models
+        case .advanced: return .advanced
+        }
+    }
 }
 
 struct MacSidebar: View {
@@ -32,31 +59,25 @@ struct MacSidebar: View {
     @State private var conversationBeingRenamed: Conversation?
     @State private var draftTitle = ""
 
+    private var scope: MacSidebarScope {
+        selection?.scope ?? .chat
+    }
+
     private var conversations: [Conversation] {
         store.searchConversations(query: searchText.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     var body: some View {
-        List(selection: $selection) {
-            Section("Chats") {
-                if conversations.isEmpty {
-                    emptyChatsRow
-                } else {
-                    ForEach(conversations) { conversation in
-                        row(for: conversation)
-                    }
-                }
-            }
-
-            Section("Library") {
-                Label("Models", systemImage: "square.stack.3d.up")
-                    .tag(MacSidebarSelection.models)
-                Label("Advanced", systemImage: "slider.horizontal.3")
-                    .tag(MacSidebarSelection.advanced)
+        Group {
+            if scope == .chat {
+                // `.searchable` is applied here and only here. Attaching it
+                // unconditionally and swapping the prompt would still put a live
+                // text field over a list that does not exist on Models.
+                list.searchable(text: $searchText, placement: .sidebar, prompt: "Search chats")
+            } else {
+                list
             }
         }
-        .listStyle(.sidebar)
-        .searchable(text: $searchText, placement: .sidebar, prompt: "Search chats")
         .navigationTitle("RunAnywhere")
         .toolbar {
             ToolbarItem {
@@ -65,6 +86,11 @@ struct MacSidebar: View {
                 }
                 .help("New Chat (⌘N)")
             }
+        }
+        // A filter typed under Chat must not survive a trip to Models and come
+        // back silently hiding rows.
+        .onChange(of: scope) { _, newScope in
+            if newScope != .chat { searchText = "" }
         }
         .confirmationDialog(
             "Delete this chat?",
@@ -90,6 +116,32 @@ struct MacSidebar: View {
             Button("Rename") { commitRename() }
             Button("Cancel", role: .cancel) { conversationBeingRenamed = nil }
         }
+    }
+
+    private var list: some View {
+        List(selection: $selection) {
+            Section {
+                Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                    .tag(MacSidebarSelection.chat)
+                Label("Models", systemImage: "square.stack.3d.up")
+                    .tag(MacSidebarSelection.models)
+                Label("Advanced", systemImage: "slider.horizontal.3")
+                    .tag(MacSidebarSelection.advanced)
+            }
+
+            if scope == .chat {
+                Section("Chats") {
+                    if conversations.isEmpty {
+                        emptyChatsRow
+                    } else {
+                        ForEach(conversations) { conversation in
+                            row(for: conversation)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.sidebar)
     }
 
     @ViewBuilder

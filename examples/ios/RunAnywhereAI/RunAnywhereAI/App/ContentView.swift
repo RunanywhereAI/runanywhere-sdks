@@ -52,9 +52,21 @@ private struct ConsumerMacShell: View {
             storedVisibility = visibility == .detailOnly ? "detailOnly" : "all"
         }
         .onChange(of: selection) { _, newValue in
-            guard case .conversation(let id) = newValue,
-                  let conversation = store.loadConversation(id) else { return }
-            viewModel.loadConversation(conversation)
+            switch newValue {
+            case .conversation(let id):
+                guard let conversation = store.loadConversation(id) else { return }
+                viewModel.loadConversation(conversation)
+            case .chat:
+                // `.chat` is an intent ("show me the transcript"), not a place.
+                // Resolving it to the open conversation keeps exactly one row
+                // highlighted for one destination — two rows lighting up for the
+                // same detail view is how a sidebar starts to feel arbitrary.
+                if let id = viewModel.currentConversation?.id {
+                    selection = .conversation(id)
+                }
+            case .models, .advanced, .none:
+                break
+            }
         }
         // Keep the sidebar's highlight on whichever conversation the chat is
         // actually showing, including one created from ⌘N or from the composer.
@@ -80,7 +92,7 @@ private struct ConsumerMacShell: View {
             NavigationStack { SimplifiedModelsView() }
         case .advanced:
             NavigationStack { ConsumerAdvancedHubView() }
-        case .conversation, .none:
+        case .chat, .conversation, .none:
             ChatInterfaceView(viewModel: viewModel)
         }
     }
@@ -92,13 +104,13 @@ private struct ConsumerMacShell: View {
         }
     }
 
-    /// Return to the transcript without discarding it. `nil` is the chat, so
-    /// falling back to it is correct when no conversation has been saved yet.
+    /// Return to the transcript without discarding it. Falls back to `.chat`
+    /// when nothing has been saved yet, so ⌘1 always lands somewhere real.
     private func showChat() {
         if let id = viewModel.currentConversation?.id {
             selection = .conversation(id)
         } else {
-            selection = nil
+            selection = .chat
         }
     }
 
@@ -106,9 +118,10 @@ private struct ConsumerMacShell: View {
         if storedVisibility == "detailOnly" {
             columnVisibility = .detailOnly
         }
-        if selection == nil, let current = viewModel.currentConversation {
-            selection = .conversation(current.id)
-        }
+        guard selection == nil else { return }
+        // Never leave the sidebar with nothing highlighted: a split view whose
+        // first column has no selection reads as "not loaded yet".
+        selection = viewModel.currentConversation.map { .conversation($0.id) } ?? .chat
     }
 }
 #else
