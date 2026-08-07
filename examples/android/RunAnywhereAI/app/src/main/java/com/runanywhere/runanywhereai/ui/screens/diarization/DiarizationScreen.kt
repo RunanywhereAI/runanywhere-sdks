@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -100,9 +99,9 @@ fun DiarizationScreen(viewModel: DiarizationViewModel = viewModel()) {
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
         Text(
-            text = "Diarization",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
+            text = "Split a recording into speaker turns on-device with NVIDIA Sortformer.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         modelCard(viewModel) { modelPicker.launch(arrayOf("*/*")) }
