@@ -6,14 +6,20 @@
 //
 //  Two things here are deliberate and easy to undo by accident:
 //
-//  1. **One scroll driver.** There used to be six (`messages.count`,
+//  1. **Zero scroll drivers.** There used to be six (`messages.count`,
 //     `isGenerating`, focus + a 0.3s `asyncAfter`, `keyboardWillShow` + a 0.1s
 //     `asyncAfter`, `last?.content`, `last?.thinkingContent`) all calling
 //     `scrollTo` on one proxy, three of them animated. They fought each other: a
 //     token arriving mid-animation restarted the 0.5s curve, so a fast reply
-//     scrolled in visible lurches. `.defaultScrollAnchor(.bottom)` holds the
-//     resting position, and a single coalesced `tailLength` keeps a growing
-//     reply pinned without animating.
+//     scrolled in visible lurches. Collapsing them to one coalesced `scrollTo`
+//     fixed the lurching but not the underlying problem: `scrollTo(_, anchor:
+//     .bottom)` on a transcript **shorter than the viewport** overscrolls past
+//     the end, so the first reply of a chat landed entirely above the visible
+//     region and the screen read as blank until you dragged it back. Verified on
+//     an iPhone 17 Pro: send one message, get a full reply, see nothing.
+//     `.defaultScrollAnchor(.bottom)` alone does the whole job — it pins content
+//     to the bottom edge *and* holds that alignment as the content grows, with
+//     no offset arithmetic to get wrong at either size.
 //  2. **The reading measure.** `Measure.text` caps both the transcript and the
 //     composer. Without it a 3456pt Mac window sets one line of prose across the
 //     whole display, which is unreadable and the loudest "this is a phone app in
@@ -44,46 +50,26 @@ struct ChatMessageListView: View {
     @ObservedObject var settingsViewModel: SettingsViewModel
     @ObservedObject var toolSettingsViewModel: ToolSettingsViewModel
 
-    private static let tailAnchor = "transcript-tail"
-
     private var isEmpty: Bool {
         viewModel.messages.isEmpty && !viewModel.isGenerating
     }
 
-    /// Characters in the message currently receiving tokens, reasoning included.
-    /// One `Int` replaces the two separate string observers that used to drive
-    /// the scroll, so reasoning-then-answer streaming stays pinned through both
-    /// phases instead of having two observers take turns winning.
-    private var tailLength: Int {
-        guard let last = viewModel.messages.last else { return 0 }
-        return last.content.count + (last.thinkingContent?.count ?? 0)
-    }
-
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                if isEmpty {
-                    emptyStateView
-                } else {
-                    messageListView
-                }
-            }
-            .scrollDisabled(isEmpty)
-            .defaultScrollAnchor(isEmpty ? .center : .bottom)
-            .background(AppColors.backgroundGrouped)
-            .contentShape(Rectangle())
-            .onTapGesture { isTextFieldFocused = false }
-            // A new turn is a layout insert, so it gets the one animated scroll.
-            // Token growth (below) must not animate — a curve restarted 40 times
-            // a second never finishes.
-            .onChange(of: viewModel.messages.count) { _, _ in
-                withMotion(Motion.standardFade) { scrollToTail(proxy) }
-            }
-            .onChange(of: tailLength) { _, _ in
-                guard viewModel.isGenerating else { return }
-                scrollToTail(proxy)
+        ScrollView {
+            if isEmpty {
+                emptyStateView
+            } else {
+                messageListView
             }
         }
+        // Scrolling stays enabled even on the empty state. It was disabled to
+        // stop an idle screen rubber-banding, but raising the keyboard halves the
+        // viewport, and a centered empty state taller than that gets its greeting
+        // clipped under the header with no way to reach it.
+        .defaultScrollAnchor(isEmpty ? .center : .bottom)
+        .background(AppColors.backgroundGrouped)
+        .contentShape(Rectangle())
+        .onTapGesture { isTextFieldFocused = false }
     }
 
     // MARK: - Empty State
@@ -154,21 +140,11 @@ struct ChatMessageListView: View {
                 .id(message.id)
                 .transition(.messageInsert)
             }
-
-            // The scroll anchor, and the breathing room that keeps the last line
-            // off the composer's top edge.
-            Color.clear
-                .frame(height: 1)
-                .id(Self.tailAnchor)
         }
         .padding(.horizontal, Space.screenMargin)
         .padding(.vertical, Space.xl)
         .measured(Measure.text)
         .motionAware(Motion.standardSpring, value: viewModel.messages.count)
-    }
-
-    private func scrollToTail(_ proxy: ScrollViewProxy) {
-        proxy.scrollTo(Self.tailAnchor, anchor: .bottom)
     }
 
     /// Which actions a turn offers.
@@ -180,26 +156,25 @@ struct ChatMessageListView: View {
     private func actions(for message: Message) -> MessageActions {
         guard !viewModel.isGenerating else { return .none }
 
+        let id = message.id
+        let delete = { viewModel.deleteMessage(id: id) }
+
         switch message.role {
         case .assistant:
             // An error bubble is UI feedback, not a reply — retrying the question
             // is the useful action, so it keeps Regenerate.
-            return MessageActions(
-                regenerate: { viewModel.regenerateReply(messageID: message.id) },
-                edit: nil,
-                delete: { viewModel.deleteMessage(id: message.id) }
-            )
+            let regenerate = { viewModel.regenerateReply(messageID: id) }
+            return MessageActions(regenerate: regenerate, edit: nil, delete: delete)
+
         case .user:
-            return MessageActions(
-                regenerate: nil,
-                edit: {
-                    viewModel.editQuestion(messageID: message.id)
-                    // The question lands in the composer; taking focus with it is
-                    // what makes this an edit rather than a puzzle.
-                    isTextFieldFocused = true
-                },
-                delete: { viewModel.deleteMessage(id: message.id) }
-            )
+            let edit = {
+                viewModel.editQuestion(messageID: id)
+                // The question lands in the composer; taking focus with it is
+                // what makes this an edit rather than a puzzle.
+                isTextFieldFocused = true
+            }
+            return MessageActions(regenerate: nil, edit: edit, delete: delete)
+
         case .system:
             return .none
         }
@@ -254,7 +229,8 @@ struct StarterPrompt: Identifiable {
 /// rather than stalled — and holds still under Reduce Motion, where an infinite
 /// loop cannot be collapsed to a fade.
 private struct ChatEmptyStateMark: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
     @State private var breathing = false
 
     var body: some View {
