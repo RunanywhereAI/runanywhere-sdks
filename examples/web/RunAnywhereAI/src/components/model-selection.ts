@@ -272,6 +272,19 @@ function renderOverlayCard(): void {
   });
 }
 
+/**
+ * Suppress the overlay because the surface has real content to show.
+ *
+ * Chat calls this when a conversation is on screen: an existing thread is worth
+ * more than a "pick a model" card, even with nothing loaded. Routed through here
+ * rather than having the view toggle classes itself, so the panel's own
+ * empty-state suppression stays in step with the overlay's visibility.
+ */
+export function setOverlaySuppressed(suppressed: boolean): void {
+  getStartedOverlay?.classList.toggle('chat-model-overlay--conversation-visible', suppressed);
+  refreshOverlayVisibility();
+}
+
 /** Catalog entries the surface behind this overlay can actually use. */
 function overlayScopedEntries(): CatalogEntry[] {
   const cats = overlayLoadedCategories;
@@ -1420,6 +1433,13 @@ function refreshOverlayVisibility(): void {
   if (!getStartedOverlay) return;
   const shouldShow = !findLoadedModelForScope(overlayLoadedCategories);
   getStartedOverlay.classList.toggle('hidden', !shouldShow);
+  // The card replaces the scroll region rather than covering it, so the panel
+  // has to know to stand its own empty state down while the card is up —
+  // otherwise both "nothing here yet" surfaces render at once.
+  getStartedOverlay.parentElement?.classList.toggle(
+    'chat-panel--model-blocked',
+    shouldShow && !getStartedOverlay.classList.contains('chat-model-overlay--conversation-visible'),
+  );
   // Re-render only while visible: rebuilding a hidden overlay would discard a
   // `<details>` the user had expanded for no benefit.
   if (shouldShow) renderOverlayCard();

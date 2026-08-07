@@ -2320,14 +2320,40 @@
   align-items: center;
   gap: var(--space-sm);
 }
+/*
+ * The "no model yet" / "engine didn't load" card.
+ *
+ * Takes the scroll region's place in the panel's flex column rather than being
+ * painted absolutely over the whole panel. As an opaque `inset: 0` overlay it
+ * covered the composer and the panel's own empty state, which left nine
+ * controls — the four prompt chips, the attach/tools/talk buttons, the textarea
+ * and Send — invisible but still focusable and still read out by a screen
+ * reader. Occupying the same box as the region it replaces means there is
+ * nothing behind it to hide, so the composer stays visible and honest (Send is
+ * already disabled and labelled "Load a model first").
+ */
 .chat-model-overlay {
-  position: absolute;
-  inset: var(--toolbar-height, 56px) 0 0 0;
+  position: relative;
+  flex: 1;
+  /* Without this a tall card makes the flex item refuse to shrink and pushes
+     the composer off the bottom of the panel. */
+  min-height: 0;
   display: flex;
-  align-items: center;
+  /*
+   * Centred while the card fits, top-aligned once it doesn't.
+   *
+   * `align-items: center` on a scroll container clips the *unreachable* side:
+   * in landscape (390 px tall) the card's first 39 px sat above the region and
+   * scrolling only pushed it further away, so "AI engine didn't load" could not
+   * be read at all. `safe center` degrades to start-alignment exactly when
+   * overflow begins; the `margin: auto` on the card is the equivalent for
+   * browsers without `safe` (including this app's Chrome 86 floor), where a
+   * flex item's auto margin still yields to the container's edges instead of
+   * overflowing past them.
+   */
+  align-items: safe center;
   justify-content: center;
-  background: var(--bg-primary);
-  z-index: 1;
+  overflow-y: auto;
   padding: var(--space-xl);
 }
 .chat-model-overlay.hidden {
@@ -2336,9 +2362,24 @@
 .chat-model-overlay.chat-model-overlay--conversation-visible {
   display: none !important;
 }
+/*
+ * One empty state at a time.
+ *
+ * The panel's own empty state (greeting + prompt chips) and this card are both
+ * "nothing here yet" surfaces, and stacking them offered chips that would type
+ * a prompt into a composer that cannot send. The card outranks them while it is
+ * up: it names the one thing that has to happen first. Set as a class rather
+ * than `:has()` so it also holds on this app's documented Chrome 86 floor.
+ */
+.chat-panel--model-blocked > #chat-messages {
+  display: none;
+}
 .chat-model-overlay-card {
   max-width: 420px;
   width: 100%;
+  /* Centres the card in the taller-than-content case and yields to the top edge
+     in the shorter case — the `safe center` fallback described on the region. */
+  margin: auto;
   padding: var(--space-xl);
   text-align: center;
   display: flex;
@@ -2398,10 +2439,86 @@
   width: 14px;
   height: 14px;
 }
-
-.chat-panel-consumer .chat-model-overlay {
-  inset: 0;
+/*
+ * Short viewports — phone landscape, and desktop windows dragged flat.
+ *
+ * The card is the whole screen's worth of content here, and at 390 px tall the
+ * full-size version pushed its only button ("Choose a Model" / "Try again")
+ * below the fold, so the state read as a dead end unless you thought to scroll.
+ * Shrinking the decorative parts first — the glyph well, the display-size title,
+ * the generous gaps — keeps the sentence and the action together. Keyed on
+ * height rather than width because it is vertical room that is missing.
+ */
+@media (max-height: 560px) {
+  .chat-model-overlay {
+    /* Tight block padding so the compacted card clears the region outright
+       rather than overflowing it by a handful of pixels and raising a scrollbar
+       over content that would otherwise fit. */
+    padding: var(--space-md) var(--space-xl);
+  }
+  .chat-model-overlay-card {
+    padding: 0;
+  }
+  .chat-model-overlay-glyph {
+    width: 52px;
+    height: 52px;
+    margin-bottom: var(--space-md);
+  }
+  .chat-model-overlay-glyph svg {
+    width: 26px;
+    height: 26px;
+  }
+  .chat-model-overlay-title {
+    margin-bottom: var(--space-sm);
+    font-size: var(--font-size-xl);
+  }
+  .chat-model-overlay-description {
+    margin-bottom: var(--space-lg);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+  }
+  .chat-model-overlay-privacy,
+  .chat-model-overlay-details {
+    margin-top: var(--space-md);
+  }
+  /*
+   * Short *and* wide: spend the width instead of the height.
+   *
+   * A phone in landscape has 844 px across but only ~242 px of panel, so the
+   * centred column wasted its whole glyph band on vertical space it did not
+   * have — the button ended up below the fold even after the shrink above. Here
+   * the glyph moves beside the text instead of above it, and the paragraph gets
+   * the width it was already being denied (~60ch, still a comfortable measure),
+   * which is enough for the sentence and the action to be on screen together.
+   *
+   * Grid rather than a nested wrapper because both cards are flat child lists
+   * built in `model-selection.ts`: everything defaults to the text column, and
+   * only the glyph is pulled into the first one.
+   */
+  @media (min-width: 640px) {
+    .chat-model-overlay-card {
+      max-width: 620px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: var(--space-lg);
+      align-items: start;
+      text-align: left;
+    }
+    .chat-model-overlay-card > * {
+      grid-column: 2;
+      justify-self: start;
+    }
+    .chat-model-overlay-glyph {
+      grid-column: 1;
+      grid-row: 1;
+      margin-bottom: 0;
+    }
+    .chat-model-overlay-description {
+      max-width: none;
+    }
+  }
 }
+
 
 /* Small status badges shown in the storage tab model list. */
 .badge {
