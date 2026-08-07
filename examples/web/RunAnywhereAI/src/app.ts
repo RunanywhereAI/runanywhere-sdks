@@ -66,6 +66,17 @@ interface TabDef {
   id: TabId;
   label: string;
   initializer: (el: HTMLElement) => TabLifecycle | undefined;
+  /**
+   * The surface this one was opened *from*, for panels reached by drilling in
+   * rather than from the sidebar.
+   *
+   * Without this the shell had no idea these panels were nested, and it showed:
+   * opening one cleared every nav highlight — so the sidebar pointed at nothing
+   * and the only "where am I" signal was the panel's own title — and no view
+   * offered a way back. On mobile, where the sidebar is a drawer, drilling into
+   * one of these was a dead end.
+   */
+  parent?: TabId;
 }
 
 interface NavItem {
@@ -89,23 +100,47 @@ const CHAT_SHEET_OPTIONS: OpenSheetOptions = {
 };
 
 const TABS: TabDef[] = [
+  // Top-level surfaces: these have their own sidebar entry, so no parent.
   { id: 'chat', label: 'Assistant', initializer: initChatTab },
   { id: 'advanced', label: 'Advanced', initializer: initAdvancedHub },
   { id: 'storage', label: 'Downloads', initializer: initStorageTab },
   { id: 'settings', label: 'Settings', initializer: (el) => { initSettingsTab(el); return undefined; } },
-  { id: 'voice', label: 'Talk Mode', initializer: initVoiceTab },
-  { id: 'vision', label: 'Image & Live', initializer: initVisionTab },
-  { id: 'segmentation', label: 'Segmentation', initializer: initSegmentationTab },
-  { id: 'documents', label: 'Documents', initializer: initDocumentsTab },
-  { id: 'transcribe', label: 'Transcribe', initializer: initTranscribeTab },
-  { id: 'speak', label: 'Read Aloud', initializer: initSpeakTab },
-  { id: 'vad', label: 'Voice Activity', initializer: initVadTab },
-  { id: 'diarization', label: 'Diarization', initializer: initDiarizationTab },
-  { id: 'solutions', label: 'Solutions', initializer: initSolutionsTab },
-  { id: 'benchmarks', label: 'Benchmarks', initializer: initBenchmarksTab },
+  // Drilled-into surfaces. `parent` is the surface a user most likely came from,
+  // and is only the fallback: switchTab records the actual origin, because some
+  // of these have two entrances (Talk Mode is both an Advanced row and the
+  // composer's mic button) and a hardcoded parent would send half of those
+  // visitors somewhere they had never been.
+  { id: 'voice', label: 'Talk Mode', initializer: initVoiceTab, parent: 'advanced' },
+  { id: 'vision', label: 'Image & Live', initializer: initVisionTab, parent: 'chat' },
+  { id: 'segmentation', label: 'Segmentation', initializer: initSegmentationTab, parent: 'advanced' },
+  { id: 'documents', label: 'Documents', initializer: initDocumentsTab, parent: 'advanced' },
+  { id: 'transcribe', label: 'Transcribe', initializer: initTranscribeTab, parent: 'advanced' },
+  { id: 'speak', label: 'Read Aloud', initializer: initSpeakTab, parent: 'advanced' },
+  { id: 'vad', label: 'Voice Activity', initializer: initVadTab, parent: 'advanced' },
+  { id: 'diarization', label: 'Diarization', initializer: initDiarizationTab, parent: 'advanced' },
+  { id: 'solutions', label: 'Solutions', initializer: initSolutionsTab, parent: 'advanced' },
+  { id: 'benchmarks', label: 'Benchmarks', initializer: initBenchmarksTab, parent: 'advanced' },
 ];
 
 const TAB_INDEX = new Map<TabId, number>(TABS.map((tab, index) => [tab.id, index]));
+
+/** Surfaces with their own sidebar entry — the only ones that can be highlighted. */
+const NAV_TAB_IDS = new Set<TabId>(TABS.filter((tab) => tab.parent === undefined).map((tab) => tab.id));
+
+/**
+ * Where each nested surface was actually opened from.
+ *
+ * Overrides TabDef.parent so Back retraces the user's own step: Talk Mode reached
+ * from the composer returns to the assistant, and the same surface reached from
+ * the Advanced hub returns there.
+ */
+const tabOrigin = new Map<TabId, TabId>();
+
+/**
+ * Watches the current nested panel so a view re-render cannot drop the shell's
+ * Back button. Exactly one is live at a time — see syncBackButton.
+ */
+let backButtonObserver: MutationObserver | null = null;
 
 let activeTab = 0;
 let drawerOpen = false;
@@ -134,6 +169,7 @@ const ICONS = {
   gauge: '<path d="M12 14l4-4"/><path d="M4.93 19.07A10 10 0 1 1 19.07 19.07"/><path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  back: '<path d="M15 18l-6-6 6-6"/>',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -452,6 +488,99 @@ function switchTabById(tabId: TabId): void {
   switchTab(index);
 }
 
+/**
+ * Which sidebar entry should read as current for a given surface.
+ *
+ * Nested surfaces have no entry of their own, so they light their nearest
+ * ancestor that does. Walks the chain rather than reading `parent` once, so a
+ * surface nested two levels deep still resolves to a real nav entry.
+ */
+function navHighlightFor(tabId: TabId): TabId {
+  const seen = new Set<TabId>();
+  let current = tabId;
+  while (!NAV_TAB_IDS.has(current)) {
+    if (seen.has(current)) break;      // cycle guard: a mis-declared parent must not hang the shell
+    seen.add(current);
+    const parent = TABS[TAB_INDEX.get(current)!].parent;
+    if (parent === undefined) break;
+    current = parent;
+  }
+  return current;
+}
+
+/** Where Back goes: the surface actually navigated from, else the declared parent. */
+function backTargetFor(tab: TabDef): TabId | undefined {
+  if (tab.parent === undefined) return undefined;
+  return tabOrigin.get(tab.id) ?? tab.parent;
+}
+
+/**
+ * Keep a Back button in the current nested surface's toolbar.
+ *
+ * Owned by the shell rather than by each of the ten nested views: it is shell
+ * navigation, the views do not own it, and ten copies is ten chances for the
+ * label, icon and placement to drift.
+ *
+ * The views do own their toolbars, though, and rebuild them via innerHTML on
+ * model-state changes and user actions as well as on activation — which threw a
+ * one-shot injection away. So the shell re-asserts the button whenever the panel
+ * subtree changes, and stops watching as soon as the user leaves.
+ */
+function syncBackButton(tab: TabDef): void {
+  backButtonObserver?.disconnect();
+  backButtonObserver = null;
+
+  const panel = document.getElementById(`tab-${tab.id}`);
+  if (!panel) return;
+
+  const target = backTargetFor(tab);
+  if (target === undefined) {
+    panel.querySelector('.toolbar-back')?.remove();
+    return;
+  }
+
+  const label = `Back to ${TABS[TAB_INDEX.get(target)!].label}`;
+  ensureBackButton(panel, target, label);
+
+  backButtonObserver = new MutationObserver(() => {
+    // Re-inject only when it is actually gone. The insertion itself mutates the
+    // subtree and re-enters this callback, so this check is what terminates it.
+    if (!panel.querySelector('.toolbar-back')) ensureBackButton(panel, target, label);
+  });
+  backButtonObserver.observe(panel, { childList: true, subtree: true });
+}
+
+/** Insert or relabel the Back button in a panel's toolbar. */
+function ensureBackButton(panel: HTMLElement, target: TabId, label: string): void {
+  const toolbar = panel.firstElementChild;
+  if (!toolbar?.classList.contains('toolbar')) return;
+
+  const existing = toolbar.querySelector<HTMLButtonElement>('.toolbar-back');
+  if (existing) {
+    // Reuse the node so re-entering cannot stack duplicates, and relabel it in
+    // case this visit arrived from a different origin.
+    existing.setAttribute('aria-label', label);
+    existing.title = label;
+    existing.dataset.backTarget = target;
+    return;
+  }
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'shell-icon-btn toolbar-back';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.dataset.backTarget = target;
+  button.innerHTML = icon(ICONS.back);
+  // Read the target at click time: this node gets relabelled in place, so a
+  // captured value could send a reused button to a stale surface.
+  button.addEventListener('click', () => {
+    const dest = button.dataset.backTarget;
+    if (dest) switchTabById(dest as TabId);
+  });
+  toolbar.insertBefore(button, toolbar.firstChild);
+}
+
 function switchTab(index: number): void {
   const previousTab = activeTab;
   activeTab = index;
@@ -469,9 +598,30 @@ function switchTab(index: number): void {
     panel.classList.toggle('active', i === index);
   });
 
-  const activeId = TABS[index].id;
+  const activeTabDef = TABS[index];
+  const activeId = activeTabDef.id;
+
+  // Remember where a drilled-into surface was opened from, so Back returns the
+  // user to the surface they actually came from rather than a guess. Only set on
+  // a real change, so re-selecting the current tab cannot make it its own origin.
+  if (previousTab !== index && activeTabDef.parent !== undefined) {
+    tabOrigin.set(activeId, TABS[previousTab].id);
+  }
+
+  // A nested surface keeps its parent's nav entry lit. Highlighting nothing left
+  // the sidebar pointing at no current location at all.
+  const highlightId = navHighlightFor(activeId);
   document.querySelectorAll<HTMLElement>('.tab-item[data-tab]').forEach((item) => {
-    item.classList.toggle('active', item.dataset.tab === activeId);
+    const isCurrent = item.dataset.tab === highlightId;
+    item.classList.toggle('active', isCurrent);
+    // The highlight was purely visual — a screen reader had no way to tell which
+    // surface was open. aria-current is the right primitive here (these are
+    // navigation buttons, not an ARIA tablist).
+    if (isCurrent) {
+      item.setAttribute('aria-current', activeId === highlightId ? 'page' : 'true');
+    } else {
+      item.removeAttribute('aria-current');
+    }
   });
 
   if (previousTab !== index) {
@@ -481,6 +631,11 @@ function switchTab(index: number): void {
       appLogger.warning(`[App] Panel ${activeId} onActivate error:`, err);
     }
   }
+
+  // After onActivate, never before: several views rebuild their whole subtree
+  // there (Segmentation, Diarization and Benchmarks all re-render on activate),
+  // which silently discarded a button injected earlier in this same function.
+  syncBackButton(activeTabDef);
 }
 
 async function refreshConversationList(): Promise<void> {

@@ -362,7 +362,18 @@
   color: var(--text-primary);
 }
 
-/* Brand accent bar on the active nav item. */
+/* Brand accent bar on the active nav item.
+ *
+ * It grows from the centre rather than appearing, so the indicator reads as
+ * moving to the item you picked instead of blinking on. The pseudo-element only
+ * exists while .active is set, so — like the panel — the animation restarts on
+ * every switch with no JS and no state to reset. scaleY is used rather than
+ * height so the growth never touches layout. */
+@keyframes nav-indicator-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
 .tab-item.consumer-nav-item.active::before {
   content: '';
   position: absolute;
@@ -372,6 +383,7 @@
   width: 3px;
   border-radius: var(--radius-full);
   background: var(--color-primary);
+  animation: nav-indicator-grow var(--duration-fast) var(--ease-out);
 }
 
 .consumer-nav-item.active .consumer-nav-item__icon {
@@ -432,9 +444,45 @@
   overflow: hidden;
 }
 
+/* Switching views was the one moment the app had to feel deliberate, and it
+ * instead read like a page reload: display:none to display:flex is a hard cut
+ * with no continuity between where you were and where you landed.
+ *
+ * Enter-only, and CSS-only, on purpose:
+ *
+ * - The outgoing panel *cannot* animate. `display` is not interpolable, and this
+ *   app's build is pinned to Chrome 86 syntax, which predates @starting-style
+ *   and `transition-behavior: allow-discrete`. Keeping the old panel mounted for
+ *   a cross-fade would instead put two copies of every heading, control and
+ *   landmark in the accessibility tree and the tab order simultaneously — a real
+ *   regression bought for a flourish.
+ * - No JS. An element that is not rendered has no running animations, so
+ *   display:flex restarts this one on every switch for free — no direction
+ *   state, no class to clean up, no timer racing the next click.
+ * - Fail-safe. Keyframe values exist only while the animation runs (no fill
+ *   mode), so a panel whose animation never starts is simply fully visible.
+ *
+ * The rise is 8px: enough to read as arrival, too small to look like the layout
+ * settling. Uniform in both directions because the nav is a vertical sidebar and
+ * implies no spatial axis for content to travel along — direction-dependent
+ * motion here would be noise, not orientation. prefers-reduced-motion is already
+ * honoured by the global block in design-system.css.
+ */
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .tab-panel.active {
   display: flex;
   position: absolute;
+  animation: panel-enter var(--duration-fast) var(--ease-out);
 }
 
 /* =============================================================================
@@ -513,6 +561,23 @@
   display: flex;
   gap: var(--space-sm-md);
   align-items: center;
+  /* The toolbar is space-between, which balances two children but centres the
+   * title once a Back button makes three. Pushing the actions to the end keeps
+   * the title anchored beside the button it belongs to, and is a no-op in the
+   * two-child case. (`:has()` would be the direct way to scope this, but the
+   * build targets Chrome 86.) */
+  margin-left: auto;
+}
+
+/* Back out of a drilled-into surface. Leads the toolbar because that is where
+ * both platform conventions put it, and because it should be reachable before
+ * the title it qualifies — including as the first stop in the tab order. Spacing
+ * is negative-left so the icon's optical edge lines up with the content below
+ * rather than its 40px hit box, which would look inset by comparison. */
+.toolbar-back {
+  flex-shrink: 0;
+  margin-left: calc(var(--space-sm) * -1);
+  margin-right: var(--space-xs);
 }
 
 /* =============================================================================
