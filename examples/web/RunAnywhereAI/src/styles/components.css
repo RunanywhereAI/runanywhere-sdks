@@ -1230,26 +1230,153 @@
   overflow-y: auto;
 }
 
-/* Fenced code blocks inside replies. */
-.chat-code {
-  margin: var(--space-sm-md) 0;
-  padding: var(--space-md) var(--space-regular);
+/*
+ * ---------------------------------------------------------------------------
+ * Rendered markdown (services/markdown.ts)
+ * ---------------------------------------------------------------------------
+ *
+ * Model replies are markdown, and the block set here matches Android's
+ * MarkdownText.kt and iOS's AdaptiveMarkdownText so the same answer has the
+ * same shape on all four surfaces.
+ *
+ * Scoped by class rather than by element so these rules apply wherever model
+ * output is rendered — the chat bubble and the RAG answer panel — and nowhere
+ * else. A bare `h4`/`ul`/`blockquote` selector would reach the app's own chrome.
+ */
+
+/* The first and last block sit flush: the container already has padding. */
+.md-p, .md-heading, .md-list, .md-quote, .md-code, .md-rule { margin: 0; }
+.md-p + *, .md-heading + *, .md-list + *, .md-quote + *, .md-code + *, .md-rule + * {
+  margin-top: var(--space-sm-md);
+}
+
+.md-p { line-height: var(--line-height-relaxed); }
+
+/*
+ * Headings carry rank by weight and size, and the scale is compressed.
+ *
+ * A model writes `##` for what is a sub-point inside one reply, not a page
+ * title — so mapping it to a full document heading size would make a bubble
+ * shout louder than the view's own header. h1/h2 land at 18px, h3 at 16px, and
+ * h4-h6 at body size with weight alone doing the work.
+ */
+.md-heading {
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+/* Extra room above a heading that follows content — a new section needs a gap
+   wider than the one between two paragraphs to read as a break. */
+* + .md-heading { margin-top: var(--space-lg); }
+.md-heading--1, .md-heading--2 { font-size: var(--font-size-lg); }
+.md-heading--3 { font-size: var(--font-size-md); }
+.md-heading--4, .md-heading--5, .md-heading--6 { font-size: var(--font-size-base); }
+
+/*
+ * Lists.
+ *
+ * The indent is `--space-xl` so the marker column clears the bubble's own
+ * padding and wrapped item text aligns under the item, not under the marker.
+ */
+.md-list {
+  padding-left: var(--space-xl);
+  line-height: var(--line-height-relaxed);
+}
+.md-list li + li { margin-top: var(--space-xs); }
+/* Nested lists tighten rather than repeat the full block gap. */
+.md-list .md-list { margin-top: var(--space-xs); }
+.md-list::marker, .md-list li::marker { color: var(--text-tertiary); }
+
+.md-quote {
+  padding-left: var(--space-md-lg);
+  border-left: 3px solid var(--border-medium);
+  color: var(--text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+
+.md-rule {
+  border: 0;
+  border-top: 1px solid var(--border-light);
+}
+
+/*
+ * Fenced code.
+ *
+ * A header row carrying the language and a copy button, matching the iOS code
+ * renderer — a browser reader should not have to hand-select code out of a
+ * scrolling box when the phone offers one tap.
+ */
+.md-code {
+  overflow: hidden;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
+}
+.md-code__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm-md);
+  /* min-height so a fence with no language still has a copy button on a row of
+     the same height — an unlabelled block must not jump smaller. */
+  min-height: 32px;
+  padding: 0 var(--space-sm-md) 0 var(--space-regular);
+  border-bottom: 1px solid var(--border-light);
+  background: var(--bg-tertiary);
+}
+.md-code__lang {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: lowercase;
+}
+.md-code__copy {
+  /* Pushed to the right edge when there is no language label to sit beside. */
+  margin-left: auto;
+  padding: var(--space-xs) var(--space-sm-md);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: color var(--duration-micro) var(--ease-standard),
+              background var(--duration-micro) var(--ease-standard);
+}
+.md-code__copy:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.md-code__copy:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.md-code__body {
+  margin: 0;
+  padding: var(--space-md) var(--space-regular);
+  overflow-x: auto;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   line-height: 1.6;
-  overflow-x: auto;
+  /*
+   * `pre` preserves the model's own line breaks and does not add its own.
+   * Code is the one place where a soft wrap changes meaning, so it scrolls
+   * horizontally instead — which is what the head row's border is anchored
+   * against, so the header stays put while the body scrolls under it.
+   */
+  white-space: pre;
+}
+/* The body's own <code> must not pick up the inline-code chip styling below. */
+.md-code__body code {
+  padding: 0;
+  background: none;
+  font: inherit;
 }
 
-.chat-message--user .chat-code {
-  background: rgba(0, 0, 0, 0.22);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: var(--text-white);
-}
-
-.chat-bubble code:not(.chat-code code) {
+/*
+ * Inline code, inside a bubble or a RAG answer.
+ *
+ * `0.9em` rather than a fixed size so a code span inside a heading scales with
+ * that heading instead of shrinking to body size mid-line.
+ */
+.chat-bubble code, .docs-answer-text code {
   font-family: var(--font-mono);
   font-size: 0.9em;
   padding: 1px 5px;
@@ -1257,9 +1384,35 @@
   background: var(--bg-tertiary);
 }
 
-.chat-message--user .chat-bubble code:not(.chat-code code) {
+/*
+ * The user's own bubble is a filled brand surface, so every one of these needs
+ * a treatment that reads on it. Rare — a user rarely types markdown — but a
+ * pasted snippet is exactly the case that would otherwise render dark-on-dark.
+ */
+.chat-message--user .chat-bubble code { background: rgba(0, 0, 0, 0.22); }
+.chat-message--user .md-code {
   background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-white);
 }
+.chat-message--user .md-code__head {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.chat-message--user .md-code__lang,
+.chat-message--user .md-code__copy { color: rgba(255, 255, 255, 0.72); }
+.chat-message--user .md-code__copy:hover {
+  color: var(--text-white);
+  background: rgba(0, 0, 0, 0.24);
+}
+.chat-message--user .md-quote {
+  border-left-color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.88);
+}
+.chat-message--user .md-rule { border-top-color: rgba(255, 255, 255, 0.24); }
+.chat-message--user .md-list::marker,
+.chat-message--user .md-list li::marker { color: rgba(255, 255, 255, 0.6); }
+.chat-message--user .chat-bubble a { color: var(--text-white); }
 
 .chat-bubble-typing {
   color: var(--text-tertiary);
@@ -1344,9 +1497,13 @@
   font-size: var(--font-size-xs);
 }
 
+/*
+ * `.chat-code` is deliberately absent here: rendered code is `.md-code__body`
+ * now, and it wraps `pre` (not `pre-wrap`) because a soft wrap inside code
+ * changes what the code says. It scrolls horizontally instead.
+ */
 .chat-tool-call pre,
 .chat-thinking-content,
-.chat-code,
 .chat-source span {
   white-space: pre-wrap;
   overflow-wrap: break-word;
