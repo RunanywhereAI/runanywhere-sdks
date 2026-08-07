@@ -1407,6 +1407,12 @@ set(_targets_built "")
 
 # --- Core (commons-only) -----------------------------------------------------
 if(RAC_WASM_BUILD_CORE)
+    # The core module runs phase1/phase2 (auth, device registration, model
+    # assignment) on the browser main thread, where synchronous emscripten_fetch
+    # and emscripten_fetch_wait both fail. The emscripten transport instead runs
+    # an async fetch and yields with emscripten_sleep(), which requires Asyncify.
+    # Callers enter through ccall({async:true}); Asyncify suspends the whole
+    # transitive call graph down to the fetch and resumes it on completion.
     rac_wasm_add_target(
         NAME racommons_core_wasm
         OUTPUT_NAME racommons
@@ -1414,6 +1420,7 @@ if(RAC_WASM_BUILD_CORE)
         EXPORT_NAME createRACommonsCoreModule
         LINK_LIBRARIES rac_commons
         EXPORTED_FUNCTIONS ${RAC_EXPORTED_FUNCTIONS_BASE}
+        EXTRA_LINK_FLAGS "-sASYNCIFY=1" "-sASYNCIFY_STACK_SIZE=1048576"
     )
     list(APPEND _targets_built "racommons_core_wasm -> packages/core/wasm/racommons.{js,wasm}")
 endif()
