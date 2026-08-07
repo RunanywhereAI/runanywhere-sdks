@@ -11,8 +11,18 @@ object GlobalState {
     val model = ModelState()
     val lora = LoraState()
 
-    private val bootstrapComplete = MutableStateFlow(false)
+    private val catalogSeeded = MutableStateFlow(false)
 
+    /**
+     * The SDK is up and the app is usable. Gates the launch splash.
+     *
+     * Deliberately *not* the same thing as [awaitBootstrapComplete]. Seeding the
+     * 105-row model catalog takes ~13.4 s of sequential JNI registration on a
+     * Snapdragon 8 Elite, while `RunAnywhere.initialize()` returns in ~0.6 s and
+     * the window itself draws in ~0.5 s. Holding the splash for the catalog put
+     * fourteen wordless seconds in front of every cold start to prepare a list
+     * only the model picker reads. Chat, voice, and vision all work without it.
+     */
     var ready: Boolean by mutableStateOf(false)
         private set
 
@@ -22,12 +32,21 @@ object GlobalState {
     fun markReady() {
         initError = null
         ready = true
-        bootstrapComplete.value = true
     }
 
-    /** Suspend until SDK setup and model-catalog seeding have both completed. */
+    fun markCatalogSeeded() {
+        catalogSeeded.value = true
+    }
+
+    /**
+     * Suspend until the model catalog has been seeded into the native registry.
+     *
+     * Only callers that read the catalog should wait on this — listing models
+     * before it completes returns a partial registry. Everything else should
+     * gate on [ready] instead, which lands ~13 s earlier.
+     */
     suspend fun awaitBootstrapComplete() {
-        bootstrapComplete.first { it }
+        catalogSeeded.first { it }
     }
 
     fun markInitFailed(message: String) {
