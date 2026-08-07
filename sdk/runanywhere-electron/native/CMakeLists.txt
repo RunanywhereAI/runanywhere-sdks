@@ -99,7 +99,11 @@ if(RAC_BUILD_ELECTRON_ADDON)
     # RAC_BACKEND_* flag builds the target — no wrapper source change required.
     # Do NOT claim Windows NPU readiness: qhexrt may link as a shell, but Snapdragon
     # Windows packaging is a separate gate.
-    set(_ra_backends llamacpp onnx sherpa qhexrt mlx coreml cloud)
+    # MLX and CoreML are excluded: MLX in commons is a Swift-callback bridge the
+    # registry refuses without a native provider Electron lacks, and CoreML is an
+    # Apple runtime adapter (rac_runtime_coreml), not an engine target. macOS GPU
+    # is llama.cpp Metal.
+    set(_ra_backends llamacpp onnx sherpa qhexrt neurt cloud)
     set(_ra_linked_backends "")
     foreach(_ra_b IN LISTS _ra_backends)
         if(TARGET rac_backend_${_ra_b})

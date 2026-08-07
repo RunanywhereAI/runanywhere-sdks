@@ -1,109 +1,188 @@
-// stream.ts — adapt an addon streaming call (callback-per-token + a completion
-// Promise) into a lazily-consumed AsyncIterable of tokens. Kept separate from
-// bridge.ts (which force-loads the native addon on import) so this pure adapter
-// can be used and unit-tested without the .node present.
-import { asSDKException } from './errors';
+// AsyncIterable plumbing for the streaming verbs.
+//
+// Every stream the SDK returns must be bridge safe: Electron's contextBridge
+// cannot clone a generator object, so an iterator has to be a plain object whose
+// `Symbol.asyncIterator` returns `this` and whose `next()` resolves a plain
+// `{ value, done }`. `bridgeStream` is the only constructor used for public
+// streams, which is why the main-process and renderer surfaces share one
+// implementation.
 
-/** Aggregate metrics for a completed generation (mirrors the other SDKs' result). */
-export interface LLMGenerationResult {
-  text: string;
-  tokenCount: number;
-  timeToFirstTokenMs: number;
-  tokensPerSecond: number;
-  totalTimeMs: number;
+import { asSDKException } from './errors.js';
+
+/** Where a producer pushes stream items. */
+export interface StreamSink<T> {
+  push(value: T): void;
+  end(): void;
+  fail(error: unknown): void;
 }
 
 /**
- * A streamed generation event (mirrors the Swift/Kotlin/RN `LLMStreamEvent`):
- * non-final events carry a `token`; the final event carries the aggregated
- * `result` with timing metrics and an empty token.
+ * Adapt a push-style producer into a lazily consumed AsyncIterable. `producer`
+ * starts on the first `next()`, so nothing runs for a stream that is never
+ * iterated. Breaking the loop calls `onCancel` and drains the producer.
  */
-export interface LLMStreamEvent {
-  token: string;
-  isFinal: boolean;
-  result?: LLMGenerationResult;
-}
-
-/**
- * Wrap a token AsyncIterable as a stream of LLMStreamEvent, computing time-to-
- * first-token and tokens/second — so callers get the same metrics the other
- * SDKs surface. `now` is injectable for deterministic tests.
- */
-export async function* streamWithMetrics(
-  source: AsyncIterable<string>,
-  now: () => number = () => Date.now()
-): AsyncIterableIterator<LLMStreamEvent> {
-  const start = now();
-  let firstAt = -1;
-  let count = 0;
-  let text = '';
-  for await (const token of source) {
-    if (firstAt < 0) firstAt = now();
-    count += 1;
-    text += token;
-    yield { token, isFinal: false };
-  }
-  const end = now();
-  const genMs = firstAt < 0 ? 0 : end - firstAt;
-  yield {
-    token: '',
-    isFinal: true,
-    result: {
-      text,
-      tokenCount: count,
-      timeToFirstTokenMs: firstAt < 0 ? 0 : firstAt - start,
-      tokensPerSecond: genMs > 0 ? count / (genMs / 1000) : 0,
-      totalTimeMs: end - start,
-    },
-  };
-}
-
-/**
- * Adapt an addon streaming call — `start(onToken) -> Promise<void>` — into a
- * lazily-consumed AsyncIterable of tokens. Tokens buffer as they arrive; the
- * iterator ends when the promise resolves and rejects if it rejects.
- */
-export function toAsyncIterable(
-  start: (onToken: (t: string) => void) => Promise<unknown>
-): AsyncIterableIterator<string> {
-  const queue: string[] = [];
+export function bridgeStream<T>(
+  producer: (sink: StreamSink<T>) => void | Promise<void>,
+  onCancel?: () => void | Promise<void>
+): AsyncIterableIterator<T> {
+  const queue: T[] = [];
   let done = false;
-  let err: unknown = null;
+  let failure: unknown = null;
+  let started = false;
+  let cancelled = false;
   let wake: (() => void) | null = null;
-  const signal = () => {
+
+  const signal = (): void => {
     const w = wake;
     wake = null;
     if (w) w();
   };
 
-  start((t) => {
-    queue.push(t);
-    signal();
-  }).then(
-    () => {
+  const sink: StreamSink<T> = {
+    push(value) {
+      if (cancelled) return;
+      queue.push(value);
+      signal();
+    },
+    end() {
       done = true;
       signal();
     },
-    (e) => {
-      err = e;
+    fail(error) {
+      failure = error;
       done = true;
       signal();
+    },
+  };
+
+  const start = (): void => {
+    if (started) return;
+    started = true;
+    try {
+      const maybe = producer(sink);
+      if (maybe && typeof (maybe as Promise<void>).then === 'function') {
+        (maybe as Promise<void>).then(
+          () => sink.end(),
+          (e) => sink.fail(e)
+        );
+      }
+    } catch (e) {
+      sink.fail(e);
     }
-  );
+  };
+
+  const finish = async (): Promise<IteratorResult<T>> => {
+    if (!cancelled) {
+      cancelled = true;
+      queue.length = 0;
+      try {
+        await onCancel?.();
+      } catch {
+        // A cancel that itself fails must not mask the caller's own control flow.
+      }
+    }
+    return { value: undefined as unknown as T, done: true };
+  };
 
   return {
     [Symbol.asyncIterator]() {
       return this;
     },
-    async next(): Promise<IteratorResult<string>> {
+    async next(): Promise<IteratorResult<T>> {
+      start();
       for (;;) {
-        if (queue.length) return { value: queue.shift() as string, done: false };
-        if (err) throw asSDKException(err);
-        if (done) return { value: undefined as unknown as string, done: true };
-        await new Promise<void>((r) => {
-          wake = r;
+        if (queue.length) return { value: queue.shift() as T, done: false };
+        if (failure) {
+          const error = failure;
+          failure = null;
+          throw asSDKException(error);
+        }
+        if (done || cancelled) return { value: undefined as unknown as T, done: true };
+        await new Promise<void>((resolve) => {
+          wake = resolve;
         });
       }
     },
+    return: finish,
+    async throw(error?: unknown): Promise<IteratorResult<T>> {
+      await finish();
+      throw asSDKException(error);
+    },
   };
+}
+
+/** Wrap a ready array as a bridge-safe stream (used for synthetic events). */
+export function streamOf<T>(values: T[]): AsyncIterableIterator<T> {
+  return bridgeStream<T>((sink) => {
+    for (const v of values) sink.push(v);
+    sink.end();
+  });
+}
+
+/** Drain a stream, returning every item. */
+export async function collect<T>(source: AsyncIterable<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const item of source) out.push(item);
+  return out;
+}
+
+/**
+ * A push queue that is also an `AsyncIterable`. Unlike {@link bridgeStream},
+ * `push` works before the consumer ever calls `next()`, so nothing is lost when
+ * a producer starts feeding it before the caller starts reading. Used by the
+ * live `stt.openStream` / `vad.openStream` sessions, which are pushed into from
+ * outside their own async iteration.
+ */
+export class AsyncQueue<T> implements AsyncIterable<T> {
+  private readonly buffer: T[] = [];
+  private wake: (() => void) | null = null;
+  private ended = false;
+  private failure: unknown = null;
+
+  /** Enqueue one item. A no-op once the queue has ended. */
+  push(value: T): void {
+    if (this.ended) return;
+    this.buffer.push(value);
+    this.signal();
+  }
+
+  /** End the queue with a terminal error; the next `next()` throws it. */
+  fail(error: unknown): void {
+    if (this.ended) return;
+    this.failure = error;
+    this.ended = true;
+    this.signal();
+  }
+
+  /** End the queue normally once every buffered item has been read. */
+  complete(): void {
+    if (this.ended) return;
+    this.ended = true;
+    this.signal();
+  }
+
+  private signal(): void {
+    const wake = this.wake;
+    this.wake = null;
+    if (wake) wake();
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<T> {
+    return {
+      next: async (): Promise<IteratorResult<T>> => {
+        for (;;) {
+          if (this.buffer.length) return { value: this.buffer.shift() as T, done: false };
+          if (this.failure) {
+            const error = this.failure;
+            this.failure = null;
+            throw asSDKException(error);
+          }
+          if (this.ended) return { value: undefined as unknown as T, done: true };
+          await new Promise<void>((resolve) => {
+            this.wake = resolve;
+          });
+        }
+      },
+    };
+  }
 }

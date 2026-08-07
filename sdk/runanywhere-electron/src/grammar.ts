@@ -1,7 +1,7 @@
-// grammar.ts — convert a (subset of) JSON Schema to a GBNF grammar so llama.cpp
-// can *constrain* decoding to valid JSON of the requested shape (guaranteed
-// parseable output, not prompt-and-hope). Supports object/array/string/number/
-// integer/boolean/null/enum and nesting — enough for structured extraction.
+// JSON Schema -> GBNF grammar, so llama.cpp can constrain decoding to valid JSON
+// of the requested shape (guaranteed-parseable output, not prompt-and-hope).
+// commons accepts raw GBNF via StructuredOutputOptions.grammar on the generate
+// path but has no schema-to-grammar converter of its own, so it lives here.
 
 export interface JsonSchema {
   type?: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean' | 'null';
@@ -9,16 +9,11 @@ export interface JsonSchema {
   required?: string[];
   items?: JsonSchema;
   enum?: Array<string | number | boolean>;
-  /** Fixed literal value (JSON const) — matches exactly this value. */
+  /** Fixed literal value (JSON const). */
   const?: string | number | boolean;
-  /** Union: the value must match one of these schemas (alternation). */
+  /** Union: the value must match one of these schemas. */
   anyOf?: JsonSchema[];
-  /**
-   * Upper bound on array length. The grammar itself enforces it — so a small
-   * model that would otherwise ramble into an unbounded list is forced to close
-   * the array within the token budget (keeps the JSON parseable). Only applies
-   * to `type: 'array'`.
-   */
+  /** Upper bound on array length; the grammar itself enforces it. */
   maxItems?: number;
 }
 
@@ -30,7 +25,7 @@ const PRIMITIVES: Record<string, string> = {
   boolean: 'boolean ::= "true" | "false"',
 };
 
-/** Wrap literal text `s` as a GBNF double-quoted literal (escaping \ and "). */
+/** Wrap literal text `s` as a GBNF double-quoted literal. */
 function lit(s: string): string {
   return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
 }
@@ -81,9 +76,6 @@ export function jsonSchemaToGrammar(schema: JsonSchema): string {
         } else if (max <= 0) {
           rules.push(`${name} ::= "[" ws "]"`);
         } else {
-          // Bound the length with a chain of nested optional tails (portable
-          // GBNF — uses only `?`, no {m,n} repetition): tail_k allows up to k
-          // items, and the array is an optional tail_max. 0..max items.
           let prev = '';
           for (let k = 1; k <= max; k++) {
             const tn = `${name}t${k}`;

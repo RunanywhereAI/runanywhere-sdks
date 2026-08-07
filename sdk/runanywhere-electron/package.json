@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/electron",
   "version": "0.1.0",
-  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
+  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/VAD/embeddings/rerank/RAG for Electron and Node, a thin binding over the C++ commons core.",
   "private": true,
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "commonjs",
@@ -17,16 +17,16 @@
       "default": "./dist/audio.js"
     },
     "./main": {
-      "types": "./dist/process/main.d.ts",
-      "default": "./dist/process/main.js"
+      "types": "./dist/rpc/main.d.ts",
+      "default": "./dist/rpc/main.js"
     },
     "./preload": {
-      "types": "./dist/process/preload.d.ts",
-      "default": "./dist/process/preload.js"
+      "types": "./dist/rpc/preload.d.ts",
+      "default": "./dist/rpc/preload.js"
     },
     "./host": {
-      "types": "./dist/process/host.d.ts",
-      "default": "./dist/process/host.js"
+      "types": "./dist/rpc/host.d.ts",
+      "default": "./dist/rpc/host.js"
     },
     "./package.json": "./package.json"
   },
@@ -36,6 +36,7 @@
     "README.md"
   ],
   "os": [
+    "darwin",
     "win32",
     "linux"
   ],
@@ -48,14 +49,16 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "bundle:native": "node scripts/bundle-native.js",
-    "pretest": "tsc -p tsconfig.json",
-    "test": "node --test \"test/unit/**/*.test.js\"",
-    "test:integration": "node --test \"test/integration/**/*.test.js\"",
-    "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\"",
+    "pretest": "tsc -p tsconfig.test.json",
+    "test": "node --test \".test-build/test/unit/**/*.test.js\"",
+    "test:integration": "node --test \".test-build/test/integration/**/*.test.js\"",
+    "test:all": "node --test \".test-build/test/unit/**/*.test.js\" \".test-build/test/integration/**/*.test.js\"",
     "prepack": "npm run build && npm run bundle:native"
   },
   "dependencies": {
+    "@runanywhere/proto-ts": "file:../shared/proto-ts",
     "@bufbuild/protobuf": "^2.12.1"
   },
   "devDependencies": {

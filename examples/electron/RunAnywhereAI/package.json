@@ -2,15 +2,24 @@
   "name": "runanywhere-ai-desktop",
   "productName": "RunAnywhere AI",
   "version": "0.1.0",
-  "description": "Private, on-device AI for Windows \u2014 chat, reasoning, your own knowledge base, voice, and vision. Nothing leaves your machine.",
+  "description": "Private, on-device AI for desktop: chat, reasoning, your own knowledge base, voice, and vision. Nothing leaves your machine.",
   "author": "RunAnywhere",
   "license": "SEE LICENSE IN ../../LICENSE",
   "private": true,
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "start:gpu": "electron . --gpu",
+    "build:renderer": "esbuild renderer.js --bundle --format=iife --platform=browser --outfile=renderer.bundle.js --external:electron",
+    "watch:renderer": "npm run build:renderer -- --watch",
+    "start": "npm run build:renderer && electron .",
+    "start:gpu": "npm run build:renderer && electron . --gpu",
     "icon": "electron assets/make-icon.js",
     "test": "node --test \"test/unit/**/*.test.js\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "electron": "^33.0.0"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
   }
 }

@@ -106,6 +106,33 @@ RAC_API rac_result_t rac_desktop_http_transport_register(void);
  */
 RAC_API rac_result_t rac_desktop_default_base_dir(char* out_path, size_t path_size);
 
+/**
+ * @brief Install desktop device-registration callbacks (rac_device_callbacks_t).
+ *
+ * Fills the platform-native device metadata (model, chip, memory, cores, NPU,
+ * OS, architecture, hostname) that the backend needs to show a real device
+ * instead of an "Unknown / — / —" placeholder row. get_device_id reuses the
+ * persistent UUID, is_registered/set_registered persist a flag in the desktop
+ * secure store, and http_post sends the registration JSON through the
+ * registered transport with the SDK bearer token.
+ *
+ * Call once after rac_init() and before the two-phase SDK init / control-plane
+ * configuration, so rac_device_manager_register_if_needed() has the callbacks.
+ *
+ * @return RAC_SUCCESS, or the error surfaced by rac_device_manager_set_callbacks.
+ */
+RAC_API rac_result_t rac_desktop_device_callbacks_register(void);
+
+/**
+ * @brief Fill a device-registration info struct from native probes.
+ *
+ * Exposed for diagnostics/tests: populates every field the registration
+ * callback would send (model, chip, memory, cores, NPU, OS, architecture,
+ * hostname). The const char* fields point into a process-global buffer that is
+ * overwritten by the next call; copy them if you need to keep them.
+ */
+RAC_API void rac_desktop_device_info_fill(struct rac_device_registration_info* out_info);
+
 #ifdef __cplusplus
 }
 #endif

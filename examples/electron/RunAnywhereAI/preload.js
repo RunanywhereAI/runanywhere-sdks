@@ -1,7 +1,8 @@
-// App preload: loads the SDK preload (which exposes window.runanywhere over the
-// MessagePort), then adds this app's own local store — conversations, settings,
-// and custom models, persisted as JSON in userData by the main process.
-require('../../../sdk/runanywhere-electron/dist/process/preload');
+// App preload: loads the SDK preload (which exposes window.runanywhereRpc, the
+// MessagePort transport), then adds this app's own local store — conversations,
+// settings, and custom models, persisted as JSON in userData by the main process.
+// The page builds the v3 facade over that transport with connectRenderer().
+require('../../../sdk/runanywhere-electron/dist/rpc/preload');
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const { migrateSettings } = require('./store');
 

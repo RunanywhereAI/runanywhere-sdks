@@ -17,7 +17,7 @@ const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require('e
 // conversations land in %APPDATA%\RunAnywhere AI (not Electron's default).
 app.setName('RunAnywhere AI');
 
-const { RunAnywhereMain } = require('../../../sdk/runanywhere-electron/dist/process/main');
+const { RunAnywhereMain } = require('../../../sdk/runanywhere-electron/dist/rpc/main');
 
 // The app ships alongside the SDK in this repo; a packaged build resolves the
 // same layout inside resources/ (see electron-builder config when packaging).
@@ -136,7 +136,7 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
     ipcMain.handle('app:backend-config', () => backendConfig());
 
     const ra = new RunAnywhereMain({
-      hostPath: path.join(SDK_ROOT, 'dist', 'process', 'host.js'),
+      hostPath: path.join(SDK_ROOT, 'dist', 'rpc', 'host.js'),
       nativePath: NATIVE_PATH,
       // On a host crash the preload has already failed the in-flight calls;
       // re-fork + reconnect so the app recovers on the next action.

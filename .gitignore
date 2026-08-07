@@ -154,14 +154,8 @@ sdk/runanywhere-kotlin/.idea/
 *.swo
 *~
 
-# Claude. Local session state stays ignored. The handoff README/scripts can
-# stay tracked, but plans and memory are local agent working notes.
-# Uses `.claude/*` rather than `.claude/` because git will not descend into
-# an excluded directory, which would make the negation below unreachable.
-.claude/*
-!.claude/handoff/
-.claude/handoff/plans/
-.claude/handoff/memory/
+# Claude. Entirely local agent state — never tracked (per review feedback).
+.claude/
 
 # Playwright MCP
 .playwright-mcp/

@@ -1,205 +1,123 @@
-// @runanywhere/electron — on-device LLM / VLM / STT / TTS / VAD / embeddings /
-// rerank / diarization / segmentation / RAG for Electron & Node, over the native
-// addon. The v3 surface is the namespaced API; everything under "deprecated"
-// below is a pre-v3 forwarder kept for one release.
+// @runanywhere/electron — on-device LLM/VLM/STT/TTS/VAD/embeddings/RAG for
+// Electron and Node, a thin binding over the C++ commons core. The public
+// surface mirrors the Swift SDK; both hosts (main process and renderer) share
+// one facade over a RaBackend.
 
-// ---- v3 surface ----
-export { createRunAnywhere } from './api/facade';
-export type { InitializeOptions, RunAnywhereApi, SecureStore } from './api/facade';
-export { NativeBackend, RAC_CATEGORY, RAC_FRAMEWORK } from './api/native-backend';
-export { RpcBackend } from './api/rpc-backend';
-export type { RpcSend } from './api/rpc-backend';
-export { BACKEND_METHODS, BACKEND_STREAMING_METHODS, rpcMethodFor } from './api/backend';
-export type { RaBackend, LoadSlot } from './api/backend';
-export { AsyncQueue, bridgeStream, collect, streamOf } from './api/iter';
-export type { StreamSink } from './api/iter';
-export { SdkEventHub } from './api/hub';
-export {
-  audio,
-  image,
-  ragDocument,
-  AgentState,
-  AudioEncoding,
-  AudioFormat,
-  DevicePlacement,
-  Environment,
-  FinishReason,
-  ImageMode,
-  InferenceFramework,
-  ModelCategory,
-  NormalizeMode,
-  PoolingMode,
-  ReasoningMode,
-  Role,
-  TokenKind,
-  ToolChoice,
-  newRequestId,
-} from './api/types';
+export { createRunAnywhere } from './facade.js';
+export type { InitializeOptions, RunAnywhereApi } from './facade.js';
+
+export { NativeBackend } from './native/backend.js';
+export { loadAddon } from './native/load.js';
+export type { NativeAddon } from './native/addon-api.js';
+export { RpcBackend } from './rpc/backend.js';
+export type { RpcSend } from './rpc/backend.js';
+export type { ControlPlaneRequest, ProtoBytes, ProtoSink, RaBackend } from './backend.js';
+export { BACKEND_METHODS, BACKEND_STREAMING_METHODS, rpcMethodFor } from './backend.js';
+
+export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException, raiseForRac } from './errors.js';
+export { NativeResource, ResourceGuard } from './resources.js';
+export { AsyncQueue, bridgeStream, collect, streamOf } from './stream.js';
+export type { StreamSink } from './stream.js';
+export { SdkEventHub } from './events.js';
+
+export { Environment, Role, FinishReason } from './types.js';
 export type {
-  AppliedAdapter,
-  Audio,
-  AudioChunk,
-  AudioFormatSpec,
-  AudioFrame,
   AudioInput,
   ChatMessage,
-  ClassInfo,
-  DiarizationResult,
   DownloadEvent,
+  DownloadProgress,
   Embedding,
   GenerationEvent,
   GenerationMetrics,
   GenerationResult,
-  ImageData,
-  ImageEvent,
   ImageInput,
-  ImageResult,
   LoadedModel,
-  LoraState,
-  Match,
   ModelFilter,
   ModelInfo,
   ModelRef,
-  ModelRegistration,
   ModelsState,
-  RagCapabilities,
-  RagDocument,
-  RagEvent,
-  RagResult,
-  RagStats,
   RankedResult,
   SDKCapabilities,
   SdkEvent,
-  Segment,
-  SegmentationResult,
-  SpeakerSegment,
-  SpeechHandle,
-  StreamingCapabilities,
-  SttState,
-  SttStream,
-  StructuredResult,
   ToolCall,
-  ToolCapabilities,
+  UnavailableCapability,
+} from './types.js';
+
+export { LLM_DEFAULTS, toLlmGenerationOptions } from './options.js';
+export type { LlmOptions } from './options.js';
+export { jsonSchemaToGrammar } from './grammar.js';
+export type { JsonSchema } from './grammar.js';
+
+export type {
+  LlmNamespace,
+  ToolsNamespace,
   ToolDefinition,
   ToolExecutor,
-  Transcription,
-  TranscriptionEvent,
-  UnavailableCapability,
-  VadEvent,
-  VadResult,
-  VadStream,
-  Voice,
-  VoiceEvent,
-  Word,
-} from './api/types';
+  ToolCallRecord,
+  ToolRunResult,
+} from './namespaces/llm.js';
+export { ModelRegistration } from './namespaces/models.js';
 export type {
-  DiarizationOptions,
-  EmbedOptions,
-  Endpointing,
-  ImageOptions,
-  Interruption,
-  LlmOptions,
+  ModelsNamespace,
+  ModelRegistrationSpec,
+  ModelFileSpec,
+  ModelFramework,
+  ModelModality,
   LoadOptions,
-  RagConfig,
-  ReasoningOptions,
-  SegmentationOptions,
+} from './namespaces/models.js';
+export type { VlmNamespace } from './namespaces/vlm.js';
+export type {
+  SttNamespace,
   SttOptions,
-  StructuredOutput,
-  TtsOptions,
-  TurnHandlingOptions,
-  VadOptions,
-} from './api/options';
-// The namespace interfaces are reached through `RunAnywhereApi`, not by name.
-export type { VoiceSession, VoiceSessionConfig } from './api/speech';
-export type { RagSession } from './api/data';
-
-// ---- deprecated (pre-v3) ----
-// Where a pre-v3 name collides with a v3 one, the v3 name is canonical and the old
-// type is re-exported with a `Legacy` prefix. The verbs themselves are unchanged.
-export {
-  RunAnywhere,
-  LLMModel,
-  VLMModel,
-  Embedder,
-  STTModel,
-  TTSVoice,
-  Vad,
-} from './RunAnywhere';
+  Transcription,
+  AudioFormatSpec,
+  TranscriptionEvent,
+  SttState,
+  SttStream,
+} from './namespaces/stt.js';
+export type { TtsNamespace, TtsOptions, Audio, AudioChunk, Voice, SampleFormat } from './namespaces/tts.js';
+export type { VadNamespace, VadOptions, VadFrame, VadResult, VadEvent, VadStream, Segment } from './namespaces/vad.js';
+export type { EmbeddingsNamespace, EmbedOptions } from './namespaces/embeddings.js';
 export type {
-  InitOptions,
-  LoadOptions as LegacyLoadOptions,
-  DownloadOptions,
-  GenerateOptions,
-  GenerateObjectOptions,
-  ToolSpec,
-  ToolRun,
-  LLMStreamEvent,
-  LLMGenerationResult,
-  Environment as LegacyEnvironment,
-  VadOptions as LegacyVadOptions,
-} from './RunAnywhere';
-export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException, raiseForRac } from './errors';
-export { EventBus } from './events';
+  DiarizationNamespace,
+  DiarizationParams,
+  Diarization,
+  SpeakerSegment,
+} from './namespaces/diarization.js';
 export type {
-  RunAnywhereEvent,
-  EventListener,
-  Modality,
-  LifecycleEvent,
-  ModelLoadedEvent,
-  ModelUnloadedEvent,
-  GenerationEvent as GenerationTelemetryEvent,
-} from './events';
-export { jsonSchemaToGrammar } from './grammar';
-export type { JsonSchema } from './grammar';
-export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
-export { splitThinking, stripThinking, isThinking } from './thinking';
-export { speakableText } from './speech';
-export { formatChat, hasTurnMarkup } from './chat-template';
-export type { ChatTemplate, ChatTurn, FormatOptions } from './chat-template';
-export type { ThinkingSplit } from './thinking';
-export { streamWithMetrics } from './stream';
-export {
-  float32ToPcm16,
-  pcm16ToFloat32,
-  pcm16Bytes,
-  downsample,
-  rms,
-  encodeWav,
-  decodeWav,
-  MicRecorder,
-  SpeakerPlayer,
-} from './audio';
-export type { MicRecorderOptions } from './audio';
-export { Chat } from './Chat';
-export type { ChatMessage as LegacyChatMessage, ChatOptions } from './Chat';
-export { VoiceAgent } from './VoiceAgent';
+  SegmentationNamespace,
+  SegmentationParams,
+  Segmentation,
+} from './namespaces/segmentation.js';
 export type {
-  VoiceAgentModels,
-  VoiceAgentOptions,
-  VoiceTurn,
-  VoiceTurnCallbacks,
-} from './VoiceAgent';
-export type { NativeAddon } from './bridge';
-export { CATALOG, isCatalogId } from './catalog';
-export type { CatalogEntry, ModelType } from './catalog';
-export { resolveModel, downloadFile, modelsRoot } from './download';
-export type { DownloadProgress, ResolvedModel } from './download';
-export {
-  RagSession as LegacyRagSession,
-  createRagSessionFromCatalog,
-  frameworkForModelPath,
-  RagModelCategory,
-  RagInferenceFramework,
-} from './rag';
-export type {
-  RagConfig as LegacyRagConfig,
+  RagNamespace,
+  RagSession,
+  RagConfig,
   RagDoc,
-  RagQuery,
-  RagGenerationOptions,
-  RagResult as LegacyRagResult,
-  RagChunk,
-  RagStats as LegacyRagStats,
-  RagBridge,
-  RagCatalogBridge,
-  RagResolvedModel,
-} from './rag';
+  RagResult,
+  RagStats,
+  Match,
+  RagQueryOptions,
+  RagEvent,
+} from './namespaces/rag.js';
+
+export { toPcm16, downsample, rms, resampleInput, to16kPcm16, audioToRaw, audioToSource } from './audio.js';
+export type { RawAudio, AudioSourceFields } from './audio.js';
+export type { RerankNamespace } from './namespaces/placeholders.js';
+export type { ImagesNamespace, ImageOptions, ImageResult, ImageData } from './namespaces/images.js';
+export type { LoraNamespace, AppliedAdapter } from './namespaces/lora.js';
+export type {
+  VoiceNamespace,
+  VoiceSession,
+  VoiceSessionConfig,
+  VoiceTurn,
+} from './namespaces/voice.js';
+
+// Renderer entry + RPC plumbing (electron-free). RunAnywhereMain / preload / host
+// import electron and are reached only through the ./main, ./preload, ./host
+// package subpaths, never the root entry.
+export { connectRenderer } from './rpc/renderer.js';
+export { ALLOWED_RPC_METHODS, dispatch } from './rpc/dispatch.js';
+export type { BackendMap, DispatchDeps, DispatchPort } from './rpc/dispatch.js';
+export { STREAMING_METHODS } from './rpc/protocol.js';
+export type { RpcErrorPayload, RpcMessage, RpcRequest } from './rpc/protocol.js';
