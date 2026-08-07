@@ -325,7 +325,9 @@ if(NOT BZIP2_FOUND)
     message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
     FetchContent_Declare(
         bzip2_src
-        URL https://sourceware.org/pub/bzip2/bzip2-${RAC_BZIP2_VERSION}.tar.gz
+        # sourceware.org is frequently unreachable from CI/dev networks; use a
+        # byte-identical GitHub-release mirror (SHA256 below still validates it).
+        URL https://github.com/Siddhesh2377/runanywhere-build-mirrors/releases/download/bzip2-1.0.8/bzip2-1.0.8.tar.gz
         URL_HASH SHA256=ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
     )
     FetchContent_MakeAvailable(bzip2_src)
