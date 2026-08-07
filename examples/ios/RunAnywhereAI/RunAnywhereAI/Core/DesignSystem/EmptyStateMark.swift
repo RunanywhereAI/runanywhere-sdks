@@ -14,11 +14,18 @@
 //  empty state is recognisably the same object, which is what makes it read as a
 //  designed state rather than a missing one.
 //
-//  Motion. The bloom breathes on the canonical 1.6s linear ambient period and
-//  the ring sweeps on the 1.2s shimmer period — both suppressed entirely under
-//  Reduce Motion (per DESIGN_GUIDELINE §6.5: a `repeatForever` collapsed to a
-//  short fade still repeats forever). Nothing here animates on a timer the
-//  reader has to wait for; the figure is fully legible on the first frame.
+//  Motion: none, deliberately.
+//
+//  This figure used to breathe a blurred circle on the 1.6s ambient period and
+//  rotate a trimmed arc on the 1.2s shimmer period. Both are cut. An empty state
+//  is not working on anything — nothing is loading, nothing is pending, no
+//  progress exists to report — so motion here has no informational job, and
+//  perpetual motion on a screen the reader is *reading* competes with the
+//  sentence that tells them what to do. A still, well-drawn mark reads as
+//  designed; a pulsing one reads as a spinner that never resolves.
+//
+//  The arc is still a partial arc, because an aperture opening toward the glyph
+//  is better composition than a closed collar. It just doesn't spin.
 //
 
 import SwiftUI
@@ -31,12 +38,6 @@ struct EmptyStateMark: View {
     var tint: Color = AppColors.brand
     /// Overall diameter. 132 is the hero size; 88 fits inside a card.
     var diameter: CGFloat = 132
-
-    @Environment(\.accessibilityReduceMotion)
-    private var reduceMotion
-
-    @State private var breathing = false
-    @State private var sweep = false
 
     /// The glyph is 34% of the figure so the ring always reads as an aperture
     /// around it rather than a tight collar.
@@ -52,31 +53,20 @@ struct EmptyStateMark: View {
         // Decoration: the caller's title and message already say what this is,
         // and a screen reader announcing "waveform image" adds nothing.
         .accessibilityHidden(true)
-        .onAppear {
-            guard !reduceMotion else { return }
-            breathing = true
-            sweep = true
-        }
-        .onChange(of: reduceMotion) { _, isReduced in
-            // Honour the setting changing while the view is on screen, rather
-            // than only at first appearance.
-            breathing = !isReduced
-            sweep = !isReduced
-        }
     }
 
-    /// The soft brand light behind everything. Blur scales with the figure so an
-    /// 88pt mark is not wearing a 132pt mark's halo.
+    /// The soft brand light behind everything, giving the mark depth against a
+    /// flat background. Blur scales with the figure so an 88pt mark is not
+    /// wearing a 132pt mark's halo.
     private var bloom: some View {
         Circle()
             .fill(tint.opacity(0.22))
             .blur(radius: diameter * 0.18)
-            .scaleEffect(breathing ? 1.06 : 0.94)
-            .animation(Motion.resolveAmbient(reduceMotion: reduceMotion), value: breathing)
     }
 
-    /// Two rings. The full one is structure; the trimmed arc rotating over it is
-    /// the only thing that says "listening for something" rather than "broken".
+    /// Two concentric rings: a full hairline for structure, and a brighter arc
+    /// over it whose gap gives the figure an orientation and keeps it from
+    /// reading as a status dot. Static — the arc is composition, not progress.
     private var aperture: some View {
         ZStack {
             Circle()
@@ -88,11 +78,10 @@ struct EmptyStateMark: View {
                     tint.opacity(0.85),
                     style: StrokeStyle(lineWidth: Stroke.emphasis, lineCap: .round)
                 )
-                .rotationEffect(.degrees(sweep ? 360 : 0))
-                .animation(
-                    Motion.resolveAmbient(Motion.shimmer, reduceMotion: reduceMotion),
-                    value: sweep
-                )
+                // Starts at the top. `.trim` begins at 3 o'clock, and an arc
+                // hanging off the right side looks like an accident rather than
+                // a crown.
+                .rotationEffect(.degrees(-90))
         }
         .padding(diameter * 0.06)
     }

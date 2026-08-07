@@ -88,7 +88,11 @@ struct ChatMessageListView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: Space.xl) {
-            ChatEmptyStateMark()
+            // The shared figure, so the empty transcript is recognisably the same
+            // object as every other empty state in the app. 96pt rather than the
+            // 132pt hero: this state also carries four starter prompts, and a
+            // full-size mark pushed them below the fold on the shortest phone.
+            EmptyStateMark(systemImage: "bubble.left.and.bubble.right", diameter: 96)
 
             VStack(spacing: Space.sm) {
                 Text(emptyStateGreeting)
@@ -237,41 +241,6 @@ struct StarterPrompt: Identifiable {
     ]
 }
 
-/// The mark on the empty transcript. Breathes so the screen reads as awake
-/// rather than stalled — and holds still under Reduce Motion, where an infinite
-/// loop cannot be collapsed to a fade.
-private struct ChatEmptyStateMark: View {
-    @Environment(\.accessibilityReduceMotion)
-    private var reduceMotion
-    @State private var breathing = false
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            AppColors.primaryAccent.opacity(0.22),
-                            AppColors.primaryAccent.opacity(0.06)
-                        ],
-                        center: .topLeading,
-                        startRadius: 6,
-                        endRadius: 84
-                    )
-                )
-                .frame(width: 80, height: 80)
-                .scaleEffect(breathing ? 1.04 : 0.97)
-
-            Image(systemName: "sparkles")
-                .font(.system(size: 32, weight: .medium))
-                .foregroundStyle(AppColors.primaryAccent)
-        }
-        .animation(Motion.resolveAmbient(reduceMotion: reduceMotion), value: breathing)
-        .onAppear { breathing = !reduceMotion }
-        .accessibilityHidden(true)
-    }
-}
-
 private struct StarterPromptChip: View {
     let prompt: StarterPrompt
     let action: () -> Void
@@ -311,9 +280,21 @@ private struct StarterPromptChip: View {
                         lineWidth: Stroke.regular
                     )
             )
+            // Hover lifts the card a hair off the page. On a Mac, a border that
+            // changes color is easy to miss on a grid of four; a card that rises
+            // is unmistakable, and it says "this is pressable" rather than just
+            // "the pointer is here". No-op on a phone, which has no hover.
+            .shadow(
+                color: AppColors.primaryAccent.opacity(isHovering ? 0.18 : 0),
+                radius: isHovering ? 12 : 0,
+                y: isHovering ? 4 : 0
+            )
+            .scaleEffect(isHovering ? 1.012 : 1)
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+        // `micro`, not `standard`: hover feedback slower than ~150ms lags the
+        // pointer, and on a grid the reader notices the lag before the lift.
         .motionAware(Motion.microFade, value: isHovering)
     }
 }
