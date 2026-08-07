@@ -158,6 +158,16 @@ public class ModelsNamespace internal constructor() {
                                     bytesDone = progress.bytes_downloaded,
                                     bytesTotal = progress.total_bytes,
                                     file = progress.current_file_name.takeIf { it.isNotEmpty() },
+                                    // C++ reports 0 for "not measured yet" and the proto leaves eta
+                                    // absent for "unknown". Both are normalised to null here so a
+                                    // UI can tell missing from genuinely zero and show nothing
+                                    // rather than "0 B/s" while the transfer spins up.
+                                    bytesPerSecond = progress.bytes_per_second.takeIf { it > 0f },
+                                    etaSeconds = progress.eta_seconds,
+                                    retryAttempt = progress.retry_attempt,
+                                    overallProgress = progress.overall_progress.takeIf { it > 0f },
+                                    currentFileIndex = progress.current_file_index,
+                                    totalFiles = progress.total_files.coerceAtLeast(1),
                                 ),
                             )
                     }

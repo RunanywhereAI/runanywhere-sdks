@@ -310,14 +310,52 @@ public sealed class DownloadEvent {
         override val sequence: Long,
     ) : DownloadEvent()
 
-    /** Bytes transferred so far. */
+    /**
+     * Bytes transferred so far, plus what a UI needs to say how the transfer is going.
+     *
+     * C++ already measures throughput and projects a finish time
+     * (`download_orchestrator.cpp`), and the `DownloadProgress` proto carries both along with the
+     * retry count and the position in a multi-file plan. Those fields used to be dropped at this
+     * boundary, so no consumer could show a rate or a remaining time no matter what it did. They are
+     * surfaced here rather than recomputed per platform: five SDKs deriving their own rate from
+     * successive byte counts would disagree with each other and with the transfer that actually
+     * knows its own history.
+     *
+     * Every added field is optional and defaulted, so a caller that only wants bytes is unaffected.
+     */
     public data class Progress(
         override val operationId: String,
         override val sequence: Long,
         val bytesDone: Long,
         val bytesTotal: Long,
         val file: String? = null,
-    ) : DownloadEvent()
+        /** Measured throughput. Null when not yet known — never a zero standing in for unknown. */
+        val bytesPerSecond: Float? = null,
+        /** Projected seconds remaining. Null when the total size or the rate is unknown. */
+        val etaSeconds: Long? = null,
+        /** 0 on the first attempt. Above 0 means the transfer recovered from a failure. */
+        val retryAttempt: Int = 0,
+        /** 0.0..1.0 across every file in the plan, not just the current one. */
+        val overallProgress: Float? = null,
+        /** 0-based position in the planned file list. */
+        val currentFileIndex: Int = 0,
+        /** Files in the plan. 1 for a single-file model. */
+        val totalFiles: Int = 1,
+    ) : DownloadEvent() {
+
+        /**
+         * Fraction of the whole download that is done, 0.0..1.0, or null when the size is unknown.
+         *
+         * Prefers [overallProgress] because a multi-file model's byte counts are per-file: reaching
+         * the end of file one of three is 100% of those bytes but a third of the download, and a bar
+         * that fills and resets twice reads as a stall or a restart. Falls back to the byte ratio for
+         * a single file, and reports null rather than a fake 0 so a caller can show an
+         * indeterminate bar instead of one that looks stuck at the left edge.
+         */
+        public val fraction: Float?
+            get() = overallProgress
+                ?: bytesTotal.takeIf { it > 0 }?.let { (bytesDone.toFloat() / it).coerceIn(0f, 1f) }
+    }
 
     /** Downloaded bytes are being checksummed/validated. */
     public data class Verifying(
