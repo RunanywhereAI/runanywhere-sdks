@@ -299,6 +299,13 @@ final class LLMViewModel {
         && isModelLoaded
     }
 
+    /// `Error` is not `Equatable`, so a view cannot `.onChange(of: error)`. This
+    /// gives the UI something it can observe, which is what lets the chat report
+    /// failures the moment they happen instead of polling after a fixed delay.
+    var errorDescription: String? {
+        error?.localizedDescription
+    }
+
     // MARK: - Initialization
 
     init() {

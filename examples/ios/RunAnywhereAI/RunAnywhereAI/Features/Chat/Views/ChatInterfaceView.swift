@@ -35,9 +35,14 @@ private enum ChatFileImportKind {
 // MARK: - Chat Interface View
 
 struct ChatInterfaceView: View {
-    @State private var viewModel = LLMViewModel()
+    // On the Mac the shell owns the view model so the sidebar and the transcript
+    // agree on which conversation is open. On iOS there is no second column, so
+    // the view creates its own.
+    @State private var viewModel: LLMViewModel
     @StateObject private var conversationStore = ConversationStore.shared
+    #if os(iOS)
     @State private var showingConversationList = false
+    #endif
     @State private var showingModelSelection = false
     @State private var showingChatDetails = false
     @State private var showingSettings = false
@@ -56,8 +61,7 @@ struct ChatInterfaceView: View {
     @State private var selectedDocumentEmbeddingModel: RAModelInfo?
     @State private var selectedDocumentAnswerModel: RAModelInfo?
     @State private var isVisionModelReady = false
-    @State private var showDebugAlert = false
-    @State private var debugMessage = ""
+    @State private var errorMessage: String?
     @State private var showModelLoadedToast = false
     @State private var showingLoRAScaleSheet = false
     @State private var showingLoRAManagement = false
@@ -77,6 +81,15 @@ struct ChatInterfaceView: View {
         category: "ChatInterfaceView"
     )
 
+    // The default is `nil` rather than `LLMViewModel()`: a default argument is
+    // evaluated in the *caller's* isolation, so a literal default would demand
+    // main-actor context at every call site. Constructing inside this
+    // `@MainActor` body keeps `ChatInterfaceView()` callable as written.
+    @MainActor
+    init(viewModel: LLMViewModel? = nil) {
+        _viewModel = State(initialValue: viewModel ?? LLMViewModel())
+    }
+
     var hasModelSelected: Bool {
         viewModel.isModelLoaded && viewModel.loadedModelName != nil
     }
@@ -86,20 +99,26 @@ struct ChatInterfaceView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Group {
-                #if os(macOS)
-                macOSView
-                #else
+        Group {
+            #if os(macOS)
+            // The Mac reaches conversations through the window's sidebar, so the
+            // slide-over drawer (and the dimming layer it needed) is gone.
+            macOSView
+            #else
+            ZStack(alignment: .leading) {
                 iOSView
-                #endif
-            }
 
-            if showingConversationList {
-                conversationDrawerOverlay
-                    .transition(.opacity)
-                    .zIndex(10)
+                if showingConversationList {
+                    conversationDrawerOverlay
+                        .transition(.opacity)
+                        .zIndex(10)
+                }
             }
+            // Scoped to the drawer it animates rather than applied to the whole
+            // screen, so an unrelated state change can't drag chat content
+            // through this curve.
+            .animation(Motion.standardFade, value: showingConversationList)
+            #endif
         }
         .adaptiveSheet(isPresented: $showingModelSelection) {
             ModelSelectionSheet(context: .llm) { model in
@@ -200,10 +219,24 @@ struct ChatInterfaceView: View {
                 showModelLoadedToast = true
             }
         }
-        .alert("Debug Info", isPresented: $showDebugAlert) {
-            Button("OK") { }
+        // Errors are surfaced by the code that produces them and by observing the
+        // view model, not by a Task that sleeps and then peeks at `error`. Three
+        // such pollers used to race here; a generation failing faster or slower
+        // than the fixed delay showed nothing at all.
+        .onChange(of: viewModel.errorDescription) { _, description in
+            guard let description else { return }
+            errorMessage = description
+        }
+        .alert(
+            "Something went wrong",
+            isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { clearError() } }
+            )
+        ) {
+            Button("OK") { clearError() }
         } message: {
-            Text(debugMessage)
+            Text(errorMessage ?? "")
         }
         .modelLoadedToast(
             isShowing: $showModelLoadedToast,
@@ -235,7 +268,11 @@ struct ChatInterfaceView: View {
         .adaptiveSheet(isPresented: $showingLoRAManagement, onDismiss: handleLoRAManagementDismiss) {
             loraManagementSheet
         }
-        .animation(.easeInOut(duration: AppLayout.animationRegular), value: showingConversationList)
+    }
+
+    private func clearError() {
+        errorMessage = nil
+        viewModel.setError(nil)
     }
 
     // Chain the file picker off the management sheet's dismissal instead of
@@ -266,10 +303,10 @@ struct ChatInterfaceView: View {
 // MARK: - Platform Views
 
 extension ChatInterfaceView {
+    #if os(macOS)
     var macOSView: some View {
         ZStack {
             VStack(spacing: 0) {
-                macOSToolbar
                 contentArea
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -277,8 +314,82 @@ extension ChatInterfaceView {
 
             modelRequiredOverlayIfNeeded
         }
+        // The window's own title bar carries the conversation identity, so the
+        // app no longer paints a second chrome strip beneath it.
+        .navigationTitle(viewModel.currentConversation?.title ?? "New Chat")
+        .navigationSubtitle(macSubtitle)
+        .toolbar { macToolbar }
+        // The composer takes the caret when a window opens or a chat is
+        // selected: a chat window whose text field is not focused makes the user
+        // click before they can type.
+        .defaultFocus($isTextFieldFocused, true)
+        .focusedSceneValue(\.chatSceneActions, chatSceneActions)
     }
 
+    /// The subtitle answers "what is answering me, and is it busy" — the two
+    /// facts the old bordered-button row spent 200pt of chrome to convey.
+    private var macSubtitle: String {
+        if viewModel.isGenerating { return "Generating…" }
+        if isModelLoading { return "Loading model…" }
+        guard let name = viewModel.loadedModelName else { return "No model loaded" }
+        let backend = viewModel.isUsingConnect
+            ? (viewModel.connectedHostName ?? "Host")
+            : (viewModel.selectedFramework?.consumerBackendShortLabel ?? "Local")
+        return "\(name) · \(backend)"
+    }
+
+    @ToolbarContentBuilder
+    private var macToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Button {
+                viewModel.createNewConversation()
+            } label: {
+                Label("New Chat", systemImage: "square.and.pencil")
+            }
+            .help("New Chat (⌘N)")
+        }
+
+        ToolbarItemGroup {
+            if viewModel.isGenerating {
+                Button {
+                    viewModel.stopGeneration()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                }
+                .help("Stop Generating (⌘.)")
+            }
+
+            modelButton
+                .help("Choose the model that answers (⇧⌘L)")
+
+            Button {
+                showingChatDetails = true
+            } label: {
+                Label("Chat Details", systemImage: "chart.bar.doc.horizontal")
+            }
+            .disabled(viewModel.messages.isEmpty)
+            .help("Chat Details (⌘I)")
+        }
+    }
+
+    private var chatSceneActions: ChatSceneActions {
+        ChatSceneActions(
+            newConversation: { viewModel.createNewConversation() },
+            loadModel: { showingModelSelection = true },
+            showChatDetails: viewModel.messages.isEmpty ? nil : { showingChatDetails = true },
+            importDocument: {
+                activeFileImportKind = .document
+                showingFileImporter = true
+            },
+            // nil disables the menu item, so ⌘. never claims to stop something
+            // that isn't running.
+            stopGeneration: viewModel.isGenerating ? { viewModel.stopGeneration() } : nil,
+            focusComposer: { isTextFieldFocused = true }
+        )
+    }
+    #endif
+
+    #if os(iOS)
     var iOSView: some View {
         VStack(spacing: 0) {
             consumerTopBar
@@ -292,65 +403,18 @@ extension ChatInterfaceView {
                 }
                 modelRequiredOverlayIfNeeded
 
-                #if os(iOS)
                 ConnectStatusBanner()
                     .padding(.top, AppSpacing.small)
                     .zIndex(1)
-                #endif
             }
         }
     }
+    #endif
 }
 
 // MARK: - Toolbar + Content Shell
 
 extension ChatInterfaceView {
-    var macOSToolbar: some View {
-        HStack {
-            Button {
-                showingConversationList = true
-            } label: {
-                Label("Conversations", systemImage: "list.bullet")
-            }
-            .buttonStyle(.bordered)
-            .tint(AppColors.primaryAccent)
-
-            Button {
-                showingChatDetails = true
-            } label: {
-                Image(systemName: "info.circle")
-            }
-            .buttonStyle(.bordered)
-            .tint(AppColors.primaryAccent)
-            .disabled(viewModel.messages.isEmpty)
-
-            Spacer()
-
-            modelButton
-
-            Spacer()
-
-            Button {
-                showingAdvancedHub = true
-            } label: {
-                Label("Advanced", systemImage: "slider.horizontal.3")
-            }
-            .buttonStyle(.bordered)
-            .tint(AppColors.primaryAccent)
-
-            Button {
-                showingSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.bordered)
-            .tint(AppColors.primaryAccent)
-        }
-        .padding(.horizontal, AppSpacing.large)
-        .padding(.vertical, AppSpacing.smallMedium)
-        .background(AppColors.backgroundPrimary)
-    }
-
     @ViewBuilder var contentArea: some View {
         if hasAssistantSurface {
             ChatMessageListView(
@@ -486,6 +550,7 @@ extension ChatInterfaceView {
             && selectedDocumentAnswerModel?.isAvailableForUse == true
     }
 
+    #if os(iOS)
     private var consumerTopBar: some View {
         HStack(spacing: AppSpacing.smallMedium) {
             iconCircleButton(systemImage: "line.3.horizontal") {
@@ -542,7 +607,9 @@ extension ChatInterfaceView {
         }
         .buttonStyle(.plain)
     }
+    #endif
 
+    #if os(iOS)
     private var conversationDrawerOverlay: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -577,11 +644,15 @@ extension ChatInterfaceView {
         }
     }
 
+    /// Direct call, not a NotificationCenter round trip: the selection is
+    /// intra-app state with exactly one consumer, and a broadcast made the data
+    /// flow untraceable and untyped for no benefit.
     private func selectConversation(_ conversation: Conversation) {
         let selected = conversationStore.loadConversation(conversation.id) ?? conversation
-        NotificationCenter.default.post(name: .conversationSelected, object: selected)
+        viewModel.loadConversation(selected)
         showingConversationList = false
     }
+    #endif
 
     private func handleFileImport(_ result: Result<[URL], Error>, kind: ChatFileImportKind) {
         switch kind {
@@ -625,17 +696,6 @@ extension ChatInterfaceView {
 
         Task {
             await viewModel.sendMessage()
-
-            Task {
-                let sleepDuration = UInt64(AppLayout.animationSlow * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: sleepDuration)
-                if let error = viewModel.error {
-                    await MainActor.run {
-                        debugMessage = "Error occurred: \(error.localizedDescription)"
-                        showDebugAlert = true
-                    }
-                }
-            }
         }
     }
 
@@ -652,17 +712,6 @@ extension ChatInterfaceView {
         Task {
             await viewModel.sendImageQuestion(attachment: attachment, prompt: viewModel.currentInput)
             await refreshVisionModelStatus()
-
-            Task {
-                let sleepDuration = UInt64(AppLayout.animationSlow * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: sleepDuration)
-                if let error = viewModel.error {
-                    await MainActor.run {
-                        debugMessage = "Error occurred: \(error.localizedDescription)"
-                        showDebugAlert = true
-                    }
-                }
-            }
         }
     }
 
@@ -681,17 +730,6 @@ extension ChatInterfaceView {
                 answerModel: answerModel,
                 prompt: viewModel.currentInput
             )
-
-            Task {
-                let sleepDuration = UInt64(AppLayout.animationSlow * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: sleepDuration)
-                if let error = viewModel.error {
-                    await MainActor.run {
-                        debugMessage = "Error occurred: \(error.localizedDescription)"
-                        showDebugAlert = true
-                    }
-                }
-            }
         }
     }
 
@@ -748,8 +786,7 @@ extension ChatInterfaceView {
                 showingVisionModelSelection = true
             }
         } catch {
-            debugMessage = error.localizedDescription
-            showDebugAlert = true
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -783,14 +820,12 @@ extension ChatInterfaceView {
                     }
                 } catch {
                     await MainActor.run {
-                        debugMessage = error.localizedDescription
-                        showDebugAlert = true
+                        errorMessage = error.localizedDescription
                     }
                 }
             }
         case .failure(let error):
-            debugMessage = error.localizedDescription
-            showDebugAlert = true
+            errorMessage = error.localizedDescription
         }
     }
 

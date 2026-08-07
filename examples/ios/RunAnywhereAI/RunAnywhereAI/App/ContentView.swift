@@ -3,7 +3,7 @@
 //  RunAnywhereAI
 //
 //  Consumer assistant shell. Chat is the product; advanced SDK demos live behind
-//  Settings/Advanced instead of top-level tabs.
+//  the sidebar's Library section instead of top-level tabs.
 //
 
 import SwiftUI
@@ -17,68 +17,80 @@ struct ContentView: View {
             ConsumerCompactShell()
             #endif
         }
-        .accentColor(AppColors.primaryAccent)
+        // `.tint` and not `.accentColor`: the latter is deprecated and, on
+        // macOS, does not reach controls that read the tint from the
+        // environment (sidebar selection, toolbar buttons, Form switches).
+        .tint(AppColors.primaryAccent)
     }
 }
 
 #if os(macOS)
-private enum ConsumerRootDestination: Hashable {
-    case assistant
-    case models
-    case settings
-    case advanced
-}
-
 private struct ConsumerMacShell: View {
-    @State private var selectedDestination: ConsumerRootDestination? = .assistant
+    @StateObject private var store = ConversationStore.shared
+    @State private var viewModel = LLMViewModel()
+    // Sidebar width and selection survive a relaunch because a window that
+    // reopens with the columns the user left is the difference between a
+    // document app and a demo.
+    @SceneStorage("mac.sidebar.visibility") private var storedVisibility: String?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var selection: MacSidebarSelection?
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedDestination) {
-                Section("RunAnywhere") {
-                    NavigationLink(value: ConsumerRootDestination.assistant) {
-                        Label("Assistant", systemImage: "sparkles")
-                    }
-                    NavigationLink(value: ConsumerRootDestination.models) {
-                        Label("Models", systemImage: "square.stack.3d.up")
-                    }
-                }
-
-                Section("Manage") {
-                    NavigationLink(value: ConsumerRootDestination.settings) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    NavigationLink(value: ConsumerRootDestination.advanced) {
-                        Label("Advanced", systemImage: "slider.horizontal.3")
-                    }
-                }
-            }
-            .navigationTitle("RunAnywhere")
-            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            MacSidebar(
+                store: store,
+                selection: $selection,
+                onNewConversation: newConversation
+            )
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
         } detail: {
-            switch selectedDestination ?? .assistant {
-            case .assistant:
-                ChatInterfaceView()
-            case .models:
-                SimplifiedModelsView()
-            case .settings:
-                NavigationStack {
-                    CombinedSettingsView()
-                }
-            case .advanced:
-                NavigationStack {
-                    ConsumerAdvancedHubView()
-                }
-            }
+            detail
         }
-        .frame(
-            minWidth: 900,
-            idealWidth: 1200,
-            maxWidth: .infinity,
-            minHeight: 620,
-            idealHeight: 820,
-            maxHeight: .infinity
-        )
+        .navigationSplitViewStyle(.balanced)
+        .onAppear(perform: restoreState)
+        .onChange(of: columnVisibility) { _, visibility in
+            storedVisibility = visibility == .detailOnly ? "detailOnly" : "all"
+        }
+        .onChange(of: selection) { _, newValue in
+            guard case .conversation(let id) = newValue,
+                  let conversation = store.loadConversation(id) else { return }
+            viewModel.loadConversation(conversation)
+        }
+        // Keep the sidebar's highlight on whichever conversation the chat is
+        // actually showing, including one created from ⌘N or from the composer.
+        .onChange(of: viewModel.currentConversation?.id) { _, id in
+            guard let id else { return }
+            if case .conversation(let selected) = selection, selected == id { return }
+            selection = .conversation(id)
+        }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        switch selection {
+        case .models:
+            NavigationStack { SimplifiedModelsView() }
+        case .advanced:
+            NavigationStack { ConsumerAdvancedHubView() }
+        case .conversation, .none:
+            ChatInterfaceView(viewModel: viewModel)
+        }
+    }
+
+    private func newConversation() {
+        viewModel.createNewConversation()
+        if let id = viewModel.currentConversation?.id {
+            selection = .conversation(id)
+        }
+    }
+
+    private func restoreState() {
+        if storedVisibility == "detailOnly" {
+            columnVisibility = .detailOnly
+        }
+        if selection == nil, let current = viewModel.currentConversation {
+            selection = .conversation(current.id)
+        }
     }
 }
 #else
