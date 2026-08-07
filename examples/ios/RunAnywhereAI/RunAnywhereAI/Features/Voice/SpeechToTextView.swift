@@ -9,20 +9,9 @@ import AppKit
 struct SpeechToTextView: View {
     @StateObject private var viewModel = STTViewModel()
     @State private var showModelPicker = false
-    @State private var breathingAnimation = false
 
     private var hasModelSelected: Bool {
         viewModel.selectedModelName != nil
-    }
-
-    private var statusMessage: String {
-        ""
-    }
-
-    private var waveHeights: [CGFloat] {
-        breathingAnimation
-            ? [24, 40, 32, 48, 28]
-            : [16, 24, 20, 28, 18]
     }
 
     var body: some View {
@@ -55,47 +44,28 @@ struct SpeechToTextView: View {
                             VStack(spacing: 0) {
                                 Spacer()
 
-                                VStack(spacing: 48) {
-                                    // Minimal waveform visualization
-                                    HStack(spacing: 4) {
-                                        ForEach(0..<5) { index in
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: [
-                                                            AppColors.primaryAccent.opacity(0.8),
-                                                            AppColors.primaryAccent.opacity(0.4)
-                                                        ],
-                                                        startPoint: .top,
-                                                        endPoint: .bottom
-                                                    )
-                                                )
-                                                .frame(width: 6, height: waveHeights[index])
-                                                .animation(
-                                                    .easeInOut(duration: 0.8)
-                                                        .repeatForever(autoreverses: true)
-                                                        .delay(Double(index) * 0.1),
-                                                    value: breathingAnimation
-                                                )
-                                        }
-                                    }
+                                VStack(spacing: Space.xxl) {
+                                    // Still, deliberately. This is the idle
+                                    // state: the microphone is closed and there
+                                    // is nothing to measure. It used to breathe
+                                    // five bars forever on a 0.8s stagger,
+                                    // which looked like live audio while
+                                    // nothing was being recorded.
+                                    EmptyStateMark(systemImage: "waveform", diameter: 96)
 
-                                    // Clean typography
-                                    VStack(spacing: 12) {
+                                    VStack(spacing: Space.sm) {
                                         Text("Ready to transcribe")
-                                            .font(.system(size: 24, weight: .semibold, design: .rounded))
-                                            .foregroundColor(.primary)
+                                            .appType(.title)
+                                            .foregroundStyle(AppColors.textPrimary)
 
                                         Text(readyModeDescription)
-                                            .font(.system(size: 15, weight: .regular))
-                                            .foregroundColor(.secondary)
+                                            .appType(.secondary)
+                                            .foregroundStyle(AppColors.textSecondary)
+                                            .multilineTextAlignment(.center)
                                     }
                                 }
 
                                 Spacer()
-                            }
-                            .onAppear {
-                                breathingAnimation = true
                             }
                         } else if viewModel.isTranscribing && viewModel.transcription.isEmpty {
                             // Processing state - Clean and centered
@@ -214,12 +184,6 @@ struct SpeechToTextView: View {
                                 viewModel.isProcessing ||
                                 viewModel.isTranscribing ? 0.6 : 1.0
                             )
-
-                            if !statusMessage.isEmpty {
-                                Text(statusMessage)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
                         }
                         .padding()
                         #if os(iOS)
@@ -383,62 +347,11 @@ struct SpeechToTextView: View {
     }
 
     private var modelButton: some View {
-        Button {
+        VoiceModelChip(
+            modelName: viewModel.selectedModelName,
+            framework: viewModel.selectedFramework
+        ) {
             showModelPicker = true
-        } label: {
-            HStack(spacing: 6) {
-                // Model logo instead of cube icon
-                if let modelName = viewModel.selectedModelName {
-                    Image(getModelLogo(for: modelName))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 36, height: 36)
-                        .cornerRadius(AppSpacing.cornerRadiusSmall)
-                } else {
-                    Image(systemName: "cube")
-                        .font(AppTypography.system14)
-                }
-
-                if let modelName = viewModel.selectedModelName {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName.shortModelName())
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-
-                        // Framework indicator
-                        if let framework = viewModel.selectedFramework {
-                            HStack(spacing: 3) {
-                                Image(systemName: frameworkIcon(for: framework))
-                                    .font(.system(size: 7))
-                                Text(framework.displayName)
-                                    .font(.system(size: 8, weight: .medium))
-                            }
-                            .foregroundColor(frameworkColor(for: framework))
-                        }
-                    }
-                } else {
-                    Text("Select Model")
-                        .font(.caption)
-                }
-            }
-        }
-    }
-
-
-    private func frameworkIcon(for framework: InferenceFramework) -> String {
-        switch framework {
-        case .onnx: return "square.stack.3d.up"
-        case .foundationModels: return "apple.logo"
-        default: return "cube"
-        }
-    }
-
-    private func frameworkColor(for framework: InferenceFramework) -> Color {
-        switch framework {
-        case .onnx: return AppColors.primaryPurple
-        case .foundationModels: return .primary
-        default: return AppColors.statusGray
         }
     }
 }

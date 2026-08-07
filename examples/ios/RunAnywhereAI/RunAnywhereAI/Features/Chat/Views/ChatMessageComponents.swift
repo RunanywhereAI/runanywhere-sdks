@@ -160,23 +160,29 @@ struct MessageBubbleView: View {
                 if isUser { userBubble } else { assistantBody }
             }
             .contextMenu { messageMenu }
+        } else if isStreamingTail {
+            // The gap between Send and the first token. Without this the bubble
+            // is `EmptyView` until a token lands, so on a cold model the reader
+            // gets an empty screen for several seconds with nothing to say the
+            // request was even received. The caret alone is the right amount:
+            // it is the same glyph the reply will grow from, so nothing swaps
+            // out when the first token arrives.
+            assistantBody
         }
     }
 
+    /// The caret lives *inside* the text now (see `StreamingTextView`), not on its
+    /// own line below it. A status dot sitting under a paragraph reads as an
+    /// indicator light; a caret hard against the last token reads as a cursor,
+    /// which is what tells a reader where the next word will land.
     private var assistantBody: some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            AdaptiveMarkdownText(
-                message.content.trimmingCharacters(in: .whitespacesAndNewlines),
-                font: AppType.font(.body),
-                color: message.isError == true ? AppColors.dangerText : AppColors.textPrimary
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
-
-            if isStreamingTail {
-                StreamingCursorDot()
-            }
-        }
+        StreamingTextView(
+            content: message.content.trimmingCharacters(in: .whitespacesAndNewlines),
+            isStreaming: isStreamingTail,
+            font: AppType.font(.body),
+            color: message.isError == true ? AppColors.dangerText : AppColors.textPrimary
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var userBubble: some View {

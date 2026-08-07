@@ -301,25 +301,16 @@ struct AdaptiveMicButton: View {
 
     private var micContent: some View {
         ZStack {
-            // Background circle
+            // The halo sits behind the button, so a capture state reads at a
+            // glance from across a desk without the icon ever being obscured.
+            if isPulsing {
+                MicCaptureHalo(diameter: AdaptiveSizing.micButtonSize)
+            }
+
             Circle()
                 .fill(isActive ? activeColor : inactiveColor)
                 .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
 
-            // Pulsing effect when active
-            if isPulsing {
-                Circle()
-                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                    .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
-                    .scaleEffect(1.3)
-                    .opacity(0)
-                    .animation(
-                        .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                        value: isPulsing
-                    )
-            }
-
-            // Icon or loading indicator
             if isLoading {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -329,7 +320,9 @@ struct AdaptiveMicButton: View {
                     .font(.system(size: AdaptiveSizing.micIconSize))
                     .foregroundColor(.white)
                     .contentTransition(.symbolEffect(.replace))
-                    .animation(.smooth(duration: 0.3), value: icon)
+                    // Icon swap is a micro-interaction, and it now routes
+                    // through the token path so Reduce Motion is handled.
+                    .motionAware(Motion.microFade, value: icon)
             }
         }
     }
@@ -367,10 +360,73 @@ struct AdaptiveMicButton: View {
     }
 }
 
+// MARK: - Mic Capture Halo
+
+/// The "capture is live" ring behind the mic button.
+///
+/// This has an informational job — it is the difference between a mic that is
+/// armed and a mic that is merely tinted — so unlike a decorative pulse it is
+/// allowed to repeat. What it is not allowed to do is drift: the previous
+/// version set `scaleEffect(1.3)` and `opacity(0)` as *constants* and then
+/// attached a `repeatForever`, so the ring was permanently invisible and
+/// animated nothing at all. It was a pulse that had never once pulsed.
+///
+/// Driven by a clock rather than a toggled `@State` so two mics on screen stay
+/// in phase and a re-render mid-cycle cannot restart the curve. Suppressed
+/// entirely under Reduce Motion, where the static ring still marks the state.
+private struct MicCaptureHalo: View {
+    let diameter: CGFloat
+
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
+    /// One expansion per 1.6s — the canonical ambient breathe.
+    private static let period: Double = 1.6
+
+    var body: some View {
+        if reduceMotion {
+            ring(scale: 1.18, opacity: 0.5)
+        } else {
+            TimelineView(.animation) { context in
+                let phase = Self.phase(at: context.date)
+                // Expand outward and fade as it goes: the ring reads as
+                // something *leaving* the mic, which is the direction sound
+                // travels. Fading to zero at the outer edge means no hard pop
+                // when the cycle restarts at the center.
+                ring(scale: 1.0 + 0.30 * phase, opacity: 0.55 * (1 - phase))
+            }
+        }
+    }
+
+    private func ring(scale: CGFloat, opacity: Double) -> some View {
+        Circle()
+            .stroke(Color.white.opacity(opacity), lineWidth: Stroke.regular)
+            .frame(width: diameter, height: diameter)
+            .scaleEffect(scale)
+            // Transform and opacity only — no layout pass per frame.
+            .allowsHitTesting(false)
+    }
+
+    private static func phase(at date: Date) -> CGFloat {
+        let elapsed = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period)
+        return CGFloat(elapsed / period)
+    }
+}
+
 // MARK: - Adaptive Audio Level Indicator
 
-/// Audio level visualization that scales for different platforms
+/// A real level meter, on the shared audio figure.
+///
+/// The previous implementation lit `index < Int(level * barCount)` bars fully
+/// green and left the rest grey — a segmented battery gauge, which at 10 bars
+/// quantises a continuous microphone level into 10 visible steps and jitters
+/// between two of them at a steady speaking volume.
+///
+/// It now delegates to `AudioActivityBars.level`, so the three voice screens
+/// that show audio all show the *same* figure with the same silhouette, spacing,
+/// and motion signature, and the meter is a genuine readout of the signal.
 struct AdaptiveAudioLevelIndicator: View {
+    /// Current input level, 0...1.
     let level: Float
     let barCount: Int
 
@@ -380,13 +436,12 @@ struct AdaptiveAudioLevelIndicator: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<barCount, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(index < Int(level * Float(barCount)) ? Color.green : Color.gray.opacity(0.3))
-                    .frame(width: AdaptiveSizing.audioBarWidth, height: AdaptiveSizing.audioBarHeight)
-            }
-        }
+        AudioActivityBars(
+            mode: .level(level),
+            tint: AppColors.statusGreen,
+            barCount: barCount,
+            height: AdaptiveSizing.audioBarHeight
+        )
     }
 }
 

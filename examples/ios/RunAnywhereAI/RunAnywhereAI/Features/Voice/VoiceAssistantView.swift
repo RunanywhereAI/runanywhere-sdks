@@ -329,7 +329,10 @@ extension VoiceAssistantView {
             AdaptiveAudioLevelIndicator(level: viewModel.audioLevel)
         }
         .padding(.bottom, 8)
-        .animation(.easeInOut(duration: 0.2), value: viewModel.audioLevel)
+        // `AudioActivityBars` already animates the level on the micro tier; a
+        // second animation on the same value from an ancestor just fights it.
+        // Left here only for the surrounding row's own changes.
+        .motionAware(Motion.microFade, value: viewModel.audioLevel)
     }
 }
 #endif
