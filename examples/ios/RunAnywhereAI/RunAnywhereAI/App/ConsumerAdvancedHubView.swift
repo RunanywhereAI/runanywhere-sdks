@@ -77,6 +77,15 @@ struct ConsumerAdvancedHubView: View {
             #endif
 
             Section("Agents") {
+                NavigationLink(destination: VoiceAssistantView()) {
+                    AdvancedFeatureRow(
+                        icon: "mic.circle",
+                        color: AppColors.primaryAccent,
+                        title: "Voice Assistant",
+                        subtitle: "Talk to the model (speech → answer → speech)"
+                    )
+                }
+
                 NavigationLink(destination: ComputerUseAgentView()) {
                     AdvancedFeatureRow(
                         icon: "cursorarrow.rays",
