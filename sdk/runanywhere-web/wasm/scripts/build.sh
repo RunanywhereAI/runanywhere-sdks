@@ -179,6 +179,26 @@ if [ "${ACTIVE_EMSCRIPTEN_VERSION}" != "${EMSCRIPTEN_VERSION}" ]; then
     exit 1
 fi
 
+# emcc's JS post-processing step runs Emscripten's own Node tooling, which
+# imports declared npm dependencies (acorn-import-phases, closure, terser).
+# `emsdk install` does not install them and the emsdk tree is gitignored, so a
+# fresh clone links against a node_modules that may not exist.
+#
+# Check it here rather than letting it surface at the end: the failure otherwise
+# appears only after every target has compiled to ~98%, as an
+# ERR_MODULE_NOT_FOUND from acorn-optimizer.mjs that reads like a toolchain bug
+# and costs a full rebuild to discover.
+EMSCRIPTEN_TOOL_ROOT="$(dirname "$(command -v emcc)")"
+if [ -f "${EMSCRIPTEN_TOOL_ROOT}/package.json" ] &&
+   [ ! -d "${EMSCRIPTEN_TOOL_ROOT}/node_modules/acorn-import-phases" ]; then
+    echo "ERROR: Emscripten's own npm dependencies are not installed."
+    echo "       Every WASM link would fail in tools/acorn-optimizer.mjs after"
+    echo "       the C++ has already compiled. Install them once:"
+    echo "         (cd ${EMSCRIPTEN_TOOL_ROOT} && npm install --no-audit --no-fund)"
+    echo "       or re-run ${SCRIPT_DIR}/setup-emsdk.sh, which now does this."
+    exit 1
+fi
+
 ORT_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
 ORT_WEBGPU_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm-webgpu/lib/libonnxruntime.a"
 ORT_WASM_RUNTIME_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
