@@ -2,14 +2,21 @@
 //  MarkdownDetector.swift
 //  RunAnywhereAI
 //
-//  Content-based markdown detection and rendering strategy
+//  Content-based markdown detection and rendering strategy.
+//
+//  Routing is on *presence*, not on a weighted score. The previous scoring gate
+//  (`headings*0.5 + bold*0.3 + code*0.2 + lists*0.3 > 1.0`) meant a reply
+//  containing one `**bold**` scored 0.3, fell through every branch, and rendered
+//  as `.plain` — so the user read literal asterisks. It took four separate bolds
+//  before any markdown was parsed at all. A single markdown construct is not
+//  "not enough markdown to bother"; it is markdown.
 //
 
 import Foundation
 
 // MARK: - Markdown Detector
 
-/// Intelligently detects markdown usage in content and recommends rendering strategy
+/// Detects markdown usage in content and recommends a rendering strategy.
 class MarkdownDetector {
     static let shared = MarkdownDetector()
 
@@ -17,75 +24,78 @@ class MarkdownDetector {
     func detectRenderingStrategy(from content: String) -> RenderingStrategy {
         let analysis = analyzeContent(content)
 
-        // Decision tree based on content analysis
         if analysis.hasCodeBlocks {
-            // Rich rendering with code block extraction
+            // Fenced code needs the block extractor, not inline parsing.
             return .rich
-        } else if analysis.hasRichMarkdown {
-            // Basic markdown parsing (bold, italic, headings)
-            return .basic
-        } else if analysis.hasMinimalMarkdown {
-            // Light markdown (just bold/italic)
-            return .light
-        } else {
-            // Plain text
-            return .plain
         }
+        if analysis.hasBlockMarkdown {
+            // Headings / lists: block structure the inline renderer rewrites into
+            // bullets and bold runs.
+            return .basic
+        }
+        if analysis.hasInlineMarkdown {
+            // Emphasis or inline code only.
+            return .light
+        }
+        return .plain
     }
 
-    /// Analyze content for markdown patterns
     // Compiled once. Recompiling per call was a hot-path cost: the streaming tail
     // bubble re-runs detection on every token, so a per-render NSRegularExpression
     // build ran once per token over the whole message.
-    private static let boldRegex = try? NSRegularExpression(pattern: "\\*\\*[^*]+\\*\\*")
-    private static let inlineCodeRegex = try? NSRegularExpression(pattern: "`[^`]+`")
+    //
+    // `[^\s*]` on the opening side rejects `** ` (a stray separator) while still
+    // matching `**a**`. The underscore variants cover models that emit `__bold__`
+    // and `_italic_`.
+    private static let inlinePattern = [
+        "\\*\\*[^\\s*][^*]*\\*\\*",                     // **bold**
+        "__[^\\s_][^_]*__",                             // __bold__
+        "(?<![\\*\\w])\\*[^\\s*][^*\\n]*\\*(?![\\*\\w])", // *italic*
+        "(?<![_\\w])_[^\\s_][^_\\n]*_(?![_\\w])",       // _italic_
+        "`[^`\\n]+`",                                   // `code`
+        "\\[[^\\]\\n]+\\]\\([^)\\s]+\\)"                // [link](url)
+    ].joined(separator: "|")
+
+    private static let inlineRegex = try? NSRegularExpression(pattern: inlinePattern)
 
     private func analyzeContent(_ content: String) -> ContentAnalysis {
         var analysis = ContentAnalysis()
 
-        // Detect code blocks (```language)
+        // Fenced code. A single opening fence counts: a streaming reply shows its
+        // fence long before its closer, and flipping strategies mid-stream would
+        // re-lay out the whole transcript.
         analysis.hasCodeBlocks = content.contains("```")
 
-        // Detect headings (#### text) - must be 1-6 # followed by space
-        let headingCount = content.components(separatedBy: .newlines)
-            .filter { line in
-                // Trim leading spaces
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                // Must start with 1-6 # characters followed by a space
-                guard trimmed.hasPrefix("#") else { return false }
+        for line in content.split(separator: "\n", omittingEmptySubsequences: false) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+
+            // Heading: 1–6 `#` then a space.
+            if trimmed.hasPrefix("#") {
                 let hashes = trimmed.prefix { $0 == "#" }
-                return hashes.count >= 1 && hashes.count <= 6
-                    && trimmed.count > hashes.count
-                    && trimmed[trimmed.index(trimmed.startIndex, offsetBy: hashes.count)] == " "
-            }.count
-        analysis.headingCount = headingCount
+                if hashes.count <= 6, trimmed.dropFirst(hashes.count).hasPrefix(" ") {
+                    analysis.hasBlockMarkdown = true
+                }
+            }
 
-        // Detect bold (**text**) and inline code (`code`) with the pre-compiled
-        // regexes above.
-        let fullRange = NSRange(content.startIndex..., in: content)
-        analysis.boldCount = Self.boldRegex?.matches(in: content, range: fullRange).count ?? 0
-        analysis.inlineCodeCount = Self.inlineCodeRegex?.matches(in: content, range: fullRange).count ?? 0
+            // Bullet or ordered list.
+            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ")
+                || trimmed.range(of: "^\\d+[.)]\\s", options: .regularExpression) != nil {
+                analysis.hasBlockMarkdown = true
+            }
 
-        // Detect lists (only count lines that start with list markers after trimming leading spaces)
-        let listCount = content.components(separatedBy: .newlines)
-            .filter { line in
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                return trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") ||
-                       trimmed.range(of: "^\\d+\\.\\s", options: .regularExpression) != nil
-            }.count
-        analysis.listCount = listCount
+            // Blockquote and thematic break also read as structure.
+            if trimmed.hasPrefix("> ") || trimmed == "---" || trimmed == "***" {
+                analysis.hasBlockMarkdown = true
+            }
 
-        // Calculate markdown richness
-        let markdownScore = Double(analysis.headingCount) * 0.5 +
-                           Double(analysis.boldCount) * 0.3 +
-                           Double(analysis.inlineCodeCount) * 0.2 +
-                           Double(analysis.listCount) * 0.3
+            if analysis.hasBlockMarkdown { break }
+        }
 
-        // Classify based on score
-        if markdownScore > 3.0 {
-            analysis.hasRichMarkdown = true
-        } else if markdownScore > 1.0 {
-            analysis.hasMinimalMarkdown = true
+        if !analysis.hasBlockMarkdown {
+            let range = NSRange(content.startIndex..., in: content)
+            analysis.hasInlineMarkdown = Self.inlineRegex?
+                .firstMatch(in: content, range: range) != nil
         }
 
         return analysis
@@ -95,13 +105,12 @@ class MarkdownDetector {
 // MARK: - Content Analysis
 
 struct ContentAnalysis {
+    /// A triple-backtick fence is present.
     var hasCodeBlocks: Bool = false
-    var hasRichMarkdown: Bool = false
-    var hasMinimalMarkdown: Bool = false
-    var headingCount: Int = 0
-    var boldCount: Int = 0
-    var inlineCodeCount: Int = 0
-    var listCount: Int = 0
+    /// Headings, lists, blockquotes, or rules — line-level structure.
+    var hasBlockMarkdown: Bool = false
+    /// Emphasis, inline code, or links — run-level formatting only.
+    var hasInlineMarkdown: Bool = false
 }
 
 // MARK: - Rendering Strategy
