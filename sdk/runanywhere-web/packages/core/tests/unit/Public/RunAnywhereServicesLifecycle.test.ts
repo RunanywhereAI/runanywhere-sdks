@@ -45,11 +45,29 @@ vi.mock('../../../src/runtime/ProtoWasm', () => ({
       return callback(8, bytes.length);
     }
 
+    async withHeapBytesAsync<T>(
+      bytes: Uint8Array,
+      callback: (ptr: number, size: number) => T | Promise<T>,
+    ): Promise<T> {
+      return callback(8, bytes.length);
+    }
+
     callResultProto<T>(
       _messageType: unknown,
       callback: (outResult: number) => number,
     ): T {
       callback(16);
+      return {
+        success: true,
+        hasCompletedHttpSetup: protoState.hasCompletedHttpSetup,
+      } as T;
+    }
+
+    async callResultProtoAsync<T>(
+      _messageType: unknown,
+      callback: (outResult: number) => number | Promise<number>,
+    ): Promise<T> {
+      await callback(16);
       return {
         success: true,
         hasCompletedHttpSetup: protoState.hasCompletedHttpSetup,
@@ -62,7 +80,7 @@ import { SDKCore as RunAnywhere } from '../../../src/Public/SDKCore';
 
 function fakeSdkModule() {
   const heap = new ArrayBuffer(256);
-  return {
+  const mod: Record<string, unknown> = {
     HEAPU8: new Uint8Array(heap),
     HEAP32: new Int32Array(heap),
     HEAPU32: new Uint32Array(heap),
@@ -77,6 +95,15 @@ function fakeSdkModule() {
     _rac_sdk_init_phase2_proto: vi.fn(() => 0),
     _rac_device_manager_register_if_needed: vi.fn(() => 0),
   };
+  // Mirror Emscripten's ccall: the async control-plane path (phase1/phase2/
+  // retry/device-reg) enters through module.ccall(name, …, { async: true }),
+  // which dispatches to the matching `_name` export. Dispatching here keeps the
+  // per-export vi.fn spies (asserted by these tests) accurate.
+  mod.ccall = vi.fn((name: string, _ret: unknown, _types: unknown, args?: unknown[]) => {
+    const fn = mod['_' + name];
+    return typeof fn === 'function' ? (fn as (...a: unknown[]) => unknown)(...(args ?? [])) : 0;
+  });
+  return mod;
 }
 
 describe('RunAnywhere services lifecycle', () => {
@@ -146,11 +173,11 @@ describe('RunAnywhere services lifecycle', () => {
     registrationState.waitForPendingRegistration.mockResolvedValue(false);
     const retry = vi.fn(() => 0);
     const legacyAuthProbe = vi.fn(() => 1);
-    runtimeState.module = {
-      ...fakeSdkModule(),
-      _rac_sdk_retry_http_proto: retry,
-      _rac_auth_is_authenticated: legacyAuthProbe,
-    };
+    // Mutate (not spread) so the module's ccall dispatcher sees these exports.
+    const module = fakeSdkModule();
+    module._rac_sdk_retry_http_proto = retry;
+    module._rac_auth_is_authenticated = legacyAuthProbe;
+    runtimeState.module = module;
 
     await RunAnywhere.completeServicesInitialization();
     protoState.hasCompletedHttpSetup = true;
