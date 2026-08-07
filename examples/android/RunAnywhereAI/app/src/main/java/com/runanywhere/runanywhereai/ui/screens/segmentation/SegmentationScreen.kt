@@ -36,7 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
@@ -87,12 +86,7 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
         Text(
-            text = "Segmentation",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Download SegFormer B0 from the catalog, then pick an image to segment classes on-device.",
+            text = "Pick a segmentation model, then choose an image to label its regions on-device.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

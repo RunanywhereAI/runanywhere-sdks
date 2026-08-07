@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
@@ -93,18 +92,11 @@ fun OcrScreen(viewModel: OcrViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-            Text(
-                text = "Document OCR",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Extract text from invoices, receipts, and scans with Nemotron OCR on the NPU.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = "Extract text from invoices, receipts, and scans with Nemotron OCR on the NPU.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         ModelCard(
             model = model,

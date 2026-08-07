@@ -66,18 +66,11 @@ fun DiffusionScreen() {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-            Text(
-                text = "Image generation",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Choose a text-to-image model from the catalog, then generate on-device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = "Choose a text-to-image model from the catalog, then generate on-device.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         // Lock the sheet during generation too: swapping the model under an
         // in-flight generateImage would pull native state out from under it.
