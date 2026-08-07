@@ -49,6 +49,29 @@ class VoiceViewModel : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
+    /**
+     * The live hypothesis for what the user is saying, or null when there is nothing in flight.
+     *
+     * Held apart from [turns] because it is a guess that will be revised — words visibly change
+     * under the reader as more audio arrives. Appending it as a turn would make the transcript
+     * rewrite itself in place, which reads as the app malfunctioning rather than as recognition
+     * working. The screen renders it with an explicit "still hearing you" treatment instead.
+     */
+    var partialTranscript by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Whether the detector currently hears speech. Kept separate from [state]: the VAD firing is
+     * not a pipeline state change, and letting it drive one is what previously let the panel claim
+     * "Transcribing" during a pause while the agent was in fact still listening.
+     */
+    var isSpeechDetected by mutableStateOf(false)
+        private set
+
+    /** True from the moment [interrupt] is called until the agent stops speaking. */
+    var isInterrupting by mutableStateOf(false)
+        private set
+
     private var job: Job? = null
     private var cleanupJob: Job? = null
     private var assistantTurnIndex: Int? = null
@@ -129,6 +152,7 @@ class VoiceViewModel : ViewModel() {
 
     private fun startRecordingNpu() {
         error = null
+        partialTranscript = null
         pcm.reset()
         try {
             recorder.start(
@@ -266,6 +290,12 @@ class VoiceViewModel : ViewModel() {
     }
 
     fun stop() {
+        // Every stop path clears the in-flight indicators: a partial hypothesis or a "hearing you"
+        // marker left standing over an ended conversation is a claim about a microphone that is no
+        // longer open.
+        partialTranscript = null
+        isSpeechDetected = false
+        isInterrupting = false
         if (useNpuSwap) {
             recorder.stop()
             job?.cancel(); job = null
@@ -298,30 +328,82 @@ class VoiceViewModel : ViewModel() {
         error = null
     }
 
+    /**
+     * Barge-in: cut the agent off mid-utterance and hand the turn back.
+     *
+     * The single most-used control in a real voice conversation — someone who has heard enough
+     * talks over the assistant rather than hanging up. The session stays open throughout, which is
+     * the whole difference between interrupting and ending the conversation.
+     */
+    fun interrupt() {
+        if (state != VoiceState.SPEAKING || isInterrupting) return
+        val open = session
+        isInterrupting = true
+        viewModelScope.launch {
+            try {
+                if (open != null) {
+                    open.interrupt()
+                } else {
+                    // NPU per-turn-swap path: there is no long-lived session to keep open, so
+                    // barge-in is "abandon this reply" — cancel the turn coroutine (it owns the
+                    // blocking speak calls) and silence playback. The transcript is untouched, so
+                    // the next tap simply starts another turn.
+                    job?.cancel()
+                    job = null
+                    runCatching { RunAnywhere.tts.stop() }
+                    state = VoiceState.IDLE
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A failed interrupt leaves the session usable, so this is a notice rather than a
+                // terminal state — dropping to IDLE here would end a conversation that is still live.
+                RACLog.w("voice interrupt failed: ${e.message}")
+                error = e.message ?: "Could not stop the reply"
+            } finally {
+                isInterrupting = false
+            }
+        }
+    }
+
     private fun handleEvent(event: VoiceEvent) {
         when (event) {
             is VoiceEvent.UserTranscribed -> {
                 val text = event.text.trim()
-                if (event.isFinal && text.isNotBlank()) {
-                    turns += VoiceTurn(text, isUser = true)
-                    assistantTurnIndex = null
+                if (event.isFinal) {
+                    partialTranscript = null
+                    if (text.isNotBlank()) {
+                        turns += VoiceTurn(text, isUser = true)
+                        assistantTurnIndex = null
+                    }
+                } else {
+                    partialTranscript = text.takeIf { it.isNotBlank() }
                 }
             }
-            is VoiceEvent.AgentStateChanged ->
+            // The pipeline's own state is the only thing allowed to move [state]. Every other event
+            // updates the region it actually describes, so the status line and the transcript can
+            // never make two different claims about the same moment.
+            is VoiceEvent.AgentStateChanged -> {
                 state = when (event.state) {
                     AgentState.LISTENING -> VoiceState.LISTENING
                     AgentState.THINKING -> VoiceState.THINKING
                     AgentState.SPEAKING -> VoiceState.SPEAKING
                 }
-            is VoiceEvent.AgentResponse -> {
-                state = VoiceState.THINKING
-                appendAssistantToken(event.text)
+                if (event.state != AgentState.LISTENING) isSpeechDetected = false
+                // Leaving SPEAKING is what actually ends an interrupt, whether the interrupt caused
+                // it or the agent simply reached the end of the sentence.
+                if (event.state != AgentState.SPEAKING) isInterrupting = false
             }
-            is VoiceEvent.SpeechStarted -> state = VoiceState.LISTENING
-            is VoiceEvent.SpeechEnded -> state = VoiceState.TRANSCRIBING
+            is VoiceEvent.AgentResponse -> appendAssistantToken(event.text)
+            is VoiceEvent.SpeechStarted -> isSpeechDetected = true
+            is VoiceEvent.SpeechEnded -> isSpeechDetected = false
             is VoiceEvent.Error -> {
                 error = event.message
-                if (!event.recoverable) state = VoiceState.IDLE
+                if (!event.recoverable) {
+                    state = VoiceState.IDLE
+                    isSpeechDetected = false
+                    partialTranscript = null
+                }
             }
         }
     }

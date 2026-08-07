@@ -23,13 +23,14 @@ import {
   refreshModelSelectionState,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
+import { icon } from '../components/icons';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import {
   formatBytes,
   formatFramework,
   modelDisplaySizeBytes,
-  modalityEmoji,
+  modalityIcon,
 } from '../services/model-display';
 
 let container: HTMLElement;
@@ -56,7 +57,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       >
         <div style="flex: 1; min-width: 200px;">
           <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 2px;">Storage Location</div>
-          <div id="storage-location-label" style="font-size: 0.9rem; font-weight: 500;">Browser Storage (OPFS)</div>
+          <div id="storage-location-label" style="font-size: 0.9rem; font-weight: 500;">Checking&hellip;</div>
         </div>
         <button class="btn btn-secondary" id="storage-choose-dir-btn" style="font-size: 0.8rem; padding: 6px 14px;">
           Choose Storage Folder
@@ -176,12 +177,14 @@ function renderStorageInfoHeader(): void {
   const quota = storageUsedBytes + storageFreeBytes;
   const usedPct = quota > 0 ? (storageUsedBytes / quota) * 100 : 0;
 
+  // "Origin used" / "Origin free" is the storage API's vocabulary, not a word a
+  // user of this app has any reason to know. The quota is per-site, so say that.
   host.innerHTML = `
     <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 6px;">Storage</div>
     <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 0.85rem;">
-      <div><strong>Origin used:</strong> ${formatBytes(storageUsedBytes)}</div>
+      <div><strong>Used by this site:</strong> ${formatBytes(storageUsedBytes)}</div>
       <div><strong>Models:</strong> ${formatBytes(modelsSize)}</div>
-      <div><strong>Origin free:</strong> ${formatBytes(storageFreeBytes)}</div>
+      <div><strong>Still available:</strong> ${formatBytes(storageFreeBytes)}</div>
     </div>
     ${quota > 0
       ? `<div class="progress-bar" style="margin-top: 8px;">
@@ -195,6 +198,16 @@ function renderStorageInfoHeader(): void {
 // Storage location switcher (web platform code)
 // ---------------------------------------------------------------------------
 
+/**
+ * Describe where downloaded models are being kept.
+ *
+ * The four states used to be written in the storage layer's own vocabulary —
+ * "OPFS", "the split-WASM SDK", "not visible in Finder" — which names an API, a
+ * build topology, and one operating system's file manager. None of the three
+ * tells a user what is true of their models, and the middle one is not even a
+ * thing that exists outside this repository. Each branch now says where the
+ * files are and what that means for them.
+ */
 function updateStorageLocationUI(): void {
   const label = container.querySelector('#storage-location-label') as HTMLElement;
   const chooseDirBtn = container.querySelector('#storage-choose-dir-btn') as HTMLElement;
@@ -202,27 +215,27 @@ function updateStorageLocationUI(): void {
 
   if (RunAnywhere.storage.isReady) {
     const safeName = escapeHtml(RunAnywhere.storage.directoryName ?? 'Unknown');
-    label.innerHTML = `<strong>Local Folder:</strong> ~/${safeName}/`
-      + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files &mdash; visible in Finder, persists forever</span>`;
+    label.innerHTML = `<strong>Your folder:</strong> ~/${safeName}/`
+      + `<br><span style="font-size:0.75rem;opacity:0.5">Models are saved as ordinary files you can open, move, and delete yourself.</span>`;
     label.style.color = 'var(--color-success, #4caf50)';
     chooseDirBtn.textContent = 'Change Folder';
     chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
   } else if (RunAnywhere.storage.directoryName !== null) {
-    label.innerHTML = 'Local folder configured &mdash; needs re-authorization'
-      + `<br><span style="font-size:0.75rem;opacity:0.5">Click "Re-authorize" to reconnect</span>`;
+    label.innerHTML = '<strong>Your folder needs permission again</strong>'
+      + `<br><span style="font-size:0.75rem;opacity:0.5">Browsers drop folder access between visits. Re-authorize to reconnect it.</span>`;
     label.style.color = 'var(--color-warning, #ff9800)';
     chooseDirBtn.style.display = '';
     reauthBtn.style.display = '';
   } else if (RunAnywhere.storage.backend === 'memory') {
-    label.innerHTML = '<strong>Persistent model storage unavailable</strong>'
-      + '<br><span style="font-size:0.75rem;opacity:0.5">Model downloads require OPFS or an approved local folder in the split-WASM SDK.</span>';
+    label.innerHTML = '<strong>Nothing can be saved here</strong>'
+      + '<br><span style="font-size:0.75rem;opacity:0.5">This browser is offering neither its own storage nor a folder to write to, so downloads cannot be kept.</span>';
     label.style.color = 'var(--color-warning, #ff9800)';
     chooseDirBtn.style.display = RunAnywhere.storage.isSupported ? '' : 'none';
     reauthBtn.style.display = 'none';
   } else {
-    label.innerHTML = '<strong>Browser Storage (OPFS)</strong>'
-      + `<br><span style="font-size:0.75rem;opacity:0.5">Sandboxed browser storage &mdash; not visible in Finder. Use "Choose Storage Folder" for a real path.</span>`;
+    label.innerHTML = '<strong>Private browser storage</strong>'
+      + `<br><span style="font-size:0.75rem;opacity:0.5">The browser keeps these files for this site; they don&rsquo;t appear in your file manager. Choose a folder to keep them somewhere you can see.</span>`;
     label.style.color = '';
     chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
@@ -239,7 +252,7 @@ function renderModelList(): void {
 
   const catalog = getCatalog();
   if (!catalog.length) {
-    host.innerHTML = '<p class="text-secondary" style="padding: 12px 0;">Catalog not registered yet.</p>';
+    host.innerHTML = '<p class="text-secondary" style="padding: 12px 0;">No models yet — still loading the list.</p>';
     return;
   }
 
@@ -262,7 +275,7 @@ function renderModelList(): void {
         : '<span class="badge badge-grey">Not downloaded</span>';
     return `
       <div class="model-row" style="cursor: default;">
-        <div class="model-logo">${modalityEmoji(entry.category)}</div>
+        <div class="model-logo">${icon(modalityIcon(entry.category), { size: 20 })}</div>
         <div class="model-info">
           <div class="model-name">${escapeHtml(entry.name)}</div>
           <div class="model-meta">

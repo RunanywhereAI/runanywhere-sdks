@@ -193,6 +193,19 @@ class RunAnywhereTextGenerationStreamTest {
     }
 
     @Test
+    fun `absurd tok rate without ttft still falls back to wall throughput`() {
+        val metrics =
+            sanitizeStreamMetrics(
+                totalMs = 15_339.0,
+                outputTokens = 179,
+                reportedTps = 179_000.0,
+                reportedTtftMs = null,
+            )
+        assertEquals(0L, metrics.ttftMs)
+        assertEquals(179 * 1000.0 / 15_339.0, metrics.decodeTokensPerSecond, 0.05)
+    }
+
+    @Test
     fun `batch buffered terminal result is sanitized in aggregateLLMStream`() =
         runBlocking {
             val bogus =

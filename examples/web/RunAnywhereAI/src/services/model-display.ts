@@ -9,31 +9,56 @@
 
 import { ModelCategory } from '@runanywhere/web';
 import type { CatalogEntry } from './model-catalog';
+// Type-only: the mapping below names glyphs, it does not draw them, so this
+// service still has no runtime dependency on the component layer.
+import type { IconName } from '../components/icons';
 export { formatFramework } from '@runanywhere/web';
 
 /**
- * Returns the HTML entity for the emoji shown next to a model row. The
- * return value is an HTML-safe entity ("&#129302;") so it can be inlined
- * inside an innerHTML template without further escaping.
+ * The glyph that stands for a model's modality, everywhere a model is listed.
+ *
+ * WAS AN EMOJI. Every model row, family card, recommendation card and pipeline
+ * slot carried one of 🤖 👁 🎤 🔊 🗣 🎨 🔗 ⚙️ — eight emoji rendered by the OS,
+ * so the avatar column was a different typeface, weight, and colour on every
+ * platform, ignored the theme entirely, and sat beside a UI drawn in 1.5px
+ * outline strokes. Emoji also cannot inherit `currentColor`, so a row could not
+ * dim its own avatar when the row was disabled.
+ *
+ * The mapping mirrors iOS `ModelCategory.consumerCapabilityIcon`
+ * (Features/Models/ModelPresentation.swift) one-for-one, so the same model shows
+ * the same idea on both platforms: message for chat, a picture for vision, a
+ * waveform for speech-in, a speaker for speech-out, two people for diarization.
+ *
+ * Returns the name only — the caller renders it with `icon()` at the size its
+ * slot wants, which is why this can live beside the other display helpers
+ * instead of inside the glyph registry.
  */
-export function modalityEmoji(category: ModelCategory): string {
+export function modalityIcon(category: ModelCategory): IconName {
   switch (category) {
     case ModelCategory.MODEL_CATEGORY_LANGUAGE:
-      return '&#129302;';
+      return 'message';
     case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
-      return '&#128065;';
+    case ModelCategory.MODEL_CATEGORY_VISION:
+      return 'image';
     case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
-      return '&#127908;';
+      return 'waveform';
     case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
-      return '&#128266;';
+      return 'speaker';
     case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-      return '&#128483;';
+      return 'pulse';
+    case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+      return 'speakers';
+    case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+      return 'segments';
     case ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION:
-      return '&#127912;';
+      return 'imageSparkle';
+    // An embedding model exists to make a corpus searchable, which is the same
+    // meaning `file` already carries ("files indexed for retrieval") — not a
+    // second meaning borrowing the glyph.
     case ModelCategory.MODEL_CATEGORY_EMBEDDING:
-      return '&#128279;';
+      return 'file';
     default:
-      return '&#9881;&#65039;';
+      return 'model';
   }
 }
 

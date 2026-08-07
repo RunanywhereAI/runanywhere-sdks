@@ -23,6 +23,7 @@ import {
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
+import { icon } from '../components/icons';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
@@ -36,6 +37,16 @@ const CAPTURE_DIMENSION = 384;
 
 let container: HTMLElement;
 let camera: VideoCapture | null = null;
+/**
+ * The prompt the user actually typed.
+ *
+ * Held here rather than read off the DOM at analyze time, because `renderView`
+ * rebuilds the panel's whole subtree — on every capture, every model-state
+ * change and every status update — and the textarea used to be re-emitted with
+ * `DEFAULT_PROMPT` as its content each time. Typing a prompt and then pressing
+ * "Capture frame" silently reverted it.
+ */
+let prompt = DEFAULT_PROMPT;
 let latestFrame: { rgbPixels: Uint8Array; width: number; height: number } | null = null;
 // Data URL preview for an image loaded from disk (null when the source is the
 // live camera). Lets the preview survive innerHTML re-renders without a camera.
@@ -112,7 +123,7 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Camera</h3>
         <p class="text-secondary">Attach your webcam and capture frames as RGB pixels for VLM inference.</p>
-        <div class="toolbar-actions">
+        <div class="docs-actions">
           <button class="btn btn-primary" id="vision-camera-btn" ${isBusy ? 'disabled' : ''}>
             ${captureReady ? 'Stop camera' : 'Start camera'}
           </button>
@@ -134,11 +145,17 @@ function renderView(): void {
           Streams <code>RunAnywhere.vlm.generateStream(image, prompt)</code>
           on the last captured frame, rendering tokens as they arrive.
         </p>
-        <label class="form-label" for="vision-prompt">Prompt</label>
-        <textarea id="vision-prompt" class="chat-input" rows="2"
-          ${isBusy ? 'disabled' : ''}
-          placeholder="What's in this image?">${escapeHtml(DEFAULT_PROMPT)}</textarea>
-        <div class="toolbar-actions">
+        <!-- A label belongs above its field, not beside it. This used to carry
+             class "form-label", which no stylesheet defined, so the label and
+             the textarea both laid out inline and the prompt box read as
+             unlabelled. "field" is the two-row block. -->
+        <div class="field">
+          <label class="field__label" for="vision-prompt">Prompt</label>
+          <textarea id="vision-prompt" class="chat-input" rows="2"
+            ${isBusy ? 'disabled' : ''}
+            placeholder="What's in this image?">${escapeHtml(prompt)}</textarea>
+        </div>
+        <div class="docs-actions">
           <button class="btn btn-primary" id="vision-analyze-btn" ${canAnalyze ? '' : 'disabled'}>
             ${isBusy ? 'Analyzing…' : 'Capture & analyze'}
           </button>
@@ -147,7 +164,16 @@ function renderView(): void {
           </button>
         </div>
         <div id="vision-status" class="docs-status">${escapeHtml(status)}</div>
-        <pre id="vision-output" class="docs-pre">${escapeHtml(lastResult ?? '(no response yet)')}</pre>
+        <!-- null means no run has produced text; an empty string means a run is
+             streaming into the pane. An output box holding the literal
+             "(no response yet)" — what this used to render — is
+             indistinguishable from a model that ran and answered nothing. -->
+        ${lastResult === null
+          ? `<div class="surface-empty">
+               ${icon('message', { size: 24 })}
+               <p>No description yet — capture a frame or load an image, then run Analyze.</p>
+             </div>`
+          : `<pre id="vision-output" class="docs-pre">${escapeHtml(lastResult)}</pre>`}
       </div>
     </div>
   `;
@@ -173,6 +199,13 @@ function renderView(): void {
     .querySelector('#vision-load-image-btn')!
     .addEventListener('click', () => imageInput.click());
   imageInput.addEventListener('change', () => void onImageFileSelected(imageInput));
+  // Mirror every keystroke into module state so the next re-render re-emits what
+  // the user typed rather than the default.
+  container
+    .querySelector<HTMLTextAreaElement>('#vision-prompt')!
+    .addEventListener('input', (event) => {
+      prompt = (event.currentTarget as HTMLTextAreaElement).value;
+    });
   container
     .querySelector('#vision-analyze-btn')!
     .addEventListener('click', () => void onAnalyze());
@@ -378,8 +411,11 @@ async function onAnalyze(): Promise<void> {
   }
   latestFrame = frame;
 
+  // Read from the live field when it is on screen (it always is at this point),
+  // falling back to the mirrored value; an empty box means "use the default"
+  // rather than sending the model no instruction at all.
   const promptEl = container.querySelector<HTMLTextAreaElement>('#vision-prompt');
-  const prompt = (promptEl?.value ?? DEFAULT_PROMPT).trim() || DEFAULT_PROMPT;
+  const effectivePrompt = (promptEl?.value ?? prompt).trim() || DEFAULT_PROMPT;
 
   const image = RunAnywhere.ImageInput.rawRgb(frame.rgbPixels, frame.width, frame.height);
 
@@ -388,7 +424,7 @@ async function onAnalyze(): Promise<void> {
   lastResult = '';
   renderView();
 
-  const events = RunAnywhere.vlm.generateStream(image, prompt, {
+  const events = RunAnywhere.vlm.generateStream(image, effectivePrompt, {
     maxOutputTokens: 200,
     temperature: 0.7,
     topP: 0.9,
@@ -416,10 +452,15 @@ async function onAnalyze(): Promise<void> {
         setStatus(`Done${tokLine}.`);
       }
     }
+    // Nothing arrived: drop back to `null` so the pane shows its empty state
+    // rather than an output box holding a parenthetical stand-in, and let the
+    // status line say which of the two outcomes it was.
     if (cancellationRequested) {
       setStatus('Cancelled.');
+      if (!lastResult) lastResult = null;
     } else if (!lastResult) {
-      lastResult = '(empty response)';
+      lastResult = null;
+      setStatus('Done — the model returned no text.');
     }
   } catch (err) {
     setStatus(cancellationRequested

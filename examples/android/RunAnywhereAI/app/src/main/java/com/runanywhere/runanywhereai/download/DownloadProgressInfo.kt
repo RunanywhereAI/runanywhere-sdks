@@ -5,6 +5,15 @@ import com.runanywhere.sdk.public.api.DownloadEvent
 import java.util.Locale
 
 /**
+ * Which part of "downloading a model" is running.
+ *
+ * The bytes arriving is only the first of three, and the other two are not instant on a
+ * multi-gigabyte bundle. Without naming them the bar parks near the end with the last measured rate
+ * still on screen, which is indistinguishable from a stalled connection.
+ */
+enum class DownloadPhase { TRANSFERRING, VERIFYING, EXTRACTING }
+
+/**
  * What a download looks like to the UI at one instant.
  *
  * A model is hundreds of megabytes to several gigabytes, so a bare percentage is not enough to tell
@@ -26,18 +35,24 @@ data class DownloadProgressInfo(
     val totalFiles: Int = 1,
     /** 0.0..1.0, or null when the total size is unknown and the bar must be indeterminate. */
     val fraction: Float? = null,
+    /** Which part of the operation is running. See [DownloadPhase]. */
+    val phase: DownloadPhase = DownloadPhase.TRANSFERRING,
 ) {
     val percent: Int? get() = fraction?.let { (it * 100).toInt().coerceIn(0, 100) }
 
     /** True when the size is unknown, so the caller shows an indeterminate bar. */
     val isIndeterminate: Boolean get() = fraction == null
 
-    /** "1.2 GB of 4.1 GB", or just the transferred amount when the total is unknown. */
+    /**
+     * "1.2 GB of 4.1 GB", or just the transferred amount when the total is unknown — and blank
+     * before the first byte lands, so the caller can say "Starting…" instead of "0 B", which reads
+     * like a transfer that is already stuck.
+     */
     val bytesLabel: String
-        get() = if (bytesTotal > 0) {
-            "${formatBytes(bytesDone)} of ${formatBytes(bytesTotal)}"
-        } else {
-            formatBytes(bytesDone)
+        get() = when {
+            bytesTotal > 0 -> "${formatBytes(bytesDone)} of ${formatBytes(bytesTotal)}"
+            bytesDone > 0 -> formatBytes(bytesDone)
+            else -> ""
         }
 
     /** "3.4 MB/s", or null when no rate has been measured yet. */
@@ -59,12 +74,53 @@ data class DownloadProgressInfo(
      * Ordered by what a waiting user looks for first — how much is left, then how fast, then when it
      * will be done — and joined only from the parts that are actually known, so an early frame reads
      * "12 MB of 4.1 GB" rather than "12 MB of 4.1 GB · 0 B/s · 0s left".
+     *
+     * The post-transfer phases replace the line outright rather than adding to it: checksumming a
+     * multi-gigabyte bundle takes real seconds, and leaving the last measured rate on screen while
+     * no bytes are moving is the difference between "nearly done" and "frozen at 99%".
      */
     val detailLine: String
-        get() = listOfNotNull(bytesLabel, speedLabel, etaLabel, fileCountLabel, retryLabel)
-            .joinToString(" · ")
+        get() = when (phase) {
+            DownloadPhase.VERIFYING -> "Checking the download…"
+            DownloadPhase.EXTRACTING -> "Unpacking…"
+            DownloadPhase.TRANSFERRING ->
+                listOfNotNull(
+                    bytesLabel.takeIf { it.isNotEmpty() },
+                    speedLabel,
+                    etaLabel,
+                    fileCountLabel,
+                    retryLabel,
+                ).joinToString(" · ")
+        }
 
     companion object {
+        /**
+         * Fold one SDK event into the running view of the transfer, or null when the event says
+         * nothing the UI shows.
+         *
+         * Shared by every collector so a download looks the same wherever it is watched from —
+         * the foreground service's notification and the picker row used to each have their own
+         * `when`, and only one of them would ever have learned about a new phase.
+         *
+         * [latest] carries the bytes and file counts forward, because the post-transfer events
+         * repeat none of them and a line that empties out mid-operation reads as a reset.
+         */
+        fun advance(latest: DownloadProgressInfo, event: DownloadEvent): DownloadProgressInfo? =
+            when (event) {
+                is DownloadEvent.Progress -> from(event)
+                // Every byte is on disk by the time these run, so the bar completes and the line
+                // names the phase instead of leaving a rate behind that is no longer moving.
+                is DownloadEvent.Verifying ->
+                    latest.copy(fraction = 1f, phase = DownloadPhase.VERIFYING)
+                // `percent` is deliberately ignored: the SDK does not pin its scale, and a bar
+                // driven by a number that might be 0..1 or 0..100 is worse than one that is honest
+                // about only knowing the phase.
+                is DownloadEvent.Extracting ->
+                    latest.copy(fraction = 1f, phase = DownloadPhase.EXTRACTING)
+                is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
+                else -> null
+            }
+
         fun from(event: DownloadEvent.Progress): DownloadProgressInfo = DownloadProgressInfo(
             bytesDone = event.bytesDone,
             bytesTotal = event.bytesTotal,

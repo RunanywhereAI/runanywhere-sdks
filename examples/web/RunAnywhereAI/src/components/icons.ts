@@ -155,6 +155,16 @@ export const ICON_PATHS = {
   /** A picture as input. Vision, attachments, image understanding. */
   image: '<rect x="3" y="5" width="18" height="14" rx="2"/>'
     + '<circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>',
+  /**
+   * A picture as *output*. Diffusion / image-generation models only.
+   *
+   * A frame with a sparkle in it, deliberately not `image` (a frame with a
+   * photographed scene in it): the two categories sit in the same model list,
+   * and reusing one glyph for both would say a generator and a vision model are
+   * the same kind of thing.
+   */
+  imageSparkle: '<rect x="3" y="4" width="18" height="16" rx="2"/>'
+    + '<path d="M12 8.2l1.2 3.1 3.1 1.2-3.1 1.2L12 16.8l-1.2-3.1L7.7 12.5l3.1-1.2L12 8.2z"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>'
     + '<circle cx="12" cy="13" r="4"/>',
   /** A corpus document. Files indexed for retrieval, attachments. */

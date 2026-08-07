@@ -2,10 +2,16 @@
  * Segmentation Tab — semantic image segmentation over the canonical
  * `RunAnywhere.segmentation.segment` facade (SegFormer / ADE20K-class models).
  *
- * No browser segmentation engine or model ships in this build yet, so the shared
- * model sheet has nothing to offer and the run stays gated. This view is wired to
- * the canonical facade so it lights up automatically once a browser engine
- * registers a `.semanticSegmentation` model. Until then it:
+ * TWO SCREENS, ONE VIEW. No browser engine registers the segmentation
+ * capability in this build, so the model catalog has no `.semanticSegmentation`
+ * entry and the shared sheet would open empty. The view therefore renders the
+ * designed unavailable state (`components/modality-unavailable.ts`) whenever the
+ * catalog can offer nothing — rather than the previous arrangement, where the
+ * full working screen was drawn (a "Load Segmentation Model" button, an image
+ * picker, a permanently disabled Run) above a paragraph explaining that the
+ * picker it just showed was empty.
+ *
+ * When a catalog entry does exist, the working flow below is what runs:
  *
  *   1. Reports the SDK-owned lifecycle state for a loaded
  *      `.semanticSegmentation` model. Model supply/load is delegated to the SDK's
@@ -28,6 +34,8 @@ import {
 } from '@runanywhere/web';
 import { findLoadedModelForCategory } from '../components/model-selection';
 import { onModelStateChange, openSheet } from '../components/model-selection';
+import { renderModalityUnavailable } from '../components/modality-unavailable';
+import { getCatalogForCategories } from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
@@ -85,6 +93,52 @@ export function initSegmentationTab(el: HTMLElement): TabLifecycle {
 
 function renderView(): void {
   const modelLoaded = isSegmentationModelLoaded();
+
+  // A picker can only offer what the catalog holds, and with no browser engine
+  // registering the capability the catalog holds nothing for it. Rendering the
+  // working screen anyway would put a "Load Segmentation Model" button in front
+  // of an empty sheet and a Run button that can never enable.
+  if (!modelLoaded && getCatalogForCategories(SEG_PICKER_FILTER).length === 0) {
+    renderUnavailable();
+    return;
+  }
+
+  renderWorkflow(modelLoaded);
+}
+
+function renderUnavailable(): void {
+  container.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-title">Segmentation</div>
+      <!-- Empty, but present: the toolbar is space-between, so without a
+           third child the shell's injected Back button and the title get
+           pushed to opposite edges. -->
+      <div class="toolbar-actions"></div>
+    </div>
+    <div class="scroll-area">
+      ${renderModalityUnavailable({
+        glyph: 'segments',
+        title: 'Segmentation',
+        summary:
+          'Segmentation labels every pixel of a photo with what it belongs to — sky, '
+          + 'road, a person — and hands back a coloured mask you can lay over the original.',
+        requirements: [
+          'No engine in this build serves it. The browser build ships llama.cpp for '
+            + 'text and vision and ONNX/Sherpa for speech; neither publishes a '
+            + 'segmentation capability.',
+          'With no engine, the model catalog has no segmentation model to list, so '
+            + 'there is nothing to choose and no download to start.',
+        ],
+        verb: 'RunAnywhere.segmentation.segment(image)',
+        elsewhere:
+          'Segmentation does run today in the iOS and Android RunAnywhere apps, where '
+          + 'the platform SDK ships an engine for it.',
+      })}
+    </div>
+  `;
+}
+
+function renderWorkflow(modelLoaded: boolean): void {
   const canRun = modelLoaded && image !== null && !isBusy;
 
   container.innerHTML = `
@@ -102,19 +156,15 @@ function renderView(): void {
         <ul class="feature-unavailable__list">
           <li><code>segmentation model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
         </ul>
-        <p class="text-secondary">
-          No browser segmentation engine or model ships in this build, so the picker
-          above stays empty and <code>RunAnywhere.segmentation.segment</code> cannot be run here yet.
-          This flow lights up automatically once a browser engine registers a
-          <code>.semanticSegmentation</code> model; until then, run segmentation from a
-          native RunAnywhere app.
-        </p>
+        ${modelLoaded
+          ? ''
+          : '<p class="text-secondary">Choose a segmentation model from the button above to enable the run.</p>'}
       </div>
 
       <div class="docs-section">
         <h3>Image</h3>
         <p class="text-secondary">Pick a photo to segment. It is decoded to tightly-packed RGBA8 pixels for the SDK.</p>
-        <div class="toolbar-actions">
+        <div class="docs-actions">
           <button class="btn btn-secondary" id="seg-load-image-btn" ${!isBusy ? '' : 'disabled'}>
             Load image…
           </button>
@@ -130,7 +180,7 @@ function renderView(): void {
           Runs <code>RunAnywhere.segmentation.segment(image)</code> on the loaded
           <code>.semanticSegmentation</code> model and overlays the returned class mask.
         </p>
-        <div class="toolbar-actions">
+        <div class="docs-actions">
           <button class="btn btn-primary" id="seg-run-btn" ${canRun ? '' : 'disabled'}>
             ${isBusy ? 'Segmenting…' : 'Run segmentation'}
           </button>

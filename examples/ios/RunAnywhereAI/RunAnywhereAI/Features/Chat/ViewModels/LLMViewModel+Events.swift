@@ -37,6 +37,31 @@ extension LLMViewModel {
                     self.handleGenerationEvent(event)
                 }
             }
+
+        subscribeToStoredTitle()
+    }
+
+    /// Follow the open chat's name in the store.
+    ///
+    /// The view model keeps its own `Conversation` copy, and the Mac window
+    /// title, the iOS top bar, and the details sheet all read *that* copy. So a
+    /// name written by anyone else — the model naming a new chat, or Rename… in
+    /// the sidebar — landed in the sidebar row and the header kept the old one
+    /// until the user switched chats and back.
+    ///
+    /// Only the title is adopted. Taking the whole stored conversation would
+    /// also replace `messages`, and the store's copy is a turn behind while a
+    /// reply is still streaming into the visible transcript.
+    private func subscribeToStoredTitle() {
+        storedTitleCancellable = conversationStore.$conversations
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] conversations in
+                guard let self,
+                      let id = self.currentConversation?.id,
+                      let stored = conversations.first(where: { $0.id == id }),
+                      stored.title != self.currentConversation?.title else { return }
+                self.adoptStoredTitle(stored.title)
+            }
     }
 
     func checkModelStatusFromSDK() async {

@@ -576,7 +576,7 @@ private fun PickerModelRow(
         isReady = viewModel.isReady(model),
         isBusy = state.busyModelId == model.id,
         progress = if (state.busyModelId == model.id) state.downloadProgress else null,
-        hasFailed = state.failedModelId == model.id,
+        interruption = state.interruptionFor(model.id),
         highlightLabel = highlightLabel,
         onSelect = { onSelect(model) },
         onDownload = { onDownload(model) },

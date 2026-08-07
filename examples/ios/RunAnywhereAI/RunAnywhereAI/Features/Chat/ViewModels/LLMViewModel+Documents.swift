@@ -18,6 +18,10 @@ extension LLMViewModel {
         let prompt = rawPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty, !isGenerating else { return }
 
+        // Same reason as the text path (`beginGeneration`): the previous turn's
+        // title request must release the LLM component before this turn claims it.
+        conversationStore.cancelPendingTitleGeneration()
+
         currentInput = ""
         setIsGenerating(true)
         setError(nil)

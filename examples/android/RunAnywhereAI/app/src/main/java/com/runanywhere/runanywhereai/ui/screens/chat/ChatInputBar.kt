@@ -96,6 +96,13 @@ fun ChatInputBar(
     modifier: Modifier = Modifier,
     pendingAttachment: ComposerAttachment? = null,
     onClearAttachment: () -> Unit = {},
+    /**
+     * Why the last file the user chose was not attached, or null. Shown here rather than as a
+     * dialog: the user is mid-compose and the remedy is to pick a different file, not to dismiss
+     * something. Silently ignoring a rejected file is indistinguishable from the picker being broken.
+     */
+    attachmentRejection: String? = null,
+    onDismissAttachmentRejection: () -> Unit = {},
     compact: Boolean = false,
     /**
      * Lets the caller put the cursor in the editor. Editing a sent question is
@@ -146,6 +153,21 @@ fun ChatInputBar(
                 BlockedReasonStrip(
                     reason = blockedReason.orEmpty(),
                     onResolve = onResolveBlocked,
+                    modifier = Modifier.padding(
+                        start = dimens.spacingMd,
+                        top = dimens.spacingSm,
+                        end = dimens.spacingMd,
+                    ),
+                )
+            }
+            AnimatedVisibility(
+                visible = attachmentRejection != null,
+                enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
+                exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
+            ) {
+                AttachmentRejectionStrip(
+                    reason = attachmentRejection.orEmpty(),
+                    onDismiss = onDismissAttachmentRejection,
                     modifier = Modifier.padding(
                         start = dimens.spacingMd,
                         top = dimens.spacingSm,
@@ -450,6 +472,56 @@ private fun BlockedReasonStrip(
     }
 }
 
+/**
+ * The file the composer would not take, and why.
+ *
+ * Error-coloured, unlike [BlockedReasonStrip]: something the user did was refused, and softening
+ * that into a neutral hint would leave them wondering whether the attachment went through.
+ */
+@Composable
+private fun AttachmentRejectionStrip(
+    reason: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.radiusLg),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                start = dimens.spacingMd,
+                end = dimens.spacingXs,
+                top = dimens.spacingXs,
+                bottom = dimens.spacingXs,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = RACIcons.Outline.AlertTriangle,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onDismiss, modifier = Modifier.size(REJECTION_DISMISS_SIZE)) {
+                Icon(
+                    RACIcons.Outline.Close,
+                    contentDescription = "Dismiss",
+                    modifier = Modifier.size(dimens.iconSm),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun StoppingStatusPill(modifier: Modifier = Modifier) {
     val dimens = LocalDimens.current
@@ -511,7 +583,7 @@ private fun AttachmentStatusPill(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onClear, modifier = Modifier.size(REJECTION_DISMISS_SIZE)) {
                 Icon(
                     RACIcons.Outline.Close,
                     contentDescription = "Remove attachment",
@@ -574,3 +646,9 @@ private fun ToolStatusPill(
         }
     }
 }
+
+/**
+ * Dismiss/clear affordances inside a pill. Larger than the 32 dp they used to be, which was under
+ * the floor for a touch pointer sitting next to a text field people are already aiming at.
+ */
+private val REJECTION_DISMISS_SIZE = 44.dp

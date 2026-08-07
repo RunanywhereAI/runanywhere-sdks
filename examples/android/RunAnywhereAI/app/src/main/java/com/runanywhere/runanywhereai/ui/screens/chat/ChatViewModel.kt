@@ -143,7 +143,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     val thinkingSupported: Boolean
-        get() = GlobalState.model.loaded?.supports_thinking == true
+        get() {
+            val loaded = GlobalState.model.loaded ?: return false
+            // NPU batch backends cannot stream thinking live; hide the capability.
+            val framework = loaded.framework
+            if (framework == ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT) {
+                return false
+            }
+            return loaded.supports_thinking
+        }
 
     val thinkingEnabled: Boolean
         get() = thinkingSupported && !SettingsRepository.settings.disableThinking
@@ -706,7 +714,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             forceGreedy = forceGreedy,
         )
         val s = SettingsRepository.settings
+        // QHexRT Maple/Bonsai finishes the whole decode before streaming. With
+        // thinking on, "TTFT" becomes the full generate (reasoning + answer) and
+        // the chat burns tokens on chain-of-thought the UI can't stream live.
+        // Keep reasoning off for NPU until token-level streaming exists.
         val reasoning = when {
+            activeModel.framework ==
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT ->
+                ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF)
             !activeModel.model.supports_thinking -> null
             s.disableThinking -> ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF)
             else -> ReasoningOptions(
@@ -746,6 +761,37 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private fun generationStats(
+        tokens: Int,
+        reportedTps: Double?,
+        reportedTtftMs: Long?,
+        totalMs: Long,
+        inputTokens: Int,
+        modelName: String,
+        framework: String?,
+        mode: GenerationMode,
+    ): GenerationStats {
+        val wallTps = if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
+        val tps = reportedTps?.takeIf { it > 0.0 } ?: wallTps
+        // Maple/Bonsai dump the full completion after DSP generate — stream
+        // intervals invent five-digit tok/s and a TTFT equal to wall clock.
+        val batchBuffered =
+            (reportedTtftMs != null && reportedTtftMs > 0 &&
+                totalMs - reportedTtftMs < maxOf(50L, (totalMs * 0.05).toLong())) ||
+                (tps > maxOf(2_000.0, wallTps * 5.0) && wallTps > 0.0) ||
+                (reportedTtftMs != null && totalMs > 0 && reportedTtftMs >= (totalMs * 0.95).toLong())
+        return GenerationStats(
+            tokens = tokens,
+            tokensPerSecond = if (batchBuffered) wallTps else tps,
+            timeToFirstTokenMs = if (batchBuffered) null else reportedTtftMs?.takeIf { it > 0 },
+            totalTimeMs = totalMs,
+            inputTokens = inputTokens,
+            modelName = modelName,
+            framework = framework,
+            mode = mode,
+        )
+    }
+
     private suspend fun generateHostedReply(
         request: ChatGenerationRequest,
         llmRequest: RALLMGenerateRequest,
@@ -772,21 +818,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens ?: 0
-        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
-        // Prefer SDK-sanitized usage; fall back to wall throughput. Do not use
-        // FIRST_TOKEN event TTFT — batch backends (Maple) only emit the first
-        // stream chunk after the full generate, so that "TTFT" is the wall clock.
-        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
-            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = result.text,
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                stats = GenerationStats(
+                stats = generationStats(
                     tokens = tokens,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
-                    totalTimeMs = totalMs,
+                    reportedTps = result.usage?.decode_tokens_per_second,
+                    reportedTtftMs = result.usage?.ttft_ms,
+                    totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens ?: 0,
                     modelName = model.displayName,
                     framework = model.framework,
@@ -821,20 +861,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val outputTokens = result.usage?.output_tokens ?: 0
-        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
-        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
-            ?: if (totalMs > 0 && outputTokens > 0) outputTokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                // Prefer result TTFT only. Do not fall back to FIRST_TOKEN event
-                // latency — batch NPU backends report wall-clock there.
-                stats = GenerationStats(
+                stats = generationStats(
                     tokens = outputTokens,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
-                    totalTimeMs = totalMs,
+                    reportedTps = result.usage?.decode_tokens_per_second,
+                    reportedTtftMs = result.usage?.ttft_ms,
+                    totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
                     framework = result.framework?.takeIf { it.isNotBlank() }
@@ -882,21 +917,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens?.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
-        // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
-        // aggregateLLMStream already sanitizes batch-buffered Maple/Bonsai rates;
-        // fall back to wall throughput only. Never use FIRST_TOKEN event TTFT —
-        // that is wall-clock for batch backends and shows up as a fake 15s prefill.
-        val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
-            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                stats = GenerationStats(
+                stats = generationStats(
                     tokens = tokens,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
-                    totalTimeMs = totalMs,
+                    reportedTps = result.usage?.decode_tokens_per_second,
+                    reportedTtftMs = result.usage?.ttft_ms,
+                    totalMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
                     framework = result.framework?.takeIf { it.isNotBlank() }

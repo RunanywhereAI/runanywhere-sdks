@@ -1722,6 +1722,14 @@
   color: var(--color-purple);
 }
 
+/*
+ * The modality avatar on a model row.
+ *
+ * Holds a stroked glyph from `components/icons.ts` (see `modalityIcon`), not an
+ * emoji, so it inherits the theme's text colour and sits at the same 1.5px
+ * weight as every other icon on the screen. `color` rather than `fill` because
+ * the glyph paints with `currentColor`.
+ */
 .model-logo {
   width: 40px;
   height: 40px;
@@ -1730,7 +1738,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -2426,6 +2434,8 @@
  */
 .model-slot--blocked { border-color: var(--color-yellow); }
 
+/* Same stroked modality glyph as `.model-logo`, one step smaller for the
+   pipeline rows. */
 .model-slot__icon {
   width: 36px;
   height: 36px;
@@ -2435,7 +2445,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  color: var(--text-secondary);
 }
 .model-slot__body { flex: 1; min-width: 0; }
 .model-slot__label {
@@ -4193,6 +4203,36 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
 }
 
 /*
+ * A labelled control inside one of these panels.
+ *
+ * Vision shipped its prompt box as `<label class="form-label">` followed by a
+ * `<textarea>` — and `.form-label` was a class no stylesheet ever defined. Both
+ * elements therefore laid out inline, so the label sat *beside* its own field on
+ * one line and the field read as unlabelled. Declaring the pairing once means
+ * the next panel to add an input inherits the correct two-row block instead of
+ * inventing another undefined class.
+ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-md-lg) 0;
+}
+
+.field__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+/* `.chat-input` carries `flex: 1` for its role in the composer row; inside a
+   column field that would stretch it vertically instead of sizing to `rows`. */
+.field .chat-input {
+  flex: none;
+  width: 100%;
+}
+
+/*
  * Document drop zone.
  *
  * A <button>, so pointer and keyboard use the same control instead of the old
@@ -4585,9 +4625,8 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   white-space: pre-wrap;
 }
 
-/* Feature unavailable placeholder — used by views whose canonical SDK
-   surface was deleted in the V2 cleanup and is pending the proto-byte
-   bridge re-land. */
+/* The designed "no browser engine ships for this modality" state — see
+   `components/modality-unavailable.ts` for what it says and why. */
 .feature-unavailable {
   padding: var(--space-3xl) var(--space-xl);
   display: flex;
@@ -4601,6 +4640,16 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   animation: chat-message-in var(--duration-regular) var(--ease-out);
 }
 
+/*
+ * Neutral, not brand orange.
+ *
+ * Orange is this app's action colour, and a 72px orange disc is the loudest
+ * thing on a screen whose entire message is "there is nothing to press here" —
+ * it reads as a call to action that does not exist. It is also the wrong
+ * contrast bet: #FF6900 measures 2.8:1 on the light theme's paper, under the 3:1
+ * WCAG 1.4.11 floor for a graphical object, while `--text-secondary` clears 6.6:1
+ * in both themes. Not red either: nothing failed.
+ */
 .feature-unavailable__icon {
   width: 72px;
   height: 72px;
@@ -4608,8 +4657,9 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background: radial-gradient(circle at 30% 30%, var(--color-primary-medium), var(--color-primary-light));
-  color: var(--color-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
   margin-bottom: var(--space-sm);
 }
 
@@ -4647,13 +4697,30 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   line-height: var(--line-height-relaxed);
 }
 
+/* Separate statements. Un-bulleted items at a relaxed line height run together
+   into one paragraph, and each of these is a distinct fact about the build. */
+.feature-unavailable__list li + li {
+  margin-top: var(--space-md);
+}
+
+/*
+ * Inline code inside this state.
+ *
+ * Neutral rather than brand orange: #FF6900 on the pale orange wash measures
+ * 2.7:1 in the light theme, and this is *text* — 4.5:1 is the bar, not 3:1. Ink
+ * on the tertiary surface clears 11:1 in both themes, and an API name is a
+ * quotation rather than something to accent.
+ */
 .feature-unavailable code {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  /* A verb like RunAnywhere.segmentation.segment(image) is longer than a 390px
+     column; break it rather than pushing the card wider than the viewport. */
+  overflow-wrap: anywhere;
 }
 
 /* =============================================================================
@@ -4958,4 +5025,194 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
     background-clip: content-box;
   }
   .toggle::after { top: 10px; left: 10px; }
+}
+
+/* =============================================================================
+ * Add from Hugging Face — the curated sub-1B shortlist.
+ *
+ * The sheet used to open on a bare sentence ("Type to search Hugging Face."),
+ * which only works for someone who already knows the name of a repo small
+ * enough to run in a tab — and the Hub's most-downloaded GGUF repos are 27B to
+ * 284B, so every obvious search ended in a model that cannot load. The
+ * shortlist answers that first.
+ *
+ * The tiles carry `.hf-repo-row` as well, so their frame, hover and focus come
+ * from the search-result rule above and cannot drift from it. Only what is
+ * genuinely different — a three-line body, its top alignment, and the reveal —
+ * is declared here.
+ * ============================================================================= */
+.hf-suggestions__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.hf-suggestions__subtext {
+  margin: 2px 0 var(--space-md);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.hf-suggestion-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.hf-suggestion { align-items: flex-start; }
+.hf-suggestion__info { flex: 1; min-width: 0; }
+.hf-suggestion__head {
+  display: flex;
+  align-items: center;
+  /* Wraps rather than squeezing the pill: the title is the longest thing on the
+     tile and a narrow sheet must break the line, not shrink the badge. */
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.hf-suggestion__title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+/* The repo id is kept on the tile — authored copy has to stay verifiable
+   against the thing it will actually download. */
+.hf-suggestion__repo {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  word-break: break-word;
+}
+.hf-suggestion__blurb {
+  margin-top: var(--space-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+/* Optically centres the chevron on the title line now that the row is
+   top-aligned rather than centred on a three-line body. */
+.hf-suggestion .hf-repo-row__chevron { margin-top: 3px; }
+
+/*
+ * The parameter count, on both the shortlist and the search rows.
+ *
+ * Neutral, not brand orange: at 10px, #FF6900 on the light theme's paper is
+ * 2.6:1 and fails AA. Not `--capability` blue either — in this app's pill
+ * vocabulary blue already means "what the model can do", and a size is a
+ * property, not a capability. Tabular figures so a column of badges lines up.
+ */
+.tag-pill--params {
+  background: var(--badge-gray);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The search row's meta line now mixes a pill with two text spans, so its
+   items have to sit on a shared centre line. */
+.hf-repo-row__meta { align-items: center; }
+
+/*
+ * The shortlist arrives rather than appearing: a 6px rise over the standard
+ * row-insert duration, staggered 22ms per tile so the eye reads down the list
+ * instead of taking all eight at once (154ms for the whole run). Eased out to a
+ * stop with no overshoot — these are rows settling into place, not an arrival
+ * worth a spring.
+ */
+.hf-suggestion {
+  animation: hf-suggestion-in var(--duration-standard) var(--ease-out) both;
+  animation-delay: calc(var(--hf-i, 0) * 22ms);
+}
+
+@keyframes hf-suggestion-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* `both` holds the from-state before the delay elapses, so the animation has to
+   be removed outright rather than zeroed — a 0s animation with fill would still
+   paint the first frame. */
+@media (prefers-reduced-motion: reduce) {
+  .hf-suggestion { animation: none; }
+}
+
+/* =============================================================================
+ * Benchmarks — throughput / latency charts
+ *
+ * The plot is inline SVG emitted at the container's real pixel width (see
+ * `drawCharts` in views/benchmarks.ts), so nothing here may resize it: a
+ * `width: 100%` would rescale the whole coordinate system and shrink the labels
+ * with it. This block only supplies colour and type, both from the theme
+ * tokens, which is what makes one chart correct in light and dark without a
+ * second palette.
+ * ============================================================================= */
+.bench-charts {
+  display: grid;
+  gap: var(--space-xl);
+  margin-top: var(--space-md-lg);
+}
+
+.bench-chart {
+  margin: 0;
+  /* The SVG is a fixed pixel width; on a pane narrower than the measurement was
+     taken at (a resize between draws) it scrolls rather than pushing the page. */
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.bench-chart__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.bench-chart__subtitle {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+/* Stated in place of the plot when a backend reported no value for this metric.
+   An axis with no bars would read as "the answer is zero". */
+.bench-chart__note {
+  margin-top: var(--space-md);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.bench-chart__plot {
+  display: block;
+  margin-top: var(--space-md);
+}
+
+.bench-chart__bar {
+  fill: var(--chart-accent);
+  /* Grow out of the baseline over the standard tier, eased to a stop. No spring:
+     an overshoot on a bar overstates the value at the moment the eye lands on
+     it, which on a measurement chart is the one thing motion must never do. */
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: bench-bar-in var(--duration-standard) var(--ease-out) both;
+}
+
+@keyframes bench-bar-in {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Recessive by design: a hairline in the separator grey, one step off the
+   surface, so the bars are the only thing with weight. */
+.bench-chart__axis {
+  stroke: var(--separator);
+  stroke-width: 1;
+}
+
+/* Text wears text tokens, never the series colour. */
+.bench-chart__label,
+.bench-chart__value {
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+}
+.bench-chart__label { fill: var(--text-secondary); }
+.bench-chart__value {
+  fill: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  /* A column of values has to line up; tabular figures are what does that. */
+  font-variant-numeric: tabular-nums;
 }

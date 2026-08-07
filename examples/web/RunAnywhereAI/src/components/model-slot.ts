@@ -21,10 +21,11 @@ import {
   cleanModelName,
   formatBytes,
   formatFramework,
-  modalityEmoji,
+  modalityIcon,
   modelDisplaySizeBytes,
 } from '../services/model-display';
 import { engineCompatibility } from '../services/engine-availability';
+import { icon } from './icons';
 import { getModelStatus, type ModelStatusSnapshot } from './model-selection';
 
 /** One role a surface needs filled, plus the entry currently filling it. */
@@ -74,7 +75,7 @@ export function renderModelSlot(slot: ModelSlotView): string {
   if (!entry) {
     return `
       <div class="model-slot model-slot--missing" data-slot="${escapeHtml(slot.key)}">
-        <div class="model-slot__icon">${modalityEmoji(slot.category)}</div>
+        <div class="model-slot__icon">${icon(modalityIcon(slot.category), { size: 20 })}</div>
         <div class="model-slot__body">
           <div class="model-slot__label">${escapeHtml(slot.label)}</div>
           <div class="model-slot__hint">${escapeHtml(slot.missingHint ?? 'No model available for this device.')}</div>
@@ -101,7 +102,7 @@ export function renderModelSlot(slot: ModelSlotView): string {
 
   return `
     <div class="model-slot model-slot--${engineReason ? 'blocked' : status.status}" data-slot="${escapeHtml(slot.key)}">
-      <div class="model-slot__icon">${modalityEmoji(slot.category)}</div>
+      <div class="model-slot__icon">${icon(modalityIcon(slot.category), { size: 20 })}</div>
       <div class="model-slot__body">
         <div class="model-slot__label">${escapeHtml(slot.label)}${optionalTag}</div>
         <div class="model-slot__hint">

@@ -11,9 +11,29 @@
 //  (download_orchestrator.cpp: `already_complete` → skip fetch → finalize +
 //  self_heal_registry) and updates the registry without any network I/O.
 //
+//  ## Why there is no retry loop here
+//
+//  Commons already owns one, and it is shared by all five SDKs:
+//  `execute_stream_with_retry` in download_orchestrator.cpp retries transient
+//  network failures four times with exponential backoff, recomputing the offset
+//  from the "<dest>.part" sidecar each attempt. Re-implementing that policy in
+//  Swift would mean two retry schedules that drift apart the first time either
+//  is tuned. So an interrupted transfer here does exactly one thing: it takes
+//  custody of the resume blob and reports the failure honestly. The next start
+//  continues from that blob (see `startTasks`), and everything about *when* to
+//  retry stays a single decision made in one place.
+//
+//  Note that the two resume mechanisms are disjoint by construction, which is
+//  why the blob custody below matters so much. Commons resumes by measuring a
+//  "<dest>.part" file it wrote itself; `URLSessionDownloadTask` keeps its bytes
+//  in a private temp file that nothing outside CFNetwork can measure. If this
+//  coordinator loses the blob, those bytes are unreachable from either side and
+//  the file restarts from zero.
+//
 
 import CryptoKit
 import Foundation
+import os
 
 /// Per-file payload carried in `URLSessionTask.taskDescription` so a background
 /// session restored after an app relaunch can place bytes and finalize without
@@ -28,7 +48,13 @@ private struct BackgroundDownloadFile: Codable {
 private struct ModelTransfer {
     let plan: RADownloadPlanResult
     let onProgress: ((RADownloadProgress) async -> Void)?
-    let continuation: CheckedContinuation<Void, Error>
+    /// `nil` for a transfer adopted from a previous run of the app: the bytes are
+    /// still moving in `nsurlsessiond`, but the caller that started them is gone,
+    /// so completion drives the commons finalize directly instead of resuming
+    /// anyone. Everything else — progress accounting, notifications, blob
+    /// custody — is identical, which is the point of modelling it this way
+    /// rather than as a separate code path.
+    let continuation: CheckedContinuation<Void, Error>?
     var fileBytes: [Int: Int64] = [:]
     /// When the transfer began, for the throughput average.
     let startedAt = Date()
@@ -41,6 +67,8 @@ private struct ModelTransfer {
     /// for the same reason as `preexistingBytes`: a resume that starts at 1.4 GB
     /// would otherwise report several gigabytes per second for one sample.
     var resumedBytes: [Int: Int64] = [:]
+
+    var isAdopted: Bool { continuation == nil }
 }
 
 final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
@@ -48,23 +76,64 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
 
     static let sessionIdentifier = "com.runanywhere.downloads"
 
+    /// A `DispatchQueue` rather than an actor because every mutation below happens
+    /// inside a synchronous `URLSession` delegate callback. Hopping those onto an
+    /// actor would make each one a suspension point, and two chunks of the same
+    /// file could then report progress out of order.
     private let stateQueue = DispatchQueue(label: "com.runanywhere.downloads.state")
     private var transfers: [String: ModelTransfer] = [:]
     private var enabledFlag = true
     private var notificationsFlag = true
     private var backgroundCompletionHandler: (() -> Void)?
+    /// Models whose transfer this process has deliberately torn down.
+    ///
+    /// Cancelling a task is not instantaneous: progress and completion callbacks
+    /// already in the delegate queue still arrive afterwards. Without this marker
+    /// they would re-adopt the transfer from its persisted plan and a cancelled
+    /// download would carry on reporting progress and posting notifications. It
+    /// also carries the "cancel arrived before `prefetch` installed its
+    /// continuation" case, so that continuation fails fast instead of hanging.
+    ///
+    /// Cleared by the next `prefetch`, which is what "a new attempt has begun"
+    /// means here.
+    private var suppressedModels: Set<String> = []
+    /// Models whose partial bytes were deliberately thrown away because the result
+    /// was corrupt. Narrower than `suppressedModels` and answers a different
+    /// question: a cancel suppresses the transfer but *keeps* its blob, whereas
+    /// these must never have one filed, or the next attempt would resume straight
+    /// back into the same bad file.
+    private var discardedModels: Set<String> = []
 
     private let logger = SDKLogger.download
+    /// Everything this transfer leaves on disk so a later attempt — or a later
+    /// process — can pick it up. See `DownloadPersistenceStore`.
+    private let store = DownloadPersistenceStore()
 
-    private lazy var session: URLSession = {
-        let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
-        config.sessionSendsLaunchEvents = true
-        config.isDiscretionary = false
-        config.waitsForConnectivity = true
-        let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = 1
-        return URLSession(configuration: config, delegate: self, delegateQueue: queue)
-    }()
+    /// The session is built on first use behind a lock rather than with `lazy var`.
+    /// `lazy` is not thread-safe, and this object is reached from the downloading
+    /// task, the cancelling task, and the app delegate's background-events
+    /// callback. Two of those racing the lazy initializer would each construct a
+    /// `URLSession` for the *same* background identifier; only one can own the
+    /// daemon's tasks, so the loser's `getAllTasks` comes back empty and its
+    /// cancel silently does nothing.
+    private let sessionLock = OSAllocatedUnfairLock<URLSession?>(initialState: nil)
+
+    private var session: URLSession {
+        sessionLock.withLock { stored in
+            if let stored { return stored }
+            let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
+            config.sessionSendsLaunchEvents = true
+            config.isDiscretionary = false
+            config.waitsForConnectivity = true
+            // Serial on purpose: the delegate callbacks mutate the transfer table
+            // and their order is the progress order a caller sees.
+            let queue = OperationQueue()
+            queue.maxConcurrentOperationCount = 1
+            let created = URLSession(configuration: config, delegate: self, delegateQueue: queue)
+            stored = created
+            return created
+        }
+    }
 
     private override init() { super.init() }
 
@@ -83,16 +152,78 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
     /// A plan is background-eligible only when every file has a known size, a URL,
     /// and needs no extraction — extraction stays a commons-owned step, so those
     /// models fall back to the foreground path.
+    ///
+    /// The fallback is logged because it is otherwise invisible: a model that
+    /// silently never uses the background session looks identical to one whose
+    /// background session is broken, and the two need completely different fixes.
     func shouldHandle(_ plan: RADownloadPlanResult) -> Bool {
-        guard isEnabled, !plan.files.isEmpty else { return false }
-        return plan.files.allSatisfy {
-            $0.expectedBytes > 0 && !$0.requiresExtraction && !$0.file.url.isEmpty
+        guard isEnabled else { return false }
+        guard !plan.files.isEmpty else {
+            logger.info("Background download skipped: the plan has no files")
+            return false
         }
+        let ineligible = plan.files.first {
+            $0.expectedBytes <= 0 || $0.requiresExtraction || $0.file.url.isEmpty
+        }
+        guard let ineligible else { return true }
+        logger.info(
+            "Background download skipped; using the commons transfer path",
+            metadata: [
+                "file": ineligible.file.filename,
+                "reason": ineligible.requiresExtraction ? "requires extraction"
+                    : (ineligible.file.url.isEmpty ? "no URL" : "unknown size")
+            ]
+        )
+        return false
     }
 
     func registerBackgroundCompletionHandler(_ handler: @escaping () -> Void) {
         stateQueue.sync { backgroundCompletionHandler = handler }
         _ = session // force the background session to exist so events are delivered
+    }
+
+    // MARK: - Restoration after a process restart
+
+    /// Re-adopt background transfers that outlived the process.
+    ///
+    /// A background `URLSession` keeps downloading inside `nsurlsessiond` after
+    /// the app is suspended or killed, but its delegate callbacks are only
+    /// delivered once the app recreates a session with the same identifier.
+    /// Nothing does that on an ordinary relaunch —
+    /// `handleEventsForBackgroundURLSession` fires only when the *system*
+    /// relaunched the app to hand over events, not when the user taps the icon —
+    /// so without this the bytes keep landing on disk while the SDK stays unaware
+    /// of them, and the next `download(id:)` starts a second task racing the first
+    /// into the same destination.
+    ///
+    /// Runs from Phase 2, after commons has discovered downloaded models, so a
+    /// transfer that finished while the app was gone can be finalized against a
+    /// populated registry instead of failing to find its own model.
+    func restoreInterruptedTransfers() async {
+        guard isEnabled else { return }
+
+        // Reading `allTasks` is what actually reconnects this process to the
+        // daemon's tasks; the returned list is a by-product.
+        let liveModelIDs = Set(await session.allTasks.compactMap { decode($0.taskDescription)?.modelID })
+        for modelID in liveModelIDs {
+            _ = adoptedTransfer(modelID: modelID)
+        }
+        if !liveModelIDs.isEmpty {
+            logger.info("Adopted \(liveModelIDs.count) background download(s) still in flight")
+        }
+
+        // A persisted plan whose files are all on disk, with no task still
+        // running, is a transfer that completed while the app was not running:
+        // the bytes landed but the registry was never told. Finalize it now
+        // rather than making the user tap download on a model that is already
+        // fully downloaded.
+        for modelID in store.interruptedModelIDs() where !liveModelIDs.contains(modelID) {
+            guard let files = store.loadPlan(modelID: modelID)?.files,
+                  allFilesComplete(files) else { continue }
+            logger.info("Finalizing a background download that completed while the app was closed",
+                        metadata: ["modelId": modelID])
+            completeTransfer(modelID: modelID)
+        }
     }
 
     // MARK: - Prefetch (in-process)
@@ -106,30 +237,67 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         onProgress: ((RADownloadProgress) async -> Void)?
     ) async throws {
         let modelID = model.id
-        persistPlan(plan, modelID: modelID)
+        store.persistPlan(plan, modelID: modelID)
+        // A new attempt begins here, so anything the previous one was suppressing
+        // stops applying. Cleared before the awaits below rather than inside the
+        // continuation, so that a cancel arriving *during* those awaits is still
+        // seen by the continuation and correctly aborts this attempt.
+        stateQueue.sync {
+            suppressedModels.remove(modelID)
+            discardedModels.remove(modelID)
+        }
 
         if notificationsEnabled {
             await DownloadNotifier.shared.requestAuthorizationIfNeeded()
         }
 
+        // Ask the session what it is already moving before planning new tasks. A
+        // background task survives the process, so on a relaunch — or on a second
+        // `download(id:)` for a model whose first attempt is still running — the
+        // destination may already have a live task, and starting another means two
+        // tasks racing to move their temp file onto the same path.
+        let inFlight = await inFlightDestinations(modelID: modelID)
+
         nonisolated(unsafe) let progressCallback = onProgress
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                stateQueue.sync {
+                // `onCancel` fires *before* this closure when the task was already
+                // cancelled on entry — which is reachable, because several awaits
+                // precede it. The teardown would then find no transfer to resume
+                // and this continuation would be stranded forever, hanging the
+                // caller's download stream. The suppression marker is the note the
+                // teardown leaves behind for exactly that ordering.
+                let start: Bool = stateQueue.sync {
+                    if suppressedModels.contains(modelID) { return false }
                     transfers[modelID] = ModelTransfer(
                         plan: plan,
                         onProgress: progressCallback,
                         continuation: continuation
                     )
+                    return true
                 }
-                startTasks(for: plan, modelID: modelID)
+                guard start else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                startTasks(for: plan, modelID: modelID, skipping: inFlight)
             }
         } onCancel: {
-            cancelTransfer(modelID: modelID)
+            // `onCancel` is synchronous, but preserving the partial bytes is not:
+            // the resume blob only exists once CFNetwork hands it back. So the
+            // teardown runs detached and resumes the caller's continuation only
+            // after the blob is on disk. Delivering `CancellationError` first
+            // would mean `isResumable(id:)` — which a UI calls the instant a
+            // download stops — reads the blob directory before anything has been
+            // written to it, and tells the user their bytes are gone.
+            //
+            // Detached rather than `Task {}` so it is explicit that this teardown
+            // must outlive the cancelled task it is cleaning up after.
+            Task.detached { await self.cancelTransfer(modelID: modelID) }
         }
     }
 
-    private func startTasks(for plan: RADownloadPlanResult, modelID: String) {
+    private func startTasks(for plan: RADownloadPlanResult, modelID: String, skipping inFlight: Set<String>) {
         // Bytes that were already complete before this transfer began, so the
         // throughput average measures only what this transfer actually moves.
         let alreadyOnDisk = plan.files
@@ -139,6 +307,9 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
 
         for file in plan.files {
             if fileSize(file.destinationPath) == file.expectedBytes { continue }
+            // Already moving in the daemon from a previous run — adopting it is
+            // strictly better than starting a duplicate.
+            if inFlight.contains(file.destinationPath) { continue }
             guard let url = URL(string: file.file.url) else { continue }
 
             let payload = BackgroundDownloadFile(
@@ -158,11 +329,11 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
             // longer honors it) must not be retried forever, and the plain request
             // below is the correct fallback.
             let task: URLSessionDownloadTask
-            if let resumeData = loadResumeData(
+            if let resumeData = store.loadResumeData(
                 modelID: modelID, destinationPath: file.destinationPath
             ) {
                 task = session.downloadTask(withResumeData: resumeData)
-                clearResumeData(modelID: modelID, destinationPath: file.destinationPath)
+                store.clearResumeData(modelID: modelID, destinationPath: file.destinationPath)
             } else {
                 var request = URLRequest(url: url)
                 if let bearer = HuggingFaceAuth.bearer(for: url) {
@@ -181,53 +352,74 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         }
     }
 
-    /// Stop the transfer but keep everything needed to continue it later.
-    ///
-    /// The plan is deliberately *not* cleared here, unlike on completion or
-    /// failure: the plan plus the per-file resume blobs are exactly what a later
-    /// attempt needs, and discarding them is what used to make a cancel throw away
-    /// the bytes.
-    func cancelTransfer(modelID: String) {
-        cancelTasks(for: modelID, preservingResumeData: true)
-        let transfer = stateQueue.sync { transfers.removeValue(forKey: modelID) }
-        transfer?.continuation.resume(throwing: CancellationError())
+    /// Destination paths this model already has a live task for.
+    private func inFlightDestinations(modelID: String) async -> Set<String> {
+        var destinations: Set<String> = []
+        for task in await session.allTasks {
+            guard task.state == .running || task.state == .suspended,
+                  let payload = decode(task.taskDescription),
+                  payload.modelID == modelID else { continue }
+            destinations.insert(payload.destinationPath)
+        }
+        return destinations
     }
 
-    private func cancelTasks(for modelID: String, preservingResumeData: Bool = false) {
-        session.getAllTasks { tasks in
-            for task in tasks where self.decode(task.taskDescription)?.modelID == modelID {
-                guard preservingResumeData,
-                      let download = task as? URLSessionDownloadTask,
-                      let payload = self.decode(task.taskDescription) else {
-                    task.cancel()
-                    continue
-                }
-                // The resume blob arrives asynchronously, so it is stored from the
-                // completion handler rather than read back off the task.
-                download.cancel { data in
-                    guard let data else {
-                        // The server did not give us a resumable response (no
-                        // ETag/Accept-Ranges, or the bytes were too few to be
-                        // worth it). Logged rather than swallowed, because it is
-                        // the difference between a retry costing the remainder
-                        // and costing the whole file.
-                        self.logger.info(
-                            "Download cancelled without resume data",
-                            metadata: ["modelId": payload.modelID]
-                        )
-                        return
-                    }
-                    self.storeResumeData(
-                        data,
-                        modelID: payload.modelID,
-                        destinationPath: payload.destinationPath
-                    )
-                    self.logger.info(
-                        "Download cancelled with resume data",
-                        metadata: ["modelId": payload.modelID, "bytes": String(data.count)]
-                    )
-                }
+    /// Stop the transfer but keep everything needed to continue it later.
+    ///
+    /// The plan is deliberately *not* cleared here, unlike on completion or an
+    /// unrecoverable failure: the plan plus the per-file resume blobs are exactly
+    /// what a later attempt needs, and discarding them is what used to make a
+    /// cancel throw away the bytes. The caller's `CancellationError` is delivered
+    /// last, once the blobs are settled, so a UI that immediately asks whether the
+    /// download is resumable gets the answer that matches what is on disk.
+    func cancelTransfer(modelID: String) async {
+        // Marked before the cancels, not after: callbacks for tasks torn down
+        // below are already queued, and a late one must not resurrect the transfer.
+        // It also covers the case where the cancel beat `prefetch` to the transfer
+        // table, so that continuation fails fast rather than awaiting a resume
+        // that will never come.
+        stateQueue.sync { _ = suppressedModels.insert(modelID) }
+        await cancelTasks(for: modelID, preservingResumeData: true)
+        let transfer = stateQueue.sync { transfers.removeValue(forKey: modelID) }
+        transfer?.continuation?.resume(throwing: CancellationError())
+    }
+
+    /// Stop every task belonging to `modelID`, awaiting resume-blob custody.
+    ///
+    /// The await matters: `cancel(byProducingResumeData:)` hands the blob back
+    /// through a callback, so returning before it lands means the bytes look lost
+    /// to anything that checks straight afterwards.
+    private func cancelTasks(for modelID: String, preservingResumeData: Bool) async {
+        for task in await session.allTasks {
+            guard let payload = decode(task.taskDescription), payload.modelID == modelID else { continue }
+            guard preservingResumeData, let download = task as? URLSessionDownloadTask else {
+                task.cancel()
+                continue
             }
+            let resumeData: Data? = await withCheckedContinuation { continuation in
+                download.cancel { continuation.resume(returning: $0) }
+            }
+            guard let resumeData else {
+                // The server did not give us a resumable response (no
+                // ETag/Accept-Ranges, or the bytes were too few to be worth it).
+                // Logged rather than swallowed, because it is the difference
+                // between a retry costing the remainder and costing the whole file.
+                logger.info(
+                    "Download stopped without resume data",
+                    metadata: ["modelId": payload.modelID, "file": payload.destinationPath]
+                )
+                continue
+            }
+            store.storeResumeData(
+                resumeData,
+                modelID: payload.modelID,
+                destinationPath: payload.destinationPath,
+                bytesOnDisk: observedBytes(modelID: payload.modelID, destinationPath: payload.destinationPath)
+            )
+            logger.info(
+                "Download stopped with resume data",
+                metadata: ["modelId": payload.modelID, "blobBytes": String(resumeData.count)]
+            )
         }
     }
 
@@ -235,18 +427,18 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
 
     private func completeTransfer(modelID: String) {
         let transfer = stateQueue.sync { transfers.removeValue(forKey: modelID) }
-        clearPersistedPlan(modelID: modelID)
+        store.clearPlan(modelID: modelID)
         // Every byte is on disk; a stale resume blob would only mislead a later
         // attempt into continuing a file that is already finished.
-        clearResumeData(modelID: modelID)
+        store.clearResumeData(modelID: modelID)
 
-        if let transfer {
-            transfer.continuation.resume()
+        if let continuation = transfer?.continuation {
+            continuation.resume()
             return
         }
 
-        // No in-process awaiter: the app was relaunched to deliver background
-        // events, so the coordinator itself drives the commons finalize.
+        // No in-process awaiter: the transfer was adopted from a previous run of
+        // the app, so the coordinator itself drives the commons finalize.
         Task {
             do {
                 _ = try await RunAnywhere.finalizeBackgroundDownload(modelID: modelID)
@@ -260,21 +452,39 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
 
     /// Fail the transfer, keeping partial bytes when a retry could still use them.
     ///
-    /// `recoverable` is false only for a corrupt result — a size mismatch or a bad
-    /// checksum — where the bytes on disk are known to be wrong and continuing from
-    /// them would reproduce the same bad file. A network drop is the opposite case:
-    /// the bytes are good, so the resume blobs are kept and the retry costs only
-    /// the remainder.
+    /// `recoverable` is false only for a corrupt result — a bad HTTP status, a size
+    /// mismatch, or a bad checksum — where the bytes on disk are known to be wrong
+    /// and continuing from them would reproduce the same bad file. A network drop
+    /// is the opposite case: the bytes are good, so the resume blobs are kept and
+    /// the retry costs only the remainder.
+    ///
+    /// Called from synchronous delegate callbacks, so the actual teardown is
+    /// detached; the error reaches the caller only once blob custody has settled,
+    /// for the same reason as cancel.
     private func failTransfer(modelID: String, message: String, recoverable: Bool = true) {
-        cancelTasks(for: modelID, preservingResumeData: recoverable)
+        Task.detached {
+            await self.finishFailedTransfer(modelID: modelID, message: message, recoverable: recoverable)
+        }
+    }
+
+    private func finishFailedTransfer(modelID: String, message: String, recoverable: Bool) async {
+        // Both marks go up before the cancels below, because the callbacks for the
+        // tasks they tear down are already queued: `suppressed` stops a late one
+        // resurrecting the transfer, and `discarded` stops a sibling's
+        // `didCompleteWithError` re-filing a blob for bytes we just judged wrong.
+        stateQueue.sync {
+            _ = suppressedModels.insert(modelID)
+            if !recoverable { _ = discardedModels.insert(modelID) }
+        }
+        await cancelTasks(for: modelID, preservingResumeData: recoverable)
         let transfer = stateQueue.sync { transfers.removeValue(forKey: modelID) }
         if !recoverable {
-            clearPersistedPlan(modelID: modelID)
-            clearResumeData(modelID: modelID)
+            store.clearPlan(modelID: modelID)
+            store.clearResumeData(modelID: modelID)
         }
         let error = SDKException(code: .downloadFailed, message: message, category: .network)
-        transfer?.continuation.resume(throwing: error)
-        Task { await notify { await $0.notifyFailed(modelID: modelID, message: message) } }
+        transfer?.continuation?.resume(throwing: error)
+        await notify { await $0.notifyFailed(modelID: modelID, message: message) }
     }
 
     // MARK: - Helpers
@@ -284,11 +494,47 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         await body(DownloadNotifier.shared)
     }
 
-    private func planFiles(for modelID: String) -> [RADownloadFilePlan]? {
-        if let plan = stateQueue.sync(execute: { transfers[modelID]?.plan }) {
-            return plan.files
+    /// The live transfer for `modelID`, adopting the persisted plan when the
+    /// bytes are moving but the caller that started them is gone.
+    ///
+    /// Without this, a delegate callback arriving after a relaunch has no plan to
+    /// attribute bytes to, so a multi-file model reports only the file it happens
+    /// to hear about and completion never fires.
+    @discardableResult
+    private func adoptedTransfer(modelID: String) -> ModelTransfer? {
+        let lookup = stateQueue.sync { (transfers[modelID], suppressedModels.contains(modelID)) }
+        if let existing = lookup.0 { return existing }
+        // A transfer this process tore down keeps its plan on disk on purpose, so
+        // the plan alone is not permission to adopt: without this check a delegate
+        // callback still draining behind a cancel would resurrect the transfer and
+        // a cancelled download would go on reporting progress.
+        guard !lookup.1, let plan = store.loadPlan(modelID: modelID) else { return nil }
+        let alreadyOnDisk = plan.files
+            .filter { fileSize($0.destinationPath) == $0.expectedBytes }
+            .reduce(Int64(0)) { $0 + $1.expectedBytes }
+        return stateQueue.sync {
+            if let existing = transfers[modelID] { return existing }
+            var adopted = ModelTransfer(plan: plan, onProgress: nil, continuation: nil)
+            adopted.preexistingBytes = alreadyOnDisk
+            transfers[modelID] = adopted
+            return adopted
         }
-        return loadPersistedPlan(modelID: modelID)?.files
+    }
+
+    /// The most recent byte count this process observed for one planned file, or 0
+    /// when it never saw a progress callback for it.
+    ///
+    /// Lives here rather than in the store because it is a question about the live
+    /// transfer table, and it is what lets a resume blob be filed with a truthful
+    /// byte count beside it.
+    private func observedBytes(modelID: String, destinationPath: String) -> Int64 {
+        stateQueue.sync {
+            guard let transfer = transfers[modelID],
+                  let index = transfer.plan.files.firstIndex(where: {
+                      $0.destinationPath == destinationPath
+                  }) else { return 0 }
+            return transfer.fileBytes[index] ?? 0
+        }
     }
 
     private func allFilesComplete(_ files: [RADownloadFilePlan]) -> Bool {
@@ -322,115 +568,29 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         return digest.caseInsensitiveCompare(expected) == .orderedSame
     }
 
-    // MARK: - Plan persistence (survives app relaunch)
-
-    private func persistenceDirectory() -> URL? {
-        guard let base = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask
-        ).first else { return nil }
-        let dir = base.appendingPathComponent("RunAnywhereDownloads", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
-
-    private func planURL(modelID: String) -> URL? {
-        let name = modelID.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? modelID
-        return persistenceDirectory()?.appendingPathComponent("\(name).plan")
-    }
-
-    private func persistPlan(_ plan: RADownloadPlanResult, modelID: String) {
-        guard let url = planURL(modelID: modelID),
-              let data = try? plan.serializedData() else { return }
-        try? data.write(to: url, options: .atomic)
-    }
-
-    private func loadPersistedPlan(modelID: String) -> RADownloadPlanResult? {
-        guard let url = planURL(modelID: modelID),
-              let data = try? Data(contentsOf: url) else { return nil }
-        return try? RADownloadPlanResult(serializedBytes: data)
-    }
-
-    private func clearPersistedPlan(modelID: String) {
-        guard let url = planURL(modelID: modelID) else { return }
-        try? FileManager.default.removeItem(at: url)
-    }
-
-    // MARK: - Resume data (survives cancel and app relaunch)
-
-    /// `URLSessionDownloadTask` keeps its partial bytes in a private temp file and
-    /// deletes them on a plain `cancel()`. `cancel(byProducingResumeData:)` instead
-    /// hands back an opaque blob that a later `downloadTask(withResumeData:)`
-    /// continues from, and that blob is what has to be kept.
-    ///
-    /// It is written to disk rather than held in memory because the case that
-    /// matters most is the app being killed: a 3 GB model interrupted at 90% must
-    /// cost the remaining 10% on next launch, not the whole file again. Keyed per
-    /// file, since a multi-file model can be interrupted with some files done and
-    /// one mid-flight.
-    private func resumeDataURL(modelID: String, destinationPath: String) -> URL? {
-        let key = "\(modelID)|\(destinationPath)"
-        let name = key.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
-            ?? String(key.hashValue)
-        return persistenceDirectory()?.appendingPathComponent("\(name).resume")
-    }
-
-    private func storeResumeData(_ data: Data, modelID: String, destinationPath: String) {
-        guard let url = resumeDataURL(modelID: modelID, destinationPath: destinationPath) else {
-            return
-        }
-        try? data.write(to: url, options: .atomic)
-    }
-
-    private func loadResumeData(modelID: String, destinationPath: String) -> Data? {
-        guard let url = resumeDataURL(modelID: modelID, destinationPath: destinationPath) else {
-            return nil
-        }
-        return try? Data(contentsOf: url)
-    }
-
-    private func clearResumeData(modelID: String, destinationPath: String) {
-        guard let url = resumeDataURL(modelID: modelID, destinationPath: destinationPath) else {
-            return
-        }
-        try? FileManager.default.removeItem(at: url)
-    }
-
-    /// Drop every stored blob for a model, used once the model is fully downloaded
-    /// or has failed for a reason a resume cannot fix.
-    private func clearResumeData(modelID: String) {
-        guard let dir = persistenceDirectory(),
-              let entries = try? FileManager.default.contentsOfDirectory(
-                  at: dir, includingPropertiesForKeys: nil
-              ) else { return }
-        let prefix = "\(modelID)|".addingPercentEncoding(withAllowedCharacters: .alphanumerics)
-        guard let prefix else { return }
-        for entry in entries
-        where entry.pathExtension == "resume" && entry.lastPathComponent.hasPrefix(prefix) {
-            try? FileManager.default.removeItem(at: entry)
-        }
-    }
-
     /// How many bytes an interrupted attempt left recoverable, so a caller can
     /// offer "Resume" only when resuming would genuinely save work.
     ///
-    /// Counts files already complete on disk, plus files that hold a resume blob.
-    /// A blob's exact byte offset is opaque until the task actually resumes, so a
-    /// partial file contributes a nominal 1 — the caller only needs to know whether
-    /// anything is recoverable, not how much.
+    /// Counts files already complete on disk, plus the checkpointed byte count of
+    /// files that hold a resume blob. A blob with no checkpoint means the bytes
+    /// are recoverable but their count was never observed — the process died
+    /// before the first progress callback — so it contributes a nominal 1 rather
+    /// than 0, because 0 would tell the caller the bytes are gone when they are not.
     ///
     /// Zero when no plan is persisted, which is the normal state for a model that
     /// has never been downloaded or whose download finished.
     func resumableBytes(modelID: String) -> Int64 {
-        let plan = stateQueue.sync { transfers[modelID]?.plan } ?? loadPersistedPlan(modelID: modelID)
+        let plan = stateQueue.sync { transfers[modelID]?.plan } ?? store.loadPlan(modelID: modelID)
         guard let plan else { return 0 }
         return plan.files.reduce(Int64(0)) { total, file in
             if fileSize(file.destinationPath) == file.expectedBytes {
                 return total + file.expectedBytes
             }
-            let hasBlob = loadResumeData(
-                modelID: modelID, destinationPath: file.destinationPath
-            ) != nil
-            return hasBlob ? total + 1 : total
+            guard store.loadResumeData(modelID: modelID, destinationPath: file.destinationPath) != nil else {
+                return total
+            }
+            let checkpoint = store.resumeCheckpoint(modelID: modelID, destinationPath: file.destinationPath)
+            return total + max(checkpoint ?? 1, 1)
         }
     }
 }
@@ -445,10 +605,26 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
     ) {
         guard let payload = decode(downloadTask.taskDescription) else { return }
 
+        // All three of these mean the bytes we hold are wrong, not merely
+        // incomplete, so the partial state is discarded — a resume would only
+        // rebuild the same bad file.
+        //
+        // The status check comes first because a background session bypasses the
+        // commons HTTP dispatcher and therefore its error handling too: a gated
+        // Hugging Face repo answers 401 with a short HTML body, which arrives here
+        // as a perfectly successful download. Without this it would be reported as
+        // a size mismatch, sending the user to look at their disk instead of their
+        // access token.
+        if let response = downloadTask.response as? HTTPURLResponse,
+           !(200...299).contains(response.statusCode) {
+            failTransfer(
+                modelID: payload.modelID,
+                message: "Server returned HTTP \(response.statusCode) for \(payload.destinationPath)",
+                recoverable: false
+            )
+            return
+        }
         let expected = payload.expectedBytes
-        // Both of these mean the bytes we hold are wrong, not merely incomplete, so
-        // the partial state is discarded — a resume would only rebuild the same
-        // corrupt file.
         if expected > 0, fileSize(location.path) != expected {
             failTransfer(
                 modelID: payload.modelID,
@@ -484,7 +660,15 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
             return
         }
 
-        guard let files = planFiles(for: payload.modelID), allFilesComplete(files) else { return }
+        // This file is done, so its resume blob is now a liability: a later
+        // attempt that found it would try to continue a finished file.
+        store.clearResumeData(modelID: payload.modelID, destinationPath: payload.destinationPath)
+
+        // Adoption (not a bare plan read) on purpose: it is what refuses to
+        // finalize a transfer the user already cancelled, even though this last
+        // file happened to land.
+        guard let files = adoptedTransfer(modelID: payload.modelID)?.plan.files,
+              allFilesComplete(files) else { return }
         completeTransfer(modelID: payload.modelID)
     }
 
@@ -498,62 +682,44 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
         guard let payload = decode(downloadTask.taskDescription) else { return }
         let modelID = payload.modelID
 
-        guard let plan = stateQueue.sync(execute: { transfers[modelID]?.plan }) else {
-            // Relaunch case: no in-process awaiter, drive the notifier per file.
-            if totalBytesExpectedToWrite > 0 {
-                let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-                Task { await notify { await $0.notifyProgress(modelID: modelID, fraction: fraction) } }
-            }
-            return
-        }
+        // Adopt on first sight so a transfer restored after a relaunch reports the
+        // same whole-plan progress as one this process started, rather than a bare
+        // per-file percentage with no notion of the other files.
+        guard let transfer = adoptedTransfer(modelID: modelID) else { return }
+        let plan = transfer.plan
+        guard let index = plan.files.firstIndex(where: {
+            $0.destinationPath == payload.destinationPath
+        }) else { return }
 
-        let index = plan.files.firstIndex { $0.destinationPath == payload.destinationPath } ?? 0
         let total = plan.totalBytes > 0 ? plan.totalBytes : plan.files.reduce(0) { $0 + $1.expectedBytes }
-        let sample: (done: Int64, elapsed: TimeInterval, moved: Int64)? = stateQueue.sync {
+        let sample: DownloadProgressSample? = stateQueue.sync {
             guard var transfer = transfers[modelID] else { return nil }
+            // An adopted task was already mid-flight when this process attached to
+            // it, and `didResumeAtOffset` does not fire for it — the daemon never
+            // "resumed" anything from our point of view. Its first sample is
+            // therefore entirely inherited bytes, and counting them as moved would
+            // report gigabytes per second for one tick right after launch.
+            if transfer.isAdopted, transfer.fileBytes[index] == nil {
+                transfer.resumedBytes[index] = totalBytesWritten
+            }
             transfer.fileBytes[index] = totalBytesWritten
             transfers[modelID] = transfer
             let done = transfer.fileBytes.values.reduce(0, +) + transfer.preexistingBytes
-            // Bytes this attempt actually moved: everything on disk, minus what was
-            // already complete before it started, minus what a resumed task
-            // inherited. Without the last term a download resumed at 1.4 GB would
-            // report gigabytes per second on its first sample.
             let inherited = transfer.resumedBytes.values.reduce(0, +)
-            return (
-                done: done,
+            return DownloadProgressSample(
+                modelID: modelID,
+                bytesDone: done,
+                bytesTotal: total,
+                fileIndex: index,
+                fileCount: plan.files.count,
                 elapsed: Date().timeIntervalSince(transfer.startedAt),
-                moved: done - transfer.preexistingBytes - inherited
+                bytesMoved: done - transfer.preexistingBytes - inherited
             )
         }
         guard let sample else { return }
-        let done = sample.done
         nonisolated(unsafe) let callback = stateQueue.sync { transfers[modelID]?.onProgress }
-
-        var progress = RADownloadProgress()
-        progress.modelID = modelID
-        // RADownloadStage was folded into RADownloadState
-        // (idl/download_service.proto); `.state` alone now carries what
-        // `.stage` used to.
-        progress.state = .downloading
-        progress.bytesDownloaded = done
-        progress.totalBytes = total
-        progress.totalFiles = Int32(plan.files.count)
-        progress.currentFileIndex = Int32(index)
-        progress.overallProgress = total > 0 ? Float(Double(done) / Double(total)) : 0
-
-        // Throughput and ETA, matching what the commons path reports
-        // (`download_orchestrator.cpp`) so the two transfer paths are
-        // indistinguishable to a caller. A whole-transfer average, not a
-        // windowed rate: the same choice commons makes, and a windowed rate on
-        // a multi-gigabyte download reads as jitter rather than information.
-        if sample.elapsed > 0, sample.moved > 0 {
-            let speed = Double(sample.moved) / sample.elapsed
-            progress.bytesPerSecond = Float(speed)
-            if total > done, speed > 0 {
-                progress.etaSeconds = Int64(Double(total - done) / speed)
-            }
-        }
-        let fraction = Double(progress.overallProgress)
+        let progress = sample.asProto()
+        let fraction = sample.fraction
 
         Task {
             await callback?(progress)
@@ -577,10 +743,10 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
         guard let payload = decode(downloadTask.taskDescription) else { return }
         let modelID = payload.modelID
         stateQueue.sync {
-            guard var transfer = transfers[modelID] else { return }
-            let index = transfer.plan.files.firstIndex {
-                $0.destinationPath == payload.destinationPath
-            } ?? 0
+            guard var transfer = transfers[modelID],
+                  let index = transfer.plan.files.firstIndex(where: {
+                      $0.destinationPath == payload.destinationPath
+                  }) else { return }
             transfer.resumedBytes[index] = fileOffset
             transfers[modelID] = transfer
         }
@@ -596,7 +762,29 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
         didCompleteWithError error: Error?
     ) {
         guard let error, let payload = decode(task.taskDescription) else { return }
-        if (error as NSError).code == NSURLErrorCancelled { return }
+        let nsError = error as NSError
+
+        // Whatever ended this task — an explicit cancel, a dropped connection, the
+        // system reclaiming the app — CFNetwork attaches the resume blob here
+        // whenever the response was resumable. This is the *only* channel that
+        // covers the interruptions nobody asked for, so the blob is filed before
+        // the error is even classified. Relying on `cancel(byProducingResumeData:)`
+        // alone meant a 3 GB model dropped at 90% by a network blip started over
+        // from zero, which is exactly the case this coordinator exists to prevent.
+        //
+        // Skipped only for a model whose bytes were deliberately discarded as
+        // corrupt; keeping a blob there would resume straight back into the bad file.
+        let isDiscarded = stateQueue.sync { discardedModels.contains(payload.modelID) }
+        if let resumeData = nsError.userInfo[NSURLSessionDownloadTaskResumeData] as? Data, !isDiscarded {
+            store.storeResumeData(
+                resumeData,
+                modelID: payload.modelID,
+                destinationPath: payload.destinationPath,
+                bytesOnDisk: observedBytes(modelID: payload.modelID, destinationPath: payload.destinationPath)
+            )
+        }
+
+        if nsError.code == NSURLErrorCancelled { return }
         failTransfer(modelID: payload.modelID, message: error.localizedDescription)
     }
 

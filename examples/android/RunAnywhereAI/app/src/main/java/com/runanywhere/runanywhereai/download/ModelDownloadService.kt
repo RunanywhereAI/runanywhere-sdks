@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.download
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentProvider
 import android.content.ContentValues
@@ -17,10 +18,10 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import com.runanywhere.runanywhereai.MainActivity
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.api.DownloadEvent
 import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.CoroutineScope
@@ -62,13 +63,12 @@ class ModelDownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_CANCEL) return handleCancelIntent()
+
         val modelId = intent?.getStringExtra(EXTRA_MODEL_ID)
         val model = modelId?.let { pending.remove(it) }
         if (model == null) {
-            // A startForegroundService() call obligates startForeground() within ~5s even when the
-            // queued model was already consumed (a redelivered/duplicate intent). Satisfy the
-            // contract with a minimal notification, then stop — otherwise Android raises
-            // ForegroundServiceDidNotStartInTimeException (a hard crash).
+            // A redelivered/duplicate intent whose queued model was already consumed.
             startForegroundGeneric()
             stopSelfSafely()
             return START_NOT_STICKY
@@ -96,6 +96,33 @@ class ModelDownloadService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * The notification's Cancel button.
+     *
+     * Once the app is in the background the notification is the only surface the transfer has, so
+     * Cancel has to work from there or a user who changed their mind has to come back into the app
+     * to stop several gigabytes of traffic. Delivered as a foreground-service start (the transfer
+     * may be the only thing keeping the process alive), which obligates a `startForeground()` call
+     * even on the path where there is nothing left to cancel.
+     */
+    private fun handleCancelIntent(): Int {
+        val job = downloadJob
+        if (job == null || !job.isActive) {
+            // The transfer settled between the tap and this delivery.
+            startForegroundGeneric("Finishing up")
+            stopSelfSafely()
+            return START_NOT_STICKY
+        }
+        // Unwinding the SDK stream is not instant, so the notification says what is happening
+        // instead of leaving a progress bar that has visibly stopped moving. This also re-posts
+        // the foreground notification, discharging the start obligation on this delivery.
+        startForegroundGeneric("Cancelling download")
+        // The SDK's `finally` fires the native cancel with delete_partial_bytes = false — the
+        // bytes already on disk survive for a later resume.
+        serviceScope.launch { job.cancelAndJoin() }
+        return START_NOT_STICKY
+    }
+
     private suspend fun runDownload(model: RAModelInfo) {
         _state.value = Download(model.id, progress = DownloadProgressInfo(), status = Status.RUNNING)
         try {
@@ -103,30 +130,38 @@ class ModelDownloadService : Service() {
             // download RAM preflight on mid-range phones. Free them first; the
             // user can re-select after the transfer finishes.
             freeResidentModelsForDownload()
+            var latest = DownloadProgressInfo()
             RunAnywhere.models.download(model.id).collect { event ->
-                val info = when (event) {
-                    is DownloadEvent.Progress -> DownloadProgressInfo.from(event)
-                    is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
-                    else -> null
-                }
-                if (info != null) {
-                    _state.value = Download(model.id, progress = info, status = Status.RUNNING)
-                    updateNotification(model, info)
-                }
+                val info = DownloadProgressInfo.advance(latest, event) ?: return@collect
+                latest = info
+                _state.value = Download(model.id, progress = info, status = Status.RUNNING)
+                updateNotification(model, info)
             }
             _state.value = Download(
                 model.id,
                 progress = DownloadProgressInfo(fraction = 1f),
                 status = Status.COMPLETED,
             )
+            postOutcome(
+                title = "${model.name} is ready",
+                body = "Downloaded and available on this device.",
+            )
         } catch (e: CancellationException) {
             // Cancellation is a user action (or teardown); the SDK preserves
             // resume bytes. Surface it as a terminal "cancelled" state.
             _state.value = Download(model.id, status = Status.CANCELLED)
+            postOutcome(
+                title = "${model.name} download paused",
+                body = "The bytes already transferred are kept — resume picks up where it stopped.",
+            )
             throw e
         } catch (e: Exception) {
             RACLog.e("foreground download failed: ${model.id}", e)
             _state.value = Download(model.id, status = Status.FAILED, error = e.message ?: "Download failed")
+            postOutcome(
+                title = "${model.name} download failed",
+                body = "Retry resumes from the bytes already on disk.",
+            )
         } finally {
             stopSelfSafely()
         }
@@ -161,12 +196,19 @@ class ModelDownloadService : Service() {
         }
     }
 
-    /** Minimal startForeground to discharge the FGS obligation when there is no work to do. */
-    private fun startForegroundGeneric() {
+    /**
+     * Minimal startForeground for the deliveries that carry no model of their own — a duplicate
+     * intent, or the Cancel action. Every `startForegroundService()` obligates a `startForeground()`
+     * within ~5s or Android raises `ForegroundServiceDidNotStartInTimeException` (a hard crash), so
+     * these paths still have to post something; [title] keeps it honest about which one it is.
+     */
+    private fun startForegroundGeneric(title: String = "Preparing download") {
         ensureChannel(this)
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Preparing download")
+            .setContentTitle(title)
             .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentIntent(openAppIntent())
+            .setProgress(0, 0, true)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
@@ -196,17 +238,83 @@ class ModelDownloadService : Service() {
      * The notification is the only view of the transfer once the app is backgrounded, which is the
      * normal case for a multi-gigabyte model, so it carries the same detail line the picker row does
      * — size, rate, and time remaining — rather than a bare percentage.
+     *
+     * It also carries both of the things a user wants from that surface: tapping it returns to the
+     * app, and Cancel stops the transfer without one. A progress notification with no way to act on
+     * it makes the background download feel like something happening *to* the user.
      */
     private fun buildNotification(model: RAModelInfo, progress: DownloadProgressInfo): Notification =
         NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Downloading ${model.name}")
             .setContentText(progress.detailLine.ifBlank { "Starting…" })
             .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setProgress(100, progress.percent ?: 0, progress.isIndeterminate)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOnlyAlertOnce(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancelIntent())
             .build()
+
+    /**
+     * What the user sees when the transfer settles while they are elsewhere.
+     *
+     * `STOP_FOREGROUND_REMOVE` takes the progress notification down with the service, so without
+     * this a download that finished — or failed — during a phone call simply vanishes, and the only
+     * way to learn the outcome is to reopen the app and read a row. Posted under its own id so it
+     * outlives the ongoing one, and dismissible because it is a report, not a running task.
+     */
+    private fun postOutcome(title: String, body: String) {
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentIntent(openAppIntent())
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+        manager.notify(OUTCOME_NOTIFICATION_ID, notification)
+    }
+
+    /** Tapping either notification brings the app back to the front rather than doing nothing. */
+    private fun openAppIntent(): PendingIntent =
+        PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+    /**
+     * No model id rides along: the service runs exactly one transfer at a time (a second start
+     * preempts the first), so "the active download" is unambiguous and an id here could only ever
+     * name a job that is already gone.
+     */
+    private fun cancelIntent(): PendingIntent {
+        val intent = Intent(this, ModelDownloadService::class.java).apply { action = ACTION_CANCEL }
+        // getForegroundService, not getService: the download may be the only thing keeping the
+        // process alive, and a plain service start from the background would be refused.
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                this,
+                CANCEL_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        } else {
+            PendingIntent.getService(
+                this,
+                CANCEL_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+    }
 
     private fun acquireWakeLock() {
         if (wakeLock?.isHeld == true) return
@@ -249,6 +357,15 @@ class ModelDownloadService : Service() {
     companion object {
         private const val CHANNEL_ID = "model_downloads"
         private const val NOTIFICATION_ID = 4801
+
+        /**
+         * The settled-outcome notification. A separate id on purpose: the ongoing one is torn down
+         * with the foreground service, so reusing that id would post a report that is immediately
+         * removed.
+         */
+        private const val OUTCOME_NOTIFICATION_ID = 4802
+        private const val CANCEL_REQUEST_CODE = 1
+        private const val ACTION_CANCEL = "com.runanywhere.runanywhereai.action.CANCEL_DOWNLOAD"
         private const val EXTRA_MODEL_ID = "model_id"
         private const val WAKE_LOCK_TAG = "RunAnywhere:ModelDownload"
         // Downloads of multi-GB bundles are slow but finite; cap the wake lock so

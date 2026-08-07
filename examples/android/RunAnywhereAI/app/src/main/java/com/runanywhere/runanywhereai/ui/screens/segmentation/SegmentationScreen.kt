@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.ui.screens.segmentation
 
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -70,8 +71,10 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
     val modelLoaded = model != null
     val busy = modelVm.state.busyModelId != null
 
+    // The Android photo picker rather than ACTION_GET_CONTENT: it needs no storage permission and
+    // offers only images, so the user can never pick something this screen cannot decode.
     val imagePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent(),
+        ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri != null) {
             runCatching {
@@ -110,7 +113,11 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
             viewModel = viewModel,
             modelLoaded = modelLoaded,
             busy = busy,
-            onPickImage = { imagePicker.launch("image/*") },
+            onPickImage = {
+                imagePicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
         )
 
         AnimatedVisibility(

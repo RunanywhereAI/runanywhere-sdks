@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.ui.screens.models
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,9 +46,10 @@ fun ModelRow(
     // When non-null, the busy spinner becomes a tap-to-cancel control so an
     // in-flight download can be stopped. Null keeps the plain progress spinner.
     onCancel: (() -> Unit)? = null,
-    // This model's last download failed. The trailing action becomes Retry, which resumes from the
-    // bytes already on disk instead of starting the transfer over.
-    hasFailed: Boolean = false,
+    // Non-null when this model has bytes on disk from a transfer that stopped — failed, or
+    // cancelled by the user. The trailing verb becomes Retry or Resume accordingly, both of which
+    // continue from those bytes instead of starting the transfer over.
+    interruption: DownloadInterruption? = null,
     highlightLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -133,16 +131,24 @@ fun ModelRow(
                 }
                 if (isBusy) {
                     DownloadProgressBlock(progress)
-                } else if (hasFailed) {
-                    DownloadFailureNote()
+                } else if (interruption != null) {
+                    DownloadInterruptionNote(interruption)
                 }
             }
 
             Spacer(Modifier.width(dimens.spacingSm))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                TrailingAction(isCurrent, isReady, isBusy, hasFailed, model, onDownload, onCancel)
+                DownloadRowAction(
+                    model = model,
+                    isCurrent = isCurrent,
+                    isReady = isReady,
+                    isBusy = isBusy,
+                    interruption = interruption,
+                    onDownload = onDownload,
+                    onCancel = onCancel,
+                )
                 if (onDelete != null && isReady) {
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(ROW_TAP_TARGET)) {
                         Icon(
                             imageVector = RACIcons.Outline.Trash,
                             contentDescription = "Delete ${model.name}",
@@ -156,98 +162,3 @@ fun ModelRow(
     }
 }
 
-@Composable
-private fun TrailingAction(
-    isCurrent: Boolean,
-    isReady: Boolean,
-    isBusy: Boolean,
-    hasFailed: Boolean,
-    model: RAModelInfo,
-    onDownload: () -> Unit,
-    onCancel: (() -> Unit)? = null,
-) {
-    when {
-        isCurrent -> ModelPill("Loaded", ModelPillColors.Availability)
-        isBusy -> DownloadProgressAction(onCancel)
-        isReady -> ModelPill("Use", ModelPillColors.Availability)
-        // Retry before the plain download chip: a failed row's primary action is to resume, and the
-        // verb should say so rather than reading like a fresh start.
-        hasFailed -> RetryChip(onRetry = onDownload)
-        else -> DownloadChip(model = model, onDownload = onDownload)
-    }
-}
-
-@Composable
-private fun RetryChip(onRetry: () -> Unit) {
-    val dimens = LocalDimens.current
-    AssistChip(
-        onClick = onRetry,
-        label = {
-            Text(
-                text = "Retry",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = RACIcons.Outline.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(dimens.iconSm),
-            )
-        },
-    )
-}
-
-// Busy-state control. With [onCancel] the spinner sits inside a tap target that
-// stops the download; without it, it stays a plain progress indicator.
-@Composable
-private fun DownloadProgressAction(onCancel: (() -> Unit)?) {
-    if (onCancel == null) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        return
-    }
-    IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                imageVector = RACIcons.Outline.Close,
-                contentDescription = "Cancel download",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(12.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
-    val dimens = LocalDimens.current
-    val needsHfToken = model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
-    AssistChip(
-        onClick = onDownload,
-        label = {
-            // The row already shows the size; the chip stays a simple verb.
-            Text(
-                text = if (needsHfToken) "Set token" else "Get",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = RACIcons.Outline.Download,
-                contentDescription = null,
-                modifier = Modifier.size(dimens.iconSm),
-            )
-        },
-    )
-}

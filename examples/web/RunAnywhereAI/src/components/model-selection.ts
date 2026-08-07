@@ -51,7 +51,7 @@ import {
   formatBytes,
   formatFramework,
   modelDisplaySizeBytes,
-  modalityEmoji,
+  modalityIcon,
   cleanModelName,
   consumerTags,
   modelOrg,
@@ -978,7 +978,7 @@ function renderOrgCard(org: OrgGroup): string {
   return `
     <div class="family-card${expanded ? ' family-card--expanded' : ''}" data-family-key="${escapeHtml(org.key)}">
       <button type="button" class="family-card__head" data-family-toggle="${escapeHtml(org.key)}" aria-expanded="${expanded}">
-        <div class="model-logo family-card__logo">${modalityEmoji(representative.category)}</div>
+        <div class="model-logo family-card__logo">${icon(modalityIcon(representative.category), { size: 20 })}</div>
         <div class="family-card__body">
           <div class="family-card__name-row">
             <span class="family-card__name">${escapeHtml(org.name)}</span>
@@ -1180,7 +1180,7 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, bestForDevi
   return `
     <div class="reco-card${isDefault ? ' reco-card--default' : ''} reco-card--${state.status}" data-model-id="${escapeHtml(entry.id)}">
       <div class="reco-card__head">
-        <div class="model-logo reco-card__logo">${modalityEmoji(entry.category)}</div>
+        <div class="model-logo reco-card__logo">${icon(modalityIcon(entry.category), { size: 20 })}</div>
         <div class="reco-card__title-wrap">
           <div class="reco-card__name">${escapeHtml(cleanModelName(entry.name))}${bestBadge}</div>
           <div class="reco-card__size">${formatBytes(modelDisplaySizeBytes(entry))} ${renderBackendPill(entry)}</div>
@@ -1212,7 +1212,7 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
   const compatibilityReason = renderCompatibilityReason(entry);
   return `
     <div class="model-row model-row--${state.status}" data-model-id="${escapeHtml(entry.id)}">
-      <div class="model-logo">${modalityEmoji(entry.category)}</div>
+      <div class="model-logo">${icon(modalityIcon(entry.category), { size: 20 })}</div>
       <div class="model-info">
         <div class="model-name">${escapeHtml(cleanModelName(entry.name))}</div>
         <div class="model-meta">

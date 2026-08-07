@@ -9,7 +9,7 @@
 import './styles/design-system.css';
 import './styles/commons.css';
 import './styles/components.css';
-import { buildAppShell } from './app';
+import { buildAppShell, getActiveTabId, isChatRouteActive } from './app';
 import { RunAnywhere, type Environment } from '@runanywhere/web';
 import { registerAll as registerModelCatalogAll } from './services/model-catalog';
 import {
@@ -114,10 +114,14 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
   // demo (Voice/Documents/Settings tabs plus explicit unavailable states)
   // is still navigable. Treating that as "not interactive" would convert
   // the documented degraded mode into a fatal initialization error view.
+  //
+  // A surface other than the assistant is the third case: the model selector is
+  // not part of that screen at all, so its absence there says nothing about
+  // readiness. `probeAppShell` already reports `interactive` for those routes.
   const backendDegraded = backendReadinessState === 'unavailable';
   const ready = state === 'interactive'
     && probe.shellReady
-    && (probe.modelUiReady || backendDegraded);
+    && (probe.modelUiReady || backendDegraded || probe.reason === 'interactive');
   const snapshot: AppReadinessSnapshot = {
     ...probe,
     ready,
@@ -222,6 +226,13 @@ function probeAppShell(): AppShellProbe {
   const tabBar = app?.querySelector('.tab-bar') ?? null;
   const activePanel = app?.querySelector<HTMLElement>('.tab-panel.active') ?? null;
   const chatPanel = document.getElementById('tab-chat');
+  // The shell now restores the tab named by the URL, so the assistant is the
+  // panel that *should* be showing only when the URL says so. Deep-linking to
+  // `#/benchmarks` must not read as "the chat tab failed to activate" and tip
+  // `waitForInteractiveShell` into the fatal initialization error view. Loading
+  // the app with no fragment still routes to chat, so the default path — and
+  // every probe the browser suite makes — is unchanged.
+  const onChatRoute = app !== null && isChatRouteActive();
   const modelTrigger = document.getElementById('chat-toolbar-model') as HTMLElement | null;
   const modelTriggerText = document.getElementById('chat-toolbar-model-text')?.textContent?.trim() ?? '';
   const modelOverlay = document.getElementById('chat-model-overlay') as HTMLElement | null;
@@ -250,18 +261,22 @@ function probeAppShell(): AppShellProbe {
       && tabBar
       && activePanel
       && chatPanel
-      && activePanel === chatPanel
+      // On the chat route the active panel has to *be* the chat panel; on any
+      // other route it has to be the panel that route names, which is exactly
+      // what `.tab-panel.active` already is.
+      && (!onChatRoute || activePanel === chatPanel)
       && loadingHidden,
   );
   const modelUiReady = Boolean(
     shellReady
       && modelUiTarget,
   );
+  const routedTab = getActiveTabId();
 
   if (!app) return { shellReady, modelUiReady, modelUiTarget, activeTab: null, reason: 'missing-app-root' };
   if (!tabContent || !tabBar) return { shellReady, modelUiReady, modelUiTarget, activeTab: null, reason: 'missing-tab-shell' };
   if (!activePanel) return { shellReady, modelUiReady, modelUiTarget, activeTab: null, reason: 'missing-active-tab' };
-  if (activePanel !== chatPanel) {
+  if (onChatRoute && activePanel !== chatPanel) {
     return {
       shellReady,
       modelUiReady,
@@ -270,7 +285,12 @@ function probeAppShell(): AppShellProbe {
       reason: 'chat-tab-not-active',
     };
   }
-  if (!loadingHidden) return { shellReady, modelUiReady, modelUiTarget, activeTab: 'chat', reason: 'loading-screen-visible' };
+  if (!loadingHidden) return { shellReady, modelUiReady, modelUiTarget, activeTab: routedTab, reason: 'loading-screen-visible' };
+  // The model selector lives on the assistant. A deep link to another surface is
+  // interactive without it, and claiming otherwise would be the probe lying.
+  if (!onChatRoute) {
+    return { shellReady, modelUiReady, modelUiTarget, activeTab: routedTab, reason: 'interactive' };
+  }
   if (!modelTrigger && !getStartedTrigger) {
     return { shellReady, modelUiReady, modelUiTarget, activeTab: 'chat', reason: 'missing-model-selector' };
   }

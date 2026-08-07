@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.hf.HfModelSummary
 import com.runanywhere.runanywhereai.data.hf.HfRepoFile
 import com.runanywhere.runanywhereai.data.hf.HfSearchKind
+import com.runanywhere.runanywhereai.data.hf.HfSuggestedModel
+import com.runanywhere.runanywhereai.data.hf.HuggingFaceCatalog
 import com.runanywhere.runanywhereai.data.hf.HuggingFaceHubClient
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.util.RACLog
@@ -21,12 +23,23 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
-/** Where the search flow currently is. Download progress is tracked separately. */
+/**
+ * Where the search flow currently is. Download progress is tracked separately.
+ *
+ * [IDLE] is not an empty screen: it is the curated suggestion list, which is what the sheet
+ * opens on and what it returns to whenever the query is emptied.
+ */
 enum class HuggingFacePhase { IDLE, SEARCHING, RESULTS, LOADING_FILES, REPO_DETAIL }
 
 data class HuggingFaceSearchState(
     val query: String = "",
     val phase: HuggingFacePhase = HuggingFacePhase.IDLE,
+    /**
+     * Authored sub-1B repos shown in [HuggingFacePhase.IDLE]. Constant for the session — it
+     * lives in state so the composable reads one source of truth instead of reaching into
+     * the catalog itself.
+     */
+    val suggestions: List<HfSuggestedModel> = HuggingFaceCatalog.ggufUnder1B,
     val results: List<HfModelSummary> = emptyList(),
     val selectedRepo: String? = null,
     val files: List<HfRepoFile> = emptyList(),
@@ -38,10 +51,12 @@ data class HuggingFaceSearchState(
 )
 
 /**
- * Drives the "Add from Hugging Face" flow: search repos, list a repo's GGUF
- * quantizations, then register + download the chosen file through the existing
- * SDK path. The SDK resolves the HF file URL and streams the download — this VM
+ * Drives the "Add from Hugging Face" flow: offer curated sub-1B suggestions, search repos,
+ * list a repo's GGUF quantizations, then register + download the chosen file through the
+ * existing SDK path. The SDK resolves the HF file URL and streams the download — this VM
  * only wires the small REST search client to the picker UI.
+ *
+ * A suggestion and a search hit converge on [openRepo]: there is exactly one download path.
  */
 class HuggingFaceSearchViewModel : ViewModel() {
 
@@ -54,7 +69,21 @@ class HuggingFaceSearchViewModel : ViewModel() {
     private var filesJob: Job? = null
     private var downloadJob: Job? = null
 
+    /**
+     * Emptying the field is a state transition, not just a blank render: any in-flight search
+     * is abandoned and the sheet goes back to the suggestions it opened with. Handling this
+     * only in the composable would leave a stale RESULTS phase behind the empty field.
+     *
+     * The previous [HuggingFaceSearchState.results] are intentionally kept — they are not
+     * shown in IDLE, and holding them means the panel crossfade animates out the list the
+     * user was actually looking at rather than a "no models match" flash.
+     */
     fun onQueryChange(query: String) {
+        if (query.isBlank()) {
+            searchJob?.cancel()
+            _state.update { it.copy(query = query, phase = HuggingFacePhase.IDLE, error = null) }
+            return
+        }
         _state.update { it.copy(query = query) }
     }
 
@@ -110,11 +139,23 @@ class HuggingFaceSearchViewModel : ViewModel() {
         }
     }
 
-    /** Returns to the results list from a repo detail view. */
-    fun backToResults() {
+    /**
+     * Leaves a repo detail view for wherever the repo was opened from. A suggestion can only
+     * be tapped while the field is empty and a search result only while it is not, so the
+     * query alone tells the two entry points apart without a second flag.
+     *
+     * [HuggingFaceSearchState.files] survive for the same reason the results do above: the
+     * outgoing half of the panel crossfade should show the file list, not "no GGUF files".
+     */
+    fun back() {
         filesJob?.cancel()
+        val hasQuery = _state.value.query.isNotBlank()
         _state.update {
-            it.copy(phase = HuggingFacePhase.RESULTS, selectedRepo = null, files = emptyList(), error = null)
+            it.copy(
+                phase = if (hasQuery) HuggingFacePhase.RESULTS else HuggingFacePhase.IDLE,
+                selectedRepo = null,
+                error = null,
+            )
         }
     }
 

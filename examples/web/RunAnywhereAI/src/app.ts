@@ -125,6 +125,89 @@ const TABS: TabDef[] = [
 
 const TAB_INDEX = new Map<TabId, number>(TABS.map((tab, index) => [tab.id, index]));
 
+// ---------------------------------------------------------------------------
+// Routing
+// ---------------------------------------------------------------------------
+
+/**
+ * Every surface has a URL, and the URL is a fragment: `#/vision`.
+ *
+ * WHY THIS EXISTS AT ALL. The active surface used to be a module-scope integer.
+ * So there was no way to link to a tab, the browser's Back button did nothing on
+ * a screen full of drilled-into panels, and a refresh — including the one the
+ * cross-origin-isolation service worker performs on Safari — always dumped the
+ * user back on the assistant, whatever they had been doing.
+ *
+ * WHY A FRAGMENT RATHER THAN THE HISTORY API. This example is a static bundle:
+ * Vite in development, a prebuilt static output on Vercel in production, and a
+ * plain directory of files for anyone who copies it. A path-based route only
+ * survives a refresh or a pasted link when the host rewrites every unknown path
+ * to `index.html` — a server-side contract this app would then depend on in
+ * three separate configs, and one that silently does not exist on a bare file
+ * server. A fragment is never sent to the server, so it works everywhere the
+ * bundle does, including `file://`. No router library: the whole mechanism is
+ * the four functions below.
+ */
+const DEFAULT_TAB: TabId = 'chat';
+
+/** The surface the current URL names; the default for an absent or bogus one. */
+function routeFromLocation(): TabId {
+  const slug = window.location.hash.replace(/^#\/?/, '').trim();
+  return TAB_INDEX.has(slug as TabId) ? (slug as TabId) : DEFAULT_TAB;
+}
+
+function hashForTab(tabId: TabId): string {
+  return `#/${tabId}`;
+}
+
+/** What this app writes into `history.state`, to recognise its own entries. */
+interface RouteHistoryState {
+  runanywhereDepth: number;
+}
+
+/**
+ * How many entries this app has pushed onto the session history.
+ *
+ * Re-read from `history.state` on every traversal so it stays correct through
+ * back *and* forward, rather than drifting the way a plain counter would. The
+ * toolbar's Back button reads it to tell "there is an entry of ours behind this
+ * one" from "this is where the user entered the site" — on a deep link straight
+ * into a nested surface, `history.back()` would leave the app entirely.
+ */
+let historyDepth = 0;
+
+function readHistoryDepth(state: unknown): number {
+  const depth = (state as RouteHistoryState | null)?.runanywhereDepth;
+  return typeof depth === 'number' && depth >= 0 ? depth : 0;
+}
+
+/**
+ * Go to a surface and record it in the browser's history.
+ *
+ * `replace` is for the initial route only: restoring the tab a URL already names
+ * must not leave a phantom entry behind the user's first Back press.
+ */
+function navigateToTab(tabId: TabId, options: { replace?: boolean } = {}): void {
+  if (!TAB_INDEX.has(tabId)) return;
+  const hash = hashForTab(tabId);
+  if (options.replace || window.location.hash === hash) {
+    // Already the current URL: re-selecting the surface you are on — tapping its
+    // nav row again, or "New chat" from the assistant — must not stack a
+    // duplicate entry that Back then has to walk through.
+    window.history.replaceState({ runanywhereDepth: historyDepth }, '', hash);
+  } else {
+    historyDepth += 1;
+    window.history.pushState({ runanywhereDepth: historyDepth }, '', hash);
+  }
+  applyRoute();
+}
+
+/** Show whatever surface the URL currently names. The one way a tab changes. */
+function applyRoute(): void {
+  const index = TAB_INDEX.get(routeFromLocation());
+  if (index !== undefined) switchTab(index);
+}
+
 /** Surfaces with their own sidebar entry — the only ones that can be highlighted. */
 const NAV_TAB_IDS = new Set<TabId>(TABS.filter((tab) => tab.parent === undefined).map((tab) => tab.id));
 
@@ -386,7 +469,11 @@ export function buildAppShell(): void {
   renderNav();
   wireShellActions();
   initializePanels();
-  switchTabById('chat');
+  // Restore the surface the URL names — a deep link, a refresh, or the reload
+  // the cross-origin-isolation service worker performs on its first install.
+  // `replace`, so the restored tab is the entry the user is already on.
+  historyDepth = readHistoryDepth(window.history.state);
+  navigateToTab(routeFromLocation(), { replace: true });
   void refreshConversationList();
 }
 
@@ -421,7 +508,7 @@ function renderNav(): void {
       if (!el) continue;
       el.addEventListener('click', () => {
         if (item.type === 'tab' && item.tabId) {
-          switchTabById(item.tabId);
+          navigateToTab(item.tabId);
         } else {
           item.action?.();
         }
@@ -442,16 +529,30 @@ function wireShellActions(): void {
   document.getElementById('consumer-menu-btn')?.addEventListener('click', openDrawer);
   document.getElementById('consumer-close-drawer-btn')?.addEventListener('click', closeDrawer);
   document.getElementById('consumer-drawer-scrim')?.addEventListener('click', closeDrawer);
-  document.getElementById('consumer-settings-btn')?.addEventListener('click', () => switchTabById('settings'));
+  document.getElementById('consumer-settings-btn')?.addEventListener('click', () => navigateToTab('settings'));
   document.getElementById('consumer-new-chat-btn')?.addEventListener('click', startNewChat);
   document.getElementById('consumer-drawer-new-chat-btn')?.addEventListener('click', () => {
     startNewChat();
     closeDrawer();
   });
 
+  // Back and forward. `pushState` fires nothing, so this only ever runs for a
+  // real traversal — our own navigations call `applyRoute()` themselves.
+  window.addEventListener('popstate', (event) => {
+    historyDepth = readHistoryDepth(event.state);
+    applyRoute();
+  });
+  // A fragment typed or edited in the address bar fires `hashchange` but not
+  // `popstate`, so the two listeners together are what make the URL the single
+  // source of truth. Guarded because a traversal fires this one as well, right
+  // after the `popstate` that already applied the route.
+  window.addEventListener('hashchange', () => {
+    if (routeFromLocation() !== TABS[activeTab].id) applyRoute();
+  });
+
   window.addEventListener('runanywhere:navigate', (event) => {
     const tabId = (event as CustomEvent<{ tab: TabId }>).detail?.tab;
-    if (tabId) switchTabById(tabId);
+    if (tabId) navigateToTab(tabId);
   });
   ConversationsStore.onChange(() => {
     void refreshConversationList();
@@ -491,13 +592,7 @@ function setMobileDrawerAria(hidden: boolean): void {
 
 function startNewChat(): void {
   window.dispatchEvent(new CustomEvent('runanywhere:new-chat'));
-  switchTabById('chat');
-}
-
-function switchTabById(tabId: TabId): void {
-  const index = TAB_INDEX.get(tabId);
-  if (index === undefined) return;
-  switchTab(index);
+  navigateToTab('chat');
 }
 
 /**
@@ -584,11 +679,21 @@ function ensureBackButton(panel: HTMLElement, target: TabId, label: string): voi
   button.title = label;
   button.dataset.backTarget = target;
   button.innerHTML = icon(ICONS.back);
-  // Read the target at click time: this node gets relabelled in place, so a
-  // captured value could send a reused button to a stale surface.
   button.addEventListener('click', () => {
+    // Prefer the browser's own history. It records where the user actually came
+    // from — better than any parent we could declare — and it keeps this button
+    // and the browser's Back in agreement: pushing a *new* entry here would mean
+    // the browser's Back immediately undid the toolbar's Back.
+    if (historyDepth > 0) {
+      window.history.back();
+      return;
+    }
+    // Nothing of ours behind this entry (a deep link straight into a nested
+    // surface), so `history.back()` would leave the site. Fall back to the
+    // declared parent, read at click time: this node gets relabelled in place,
+    // so a captured value could send a reused button to a stale surface.
     const dest = button.dataset.backTarget;
-    if (dest) switchTabById(dest as TabId);
+    if (dest) navigateToTab(dest as TabId);
   });
   toolbar.insertBefore(button, toolbar.firstChild);
 }
@@ -708,7 +813,7 @@ function buildConversationRow(
     window.dispatchEvent(new CustomEvent('runanywhere:load-chat', {
       detail: { conversationId: conversation.id },
     }));
-    switchTabById('chat');
+    navigateToTab('chat');
     closeDrawer();
   });
 
@@ -722,7 +827,7 @@ function buildConversationRow(
       window.dispatchEvent(new CustomEvent('runanywhere:delete-chat', {
         detail: { conversationId: conversation.id },
       }));
-      if (current?.id === conversation.id) switchTabById('chat');
+      if (current?.id === conversation.id) navigateToTab('chat');
     }).catch((error) => {
       appLogger.warning('[App] Could not delete saved chat:', error);
     });
@@ -793,7 +898,7 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
   el.querySelectorAll<HTMLButtonElement>('[data-advanced-target]').forEach((button) => {
     button.addEventListener('click', () => {
       const tab = button.dataset.advancedTarget as TabId | undefined;
-      if (tab) switchTabById(tab);
+      if (tab) navigateToTab(tab);
     });
   });
   return {};
@@ -811,4 +916,19 @@ function advancedRow(item: { tab: TabId; icon: IconName; title: string; subtitle
 // Export for external probes.
 export function getActiveTab(): number {
   return activeTab;
+}
+
+/**
+ * The surface currently on screen, by id.
+ *
+ * `main.ts`'s readiness probe needs this: now that a URL can name any tab, the
+ * probe can no longer assume the assistant is the panel that must be showing.
+ */
+export function getActiveTabId(): string {
+  return TABS[activeTab].id;
+}
+
+/** True when the assistant is the routed surface — the only one with model UI. */
+export function isChatRouteActive(): boolean {
+  return TABS[activeTab].id === DEFAULT_TAB;
 }

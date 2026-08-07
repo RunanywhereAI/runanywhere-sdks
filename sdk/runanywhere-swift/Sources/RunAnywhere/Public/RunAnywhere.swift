@@ -474,6 +474,15 @@ public enum RunAnywhere {
             $0.httpSetupApplicable = phase2Result.httpApplicable
             $0.hasCompletedServicesInit = true
         }
+
+        // Step 4 (must stay in Swift): re-attach to background downloads that
+        // outlived the last run of the app. A background URLSession keeps
+        // transferring in nsurlsessiond while the app is suspended or killed, but
+        // only delivers its callbacks to a process that has recreated the session
+        // — and nothing does that when the user simply relaunches the app. Runs
+        // after Step 3 so a transfer that finished while the app was closed can be
+        // finalized against the registry commons has just discovered.
+        await BackgroundDownloadCoordinator.shared.restoreInterruptedTransfers()
     }
 
     /// Ensure services are ready before API calls (internal guard).

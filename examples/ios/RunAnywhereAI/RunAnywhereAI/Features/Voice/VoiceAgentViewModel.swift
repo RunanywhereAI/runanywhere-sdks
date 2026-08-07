@@ -60,11 +60,26 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Current transcript from STT
     @Published private(set) var currentTranscript = ""
 
+    /// Whether `currentTranscript` is settled or still a live hypothesis.
+    ///
+    /// A partial hypothesis is a guess the recognizer will revise — words change
+    /// under the reader as more audio arrives. Drawing it identically to the
+    /// final transcript makes the panel look like it is malfunctioning, so the
+    /// view marks it. `VoiceEvent.userTranscribed` has always carried the flag;
+    /// this screen used to throw it away.
+    @Published private(set) var isTranscriptFinal = false
+
     /// Assistant's response from LLM
     @Published private(set) var assistantResponse = ""
 
     /// Whether speech is currently detected (for pulsing animation)
     @Published private(set) var isSpeechDetected = false
+
+    /// True from the moment `interrupt()` is called until the agent leaves
+    /// `speaking`. The control is held disabled for that whole window rather
+    /// than staying live and inviting a second press that would queue behind the
+    /// first.
+    @Published private(set) var isInterrupting = false
 
     // MARK: - Model Selection State
 
@@ -137,12 +152,29 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
+    /// What the status indicator says.
+    ///
+    /// `VoiceSessionState.displayName` maps both idle states to "Ready", which
+    /// is a claim about the pipeline, not the session — and the same screen
+    /// shows a setup card reading "Not set up" directly beneath it whenever the
+    /// trio is missing. Two opposite statements about one thing. Idle-and-
+    /// unequipped is "Needs setup"; idle-and-equipped is "Ready".
+    var statusLabel: String {
+        switch sessionState {
+        case .disconnected, .connected:
+            return allModelsLoaded ? "Ready" : "Needs setup"
+        default:
+            return sessionState.displayName
+        }
+    }
+
     /// Status color for UI indicators
     var statusColor: StatusColor {
         switch sessionState {
         case .disconnected: return .gray
         case .connecting: return .orange
-        case .connected: return .green
+        // Green only once the pipeline can actually start; grey while it can't.
+        case .connected: return allModelsLoaded ? .green : .gray
         case .listening: return .red
         case .processing: return .orange
         case .speaking: return .green
@@ -161,31 +193,78 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    /// Microphone button icon
+    /// Microphone button icon.
+    ///
+    /// While the agent is speaking the button's job is barge-in, so it carries
+    /// `stop.fill` — the same glyph Stop Generating uses in the chat, meaning
+    /// the same thing: end what is running. A speaker glyph there described the
+    /// *state* and named no action, which is why nobody found the interrupt.
     var micButtonIcon: String {
         switch sessionState {
         case .listening: return "mic.fill"
-        case .speaking: return "speaker.wave.2.fill"
+        case .speaking: return "stop.fill"
         case .processing: return "waveform"
         default: return "mic"
         }
     }
 
-    /// Instruction text for current state
+    /// Whether the agent can be cut off right now.
+    var canInterrupt: Bool {
+        sessionState == .speaking && !isInterrupting
+    }
+
+    /// What the primary control does in the current state.
+    ///
+    /// This used to promise "Tap to send" while listening and "Tap to speak"
+    /// while connected, neither of which the button did — a tap is ignored in
+    /// every state except idle. A control that names an action it will not
+    /// perform is worse than an unlabelled one, so the copy now describes only
+    /// what is actually wired: start when idle, interrupt while the agent is
+    /// talking, and long-press to end.
     var instructionText: String {
         switch sessionState {
         case .listening:
-            return "Tap to send · Hold to stop"
+            return isSpeechDetected ? "Listening · hold to end" : "Go ahead — hold to end"
         case .processing:
-            return "Processing your message..."
+            return "Working out a reply · hold to end"
         case .speaking:
-            return "Speaking..."
+            return isInterrupting ? "Stopping…" : "Tap to interrupt · hold to end"
         case .connecting:
-            return "Connecting..."
+            return "Connecting…"
         case .connected:
-            return "Tap to speak · Hold to end"
-        default:
+            return "Ready · hold to end"
+        case .error:
+            return "Tap to try again"
+        case .disconnected:
             return "Tap to start conversation"
+        }
+    }
+
+    /// What an empty transcript pane says, given what the agent is doing.
+    ///
+    /// These were fixed strings, so an empty pane read "Listening…" while the
+    /// agent was thinking and "waiting for you" while it was already talking —
+    /// the panel contradicting the status pill directly above it. An empty state
+    /// is still a claim about the system, and it has to be a true one.
+    var transcriptPlaceholder: String {
+        switch sessionState {
+        case .connecting: return "Getting ready…"
+        case .listening: return isSpeechDetected ? "Listening…" : "Go ahead — say something."
+        case .processing: return "Working out a reply…"
+        case .speaking: return "Speaking. Talk over it any time to interrupt."
+        case .connected: return "Ready when you are."
+        case .disconnected, .error: return "Nothing heard yet."
+        }
+    }
+
+    var replyPlaceholder: String {
+        switch sessionState {
+        case .connecting: return "Getting ready…"
+        case .listening: return "Waiting for you to finish speaking…"
+        case .processing: return "Thinking…"
+        case .speaking: return "Speaking…"
+        case .connected: return "No reply yet."
+        case .disconnected, .error: return "No reply yet."
         }
     }
 
@@ -629,7 +708,10 @@ final class VoiceAgentViewModel: ObservableObject {
         currentStatus = "Connecting..."
         errorMessage = nil
         currentTranscript = ""
+        isTranscriptFinal = false
         assistantResponse = ""
+        isSpeechDetected = false
+        isInterrupting = false
 
         do {
             let session = try await RunAnywhere.voice.createSession(
@@ -662,6 +744,29 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
+    /// Cut the agent off mid-utterance and hand the turn back.
+    ///
+    /// The single most-used control in a real voice conversation: a person who
+    /// has heard enough talks over the assistant rather than hanging up. The SDK
+    /// has always exposed `VoiceSession.interrupt()` and this screen never
+    /// called it, so the only way to stop a long-winded reply was to end the
+    /// session and release the microphone.
+    ///
+    /// `interrupt()` returns only once playback and any in-flight response have
+    /// settled, so the control stays disabled for that whole window. The session
+    /// stays open throughout — that is the difference between interrupting and
+    /// hanging up.
+    func interruptAgent() async {
+        guard let session, !isInterrupting else { return }
+        isInterrupting = true
+        await session.interrupt()
+        // `isInterrupting` is cleared by the agent leaving `speaking` (see
+        // `apply(_:)`), not here: the state change is what the reader is
+        // actually waiting on. Clear it anyway if the session already stopped
+        // speaking without emitting one, so the control can never stick.
+        if sessionState != .speaking { isInterrupting = false }
+    }
+
     /// Stop the current voice conversation.
     ///
     /// Mirrors Android `VoiceViewModel.stop()`: cancel the event stream and
@@ -677,6 +782,7 @@ final class VoiceAgentViewModel: ObservableObject {
         currentStatus = "Ready"
         audioLevel = 0.0
         isSpeechDetected = false
+        isInterrupting = false
         let closing = session
         session = nil
         await closing?.close()
@@ -694,27 +800,38 @@ final class VoiceAgentViewModel: ObservableObject {
 
         case .speechStarted:
             isSpeechDetected = true
-            sessionState = .listening
-            currentStatus = "Listening..."
+            // Do NOT force `.listening` here. Speech starting while the agent is
+            // talking is barge-in, not a state change — claiming "Listening"
+            // over a reply that is still being spoken is the panel contradicting
+            // itself. `agentStateChanged` is what moves the turn.
+            if sessionState == .listening || sessionState == .connected {
+                sessionState = .listening
+                currentStatus = "Listening..."
+            }
 
         case .speechEnded:
             isSpeechDetected = false
-            sessionState = .processing
-            currentStatus = "Processing..."
 
-        case .userTranscribed(let text, _):
+        case let .userTranscribed(text, isFinal):
+            // A partial hypothesis overwrites the previous one; a final one ends
+            // the user's turn, so the answer to the *previous* question stops
+            // being the answer on screen.
             currentTranscript = text
+            isTranscriptFinal = isFinal
+            if isFinal { assistantResponse = "" }
 
         case .agentResponse(let text):
             // Emitted per token; append as it streams.
             assistantResponse += text
 
-        case .error(let message, let recoverable):
+        case let .error(message, recoverable):
             logger.error("Voice session error: \(message)")
             errorMessage = message
             if !recoverable {
                 sessionState = .error(message)
                 currentStatus = "Error"
+                isInterrupting = false
+                isSpeechDetected = false
             }
         }
     }
@@ -736,6 +853,11 @@ final class VoiceAgentViewModel: ObservableObject {
             sessionState = .speaking
             currentStatus = "Speaking..."
         }
+        // Leaving `speaking` is what actually ends an interrupt, whether the
+        // interrupt caused it or the agent simply finished the sentence.
+        // `AgentState` is `Sendable` but not `Equatable`, hence the pattern
+        // match rather than `state != .speaking`.
+        if case .speaking = state {} else { isInterrupting = false }
     }
 
     /// The event stream threw, so the pipeline is no longer running.
@@ -770,7 +892,9 @@ final class VoiceAgentViewModel: ObservableObject {
         currentStatus = "Ready"
         audioLevel = 0.0
         isSpeechDetected = false
+        isInterrupting = false
         currentTranscript = ""
+        isTranscriptFinal = false
         assistantResponse = ""
         // VM teardown path (view's onDisappear) — Android's lifecycle
         // equivalent (`onCleared()` → `stop()`) also releases the agent here.

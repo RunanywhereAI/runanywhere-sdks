@@ -223,6 +223,17 @@
   --ambient-shimmer: 1.2s;  /* skeleton / loading sweeps */
   --ambient-spin: 1s;       /* spinner rotation */
 
+  /* ---- Data visualisation ----
+   * The colour a chart mark is painted with. Its own token rather than
+   * `--color-primary` used directly, because a bar is a non-text graphical
+   * object and WCAG 1.4.11 asks 3:1 against the surface behind it: #FF6900
+   * measures 6.2:1 on the dark background and only 2.8:1 on the light one. Dark
+   * keeps the brand orange; light steps to the brand's interactive tone, which
+   * is 3.4:1 there and the same hue. One accent, because every chart in this app
+   * plots a single series — a second hue would imply a distinction that is not
+   * in the data. */
+  --chart-accent: var(--color-primary);
+
   /* ---- Component Sizes ---- */
   --icon-sm: 18px;
   --icon-md: 28px;
@@ -287,6 +298,9 @@
   --bg-input: #F6F4F1;
 
   --color-primary-hover: #CC5400;
+  /* See the token's definition above: brand orange is under the 3:1 floor on
+     paper, the brand-strong tone clears it at the same hue. */
+  --chart-accent: var(--color-primary-strong);
   --bubble-assistant-start: #EFECE8;
   --bubble-assistant-end: #F4F1ED;
 

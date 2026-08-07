@@ -1,9 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -55,14 +54,6 @@ import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.launch
 
-private enum class PendingAttachmentKind { IMAGE, DOCUMENT }
-
-private data class PendingAttachment(
-    val kind: PendingAttachmentKind,
-    val uri: Uri,
-    val name: String,
-)
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
@@ -84,32 +75,45 @@ fun ChatScreen(
     val documentAnswerVm: ModelSelectionViewModel =
         viewModel(key = "chat-rag-answer-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.RAG_LLM))
     val composerFocus = remember { FocusRequester() }
-    var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
+    var pendingAttachment by remember { mutableStateOf<StagedAttachment?>(null) }
+    // Why the last file was refused. Held next to the composer rather than raised as a dialog: the
+    // user is mid-compose, and the fix is to pick a different file, not to acknowledge an error.
+    var attachmentRejection by remember { mutableStateOf<String?>(null) }
     var showImageModelSheet by remember { mutableStateOf(false) }
     var showDocumentIndexSheet by remember { mutableStateOf(false) }
     var showDocumentAnswerSheet by remember { mutableStateOf(false) }
 
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        pendingAttachment = PendingAttachment(
-            kind = PendingAttachmentKind.IMAGE,
+    // The single funnel for every way a file can arrive, so a picker that was told to return one
+    // type is checked exactly as strictly as one that was not.
+    fun stageAttachment(kind: ComposerAttachmentKind, uri: Uri) {
+        val rejection = ComposerAttachmentPolicy.reasonToReject(context, kind, uri)
+        if (rejection != null) {
+            attachmentRejection = rejection
+            return
+        }
+        attachmentRejection = null
+        pendingAttachment = StagedAttachment(
+            kind = kind,
             uri = uri,
-            name = displayName(context, uri) ?: "Selected image",
-        )
-    }
-    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        pendingAttachment = PendingAttachment(
-            kind = PendingAttachmentKind.DOCUMENT,
-            uri = uri,
-            name = displayName(context, uri) ?: "Selected document",
+            name = ComposerAttachmentPolicy.displayName(context, kind, uri),
         )
     }
 
-    fun sendPendingAttachment(attachment: PendingAttachment) {
+    // The Android photo picker, not ACTION_GET_CONTENT: it needs no storage permission, shows only
+    // images, and on devices without the system picker the Compat contract falls back on its own.
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        uri?.let { stageAttachment(ComposerAttachmentKind.IMAGE, it) }
+    }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { stageAttachment(ComposerAttachmentKind.DOCUMENT, it) }
+    }
+
+    fun sendPendingAttachment(attachment: StagedAttachment) {
         if (viewModel.isBusy) return
         when (attachment.kind) {
-            PendingAttachmentKind.IMAGE -> {
+            ComposerAttachmentKind.IMAGE -> {
                 val imageModel = imageModelVm.readySelectedModel()
                 if (imageModel == null) {
                     showImageModelSheet = true
@@ -127,7 +131,7 @@ fun ChatScreen(
                     viewModel.sendImage(attachment.uri, loadedModel = imageModel)
                 }
             }
-            PendingAttachmentKind.DOCUMENT -> {
+            ComposerAttachmentKind.DOCUMENT -> {
                 val indexModel = documentIndexVm.readySelectedModel()
                 val answerModel = documentAnswerVm.readySelectedModel()
                 when {
@@ -248,7 +252,11 @@ fun ChatScreen(
                             toolsUnavailableMessage = viewModel.toolsUnavailableMessage,
                             onToggleTools = viewModel::toggleTools,
                             onAttachDocument = { documentPicker.launch(DocumentExtractor.acceptedMimeTypes) },
-                            onAttachImage = { imagePicker.launch("image/*") },
+                            onAttachImage = {
+                                imagePicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
                             onOpenLive = onOpenVision,
                             onOpenTalk = onOpenVoice,
                             onOpenAdvanced = onOpenAdvanced,
@@ -257,7 +265,12 @@ fun ChatScreen(
                             thinkingSupported = viewModel.thinkingSupported,
                             modifier = Modifier.widthIn(max = dimens.contentMaxWidth),
                             pendingAttachment = pendingAttachment?.toComposerAttachment(),
-                            onClearAttachment = { pendingAttachment = null },
+                            onClearAttachment = {
+                                pendingAttachment = null
+                                attachmentRejection = null
+                            },
+                            attachmentRejection = attachmentRejection,
+                            onDismissAttachmentRejection = { attachmentRejection = null },
                             compact = useCompactComposer,
                             focusRequester = composerFocus,
                         )
@@ -342,24 +355,16 @@ private fun ModelSelectionViewModel.readySelectedModel(): RAModelInfo? {
     return selected ?: state.models.firstOrNull { isReady(it) }
 }
 
-private fun PendingAttachment.toComposerAttachment(): ComposerAttachment =
+private fun StagedAttachment.toComposerAttachment(): ComposerAttachment =
     when (kind) {
-        PendingAttachmentKind.IMAGE -> ComposerAttachment(
+        ComposerAttachmentKind.IMAGE -> ComposerAttachment(
             name = name,
             description = "Ask about this image",
             icon = RACIcons.Outline.Image,
         )
-        PendingAttachmentKind.DOCUMENT -> ComposerAttachment(
+        ComposerAttachmentKind.DOCUMENT -> ComposerAttachment(
             name = name,
             description = "Ask with sources from this document",
             icon = RACIcons.Outline.FileText,
         )
     }
-
-private fun displayName(context: Context, uri: Uri): String? =
-    context.contentResolver
-        .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-        ?.use { cursor ->
-            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (cursor.moveToFirst() && index >= 0) cursor.getString(index)?.takeIf { it.isNotBlank() } else null
-        }

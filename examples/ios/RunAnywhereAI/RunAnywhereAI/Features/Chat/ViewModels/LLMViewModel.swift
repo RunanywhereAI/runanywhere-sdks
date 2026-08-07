@@ -78,12 +78,21 @@ final class LLMViewModel {
     private(set) var activeGenerationID: UUID?
     var lifecycleCancellable: AnyCancellable?
     var generationCancellable: AnyCancellable?
+    /// Keeps the header's copy of the chat's name in step with the store's.
+    var storedTitleCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
     var preparedDocumentRAGPipelineKey: ChatDocumentRAGPipelineKey?
     /// RAG session backing the chat's document questions. Held open across turns
     /// for the same document/model triple and closed before a new one opens.
     var documentRAGSession: RagSession?
+    /// When the turn in flight was started, so its duration is measured rather
+    /// than reconstructed. `GenerationResult` reports throughput and a token
+    /// count but no elapsed time, and dividing one by the other gives 0.0s on
+    /// any backend that does not count tokens — which is what the Apple
+    /// Foundation Models path does (`platform_llm_vtable_generate_stream` emits
+    /// the whole reply as one token and reports `completion_tokens = 0`).
+    private(set) var generationStartedAt: Date?
     /// TTFT (ms) reported by the SDK event bus for the generation in flight.
     /// The event carries an SDK-side generation id the app never sees on the
     /// result, so the single-generation-at-a-time chat keeps the latest value
@@ -283,6 +292,15 @@ final class LLMViewModel {
         currentConversation = conversation
     }
 
+    /// Take a new name for the open chat without touching anything else on it.
+    /// See `subscribeToStoredTitle` for why the whole conversation is not
+    /// adopted instead.
+    func adoptStoredTitle(_ title: String) {
+        guard var conversation = currentConversation, conversation.title != title else { return }
+        conversation.title = title
+        currentConversation = conversation
+    }
+
     func setError(_ err: Error?) {
         error = err
     }
@@ -382,9 +400,15 @@ final class LLMViewModel {
     /// drifted in every previous chat app in this repo: one forgot to reset
     /// `activeGenerationTTFTMs`, so the second reply reported the first's TTFT.
     func beginGeneration() {
+        // The previous turn's epilogue may still be asking the model to name the
+        // chat. One LLM component serves one generation, and the user's turn
+        // outranks a sidebar label, so take it back before claiming the chat.
+        conversationStore.cancelPendingTitleGeneration()
+
         isGenerating = true
         error = nil
         activeGenerationTTFTMs = nil
+        generationStartedAt = Date()
 
         // Create conversation on first message
         if currentConversation == nil {

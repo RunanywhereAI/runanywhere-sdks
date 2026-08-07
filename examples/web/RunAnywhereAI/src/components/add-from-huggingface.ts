@@ -2,8 +2,11 @@
  * Add from Hugging Face — a modal overlay for discovering and downloading an
  * arbitrary GGUF model from the Hugging Face Hub, PocketPal-style.
  *
- * Flow: search repos → pick a repo → see its GGUF quantizations (quant + size)
- * → Download. Discovery is served by the small `hf-hub-client` REST helper; the
+ * Flow: pick a suggestion or search repos → pick a repo → see its GGUF
+ * quantizations (quant + size) → Download. Both entry points converge on the
+ * same `openRepo()` call, so there is exactly one download path.
+ *
+ * Discovery is served by the small `hf-hub-client` REST helper; the
  * SDK does all resolve/register/download/persist work
  * (`RunAnywhere.models.register` + `RunAnywhere.models.download`), exactly like the
  * built-in catalog flow in `model-selection.ts`.
@@ -19,6 +22,8 @@ import {
   searchGgufModels,
   listGgufFiles,
   hfResolveUrl,
+  formatParameterCount,
+  HF_SUGGESTED_GGUF_MODELS,
   type HfModelSummary,
   type HfRepoFile,
 } from '../services/hf-hub-client';
@@ -107,12 +112,15 @@ function renderModal(): void {
     if (searchDebounce !== null) window.clearTimeout(searchDebounce);
     searchDebounce = window.setTimeout(() => void runSearch(input.value), 350);
   });
-  // Overrides the shared modal's default of focusing the sheet: this dialog is
-  // empty until something is typed, so there is nothing to read first and
-  // raising the keyboard is the helpful act.
+  // Overrides the shared modal's default of focusing the sheet, and `dialogs.ts`
+  // names this dialog as the one caller that does so. Search stays the primary
+  // act — a user who already knows the repo they want types it without a click
+  // — and the suggestions below are not lost to assistive tech either: they sit
+  // under a real heading, and the very next Tab stop from this field is the
+  // first suggestion.
   input.focus();
 
-  renderResults('<p class="text-tertiary hf-empty">Type to search Hugging Face.</p>');
+  renderSuggestions();
 }
 
 function renderResults(html: string): void {
@@ -126,6 +134,56 @@ function currentQuery(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Idle state — the curated sub-1B suggestions
+// ---------------------------------------------------------------------------
+
+/**
+ * The dialog's idle state.
+ *
+ * It used to be the sentence "Type to search Hugging Face.", which asks the
+ * user to already know the name of a repo that is small enough to run in a
+ * browser tab — the Hub's most-downloaded GGUF repos are 27B-284B models, so
+ * the obvious searches all end in something that cannot load. The curated list
+ * in `hf-hub-client` answers that question up front; every tile is a repo whose
+ * parameter count was measured and is under 1B.
+ *
+ * This runs on open and again whenever the query is cleared, so browsing and
+ * searching are the same surface rather than two modes.
+ */
+function renderSuggestions(): void {
+  // Carries `hf-repo-row` as well as its own class so the shortlist and the
+  // search results share one frame, hover and focus treatment — they are two
+  // states of the same list and must not look like two components. `--hf-i` is
+  // the row's index, which the stylesheet turns into the reveal stagger.
+  const tiles = HF_SUGGESTED_GGUF_MODELS.map((model, index) => `
+    <button type="button" class="hf-repo-row hf-suggestion" style="--hf-i:${index}"
+      data-repo-id="${escapeHtml(model.repoId)}">
+      <div class="hf-suggestion__info">
+        <div class="hf-suggestion__head">
+          <span class="hf-suggestion__title">${escapeHtml(model.title)}</span>
+          <span class="tag-pill tag-pill--params">${escapeHtml(formatParameterCount(model.params))}</span>
+        </div>
+        <div class="hf-suggestion__repo">${escapeHtml(model.repoId)}</div>
+        <div class="hf-suggestion__blurb">${escapeHtml(model.blurb)}</div>
+      </div>
+      ${icon('chevronRight', { size: 16, className: 'hf-repo-row__chevron' })}
+    </button>
+  `).join('');
+
+  // A real heading rather than a styled div: this is the one landmark a screen
+  // reader can jump to from the focused search field, and it is what tells the
+  // user the tiles below are a shortlist and not search results.
+  renderResults(`
+    <section class="hf-suggestions" aria-labelledby="hf-suggestions-title">
+      <h4 class="hf-suggestions__title" id="hf-suggestions-title">Suggested small models</h4>
+      <p class="hf-suggestions__subtext">All under 1B parameters.</p>
+      <div class="hf-suggestion-list">${tiles}</div>
+    </section>
+  `);
+  bindRepoOpeners('.hf-suggestion');
+}
+
+// ---------------------------------------------------------------------------
 // Search → repo list
 // ---------------------------------------------------------------------------
 
@@ -135,7 +193,8 @@ async function runSearch(query: string): Promise<void> {
   selectedFiles = [];
   fileStates.clear();
   if (!trimmed) {
-    renderResults('<p class="text-tertiary hf-empty">Type to search Hugging Face.</p>');
+    // Clearing the field is a return to browsing, not an empty result set.
+    renderSuggestions();
     return;
   }
   renderResults('<p class="text-tertiary hf-empty">Searching…</p>');
@@ -154,21 +213,42 @@ function renderRepoList(results: readonly HfModelSummary[]): void {
     renderResults('<p class="text-tertiary hf-empty">No GGUF repositories match your search.</p>');
     return;
   }
-  const rows = results.map((repo) => `
+  const rows = results.map((repo) => {
+    // The Hub only reports `gguf.total` for repos whose header it could parse.
+    // Absent means absent: no badge, rather than a placeholder that would read
+    // as a real (and wrong) size. Same pill as the suggestion tiles, so the two
+    // states of this list read as one screen.
+    const params = repo.params === undefined
+      ? ''
+      : `<span class="tag-pill tag-pill--params">${escapeHtml(formatParameterCount(repo.params))}</span>`;
+    return `
     <button type="button" class="hf-repo-row" data-repo-id="${escapeHtml(repo.id)}">
       <div class="hf-repo-row__info">
         <div class="hf-repo-row__name">${escapeHtml(repo.id)}</div>
         <div class="hf-repo-row__meta">
+          ${params}
           <span>&#8595; ${formatCount(repo.downloads)} downloads</span>
           <span>&#9829; ${formatCount(repo.likes)}</span>
         </div>
       </div>
       ${icon('chevronRight', { size: 16, className: 'hf-repo-row__chevron' })}
     </button>
-  `).join('');
+  `;
+  }).join('');
   renderResults(`<div class="hf-repo-list">${rows}</div>`);
 
-  modalEl?.querySelectorAll<HTMLButtonElement>('.hf-repo-row').forEach((btn) => {
+  bindRepoOpeners('.hf-repo-row');
+}
+
+/**
+ * Wire every control matching `selector` to open the repo named in its dataset.
+ *
+ * Shared by the suggestion tiles and the search rows so a suggestion is not a
+ * second download path — it is the identical `openRepo()` entry the search
+ * results use.
+ */
+function bindRepoOpeners(selector: string): void {
+  modalEl?.querySelectorAll<HTMLButtonElement>(selector).forEach((btn) => {
     btn.addEventListener('click', () => {
       const repoId = btn.dataset.repoId;
       if (repoId) void openRepo(repoId);
@@ -372,10 +452,14 @@ function setFileState(path: string, state: FileRowState): void {
 // ---------------------------------------------------------------------------
 
 function backButtonHtml(): string {
+  // Names the list it actually returns to. With the field empty there are no
+  // results behind this repo — `runSearch('')` re-renders the shortlist — and
+  // "Back to results" would promise a screen the user never saw.
+  const label = currentQuery() ? 'Back to results' : 'Back to suggestions';
   return `
     <button type="button" class="hf-back-btn" id="hf-back-btn">
       ${icon('back', { size: 16 })}
-      Back to results
+      ${label}
     </button>
   `;
 }

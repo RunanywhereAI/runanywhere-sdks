@@ -25,7 +25,9 @@ private enum ChatFileImportKind {
     var allowedContentTypes: [UTType] {
         switch self {
         case .document:
-            return [.pdf, .json]
+            // One list, shared with the drop and paste paths, so the picker
+            // cannot offer a type those refuse or hide one they accept.
+            return ChatAttachmentLoader.documentContentTypes
         case .lora:
             return [.data]
         }
@@ -62,6 +64,9 @@ struct ChatInterfaceView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var pendingImageAttachment: ChatImageAttachment?
     @State private var pendingDocumentAttachment: ChatDocumentAttachment?
+    /// True while a drag is over the transcript, so the pane can say it will
+    /// take the file before the user lets go.
+    @State private var isDropTargeted = false
     @State private var selectedDocumentEmbeddingModel: RAModelInfo?
     @State private var selectedDocumentAnswerModel: RAModelInfo?
     @State private var isVisionModelReady = false
@@ -325,7 +330,31 @@ extension ChatInterfaceView {
         // selected: a chat window whose text field is not focused makes the user
         // click before they can type.
         .defaultFocus($isTextFieldFocused, true)
+        .onChange(of: hasAssistantSurface, initial: true) { _, ready in
+            guard ready else { return }
+            focusComposer()
+        }
+        .onChange(of: viewModel.currentConversation?.id) { _, _ in
+            focusComposer()
+        }
         .focusedSceneValue(\.chatSceneActions, chatSceneActions)
+    }
+
+    /// Put the caret in the message field.
+    ///
+    /// `.defaultFocus` alone does not do it here. AppKit resolves a window's
+    /// default focus the first time the window works out where focus goes, and
+    /// at that moment this view does not exist — the SDK gate in
+    /// `RunAnywhereAIApp` is still showing the loading view — so the declaration
+    /// is evaluated against a chat that has no text field yet and the caret
+    /// lands nowhere. Measured on the Mac build: at launch, typing went to the
+    /// sidebar's list type-select and the message never reached the composer.
+    ///
+    /// Asking again from a fresh main-actor turn runs after SwiftUI has
+    /// installed the field, which is what makes it stick. `.defaultFocus` stays
+    /// because it is still the right answer for a second window opened later.
+    private func focusComposer() {
+        Task { @MainActor in isTextFieldFocused = true }
     }
 
     /// The subtitle answers "what is answering me, and is it busy" — the two
@@ -417,6 +446,11 @@ extension ChatInterfaceView {
             loadModel: { showingModelSelection = true },
             showChatDetails: viewModel.messages.isEmpty ? nil : { showingChatDetails = true },
             importDocument: importDocument,
+            // nil disables the menu item, so it never offers to attach a
+            // clipboard that has nothing the chat can take.
+            pasteAttachment: ChatAttachmentLoader.pasteboardHasAttachment
+                ? { handleComposerAction(.pasteAttachment) }
+                : nil,
             // nil disables the menu item, so ⌘. never claims to stop something
             // that isn't running.
             stopGeneration: viewModel.isGenerating ? { viewModel.stopGeneration() } : nil,
@@ -458,6 +492,34 @@ extension ChatInterfaceView {
 extension ChatInterfaceView {
     @ViewBuilder var contentArea: some View {
         if hasAssistantSurface {
+            chatSurface
+                // Dropping a screenshot on a chat box is something people try
+                // without being told they can, and the web app already accepts
+                // it. `.fileURL` covers Finder and Files; `.image` covers a drag
+                // straight out of a browser or Preview, which carries bytes and
+                // no file.
+                .onDrop(of: [.fileURL, .image], isTargeted: $isDropTargeted) { providers in
+                    acceptDroppedProviders(providers)
+                }
+                .overlay { dropCue }
+        }
+        // No `else`. With no model loaded, `ModelRequiredOverlay` is the screen —
+        // it sits above this in the same ZStack and paints edge to edge, so a
+        // placeholder here can only ever be a surface nobody sees. The enclosing
+        // stack already claims the full pane, so nothing collapses without it.
+        //
+        // Pasting is not wired here either. It is reached from the composer's +
+        // menu, and on the Mac also from Edit ▸ Paste Attachment (⇧⌘V).
+        // Deliberately not plain ⌘V: the composer is a focused text field and
+        // the responder chain hands it ⌘V first, so an `.onPasteCommand` on this
+        // view never fires — verified by putting a PNG on the pasteboard and
+        // pressing ⌘V, which did nothing at all. ⌘V continuing to paste *text*
+        // into the message is also what a writer expects; attaching a file is a
+        // different intent, and the two now have two keys.
+    }
+
+    @ViewBuilder private var chatSurface: some View {
+        VStack(spacing: 0) {
             ChatMessageListView(
                 viewModel: viewModel,
                 isTextFieldFocused: $isTextFieldFocused,
@@ -492,10 +554,38 @@ extension ChatInterfaceView {
                 onSend: sendMessage
             )
         }
-        // No `else`. With no model loaded, `ModelRequiredOverlay` is the screen —
-        // it sits above this in the same ZStack and paints edge to edge, so a
-        // placeholder here can only ever be a surface nobody sees. The enclosing
-        // stack already claims the full pane, so nothing collapses without it.
+    }
+
+    /// What a drag over the transcript looks like.
+    ///
+    /// Dashed rather than a solid brand ring so it cannot be mistaken for the
+    /// composer's focus ring, which is the other brand-coloured outline on this
+    /// screen. Inset so the dashes read as an invitation over the content rather
+    /// than as a new edge for the pane.
+    @ViewBuilder private var dropCue: some View {
+        if isDropTargeted {
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .strokeBorder(
+                    AppColors.primaryAccent,
+                    style: StrokeStyle(lineWidth: Stroke.emphasis, dash: [7, 5])
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .fill(AppColors.primaryAccent.opacity(0.06))
+                )
+                .overlay {
+                    Label("Drop to attach", systemImage: "arrow.down.doc")
+                        .appType(.cardTitle)
+                        .foregroundStyle(AppColors.primaryAccent)
+                        .padding(.horizontal, Space.lg)
+                        .padding(.vertical, Space.md)
+                        .background(.regularMaterial, in: Capsule())
+                }
+                .padding(Space.md)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+                .motionAware(Motion.microFade, value: isDropTargeted)
+        }
     }
 
     @ViewBuilder var modelRequiredOverlayIfNeeded: some View {
@@ -627,8 +717,104 @@ extension ChatInterfaceView {
             showingPhotoPicker = true
         case .takePhoto:
             showingVisionWorkbench = true
+        case .pasteAttachment:
+            Task { @MainActor in
+                do {
+                    guard let attachment = try await ChatAttachmentLoader.pasteboardAttachment() else {
+                        errorMessage = "There's nothing on the clipboard the chat can use. "
+                            + "Copy an image, or a PDF, .txt, .md, or .json file."
+                        return
+                    }
+                    stage(attachment)
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
         case .talk:
             showingTalkMode = true
+        }
+    }
+
+    // MARK: - Dropped and pasted files
+
+    /// Stage one attachment, whichever way it arrived.
+    ///
+    /// The single funnel for the photo picker, the file importer, a drop, and a
+    /// paste. Sharing it is what keeps a dropped file validated exactly as
+    /// strictly as a picked one, and it is the only place that enforces "one
+    /// attachment at a time" — two independent optionals made "an image and a
+    /// document at once" representable, and the composer cannot send that.
+    @MainActor
+    private func stage(_ attachment: ChatPendingAttachment) {
+        switch attachment {
+        case .image(let image):
+            pendingImageAttachment = image
+            pendingDocumentAttachment = nil
+            if !isVisionModelReady { showingVisionModelSelection = true }
+        case .document(let document):
+            pendingDocumentAttachment = document
+            pendingImageAttachment = nil
+            if !areDocumentModelsReady { showNextDocumentModelPicker() }
+        }
+        isTextFieldFocused = true
+    }
+
+    /// Accept the first item of a drop or a ⌘V.
+    ///
+    /// One item, not all of them: the composer holds one attachment, and quietly
+    /// dropping the other nine of a ten-file drag would be worse than saying so.
+    /// Returns `true` whenever the drag is claimed, so the pointer does not show
+    /// a rejection animation while the async read is still running.
+    private func acceptDroppedProviders(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+
+        Task { @MainActor in
+            do {
+                if let url = try await Self.loadFileURL(from: provider) {
+                    stage(try await ChatAttachmentLoader.attachment(forFileAt: url))
+                } else if let data = try await Self.loadImageData(from: provider) {
+                    stage(.image(try ChatAttachmentLoader.imageAttachment(
+                        from: data,
+                        filename: provider.suggestedName ?? "Dropped image"
+                    )))
+                } else {
+                    errorMessage = "That can't be attached. Use an image, or a PDF, .txt, .md, or .json file."
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+        return true
+    }
+
+    private static func loadFileURL(from provider: NSItemProvider) async throws -> URL? {
+        guard provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) else { return nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            _ = provider.loadObject(ofClass: URL.self) { url, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: url)
+                }
+            }
+        }
+    }
+
+    /// Bytes for an image dragged from somewhere with no file behind it — a
+    /// browser, Preview, a screenshot thumbnail.
+    private static func loadImageData(from provider: NSItemProvider) async throws -> Data? {
+        guard let identifier = provider.registeredTypeIdentifiers.first(where: {
+            UTType($0)?.conforms(to: .image) == true
+        }) else { return nil }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: identifier) { data, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: data)
+                }
+            }
         }
     }
 
@@ -708,12 +894,7 @@ extension ChatInterfaceView {
         defer { selectedPhotoItem = nil }
 
         do {
-            pendingImageAttachment = try await ChatAttachmentLoader.imageAttachment(from: item)
-            pendingDocumentAttachment = nil
-
-            if !isVisionModelReady {
-                showingVisionModelSelection = true
-            }
+            stage(.image(try await ChatAttachmentLoader.imageAttachment(from: item)))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -731,11 +912,11 @@ extension ChatInterfaceView {
             guard let url = urls.first else { return }
             Task { @MainActor in
                 do {
-                    pendingDocumentAttachment = try await ChatAttachmentLoader.documentAttachment(from: url)
-                    pendingImageAttachment = nil
-                    if !areDocumentModelsReady {
-                        showNextDocumentModelPicker()
-                    }
+                    // Through the same validating entry point a drop uses. The
+                    // importer's `allowedContentTypes` filters the picker, but
+                    // the user can switch it to "All Files" — so the type and
+                    // size are still checked here.
+                    stage(try await ChatAttachmentLoader.attachment(forFileAt: url))
                 } catch {
                     errorMessage = error.localizedDescription
                 }

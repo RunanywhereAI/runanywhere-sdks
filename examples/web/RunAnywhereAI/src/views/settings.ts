@@ -271,23 +271,29 @@ export function initSettingsTab(el: HTMLElement): void {
         </div>
       </div>
 
-      <!-- Hugging Face access token for gated/private model downloads. The SDK
-           owns the token (RunAnywhere.setHuggingFaceToken); it is held in memory for the
-           current session only and is never persisted to browser storage. -->
+      <!-- Hugging Face access token for restricted model downloads. The SDK owns
+           the token (RunAnywhere.setHuggingFaceToken); it is held in memory for the
+           current session only and is never persisted to browser storage.
+
+           The hint below is consumer copy and deliberately names none of that:
+           it used to say "gated or private models" and quote the SDK method,
+           which tells the reader what the code does rather than whether they
+           need to do anything. -->
       <div class="settings-section">
         <div class="settings-section-title">Hugging Face Access</div>
         <div class="setting-row">
-          <span class="setting-label">Token</span>
+          <span class="setting-label">Access token</span>
           <span class="setting-value" id="settings-hf-state">${hfTokenConfigured ? 'Configured' : 'Not set'}</span>
         </div>
         <div class="setting-row setting-row--stacked">
+          <label class="sr-only" for="settings-hf-token">Hugging Face access token</label>
           <input type="password" class="text-input w-full" id="settings-hf-token" placeholder="hf_..." autocomplete="off" spellcheck="false">
           <p class="setting-hint">
-            Optional. Add a Hugging Face token to download gated or private
-            models; public models need none. The token is passed to the SDK via
-            <code>RunAnywhere.setHuggingFaceToken</code>, kept in memory for this session
-            only, and never persisted to browser storage; re-enter it after a
-            reload.
+            Optional. Every model in this app downloads without one. You only
+            need a token for models Hugging Face asks you to sign in for &mdash;
+            a licence you have to accept, or something private of your own.
+            It is kept in memory for this tab only, never saved, and never sent
+            anywhere but Hugging Face; re-enter it after a reload.
             <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Get a token</a>.
           </p>
           <div class="flex items-center gap-sm">
@@ -316,7 +322,9 @@ export function initSettingsTab(el: HTMLElement): void {
         </div>
         <div class="setting-row">
           <span class="setting-label">Platform</span>
-          <span class="setting-value">Web (Emscripten WASM)</span>
+          <!-- Emscripten is the toolchain that produced the binary, not a thing
+               the reader is running on. WebAssembly is. -->
+          <span class="setting-value">Web browser (WebAssembly)</span>
         </div>
         <a class="setting-row setting-row--link" id="settings-docs-link"
           href="https://docs.runanywhere.ai" target="_blank" rel="noopener noreferrer">

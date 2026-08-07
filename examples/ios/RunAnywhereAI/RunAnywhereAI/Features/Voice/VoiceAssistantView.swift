@@ -5,12 +5,19 @@ import UIKit
 #endif
 
 struct VoiceAssistantView: View {
+    /// Which single-component picker the setup card asked for while it was still
+    /// on screen. Consumed once the card's own sheet has finished dismissing.
+    private enum PendingPicker {
+        case stt, llm, tts
+    }
+
     @StateObject private var viewModel = VoiceAgentViewModel()
     @State private var showModelInfo = false
     @State private var showModelSelection = false
     @State private var showSTTModelSelection = false
     @State private var showLLMModelSelection = false
     @State private var showTTSModelSelection = false
+    @State private var pendingPicker: PendingPicker?
 
     // Particle animation states
     @State private var amplitude: Float = 0.0
@@ -30,7 +37,7 @@ struct VoiceAssistantView: View {
             iOSContent
             #endif
         }
-        .adaptiveSheet(isPresented: $showModelSelection) {
+        .adaptiveSheet(isPresented: $showModelSelection, onDismiss: presentPendingPicker) {
             modelSelectionSheet
         }
         .adaptiveSheet(isPresented: $showSTTModelSelection) {
@@ -61,6 +68,23 @@ struct VoiceAssistantView: View {
             viewModel.cleanup()
         }
     }
+
+    /// Remember which picker to open and close the card that asked for it.
+    private func requestPicker(_ picker: PendingPicker) {
+        pendingPicker = picker
+        showModelSelection = false
+    }
+
+    /// Open it, now that the presenting sheet is actually gone.
+    private func presentPendingPicker() {
+        guard let picker = pendingPicker else { return }
+        pendingPicker = nil
+        switch picker {
+        case .stt: showSTTModelSelection = true
+        case .llm: showLLMModelSelection = true
+        case .tts: showTTSModelSelection = true
+        }
+    }
 }
 
 #if os(macOS)
@@ -87,7 +111,7 @@ extension VoiceAssistantView {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(AppColors.backgroundPrimary)
     }
 
     private var macOSToolbar: some View {
@@ -102,19 +126,24 @@ extension VoiceAssistantView {
 
             Spacer()
 
-            HStack(spacing: AppSpacing.small) {
+            HStack(spacing: Space.sm) {
                 Circle()
                     .fill(viewModel.statusColor.swiftUIColor)
                     .frame(width: 8, height: 8)
-                Text(viewModel.sessionState.displayName)
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
+                Text(viewModel.statusLabel)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
             }
+            // One element, one announcement: the dot is decoration and the word
+            // beside it is the state, so the two are read together and the
+            // colour is never the only carrier.
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Voice session: \(viewModel.statusLabel)")
 
             Spacer()
 
             Button(action: {
-                withAnimation(.spring(response: 0.3)) {
+                withMotion(Motion.standardSpring) {
                     showModelInfo.toggle()
                 }
             }, label: {
@@ -128,44 +157,78 @@ extension VoiceAssistantView {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(AppColors.backgroundPrimary)
     }
 
+    /// The transcript and the reply, each always present once a session exists.
+    ///
+    /// Both panes used to disappear when empty and fall back to one fixed line,
+    /// "Click the microphone to start" — which stayed on screen while the agent
+    /// was listening, thinking, and talking. The panel is now two labelled
+    /// regions whose empty text is derived from the session state, so it can
+    /// never claim something the status indicator above it contradicts.
     private var macOSConversationArea: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if !viewModel.currentTranscript.isEmpty {
-                        ConversationBubble(
-                            speaker: "You",
-                            message: viewModel.currentTranscript,
-                            isUser: true
-                        )
-                        .id("user")
-                    }
-
-                    if !viewModel.assistantResponse.isEmpty {
-                        ConversationBubble(
-                            speaker: "Assistant",
-                            message: viewModel.assistantResponse,
-                            isUser: false
-                        )
-                        .id("assistant")
-                    }
-
-                    if viewModel.currentTranscript.isEmpty && viewModel.assistantResponse.isEmpty {
+                VStack(alignment: .leading, spacing: Space.xl) {
+                    if viewModel.isActive
+                        || !viewModel.currentTranscript.isEmpty
+                        || !viewModel.assistantResponse.isEmpty {
+                        transcriptPane
+                        replyPane.id("assistant")
+                    } else {
                         emptyStatePlaceholder(text: "Click the microphone to start")
                     }
                 }
                 .padding(.horizontal, AdaptiveSizing.contentPadding)
-                .padding(.vertical, 20)
+                .padding(.vertical, Space.xl)
                 .adaptiveConversationWidth()
             }
             .onChange(of: viewModel.assistantResponse) { _, _ in
-                withAnimation {
+                withMotion(Motion.standardSpring) {
                     proxy.scrollTo("assistant", anchor: .bottom)
                 }
             }
+        }
+    }
+
+    private var transcriptPane: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            HStack(spacing: Space.sm) {
+                Text("You said")
+                    .appType(.overline)
+                    .foregroundStyle(AppColors.textSecondary)
+                if !viewModel.currentTranscript.isEmpty && !viewModel.isTranscriptFinal {
+                    PartialSpeechBadge()
+                }
+            }
+
+            ConversationBubble(
+                speaker: "You",
+                message: viewModel.currentTranscript.isEmpty
+                    ? viewModel.transcriptPlaceholder
+                    : viewModel.currentTranscript,
+                isUser: true,
+                isPlaceholder: viewModel.currentTranscript.isEmpty,
+                isPartial: !viewModel.currentTranscript.isEmpty && !viewModel.isTranscriptFinal
+            )
+        }
+    }
+
+    private var replyPane: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Text("Reply")
+                .appType(.overline)
+                .foregroundStyle(AppColors.textSecondary)
+
+            ConversationBubble(
+                speaker: "Assistant",
+                message: viewModel.assistantResponse.isEmpty
+                    ? viewModel.replyPlaceholder
+                    : viewModel.assistantResponse,
+                isUser: false,
+                isPlaceholder: viewModel.assistantResponse.isEmpty
+            )
         }
     }
 }
@@ -243,7 +306,7 @@ extension VoiceAssistantView {
             Spacer()
 
             Button(action: {
-                withAnimation(.spring(response: 0.3)) {
+                withMotion(Motion.standardSpring) {
                     showModelInfo.toggle()
                 }
             }, label: {
@@ -266,13 +329,34 @@ extension VoiceAssistantView {
     }
 
     private var iOSControlArea: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: Space.xl) {
             if let error = viewModel.errorMessage {
                 Text(error)
-                    .font(.caption)
-                    .foregroundColor(AppColors.statusRed)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.statusRed)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Space.xl)
+            }
+
+            // What the recogniser heard. Shown even while it is still a
+            // hypothesis — that is the only feedback that the microphone is
+            // actually working — but marked as one, because the words in a
+            // partial visibly change and an unmarked one reads as a glitch.
+            if !viewModel.currentTranscript.isEmpty {
+                VStack(spacing: Space.sm) {
+                    Text(viewModel.currentTranscript)
+                        .appType(.secondary)
+                        .italic(!viewModel.isTranscriptFinal)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                        .padding(.horizontal, Space.xl)
+
+                    if !viewModel.isTranscriptFinal {
+                        PartialSpeechBadge()
+                    }
+                }
+                .transition(.opacity)
             }
 
             // Scrollable markdown response - streaming real-time
@@ -282,15 +366,15 @@ extension VoiceAssistantView {
                         VStack {
                             AdaptiveMarkdownText(
                                 viewModel.assistantResponse,
-                                font: .body,
-                                color: .primary
+                                font: AppType.font(.body),
+                                color: AppColors.textPrimary
                             )
                             .multilineTextAlignment(.center)
                             .id("responseEnd")
                         }
-                        .padding(.horizontal, 30)
+                        .padding(.horizontal, Space.xl)
                         .onChange(of: viewModel.assistantResponse) { _, _ in
-                            withAnimation {
+                            withMotion(Motion.standardSpring) {
                                 proxy.scrollTo("responseEnd", anchor: .bottom)
                             }
                         }
@@ -303,11 +387,15 @@ extension VoiceAssistantView {
             micButtonSection
 
             Text(viewModel.instructionText)
-                .font(.caption2)
-                .foregroundColor(.secondary.opacity(0.7))
+                .appType(.caption)
+                .foregroundStyle(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
+                // The line changes wording every turn; a crossfade keeps it from
+                // snapping while the particle field behind it is still moving.
+                .motionAware(Motion.standardFade, value: viewModel.instructionText)
         }
-        .padding(.bottom, 30)
+        .motionAware(Motion.standardSpring, value: viewModel.currentTranscript.isEmpty)
+        .padding(.bottom, Space.xl)
     }
 
     private var audioLevelIndicator: some View {
@@ -382,23 +470,24 @@ extension VoiceAssistantView {
     }
 
     private var controlArea: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: Space.xl) {
             if let error = viewModel.errorMessage {
                 Text(error)
-                    .font(.caption)
-                    .foregroundColor(AppColors.statusRed)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.statusRed)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, Space.xl)
             }
 
             micButtonSection
 
             Text(viewModel.instructionText)
-                .font(.caption2)
-                .foregroundColor(.secondary.opacity(0.7))
+                .appType(.caption)
+                .foregroundStyle(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
+                .motionAware(Motion.standardFade, value: viewModel.instructionText)
         }
-        .padding(.bottom, 30)
+        .padding(.bottom, Space.xl)
     }
 
     private var micButtonSection: some View {
@@ -418,10 +507,19 @@ extension VoiceAssistantView {
                 action: {
                     // Snapshot state synchronously so the decision can't race with
                     // state updates that happen between the tap and the Task firing.
-                    // Tap is only meaningful from an idle state (.disconnected /
-                    // .error) — barge-in / force-commit / resume are driven by
-                    // the C voice agent itself today, so taps in the speaking /
-                    // listening / connected states are intentionally inert.
+                    //
+                    // Two live meanings, and only two: start when idle, and cut
+                    // the agent off while it is talking. Barge-in is the control
+                    // a voice conversation needs most — a person who has heard
+                    // enough talks over the assistant rather than hanging up —
+                    // and it was the one thing this button could not do, even
+                    // though `VoiceSession.interrupt()` has always existed.
+                    // A tap while listening or thinking stays inert: there is
+                    // nothing to cut off, and the VAD decides when a turn ends.
+                    if viewModel.canInterrupt {
+                        Task { await viewModel.interruptAgent() }
+                        return
+                    }
                     let isActive = viewModel.isActive
                     let isConnected = viewModel.sessionState == .connected
                     guard !isActive && !isConnected else { return }
@@ -444,27 +542,16 @@ extension VoiceAssistantView {
 
 extension VoiceAssistantView {
     private var modelSelectionSheet: some View {
-        NavigationView {
+        NavigationStack {
             VoiceAISetupCard(
                 viewModel: viewModel,
-                onChangeSTT: {
-                    showModelSelection = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showSTTModelSelection = true
-                    }
-                },
-                onChangeLLM: {
-                    showModelSelection = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showLLMModelSelection = true
-                    }
-                },
-                onChangeTTS: {
-                    showModelSelection = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showTTSModelSelection = true
-                    }
-                }
+                // Chained off this sheet's dismissal (see `onDismiss` on the
+                // presenter), not raced behind a fixed 0.3s delay: a sheet that
+                // is still animating out swallows the next presentation, and a
+                // machine slower than the guess showed nothing at all.
+                onChangeSTT: { requestPicker(.stt) },
+                onChangeLLM: { requestPicker(.llm) },
+                onChangeTTS: { requestPicker(.tts) }
             )
             .navigationTitle("Voice Models")
             #if os(iOS)
@@ -486,9 +573,6 @@ extension VoiceAssistantView {
             }
             #endif
         }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
     }
 
     // MARK: - Animation Helpers

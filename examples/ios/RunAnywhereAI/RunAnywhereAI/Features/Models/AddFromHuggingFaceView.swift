@@ -7,6 +7,12 @@
 //  through the SDK. The SDK owns resolution/download; this view only collects
 //  the user's choice and surfaces progress.
 //
+//  The sheet opens on the curated sub-1B catalog rather than on an empty search
+//  box. An empty box asks the reader to already know what a good on-device model
+//  is called, which on a Hub with a million repos is the whole problem; a ranked
+//  set of models that actually fit on a phone gives them something to tap on the
+//  first frame. Search is untouched and takes over the moment they type.
+//
 
 import SwiftUI
 import RunAnywhere
@@ -80,6 +86,22 @@ struct AddFromHuggingFaceView: View {
         mlxAvailable ? HFSearchKind.allCases : [.gguf]
     }
 
+    /// The trimmed query, and the single place the sheet decides whether a
+    /// search is in play at all. Whitespace-only input is not a search.
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The curated set for whichever kind the picker has selected.
+    ///
+    /// MLX is reachable here only because `availableKinds` offered it, and that
+    /// list is built from `mlxAvailable` — the registered-frameworks probe below.
+    /// Reusing `searchKind` is therefore the same capability signal, not a
+    /// second one.
+    private var suggestions: [HFSuggestedModel] {
+        HuggingFaceHubClient.suggestedModels(for: searchKind)
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -110,6 +132,23 @@ struct AddFromHuggingFaceView: View {
         .task {
             await detectMLXAvailability()
         }
+        .onChange(of: query) { _, newValue in
+            // Clearing the field is what brings the suggestions back, so the
+            // now-stale results have to go with it. Typing still does not fire a
+            // request — submitting does; this only tears state down.
+            guard newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            results = []
+            errorMessage = nil
+        }
+        .onChange(of: searchKind) { _, _ in
+            // Rows route by `searchKind`, so leaving GGUF hits on screen after a
+            // switch to MLX would open the GGUF file list against an MLX repo.
+            // Re-query rather than relabel; an empty query simply falls through
+            // to the other kind's suggestions.
+            results = []
+            errorMessage = nil
+            runSearch()
+        }
     }
 
     // MARK: Header (picker + search)
@@ -136,14 +175,18 @@ struct AddFromHuggingFaceView: View {
                     .autocorrectionDisabled()
                     .onSubmit { runSearch() }
                 if !query.isEmpty {
+                    // Emptying the field is the only thing this does; the
+                    // `onChange(of: query)` above owns tearing down the results,
+                    // so clearing by keyboard and clearing by button cannot
+                    // diverge.
                     Button {
                         query = ""
-                        results = []
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(AppColors.textSecondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(AppSpacing.medium)
@@ -155,6 +198,11 @@ struct AddFromHuggingFaceView: View {
 
     // MARK: Results
 
+    /// Five branches, because these are five different facts: a request in
+    /// flight, a request that failed, hits to show, an untouched sheet, and a
+    /// query that genuinely matched nothing. The last two used to share one
+    /// view; keeping them apart is what stops a failed search from silently
+    /// presenting the curated catalog as its results.
     @ViewBuilder private var resultsContent: some View {
         if isSearching {
             Spacer()
@@ -162,31 +210,56 @@ struct AddFromHuggingFaceView: View {
             Spacer()
         } else if let errorMessage {
             errorState(errorMessage)
-        } else if results.isEmpty {
-            emptyState
+        } else if !results.isEmpty {
+            resultsList
+        } else if trimmedQuery.isEmpty {
+            suggestionsList
         } else {
-            List(results) { repo in
-                NavigationLink {
-                    HuggingFaceRepoDetailView(repo: repo, kind: searchKind)
-                } label: {
-                    repoRow(repo)
-                }
-            }
-            .listStyle(.plain)
+            noResultsState
         }
+    }
+
+    // MARK: Search results
+
+    private var resultsList: some View {
+        List(results) { repo in
+            NavigationLink {
+                HuggingFaceRepoDetailView(repo: repo, kind: searchKind)
+            } label: {
+                repoRow(repo)
+            }
+        }
+        .listStyle(.plain)
     }
 
     private func repoRow(_ repo: HFModelSummary) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-            Text(repo.displayName)
-                .font(AppTypography.subheadlineSemibold)
-                .foregroundColor(AppColors.textPrimary)
+            HStack(spacing: AppSpacing.smallMedium) {
+                Text(repo.displayName)
+                    .font(AppTypography.subheadlineSemibold)
+                    .foregroundColor(AppColors.textPrimary)
+                // The same chip the suggestion tiles carry, so a searched repo
+                // and a suggested one are measured on the same scale. Only GGUF
+                // searches can produce one; MLX rows simply have no badge.
+                if let badge = repo.parameterBadge {
+                    HFParameterBadge(text: badge)
+                }
+            }
             HStack(spacing: AppSpacing.medium) {
                 if let owner = repo.owner {
                     Label(owner, systemImage: "person.crop.circle")
+                        .accessibilityLabel("Published by \(owner)")
                 }
-                Label("\(repo.downloads)", systemImage: "arrow.down.circle")
-                Label("\(repo.likes)", systemImage: "heart")
+                // Counts are omitted rather than zeroed when the Hub did not
+                // report them — "0 downloads" is a claim, and a wrong one.
+                if let downloads = repo.downloads {
+                    Label(downloads.formatted(), systemImage: "arrow.down.circle")
+                        .accessibilityLabel("\(downloads.formatted()) downloads")
+                }
+                if let likes = repo.likes {
+                    Label(likes.formatted(), systemImage: "heart")
+                        .accessibilityLabel("\(likes.formatted()) likes")
+                }
             }
             .font(AppTypography.caption)
             .foregroundColor(AppColors.textSecondary)
@@ -194,18 +267,82 @@ struct AddFromHuggingFaceView: View {
         .padding(.vertical, AppSpacing.xxSmall)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: AppSpacing.mediumLarge) {
-            Spacer()
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 32, weight: .semibold))
-                .foregroundColor(AppColors.textSecondary.opacity(0.6))
-            Text(query.isEmpty ? "Search for on-device models" : "No results")
-                .font(AppTypography.subheadline)
-                .foregroundColor(AppColors.textSecondary)
-            Spacer()
+    // MARK: Suggestions (idle state)
+
+    private var suggestionsList: some View {
+        List {
+            Section {
+                ForEach(suggestions) { suggestion in
+                    // Deliberately the same destination a search hit opens.
+                    // A suggestion is a shortcut to the existing flow, not a
+                    // second download path.
+                    NavigationLink {
+                        HuggingFaceRepoDetailView(repo: suggestion.summary, kind: searchKind)
+                    } label: {
+                        suggestionRow(suggestion)
+                    }
+                }
+            } header: {
+                suggestionsHeader
+            }
         }
-        .frame(maxWidth: .infinity)
+        .listStyle(.plain)
+    }
+
+    private var suggestionsHeader: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
+            Text("Suggested small models")
+                .font(AppTypography.subheadlineSemibold)
+                .foregroundColor(AppColors.textPrimary)
+            Text("All under 1B parameters.")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
+        }
+        // `List` uppercases section headers by default. This one is a title and
+        // a sentence, not a group label, and "ALL UNDER 1B PARAMETERS." shouts.
+        .textCase(nil)
+        .padding(.vertical, AppSpacing.xSmall)
+    }
+
+    private func suggestionRow(_ suggestion: HFSuggestedModel) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+            HStack(spacing: AppSpacing.smallMedium) {
+                Text(suggestion.title)
+                    .font(AppTypography.subheadlineSemibold)
+                    .foregroundColor(AppColors.textPrimary)
+                HFParameterBadge(text: suggestion.parameterBadge)
+            }
+            // Middle truncation: the tail of a repo id ("-Instruct-GGUF") is
+            // what distinguishes it from its siblings, so it is the one part
+            // that must survive a narrow phone.
+            Text(suggestion.repoId)
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text(suggestion.blurb)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, AppSpacing.xxSmall)
+    }
+
+    // MARK: Empty results
+
+    /// A query the reader actually typed that matched nothing.
+    ///
+    /// `ContentUnavailableView` rather than the app's branded `EmptyStateView`:
+    /// on a plain list of search results, matching the system exactly is what
+    /// makes the state read as "no matches" instead of "something broke".
+    private var noResultsState: some View {
+        ContentUnavailableView {
+            Label("No results", systemImage: "magnifyingglass")
+        } description: {
+            Text("Nothing on Hugging Face matched “\(trimmedQuery)”. "
+                 + "Clear the search to see suggested small models.")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorState(_ message: String) -> some View {
@@ -227,7 +364,7 @@ struct AddFromHuggingFaceView: View {
     // MARK: Actions
 
     private func runSearch() {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = trimmedQuery
         guard !trimmed.isEmpty else { return }
         isSearching = true
         errorMessage = nil
@@ -253,6 +390,36 @@ struct AddFromHuggingFaceView: View {
         await MainActor.run {
             mlxAvailable = frameworks.contains(.mlx)
         }
+    }
+}
+
+// MARK: - Parameter Badge
+
+/// The parameter-count chip, shared by suggestion tiles and search-result rows
+/// so the two read as one screen rather than two features bolted together.
+///
+/// Brand-tinted because the parameter count is the thing this screen is
+/// organised around, but tinted carefully: the fill is held at 12% and the text
+/// is `brandInk`, not `brand`. Flat `#FF6900` on a 20% wash measures ≈2.6:1 and
+/// is unreadable at chip size; the deepened ink on a 12% wash measures ≈4.8:1 in
+/// light and ≈6.4:1 in dark, which clears AA for text this small.
+private struct HFParameterBadge: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(AppTypography.caption2)
+            .fontWeight(.semibold)
+            .foregroundColor(AppColors.brandInk)
+            .padding(.horizontal, AppSpacing.small)
+            .padding(.vertical, AppSpacing.xxSmall)
+            .background(
+                AppColors.brand.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusSmall, style: .continuous)
+            )
+            // "135M" alone is ambiguous read aloud — megabytes, messages, or
+            // parameters. Say what it counts.
+            .accessibilityLabel("\(text) parameters")
     }
 }
 

@@ -97,35 +97,60 @@ struct VoiceModelChip: View {
     private static let logoSize: CGFloat = 32
 }
 
+// MARK: - PartialSpeechBadge
+
+/// Marks a transcript that is still a guess.
+///
+/// Speech recognition emits a hypothesis long before it emits a result, and the
+/// words in it visibly change as more audio arrives. Drawn identically to the
+/// settled transcript that reads as the app malfunctioning, so the two are
+/// distinguished — by a label, not by colour alone, and the transcript itself
+/// also renders in a lighter, italic style.
+struct PartialSpeechBadge: View {
+    var body: some View {
+        Text("Still hearing you")
+            .appType(.chip)
+            .foregroundStyle(AppColors.primaryAccent)
+            .padding(.horizontal, Space.sm)
+            .padding(.vertical, Space.xs)
+            .background(Capsule().fill(AppColors.primaryAccent.opacity(0.12)))
+            .accessibilityLabel("Partial transcript, still being recognised")
+    }
+}
+
 // MARK: - ConversationBubble
 
 struct ConversationBubble: View {
     let speaker: String
     let message: String
     let isUser: Bool
+    /// True when `message` is state copy standing in for content that has not
+    /// arrived, so it is set apart instead of reading as something the user or
+    /// the model actually said.
+    var isPlaceholder = false
+    /// True while a user transcript is a revisable hypothesis.
+    var isPartial = false
 
-    private func fillColor(isUser: Bool) -> Color {
-        if isUser {
-            #if os(macOS)
-            return Color(NSColor.controlBackgroundColor)
-            #else
-            return Color(.secondarySystemBackground)
-            #endif
-        } else {
-            return AppColors.primaryAccent.opacity(0.08)
-        }
+    private var fill: Color {
+        isUser ? AppColors.backgroundSecondary : AppColors.primaryAccent.opacity(0.08)
     }
 
     var body: some View {
         Text(message)
-            .font(.body)
-            .foregroundColor(.primary)
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(fillColor(isUser: isUser))
-            )
+            .appType(.body)
+            .italic(isPartial || isPlaceholder)
+            .foregroundStyle(isPlaceholder ? AppColors.textSecondary : AppColors.textPrimary)
+            .textSelection(.enabled)
+            .padding(Space.md)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                    .fill(fill)
+            )
+            // The label names who is talking, which the visual layout carries
+            // for a sighted reader and nothing else carries otherwise.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(speaker): \(message)")
     }
 }
 

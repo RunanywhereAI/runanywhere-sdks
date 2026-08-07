@@ -86,9 +86,15 @@ object DocumentExtractor {
         context.contentResolver.openInputStream(uri)?.use(::readUtf8TextWithinLimits)
             ?: throw IllegalStateException("Could not read the file.")
 
-    private data class DocumentInfo(val name: String?, val size: Long?)
+    /** Display name and byte size as the provider reports them; either may be absent. */
+    data class DocumentInfo(val name: String?, val size: Long?)
 
-    private fun documentInfo(context: Context, uri: Uri): DocumentInfo =
+    /**
+     * Internal rather than private so the composer can pre-flight a file with the same reader that
+     * will later ingest it. Checking the size at attach time and again at extraction time using two
+     * different queries is how the two ends of a flow drift into disagreeing about the same file.
+     */
+    internal fun documentInfo(context: Context, uri: Uri): DocumentInfo =
         context.contentResolver
             .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)
             ?.use { cursor ->

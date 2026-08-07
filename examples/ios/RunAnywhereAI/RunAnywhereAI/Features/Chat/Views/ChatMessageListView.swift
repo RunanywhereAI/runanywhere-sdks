@@ -38,6 +38,10 @@ enum ComposerAction {
     case attachFile
     case takePhoto
     case attachPhoto
+    /// Attach whatever is on the clipboard. Also reachable with ⌘V on the Mac;
+    /// the menu item is what makes it discoverable on a phone, which has no
+    /// keyboard shortcut and no other way to hand a screenshot to the chat.
+    case pasteAttachment
     case talk
 }
 
@@ -445,6 +449,17 @@ struct ChatInputAreaView: View {
                     Label("Live Camera", systemImage: "livephoto")
                 }
                 #endif
+
+                // Disabled rather than hidden when the clipboard is empty: a row
+                // that appears and disappears is a control nobody learns, and it
+                // is the only signal on a phone that pasting a screenshot is
+                // even possible.
+                Button {
+                    onComposerAction(.pasteAttachment)
+                } label: {
+                    Label("Paste", systemImage: "doc.on.clipboard")
+                }
+                .disabled(!ChatAttachmentLoader.pasteboardHasAttachment)
             }
 
             Section {

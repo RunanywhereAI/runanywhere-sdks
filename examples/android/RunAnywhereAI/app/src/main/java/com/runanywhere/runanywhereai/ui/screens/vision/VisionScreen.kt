@@ -9,6 +9,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -79,7 +80,11 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
 
     var liveMode by remember(openLiveCamera) { mutableStateOf(openLiveCamera) }
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    // The Android photo picker rather than ACTION_GET_CONTENT: no storage permission, photos only,
+    // and the Compat contract falls back to a document picker on devices without the system one.
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
         uri?.let { visionVm.onImagePicked(decodeBitmap(context, it)) }
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
@@ -148,11 +153,20 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
         ImagePreview(bitmap = visionVm.image)
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
-            OutlinedButton(onClick = { galleryLauncher.launch("image/*") }, modifier = Modifier.weight(1f)) {
-                Text("Gallery")
+            OutlinedButton(
+                onClick = {
+                    galleryLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(RACIcons.Outline.Image, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+                Text("Gallery", modifier = Modifier.padding(start = dimens.spacingSm))
             }
             OutlinedButton(onClick = { onCapture() }, modifier = Modifier.weight(1f)) {
-                Text("Camera")
+                Icon(RACIcons.Outline.Camera, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+                Text("Camera", modifier = Modifier.padding(start = dimens.spacingSm))
             }
         }
 

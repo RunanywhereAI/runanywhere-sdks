@@ -47,6 +47,14 @@ struct RunAnywhereAIApp: App {
     @State private var showFlowActivation = false
     #endif
     @State private var isSDKInitialized = false
+    /// True from the first line of `initializeSDK()` until it settles.
+    ///
+    /// `isSDKInitialized` is only written at the *end*, so it cannot gate a
+    /// second entry: on the Mac the scene goes `.active` while the `.task` is
+    /// still awaiting, and the app registered backends, initialized the SDK, and
+    /// walked the whole 86-model catalog twice. Measured at launch: "SDK
+    /// initialized" logged at 5.10s and again at 5.91s.
+    @State private var isInitializingSDK = false
     @State private var initializationError: Error?
     @Environment(\.scenePhase)
     private var scenePhase
@@ -86,7 +94,10 @@ struct RunAnywhereAIApp: App {
                 await initializeSDK()
             }
             .onChange(of: scenePhase) { _, phase in
-                guard phase == .active, !isSDKInitialized, initializationError == nil else { return }
+                guard phase == .active,
+                      !isSDKInitialized,
+                      !isInitializingSDK,
+                      initializationError == nil else { return }
                 Task {
                     _ = SettingsViewModel.shared
                     await initializeSDK()
@@ -116,6 +127,18 @@ struct RunAnywhereAIApp: App {
     }
 
     private func initializeSDK() async {
+        // Claim the flag on the main actor, where every other read of it happens,
+        // so the `.task` and a `.active` scene phase arriving together cannot both
+        // pass the check. Cleared on both exits below, never by a `defer` — this
+        // function is nonisolated and a `defer` here could only hop back
+        // asynchronously, after a competing caller had already read a stale false.
+        let alreadyRunning = await MainActor.run { () -> Bool in
+            guard !isInitializingSDK else { return true }
+            isInitializingSDK = true
+            return false
+        }
+        guard !alreadyRunning else { return }
+
         do {
             // Register backends with C++ registry FIRST, before any await. Otherwise we can
             // suspend at the next line and another task may run loadModel() → ensureServicesReady()
@@ -143,10 +166,16 @@ struct RunAnywhereAIApp: App {
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("SDK initialized in \(String(format: "%.3f", initTime * 1000), privacy: .public)ms")
 
-            await MainActor.run { isSDKInitialized = true }
+            await MainActor.run {
+                isSDKInitialized = true
+                isInitializingSDK = false
+            }
         } catch {
             logger.error("SDK initialization failed: \(error, privacy: .public)")
-            await MainActor.run { initializationError = error }
+            await MainActor.run {
+                initializationError = error
+                isInitializingSDK = false
+            }
         }
     }
 

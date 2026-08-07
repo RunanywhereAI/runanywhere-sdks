@@ -18,7 +18,6 @@ import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
-import com.runanywhere.sdk.public.api.DownloadEvent
 import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.Job
@@ -37,9 +36,24 @@ data class ModelSelectionState(
     // The model whose download failed, kept with [error] so the row can offer a retry that resumes
     // from the bytes already on disk rather than starting over.
     val failedModelId: String? = null,
+    // The model whose download the user stopped. Distinct from [failedModelId] because nothing went
+    // wrong — the row says "Resume", not "Retry", and shows no error colour. Partial bytes survive a
+    // cancel (the SDK passes delete_partial_bytes = false), so resuming is genuinely cheap.
+    val pausedModelId: String? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
-)
+) {
+    /**
+     * How a stopped transfer for [modelId] should be described, or null when there is nothing on
+     * disk to continue. Resolved here rather than at each row so the note and the verb are read
+     * from one place and cannot disagree.
+     */
+    fun interruptionFor(modelId: String): DownloadInterruption? = when (modelId) {
+        failedModelId -> DownloadInterruption.FAILED
+        pausedModelId -> DownloadInterruption.PAUSED
+        else -> null
+    }
+}
 
 class ModelSelectionViewModel(
     private val context: ModelSelectionContext,
@@ -88,6 +102,26 @@ class ModelSelectionViewModel(
             GlobalState.awaitBootstrapComplete()
             BackendAvailability.snapshots.collect { reload() }
         }
+        viewModelScope.launch {
+            // Adopt a transfer the foreground service is already running. A download started
+            // before this ViewModel existed — the app was backgrounded and the Activity recreated,
+            // or the picker was simply closed and reopened — has no collector here, so without
+            // this the row would offer "Get" over a download that is still going and a second tap
+            // would preempt it.
+            ModelDownloadService.state.collect { adoptActiveDownload(it) }
+        }
+    }
+
+    /**
+     * Start mirroring [snapshot] if it names a running download this picker shows and nothing is
+     * already tracking it. Idempotent: the guard on an active [downloadJob] is what keeps the
+     * service's own state flow from spawning a second collector on every progress tick.
+     */
+    private fun adoptActiveDownload(snapshot: ModelDownloadService.Download?) {
+        if (snapshot == null || snapshot.status != ModelDownloadService.Status.RUNNING) return
+        if (downloadJob?.isActive == true) return
+        val model = state.models.firstOrNull { it.id == snapshot.modelId } ?: return
+        downloadJob = viewModelScope.launch { collectForegroundDownload(model) }
     }
 
     fun refresh() {
@@ -112,6 +146,10 @@ class ModelSelectionViewModel(
                 // they look tappable and then hard-fail at load.
                 .filter { BackendAvailability.isAvailable(it.framework) }
             state = state.copy(models = models, isLoading = false, error = null)
+            // The service's state flow is conflated, so a download that was already running when
+            // this picker was built emitted its RUNNING snapshot before [models] was populated and
+            // will not re-emit. Re-check now that there is a list to match it against.
+            adoptActiveDownload(ModelDownloadService.state.value)
             syncCurrent(models)
             autoLoadIfNeeded(models)
         } catch (e: CancellationException) {
@@ -160,6 +198,7 @@ class ModelSelectionViewModel(
             busyModelId = model.id,
             downloadProgress = DownloadProgressInfo(),
             failedModelId = null,
+            pausedModelId = null,
             error = null,
         )
         var sawOurModel = false
@@ -211,7 +250,15 @@ class ModelSelectionViewModel(
                     failedModelId = model.id,
                     error = snapshot.error ?: "Download failed",
                 )
-            else ->
+            ModelDownloadService.Status.CANCELLED ->
+                // Deliberately no error: the user stopped this. The row switches to "Resume" so the
+                // partial bytes on disk are visibly an asset rather than something to start over.
+                state = state.copy(
+                    busyModelId = null,
+                    downloadProgress = null,
+                    pausedModelId = model.id,
+                )
+            ModelDownloadService.Status.RUNNING ->
                 state = state.copy(busyModelId = null, downloadProgress = null)
         }
         ModelDownloadService.clearIfTerminal(model.id)
@@ -224,9 +271,18 @@ class ModelSelectionViewModel(
             ModelDownloadService.cancel(modelId)
             downloadJob?.cancel()
             downloadJob = null
+            // Cancelling the collector means applyTerminalDownload never runs, so the paused row
+            // state and the service's terminal snapshot are both settled here instead. Without the
+            // clear, the stale CANCELLED snapshot would end the next collector for this model the
+            // instant it subscribed.
             if (state.busyModelId == modelId) {
-                state = state.copy(busyModelId = null, downloadProgress = null)
+                state = state.copy(
+                    busyModelId = null,
+                    downloadProgress = null,
+                    pausedModelId = modelId,
+                )
             }
+            ModelDownloadService.clearIfTerminal(modelId)
         }
     }
 
@@ -245,19 +301,18 @@ class ModelSelectionViewModel(
             busyModelId = model.id,
             downloadProgress = DownloadProgressInfo(),
             failedModelId = null,
+            pausedModelId = null,
             error = null,
         )
         return try {
             // Same as ModelDownloadService: free resident weights so the RAM
             // preflight can pass when another STT/LLM is still loaded.
             RuntimeModelSelection.unloadAllForDownload()
+            var latest = DownloadProgressInfo()
             RunAnywhere.models.download(model.id).collect { event ->
-                val info = when (event) {
-                    is DownloadEvent.Progress -> DownloadProgressInfo.from(event)
-                    is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
-                    else -> null
-                }
-                if (info != null) state = state.copy(downloadProgress = info)
+                val info = DownloadProgressInfo.advance(latest, event) ?: return@collect
+                latest = info
+                state = state.copy(downloadProgress = info)
             }
             state = state.copy(busyModelId = null, downloadProgress = null, currentModelId = null)
             reload()
@@ -390,6 +445,11 @@ class ModelSelectionViewModel(
 
     private suspend fun autoLoadIfNeeded(models: List<RAModelInfo>) {
         if (!isLlm || GlobalState.model.isLoaded) return
+        // A download begins by unloading resident weights to clear the RAM its preflight needs.
+        // Auto-loading a chat model while one is in flight puts that memory straight back and can
+        // fail the very transfer that freed it — and leaves the picker claiming a model is Loaded
+        // beside a row that just said it was unloading everything.
+        if (ModelDownloadService.state.value?.status == ModelDownloadService.Status.RUNNING) return
         val ready = models.filter { isReady(it) && !it.isBuiltIn }
         // Default to the recommended chat model (Qwen3.5-0.8B — best on-device multi-turn recall) instead
         // of whatever happens to be first in the list; degrade through the other strong NPU chat models,

@@ -24,6 +24,7 @@ struct ChatSceneActions {
     var loadModel: (() -> Void)?
     var showChatDetails: (() -> Void)?
     var importDocument: (() -> Void)?
+    var pasteAttachment: (() -> Void)?
     var stopGeneration: (() -> Void)?
     var focusComposer: (() -> Void)?
 }
@@ -69,6 +70,21 @@ struct AppCommands: Commands {
             menuButton("New Conversation", key: "n", action: actions?.newConversation)
             Divider()
             menuButton("Import Document…", key: "o", action: actions?.importDocument)
+        }
+
+        // ⇧⌘V, not ⌘V. The composer is a focused text field and AppKit gives it
+        // ⌘V first, so a paste bound there never reaches the chat — and ⌘V
+        // pasting text into the message is the behaviour a writer expects
+        // anyway. Attaching what is on the clipboard is a different intent and
+        // gets its own key. Disabled when the clipboard holds nothing usable, so
+        // the menu never offers an action that would fail.
+        CommandGroup(after: .pasteboard) {
+            menuButton(
+                "Paste Attachment",
+                key: "v",
+                modifiers: [.command, .shift],
+                action: actions?.pasteAttachment
+            )
         }
 
         CommandMenu("Model") {

@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.ui.screens.models
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,14 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -148,7 +145,7 @@ fun OrgCard(
                             isReady = viewModel.isReady(model),
                             isBusy = state.busyModelId == model.id,
                             progress = if (state.busyModelId == model.id) state.downloadProgress else null,
-                            hasFailed = state.failedModelId == model.id,
+                            interruption = state.interruptionFor(model.id),
                             onSelect = { onSelect(model) },
                             onDownload = { onDownload(model) },
                             onCancel = { viewModel.cancelDownload(model.id) },
@@ -177,7 +174,7 @@ private fun OrgModelRow(
     isReady: Boolean,
     isBusy: Boolean,
     progress: DownloadProgressInfo?,
-    hasFailed: Boolean,
+    interruption: DownloadInterruption?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onCancel: (() -> Unit)? = null,
@@ -233,15 +230,23 @@ private fun OrgModelRow(
             // different layout of the same transfer, not a different amount of information.
             if (isBusy) {
                 DownloadProgressBlock(progress)
-            } else if (hasFailed) {
-                DownloadFailureNote()
+            } else if (interruption != null) {
+                DownloadInterruptionNote(interruption)
             }
         }
         Spacer(Modifier.width(dimens.spacingSm))
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-            OrgModelAction(isCurrent, isReady, isBusy, model, onDownload, onCancel)
+            DownloadRowAction(
+                model = model,
+                isCurrent = isCurrent,
+                isReady = isReady,
+                isBusy = isBusy,
+                interruption = interruption,
+                onDownload = onDownload,
+                onCancel = onCancel,
+            )
             if (onDelete != null && isReady) {
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(ROW_TAP_TARGET)) {
                     Icon(
                         imageVector = RACIcons.Outline.Trash,
                         contentDescription = "Delete ${model.name}",
@@ -254,62 +259,3 @@ private fun OrgModelRow(
     }
 }
 
-@Composable
-private fun OrgModelAction(
-    isCurrent: Boolean,
-    isReady: Boolean,
-    isBusy: Boolean,
-    model: RAModelInfo,
-    onDownload: () -> Unit,
-    onCancel: (() -> Unit)? = null,
-) {
-    when {
-        isCurrent -> ModelPill("Loaded", ModelPillColors.Availability)
-        isBusy -> OrgProgressAction(onCancel)
-        isReady -> ModelPill("Use", ModelPillColors.Availability)
-        else -> {
-            val dimens = LocalDimens.current
-            val needsToken = model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
-            TextButton(onClick = onDownload) {
-                Icon(
-                    imageVector = RACIcons.Outline.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(dimens.iconSm),
-                )
-                Spacer(modifier = Modifier.width(dimens.spacingXs))
-                Text(
-                    text = if (needsToken) "Set token" else "Get",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OrgProgressAction(onCancel: (() -> Unit)?) {
-    if (onCancel == null) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        return
-    }
-    IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                imageVector = RACIcons.Outline.Close,
-                contentDescription = "Cancel download",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(12.dp),
-            )
-        }
-    }
-}
