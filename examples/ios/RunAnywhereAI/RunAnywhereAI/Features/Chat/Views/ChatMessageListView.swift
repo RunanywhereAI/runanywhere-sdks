@@ -55,21 +55,33 @@ struct ChatMessageListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            if isEmpty {
-                emptyStateView
-            } else {
-                messageListView
+        // `GeometryReader` for one number: the viewport height, which the content
+        // below claims as a *minimum*. Without it `.defaultScrollAnchor(.bottom)`
+        // pins a two-message transcript to the composer and leaves ~860pt of void
+        // above it in a 1034pt Mac window — measured on the real app. Claiming
+        // the viewport height with `alignment: .top` makes bottom-anchoring a
+        // no-op while the transcript is short (it starts at the top and grows
+        // down, as every assistant does) and hands scrolling back the moment the
+        // content genuinely overflows.
+        GeometryReader { proxy in
+            ScrollView {
+                if isEmpty {
+                    emptyStateView
+                        .frame(minHeight: proxy.size.height, alignment: .center)
+                } else {
+                    messageListView
+                        .frame(minHeight: proxy.size.height, alignment: .top)
+                }
             }
+            // Scrolling stays enabled even on the empty state. It was disabled to
+            // stop an idle screen rubber-banding, but raising the keyboard halves
+            // the viewport, and a centered empty state taller than that gets its
+            // greeting clipped under the header with no way to reach it.
+            .defaultScrollAnchor(isEmpty ? .center : .bottom)
+            .background(AppColors.backgroundGrouped)
+            .contentShape(Rectangle())
+            .onTapGesture { isTextFieldFocused = false }
         }
-        // Scrolling stays enabled even on the empty state. It was disabled to
-        // stop an idle screen rubber-banding, but raising the keyboard halves the
-        // viewport, and a centered empty state taller than that gets its greeting
-        // clipped under the header with no way to reach it.
-        .defaultScrollAnchor(isEmpty ? .center : .bottom)
-        .background(AppColors.backgroundGrouped)
-        .contentShape(Rectangle())
-        .onTapGesture { isTextFieldFocused = false }
     }
 
     // MARK: - Empty State

@@ -340,17 +340,11 @@ extension ChatInterfaceView {
         return "\(name) · \(backend)"
     }
 
-    @ToolbarContentBuilder
-    private var macToolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            Button {
-                viewModel.createNewConversation()
-            } label: {
-                Label("New Chat", systemImage: "square.and.pencil")
-            }
-            .help("New Chat (⌘N)")
-        }
-
+    /// New Chat is deliberately absent: `MacSidebar` already owns it, and the two
+    /// together put two identical `square.and.pencil` buttons a few points apart
+    /// in one unified title bar. The sidebar is the conventional Mac home for it
+    /// (Notes, Mail, Messages all put compose over the list), so that one stays.
+    @ToolbarContentBuilder private var macToolbar: some ToolbarContent {
         ToolbarItemGroup {
             if viewModel.isGenerating {
                 Button {
@@ -361,8 +355,7 @@ extension ChatInterfaceView {
                 .help("Stop Generating (⌘.)")
             }
 
-            modelButton
-                .help("Choose the model that answers (⇧⌘L)")
+            macModelButton
 
             Button {
                 showingChatDetails = true
@@ -374,19 +367,60 @@ extension ChatInterfaceView {
         }
     }
 
+    /// A glyph, not a card.
+    ///
+    /// `.navigationSubtitle` already reads "MLX Bonsai-27B 1-bit · Apple"; the
+    /// shared `modelButton` repeated that same name and backend as a 36pt-logo
+    /// chip 1300pt to its right, so the title bar named the model twice. Here the
+    /// control keeps only the job the subtitle can't do — being clickable — and
+    /// the model's own logo carries the identity at toolbar scale.
+    private var macModelButton: some View {
+        Button {
+            showingModelSelection = true
+        } label: {
+            if isModelLoading {
+                ProgressView()
+                    .controlSize(.small)
+            } else if let modelName = viewModel.loadedModelName {
+                Image(getModelLogo(for: modelName))
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 18, height: 18)
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.xs / 2, style: .continuous))
+            } else {
+                Label("Choose Model", systemImage: "cube")
+            }
+        }
+        .help(macModelButtonHelp)
+        .accessibilityLabel(macModelButtonHelp)
+    }
+
+    private var macModelButtonHelp: String {
+        guard let name = viewModel.loadedModelName else {
+            return "Choose the model that answers (⇧⌘L)"
+        }
+        return "\(name) — choose a different model (⇧⌘L)"
+    }
+
     private var chatSceneActions: ChatSceneActions {
-        ChatSceneActions(
+        // Hoisted into locals rather than written inline: `trailing_closure` wants
+        // the final closure argument moved out of the parentheses, and
+        // `multiple_closures_with_trailing_closure` forbids exactly that on a call
+        // carrying more than one. Named locals satisfy both.
+        let focusComposer = { isTextFieldFocused = true }
+        let importDocument = {
+            activeFileImportKind = .document
+            showingFileImporter = true
+        }
+        return ChatSceneActions(
             newConversation: { viewModel.createNewConversation() },
             loadModel: { showingModelSelection = true },
             showChatDetails: viewModel.messages.isEmpty ? nil : { showingChatDetails = true },
-            importDocument: {
-                activeFileImportKind = .document
-                showingFileImporter = true
-            },
+            importDocument: importDocument,
             // nil disables the menu item, so ⌘. never claims to stop something
             // that isn't running.
             stopGeneration: viewModel.isGenerating ? { viewModel.stopGeneration() } : nil,
-            focusComposer: { isTextFieldFocused = true }
+            focusComposer: focusComposer
         )
     }
     #endif
@@ -394,7 +428,12 @@ extension ChatInterfaceView {
     #if os(iOS)
     var iOSView: some View {
         VStack(spacing: 0) {
-            consumerTopBar
+            ChatTopBar(
+                model: modelSummary,
+                onOpenChats: { showingConversationList = true },
+                onChooseModel: { showingModelSelection = true },
+                onNewChat: { viewModel.createNewConversation() }
+            )
 
             // The banner belongs to the chat surface, not the entire screen.
             // It therefore overlays content below the top bar without ever
@@ -452,9 +491,11 @@ extension ChatInterfaceView {
                 onComposerAction: handleComposerAction,
                 onSend: sendMessage
             )
-        } else {
-            Spacer()
         }
+        // No `else`. With no model loaded, `ModelRequiredOverlay` is the screen —
+        // it sits above this in the same ZStack and paints edge to edge, so a
+        // placeholder here can only ever be a surface nobody sees. The enclosing
+        // stack already claims the full pane, so nothing collapses without it.
     }
 
     @ViewBuilder var modelRequiredOverlayIfNeeded: some View {
@@ -463,56 +504,23 @@ extension ChatInterfaceView {
         }
     }
 
-    private var modelButton: some View {
-        Button {
-            showingModelSelection = true
-        } label: {
-            HStack(spacing: 6) {
-                if isModelLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Loading model…")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                } else if let modelName = viewModel.loadedModelName {
-                    Image(getModelLogo(for: modelName))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 36, height: 36)
-                        .cornerRadius(4)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName.shortModelName(maxLength: 13))
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-
-                        HStack(spacing: 3) {
-                            Image(systemName: viewModel.isUsingConnect
-                                  ? "desktopcomputer"
-                                  : viewModel.selectedFramework?.consumerBackendIcon ?? "cube")
-                                .font(.system(size: 7))
-                            Text(viewModel.isUsingConnect
-                                 ? (viewModel.connectedHostName ?? "Host")
-                                 : viewModel.selectedFramework?.consumerBackendShortLabel ?? "Ready")
-                                .font(.system(size: 8, weight: .medium))
-                        }
-                        .foregroundColor(viewModel.selectedFramework?.consumerBackendColor ?? AppColors.primaryAccent)
-                    }
-                } else {
-                    Image(systemName: "cube")
-                        .font(.system(size: 14))
-                    Text("Choose Model")
-                        .font(AppTypography.caption)
-                }
-            }
-        }
-        #if os(macOS)
-        .buttonStyle(.bordered)
-        .tint(AppColors.primaryAccent)
-        #endif
+    /// The facts `ChatTopBar` needs about the model that answers, resolved here
+    /// so the header never reaches into the view model for them itself.
+    #if os(iOS)
+    var modelSummary: ChatModelSummary {
+        ChatModelSummary(
+            name: viewModel.loadedModelName,
+            isLoading: modelListViewModel.isLoadingModel,
+            backendLabel: viewModel.isUsingConnect
+                ? (viewModel.connectedHostName ?? "Host")
+                : (viewModel.selectedFramework?.consumerBackendShortLabel ?? "Ready"),
+            backendIcon: viewModel.isUsingConnect
+                ? "desktopcomputer"
+                : (viewModel.selectedFramework?.consumerBackendIcon ?? "cube"),
+            backendColor: viewModel.selectedFramework?.consumerBackendColor ?? AppColors.primaryAccent
+        )
     }
+    #endif
 
     private var isModelLoading: Bool {
         modelListViewModel.isLoadingModel && viewModel.loadedModelName == nil
@@ -551,65 +559,6 @@ extension ChatInterfaceView {
         selectedDocumentEmbeddingModel?.isAvailableForUse == true
             && selectedDocumentAnswerModel?.isAvailableForUse == true
     }
-
-    #if os(iOS)
-    private var consumerTopBar: some View {
-        HStack(spacing: AppSpacing.smallMedium) {
-            iconCircleButton(systemImage: "line.3.horizontal") {
-                showingConversationList = true
-            }
-            .accessibilityLabel("Chats")
-
-            Spacer(minLength: AppSpacing.smallMedium)
-
-            modelChip
-
-            Spacer(minLength: AppSpacing.smallMedium)
-
-            iconCircleButton(systemImage: "square.and.pencil") {
-                viewModel.createNewConversation()
-            }
-            .accessibilityLabel("New Chat")
-        }
-        .padding(.horizontal, AppSpacing.large)
-        .padding(.vertical, AppSpacing.medium)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(AppColors.separator)
-                .frame(height: AppSpacing.strokeThin)
-        }
-    }
-
-    // The shared modelButton, presented as a tappable pill so it reads as the
-    // primary control in the center of the bar.
-    private var modelChip: some View {
-        modelButton
-            .padding(.horizontal, AppSpacing.mediumLarge)
-            .frame(height: 42)
-            .background(
-                Capsule().fill(AppColors.backgroundSecondary)
-            )
-            .overlay(
-                Capsule().strokeBorder(AppColors.separator, lineWidth: AppSpacing.strokeRegular)
-            )
-    }
-
-    private func iconCircleButton(systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(AppColors.textPrimary)
-                .frame(width: 42, height: 42)
-                .background(
-                    Circle()
-                        .fill(AppColors.backgroundSecondary)
-                        .overlay(Circle().strokeBorder(AppColors.separator, lineWidth: AppSpacing.strokeThin))
-                )
-        }
-        .buttonStyle(.plain)
-    }
-    #endif
 
     #if os(iOS)
     private var conversationDrawerOverlay: some View {
@@ -759,29 +708,7 @@ extension ChatInterfaceView {
         defer { selectedPhotoItem = nil }
 
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-                throw LLMError.custom("The selected image could not be loaded.")
-            }
-
-            // The SDK owns pixel conversion; hand it the platform image type.
-            let image: ImageInput?
-            #if canImport(UIKit)
-            image = try UIImage(data: data).map { try ImageInput.uiImage($0) }
-            #elseif canImport(AppKit)
-            image = try NSImage(data: data).map { try ImageInput.nsImage($0) }
-            #else
-            image = nil
-            #endif
-
-            guard let image else {
-                throw LLMError.custom("The selected image could not be prepared for the vision model.")
-            }
-
-            pendingImageAttachment = ChatImageAttachment(
-                data: data,
-                image: image,
-                filename: item.itemIdentifier ?? "Selected image"
-            )
+            pendingImageAttachment = try await ChatAttachmentLoader.imageAttachment(from: item)
             pendingDocumentAttachment = nil
 
             if !isVisionModelReady {
@@ -802,28 +729,15 @@ extension ChatInterfaceView {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-            Task {
+            Task { @MainActor in
                 do {
-                    // Extract off the main actor — PDFKit/JSON parsing of a large
-                    // file blocks the UI (and risks the watchdog) if run inline.
-                    // extractText manages its own security-scoped access.
-                    let text = try await Task.detached(priority: .userInitiated) {
-                        try DocumentService.extractText(from: url)
-                    }.value
-                    await MainActor.run {
-                        pendingDocumentAttachment = ChatDocumentAttachment(
-                            filename: url.lastPathComponent,
-                            text: text
-                        )
-                        pendingImageAttachment = nil
-                        if !areDocumentModelsReady {
-                            showNextDocumentModelPicker()
-                        }
+                    pendingDocumentAttachment = try await ChatAttachmentLoader.documentAttachment(from: url)
+                    pendingImageAttachment = nil
+                    if !areDocumentModelsReady {
+                        showNextDocumentModelPicker()
                     }
                 } catch {
-                    await MainActor.run {
-                        errorMessage = error.localizedDescription
-                    }
+                    errorMessage = error.localizedDescription
                 }
             }
         case .failure(let error):
