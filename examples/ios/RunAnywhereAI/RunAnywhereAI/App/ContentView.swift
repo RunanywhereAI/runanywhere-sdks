@@ -63,6 +63,14 @@ private struct ConsumerMacShell: View {
             if case .conversation(let selected) = selection, selected == id { return }
             selection = .conversation(id)
         }
+        // The shell owns which column is showing, so the View menu's ⌘1/⌘2/⌘3
+        // are published from here rather than from the chat — the chat cannot
+        // navigate away from itself.
+        .focusedSceneValue(\.shellNavigationActions, ShellNavigationActions(
+            showChat: showChat,
+            showModels: { selection = .models },
+            showAdvanced: { selection = .advanced }
+        ))
     }
 
     @ViewBuilder
@@ -81,6 +89,16 @@ private struct ConsumerMacShell: View {
         viewModel.createNewConversation()
         if let id = viewModel.currentConversation?.id {
             selection = .conversation(id)
+        }
+    }
+
+    /// Return to the transcript without discarding it. `nil` is the chat, so
+    /// falling back to it is correct when no conversation has been saved yet.
+    private func showChat() {
+        if let id = viewModel.currentConversation?.id {
+            selection = .conversation(id)
+        } else {
+            selection = nil
         }
     }
 

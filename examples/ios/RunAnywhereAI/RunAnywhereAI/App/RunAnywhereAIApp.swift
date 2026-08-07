@@ -96,8 +96,22 @@ struct RunAnywhereAIApp: App {
         #if os(macOS)
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
-        .defaultSize(width: 1200, height: 800)
-        .windowResizability(.contentSize)
+        .defaultSize(width: 1180, height: 780)
+        // `.contentSize` pinned the window to whatever its content asked for,
+        // which on a sidebar+detail layout means the user cannot make the window
+        // bigger than the transcript's ideal size. `.contentMinSize` keeps the
+        // floor and gives back the whole display.
+        .windowResizability(.contentMinSize)
+        .commands { AppCommands() }
+        #endif
+
+        #if os(macOS)
+        // The real preferences window, behind ⌘, where a Mac user looks for it.
+        // Settings used to be a sheet reached from a button inside the chat,
+        // which is both the wrong place and the wrong shape.
+        Settings {
+            CombinedSettingsView()
+        }
         #endif
     }
 
