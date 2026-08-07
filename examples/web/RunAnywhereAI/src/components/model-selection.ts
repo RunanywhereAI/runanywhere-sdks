@@ -69,7 +69,7 @@ import {
   recommendModels,
   type RecommendedSelection,
 } from '../services/model-recommendation';
-import { showToast } from './dialogs';
+import { openModal, showToast } from './dialogs';
 import { appLogger } from '../services/app-logger';
 import { openAddFromHuggingFace } from './add-from-huggingface';
 
@@ -89,7 +89,16 @@ type RowStatus = RowState['status'];
 
 const rowStates = new Map<string, RowState>();
 
+/**
+ * The open sheet's backdrop, or null.
+ *
+ * Doubles as the "is the picker open" flag every render path already checks, and
+ * as the identity a long-running load compares against so a completed selection
+ * is never delivered to a sheet the user has since closed and reopened.
+ */
 let modalEl: HTMLElement | null = null;
+/** Dismisses the open sheet through the shared modal, which owns teardown. */
+let closeActiveSheet: (() => void) | null = null;
 let toolbarBtn: HTMLElement | null = null;
 let toolbarText: HTMLElement | null = null;
 let getStartedOverlay: HTMLElement | null = null;
@@ -453,51 +462,46 @@ export async function ensureModelReady(modelId: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 function renderSheet(): void {
-  const title = escapeHtml(activeSheetOptions.title ?? 'Select Model');
   searchQuery = '';
   expandedOrgs.clear();
-  modalEl = document.createElement('div');
-  modalEl.className = 'modal-backdrop';
-  modalEl.innerHTML = `
-    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="model-sheet-title">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3 class="text-md font-semibold" id="model-sheet-title">${title}</h3>
-        <button type="button" class="btn-ghost" id="model-sheet-close" aria-label="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div id="model-sheet-banner"></div>
-        <div class="model-search">
-          <svg class="model-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="7"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input id="model-sheet-search" class="model-search__input" type="search"
-            placeholder="Search models, capabilities…" autocomplete="off" spellcheck="false" />
-        </div>
-        <button type="button" class="btn btn-secondary btn-sm model-sheet-hf-btn" id="model-sheet-hf-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Add from Hugging Face
-        </button>
-        <div id="model-sheet-list"></div>
-      </div>
-    </div>
-  `;
 
-  document.body.appendChild(modalEl);
-
-  modalEl.querySelector('#model-sheet-close')!.addEventListener('click', closeSheet);
-  modalEl.addEventListener('click', (event) => {
-    if (event.target === modalEl) closeSheet();
+  // The shell — backdrop, header, Close, Escape, focus trap, focus restore —
+  // belongs to `openModal`; this function owns only the picker's own body.
+  // Focus is deliberately left on the sheet rather than the search field: this
+  // opens from a tap on a phone, where focusing the input would raise the
+  // keyboard over the list the user came to read.
+  const modal = openModal({
+    title: activeSheetOptions.title ?? 'Select Model',
+    titleId: 'model-sheet-title',
+    onClose: () => {
+      modalEl = null;
+      activeSheetOptions = {};
+      searchQuery = '';
+    },
   });
+  modalEl = modal.root;
+  closeActiveSheet = modal.close;
+
+  modal.body.innerHTML = `
+    <div id="model-sheet-banner"></div>
+    <div class="model-search">
+      <svg class="model-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="model-sheet-search" class="model-search__input" type="search"
+        placeholder="Search models, capabilities…" aria-label="Search models"
+        autocomplete="off" spellcheck="false" />
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm model-sheet-hf-btn" id="model-sheet-hf-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Add from Hugging Face
+    </button>
+    <div id="model-sheet-list"></div>
+  `;
 
   const searchInput = modalEl.querySelector('#model-sheet-search') as HTMLInputElement;
   searchInput.addEventListener('input', () => {
@@ -650,11 +654,11 @@ export async function runEngineRetry(): Promise<void> {
 }
 
 function closeSheet(): void {
-  if (!modalEl) return;
-  modalEl.remove();
-  modalEl = null;
-  activeSheetOptions = {};
-  searchQuery = '';
+  // State is reset in the modal's `onClose`, so dismissing via Escape, the
+  // backdrop, or the Close button cannot leave `activeSheetOptions` pointing at
+  // a consumer that is no longer on screen.
+  closeActiveSheet?.();
+  closeActiveSheet = null;
 }
 
 /**
