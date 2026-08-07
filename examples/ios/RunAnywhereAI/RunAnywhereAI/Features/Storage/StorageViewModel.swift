@@ -25,6 +25,17 @@ class StorageViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
+    /// Byte counts, formatted once here rather than at each of the call sites
+    /// that used to reach for `ByteCountFormatter` themselves — the storage
+    /// screen and the Settings storage pane were free to disagree.
+    var formattedModelStorage: String { Self.formatBytes(modelStorageSize) }
+    var formattedAvailableSpace: String { Self.formatBytes(availableSpace) }
+    var formattedTotalStorage: String { Self.formatBytes(totalStorageSize) }
+
+    static func formatBytes(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
     func loadData() async {
         isLoading = true
         errorMessage = nil

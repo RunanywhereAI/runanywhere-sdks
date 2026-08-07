@@ -21,7 +21,6 @@ import SwiftUI
 /// about what is possible right now.
 struct ChatSceneActions {
     var newConversation: (() -> Void)?
-    var openConversationList: (() -> Void)?
     var loadModel: (() -> Void)?
     var showChatDetails: (() -> Void)?
     var importDocument: (() -> Void)?
@@ -33,15 +32,34 @@ struct ChatSceneActionsKey: FocusedValueKey {
     typealias Value = ChatSceneActions
 }
 
+/// Where the window's detail column can go. Published by the shell rather than
+/// by the chat, because the chat is only one of the three destinations and
+/// cannot navigate away from itself.
+struct ShellNavigationActions {
+    var showChat: (() -> Void)?
+    var showModels: (() -> Void)?
+    var showAdvanced: (() -> Void)?
+}
+
+struct ShellNavigationActionsKey: FocusedValueKey {
+    typealias Value = ShellNavigationActions
+}
+
 extension FocusedValues {
     var chatSceneActions: ChatSceneActions? {
         get { self[ChatSceneActionsKey.self] }
         set { self[ChatSceneActionsKey.self] = newValue }
     }
+
+    var shellNavigationActions: ShellNavigationActions? {
+        get { self[ShellNavigationActionsKey.self] }
+        set { self[ShellNavigationActionsKey.self] = newValue }
+    }
 }
 
 struct AppCommands: Commands {
     @FocusedValue(\.chatSceneActions) private var actions
+    @FocusedValue(\.shellNavigationActions) private var navigation
 
     var body: some Commands {
         // Replacing `.newItem` drops AppKit's default "New" (which would open a
@@ -60,9 +78,11 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .toolbar) {
-            menuButton("Conversations", key: "1", action: actions?.openConversationList)
-            menuButton("Chat Details", key: "i", action: actions?.showChatDetails)
+            menuButton("Chat", key: "1", action: navigation?.showChat)
+            menuButton("Models", key: "2", action: navigation?.showModels)
+            menuButton("Advanced", key: "3", action: navigation?.showAdvanced)
             Divider()
+            menuButton("Chat Details", key: "i", action: actions?.showChatDetails)
             menuButton("Focus Composer", key: "\r", modifiers: [.command, .shift], action: actions?.focusComposer)
         }
 

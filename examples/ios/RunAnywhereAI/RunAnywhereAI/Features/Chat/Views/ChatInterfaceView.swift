@@ -45,8 +45,12 @@ struct ChatInterfaceView: View {
     #endif
     @State private var showingModelSelection = false
     @State private var showingChatDetails = false
+    #if os(iOS)
+    // Both are Mac windows/destinations rather than sheets, so the state that
+    // drives them does not exist there.
     @State private var showingSettings = false
     @State private var showingAdvancedHub = false
+    #endif
     @State private var showingTalkMode = false
     @State private var showingVisionWorkbench = false
     @State private var showingFileImporter = false
@@ -125,10 +129,12 @@ struct ChatInterfaceView: View {
                 await handleModelSelected(model)
             }
         }
+        // Settings and Advanced are sheets only on iOS. On the Mac, Settings is
+        // the app's own preferences window (⌘,) and Advanced is a sidebar
+        // destination (⌘3) — presenting either over the chat there would be a
+        // second, competing way to reach the same screen.
+        #if os(iOS)
         .adaptiveSheet(isPresented: $showingSettings) {
-#if os(macOS)
-            NavigationStack { CombinedSettingsView() }
-#else
             NavigationStack {
                 CombinedSettingsView()
                     .toolbar {
@@ -137,12 +143,8 @@ struct ChatInterfaceView: View {
                         }
                     }
             }
-#endif
         }
         .adaptiveSheet(isPresented: $showingAdvancedHub) {
-#if os(macOS)
-            NavigationStack { ConsumerAdvancedHubView() }
-#else
             NavigationStack {
                 ConsumerAdvancedHubView()
                     .toolbar {
@@ -151,8 +153,8 @@ struct ChatInterfaceView: View {
                         }
                     }
             }
-#endif
         }
+        #endif
         .adaptiveSheet(isPresented: $showingTalkMode) {
             VoiceAssistantView()
         }
