@@ -176,9 +176,28 @@ function publishReadinessStep(step: AppReadinessStep): void {
   publishReadiness(appReadinessState);
 }
 
+/**
+ * Consumer-facing wording for each boot step.
+ *
+ * The status line used to print the internal slug — "Step: registering
+ * llamacpp..." — which is the engine package's name, not language a user of a
+ * consumer app has any way to interpret. The step values themselves stay
+ * internal identifiers; this is the one place they become English.
+ */
+const LOADING_STATUS_TEXT: Record<AppReadinessStep, string> = {
+  booting: 'Loading the SDK…',
+  'initializing-sdk': 'Starting the on-device runtime…',
+  'registering-llamacpp': 'Preparing text generation…',
+  'registering-onnx': 'Preparing speech…',
+  catalog: 'Checking available models…',
+  'building-shell': 'Almost ready…',
+  interactive: 'Ready.',
+  error: 'Something went wrong.',
+};
+
 function updateLoadingStatus(step: AppReadinessStep): void {
   const status = document.getElementById('loading-status');
-  if (status) status.textContent = `Step: ${step.replaceAll('-', ' ')}...`;
+  if (status) status.textContent = LOADING_STATUS_TEXT[step];
 }
 
 async function withTimeout<T>(step: string, timeoutMs: number, operation: Promise<T>): Promise<T> {
@@ -345,11 +364,15 @@ async function main(): Promise<void> {
   readinessStep = 'booting';
   publishReadiness('booting');
 
+  // The boot screen is already on screen — index.html ships it as static markup
+  // so it paints with the document. This only matters on the retry path, where
+  // the previous attempt removed it. It must come *before* the awaited step
+  // below, or a retry shows a blank page for the duration of that step.
+  showLoadingScreen();
+
   // Step 0: Ensure cross-origin isolation for SharedArrayBuffer (Safari/iOS)
   await withTimeout('setting up cross-origin isolation', 60_000, ensureCrossOriginIsolation());
 
-  // Show loading screen while SDK initializes
-  showLoadingScreen();
   publishReadinessStep('initializing-sdk');
   publishReadiness('initializing-sdk');
 
@@ -768,44 +791,66 @@ function showAccelerationBadge(llmMode: string): void {
 // Loading Screen
 // ---------------------------------------------------------------------------
 
+/**
+ * Make the boot screen visible.
+ *
+ * The markup lives in index.html so it paints with the document rather than
+ * after the module graph runs — see the comment there. This must therefore never
+ * build or replace it: re-creating the node would throw away an already-painted
+ * screen and flash. It only un-hides, which matters on the retry path, where
+ * hideLoadingScreen() has already run and removed the element.
+ */
 function showLoadingScreen(): void {
-  document.getElementById('loading-screen')?.remove();
+  // Cancel a pending teardown before adopting the node it is about to delete.
+  // hideLoadingScreen() removes the element 500ms after fading it out, so a
+  // Retry click inside that window would un-hide the screen and then have it
+  // yanked out from under the boot it just started — leaving the user on a blank
+  // page with no sign that anything is happening.
+  if (loadingScreenRemovalTimer !== null) {
+    clearTimeout(loadingScreenRemovalTimer);
+    loadingScreenRemovalTimer = null;
+  }
 
+  const existing = document.getElementById('loading-screen');
+  if (existing) {
+    existing.classList.remove('hidden');
+    return;
+  }
+
+  // Retry after a failed boot: the original was removed, so rebuild the same
+  // structure index.html ships.
   const screen = document.createElement('div');
   screen.className = 'loading-screen';
   screen.id = 'loading-screen';
   screen.innerHTML = `
     <div class="loading-logo">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-        <defs>
-          <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#FF6900"/>
-            <stop offset="100%" style="stop-color:#FB2C36"/>
-          </linearGradient>
-        </defs>
-        <circle cx="50" cy="50" r="45" fill="url(#logo-grad)" opacity="0.15"/>
-        <circle cx="50" cy="50" r="30" fill="url(#logo-grad)" opacity="0.3"/>
-        <text x="50" y="58" text-anchor="middle" fill="url(#logo-grad)" font-size="28" font-weight="bold" font-family="-apple-system, system-ui, sans-serif">RA</text>
-      </svg>
+      <img src="/runanywhere-logo.svg" alt="" width="100" height="100" />
     </div>
     <div class="loading-text">
-      <h2>Setting Up Your AI</h2>
-      <p>Preparing your private AI assistant...</p>
+      <h2>Starting RunAnywhere</h2>
+      <p>Getting your on-device AI ready&hellip;</p>
     </div>
     <div class="loading-bar">
       <div class="loading-bar-fill"></div>
     </div>
-    <p class="text-sm text-tertiary" id="loading-status">Step: initializing SDK...</p>
+    <p class="text-sm text-tertiary" id="loading-status">Loading the SDK&hellip;</p>
   `;
   document.body.appendChild(screen);
 }
 
+/** Pending removal timer, so showLoadingScreen() can cancel a fade in flight. */
+let loadingScreenRemovalTimer: number | null = null;
+
 function hideLoadingScreen(): void {
   const screen = document.getElementById('loading-screen');
-  if (screen) {
-    screen.classList.add('hidden');
-    setTimeout(() => screen.remove(), 500);
-  }
+  if (!screen) return;
+
+  screen.classList.add('hidden');
+  if (loadingScreenRemovalTimer !== null) clearTimeout(loadingScreenRemovalTimer);
+  loadingScreenRemovalTimer = window.setTimeout(() => {
+    loadingScreenRemovalTimer = null;
+    screen.remove();
+  }, 500);
 }
 
 // ---------------------------------------------------------------------------
