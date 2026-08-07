@@ -4053,6 +4053,60 @@ input[type="range"]::-webkit-slider-thumb {
   flex-wrap: wrap;
 }
 
+/*
+ * Document drop zone.
+ *
+ * A <button>, so pointer and keyboard use the same control instead of the old
+ * arrangement — a hidden file input behind an "Upload" button, with no drop
+ * target at all. Full-width and dashed because the affordance has to read as
+ * "put something here" before it is hovered.
+ */
+.docs-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  margin: var(--space-md-lg) 0 0;
+  padding: var(--space-xl);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+.docs-dropzone:hover { background: var(--bg-tertiary); border-color: var(--color-primary); }
+.docs-dropzone:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/*
+ * Dragging over it. Set from JS with an enter/leave counter rather than `:hover`,
+ * because a pointer holding a dragged file does not reliably hover, and a plain
+ * `dragleave` fires when crossing onto a child and would flicker the state.
+ */
+.docs-dropzone--active {
+  background: var(--bg-tertiary);
+  border-color: var(--color-primary);
+  border-style: solid;
+}
+.docs-dropzone-glyph {
+  width: 28px;
+  height: 28px;
+  color: var(--text-tertiary);
+}
+.docs-dropzone--active .docs-dropzone-glyph,
+.docs-dropzone:hover .docs-dropzone-glyph { color: var(--color-primary); }
+.docs-dropzone-title {
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+}
+.docs-dropzone-hint {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
 .docs-list {
   list-style: none;
   margin: 12px 0;
