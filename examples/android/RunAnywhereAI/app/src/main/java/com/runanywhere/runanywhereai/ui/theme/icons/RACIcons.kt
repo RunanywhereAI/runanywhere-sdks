@@ -128,10 +128,142 @@ object RACIcons {
             )
         }
 
-        val Activity: ImageVector by lazy {
+        /**
+         * A silence baseline with one burst of speech over it — voice-activity detection, and
+         * nothing else. The web registry calls this `pulse` and draws the same two strokes.
+         *
+         * This replaced an `Activity` glyph that was doing five jobs at once (two framework
+         * badges, the Advanced-hub row, the Voice screen's turn-taking tile, and the VAD
+         * screen's own mark). The baseline is what makes it specifically *detection*: a trace
+         * that is mostly flat, with an event in it.
+         */
+        val Pulse: ImageVector by lazy {
             racOutlineIcon(
-                "Activity",
-                "M3 12h4l3 8l4 -16l3 8h4",
+                "Pulse",
+                "M3 11h3l2 -5l3 10l2.5 -7l1.5 2h6",
+                "M3 17h18",
+            )
+        }
+
+        /**
+         * Five bars at speech-like heights: audio as a signal. Used for engines and screens
+         * whose subject is the *sound*, as distinct from [Microphone] (capturing it) and
+         * [Volume] (playing it back).
+         */
+        val Waveform: ImageVector by lazy {
+            racOutlineIcon(
+                "Waveform",
+                "M4 10v4",
+                "M8 7v10",
+                "M12 4v16",
+                "M16 8v8",
+                "M20 11v2",
+            )
+        }
+
+        /**
+         * A dial with a needle — measurement. Benchmarks only. Sharing [Cpu] with the device's
+         * chip row meant the same picture answered both "what silicon is this" and "how fast
+         * is it", which are the two things a benchmark screen exists to keep apart.
+         */
+        val Gauge: ImageVector by lazy {
+            racOutlineIcon(
+                "Gauge",
+                "M4.93 19.07a10 10 0 1 1 14.14 0",
+                "M12 15l3.5 -4.5",
+                "M10 18a2 2 0 1 0 4 0a2 2 0 0 0 -4 0",
+            )
+        }
+
+        /**
+         * A model as an artifact: one solid object with weights inside. This is the mark for
+         * "a model" wherever the subject is the file the user chose or downloaded — never the
+         * hardware it runs on ([Cpu]) and never a framework ([Stack]).
+         */
+        val Model: ImageVector by lazy {
+            racOutlineIcon(
+                "Model",
+                "M21 16v-8a2 2 0 0 0 -1 -1.73l-7 -4a2 2 0 0 0 -2 0l-7 4a2 2 0 0 0 -1 1.73v8a2 " +
+                    "2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7 -4a2 2 0 0 0 1 -1.73z",
+                "M3.3 7l8.7 5l8.7 -5",
+                "M12 22v-10",
+            )
+        }
+
+        /**
+         * Three tracks with handles at different positions — the workbench. The Advanced hub,
+         * the Settings row that opens it, and the composer action that jumps to it all use
+         * this, so the destination has one face. [Stack] went back to meaning "an inference
+         * framework" only.
+         */
+        val Sliders: ImageVector by lazy {
+            racOutlineIcon(
+                "Sliders",
+                "M4 21v-7",
+                "M4 10v-7",
+                "M12 21v-9",
+                "M12 8v-5",
+                "M20 21v-5",
+                "M20 12v-9",
+                "M2 14h4",
+                "M10 8h4",
+                "M18 16h4",
+            )
+        }
+
+        /** Items being ticked off. A list the user works through, not a stack of layers. */
+        val Checklist: ImageVector by lazy {
+            racOutlineIcon(
+                "Checklist",
+                "M3 7l2 2l4 -4",
+                "M3 17l2 2l4 -4",
+                "M13 6h8",
+                "M13 12h8",
+                "M13 18h8",
+            )
+        }
+
+        /**
+         * A framed picture — an image the app *holds*, e.g. an attachment in the composer or a
+         * thumbnail in the transcript. [Eye] stays reserved for *looking* at one (the vision
+         * modality), which is why the composer can now show "Image" and "Live camera" as
+         * visibly different things.
+         */
+        val Image: ImageVector by lazy {
+            racOutlineIcon(
+                "Image",
+                "M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2z",
+                "M7 10.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 0 0 -3 0",
+                "M21 15l-4.5 -4.5l-7.5 7.5",
+            )
+        }
+
+        /** Nodes wired into a graph — a compute graph. The ONNX badge, which is literally that. */
+        val Graph: ImageVector by lazy {
+            racOutlineIcon(
+                "Graph",
+                "M10 4h4a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z",
+                "M4 15h4a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z",
+                "M16 15h4a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z",
+                "M6 15v-2a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v2",
+                "M12 9v3",
+            )
+        }
+
+        /**
+         * A RAM module with legs: working memory. [Database] is a drum of stored records and
+         * kept its one job (the RAG vector index); showing the device's RAM with the same drum
+         * claimed the phone's memory and the embedding store were the same thing.
+         */
+        val Memory: ImageVector by lazy {
+            racOutlineIcon(
+                "Memory",
+                "M4 8h16a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1z",
+                "M7 11h3v2h-3z",
+                "M14 11h3v2h-3z",
+                "M7 16v2",
+                "M12 16v2",
+                "M17 16v2",
             )
         }
 
@@ -439,6 +571,80 @@ object RACIcons {
                 "M12 4l-8 4l8 4l8 -4l-8 -4",
                 "M4 12l8 4l8 -4",
                 "M4 16l8 4l8 -4",
+            )
+        }
+
+        /**
+         * Recognising characters inside a framed image. Distinct from [FileText], which is
+         * always a document the app already holds as text — reusing that glyph for OCR was
+         * exactly the one-glyph-two-meanings collision §7 forbids.
+         */
+        val ScanText: ImageVector by lazy {
+            racOutlineIcon(
+                "ScanText",
+                "M4 8v-2a2 2 0 0 1 2 -2h2",
+                "M4 16v2a2 2 0 0 0 2 2h2",
+                "M16 4h2a2 2 0 0 1 2 2v2",
+                "M16 20h2a2 2 0 0 0 2 -2v-2",
+                "M8 9h8",
+                "M8 12h6",
+                "M8 15h4",
+            )
+        }
+
+        /**
+         * Regions stacked over an image — a mask. Segmentation only; [Stack] stays the
+         * generic "several of a kind" mark it already is everywhere else.
+         */
+        val Layers: ImageVector by lazy {
+            racOutlineIcon(
+                "Layers",
+                "M3 5a2 2 0 0 1 2 -2h5v7h-7v-5z",
+                "M14 3h5a2 2 0 0 1 2 2v5h-7v-7z",
+                "M14 14h7v5a2 2 0 0 1 -2 2h-5v-7z",
+                "M3 14h7v7h-5a2 2 0 0 1 -2 -2v-5z",
+            )
+        }
+
+        /** Something the model made rather than something it read. Generation, app-wide. */
+        val Sparkles: ImageVector by lazy {
+            racOutlineIcon(
+                "Sparkles",
+                "M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2z",
+                "M16 6a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2z",
+                "M9 18a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6z",
+            )
+        }
+
+        /** A multi-step pipeline: work routed through stages. Never a stack of layers. */
+        val Route: ImageVector by lazy {
+            racOutlineIcon(
+                "Route",
+                "M3 17a2 2 0 1 0 4 0a2 2 0 0 0 -4 0",
+                "M17 7a2 2 0 1 0 4 0a2 2 0 0 0 -4 0",
+                "M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5",
+            )
+        }
+
+        /** More than one speaker. Diarization, attribution, per-person anything. */
+        val Users: ImageVector by lazy {
+            racOutlineIcon(
+                "Users",
+                "M5 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0",
+                "M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2",
+                "M16 3.13a4 4 0 0 1 0 7.75",
+                "M21 21v-2a4 4 0 0 0 -3 -3.85",
+            )
+        }
+
+        /** Audio leaving the device. Playback and synthesis — never capture ([Microphone]). */
+        val Volume: ImageVector by lazy {
+            racOutlineIcon(
+                "Volume",
+                "M15 8a5 5 0 0 1 0 8",
+                "M17.7 5a9 9 0 0 1 0 14",
+                "M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a" +
+                    ".8 .8 0 0 1 -1.5 .5l-3.5 -4.5",
             )
         }
     }

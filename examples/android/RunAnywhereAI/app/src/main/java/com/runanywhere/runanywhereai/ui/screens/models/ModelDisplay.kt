@@ -80,17 +80,34 @@ fun InferenceFramework.consumerBackendLabel(): String = when (this) {
     else -> displayName
 }
 
+/**
+ * The badge glyph for a backend, chosen by *what kind of runtime it is* — a general LLM
+ * framework, a compute-graph runtime, an audio engine, or accelerator silicon.
+ *
+ * Every arm here has to be legible next to every other arm, because these badges appear
+ * side by side in the model list. Four of them used to collide: ONNX and Fluid Audio both
+ * drew the signal trace the VAD screen used for speech detection, and QHexRT, CoreML and
+ * MLX all drew the same chip the device card used for "Chip" and the Benchmarks row used
+ * for itself. Accelerated backends now share [RACIcons.Outline.Cpu] *only* with each other
+ * — which is correct, since "runs on an accelerator" is genuinely one meaning — while the
+ * device's own silicon row and the benchmark entry moved off it entirely.
+ */
 fun InferenceFramework.backendIcon(): ImageVector = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> RACIcons.Outline.Stack
-    InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> RACIcons.Outline.Activity
+    // A compute graph, which is literally what an ONNX file holds.
+    InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> RACIcons.Outline.Graph
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> RACIcons.Filled.Bolt
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> RACIcons.Outline.Robot
-    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> RACIcons.Outline.Cpu
-    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> RACIcons.Outline.Microphone
-    InferenceFramework.INFERENCE_FRAMEWORK_COREML -> RACIcons.Outline.Cpu
-    InferenceFramework.INFERENCE_FRAMEWORK_MLX -> RACIcons.Outline.Cpu
+    // Accelerator-backed runtimes. One glyph, one meaning: "this runs on dedicated silicon."
+    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+    InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+    InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+    -> RACIcons.Outline.Cpu
+    // Speech engines: the subject is the audio signal, not the microphone that captured it.
+    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO,
+    -> RACIcons.Outline.Waveform
     InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> RACIcons.Outline.Robot
-    InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> RACIcons.Outline.Activity
     InferenceFramework.INFERENCE_FRAMEWORK_TFLITE,
     InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH,
     InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE,
