@@ -67,6 +67,7 @@ private data class PendingAttachment(
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel,
+    onOpenModels: () -> Unit,
     onOpenVision: () -> Unit,
     onOpenVoice: () -> Unit,
     onOpenAdvanced: () -> Unit,
@@ -154,6 +155,15 @@ fun ChatScreen(
         }
     }
 
+    // A suggestion chip is the launch screen's most prominent affordance, so it
+    // cannot fail quietly. If nothing can answer it yet, the prompt still lands
+    // in the composer (nothing typed is lost) and the model picker opens — the
+    // one action that unblocks it. Mirrors iOS `sendImageQuestion`, which opens
+    // the vision picker rather than returning when no model is ready.
+    fun submitSuggestion(prompt: String) {
+        if (!viewModel.sendPrompt(prompt)) onOpenModels()
+    }
+
     var autoFollow by remember { mutableStateOf(true) }
 
     val atBottom by remember {
@@ -215,7 +225,7 @@ fun ChatScreen(
                             PromptSuggestions(
                                 toolsEnabled = viewModel.toolsEnabled,
                                 loraActive = GlobalState.lora.isActive,
-                                onSelect = viewModel::sendPrompt,
+                                onSelect = ::submitSuggestion,
                                 modifier = Modifier.padding(bottom = dimens.spacingSm),
                             )
                         }
@@ -229,6 +239,8 @@ fun ChatScreen(
                             onInputChange = viewModel::onInputChange,
                             onSend = ::submitComposer,
                             canSend = viewModel.canSend || (pendingAttachment != null && !viewModel.isBusy),
+                            blockedReason = viewModel.sendBlockedReason,
+                            onResolveBlocked = onOpenModels,
                             isGenerating = viewModel.isGenerating,
                             isStopping = viewModel.isStopping,
                             onStop = viewModel::stop,
@@ -267,6 +279,11 @@ fun ChatScreen(
                         .fillMaxSize()
                         .widthIn(max = dimens.contentMaxWidth),
                     isGenerating = viewModel.isGenerating,
+                    // The empty transcript is the app's first screen, so it carries
+                    // the one action that unblocks everything else when no model is
+                    // resident yet.
+                    hasModel = viewModel.hasUsableModel,
+                    onChooseModel = onOpenModels,
                     // Withheld while a turn is in flight, mirroring iOS
                     // `ChatMessageListView.actions(for:)`: every one of these
                     // renumbers the transcript the running stream is indexed

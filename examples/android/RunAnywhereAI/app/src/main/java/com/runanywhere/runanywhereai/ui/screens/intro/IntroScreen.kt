@@ -70,7 +70,7 @@ fun IntroScreen() {
     LaunchedEffect(Unit) { shown = true }
     val entry by animateFloatAsState(
         targetValue = if (shown) 1f else 0f,
-        animationSpec = AppMotion.tweenLong(),
+        animationSpec = AppMotion.emphasis(),
         label = "introEntry",
     )
 

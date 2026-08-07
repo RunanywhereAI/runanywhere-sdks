@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 
@@ -70,6 +71,14 @@ fun ChatInputBar(
     onInputChange: (String) -> Unit = {},
     onSend: () -> Unit = {},
     canSend: Boolean = false,
+    /**
+     * Why the composer cannot send, or null when it can. Shown as an actionable
+     * strip above the editor rather than left to the reader to infer from a grey
+     * button. Null while a turn is in flight — the spinner already says that.
+     */
+    blockedReason: String? = null,
+    /** Takes the user to whatever [blockedReason] is asking for. */
+    onResolveBlocked: () -> Unit = {},
     isGenerating: Boolean = false,
     isStopping: Boolean = false,
     onStop: () -> Unit = {},
@@ -127,6 +136,21 @@ fun ChatInputBar(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         )
         if (!compact) {
+            AnimatedVisibility(
+                visible = blockedReason != null,
+                enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
+                exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
+            ) {
+                BlockedReasonStrip(
+                    reason = blockedReason.orEmpty(),
+                    onResolve = onResolveBlocked,
+                    modifier = Modifier.padding(
+                        start = dimens.spacingMd,
+                        top = dimens.spacingSm,
+                        end = dimens.spacingMd,
+                    ),
+                )
+            }
             AnimatedVisibility(
                 visible = pendingAttachment != null,
                 enter = fadeIn() + expandVertically(),
@@ -362,6 +386,61 @@ fun ChatInputBar(
                     ),
                 )
             }
+        }
+    }
+}
+
+/**
+ * The one blocker standing between a written message and an answer, plus the tap
+ * that clears it.
+ *
+ * Deliberately not an error colour: nothing has gone wrong on a first launch, the
+ * user simply has not chosen a model yet. Error red here would read as a fault
+ * the user caused.
+ */
+@Composable
+private fun BlockedReasonStrip(
+    reason: String,
+    onResolve: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.radiusLg),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        onClick = onResolve,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = RACIcons.Outline.Cpu,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = reason,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Tap to choose one — it downloads and runs on this device.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = RACIcons.Outline.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(dimens.iconSm),
+            )
         }
     }
 }
