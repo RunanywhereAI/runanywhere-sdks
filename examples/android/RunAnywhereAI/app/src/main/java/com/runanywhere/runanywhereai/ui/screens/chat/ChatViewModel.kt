@@ -153,8 +153,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     val canSend: Boolean
-        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() &&
-            (GlobalState.model.isLoaded || isUsingConnect)
+        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() && hasUsableModel
+
+    /** A local model is resident, or a hosted one is reachable. */
+    val hasUsableModel: Boolean
+        get() = GlobalState.model.isLoaded || isUsingConnect
+
+    /**
+     * Why a written message cannot be sent, or null when nothing is in the way.
+     *
+     * Only about the *model*, never about a transient busy state: "sending" and
+     * "stopping" already have their own visible affordances (the spinner, the
+     * stop button, the stopping pill), and repeating them here would make the
+     * composer shout during every normal turn. A missing model is different —
+     * it is the one blocker the user has to act on, and without this the send
+     * button is simply grey for no stated reason.
+     */
+    val sendBlockedReason: String?
+        get() = if (hasUsableModel) null else "No model is loaded yet."
 
     val isUsingConnect: Boolean
         get() = connectState.status == ConnectStatus.CONNECTED && connectState.activeModel != null
@@ -254,10 +270,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         input = value
     }
 
-    fun sendPrompt(prompt: String) {
-        if (isGenerating) return
+    /**
+     * Put a suggested prompt in the composer and send it if that is possible.
+     *
+     * Returns false when the prompt was staged but not sent, so the caller can
+     * take the user to whatever is missing. It used to return silently in that
+     * case, which made the launch screen's most prominent affordance a dead tap:
+     * no message, no keyboard, no explanation.
+     */
+    fun sendPrompt(prompt: String): Boolean {
+        if (isBusy) return false
         input = prompt
+        if (!canSend) return false
         send()
+        return true
     }
 
     fun toggleTools() {
