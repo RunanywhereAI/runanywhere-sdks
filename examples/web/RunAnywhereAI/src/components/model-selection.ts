@@ -33,7 +33,19 @@ import {
   getCatalog,
   webModelCompatibility,
   type CatalogEntry,
+  type WebModelCompatibility,
 } from '../services/model-catalog';
+import {
+  canRetryEngines,
+  describeFailures,
+  engineCompatibility,
+  failureDiagnostics,
+  failuresForEntries,
+  isRetryingForEntries,
+  onEngineStateChange,
+  retryEngines,
+  type EngineFailure,
+} from '../services/engine-availability';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import {
@@ -82,6 +94,7 @@ let toolbarBtn: HTMLElement | null = null;
 let toolbarText: HTMLElement | null = null;
 let getStartedOverlay: HTMLElement | null = null;
 let getStartedBtn: HTMLButtonElement | null = null;
+let overlaySheetOptions: OpenSheetOptions = {};
 let catalogRegistered = false;
 const listeners: Array<() => void> = [];
 
@@ -206,10 +219,61 @@ export function buildGetStartedOverlay(
   loadedCategories: readonly ModelCategory[] | undefined = sheetOptions.filterCategories,
 ): HTMLElement {
   overlayLoadedCategories = loadedCategories;
+  overlaySheetOptions = sheetOptions;
   const overlay = document.createElement('div');
   overlay.id = 'chat-model-overlay';
   overlay.className = 'chat-model-overlay';
-  overlay.innerHTML = `
+
+  getStartedOverlay = overlay;
+  renderOverlayCard();
+  refreshOverlayVisibility();
+  return overlay;
+}
+
+/**
+ * Render the overlay's card for the current engine state.
+ *
+ * Two mutually exclusive states, never a blend: an invitation to pick a model
+ * when one could actually load, or a plain statement that the engine didn't
+ * load when it couldn't. The old overlay only had the first, so a session with
+ * no engine still opened with "Welcome / Choose your AI model and start
+ * chatting" and an orange CTA into a catalog where every download was futile.
+ */
+function renderOverlayCard(): void {
+  const overlay = getStartedOverlay;
+  if (!overlay) return;
+
+  const scoped = overlayScopedEntries();
+  const failures = failuresForEntries(scoped);
+  // Mid-retry every engine record is `pending`, so `failures` is briefly empty.
+  // Falling back to the welcome card there would flash "Choose a Model" over a
+  // catalog that still can't load anything — so the unavailable card stays up
+  // and says it is re-checking instead.
+  const rechecking = isRetryingForEntries(scoped);
+  overlay.innerHTML = failures.length > 0 || rechecking
+    ? unavailableOverlayCard(failures, rechecking)
+    : welcomeOverlayCard();
+
+  getStartedBtn = overlay.querySelector<HTMLButtonElement>('#chat-get-started-btn');
+  getStartedBtn?.addEventListener('click', () => openSheet(overlaySheetOptions));
+  const diagnostic = overlay.querySelector<HTMLPreElement>('.engine-banner__diagnostic');
+  if (diagnostic) diagnostic.textContent = failureDiagnostics(failures);
+  overlay.querySelector('#chat-engine-retry-btn')?.addEventListener('click', () => {
+    void runEngineRetry();
+  });
+}
+
+/** Catalog entries the surface behind this overlay can actually use. */
+function overlayScopedEntries(): CatalogEntry[] {
+  const cats = overlayLoadedCategories;
+  const all = getCatalog();
+  return cats && cats.length > 0
+    ? all.filter((entry) => cats.includes(entry.category))
+    : [...all];
+}
+
+function welcomeOverlayCard(): string {
+  return `
     <div class="chat-model-overlay-card">
       <div class="chat-model-overlay-glyph">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -236,13 +300,40 @@ export function buildGetStartedOverlay(
       </div>
     </div>
   `;
+}
 
-  getStartedOverlay = overlay;
-  getStartedBtn = overlay.querySelector('#chat-get-started-btn') as HTMLButtonElement;
-  getStartedBtn.addEventListener('click', () => openSheet(sheetOptions));
-
-  refreshOverlayVisibility();
-  return overlay;
+function unavailableOverlayCard(
+  failures: readonly EngineFailure[],
+  rechecking: boolean,
+): string {
+  const retry = canRetryEngines()
+    ? `<button type="button" id="chat-engine-retry-btn" class="btn btn-primary btn-lg" ${rechecking ? 'disabled' : ''}>
+         ${rechecking ? 'Re-checking&hellip;' : 'Try again'}
+       </button>`
+    : '';
+  return `
+    <div class="chat-model-overlay-card">
+      <div class="chat-model-overlay-glyph chat-model-overlay-glyph--warning">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <h3 class="chat-model-overlay-title">${rechecking ? 'Re-checking the AI engine' : 'AI engine didn&rsquo;t load'}</h3>
+      <p class="chat-model-overlay-description">${escapeHtml(
+        rechecking
+          ? 'Loading the on-device AI engine again…'
+          : describeFailures(failures),
+      )}</p>
+      ${retry}
+      ${failures.length > 0
+        ? `<details class="engine-banner__details chat-model-overlay-details">
+             <summary>Technical details</summary>
+             <pre class="engine-banner__diagnostic"></pre>
+           </details>`
+        : ''}
+    </div>
+  `;
 }
 
 /**
@@ -454,6 +545,19 @@ async function ensureCapabilities(): Promise<void> {
 function renderBanner(): void {
   const host = modalEl?.querySelector('#model-sheet-banner') as HTMLElement | null;
   if (!host) return;
+
+  // An engine failure outranks the hardware banner. "Recommended for your
+  // device / WebGPU · 32 GB · High-performance" above a list where nothing can
+  // load is the single most misleading thing this sheet can say, and the reason
+  // the picker used to send people into a download that could never succeed.
+  const scoped = scopedEntries();
+  const failures = failuresForEntries(scoped);
+  const rechecking = isRetryingForEntries(scoped);
+  if (failures.length > 0 || rechecking) {
+    renderEngineFailureBanner(host, failures, rechecking);
+    return;
+  }
+
   const caps = capabilitiesCache;
   if (!caps) {
     host.innerHTML = '';
@@ -476,6 +580,75 @@ function renderBanner(): void {
   `;
 }
 
+/**
+ * The banner shown in place of the device banner when an engine failed.
+ *
+ * Structure mirrors `.device-banner` so the sheet's layout doesn't shift: same
+ * glyph/text arrangement, a warning tone instead of the brand gradient, one
+ * Retry action, and the raw diagnostic folded into a `<details>` — useful when
+ * a developer is debugging their own build, invisible when a consumer isn't.
+ */
+function renderEngineFailureBanner(
+  host: HTMLElement,
+  failures: readonly EngineFailure[],
+  rechecking: boolean,
+): void {
+  const retryBtn = canRetryEngines()
+    ? `<button type="button" class="btn btn-secondary btn-sm" id="model-sheet-engine-retry" ${rechecking ? 'disabled' : ''}>
+         ${rechecking ? 'Re-checking&hellip;' : 'Retry setup'}
+       </button>`
+    : '';
+  host.innerHTML = `
+    <div class="engine-banner" role="status">
+      <div class="engine-banner__glyph">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <div class="engine-banner__text">
+        <div class="engine-banner__title">${rechecking ? 'Re-checking the AI engine' : 'On-device AI engine unavailable'}</div>
+        <div class="engine-banner__meta">${escapeHtml(
+          rechecking
+            ? 'Loading the on-device AI engine again…'
+            : describeFailures(failures),
+        )}</div>
+        ${failures.length > 0
+          ? `<details class="engine-banner__details">
+               <summary>Technical details</summary>
+               <pre class="engine-banner__diagnostic"></pre>
+             </details>`
+          : ''}
+      </div>
+      ${retryBtn}
+    </div>
+  `;
+  // The diagnostic is upstream text (fetch/WASM messages, possibly a URL), so
+  // it goes in as textContent and never as markup.
+  const diagnostic = host.querySelector<HTMLPreElement>('.engine-banner__diagnostic');
+  if (diagnostic) diagnostic.textContent = failureDiagnostics(failures);
+  host.querySelector('#model-sheet-engine-retry')?.addEventListener('click', () => {
+    void runEngineRetry();
+  });
+}
+
+/**
+ * Retry, then say what happened.
+ *
+ * "Nothing changed" is a real outcome and has to be reported: a retry that
+ * silently re-renders the same banner is indistinguishable from a click that
+ * did nothing at all, which is the failure mode this whole change exists to
+ * remove.
+ */
+export async function runEngineRetry(): Promise<void> {
+  const outcome = await retryEngines();
+  if (outcome === 'recovered') {
+    showToast('On-device AI engine loaded.', 'success');
+  } else if (outcome === 'still-unavailable') {
+    showToast('The AI engine still could not load. See technical details.', 'warning');
+  }
+}
+
 function closeSheet(): void {
   if (!modalEl) return;
   modalEl.remove();
@@ -484,15 +657,25 @@ function closeSheet(): void {
   searchQuery = '';
 }
 
+/**
+ * The catalog entries this sheet is currently showing.
+ *
+ * Shared with the banner so a modality-scoped sheet (Transcribe → speech only)
+ * cannot warn about an engine none of its visible rows use.
+ */
+function scopedEntries(): CatalogEntry[] {
+  const allEntries = getCatalog();
+  const filterCats = activeSheetOptions.filterCategories;
+  return filterCats && filterCats.length > 0
+    ? allEntries.filter((entry) => filterCats.includes(entry.category))
+    : [...allEntries];
+}
+
 function renderRows(): void {
   const host = document.getElementById('model-sheet-list');
   if (!host) return;
 
-  const allEntries = getCatalog();
-  const filterCats = activeSheetOptions.filterCategories;
-  const scoped = filterCats && filterCats.length > 0
-    ? allEntries.filter((entry) => filterCats.includes(entry.category))
-    : allEntries;
+  const scoped = scopedEntries();
   if (!scoped.length) {
     host.innerHTML = '<p class="text-secondary">No models registered.</p>';
     bindRowActions(host);
@@ -784,8 +967,9 @@ function renderOrgVariants(org: OrgGroup): string {
 }
 
 /** A single variant row inside an expanded family. */
-function renderVariantRow(entry: CatalogEntry, isBest: boolean): string {
+function renderVariantRow(entry: CatalogEntry, bestForDevice: boolean): string {
   const state = stateOf(entry.id);
+  const isBest = bestForDevice && isRecommendable(entry);
   const progressBar = state.status === 'downloading'
     ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
     : '';
@@ -874,7 +1058,12 @@ function matchesSearch(entry: CatalogEntry, query: string): boolean {
 }
 
 /** Render a rich recommended card with a single clean tag row. */
-function renderRecommendedCard(entry: CatalogEntry, state: RowState, isDefault: boolean): string {
+function renderRecommendedCard(entry: CatalogEntry, state: RowState, bestForDevice: boolean): string {
+  // "Best for this device" is a recommendation, and recommending a model that
+  // cannot run is worse than recommending nothing: it is the row a first-time
+  // user reaches for. Strip the badge and the brand highlight when the row is
+  // not actionable, and let the disabled button + reason speak instead.
+  const isDefault = bestForDevice && isRecommendable(entry);
   const tags = consumerTags(entry).map(renderTagPill).join('');
   const progressBar = state.status === 'downloading'
     ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
@@ -940,10 +1129,25 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
   `;
 }
 
-function compatibilityFor(entry: CatalogEntry) {
-  return webModelCompatibility(entry, {
+/**
+ * Every reason this row might not be actionable, resolved to one.
+ *
+ * Size first, engine second: the 4 GiB WASM32 ceiling is a permanent property
+ * of this model on the Web, while a failed registration is usually transient.
+ * Telling someone to retry an engine for a model that could never fit would
+ * send them around a loop that cannot end.
+ */
+function compatibilityFor(entry: CatalogEntry): WebModelCompatibility {
+  const size = webModelCompatibility(entry, {
     hasWebGPU: capabilitiesCache?.hasWebGPU,
   });
+  if (!size.supported) return size;
+  return engineCompatibility(entry);
+}
+
+/** Can this row be held up as a recommendation right now? */
+function isRecommendable(entry: CatalogEntry): boolean {
+  return compatibilityFor(entry).supported;
 }
 
 function renderCompatibilityReason(entry: CatalogEntry): string {
@@ -1212,6 +1416,9 @@ function refreshOverlayVisibility(): void {
   if (!getStartedOverlay) return;
   const shouldShow = !findLoadedModelForScope(overlayLoadedCategories);
   getStartedOverlay.classList.toggle('hidden', !shouldShow);
+  // Re-render only while visible: rebuilding a hidden overlay would discard a
+  // `<details>` the user had expanded for no benefit.
+  if (shouldShow) renderOverlayCard();
   if (getStartedBtn) {
     getStartedBtn.disabled = !catalogRegistered;
     if (!getStartedBtn.textContent?.trim()) {
@@ -1219,6 +1426,24 @@ function refreshOverlayVisibility(): void {
     }
   }
 }
+
+// Engine registration resolves after the shell is built, and a retry can flip
+// it back, so every engine-dependent surface re-renders from one subscription
+// rather than each caller remembering to poll.
+onEngineStateChange(() => {
+  if (modalEl) {
+    renderBanner();
+    renderRows();
+  }
+  refreshOverlayVisibility();
+  for (const listener of listeners) {
+    try {
+      listener();
+    } catch (err) {
+      appLogger.warning('[model-selection] engine listener threw', err);
+    }
+  }
+});
 
 function findLoadedModelForScope(
   categories?: readonly ModelCategory[],

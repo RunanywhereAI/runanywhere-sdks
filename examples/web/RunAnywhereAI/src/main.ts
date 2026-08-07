@@ -24,6 +24,14 @@ import {
 } from './views/settings';
 import { formatError } from './services/format-error';
 import { appLogger } from './services/app-logger';
+import {
+  engineFailures,
+  failureDiagnostics,
+  reportEngineRegistration,
+  resetEngineAvailability,
+  setEngineRetryHandler,
+} from './services/engine-availability';
+import { escapeHtml } from './services/escape-html';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
@@ -93,6 +101,7 @@ let activeRuntimeConfiguration: RuntimeConfiguration | null = null;
 let runtimeReconfigurationPromise: Promise<APIConfigurationApplyResult> | null = null;
 
 setAPIConfigurationApplyHandler(applyAPIConfiguration);
+setEngineRetryHandler(retryEngineRegistration);
 
 function publishReadiness(state: AppReadinessState, error?: string): AppReadinessSnapshot {
   appReadinessState = state;
@@ -446,13 +455,22 @@ async function startRuntime(
         ? RunAnywhere.runtime.active
         : LlamaCPP.accelerationMode;
     appLogger.info('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
+    reportEngineRegistration('llamacpp', { ok: true });
   } catch (err) {
     const message = formatError(err);
     backendErrors.push(`llamacpp: ${message}`);
+    // Pass the formatted string, not the Error: `appLogger` deliberately
+    // reduces an Error to `{ errorType }` so a message carrying a signed URL
+    // can never reach the console. A string routes through
+    // `sanitizeDiagnosticText` instead, which redacts credentials and keeps the
+    // actionable part ("which artifact failed to load").
     appLogger.warning(
       '[RunAnywhere] llamacpp backend failed to register; chat will show feature-unavailable:',
-      err,
+      message,
     );
+    // Tell the UI which engine died, so the picker can disable exactly the rows
+    // that need it instead of offering downloads that cannot load.
+    reportEngineRegistration('llamacpp', { ok: false, error: message });
   }
 
   try {
@@ -487,13 +505,16 @@ async function startRuntime(
       diagnostics: ONNX.lastWorkerDiagnostics,
       speech,
     };
+    reportEngineRegistration('onnx', { ok: true });
   } catch (err) {
     const message = formatError(err);
     backendErrors.push(`onnx/sherpa: ${message}`);
+    // Formatted string, not the Error — see the llamacpp branch above.
     appLogger.warning(
       '[RunAnywhere] onnx backend failed to register; STT/TTS/VAD will show feature-unavailable:',
-      err,
+      message,
     );
+    reportEngineRegistration('onnx', { ok: false, error: message });
   }
 
   backendReadinessState = backendErrors.length === 0 ? 'registered' : 'unavailable';
@@ -552,6 +573,7 @@ function applyAPIConfiguration(
     sdkReadinessState = 'initializing';
     backendReadinessState = 'pending';
     backendRegistrationError = undefined;
+    resetEngineAvailability();
     identityReadinessState = 'not-required';
     identityInitializationError = undefined;
 
@@ -592,6 +614,55 @@ function applyAPIConfiguration(
   });
 
   return runtimeReconfigurationPromise;
+}
+
+/**
+ * Re-run the boot path with the configuration already in effect.
+ *
+ * A WASM registration failure is often transient — one chunk request failed,
+ * the tab was offline, a proxy stalled — and a full page reload throws away
+ * conversations, the loaded catalog state, and whatever tab the user was on.
+ * This is the same teardown-then-`startRuntime` sequence Settings uses, minus
+ * the credential change, so recovery costs a few seconds instead of a reload.
+ *
+ * `requireAllBackends: false` matches boot: one engine failing must not abort
+ * the other's registration or tip the app into the fatal error view.
+ * `startRuntime` reports each outcome through `reportEngineRegistration`, so
+ * the UI ends up truthful whether this succeeds, partly succeeds, or throws.
+ */
+async function retryEngineRegistration(): Promise<void> {
+  // Serialize against a Settings apply: both drive teardown + startRuntime, and
+  // interleaving them would register backends onto a runtime being destroyed.
+  if (runtimeReconfigurationPromise) {
+    await runtimeReconfigurationPromise.catch(() => undefined);
+    return;
+  }
+
+  const configuration = activeRuntimeConfiguration ?? { environment: 'development' };
+  backendReadinessState = 'pending';
+  backendRegistrationError = undefined;
+  publishReadiness(appReadinessState);
+
+  runtimeReconfigurationPromise = (async () => {
+    await teardownRuntime();
+    await startRuntime(configuration, false);
+    return {
+      environment: configuration.environment,
+      telemetryEnabled: configuration.environment === 'production',
+    };
+  })().finally(() => {
+    runtimeReconfigurationPromise = null;
+  });
+
+  try {
+    await runtimeReconfigurationPromise;
+    sdkReadinessState = 'ready';
+    sdkInitializationError = undefined;
+  } finally {
+    // Republish either way: on failure the snapshot must show the engines still
+    // unavailable rather than stay stuck on 'pending'.
+    publishReadiness(appReadinessState);
+  }
 }
 
 /** Backends own native registrations, so release them before core shutdown. */
@@ -636,7 +707,8 @@ async function refreshSDKCatalogs(): Promise<void> {
     const { applied } = await RunAnywhere.lora.list();
     appLogger.info(`[RunAnywhere] LoRA adapters applied: ${applied.length}`);
   } catch (err) {
-    appLogger.warning('[RunAnywhere] LoRA state unavailable:', err);
+    // Formatted string so the reason survives the logger's Error redaction.
+    appLogger.warning('[RunAnywhere] LoRA state unavailable:', formatError(err));
   }
 }
 
@@ -644,11 +716,27 @@ async function refreshSDKCatalogs(): Promise<void> {
  * Multi-modality badge: LLM + Speech (+ note that full matrix is on
  * RunAnywhere.runtime.modalities). WebGPU on the LLM line does not imply
  * speech GPU.
+ *
+ * `runtime.modalities` reports *where* a modality would execute (worker vs main
+ * thread), not *whether* an engine registered — with no engine at all it still
+ * answers `status: 'main'`. So the per-engine outcome this app tracked itself is
+ * checked first; without it the badge would sit in the corner reporting a
+ * running LLM path while the screen behind it says the engine never loaded.
  */
 function showAccelerationBadge(llmMode: string): void {
   document.getElementById('accel-badge')?.remove();
   const badge = document.createElement('div');
   badge.id = 'accel-badge';
+  const failures = engineFailures();
+  if (failures.length > 0) {
+    badge.className = 'accel-badge accel-badge--unavailable';
+    badge.innerHTML = failures
+      .map((failure) => `<span class="accel-badge__line">${escapeHtml(failure.label)}: not loaded</span>`)
+      .join('');
+    badge.title = failureDiagnostics(failures);
+    document.body.appendChild(badge);
+    return;
+  }
   const mods = RunAnywhere.runtime.modalities;
   const llmGPU = llmMode === 'webgpu' || mods.llm.acceleration === 'webgpu';
   const speech = RunAnywhere.runtime.speech;
