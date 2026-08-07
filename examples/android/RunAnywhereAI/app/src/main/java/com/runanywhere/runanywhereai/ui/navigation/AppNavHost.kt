@@ -48,25 +48,26 @@ fun AppNavHost(
         startDestination = Chat,
         modifier = modifier,
         enterTransition = {
-            slideInHorizontally(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseOut)) { it / 4 } +
-                fadeIn(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseOut))
+            slideInHorizontally(AppMotion.emphasis()) { it / 4 } +
+                fadeIn(AppMotion.standard())
         },
         exitTransition = {
-            slideOutHorizontally(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseIn)) { -it / 4 } +
-                fadeOut(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn))
+            slideOutHorizontally(AppMotion.exit()) { -it / 4 } +
+                fadeOut(AppMotion.exit())
         },
         popEnterTransition = {
-            slideInHorizontally(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseOut)) { -it / 4 } +
-                fadeIn(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseOut))
+            slideInHorizontally(AppMotion.emphasis()) { -it / 4 } +
+                fadeIn(AppMotion.standard())
         },
         popExitTransition = {
-            slideOutHorizontally(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseIn)) { it / 4 } +
-                fadeOut(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn))
+            slideOutHorizontally(AppMotion.exit()) { it / 4 } +
+                fadeOut(AppMotion.exit())
         },
     ) {
         composable<Chat> {
             ChatScreen(
                 viewModel = chatViewModel,
+                onOpenModels = onOpenModels,
                 onOpenVision = onOpenVision,
                 onOpenVoice = onOpenVoice,
                 onOpenAdvanced = onOpenAdvanced,

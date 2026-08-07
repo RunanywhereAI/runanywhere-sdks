@@ -85,7 +85,12 @@ fun RunAnywhereAITheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    CompositionLocalProvider(LocalDimens provides CompactDimens) {
+    CompositionLocalProvider(
+        LocalDimens provides CompactDimens,
+        // Read once at the theme root so every animated surface can honour
+        // reduce-motion (DESIGN_GUIDELINE §6.5) without touching a ContentResolver.
+        LocalReduceMotion provides rememberSystemReduceMotion(),
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
             typography = Typography,
