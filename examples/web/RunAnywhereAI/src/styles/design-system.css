@@ -111,6 +111,12 @@
   --shadow-default: rgba(0, 0, 0, 0.25);
   --shadow-medium: rgba(0, 0, 0, 0.35);
   --shadow-accent: rgba(255, 105, 0, 0.22);
+  /* The expanding-ring pulse on a live control (mic listening). Stronger than
+     `--shadow-accent` because it has to read through a 20px spread as it fades,
+     and it must end at fully transparent brand — not at `transparent`, which
+     some engines interpolate through black and shows as a grey halo. */
+  --ring-pulse-from: rgba(255, 105, 0, 0.4);
+  --ring-pulse-to: rgba(255, 105, 0, 0);
   --elevation-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
   --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.24);
   --elevation-lg: 0 12px 40px rgba(0, 0, 0, 0.34);

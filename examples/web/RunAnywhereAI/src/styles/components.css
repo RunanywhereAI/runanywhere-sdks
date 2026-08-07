@@ -789,42 +789,6 @@
 }
 
 /* =============================================================================
- * Typing Indicator
- * ============================================================================= */
-.typing-indicator {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm-md) var(--space-md-lg);
-}
-
-.typing-dots {
-  display: flex;
-  gap: 4px;
-}
-
-.typing-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  opacity: 0.5;
-  animation: typing-bounce 1.4s infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typing-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-  30% { transform: translateY(-6px); opacity: 1; }
-}
-
-.typing-text {
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-}
-
-/* =============================================================================
  * Chat Input Area
  * ============================================================================= */
 .chat-input-area {
@@ -1142,7 +1106,8 @@
   border-radius: var(--radius-full);
   background: var(--color-primary);
   vertical-align: baseline;
-  animation: chat-cursor-pulse 1s ease-in-out infinite;
+  /* Linear, not eased: an eased curve reads as a stutter on every loop. */
+  animation: chat-cursor-pulse var(--ambient-breathe) linear infinite;
 }
 
 @keyframes chat-cursor-pulse {
@@ -1567,76 +1532,6 @@
   font-size: var(--font-size-xs);
 }
 
-/* =============================================================================
- * Model Overlay (Welcome / Get Started)
- * ============================================================================= */
-.model-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-primary);
-  z-index: 50;
-  gap: var(--space-xl);
-  text-align: center;
-  padding: var(--space-3xl);
-}
-
-.model-overlay-bg {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.floating-circle {
-  position: absolute;
-  border-radius: var(--radius-full);
-  opacity: 0.08;
-  animation: float-circle 8s ease-in-out infinite;
-}
-@keyframes float-circle {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(20px, -30px) scale(1.1); }
-  50% { transform: translate(-10px, -60px) scale(0.95); }
-  75% { transform: translate(30px, -20px) scale(1.05); }
-}
-
-.model-overlay-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-lg);
-}
-
-.model-overlay .sparkle-icon {
-  font-size: 48px;
-  line-height: 1;
-}
-
-.model-overlay h2 {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-}
-
-.model-overlay p {
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
-  max-width: 360px;
-}
-
-.privacy-note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-  margin-top: var(--space-md);
-}
 
 /* =============================================================================
  * Model Selection Sheet
@@ -2817,7 +2712,9 @@
   height: 100%;
   background: var(--color-primary);
   border-radius: var(--radius-full);
-  transition: width 0.3s ease;
+  /* `--ease-in-out` because both ends of a filling bar matter, and never
+     `--ease-spring`: an overshoot here would read as the number going backwards. */
+  transition: width var(--duration-standard) var(--ease-in-out);
 }
 
 /*
@@ -2939,11 +2836,13 @@
 }
 .mic-btn:hover { transform: scale(1.05); box-shadow: 0 0 30px var(--shadow-accent); }
 .mic-btn:active { transform: scale(0.95); }
-.mic-btn.listening { animation: mic-pulse 2s ease-in-out infinite; }
+/* The listening ring shares the breathe period with every other "we are live"
+   indicator, so a mic and a streaming cursor on screen together stay in phase. */
+.mic-btn.listening { animation: mic-pulse var(--ambient-breathe) linear infinite; }
 
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 0, 0.4); }
-  50% { box-shadow: 0 0 0 20px rgba(255, 105, 0, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--ring-pulse-from); }
+  50% { box-shadow: 0 0 0 20px var(--ring-pulse-to); }
 }
 
 .mic-btn svg { width: 28px; height: 28px; }
@@ -3313,7 +3212,7 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
 .loading-logo {
   width: 100px;
   height: 100px;
-  animation: logo-pulse 2s ease-in-out infinite;
+  animation: logo-pulse var(--ambient-breathe) linear infinite;
 }
 
 @keyframes logo-pulse {
@@ -3344,17 +3243,28 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   overflow: hidden;
 }
 
+/*
+ * The boot bar cannot know its progress — the SDK is still coming up — so it
+ * runs a fixed-width segment across the track rather than pretending to fill.
+ *
+ * Driven by `transform`, not `width`/`margin-left`: those two animated together
+ * relayout the element on every frame, on the one screen that is competing with
+ * WASM instantiation and model registration for the main thread. This version
+ * stays on the compositor, and the shimmer period is shared with the download
+ * progress bar so the app's two indeterminate states move at one speed.
+ */
 .loading-bar-fill {
   height: 100%;
+  width: 40%;
   background: var(--color-primary);
   border-radius: var(--radius-full);
-  animation: loading-sweep 2s ease-in-out infinite;
+  animation: loading-sweep var(--ambient-shimmer) linear infinite;
+  will-change: transform;
 }
 
 @keyframes loading-sweep {
-  0% { width: 0; margin-left: 0; }
-  50% { width: 60%; margin-left: 20%; }
-  100% { width: 0; margin-left: 100%; }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
 }
 
 /* =============================================================================
@@ -3441,24 +3351,6 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
 }
 
 /* =============================================================================
- * Audio Waveform
- * ============================================================================= */
-.waveform-bars {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 40px;
-}
-
-.waveform-bar {
-  width: 3px;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: height 0.1s ease;
-}
-
-/* =============================================================================
  * Device Info Section (Model Sheet)
  * ============================================================================= */
 .device-info {
@@ -3511,43 +3403,6 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   color: var(--color-blue);
 }
 .stt-mode-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-
-/* =============================================================================
- * STT Breathing Waveform Animation
- * ============================================================================= */
-.stt-waveform-anim {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 60px;
-}
-.stt-wave-bar {
-  width: 6px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(180deg, var(--color-blue), rgba(59, 130, 246, 0.3));
-  animation: stt-breathe 2s ease-in-out infinite;
-}
-.stt-wave-bar:nth-child(1) { height: 20px; animation-delay: 0s; }
-.stt-wave-bar:nth-child(2) { height: 35px; animation-delay: 0.2s; }
-.stt-wave-bar:nth-child(3) { height: 45px; animation-delay: 0.4s; }
-.stt-wave-bar:nth-child(4) { height: 35px; animation-delay: 0.6s; }
-.stt-wave-bar:nth-child(5) { height: 20px; animation-delay: 0.8s; }
-
-@keyframes stt-breathe {
-  0%, 100% { transform: scaleY(0.5); opacity: 0.4; }
-  50% { transform: scaleY(1); opacity: 1; }
-}
-
-@keyframes stt-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 
 /* =============================================================================
  * Vision Tab - Camera + VLM
@@ -3607,31 +3462,6 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   color: var(--text-primary);
   white-space: pre-wrap;
 }
-.vision-live-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  font-size: 9px;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.5px;
-  background: var(--badge-green);
-  color: var(--color-green);
-  animation: vision-live-pulse 1.5s ease-in-out infinite;
-}
-.vision-live-badge::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-green);
-}
-@keyframes vision-live-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
 /* Metrics row */
 .vision-metrics {
   display: flex;
@@ -3695,9 +3525,6 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   background: rgba(255, 105, 0, 0.25);
   transform: scale(1.05);
 }
-/** Scaled-down typing dots for the processing overlay */
-.vision-typing-dots-sm { transform: scale(0.8); }
-
 /** "Analyzing..." text overlay on camera */
 .vision-analyzing-label {
   font-size: var(--font-size-xs);
@@ -4028,29 +3855,6 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   background: var(--bg-secondary);
 }
 
-/** Audio level bars container */
-.stt-level-container {
-  display: none;
-  width: 100%;
-  max-width: 300px;
-}
-
-.stt-level-row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 24px;
-  justify-content: center;
-}
-
-.stt-level-bar {
-  width: 4px;
-  height: 3px;
-  background: var(--color-green);
-  border-radius: 1px;
-  transition: height 0.08s ease;
-}
-
 /** Mic button (large) for STT */
 .mic-btn-lg {
   width: 72px;
@@ -4304,57 +4108,6 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   font-size: var(--font-size-xs);
   color: var(--text-tertiary, var(--text-secondary));
   margin-top: 2px;
-}
-
-/* ---------------------------------------------------------------------------
-   Model-switch info banner
-   --------------------------------------------------------------------------- */
-
-.model-switch-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  margin: var(--space-sm) 0;
-  background: var(--bg-secondary, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-left: 3px solid var(--color-blue, #3b82f6);
-  border-radius: var(--radius-md, 8px);
-  font-size: var(--font-size-sm, 13px);
-  color: var(--text-secondary, #94a3b8);
-  animation: banner-slide-in 0.3s ease-out;
-}
-
-.model-switch-banner svg {
-  flex-shrink: 0;
-  color: var(--color-blue, #3b82f6);
-}
-
-.model-switch-banner strong {
-  color: var(--text-primary, #e2e8f0);
-}
-
-.model-switch-banner .banner-dismiss {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--text-secondary, #94a3b8);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-}
-
-.model-switch-banner .banner-dismiss:hover {
-  opacity: 1;
-  color: var(--text-primary, #e2e8f0);
-}
-
-@keyframes banner-slide-in {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================ */
