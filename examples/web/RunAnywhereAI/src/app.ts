@@ -145,21 +145,53 @@ const THEME_COLORS = { dark: '#191817', light: '#FCFBFA' } as const;
 
 type ThemeName = 'dark' | 'light';
 
-function effectiveTheme(): ThemeName {
-  const explicit = document.documentElement.dataset.theme;
-  if (explicit === 'light' || explicit === 'dark') return explicit;
+/**
+ * The user's explicit choice, or null when they have never toggled and are
+ * therefore still following the OS.
+ *
+ * This has to be tracked separately from `data-theme`, because the pre-paint
+ * script in index.html always resolves the attribute to a concrete value —
+ * `design-system.css` has no `prefers-color-scheme` fallback, by design, so an
+ * unset attribute would mean dark rather than "ask the OS". Reading the
+ * attribute back therefore cannot distinguish "chose light" from "OS is light",
+ * which is the difference that decides whether an OS change should be followed.
+ */
+let storedThemeChoice: ThemeName | null = readStoredThemeChoice();
+
+function readStoredThemeChoice(): ThemeName | null {
+  try {
+    const value = localStorage.getItem(THEME_STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch {
+    return null; // storage may be blocked; treat as "follow the OS"
+  }
+}
+
+function systemTheme(): ThemeName {
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
-function applyTheme(theme: ThemeName): void {
+function effectiveTheme(): ThemeName {
+  return storedThemeChoice ?? systemTheme();
+}
+
+/** Paints the current effective theme. Does not change the stored choice. */
+function renderTheme(): void {
+  const theme = effectiveTheme();
   document.documentElement.dataset.theme = theme;
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch { /* storage may not be available */ }
+  document.documentElement.style.colorScheme = theme;
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', THEME_COLORS[theme]);
   refreshThemeButton();
+}
+
+function applyTheme(theme: ThemeName): void {
+  storedThemeChoice = theme;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch { /* storage may not be available */ }
+  renderTheme();
 }
 
 function refreshThemeButton(): void {
@@ -352,11 +384,13 @@ function renderNav(): void {
 }
 
 function wireShellActions(): void {
-  refreshThemeButton();
+  renderTheme();
   document.getElementById('consumer-theme-btn')?.addEventListener('click', () => {
     applyTheme(effectiveTheme() === 'dark' ? 'light' : 'dark');
   });
-  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', refreshThemeButton);
+  // Only repaints while the user is still following the OS; once they toggle,
+  // `storedThemeChoice` wins and `renderTheme()` is a no-op.
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', renderTheme);
   document.getElementById('consumer-menu-btn')?.addEventListener('click', openDrawer);
   document.getElementById('consumer-close-drawer-btn')?.addEventListener('click', closeDrawer);
   document.getElementById('consumer-drawer-scrim')?.addEventListener('click', closeDrawer);

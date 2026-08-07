@@ -31,12 +31,26 @@
   --color-yellow: #EAB308;
   --color-purple: #8B5CF6;
 
-  /* ---- Text Colors (Dark) ---- */
-  --text-primary: #F0EEEB;
-  --text-secondary: #A8A29B;
-  --text-tertiary: #757069;
+  /* ---- Text Colors (Dark) ----
+   * The three-step ramp is tuned so even --text-tertiary, the faintest step,
+   * clears WCAG AA 4.5:1 on every background token this app actually paints
+   * behind text (--bg-primary #191817 through --bg-gray5 #2E2B29). The old
+   * tertiary (#757069) measured 3.03–3.61:1 and was used for 11–12px metadata —
+   * timestamps, model sizes, hints — which is exactly the copy that needs
+   * contrast most. Hierarchy is preserved by keeping a clear luminance gap
+   * between the steps rather than by pushing the last one below legibility. */
+  --text-primary: #F0EEEB;   /* 12.1:1 min */
+  --text-secondary: #B7B1A9; /*  6.6:1 min */
+  --text-tertiary: #99938B;  /*  4.6:1 min */
   --text-white: #FFFFFF;
-  --text-on-primary: #FFFFFF;
+  /* Ink, not white. Per DESIGN_GUIDELINE.md §5, white on solid #FF6900 is
+   * 2.89:1 and fails AA; ink is 6.12:1. This token is for text sitting ON an
+   * orange fill, and its only use sites are 10px uppercase badges — small text,
+   * the case the guideline explicitly forbids white for. The white-on-orange
+   * deviation stays allowed for large/bold brand moments, which use
+   * --text-white on the gradient instead. Darkening #FF6900 is not an option:
+   * the hue is locked brand identity. */
+  --text-on-primary: #10182B;
 
   /* ---- Background Colors (Dark, warm neutral) ---- */
   --bg-primary: #191817;
@@ -173,15 +187,23 @@
 
 /* =============================================================================
  * Light Theme (warm paper surfaces)
- * Applied twice on purpose: once for the explicit toggle, once for system
- * preference when the user has not explicitly chosen dark.
+ *
+ * Declared ONCE, keyed only on the explicit attribute. There is deliberately no
+ * second `@media (prefers-color-scheme: light)` copy: the system preference is
+ * resolved to a concrete `data-theme` value in JS before first paint (the inline
+ * script in index.html, then `renderTheme()` in app.ts on preference change), so
+ * `<html>` always carries either "light" or "dark" and CSS never has to guess.
+ * The palette previously existed twice — a toggle copy and a media-query copy —
+ * which is 30 duplicated hex values that drift the moment one is edited.
  * ============================================================================= */
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --text-primary: #1D1B19;
-  --text-secondary: #57534D;
-  --text-tertiary: #8A857E;
+  /* Same AA-clearing three-step ramp as dark, mirrored onto paper: the faintest
+   * step still measures 4.6:1 on the lightest surface it is painted on. */
+  --text-primary: #1D1B19;   /* 13.2:1 min */
+  --text-secondary: #4E4A45; /*  6.8:1 min */
+  --text-tertiary: #68625C;  /*  4.6:1 min */
 
   --bg-primary: #FCFBFA;
   --bg-secondary: #F6F4F1;
@@ -211,45 +233,6 @@
   --elevation-sm: 0 1px 2px rgba(29, 27, 25, 0.06);
   --elevation-md: 0 4px 16px rgba(29, 27, 25, 0.08);
   --elevation-lg: 0 12px 40px rgba(29, 27, 25, 0.12);
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
-
-    --text-primary: #1D1B19;
-    --text-secondary: #57534D;
-    --text-tertiary: #8A857E;
-
-    --bg-primary: #FCFBFA;
-    --bg-secondary: #F6F4F1;
-    --bg-tertiary: #EFECE8;
-    --bg-grouped: #F6F4F1;
-    --bg-gray5: #E5E1DC;
-    --bg-gray6: #EFECE8;
-    --bg-elevated: #FFFFFF;
-    --bg-input: #F6F4F1;
-
-    --color-primary-hover: #CC5400;
-    --bubble-assistant-start: #EFECE8;
-    --bubble-assistant-end: #F4F1ED;
-
-    --thinking-content-bg: #F4F1ED;
-
-    --badge-gray: rgba(87, 83, 77, 0.14);
-
-    --border-light: rgba(29, 27, 25, 0.08);
-    --border-medium: rgba(29, 27, 25, 0.05);
-    --border-strong: rgba(29, 27, 25, 0.14);
-    --separator: #E5E1DC;
-    --divider: #D6D1CA;
-
-    --shadow-default: rgba(29, 27, 25, 0.08);
-    --shadow-medium: rgba(29, 27, 25, 0.12);
-    --elevation-sm: 0 1px 2px rgba(29, 27, 25, 0.06);
-    --elevation-md: 0 4px 16px rgba(29, 27, 25, 0.08);
-    --elevation-lg: 0 12px 40px rgba(29, 27, 25, 0.12);
-  }
 }
 
 /* =============================================================================

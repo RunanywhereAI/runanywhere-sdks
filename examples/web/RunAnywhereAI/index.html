@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0C0E17" />
+  <!-- No maximum-scale / user-scalable=no: blocking pinch-zoom fails WCAG 1.4.4
+       and there is no layout here that needs it. interactive-widget keeps the
+       composer above the on-screen keyboard instead of letting the keyboard
+       shrink the visual viewport out from under a fixed-position input. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <!-- Matches --bg-primary in design-system.css; overwritten per theme by app.ts. -->
+  <meta name="theme-color" content="#191817" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>RunAnywhere</title>
@@ -12,14 +17,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&display=swap" />
   <script>
-    // Apply the persisted theme before first paint to avoid a flash.
+    // Resolve the theme to a concrete value before first paint, so no frame is
+    // ever painted in the wrong palette. This must always set the attribute —
+    // design-system.css declares light ONLY under [data-theme="light"] and has
+    // no prefers-color-scheme fallback, so an unset attribute means dark. The
+    // stored choice wins; absent one, the OS preference is read here rather than
+    // in CSS, which keeps a single source of truth for "which theme is on".
     (function () {
-      try {
-        var theme = localStorage.getItem('runanywhere-theme');
-        if (theme === 'light' || theme === 'dark') {
-          document.documentElement.dataset.theme = theme;
-        }
-      } catch (e) { /* storage unavailable */ }
+      var stored = null;
+      try { stored = localStorage.getItem('runanywhere-theme'); } catch (e) { /* storage unavailable */ }
+      var theme = stored === 'light' || stored === 'dark'
+        ? stored
+        : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
     })();
   </script>
 </head>
