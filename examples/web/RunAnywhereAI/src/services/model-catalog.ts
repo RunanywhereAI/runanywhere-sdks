@@ -718,6 +718,23 @@ export function getCatalog(): readonly CatalogEntry[] {
 }
 
 /**
+ * The catalog entries a single-modality surface deals in.
+ *
+ * A surface must scope its engine-failure question to the models it can
+ * actually offer: Read Aloud has no business reporting that llama.cpp failed,
+ * and Documents has to follow whichever framework its selected embedding model
+ * uses. Categories are the same axis the model sheet already filters on
+ * (`OpenSheetOptions.filterCategories`), so a view passes one list and gets a
+ * consistent picker and notice.
+ */
+export function getCatalogForCategories(
+  categories: readonly ModelCategory[],
+): readonly CatalogEntry[] {
+  if (categories.length === 0) return CATALOG;
+  return CATALOG.filter((entry) => categories.includes(entry.category));
+}
+
+/**
  * Decide whether a catalog entry can complete the Web download/load path.
  *
  * Important: WebGPU acceleration does NOT bypass this gate. The current
