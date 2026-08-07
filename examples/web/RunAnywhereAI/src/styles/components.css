@@ -534,16 +534,30 @@
   white-space: nowrap;
 }
 
-.btn:hover { background: var(--bg-gray5); border-color: var(--border-strong); }
-.btn:active { transform: scale(0.98); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover:not(:disabled) { background: var(--bg-gray5); border-color: var(--border-strong); }
+.btn:active:not(:disabled) { transform: scale(0.98); }
+.btn:disabled { cursor: not-allowed; }
 
 .btn-primary {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--text-white);
 }
-.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+
+/* A disabled button drops the brand fill entirely rather than fading it.
+   Orange at 50% opacity over the dark canvas becomes a muddy brown that still
+   reads as "this is the bright primary action" while being inert, and its label
+   lands at ~3:1 — legible enough to invite a click, not enough to read
+   comfortably. Neutral surface + tertiary label says "not yet" unambiguously,
+   and the adjacent enabled button keeps the only orange on screen. */
+.btn:disabled,
+.btn-primary:disabled {
+  background: var(--bg-tertiary);
+  border-color: var(--border-light);
+  color: var(--text-tertiary);
+  box-shadow: none;
+}
 
 .btn-icon {
   width: 36px;
@@ -2066,23 +2080,37 @@
 }
 
 /* =============================================================================
- * Voice AI setup card — pre-selected STT + LLM + TTS (+ VAD) with one-tap
- * download/load and per-component progress.
+ * Setup card + model slots.
+ *
+ * Shared by every surface that needs a specific set of models resident before
+ * its primary action is honest: Voice AI (STT + LLM + TTS + VAD) and Solutions
+ * (the model ids each YAML names). The slot rows are rendered by
+ * `components/model-slot.ts` so the state vocabulary — "On device", "Loading…",
+ * "✓ Ready" — is written once and cannot drift between surfaces.
  * ============================================================================= */
-.voice-setup {
+.setup-card {
   margin: var(--space-lg);
+  /* Capped so the slot rows keep a sane row length on a wide desktop pane; the
+     card is a form, not a table. */
+  max-width: 720px;
   padding: var(--space-xl);
   border-radius: var(--radius-card);
   background: linear-gradient(135deg, var(--color-primary-light), var(--bg-secondary));
   border: 1px solid var(--border-light);
 }
-.voice-setup__head {
+/* The brand-tinted gradient marks a single hero setup task (Voice AI). Where a
+   surface stacks several cards of equal standing (Solutions), the tint stops
+   meaning "start here" and just adds noise — so those opt out. */
+.setup-card--plain {
+  background: var(--bg-secondary);
+}
+.setup-card__head {
   display: flex;
   align-items: center;
   gap: var(--space-md-lg);
   margin-bottom: var(--space-lg);
 }
-.voice-setup__glyph {
+.setup-card__glyph {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
@@ -2094,26 +2122,26 @@
   background: var(--bg-secondary);
   box-shadow: var(--elevation-sm);
 }
-.voice-setup__glyph svg { width: 24px; height: 24px; }
-.voice-setup__title {
+.setup-card__glyph svg { width: 24px; height: 24px; }
+.setup-card__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
   letter-spacing: -0.01em;
 }
-.voice-setup__subtitle {
+.setup-card__subtitle {
   margin-top: 2px;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
 }
 
-.voice-setup__slots {
+.setup-card__slots {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
 }
 
-.voice-slot {
+.model-slot {
   display: flex;
   align-items: center;
   gap: var(--space-md-lg);
@@ -2123,11 +2151,11 @@
   border: 1px solid var(--border-light);
   transition: border-color var(--duration-fast);
 }
-.voice-slot--loaded { border-color: var(--color-green); }
-.voice-slot--error { border-color: var(--color-red); }
-.voice-slot--missing { opacity: 0.6; }
+.model-slot--loaded { border-color: var(--color-green); }
+.model-slot--error { border-color: var(--color-red); }
+.model-slot--missing { opacity: 0.6; }
 
-.voice-slot__icon {
+.model-slot__icon {
   width: 36px;
   height: 36px;
   flex-shrink: 0;
@@ -2138,12 +2166,12 @@
   justify-content: center;
   font-size: 16px;
 }
-.voice-slot__body { flex: 1; min-width: 0; }
-.voice-slot__label {
+.model-slot__body { flex: 1; min-width: 0; }
+.model-slot__label {
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-sm);
 }
-.voice-slot__opt {
+.model-slot__opt {
   margin-left: var(--space-xs);
   font-weight: var(--font-weight-normal);
   font-size: 10px;
@@ -2151,32 +2179,32 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.voice-slot__hint {
+.model-slot__hint {
   margin-top: 2px;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
-.voice-slot__progress {
+.model-slot__progress {
   margin-top: var(--space-sm);
   max-width: 220px;
 }
-.voice-slot__aside {
+.model-slot__aside {
   display: flex;
   align-items: center;
   gap: var(--space-md);
   flex-shrink: 0;
 }
-.voice-slot__state {
+.model-slot__state {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.voice-slot__state--ready { color: var(--color-green); }
-.voice-slot__state--error { color: var(--color-red); }
-.voice-slot__state--pending { color: var(--text-tertiary); }
-.voice-slot__change {
+.model-slot__state--ready { color: var(--color-green); }
+.model-slot__state--error { color: var(--color-red); }
+.model-slot__state--pending { color: var(--text-tertiary); }
+.model-slot__change {
   background: none;
   border: none;
   cursor: pointer;
@@ -2187,21 +2215,21 @@
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-full);
 }
-.voice-slot__change:hover { background: var(--color-primary-light); }
+.model-slot__change:hover { background: var(--color-primary-light); }
 
-.voice-setup__actions {
+.setup-card__actions {
   margin-top: var(--space-lg);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-sm);
 }
-.voice-setup__note,
-.voice-setup__ready {
+.setup-card__note,
+.setup-card__ready {
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
-.voice-setup__ready {
+.setup-card__ready {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -2289,6 +2317,10 @@
 .badge-green { background: var(--badge-green); color: var(--color-green); }
 .badge-blue  { background: var(--badge-blue);  color: var(--color-blue); }
 .badge-grey  { background: var(--badge-gray);  color: var(--text-secondary); }
+/* The failure variant. `--badge-red` was already tokenized but never had a
+   rule, so views that needed it fell back to the grey badge and rendered a
+   failure in the same colour as an idle state. */
+.badge-red   { background: var(--badge-red);   color: var(--color-red); }
 
 .storage-model-list {
   display: flex;
@@ -2414,62 +2446,6 @@
   max-height: 150px;
   margin-top: var(--space-md);
   text-align: left;
-}
-
-/* =============================================================================
- * Pipeline Setup Cards (Voice Tab)
- * ============================================================================= */
-.pipeline-setup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md-lg);
-  padding: var(--space-xl);
-  max-width: 400px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.setup-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-card);
-  padding: var(--space-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--space-md-lg);
-  cursor: pointer;
-  transition: border-color var(--duration-fast);
-}
-.setup-card:hover { border-color: var(--border-strong); }
-.setup-card.loaded { border-color: var(--color-green); }
-
-.setup-step-number {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: var(--bg-gray5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-sm);
-  flex-shrink: 0;
-}
-.setup-card.loaded .setup-step-number { background: var(--badge-green); color: var(--color-green); }
-
-.setup-card-info {
-  flex: 1;
-}
-
-.setup-card-title {
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-base);
-}
-
-.setup-card-status {
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-  margin-top: 2px;
 }
 
 /* =============================================================================
@@ -3758,6 +3734,14 @@ input[type="range"]::-webkit-slider-thumb {
   margin-bottom: 8px;
 }
 
+/* Cap the measure. These sections stretch to the full detail pane, which on a
+   desktop window is ~1130px — roughly 180 characters per line, about 2.5x the
+   span the eye can track without losing its place returning to the next line.
+   Only prose is capped; rows, inputs, and previews keep the full width. */
+.docs-section > p {
+  max-width: 68ch;
+}
+
 .docs-actions {
   display: flex;
   gap: 8px;
@@ -3806,6 +3790,50 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--text-secondary, #94a3b8);
   min-height: 18px;
   margin-top: 8px;
+}
+
+/* An error has to look like one. `.docs-status.error` is written by transcribe,
+   voice, and solutions; without this rule a failure rendered in the same grey
+   as an idle hint, which is the "silently label a failure as fine" failure the
+   app's rules forbid. */
+.docs-status.error {
+  color: var(--color-red);
+  background: var(--badge-red);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+}
+
+/* Verbatim model/pipeline output — transcripts, responses, diagnostics. Wraps
+   rather than scrolling horizontally, since these hold sentences, not code. */
+.docs-pre {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  /* Sans, not the UA's monospace default: these hold spoken sentences, and mono
+     costs reading speed on prose. Sized at body scale because a transcript is
+     the content, not a caption. */
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* The DAG a solution's config expands into, above its model rows. */
+.solution-card__graph {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
 }
 
 .docs-query {

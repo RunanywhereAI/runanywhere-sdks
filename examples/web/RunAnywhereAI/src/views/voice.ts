@@ -40,19 +40,12 @@ import {
   type VoicePipelineSelection,
 } from '../services/model-recommendation';
 import {
-  cleanModelName,
-  formatBytes,
-  formatFramework,
-  modalityEmoji,
-  modelDisplaySizeBytes,
-} from '../services/model-display';
-import {
   ensureModelReady,
-  getModelStatus,
   isModelLoaded,
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
+import { renderModelSlot, type ModelSlotView } from '../components/model-slot';
 
 // ---------------------------------------------------------------------------
 // View state
@@ -81,7 +74,6 @@ let isSpeechDetected = false;
 let userTranscript = '';
 let assistantResponse = '';
 let lastError: string | null = null;
-let lastEventSummary = '';
 
 // Pre-selected best-for-device voice trio (+ VAD), computed once on first
 // activation. `null` until the async capability probe resolves.
@@ -108,6 +100,11 @@ function pipelineSlots(): PipelineSlot[] {
     { key: 'tts', label: 'Text-to-speech', category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, entry: p?.tts ?? null, optional: false },
     { key: 'vad', label: 'Voice detection', category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION, entry: p?.vad ?? null, optional: true },
   ];
+}
+
+/** Adapt a pipeline slot to the shared setup-card row. */
+function slotView(slot: PipelineSlot): ModelSlotView {
+  return { ...slot, changeable: true };
 }
 
 /** Required (non-VAD) slots that have a resolved model entry. */
@@ -221,8 +218,9 @@ function renderView(): void {
 
       <div class="docs-section">
         <h3>Conversation</h3>
-        <p class="text-secondary">Speak naturally — after setup, voice capture
-        and AI inference run in this browser.</p>
+        <p class="text-secondary">Speak naturally. Your microphone opens only
+        while a conversation is running, and both speech recognition and the
+        reply are computed in this browser — no audio leaves the device.</p>
         <div class="toolbar-actions">
           <button
             class="btn btn-primary"
@@ -235,26 +233,26 @@ function renderView(): void {
             ${isActive ? '' : 'disabled'}
           >Stop</button>
         </div>
-        <div class="docs-status">
-          <strong>State:</strong>
-          <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState)}">${prettyState(sessionState)}</span>
-          ${isSpeechDetected ? '<span class="badge badge-green" style="margin-left:6px">Speech detected</span>' : ''}
-          <span class="text-secondary" style="margin-left:8px"><code>${escapeHtml(lastEventSummary || '(no events yet)')}</code></span>
+        <div class="docs-status" role="status" aria-live="polite">
+          <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState, allReady)}">${prettyState(sessionState, allReady)}</span>
+          ${isSpeechDetected ? '<span class="badge badge-green">Hearing you</span>' : ''}
         </div>
         ${lastError
-          ? `<div class="docs-status error">Error: ${escapeHtml(lastError)}</div>`
+          ? `<div class="docs-status error">${escapeHtml(lastError)}</div>`
           : ''}
       </div>
 
-      <div class="docs-section">
-        <h3>You said</h3>
-        <pre id="voice-user-transcript" class="docs-pre">${escapeHtml(userTranscript || '(waiting for speech...)')}</pre>
-      </div>
+      ${userTranscript || assistantResponse || isActive
+        ? `<div class="docs-section">
+             <h3>You said</h3>
+             <pre id="voice-user-transcript" class="docs-pre">${escapeHtml(userTranscript || TRANSCRIPT_PLACEHOLDER)}</pre>
+           </div>
 
-      <div class="docs-section">
-        <h3>Assistant</h3>
-        <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || '(no response yet)')}</pre>
-      </div>
+           <div class="docs-section">
+             <h3>Reply</h3>
+             <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || REPLY_PLACEHOLDER)}</pre>
+           </div>`
+        : ''}
     </div>
   `;
 
@@ -269,101 +267,43 @@ function renderView(): void {
 function renderSetupCard(allReady: boolean): string {
   if (!voicePipeline) {
     return `
-      <div class="voice-setup">
-        <div class="voice-setup__head">
-          <div class="voice-setup__title">Setting up Voice AI…</div>
-          <div class="voice-setup__subtitle">Finding the best models for your device.</div>
+      <div class="setup-card">
+        <div class="setup-card__head">
+          <div class="setup-card__title">Setting up Voice AI…</div>
+          <div class="setup-card__subtitle">Finding the best models for your device.</div>
         </div>
       </div>
     `;
   }
 
   const slots = pipelineSlots().filter((slot) => slot.entry || !slot.optional);
-  const rows = slots.map(renderSlotRow).join('');
+  const rows = slots.map((slot) => renderModelSlot(slotView(slot))).join('');
 
   const primary = allReady
-    ? `<div class="voice-setup__ready"><span class="badge badge-green">Ready</span> Your voice assistant is set up.</div>`
+    ? `<div class="setup-card__ready"><span class="badge badge-green">Ready</span> Your voice assistant is set up.</div>`
     : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
          ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
        </button>
-       <div class="voice-setup__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
+       <div class="setup-card__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
 
   return `
-    <div class="voice-setup">
-      <div class="voice-setup__head">
-        <div class="voice-setup__glyph">
+    <div class="setup-card">
+      <div class="setup-card__head">
+        <div class="setup-card__glyph">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
             <path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
           </svg>
         </div>
         <div>
-          <div class="voice-setup__title">Voice AI</div>
-          <div class="voice-setup__subtitle">Talk to a fully on-device assistant — pre-tuned for your hardware.</div>
+          <div class="setup-card__title">Voice AI</div>
+          <div class="setup-card__subtitle">Talk to a fully on-device assistant — pre-tuned for your hardware.</div>
         </div>
       </div>
-      <div class="voice-setup__slots">${rows}</div>
-      <div class="voice-setup__actions">${primary}</div>
+      <div class="setup-card__slots">${rows}</div>
+      <div class="setup-card__actions">${primary}</div>
     </div>
   `;
-}
-
-/** One pipeline component row inside the setup card. */
-function renderSlotRow(slot: PipelineSlot): string {
-  const entry = slot.entry;
-  if (!entry) {
-    return `
-      <div class="voice-slot voice-slot--missing">
-        <div class="voice-slot__icon">${modalityEmoji(slot.category)}</div>
-        <div class="voice-slot__body">
-          <div class="voice-slot__label">${escapeHtml(slot.label)}</div>
-          <div class="voice-slot__hint">No model available for this device.</div>
-        </div>
-      </div>
-    `;
-  }
-
-  const status = getModelStatus(entry.id);
-  const stateHtml = renderSlotState(status);
-  const changeBtn = `<button type="button" class="voice-slot__change" data-change="${slot.key}">Change</button>`;
-
-  return `
-    <div class="voice-slot voice-slot--${status.status}" data-slot="${slot.key}">
-      <div class="voice-slot__icon">${modalityEmoji(slot.category)}</div>
-      <div class="voice-slot__body">
-        <div class="voice-slot__label">${escapeHtml(slot.label)}${slot.optional ? ' <span class="voice-slot__opt">optional</span>' : ''}</div>
-        <div class="voice-slot__hint">
-          ${escapeHtml(cleanModelName(entry.name))}
-          · ${formatBytes(modelDisplaySizeBytes(entry))}
-          <span class="backend-pill">${escapeHtml(formatFramework(entry.framework))}</span>
-        </div>
-        ${status.status === 'downloading'
-          ? `<div class="progress-bar voice-slot__progress"><div class="progress-fill" style="width:${Math.round(status.progress * 100)}%"></div></div>`
-          : ''}
-      </div>
-      <div class="voice-slot__aside">
-        ${stateHtml}
-        ${changeBtn}
-      </div>
-    </div>
-  `;
-}
-
-function renderSlotState(status: ReturnType<typeof getModelStatus>): string {
-  switch (status.status) {
-    case 'loaded':
-      return '<span class="voice-slot__state voice-slot__state--ready">&#10003; Ready</span>';
-    case 'downloaded':
-      return '<span class="voice-slot__state">On device</span>';
-    case 'downloading':
-      return `<span class="voice-slot__state">${Math.round(status.progress * 100)}%</span>`;
-    case 'loading':
-      return '<span class="voice-slot__state">Loading…</span>';
-    case 'error':
-      return '<span class="voice-slot__state voice-slot__state--error">Failed</span>';
-    default:
-      return '<span class="voice-slot__state voice-slot__state--pending">Not set up</span>';
-  }
 }
 
 function attachHandlers(): void {
@@ -414,7 +354,6 @@ async function startSession(): Promise<void> {
   lastError = null;
   isSpeechDetected = false;
   sessionState = 'connecting';
-  setEventSummary('Connecting...');
   renderView();
 
   try {
@@ -431,12 +370,10 @@ async function startSession(): Promise<void> {
     await session.start();
 
     sessionState = 'listening';
-    setEventSummary('Listening...');
     renderView();
   } catch (err) {
     lastError = `Failed to start voice session: ${formatError(err)}`;
     sessionState = 'error';
-    setEventSummary('Start failed.');
     await stopSession({ silent: true });
     renderView();
   }
@@ -461,7 +398,6 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
 
   if (wasActive && sessionState !== 'error') {
     sessionState = 'disconnected';
-    setEventSummary('Session stopped.');
   }
 
   if (!opts.silent) renderView();
@@ -501,17 +437,14 @@ function handleVoiceEvent(event: VoiceEvent): void {
     case 'agentStateChanged':
       sessionState = event.state === 'thinking' ? 'processing' : event.state;
       if (event.state !== 'listening') isSpeechDetected = false;
-      setEventSummary(`state: ${event.state}`);
       scheduleRender();
       break;
     case 'speechStarted':
       isSpeechDetected = true;
-      setEventSummary('speech started');
       scheduleRender();
       break;
     case 'speechEnded':
       isSpeechDetected = false;
-      setEventSummary('speech ended');
       scheduleRender();
       break;
     case 'userTranscribed':
@@ -534,10 +467,6 @@ function handleVoiceEvent(event: VoiceEvent): void {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function setEventSummary(text: string): void {
-  lastEventSummary = text;
-}
-
 let renderScheduled = false;
 function scheduleRender(): void {
   if (renderScheduled || unmounted) return;
@@ -548,41 +477,61 @@ function scheduleRender(): void {
   });
 }
 
+/** Placeholders, shared with `renderView` so the two paths can't diverge. */
+const TRANSCRIPT_PLACEHOLDER = 'Listening…';
+const REPLY_PLACEHOLDER = 'Waiting for you to finish speaking…';
+
+/**
+ * Patch just the two text regions.
+ *
+ * Per-token `renderView()` would rebuild the whole panel and reset scroll and
+ * focus on every partial hypothesis, so the streaming path writes textContent
+ * directly. `textContent` (never innerHTML) is what makes that safe for
+ * model-authored text.
+ */
 function updateTextRegions(): void {
   const userPre = container.querySelector<HTMLPreElement>('#voice-user-transcript');
-  if (userPre) userPre.textContent = userTranscript || '(waiting for speech...)';
+  if (userPre) userPre.textContent = userTranscript || TRANSCRIPT_PLACEHOLDER;
   const respPre = container.querySelector<HTMLPreElement>('#voice-assistant-response');
-  if (respPre) respPre.textContent = assistantResponse || '(no response yet)';
+  if (respPre) respPre.textContent = assistantResponse || REPLY_PLACEHOLDER;
 }
 
-/** iOS parity: VoiceAgentTypes.swift:34-44 `displayName`. */
-function prettyState(state: SessionState): string {
+/**
+ * iOS parity: VoiceAgentTypes.swift:34-44 `displayName`, with one divergence.
+ *
+ * iOS maps `.disconnected` to "Ready", which is true there because its voice
+ * screen is only reachable once models are resident. Here the same state is the
+ * *pre-setup* state, so echoing "Ready" put a green "Ready" pill directly below
+ * four rows reading "Not set up" — two opposite claims about the same thing, on
+ * one screen. `allReady` disambiguates: idle-and-unequipped is "Needs setup",
+ * idle-and-equipped is "Ready to talk".
+ */
+function prettyState(state: SessionState, allReady: boolean): string {
   switch (state) {
-    case 'disconnected': return 'Ready';
+    case 'disconnected':
+    case 'connected':
+      return allReady ? 'Ready to talk' : 'Needs setup';
     case 'connecting': return 'Connecting';
-    case 'connected': return 'Ready';
     case 'listening': return 'Listening';
     case 'processing': return 'Thinking';
     case 'speaking': return 'Speaking';
-    case 'error': return 'Error';
+    case 'error': return 'Something went wrong';
   }
 }
 
-function stateBadgeClass(state: SessionState): string {
+function stateBadgeClass(state: SessionState, allReady: boolean): string {
   switch (state) {
     case 'listening':
-    case 'connected':
       return 'badge-green';
     case 'processing':
     case 'speaking':
     case 'connecting':
       return 'badge-blue';
     case 'error':
-      // No `.badge-red` rule is shipped today; use the grey variant tinted
-      // by the inline `error` docs-status class below so failures still
-      // surface visibly without depending on a missing rule.
-      return 'badge-grey';
-    default:
-      return 'badge-grey';
+      return 'badge-red';
+    case 'disconnected':
+    case 'connected':
+      // Green only once the pipeline can actually start; grey while it can't.
+      return allReady ? 'badge-green' : 'badge-grey';
   }
 }
