@@ -4619,6 +4619,27 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   overflow-y: auto;
 }
 
+/*
+ * A speech transcript that is still a hypothesis.
+ *
+ * Words in a partial result get revised as more audio arrives, so text visibly
+ * rewrites itself under the reader. Shown identically to the settled transcript
+ * that reads as a glitch; marked as provisional it reads as the system working.
+ *
+ * Italic plus secondary text carries the meaning, and a left bar in brand orange
+ * gives it a second, non-colour-dependent cue. Deliberately NOT a lower opacity
+ * or a lighter grey — this is live content a user is actively reading to check
+ * whether they were understood, so it has to stay at full legibility.
+ */
+.docs-pre--partial {
+  color: var(--text-secondary);
+  font-style: italic;
+  border-left: 2px solid var(--color-primary);
+  /* Only the property that changes, so the text itself never animates while it
+     is being rewritten. */
+  transition: color var(--duration-standard) var(--ease-out);
+}
+
 /* The DAG a solution's config expands into, above its model rows. */
 .solution-card__graph {
   margin-top: var(--space-md);

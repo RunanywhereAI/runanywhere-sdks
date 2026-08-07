@@ -82,8 +82,19 @@ let eventConsumer: AbortController | null = null;
 let sessionState: SessionState = 'disconnected';
 let isSpeechDetected = false;
 let userTranscript = '';
+/**
+ * Whether `userTranscript` is a settled result or a live hypothesis.
+ *
+ * A partial hypothesis is a guess that will be revised — words visibly change
+ * under the reader as more audio arrives. Rendering it identically to the final
+ * transcript makes the panel look like it is malfunctioning. Every other app
+ * distinguishes the two, so this does too.
+ */
+let isTranscriptFinal = false;
 let assistantResponse = '';
 let lastError: string | null = null;
+/** True from the moment interrupt() is called until the agent leaves `speaking`. */
+let interrupting = false;
 
 // Pre-selected best-for-device voice trio (+ VAD), computed once on first
 // activation. `null` until the async capability probe resolves.
@@ -274,11 +285,29 @@ function renderView(): void {
             id="voice-start-btn"
             ${allReady && !isActive && !blocked ? '' : 'disabled'}
           >${isActive ? 'Conversation active' : 'Start conversation'}</button>
-          <button
-            class="btn btn-secondary"
-            id="voice-stop-btn"
-            ${isActive ? '' : 'disabled'}
-          >Stop</button>
+          ${
+            /*
+             * Barge-in. `session.interrupt()` cuts the agent off mid-utterance
+             * and hands the turn back, which is the single most-used control in
+             * a real voice conversation — a person who has heard enough talks
+             * over the assistant rather than ending the call. The SDK has always
+             * exposed it and this view never called it, so the only way to stop
+             * a long-winded reply was Stop, which closes the session and
+             * releases the microphone. It replaces Stop while the agent is
+             * speaking because those are the same intent at that moment, and two
+             * adjacent stop-shaped buttons would be a coin toss.
+             */
+            sessionState === 'speaking'
+              ? `<button class="btn btn-secondary" id="voice-interrupt-btn" ${interrupting ? 'disabled' : ''}>
+                   ${icon('stop', { size: 16 })}
+                   <span>${interrupting ? 'Stopping…' : 'Stop talking'}</span>
+                 </button>`
+              : `<button
+                  class="btn btn-secondary"
+                  id="voice-stop-btn"
+                  ${isActive ? '' : 'disabled'}
+                >End conversation</button>`
+          }
         </div>
         <div class="docs-status" role="status" aria-live="polite">
           <span id="voice-state-pill" class="badge ${blocked ? 'badge-yellow' : stateBadgeClass(sessionState, allReady)}">${blocked ? (pipelineRechecking() ? 'Re-checking engine' : 'Engine unavailable') : prettyState(sessionState, allReady)}</span>
@@ -292,12 +321,12 @@ function renderView(): void {
       ${userTranscript || assistantResponse || isActive
         ? `<div class="docs-section">
              <h3>You said</h3>
-             <pre id="voice-user-transcript" class="docs-pre">${escapeHtml(userTranscript || TRANSCRIPT_PLACEHOLDER)}</pre>
+             <pre id="voice-user-transcript" class="docs-pre${transcriptModifier()}">${escapeHtml(userTranscript || transcriptPlaceholder())}</pre>
            </div>
 
            <div class="docs-section">
              <h3>Reply</h3>
-             <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || REPLY_PLACEHOLDER)}</pre>
+             <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || replyPlaceholder())}</pre>
            </div>`
         : ''}
     </div>
@@ -370,6 +399,7 @@ function attachHandlers(): void {
   container.querySelector('#voice-refresh-btn')?.addEventListener('click', () => renderView());
   container.querySelector('#voice-start-btn')?.addEventListener('click', () => void startSession());
   container.querySelector('#voice-stop-btn')?.addEventListener('click', () => void stopSession());
+  container.querySelector('#voice-interrupt-btn')?.addEventListener('click', () => void interruptAgent());
   container.querySelector('#voice-setup-btn')?.addEventListener('click', () => void setupPipeline());
   container.querySelector('#voice-engine-retry')?.addEventListener('click', () => void runEngineRetry());
   container.querySelectorAll<HTMLElement>('[data-change]').forEach((el) => {
@@ -411,9 +441,11 @@ async function startSession(): Promise<void> {
   }
 
   userTranscript = '';
+  isTranscriptFinal = false;
   assistantResponse = '';
   lastError = null;
   isSpeechDetected = false;
+  interrupting = false;
   sessionState = 'connecting';
   renderView();
 
@@ -440,6 +472,32 @@ async function startSession(): Promise<void> {
   }
 }
 
+/**
+ * Cut the agent off mid-utterance and hand the turn back.
+ *
+ * `interrupt()` resolves only once the interrupted response, its tools, and its
+ * playout have all settled, so the button is disabled for that whole window
+ * rather than staying live and inviting a second press that would queue behind
+ * the first. The session stays open throughout — this is the difference between
+ * interrupting and hanging up.
+ */
+async function interruptAgent(): Promise<void> {
+  const active = session;
+  if (!active || interrupting) return;
+  interrupting = true;
+  renderView();
+  try {
+    await active.interrupt();
+  } catch (err) {
+    // A failed interrupt leaves the session usable, so this is a notice, not an
+    // error state — dropping to `error` would imply the conversation is over.
+    lastError = `Could not interrupt: ${formatError(err)}`;
+  } finally {
+    interrupting = false;
+    if (!unmounted) renderView();
+  }
+}
+
 async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
   const wasActive = isActiveState(sessionState);
 
@@ -456,6 +514,7 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
   }
 
   isSpeechDetected = false;
+  interrupting = false;
 
   if (wasActive && sessionState !== 'error') {
     sessionState = 'disconnected';
@@ -498,6 +557,9 @@ function handleVoiceEvent(event: VoiceEvent): void {
     case 'agentStateChanged':
       sessionState = event.state === 'thinking' ? 'processing' : event.state;
       if (event.state !== 'listening') isSpeechDetected = false;
+      // Leaving `speaking` is what actually ends an interrupt, whether the
+      // interrupt caused it or the agent simply finished the sentence.
+      if (event.state !== 'speaking') interrupting = false;
       scheduleRender();
       break;
     case 'speechStarted':
@@ -511,6 +573,7 @@ function handleVoiceEvent(event: VoiceEvent): void {
     case 'userTranscribed':
       // Partial hypotheses overwrite; a final clears the previous answer.
       userTranscript = event.text;
+      isTranscriptFinal = event.isFinal;
       if (event.isFinal) assistantResponse = '';
       break;
     case 'agentResponse':
@@ -538,9 +601,38 @@ function scheduleRender(): void {
   });
 }
 
-/** Placeholders, shared with `renderView` so the two paths can't diverge. */
-const TRANSCRIPT_PLACEHOLDER = 'Listening…';
-const REPLY_PLACEHOLDER = 'Waiting for you to finish speaking…';
+/**
+ * What an empty transcript pane says, given what the agent is actually doing.
+ *
+ * These were two fixed strings, so an empty pane read "Listening…" while the
+ * agent was thinking and "Waiting for you to finish speaking…" while it was
+ * already talking — the panel contradicting the status pill directly above it.
+ * An empty state is still a claim about the system, and it has to be a true one.
+ */
+function transcriptPlaceholder(): string {
+  switch (sessionState) {
+    case 'connecting': return 'Getting ready…';
+    case 'listening': return isSpeechDetected ? 'Listening…' : 'Go ahead — say something.';
+    case 'processing': return 'Working out a reply…';
+    case 'speaking': return 'Speaking. Talk over it any time to interrupt.';
+    default: return 'Nothing heard yet.';
+  }
+}
+
+function replyPlaceholder(): string {
+  switch (sessionState) {
+    case 'connecting': return 'Getting ready…';
+    case 'listening': return 'Waiting for you to finish speaking…';
+    case 'processing': return 'Thinking…';
+    case 'speaking': return 'Speaking…';
+    default: return 'No reply yet.';
+  }
+}
+
+/** `--partial` while the transcript is a revisable hypothesis. */
+function transcriptModifier(): string {
+  return userTranscript && !isTranscriptFinal ? ' docs-pre--partial' : '';
+}
 
 /**
  * Patch just the two text regions.
@@ -552,9 +644,14 @@ const REPLY_PLACEHOLDER = 'Waiting for you to finish speaking…';
  */
 function updateTextRegions(): void {
   const userPre = container.querySelector<HTMLPreElement>('#voice-user-transcript');
-  if (userPre) userPre.textContent = userTranscript || TRANSCRIPT_PLACEHOLDER;
+  if (userPre) {
+    userPre.textContent = userTranscript || transcriptPlaceholder();
+    // Toggled here rather than only in renderView because the settle from
+    // partial to final arrives as an event, not a re-render.
+    userPre.classList.toggle('docs-pre--partial', Boolean(userTranscript) && !isTranscriptFinal);
+  }
   const respPre = container.querySelector<HTMLPreElement>('#voice-assistant-response');
-  if (respPre) respPre.textContent = assistantResponse || REPLY_PLACEHOLDER;
+  if (respPre) respPre.textContent = assistantResponse || replyPlaceholder();
 }
 
 /**
