@@ -120,6 +120,39 @@ struct rac_llm_component {
  * Simple token estimation (~4 chars per token).
  * Mirrors Swift's token estimation in LLMCapability.
  */
+// Batch-style backends (Maple/Bonsai FastRPC, some remote hosts) finish the
+// whole generate before dumping stream chunks. Wall-to-first-token then ≈ total
+// time, so "decode = total − ttft" collapses to a few ms → absurd five-digit
+// tok/s, and TTFT looks like a 15s prefill when generation was running the
+// whole time. Detect that and report wall throughput with no stream-TTFT.
+struct StreamTimingMetrics {
+    int64_t ttft_ms = 0;
+    int64_t prompt_eval_ms = 0;
+    double tokens_per_second = 0.0;
+};
+
+static StreamTimingMetrics compute_stream_timing_metrics(int64_t total_ms, int64_t raw_ttft_ms,
+                                                         int32_t completion_tokens) {
+    StreamTimingMetrics m;
+    if (total_ms <= 0 || completion_tokens <= 0) {
+        return m;
+    }
+    const int64_t decode_window =
+        (raw_ttft_ms > 0 && raw_ttft_ms < total_ms) ? (total_ms - raw_ttft_ms) : total_ms;
+    const bool batch_buffered =
+        raw_ttft_ms > 0 && decode_window < std::max<int64_t>(50, total_ms / 20);
+    if (batch_buffered) {
+        m.tokens_per_second = static_cast<double>(completion_tokens) /
+                              (static_cast<double>(total_ms) / 1000.0);
+        return m;
+    }
+    m.ttft_ms = raw_ttft_ms > 0 ? raw_ttft_ms : 0;
+    m.prompt_eval_ms = m.ttft_ms;
+    m.tokens_per_second = static_cast<double>(completion_tokens) /
+                          (static_cast<double>(decode_window) / 1000.0);
+    return m;
+}
+
 static int32_t estimate_tokens(const char* text) {
     if (!text)
         return 1;
@@ -1025,27 +1058,19 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
-    double ttft_ms = 0.0;
-    // Calculate TTFT
+    int64_t raw_ttft_ms = 0;
     if (ctx.first_token_recorded) {
-        auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            ctx.first_token_time - ctx.start_time);
-        final_result.time_to_first_token_ms = ttft_duration.count();
-        final_result.prompt_eval_time_ms = ttft_duration.count();
-        ttft_ms = static_cast<double>(ttft_duration.count());
+        raw_ttft_ms = std::chrono::duration_cast<std::chrono::milliseconds>(ctx.first_token_time -
+                                                                            ctx.start_time)
+                          .count();
     }
-
-    // Tokens/sec over decode time only — including prefill (TTFT) in the
-    // denominator systematically understates generation speed.
-    double tokens_per_second = 0.0;
-    const double decode_ms = (ttft_ms > 0.0 && ttft_ms < static_cast<double>(total_time_ms))
-                                 ? static_cast<double>(total_time_ms) - ttft_ms
-                                 : static_cast<double>(total_time_ms);
-    if (decode_ms > 0.0) {
-        tokens_per_second =
-            static_cast<double>(final_result.completion_tokens) / (decode_ms / 1000.0);
-        final_result.tokens_per_second = static_cast<float>(tokens_per_second);
-    }
+    const StreamTimingMetrics timing = compute_stream_timing_metrics(
+        total_time_ms, raw_ttft_ms, final_result.completion_tokens);
+    final_result.time_to_first_token_ms = timing.ttft_ms;
+    final_result.prompt_eval_time_ms = timing.prompt_eval_ms;
+    final_result.tokens_per_second = static_cast<float>(timing.tokens_per_second);
+    const double tokens_per_second = timing.tokens_per_second;
+    const double ttft_ms = static_cast<double>(timing.ttft_ms);
 
     if (complete_callback) {
         complete_callback(&final_result, user_data);
@@ -2178,17 +2203,27 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     final_result.mutable_usage()->set_total_tokens(ctx->prompt_tokens + ctx->token_count);
     const int64_t total_time_ms = now_ms() - ctx->started_ms;
     final_result.set_generation_time_ms(static_cast<double>(total_time_ms));
-    int64_t ttft_ms = 0;
-    if (ctx->first_token_ms > 0) {
-        ttft_ms = ctx->first_token_ms - ctx->started_ms;
-        final_result.mutable_usage()->set_ttft_ms(ttft_ms);
+    const int64_t raw_ttft_ms =
+        ctx->first_token_ms > 0 ? ctx->first_token_ms - ctx->started_ms : 0;
+    const StreamTimingMetrics timing =
+        compute_stream_timing_metrics(total_time_ms, raw_ttft_ms, ctx->token_count);
+    if (timing.ttft_ms > 0) {
+        final_result.mutable_usage()->set_ttft_ms(timing.ttft_ms);
     }
-    // Tokens/sec over decode time only, not prefill-inclusive wall time.
-    const int64_t decode_ms =
-        (ttft_ms > 0 && ttft_ms < total_time_ms) ? total_time_ms - ttft_ms : total_time_ms;
-    if (decode_ms > 0 && ctx->token_count > 0) {
-        final_result.mutable_usage()->set_decode_tokens_per_second(static_cast<double>(
-            static_cast<double>(ctx->token_count) / (static_cast<double>(decode_ms) / 1000.0)));
+    if (timing.prompt_eval_ms > 0) {
+        final_result.set_prompt_eval_time_ms(timing.prompt_eval_ms);
+    }
+    if (timing.tokens_per_second > 0.0) {
+        final_result.mutable_usage()->set_decode_tokens_per_second(timing.tokens_per_second);
+    }
+    // When the stream was batch-buffered, decode_time_ms is the full wall
+    // generate (there is no separate post-TTFT decode window to report).
+    if (timing.ttft_ms == 0 && total_time_ms > 0 && raw_ttft_ms > 0) {
+        final_result.set_decode_time_ms(total_time_ms);
+    } else if (timing.ttft_ms > 0 && timing.ttft_ms < total_time_ms) {
+        final_result.set_decode_time_ms(total_time_ms - timing.ttft_ms);
+    } else if (total_time_ms > 0) {
+        final_result.set_decode_time_ms(total_time_ms);
     }
     // finish_reason widened from a bare string to the FinishReason enum
     // (idl/llm_options.proto). Map the producer's plain-English reason
@@ -2504,12 +2539,10 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         }
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
         const int64_t stream_elapsed = now_ms() - ctx.started_ms;
-        // Tokens/sec over decode time only, not prefill-inclusive wall time.
-        const int64_t stream_ttft =
+        const int64_t raw_stream_ttft =
             ctx.first_token_ms > ctx.started_ms ? ctx.first_token_ms - ctx.started_ms : 0;
-        const int64_t stream_decode = (stream_ttft > 0 && stream_ttft < stream_elapsed)
-                                          ? stream_elapsed - stream_ttft
-                                          : stream_elapsed;
+        const StreamTimingMetrics stream_timing =
+            compute_stream_timing_metrics(stream_elapsed, raw_stream_ttft, ctx.token_count);
         // GENERATION_EVENT_KIND_STREAM_COMPLETED was deleted (idl/sdk_events.proto):
         // streaming completion now folds into COMPLETED, discriminated by
         // is_streaming below (matches the non-streaming completion event).
@@ -2517,13 +2550,11 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                  prompt.c_str(), nullptr, ctx.response_text.c_str(),
                                  nullptr, ref.model_id, ctx.token_count, stream_elapsed,
                                  ctx.prompt_tokens, ref.framework_name,
-                                 (ctx.token_count > 0 && stream_decode > 0)
-                                     ? ctx.token_count * 1000.0 / static_cast<double>(stream_decode)
-                                     : 0.0,
-                                 static_cast<double>(stream_ttft), options.temperature,
+                                 stream_timing.tokens_per_second,
+                                 static_cast<double>(stream_timing.ttft_ms), options.temperature,
                                  options.max_tokens, lifecycle_context_length(ref),
                                  /*is_streaming=*/true,
-                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_ttft));
+                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_timing.prompt_eval_ms));
     }
 
     rac::llm::release_lifecycle_llm(&ref);

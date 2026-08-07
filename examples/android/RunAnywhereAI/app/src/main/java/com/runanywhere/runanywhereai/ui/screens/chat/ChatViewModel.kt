@@ -666,6 +666,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
                 val outputTokens = generation.output_tokens
                 val durationMs = generation.total_duration_ms
+                val rawTtft = firstTokenLatencies[generationId] ?: activeGenerationTTFTMs
+                val decodeWindow = if (rawTtft != null && rawTtft > 0) durationMs - rawTtft else durationMs
+                // Batch backends (Maple) emit first stream token only after the
+                // full generate — raw TTFT ≈ wall clock and must not be shown.
+                val batchBuffered =
+                    rawTtft != null && rawTtft > 0 &&
+                        decodeWindow < maxOf(50.0, durationMs * 0.05)
+                val ttftMs = if (batchBuffered) null else rawTtft
                 val tps = if (durationMs > 0 && outputTokens > 0) {
                     outputTokens * 1000.0 / durationMs
                 } else {
@@ -676,7 +684,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     outputTokens = outputTokens,
                     durationMs = durationMs,
                     tokensPerSecond = tps,
-                    timeToFirstTokenMs = firstTokenLatencies[generationId] ?: activeGenerationTTFTMs,
+                    timeToFirstTokenMs = ttftMs,
                 )
                 if (firstTokenLatencies.size > MAX_TRACKED_GENERATIONS) firstTokenLatencies.clear()
             }
@@ -765,6 +773,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens ?: 0
         // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
+        // Prefer SDK-sanitized usage; fall back to wall throughput. Do not use
+        // FIRST_TOKEN event TTFT — batch backends (Maple) only emit the first
+        // stream chunk after the full generate, so that "TTFT" is the wall clock.
         val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
             ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
@@ -774,8 +785,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 stats = GenerationStats(
                     tokens = tokens,
                     tokensPerSecond = tps,
-                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
-                    // TokenUsage.ttft_ms is the sole canonical spelling now.
                     timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
                     totalTimeMs = totalMs,
                     inputTokens = result.usage?.input_tokens ?: 0,
@@ -819,16 +828,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             reply.copy(
                 text = ChatToolResultNormalizer.stripStrayToolCall(result.text),
                 thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                // Mirrors iOS buildMessageAnalytics: prefer the result's TTFT and
-                // fall back to the value recorded from the SDK's first-token event;
-                // framework falls back to the loaded model's analytics key.
+                // Prefer result TTFT only. Do not fall back to FIRST_TOKEN event
+                // latency — batch NPU backends report wall-clock there.
                 stats = GenerationStats(
                     tokens = outputTokens,
                     tokensPerSecond = tps,
-                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
-                    // TokenUsage.ttft_ms is the sole canonical spelling now.
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 }
-                        ?: activeGenerationTTFTMs,
+                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
                     totalTimeMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,
@@ -878,8 +883,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val totalMs = result.generation_time_ms.toLong()
         val tokens = result.usage?.output_tokens?.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
         // TokenUsage.tokens_per_second was renamed decode_tokens_per_second.
+        // aggregateLLMStream already sanitizes batch-buffered Maple/Bonsai rates;
+        // fall back to wall throughput only. Never use FIRST_TOKEN event TTFT —
+        // that is wall-clock for batch backends and shows up as a fake 15s prefill.
         val tps = result.usage?.decode_tokens_per_second?.takeIf { it > 0 }
-            ?: sdkMetrics?.tokensPerSecond?.takeIf { it > 0 }
             ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
@@ -888,11 +895,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 stats = GenerationStats(
                     tokens = tokens,
                     tokensPerSecond = tps,
-                    // Top-level LLMGenerationResult.ttft_ms was deleted outright;
-                    // TokenUsage.ttft_ms is the sole canonical spelling now.
-                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 }
-                        ?: activeGenerationTTFTMs
-                        ?: sdkMetrics?.timeToFirstTokenMs,
+                    timeToFirstTokenMs = result.usage?.ttft_ms?.takeIf { it > 0 },
                     totalTimeMs = totalMs,
                     inputTokens = result.usage?.input_tokens?.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
                     modelName = activeModel.model.name,

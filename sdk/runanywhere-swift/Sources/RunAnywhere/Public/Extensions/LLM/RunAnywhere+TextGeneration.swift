@@ -221,20 +221,39 @@ public extension RunAnywhere {
         result.modelUsed = modelID
         // totalTimeMs was deleted outright; generationTimeMs (already a
         // Double) is the sole wall-clock field left on this message.
-        result.generationTimeMs = final.map { $0.generationTimeMs } ?? totalLatency
+        let generationTimeMs: Double = {
+            if let g = final?.generationTimeMs, g > 0 { return g }
+            return totalLatency
+        }()
+        result.generationTimeMs = generationTimeMs
         result.framework = framework
-        result.promptEvalTimeMs = final.map { $0.promptEvalTimeMs } ?? 0
-        result.decodeTimeMs = final.map { $0.decodeTimeMs } ?? 0
         // tokensPerSecond was renamed decodeTokensPerSecond and moved onto
         // the shared RATokenUsage message (idl/token_usage.proto).
-        result.usage.decodeTokensPerSecond = final.map { $0.usage.decodeTokensPerSecond }
-            ?? (totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0)
-        // ttftMs (top-level Double) was deleted outright; ttft is now
-        // Int64 milliseconds on the shared RATokenUsage message.
-        if let ttftFromFinal = final?.usage.ttftMs, ttftFromFinal > 0 {
-            result.usage.ttftMs = ttftFromFinal
-        } else if let ttft {
-            result.usage.ttftMs = Int64(ttft.rounded())
+        // Batch-buffered streams (Maple/Bonsai) dump tokens only after the
+        // full generate; wall-to-first ≈ total and "decode = total − ttft"
+        // becomes a few ms → absurd tok/s and a fake 15s TTFT. Match commons.
+        let reportedTps = final?.usage.decodeTokensPerSecond ?? 0
+        let reportedTtft: Int64? = {
+            if let ttftFromFinal = final?.usage.ttftMs, ttftFromFinal > 0 { return ttftFromFinal }
+            if let ttft { return Int64(ttft.rounded()) }
+            return nil
+        }()
+        let outputTokens = Int(result.usage.outputTokens)
+        let wallTps = generationTimeMs > 0 && outputTokens > 0
+            ? Double(outputTokens) / (generationTimeMs / 1000.0) : 0
+        let decodeWindow = reportedTtft.map { generationTimeMs - Double($0) } ?? generationTimeMs
+        let batchBuffered =
+            reportedTtft != nil && decodeWindow < max(50.0, generationTimeMs * 0.05)
+        if batchBuffered {
+            result.usage.decodeTokensPerSecond = wallTps
+            result.usage.ttftMs = 0
+            result.promptEvalTimeMs = 0
+            result.decodeTimeMs = Int64(generationTimeMs.rounded())
+        } else {
+            result.usage.decodeTokensPerSecond = reportedTps > 0 ? reportedTps : wallTps
+            if let reportedTtft { result.usage.ttftMs = reportedTtft }
+            result.promptEvalTimeMs = final?.promptEvalTimeMs ?? (reportedTtft ?? 0)
+            result.decodeTimeMs = final?.decodeTimeMs ?? 0
         }
         if finishReason != .unspecified { result.finishReason = finishReason }
         if let terminalError { result.error = terminalError }

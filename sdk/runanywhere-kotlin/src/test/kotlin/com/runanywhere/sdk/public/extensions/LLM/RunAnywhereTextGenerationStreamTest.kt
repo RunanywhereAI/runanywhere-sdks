@@ -177,6 +177,68 @@ class RunAnywhereTextGenerationStreamTest {
         }
 
     @Test
+    fun `batch buffered maple metrics use wall throughput and clear fake ttft`() {
+        // 182 tokens, 13685 ms wall, "TTFT" 13680 ms, flush window 5 ms →
+        // naive decode rate ≈ 36400 tok/s. Sanitizer must report ~13.3 tok/s
+        // and drop the stream-derived TTFT (it is not prefill).
+        val metrics =
+            sanitizeStreamMetrics(
+                totalMs = 13_685.0,
+                outputTokens = 182,
+                reportedTps = 36_400.0,
+                reportedTtftMs = 13_680L,
+            )
+        assertEquals(0L, metrics.ttftMs)
+        assertEquals(182 * 1000.0 / 13_685.0, metrics.decodeTokensPerSecond, 0.05)
+    }
+
+    @Test
+    fun `batch buffered terminal result is sanitized in aggregateLLMStream`() =
+        runBlocking {
+            val bogus =
+                LLMGenerationResult(
+                    text = "Paris",
+                    generation_time_ms = 13_685.0,
+                    prompt_eval_time_ms = 13_680L,
+                    decode_time_ms = 5L,
+                    usage =
+                        TokenUsage(
+                            input_tokens = 73,
+                            output_tokens = 182,
+                            total_tokens = 255,
+                            decode_tokens_per_second = 36_400.0,
+                            ttft_ms = 13_680L,
+                        ),
+                )
+            var tick = 0L
+            val result =
+                aggregateLLMStream(
+                    prompt = "capital of France",
+                    events =
+                        flowOf(
+                            LLMStreamEvent(
+                                token = "Paris",
+                                event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_TOKEN,
+                            ),
+                            LLMStreamEvent(
+                                event_kind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_COMPLETED,
+                                finish_reason = FinishReason.FINISH_REASON_STOP,
+                                result = bogus,
+                            ),
+                        ),
+                    onToken = null,
+                    resolveModelIdentity = {
+                        LLMStreamModelIdentity(modelID = "maple", framework = "qhexrt")
+                    },
+                    nowMillis = { tick++ },
+                )
+            val usage = result.usage!!
+            assertEquals(0L, usage.ttft_ms)
+            assertEquals(182 * 1000.0 / 13_685.0, usage.decode_tokens_per_second, 0.05)
+            assertEquals(13_685.0, result.generation_time_ms, 0.0)
+        }
+
+    @Test
     fun `collector cancellation makes the callback reject further events`() =
         runBlocking {
             val continueAfterCancellation = CountDownLatch(1)
