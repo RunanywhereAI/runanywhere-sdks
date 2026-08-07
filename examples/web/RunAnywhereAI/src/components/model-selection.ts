@@ -20,7 +20,7 @@
  * No legacy app-side registries or extension-point routing.
  */
 
-import type { ModelInfo } from '@runanywhere/web';
+import type { DownloadEvent, ModelInfo } from '@runanywhere/web';
 import {
   RunAnywhere,
   ModelCategory,
@@ -110,6 +110,31 @@ type RowState =
 type RowStatus = RowState['status'];
 
 const rowStates = new Map<string, RowState>();
+
+/**
+ * Live download iterators, by model id.
+ *
+ * Held so Cancel has something to break out of: `models.download()` treats
+ * abandoning its iterator as the cancellation signal and preserves the resume
+ * token, so this map is the whole mechanism behind both stopping a transfer and
+ * later continuing it instead of starting over.
+ */
+const activeDownloads = new Map<string, AsyncIterator<DownloadEvent>>();
+
+/**
+ * Models whose transfer was cancelled part-way through in this session.
+ *
+ * Purely a labelling concern: the SDK cancels with `deletePartialBytes: false`
+ * and plans the next attempt with `resumeExisting`, so pressing Download again
+ * continues from where it stopped. "Download" implies starting over and would
+ * make someone hesitate to cancel a large transfer they are able to resume;
+ * this set is what lets the button say "Resume" and mean it.
+ *
+ * Session-scoped on purpose — it says what this user just did, and claiming
+ * resumability across a reload would require the SDK to surface the plan's
+ * `resumeFromBytes`, which the DownloadEvent union does not carry.
+ */
+const resumableDownloads = new Set<string>();
 
 /**
  * The open sheet's backdrop, or null.
@@ -719,7 +744,7 @@ function renderRows(): void {
   bindFamilyInteractions(host);
 }
 
-type ModelAction = 'download' | 'load' | 'unload' | 'select';
+type ModelAction = 'download' | 'load' | 'unload' | 'select' | 'cancel-download';
 
 function bindRowActions(host: HTMLElement): void {
   host.querySelectorAll('[data-action]').forEach((el) => {
@@ -1242,9 +1267,25 @@ function actionButton(entry: CatalogEntry, state: RowState): string {
   }
   switch (state.status) {
     case 'registered':
+      // "Resume" after a cancelled transfer, because that is what happens: the
+      // partial bytes were kept and the next attempt continues from them.
+      // Saying "Download" would imply the wait starts over.
+      if (resumableDownloads.has(entry.id)) {
+        return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}" title="Continue from where this stopped">Resume</button>`;
+      }
       return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}">Download</button>`;
     case 'downloading':
-      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${Math.round(state.progress * 100)}%</button>`;
+      // Transferring is the only cancellable phase — verifying and extracting
+      // are short, local, and have no transfer left to abandon, so offering
+      // Cancel there would be a button that mostly misses its own window.
+      //
+      // The percentage moved to the progress detail line, which frees this slot
+      // for the control a waiting user actually wants. It was previously a
+      // disabled button showing a number already rendered directly below it.
+      if (state.phase === 'transferring') {
+        return `<button type="button" class="model-action-btn model-action-btn--cancel" data-action="cancel-download" data-model-id="${safeModelId}" title="Stop this download">Cancel</button>`;
+      }
+      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${state.phase === 'verifying' ? 'Checking&hellip;' : 'Unpacking&hellip;'}</button>`;
     case 'downloaded':
       return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${safeModelId}">Use</button>`;
     case 'loading':
@@ -1275,8 +1316,33 @@ async function handleAction(action: ModelAction, modelId: string): Promise<void>
     }
   }
   else if (action === 'unload') await unloadModel(modelId);
+  else if (action === 'cancel-download') await cancelDownload(modelId);
   else if (action === 'select') {
     completeSheetSelection(modelId, activeSheetOptions.onModelReady, modalEl);
+  }
+}
+
+/**
+ * Stop an in-flight download.
+ *
+ * `models.download()` cancels the transfer when its iterator is broken out of,
+ * and keeps the resume token — so this is also what makes a later Download
+ * click continue rather than restart. Without a control there was no way to
+ * stop a multi-gigabyte transfer short of closing the tab, which loses the
+ * partial file and the token with it.
+ *
+ * The generator emits `cancelled` on the way out, and that branch is what
+ * returns the row to `registered`; doing it here as well would race it.
+ */
+async function cancelDownload(modelId: string): Promise<void> {
+  const iterator = activeDownloads.get(modelId);
+  if (!iterator) return;
+  activeDownloads.delete(modelId);
+  try {
+    await iterator.return?.(undefined);
+  } catch {
+    // A generator that already finished rejects here; the row state is
+    // whatever its terminal event set, which is correct either way.
   }
 }
 
@@ -1356,8 +1422,15 @@ async function startDownload(modelId: string): Promise<void> {
   let lastBytes = 0;
   let smoothed: number | undefined;
 
+  // Iterated explicitly rather than with `for await` so Cancel has a handle to
+  // break out of; that break *is* the SDK's cancellation signal.
+  const events = RunAnywhere.models.download(modelId);
+  const iterator = events[Symbol.asyncIterator]();
+  activeDownloads.set(modelId, iterator);
+
   try {
-    for await (const event of RunAnywhere.models.download(modelId)) {
+    for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
+      const event = step.value;
       switch (event.type) {
         case 'progress': {
           const now = performance.now();
@@ -1399,6 +1472,7 @@ async function startDownload(modelId: string): Promise<void> {
           // Was falling into the same branch as `completed`, so a cancelled
           // download claimed the model was on disk and the next Load failed
           // with a missing-file error the user had no way to connect to it.
+          resumableDownloads.add(modelId);
           setRow(modelId, { status: 'registered' });
           return;
         case 'failed':
@@ -1406,6 +1480,7 @@ async function startDownload(modelId: string): Promise<void> {
           showToast(`Download failed: ${event.error.message}`, 'warning');
           return;
         case 'completed':
+          resumableDownloads.delete(modelId);
           setRow(modelId, { status: 'downloaded' });
           break;
         case 'started':
@@ -1416,6 +1491,12 @@ async function startDownload(modelId: string): Promise<void> {
     const message = formatError(err);
     setRow(modelId, { status: 'error', error: message });
     showToast(`Download failed: ${message}`, 'warning');
+  } finally {
+    // Covers every exit — completed, cancelled, failed, and the throw path — so
+    // a stale iterator can never be handed to a later Cancel click. Guarded on
+    // identity because a fresh download for the same model may already have
+    // replaced this entry.
+    if (activeDownloads.get(modelId) === iterator) activeDownloads.delete(modelId);
   }
 }
 
