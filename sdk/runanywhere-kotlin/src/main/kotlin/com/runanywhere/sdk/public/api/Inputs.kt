@@ -53,6 +53,18 @@ public class AudioInput internal constructor(
             AudioEncoding.FLOAT32, AudioEncoding.CONTAINER -> bytes
         }
 
+    /**
+     * Bytes as signed 16-bit little-endian PCM — the layout the sherpa STT
+     * engine expects (it reinterprets the buffer as int16 and converts to float
+     * itself; see the iOS bridge, which sends unconverted PCM16). Sending
+     * float32 here would be misread as int16 and transcribed as noise.
+     */
+    internal fun pcm16Bytes(): ByteArray =
+        when (format.encoding) {
+            AudioEncoding.PCM16, AudioEncoding.CONTAINER -> bytes
+            AudioEncoding.FLOAT32 -> float32ToPcm16Bytes(bytes)
+        }
+
     public companion object {
         /** Wrap signed 16-bit little-endian microphone samples. */
         public fun pcm16(
@@ -207,6 +219,18 @@ private fun pcm16ToFloat32Bytes(pcm16: ByteArray): ByteArray {
     val input = ByteBuffer.wrap(pcm16).order(ByteOrder.LITTLE_ENDIAN)
     val output = ByteBuffer.allocate(sampleCount * Float.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
     repeat(sampleCount) { output.putFloat(input.short.toFloat() / PCM16_FULL_SCALE) }
+    return output.array()
+}
+
+private fun float32ToPcm16Bytes(float32: ByteArray): ByteArray {
+    val sampleCount = float32.size / Float.SIZE_BYTES
+    if (sampleCount == 0) return ByteArray(0)
+    val input = ByteBuffer.wrap(float32).order(ByteOrder.LITTLE_ENDIAN)
+    val output = ByteBuffer.allocate(sampleCount * 2).order(ByteOrder.LITTLE_ENDIAN)
+    repeat(sampleCount) {
+        val clamped = input.float.coerceIn(-1.0f, 1.0f)
+        output.putShort((clamped * 32_767.0f).toInt().toShort())
+    }
     return output.array()
 }
 

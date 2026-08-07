@@ -137,7 +137,7 @@ public class SttNamespace internal constructor() {
      * @throws SDKException when no speech-recognition model is loaded.
      */
     public suspend fun transcribe(audio: AudioInput, options: SttOptions? = null): Transcription =
-        legacyTranscribe(audio.normalizedBytes(), options.orDefault().toProto()).toTranscription()
+        legacyTranscribe(audio.pcm16Bytes(), options.orDefault().toProto()).toTranscription()
 
     /**
      * Open a live transcription stream with one audio format established up front.
