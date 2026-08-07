@@ -31,6 +31,7 @@ import {
 import type { ToolValue } from '@runanywhere/proto-ts/tool_calling';
 import {
   buildGetStartedOverlay,
+  syncMountedOverlayState,
   setOverlaySuppressed,
   findLoadedModelForCategory,
   onModelStateChange,
@@ -240,6 +241,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   // panel, so the composer below it stays visible rather than being hidden
   // behind an opaque layer while remaining focusable.
   container.insertBefore(getStartedOverlay, messagesEl.nextSibling);
+  // Only now can the overlay set state on its parent — see
+  // syncMountedOverlayState. Without this the panel's empty state is hidden a
+  // frame late and the overlay doubles in height after paint.
+  syncMountedOverlayState();
 
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
   const sendBtn = container.querySelector('#chat-send-btn') as HTMLButtonElement;

@@ -240,6 +240,23 @@ export function buildGetStartedOverlay(
 }
 
 /**
+ * Re-sync the overlay's panel state once it has been inserted into the DOM.
+ *
+ * `buildGetStartedOverlay` runs before its caller inserts the node, so
+ * `refreshOverlayVisibility()`'s `parentElement` is still null there and the
+ * `chat-panel--model-blocked` class — which stands the panel's own empty state
+ * down — cannot be applied. It therefore only landed on a *later* refresh, after
+ * the first paint, and hiding `#chat-messages` at that point doubled the
+ * overlay's height (376px to 752px) and shoved the nav 30px down: a 0.19 layout
+ * shift, nearly twice the "good" CLS threshold, on every cold load with no model.
+ *
+ * Callers must invoke this immediately after inserting the overlay.
+ */
+export function syncMountedOverlayState(): void {
+  refreshOverlayVisibility();
+}
+
+/**
  * Render the overlay's card for the current engine state.
  *
  * Two mutually exclusive states, never a blend: an invitation to pick a model
