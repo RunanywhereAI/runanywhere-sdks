@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -81,6 +82,7 @@ fun ChatScreen(
         viewModel(key = "chat-rag-index-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.RAG_EMBEDDING))
     val documentAnswerVm: ModelSelectionViewModel =
         viewModel(key = "chat-rag-answer-model", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.RAG_LLM))
+    val composerFocus = remember { FocusRequester() }
     var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
     var showImageModelSheet by remember { mutableStateOf(false) }
     var showDocumentIndexSheet by remember { mutableStateOf(false) }
@@ -245,6 +247,7 @@ fun ChatScreen(
                             pendingAttachment = pendingAttachment?.toComposerAttachment(),
                             onClearAttachment = { pendingAttachment = null },
                             compact = useCompactComposer,
+                            focusRequester = composerFocus,
                         )
                     }
                 }
@@ -264,6 +267,26 @@ fun ChatScreen(
                         .fillMaxSize()
                         .widthIn(max = dimens.contentMaxWidth),
                     isGenerating = viewModel.isGenerating,
+                    // Withheld while a turn is in flight, mirroring iOS
+                    // `ChatMessageListView.actions(for:)`: every one of these
+                    // renumbers the transcript the running stream is indexed
+                    // against. Copy stays, since the row owns it and it mutates
+                    // nothing.
+                    actions = if (viewModel.isBusy) {
+                        ChatMessageActions()
+                    } else {
+                        ChatMessageActions(
+                            onRegenerate = viewModel::regenerateReply,
+                            onEdit = { index ->
+                                viewModel.editQuestion(index)
+                                // The question lands in the composer; taking focus
+                                // with it is what makes this an edit rather than a
+                                // puzzle.
+                                composerFocus.requestFocus()
+                            },
+                            onDelete = viewModel::deleteMessage,
+                        )
+                    },
                 )
                 ScrollToBottomButton(
                     visible = !autoFollow && messages.isNotEmpty(),
