@@ -113,8 +113,7 @@ message LLMGenerationResult {
     optional string thinking_content = 2;
     string model_used          = 5;
     double generation_time_ms  = 6;
-    reserved 7;   // was double ttft_ms -- TokenUsage.ttft_ms is the canonical
-                  // spelling (usage = 25)
+    reserved 7;   // was double ttft_ms; TokenUsage.ttft_ms (usage = 25) is canonical
     optional string framework  = 9;
     reserved 10;  // was string finish_reason -- wire-type flip to enum, fresh tag below
     int32  thinking_tokens     = 11;
