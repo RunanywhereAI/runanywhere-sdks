@@ -27,7 +27,7 @@ import { refreshModelSelectionState } from './model-selection';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import { formatBytes } from '../services/model-display';
-import { showToast } from './dialogs';
+import { openModal, showToast } from './dialogs';
 
 // ---------------------------------------------------------------------------
 // State (module-scope — one HF modal per app, like the model-selection sheet)
@@ -71,63 +71,50 @@ function resetState(): void {
 // ---------------------------------------------------------------------------
 
 function renderModal(): void {
-  modalEl = document.createElement('div');
-  modalEl.className = 'modal-backdrop';
-  modalEl.innerHTML = `
-    <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="hf-sheet-title">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3 class="text-md font-semibold" id="hf-sheet-title">Add from Hugging Face</h3>
-        <button type="button" class="btn-ghost" id="hf-sheet-close" aria-label="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <div class="model-search">
-          <svg class="model-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="7"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input id="hf-search-input" class="model-search__input" type="search"
-            placeholder="Search GGUF models on Hugging Face…" autocomplete="off" spellcheck="false" />
-        </div>
-        <p class="text-tertiary hf-hint">
-          Searches public GGUF repositories. Pick a repo to choose a quantization to download.
-        </p>
-        <div id="hf-result-list"></div>
-      </div>
+  // Opens on top of the model picker, which stays open underneath — the shared
+  // modal keeps a stack so Escape and Tab apply to this one, and closing it
+  // returns focus and interactivity to the picker rather than to the page.
+  const modal = openModal({
+    title: 'Add from Hugging Face',
+    titleId: 'hf-sheet-title',
+    onClose: () => {
+      if (searchDebounce !== null) {
+        window.clearTimeout(searchDebounce);
+        searchDebounce = null;
+      }
+      modalEl = null;
+      resetState();
+    },
+  });
+  modalEl = modal.root;
+
+  modal.body.innerHTML = `
+    <div class="model-search">
+      <svg class="model-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="hf-search-input" class="model-search__input" type="search"
+        placeholder="Search GGUF models on Hugging Face…" aria-label="Search Hugging Face for GGUF models"
+        autocomplete="off" spellcheck="false" />
     </div>
+    <p class="text-tertiary hf-hint">
+      Searches public GGUF repositories. Pick a repo to choose a quantization to download.
+    </p>
+    <div id="hf-result-list"></div>
   `;
 
-  document.body.appendChild(modalEl);
-
-  modalEl.querySelector('#hf-sheet-close')!.addEventListener('click', closeModal);
-  modalEl.addEventListener('click', (event) => {
-    if (event.target === modalEl) closeModal();
-  });
-
-  const input = modalEl.querySelector('#hf-search-input') as HTMLInputElement;
+  const input = modal.body.querySelector('#hf-search-input') as HTMLInputElement;
   input.addEventListener('input', () => {
     if (searchDebounce !== null) window.clearTimeout(searchDebounce);
     searchDebounce = window.setTimeout(() => void runSearch(input.value), 350);
   });
+  // Overrides the shared modal's default of focusing the sheet: this dialog is
+  // empty until something is typed, so there is nothing to read first and
+  // raising the keyboard is the helpful act.
   input.focus();
 
   renderResults('<p class="text-tertiary hf-empty">Type to search Hugging Face.</p>');
-}
-
-function closeModal(): void {
-  if (searchDebounce !== null) {
-    window.clearTimeout(searchDebounce);
-    searchDebounce = null;
-  }
-  if (!modalEl) return;
-  modalEl.remove();
-  modalEl = null;
-  resetState();
 }
 
 function renderResults(html: string): void {
