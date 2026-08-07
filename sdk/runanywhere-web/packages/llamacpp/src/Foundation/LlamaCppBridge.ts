@@ -315,7 +315,7 @@ export class LlamaCppBridge {
       // "rac_init was called" marker.
       await this._initRACommons(this._platformAdapter.getAdapterPtr());
       this._loaded = true;
-      completeNativePhase1ForModule(this._module);
+      await completeNativePhase1ForModule(this._module);
 
       // Register the unified llama.cpp backend (LLM + embeddings + VLM in one call).
       await this._registerBackend();

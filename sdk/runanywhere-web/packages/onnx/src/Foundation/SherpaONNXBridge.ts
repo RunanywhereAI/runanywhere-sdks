@@ -270,7 +270,7 @@ export class SherpaONNXBridge {
       // from being overwritten.
       await this._initCommons(this._module, this._platformAdapter.getAdapterPtr());
       this._bridgeOwnedInit = true;
-      completeNativePhase1ForModule(this._module);
+      await completeNativePhase1ForModule(this._module);
 
       // Claim speech + embedding + semantic segmentation + RAG. The dedicated racommons-onnx-sherpa
       // artifact exports `_rac_embeddings_embed_batch_lifecycle_proto` (in the BASE
