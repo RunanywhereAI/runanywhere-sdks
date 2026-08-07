@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
+import com.runanywhere.runanywhereai.ui.components.AudioWaveform
 import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
@@ -529,7 +530,7 @@ private fun StatusLine(sttVm: SttViewModel, hasModel: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
-            LevelBars(level = sttVm.audioLevel)
+            AudioWaveform(level = sttVm.audioLevel)
             Text(
                 text = if (sttVm.mode == SttMode.LIVE) "Listening — pause to transcribe" else "Recording…",
                 style = MaterialTheme.typography.bodyMedium,
@@ -548,22 +549,6 @@ private fun StatusLine(sttVm: SttViewModel, hasModel: Boolean) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun LevelBars(level: Float) {
-    val dimens = LocalDimens.current
-    val active = (level * BAR_COUNT).toInt()
-    Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs), verticalAlignment = Alignment.CenterVertically) {
-        repeat(BAR_COUNT) { index ->
-            Box(
-                modifier = Modifier
-                    .size(width = 5.dp, height = (8 + index * 2).dp)
-                    .clip(RoundedCornerShape(dimens.radiusFull))
-                    .background(if (index < active) primaryGreen else MaterialTheme.colorScheme.surfaceContainerHighest),
-            )
-        }
     }
 }
 
@@ -604,4 +589,3 @@ private fun StatRows(metrics: SttMetrics) {
     }
 }
 
-private const val BAR_COUNT = 12

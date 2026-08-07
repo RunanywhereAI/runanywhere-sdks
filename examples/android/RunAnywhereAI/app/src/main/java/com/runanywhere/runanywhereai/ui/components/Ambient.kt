@@ -6,22 +6,42 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
+import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.ambientPeriod
 
 /**
@@ -106,3 +126,126 @@ fun Modifier.shimmer(highlight: Color): Modifier {
         )
     }
 }
+
+/**
+ * The "a model is working on this" placeholder for a whole-surface wait.
+ *
+ * Deliberately not a `CircularProgressIndicator`. Diffusion runs a fixed number of steps with
+ * no progress callback, so a determinate bar would be a lie — but the stock indeterminate
+ * spinner is a generic "blocked" glyph that says nothing about *this* app. This is one arc on
+ * one static track, rotated by a `graphicsLayer` so the animation is a GPU transform and the
+ * `Canvas` content is drawn once and cached.
+ *
+ * **One loop, one period.** An earlier draft breathed the track's alpha on the 1.6 s pulse
+ * while orbiting the head on the 1.0 s spin; two ambient periods on one element beat against
+ * each other and read as a glitch. The track is now constant and only the head moves — which
+ * is also the only part of it carrying information.
+ *
+ * Under reduced motion nothing runs: the head parks at twelve o'clock and the piece renders
+ * as a static ring with one brand-tinted arc, which is a legible "working" mark on its own.
+ */
+@Composable
+fun GeneratingCanvas(label: String, supporting: String? = null, modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
+    val scheme = MaterialTheme.colorScheme
+    val spinPeriod = ambientPeriod(AppMotion.AMBIENT_SPIN)
+    val rotation = if (spinPeriod == null) {
+        0f
+    } else {
+        val transition = rememberInfiniteTransition(label = "canvasOrbit")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = FULL_TURN,
+            animationSpec = infiniteRepeatable(
+                animation = tween(spinPeriod, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "canvasOrbitAngle",
+        )
+        angle
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(dimens.spacingXl)
+            // One announcement for the whole piece; the mark itself is decoration.
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+    ) {
+        Box(modifier = Modifier.size(dimens.artCircle), contentAlignment = Alignment.Center) {
+            // The track: static, so the moving head has something to travel along and the
+            // ring's weight never changes.
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawOrbitArc(
+                    stroke = ORBIT_STROKE.toPx(),
+                    startAngle = ORBIT_START,
+                    sweepAngle = FULL_TURN,
+                    brush = SolidColor(scheme.primary.copy(alpha = TRACK_ALPHA)),
+                )
+            }
+            // The head. `graphicsLayer` rotation means the arc is rasterised once and the
+            // per-frame work is a transform on the compositor, not a re-draw.
+            Canvas(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { rotationZ = rotation },
+            ) {
+                drawOrbitArc(
+                    stroke = ORBIT_STROKE.toPx(),
+                    startAngle = ORBIT_START,
+                    sweepAngle = ORBIT_SWEEP,
+                    // Sweeps orange→red across the head's own travel, so the leading tip is
+                    // the brightest part of it.
+                    brush = Brush.sweepGradient(listOf(scheme.primary, scheme.tertiary)),
+                )
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
+        supporting?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = dimens.bubbleMaxWidth),
+            )
+        }
+    }
+}
+
+/** The shared geometry for the two orbit arcs, so track and head can never drift apart. */
+private fun DrawScope.drawOrbitArc(
+    stroke: Float,
+    startAngle: Float,
+    sweepAngle: Float,
+    brush: Brush,
+) {
+    val inset = stroke / 2f
+    drawArc(
+        brush = brush,
+        startAngle = startAngle,
+        sweepAngle = sweepAngle,
+        useCenter = false,
+        topLeft = Offset(inset, inset),
+        size = Size(size.width - stroke, size.height - stroke),
+        style = Stroke(width = stroke, cap = StrokeCap.Round),
+    )
+}
+
+private const val FULL_TURN = 360f
+
+/** Twelve o'clock, in the arc API's coordinate space (0° is three o'clock). */
+private const val ORBIT_START = -90f
+
+/** A quarter turn: long enough to read as travel, short enough to read as a head. */
+private const val ORBIT_SWEEP = 90f
+
+private const val TRACK_ALPHA = 0.16f
+
+private val ORBIT_STROKE = 3.dp

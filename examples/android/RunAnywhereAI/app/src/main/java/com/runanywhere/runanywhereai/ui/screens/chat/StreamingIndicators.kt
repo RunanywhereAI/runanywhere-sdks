@@ -35,9 +35,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.components.StreamingCaret
 import com.runanywhere.runanywhereai.ui.components.shimmer
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
+import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.LocalReduceMotion
 import com.runanywhere.runanywhereai.ui.theme.ambientPeriod
 import kotlinx.coroutines.delay
@@ -87,6 +89,7 @@ private const val WARMING_AFTER_MS = 2_500L
  */
 @Composable
 fun PendingReplyIndicator(modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
     var phase by remember { mutableStateOf(WaitPhase.DISPATCHING) }
 
     LaunchedEffect(Unit) {
@@ -103,11 +106,11 @@ fun PendingReplyIndicator(modifier: Modifier = Modifier) {
                 liveRegion = LiveRegionMode.Polite
                 contentDescription = phase.label
             },
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
             ThinkingPips()
             AnimatedContent(
@@ -129,50 +132,70 @@ fun PendingReplyIndicator(modifier: Modifier = Modifier) {
 }
 
 /**
- * Three pips breathing out of phase. Staggered by a third of the period each so the group
- * reads as a travelling wave — the "thinking" idiom — rather than three lights blinking in
- * unison. Suppressed to a steady row when motion is reduced.
+ * Three pips breathing out of phase, so the group reads as a travelling wave — the "thinking"
+ * idiom — rather than three lights blinking in unison.
+ *
+ * **One clock, three phases.** An earlier version gave each pip its own
+ * `rememberInfiniteTransition` with a `delayMillis` offset; inside `infiniteRepeatable` that
+ * delay is re-applied at the *start of every cycle*, so the pips did not run a third of a
+ * period apart — they each stalled, and the wave came apart within a couple of seconds. This
+ * runs one 0→1 phase value and derives each pip's opacity from it, which is phase-locked by
+ * construction and costs one animation instead of three.
+ *
+ * Alpha is applied via `graphicsLayer`, so a frame is a compositor property change rather
+ * than a re-draw of three shapes. Under reduced motion the row is simply steady.
  */
 @Composable
 private fun ThinkingPips() {
     val period = ambientPeriod(AppMotion.AMBIENT_BREATHE)
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+    val phase = if (period == null) {
+        null
+    } else {
+        val transition = rememberInfiniteTransition(label = "pips")
+        val value by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(period, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "pipPhase",
+        )
+        value
+    }
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(PIP_GAP),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         repeat(PIP_COUNT) { index ->
-            val alpha = if (period == null) {
-                0.7f
-            } else {
-                pipAlpha(index = index, period = period)
-            }
             Box(
                 modifier = Modifier
-                    .size(6.dp)
+                    .size(PIP_SIZE)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
+                    .graphicsLayer {
+                        alpha = if (phase == null) {
+                            PIP_RESTING_ALPHA
+                        } else {
+                            // A triangle wave, offset by a pip-width of phase each. Triangle
+                            // rather than sine because the ambient tier is linear (§6.4) and
+                            // the two must not visibly disagree.
+                            val local = (phase + index.toFloat() / PIP_COUNT) % 1f
+                            val ramp = if (local < 0.5f) local * 2f else (1f - local) * 2f
+                            PIP_MIN_ALPHA + ramp * (1f - PIP_MIN_ALPHA)
+                        }
+                    }
+                    .background(MaterialTheme.colorScheme.primary),
             )
         }
     }
 }
 
-@Composable
-private fun pipAlpha(index: Int, period: Int): Float {
-    val transition = rememberInfiniteTransition(label = "pip$index")
-    val value by transition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = period / 2,
-                delayMillis = index * (period / (2 * PIP_COUNT)),
-                easing = LinearEasing,
-            ),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pipAlpha$index",
-    )
-    return value
-}
-
 private const val PIP_COUNT = 3
+private const val PIP_MIN_ALPHA = 0.25f
+private const val PIP_RESTING_ALPHA = 0.7f
+private val PIP_SIZE = 6.dp
+private val PIP_GAP = 4.dp
 
 /**
  * Placeholder lines with a shimmer sweep, at the widths a short paragraph actually has —
@@ -181,25 +204,28 @@ private const val PIP_COUNT = 3
  */
 @Composable
 private fun ReplySkeleton(modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
     ) {
         SKELETON_WIDTHS.forEach { fraction ->
             Box(
                 modifier = Modifier
                     .fillMaxWidth(fraction)
-                    .height(12.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .height(SKELETON_LINE_HEIGHT)
+                    .clip(RoundedCornerShape(dimens.radiusFull))
                     .background(scheme.surfaceContainerHigh)
-                    .shimmer(highlight = scheme.primary.copy(alpha = 0.16f)),
+                    .shimmer(highlight = scheme.primary.copy(alpha = SKELETON_SHIMMER_ALPHA)),
             )
         }
     }
 }
 
 private val SKELETON_WIDTHS = listOf(1f, 0.94f, 0.55f)
+private val SKELETON_LINE_HEIGHT = 12.dp
+private const val SKELETON_SHIMMER_ALPHA = 0.16f
 
 /**
  * Fades the bottom edge of streaming prose so arriving text rises into view instead of

@@ -1,11 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,12 +28,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.components.rememberBreath
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import com.runanywhere.runanywhereai.ui.theme.motionSpec
 
 enum class ThinkingPhase {
     ACTIVE,
@@ -72,14 +70,17 @@ fun ThinkingSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
         ) {
-            val brainAlpha = if (inProgress) pulse() else 1f
+            // Breathes on the shared 1.6 s ambient period while the model reasons, steady
+            // once it is done. `graphicsLayer` rather than `Modifier.alpha` so the per-frame
+            // cost is a compositor property, not a draw invalidation on the icon.
+            val brainAlpha = if (inProgress) rememberBreath(min = 0.4f, label = "thinking") else 1f
             Icon(
                 imageVector = RACIcons.Outline.Brain,
                 contentDescription = null,
                 tint = accent,
                 modifier = Modifier
                     .size(dimens.iconSm)
-                    .alpha(brainAlpha),
+                    .graphicsLayer { alpha = brainAlpha },
             )
             Text(
                 text = if (inProgress) "Thinking…" else "Reasoning",
@@ -94,10 +95,15 @@ fun ThinkingSection(
             )
         }
 
+        // A disclosure is the canonical STANDARD-tier state change. Both halves go through
+        // `motionSpec` so the whole expand collapses to one 150 ms crossfade under reduced
+        // motion instead of still sliding the panel open.
         AnimatedVisibility(
             visible = expanded,
-            enter = fadeIn(tween(180)) + expandVertically(),
-            exit = fadeOut(tween(180)) + shrinkVertically(),
+            enter = fadeIn(motionSpec { AppMotion.standard() }) +
+                expandVertically(motionSpec { AppMotion.standard() }),
+            exit = fadeOut(motionSpec { AppMotion.exit() }) +
+                shrinkVertically(motionSpec { AppMotion.exit() }),
         ) {
             Surface(
                 modifier = Modifier
@@ -118,16 +124,4 @@ fun ThinkingSection(
             }
         }
     }
-}
-
-@Composable
-private fun pulse(): Float {
-    val transition = rememberInfiniteTransition(label = "thinking")
-    val alpha by transition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
-        label = "thinkingAlpha",
-    )
-    return alpha
 }

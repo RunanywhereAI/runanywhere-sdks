@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -36,10 +37,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,14 +48,17 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.components.AudioWaveform
 import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
 import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
+import com.runanywhere.runanywhereai.ui.theme.ambientPeriod
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
@@ -275,26 +278,51 @@ private fun SpeechIndicator(isListening: Boolean, isSpeechDetected: Boolean, aud
             color = if (isSpeechDetected) primaryGreen else MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        if (isListening) LevelBars(level = audioLevel)
+        // The waveform's own history is the record of what the mic heard; `active` tints it
+        // green only while the detector agrees it is speech, so "hearing you" and "hearing
+        // the room" are visibly different states rather than the same lit bars.
+        if (isListening) {
+            AudioWaveform(level = audioLevel, active = isSpeechDetected)
+        }
     }
 }
 
+/**
+ * A ring radiating out of the mic mark while speech is being heard.
+ *
+ * Informational: it is on screen only while the VAD reports speech, so the ripple *is* the
+ * detection. Pinned to the canonical 1.0 s ambient period and linear — an eased loop stutters
+ * at the seam where it restarts. Scale and alpha ride one `graphicsLayer`, so the per-frame
+ * cost is two compositor properties rather than a re-layout of a 120dp circle.
+ *
+ * Renders nothing at all under reduced motion; the mic mark already turns green, which is the
+ * same information without the movement.
+ */
 @Composable
 private fun PulseRing() {
+    val period = ambientPeriod(AppMotion.AMBIENT_SPIN) ?: return
     val transition = rememberInfiniteTransition(label = "vadPulse")
     val progress by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 1000), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(
+            animation = tween(period, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
         label = "vadPulseProgress",
     )
     Box(
         modifier = Modifier
-            .size(120.dp)
-            .scale(1f + progress * 0.3f)
-            .alpha(1f - progress)
+            .size(PULSE_RING_SIZE)
+            .graphicsLayer {
+                val s = 1f + progress * PULSE_RING_GROWTH
+                scaleX = s
+                scaleY = s
+                // Fades as it grows, so the ring dissipates instead of hitting the edge.
+                alpha = 1f - progress
+            }
             .clip(CircleShape)
-            .background(primaryGreen.copy(alpha = 0.25f)),
+            .background(primaryGreen.copy(alpha = PULSE_RING_ALPHA)),
     )
 }
 
@@ -384,20 +412,7 @@ private fun ActivityLogRow(entry: VadLogEntry, timeFormat: DateFormat) {
     }
 }
 
-@Composable
-private fun LevelBars(level: Float) {
-    val dimens = LocalDimens.current
-    val active = (level * BAR_COUNT).toInt()
-    Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs), verticalAlignment = Alignment.CenterVertically) {
-        repeat(BAR_COUNT) { index ->
-            Box(
-                modifier = Modifier
-                    .size(width = 5.dp, height = (8 + index * 2).dp)
-                    .clip(RoundedCornerShape(dimens.radiusFull))
-                    .background(if (index < active) primaryGreen else MaterialTheme.colorScheme.surfaceContainerHighest),
-            )
-        }
-    }
-}
-
-private const val BAR_COUNT = 12
+/** The mic mark's ripple geometry. */
+private val PULSE_RING_SIZE = 120.dp
+private const val PULSE_RING_GROWTH = 0.3f
+private const val PULSE_RING_ALPHA = 0.25f

@@ -1,12 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.intro
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,12 +28,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.R
+import com.runanywhere.runanywhereai.ui.components.rememberBreath
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 
@@ -74,15 +69,11 @@ fun IntroScreen() {
         label = "introEntry",
     )
 
-    val transition = rememberInfiniteTransition(label = "introPulse")
-    // 2.2 s per cycle with Reverse: slow enough to read as breathing rather than
-    // blinking, and long enough that a fast launch never shows a full period.
-    val pulse by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Reverse),
-        label = "introPulseValue",
-    )
+    // The shared 1.6 s pulse period, not a bespoke 2.2 s one: this is the same "something
+    // is working" breath the chat pips and the thinking glyph use, and three different
+    // periods for one idea is how a motion system stops being a system. Returns its resting
+    // value under reduced motion, so the halo is simply still.
+    val pulse = rememberBreath(min = 0f, max = 1f, label = "introPulse")
 
     Box(
         modifier = Modifier
@@ -96,14 +87,18 @@ fun IntroScreen() {
             verticalArrangement = Arrangement.Center,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                // A soft brand halo behind the mark. Scaled and faded by the same
-                // pulse so the glow and the mark breathe together instead of
-                // reading as two animations.
+                // A soft brand halo behind the mark. Scale and opacity ride the same
+                // pulse in one `graphicsLayer`, so it is one compositor property set
+                // per frame — and it reads as one glow breathing, not two animations.
                 Box(
                     modifier = Modifier
-                        .size(160.dp)
-                        .scale(0.92f + pulse * 0.16f)
-                        .alpha(0.10f + pulse * 0.14f)
+                        .size(HALO_SIZE)
+                        .graphicsLayer {
+                            val s = HALO_SCALE_MIN + pulse * HALO_SCALE_RANGE
+                            scaleX = s
+                            scaleY = s
+                            alpha = HALO_ALPHA_MIN + pulse * HALO_ALPHA_RANGE
+                        }
                         .background(
                             brush = Brush.radialGradient(
                                 listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.background),
@@ -115,10 +110,14 @@ fun IntroScreen() {
                     painter = painterResource(R.drawable.runanywhere_logo),
                     contentDescription = "RunAnywhere",
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(MARK_SIZE)
                         // A narrower range than the halo: the mark should settle,
                         // not throb.
-                        .scale(0.97f + pulse * 0.06f),
+                        .graphicsLayer {
+                            val s = MARK_SCALE_MIN + pulse * MARK_SCALE_RANGE
+                            scaleX = s
+                            scaleY = s
+                        },
                 )
             }
 
@@ -193,3 +192,15 @@ fun InitErrorScreen(message: String, onRetry: () -> Unit) {
         }
     }
 }
+
+// The boot mark's geometry. Named because a raw `0.92f + pulse * 0.16f` at a call site says
+// nothing about which end is rest and which is the excursion.
+private val HALO_SIZE = 160.dp
+private const val HALO_SCALE_MIN = 0.92f
+private const val HALO_SCALE_RANGE = 0.16f
+private const val HALO_ALPHA_MIN = 0.10f
+private const val HALO_ALPHA_RANGE = 0.14f
+
+private val MARK_SIZE = 88.dp
+private const val MARK_SCALE_MIN = 0.97f
+private const val MARK_SCALE_RANGE = 0.06f
