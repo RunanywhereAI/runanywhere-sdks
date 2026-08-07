@@ -36,6 +36,7 @@ import {
   wireEngineNotice,
 } from '../components/engine-notice';
 import { renderFileDrop, wireFileDrop } from '../components/file-drop';
+import { icon } from '../components/icons';
 import { onEngineStateChange } from '../services/engine-availability';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
@@ -174,12 +175,7 @@ function renderTranscribe(): void {
         ${transcript
           ? `<pre id="transcribe-output" class="docs-pre">${escapeHtml(transcript)}</pre>`
           : `<div class="surface-empty" id="transcribe-output">
-               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                 <line x1="12" y1="19" x2="12" y2="22"/>
-               </svg>
+               ${icon('waveform', { size: 24 })}
                <p>Your transcript will appear here.</p>
              </div>`}
       </div>

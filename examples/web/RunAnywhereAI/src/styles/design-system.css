@@ -172,14 +172,50 @@
   --radius-composer: 28px;
   --radius-full: 9999px;
 
-  /* ---- Motion ---- */
-  --duration-quick: 0.15s;
-  --duration-fast: 0.25s;
-  --duration-regular: 0.3s;
-  --duration-slow: 0.5s;
-  --duration-very-slow: 0.6s;
+  /* ---- Motion ----
+   *
+   * The four tiers from DESIGN_GUIDELINE.md §6, shared with iOS and Android so
+   * the same interaction runs at the same speed on all three. This file
+   * previously had five tiers of its own (150/250/300/500/600ms) while iOS used
+   * 120/240/400/700 and Android 200/300/450/550 — three apps, three speeds for
+   * the same gesture. The old names are kept as aliases below because 60+ call
+   * sites reference them; the values are what changed.
+   *
+   * A duration outside these four is a bug, not a preference. Continuous motion
+   * (spinners, breathing, shimmer) is exempt and specified separately. */
+  --duration-micro: 0.12s;     /* tap feedback, chip select, icon swap, hover */
+  --duration-standard: 0.24s;  /* the default: row insert, disclosure, state */
+  --duration-emphasis: 0.4s;   /* sheets, hero swaps, large travel */
+  --duration-hero: 0.7s;       /* once-per-session brand moments only */
+
+  /* Aliases for the pre-existing names, mapped onto the canonical tiers. */
+  --duration-quick: var(--duration-micro);
+  --duration-fast: var(--duration-standard);
+  --duration-regular: var(--duration-standard);
+  --duration-slow: var(--duration-emphasis);
+  --duration-very-slow: var(--duration-hero);
+
+  /* ---- Easing ----
+   * `--ease-out` is the workhorse: entrances and settle-to-rest.
+   * `--ease-in-out` for moves where both ends matter (a bar filling, a value
+   * ticking). `--ease-in` for exits ONLY — it starts too slowly to feel
+   * responsive on the way in.
+   * `--ease-spring` is the CSS stand-in for the `bouncy` spring, and carries
+   * that spring's restriction: arrival and success moments only. An overshoot
+   * on a progress bar or a spinner reads as instability, not delight. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* ---- Ambient (continuous) motion ----
+   * Always `linear`: an eased curve reads as a stutter every time it loops.
+   * Three periods, because eight was what this file had grown to — 0.8s, 1s,
+   * 1.4s, 1.5s, 2s, 2s, 2s and 8s, each chosen locally, so nothing on screen
+   * was ever in phase with anything else. */
+  --ambient-breathe: 1.6s;  /* pulses, glows, listening indicators */
+  --ambient-shimmer: 1.2s;  /* skeleton / loading sweeps */
+  --ambient-spin: 1s;       /* spinner rotation */
 
   /* ---- Component Sizes ---- */
   --icon-sm: 18px;

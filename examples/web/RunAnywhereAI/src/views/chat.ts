@@ -40,6 +40,7 @@ import {
   type OpenSheetOptions,
 } from '../components/model-selection';
 import { showToast } from '../components/dialogs';
+import { icon, type IconName } from '../components/icons';
 import { getGenerationSettings } from './settings';
 import {
   answerDocumentAttachment,
@@ -190,35 +191,35 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     <div class="chat-composer-shell">
       <div class="composer-status-pill hidden" id="chat-attachment-pill"></div>
       <div class="composer-status-pill composer-status-pill--tools hidden" id="chat-tools-status">
-        ${svgIcon('<path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20z"/><path d="M2 12h20"/><path d="M12 2c3 3.2 3 16.8 0 20"/><path d="M12 2c-3 3.2-3 16.8 0 20"/>')}
+        ${icon('globe')}
         <span><strong>Web & tools on</strong><small>Trace appears in replies</small></span>
       </div>
       <div class="chat-input-area">
         <div class="composer-menu-wrap">
           <button class="composer-icon-btn" id="chat-attach-btn" type="button" aria-label="Attach or open mode" title="Attach or open mode">
-            ${svgIcon('<path d="M12 5v14"/><path d="M5 12h14"/>')}
+            ${icon('plus')}
           </button>
           <div class="composer-menu hidden" id="chat-attach-menu">
             <button type="button" data-action="document">
-              ${svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+              ${icon('file')}
               <span><strong>Document</strong><small>Ask questions with sources</small></span>
             </button>
             <button type="button" data-action="image">
-              ${svgIcon('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>')}
+              ${icon('image')}
               <span><strong>Image</strong><small>Ask about a photo</small></span>
             </button>
             <button type="button" data-action="live">
-              ${svgIcon('<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M8 6h8v9H8z"/>')}
+              ${icon('device')}
               <span><strong>Live camera</strong><small>Look around with vision</small></span>
             </button>
           </div>
         </div>
         <button class="composer-icon-btn" id="chat-tools-btn" type="button" aria-label="Enable web and tools" title="Enable web and tools">
-          ${svgIcon('<path d="M12 2a10 10 0 0 0 0 20 10 10 0 0 0 0-20z"/><path d="M2 12h20"/><path d="M12 2c3 3.2 3 16.8 0 20"/><path d="M12 2c-3 3.2-3 16.8 0 20"/>')}
+          ${icon('globe')}
         </button>
         <textarea class="chat-input" id="chat-input" placeholder="Ask anything..." rows="1"></textarea>
         <button class="composer-icon-btn" id="chat-talk-btn" type="button" aria-label="Talk mode" title="Talk mode">
-          ${svgIcon('<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/>')}
+          ${icon('mic')}
         </button>
         <button class="send-btn" id="chat-send-btn" disabled aria-label="Send message"></button>
       </div>
@@ -281,12 +282,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
     attachmentPill.classList.remove('hidden');
     attachmentPill.innerHTML = `
-      ${svgIcon(pendingAttachment.kind === 'image'
-        ? '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>'
-        : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+      ${icon(pendingAttachment.kind === 'image' ? 'image' : 'file')}
       <span><strong>${escapeHtml(pendingAttachment.name)}</strong><small>${escapeHtml(pendingAttachment.description)}</small></span>
       <button type="button" id="chat-clear-attachment" aria-label="Remove attachment">
-        ${svgIcon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>')}
+        ${icon('close')}
       </button>
     `;
     attachmentPill
@@ -307,8 +306,8 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     sendBtn.disabled = !conversationHydrated
       || (!isGenerating && ((!hasInput && !hasAttachment) || (!modelLoaded && !hasAttachment)));
     sendBtn.innerHTML = isGenerating
-      ? svgIcon('<rect x="6" y="6" width="12" height="12" rx="2"/>')
-      : svgIcon('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>');
+      ? icon('stop')
+      : icon('send');
     // Tooltip clarifies why the button is disabled. The textbox stays
     // enabled so users may compose while a model is loading.
     if (!conversationHydrated) {
@@ -1269,10 +1268,6 @@ function navigateTo(tab: string): void {
   window.dispatchEvent(new CustomEvent('runanywhere:navigate', { detail: { tab } }));
 }
 
-function svgIcon(paths: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-}
-
 /**
  * True when the C++ lifecycle reports an LLM loaded. Used to gate the chat
  * Send button so users can't click into a silent no-op before loading a
@@ -1319,26 +1314,26 @@ function greeting(): string {
   return 'Good evening';
 }
 
-const STARTER_PROMPTS: Array<{ label: string; prompt: string; icon: string }> = [
+const STARTER_PROMPTS: Array<{ label: string; prompt: string; icon: IconName }> = [
   {
     label: 'Draft a message',
     prompt: 'Help me draft a short, friendly message to my team about shipping our next release this Friday.',
-    icon: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    icon: 'pencil',
   },
   {
     label: 'Explain a topic',
     prompt: 'Explain how on-device AI keeps my data private, in simple terms.',
-    icon: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    icon: 'help',
   },
   {
     label: 'Compare options',
     prompt: 'Help me compare two small local models for private chat.',
-    icon: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/>',
+    icon: 'compare',
   },
   {
     label: 'Make a checklist',
     prompt: 'Draft a concise checklist for testing an on-device AI app.',
-    icon: '<path d="M3 17l2 2 4-4"/><path d="M3 7l2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+    icon: 'checklist',
   },
 ];
 
@@ -1346,7 +1341,7 @@ function renderMessages(host: HTMLElement): void {
   if (messages.length === 0) {
     host.innerHTML = `
       <div class="chat-empty-state">
-        <div class="empty-logo">${svgIcon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>')}</div>
+        <div class="empty-logo">${icon('sparkles')}</div>
         <h3>${greeting()}</h3>
         <p>
           AI inference runs on this device. Setup, model downloads, and
@@ -1355,7 +1350,7 @@ function renderMessages(host: HTMLElement): void {
         <div class="suggestion-chips">
           ${STARTER_PROMPTS.map((starter) => `
             <button type="button" class="suggestion-chip" data-prompt="${escapeHtml(starter.prompt)}">
-              ${svgIcon(starter.icon)}
+              ${icon(starter.icon, { size: 20 })}
               <span>${starter.label}</span>
             </button>
           `).join('')}
@@ -1389,7 +1384,7 @@ function renderMessageActions(msg: ChatMessage, idx: number): string {
   return `
     <div class="chat-msg-actions">
       <button type="button" class="chat-action-btn" data-copy-idx="${idx}" aria-label="Copy reply">
-        ${svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>')}
+        ${icon('copy')}
         <span>Copy</span>
       </button>
     </div>
@@ -1427,9 +1422,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
         ${msg.toolCalls.map((call) => `
           <details class="chat-tool-call">
             <summary>
-              ${svgIcon(call.error
-                ? '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
-                : '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9l-3.8 3.8z"/>')}
+              ${icon(call.error ? 'warning' : 'tool')}
               <span>${escapeHtml(call.name)}</span>
               <small>${call.error ? 'failed' : 'completed'}</small>
             </summary>
@@ -1443,9 +1436,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
   const attachmentSection = msg.attachment
     ? `
       <div class="chat-attachment-card chat-attachment-card--${msg.attachment.kind}">
-        ${svgIcon(msg.attachment.kind === 'image'
-          ? '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>'
-          : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>')}
+        ${icon(msg.attachment.kind === 'image' ? 'image' : 'file')}
         <span><strong>${escapeHtml(msg.attachment.name)}</strong><small>${escapeHtml(msg.attachment.detail ?? '')}</small></span>
       </div>
     `

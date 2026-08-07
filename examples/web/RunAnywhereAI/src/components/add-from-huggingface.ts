@@ -28,6 +28,7 @@ import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import { formatBytes } from '../services/model-display';
 import { openModal, showToast } from './dialogs';
+import { icon } from './icons';
 
 // ---------------------------------------------------------------------------
 // State (module-scope — one HF modal per app, like the model-selection sheet)
@@ -90,10 +91,7 @@ function renderModal(): void {
 
   modal.body.innerHTML = `
     <div class="model-search">
-      <svg class="model-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="7"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
+      ${icon('search', { size: 16, className: 'model-search__icon' })}
       <input id="hf-search-input" class="model-search__input" type="search"
         placeholder="Search GGUF models on Hugging Face…" aria-label="Search Hugging Face for GGUF models"
         autocomplete="off" spellcheck="false" />
@@ -165,9 +163,7 @@ function renderRepoList(results: readonly HfModelSummary[]): void {
           <span>&#9829; ${formatCount(repo.likes)}</span>
         </div>
       </div>
-      <svg class="hf-repo-row__chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
+      ${icon('chevronRight', { size: 16, className: 'hf-repo-row__chevron' })}
     </button>
   `).join('');
   renderResults(`<div class="hf-repo-list">${rows}</div>`);
@@ -378,9 +374,7 @@ function setFileState(path: string, state: FileRowState): void {
 function backButtonHtml(): string {
   return `
     <button type="button" class="hf-back-btn" id="hf-back-btn">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
+      ${icon('back', { size: 16 })}
       Back to results
     </button>
   `;

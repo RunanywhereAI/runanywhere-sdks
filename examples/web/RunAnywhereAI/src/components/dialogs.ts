@@ -16,6 +16,8 @@
  * the shell is centralized and the callers supply only a title and a body.
  */
 
+import { icon, type IconName } from './icons';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -26,10 +28,22 @@ export type ToastVariant = 'success' | 'warning' | 'info';
 // Toast
 // ---------------------------------------------------------------------------
 
-const TOAST_ICONS: Record<ToastVariant, string> = {
-  success: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--color-green)" stroke-width="2" width="18" height="18"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
-  warning: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--color-orange, orange)" stroke-width="2" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  info: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+/**
+ * The glyph for each variant.
+ *
+ * Colour is deliberately NOT set here. These used to carry
+ * `stroke="var(--color-green)"` / `"var(--color-primary)"` and, for warning,
+ * `stroke="var(--color-orange, orange)"` — a token this app never defines, so
+ * every warning toast was painting the CSS keyword `orange` (#FFA500), an
+ * off-brand hue sitting next to #FF6900 in the same corner of the screen. The
+ * icons now inherit `currentColor` from `.toast--<variant>`, which reads the
+ * token layer, so a palette change reaches them and no hex or fallback keyword
+ * lives in a template string.
+ */
+const TOAST_ICONS: Record<ToastVariant, IconName> = {
+  success: 'check',
+  warning: 'warning',
+  info: 'info',
 };
 
 /**
@@ -45,10 +59,11 @@ export function showToast(
   existing?.remove();
 
   const toast = document.createElement('div');
-  toast.className = 'toast';
+  toast.className = `toast toast--${variant}`;
   // The icon is a closed, source-controlled SVG. Toast messages frequently
-  // contain backend/model/download errors, so keep them out of an HTML sink.
-  toast.innerHTML = TOAST_ICONS[variant];
+  // contain backend/model/download errors, so keep them out of an HTML sink —
+  // the message goes in via textContent below.
+  toast.innerHTML = icon(TOAST_ICONS[variant], { size: 20 });
   const label = document.createElement('span');
   label.textContent = message;
   toast.appendChild(label);
@@ -207,12 +222,7 @@ export function openModal(options: ModalOptions): ModalHandle {
   closeBtn.type = 'button';
   closeBtn.className = 'btn-ghost';
   closeBtn.setAttribute('aria-label', 'Close');
-  closeBtn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" aria-hidden="true">
-      <line x1="18" y1="6" x2="6" y2="18"/>
-      <line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
-  `;
+  closeBtn.innerHTML = icon('close', { size: 20 });
   header.append(heading, closeBtn);
 
   const body = document.createElement('div');

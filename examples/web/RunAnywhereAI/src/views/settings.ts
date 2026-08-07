@@ -13,6 +13,7 @@
  */
 
 import { RunAnywhere } from '@runanywhere/web';
+import { icon } from '../components/icons';
 import { escapeHtml } from '../services/escape-html';
 import {
   isUsableCredential,
@@ -317,10 +318,11 @@ export function initSettingsTab(el: HTMLElement): void {
           <span class="setting-label">Platform</span>
           <span class="setting-value">Web (Emscripten WASM)</span>
         </div>
-        <div class="setting-row cursor-pointer" id="settings-docs-link">
-          <span class="setting-label text-accent">Documentation</span>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="1.5" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </div>
+        <a class="setting-row setting-row--link" id="settings-docs-link"
+          href="https://docs.runanywhere.ai" target="_blank" rel="noopener noreferrer">
+          <span class="setting-label">Documentation</span>
+          ${icon('externalLink', { size: 16 })}
+        </a>
       </div>
 
     </div>
@@ -422,10 +424,10 @@ export function initSettingsTab(el: HTMLElement): void {
     }
   });
 
-  // Docs link
-  container.querySelector('#settings-docs-link')!.addEventListener('click', () => {
-    window.open('https://docs.runanywhere.ai', '_blank');
-  });
+  // The docs link is a real <a href target="_blank">, so the browser owns
+  // opening it — which is what makes it keyboard-reachable, announced as a
+  // link, and usable via "open in new window". It was a <div> with a click
+  // handler calling window.open(), which none of those are true of.
 }
 
 async function applyAPIConfiguration(
