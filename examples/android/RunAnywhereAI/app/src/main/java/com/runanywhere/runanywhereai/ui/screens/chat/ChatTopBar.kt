@@ -1,10 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,9 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.components.rememberBreath
 import com.runanywhere.runanywhereai.ui.screens.models.brand
 import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
 import com.runanywhere.runanywhereai.ui.screens.models.consumerBackendShortLabel
@@ -157,18 +153,10 @@ private fun ModelCard(
         hostedModel != null || model != null -> primaryGreen
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val dotAlpha = if (generating) {
-        val transition = rememberInfiniteTransition(label = "generating")
-        val alpha by transition.animateFloat(
-            initialValue = 0.3f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
-            label = "generatingDot",
-        )
-        alpha
-    } else {
-        1f
-    }
+    // On the shared 1.6 s pulse, so the status dot breathes in step with the chat's thinking
+    // pips instead of at its own 700 ms rate. Steady when the turn is done, or under
+    // reduced motion.
+    val dotAlpha = if (generating) rememberBreath(min = 0.3f, label = "generatingDot") else 1f
 
     Card(modifier = Modifier.clickable(onClick = onClick).widthIn(max = 200.dp)) {
         Row(
@@ -201,7 +189,7 @@ private fun ModelCard(
                     Spacer(
                         Modifier
                             .size(dimens.spacingSm)
-                            .alpha(dotAlpha)
+                            .graphicsLayer { alpha = dotAlpha }
                             .background(dotColor, CircleShape),
                     )
                     Text(
