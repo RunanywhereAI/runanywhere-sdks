@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Android 12+ owns the cold-start window through the platform SplashScreen,
+         so the pre-31 layer-list is replaced by the real attributes here. Without
+         them the system draws its own default — a window tinted from the theme with
+         the *launcher* icon on it — which showed a different mark than the app's
+         own and, before Theme.RunAnywhereAI went dark, flashed white.
+
+         The icon is the brand mark rather than @mipmap/ic_launcher because the
+         platform masks this slot to the device's icon shape and the launcher icon
+         already carries its own background; reusing it would nest one badge inside
+         another. -->
+    <style name="Theme.RunAnywhereAI.Starting" parent="Theme.RunAnywhereAI">
+        <item name="android:windowSplashScreenBackground">@color/brand_window_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+    </style>
+</resources>
