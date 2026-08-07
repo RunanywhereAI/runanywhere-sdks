@@ -56,24 +56,6 @@ struct AdaptiveSizing {
         }
     }
 
-    /// Secondary action button size
-    static var actionButtonSize: CGFloat {
-        switch DeviceFormFactor.current {
-        case .phone: return 44
-        case .tablet: return 50
-        case .desktop: return 56
-        }
-    }
-
-    /// Maximum content width for readable text
-    static var maxContentWidth: CGFloat {
-        switch DeviceFormFactor.current {
-        case .phone: return .infinity
-        case .tablet: return 700
-        case .desktop: return 800
-        }
-    }
-
     /// Conversation area max width
     static var conversationMaxWidth: CGFloat {
         switch DeviceFormFactor.current {
@@ -269,80 +251,6 @@ private struct AdaptiveSheetChrome<Content: View>: View {
 }
 #endif
 
-// MARK: - Adaptive Form Style
-struct AdaptiveFormStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        #if os(macOS)
-        content
-            .formStyle(.grouped)
-            .scrollContentBackground(.visible)
-        #else
-        content
-            .formStyle(.automatic)
-        #endif
-    }
-}
-
-// MARK: - Adaptive Navigation
-struct AdaptiveNavigation<Content: View>: View {
-    let title: String
-    let content: () -> Content
-
-    var body: some View {
-        #if os(macOS)
-        VStack(spacing: 0) {
-            // Custom title bar for macOS
-            HStack {
-                Text(title)
-                    .font(.headline)
-                Spacer()
-            }
-            .padding()
-            .background(Color(NSColor.windowBackgroundColor))
-
-            Divider()
-
-            content()
-        }
-        #else
-        NavigationView {
-            content()
-                .navigationTitle(title)
-                .navigationBarTitleDisplayModeCompat(.inline)
-        }
-        #endif
-    }
-}
-
-// MARK: - Adaptive Button Style
-struct AdaptiveButtonStyle: ButtonStyle {
-    let isPrimary: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        #if os(macOS)
-        if isPrimary {
-            configuration.label
-                .buttonStyle(.borderedProminent)
-                .tint(AppColors.primaryAccent)
-                .controlSize(.regular)
-        } else {
-            configuration.label
-                .buttonStyle(.bordered)
-                .tint(AppColors.primaryAccent)
-                .controlSize(.regular)
-        }
-        #else
-        configuration.label
-            .padding(.horizontal, isPrimary ? 16 : 12)
-            .padding(.vertical, isPrimary ? 12 : 8)
-            .background(isPrimary ? AppColors.primaryAccent : Color.secondary.opacity(0.2))
-            .foregroundColor(isPrimary ? .white : .primary)
-            .cornerRadius(8)
-            .opacity(configuration.isPressed ? 0.8 : 1.0)
-        #endif
-    }
-}
-
 // MARK: - View Extensions
 extension View {
     func adaptiveSheet<Content: View>(
@@ -355,138 +263,6 @@ extension View {
             onDismiss: onDismiss,
             sheetContent: content
         ))
-    }
-
-    func adaptiveFormStyle() -> some View {
-        modifier(AdaptiveFormStyle())
-    }
-
-    func adaptiveButtonStyle(isPrimary: Bool = false) -> some View {
-        buttonStyle(AdaptiveButtonStyle(isPrimary: isPrimary))
-    }
-
-    func adaptiveFrame() -> some View {
-        #if os(macOS)
-        self.frame(
-            minWidth: 400,
-            idealWidth: 600,
-            maxWidth: 900,
-            minHeight: 300,
-            idealHeight: 500,
-            maxHeight: 800
-        )
-        #else
-        self
-        #endif
-    }
-
-    func adaptiveToolbar<Leading: View, Trailing: View>(
-        @ViewBuilder leading: () -> Leading,
-        @ViewBuilder trailing: () -> Trailing
-    ) -> some View {
-        #if os(macOS)
-        self.toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                leading()
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                trailing()
-            }
-        }
-        #else
-        self.toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                leading()
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                trailing()
-            }
-        }
-        #endif
-    }
-}
-
-// MARK: - Platform-Specific Colors
-extension Color {
-    static var adaptiveBackground: Color {
-        #if os(macOS)
-        Color(NSColor.windowBackgroundColor)
-        #else
-        Color(.systemBackground)
-        #endif
-    }
-
-    static var adaptiveSecondaryBackground: Color {
-        #if os(macOS)
-        Color(NSColor.controlBackgroundColor)
-        #else
-        Color(.secondarySystemBackground)
-        #endif
-    }
-
-    static var adaptiveTertiaryBackground: Color {
-        #if os(macOS)
-        Color(NSColor.textBackgroundColor)
-        #else
-        Color(.tertiarySystemBackground)
-        #endif
-    }
-
-    static var adaptiveGroupedBackground: Color {
-        #if os(macOS)
-        Color(NSColor.controlBackgroundColor)
-        #else
-        Color(.systemGroupedBackground)
-        #endif
-    }
-
-    static var adaptiveSeparator: Color {
-        #if os(macOS)
-        Color(NSColor.separatorColor)
-        #else
-        Color(.separator)
-        #endif
-    }
-
-    static var adaptiveLabel: Color {
-        #if os(macOS)
-        Color(NSColor.labelColor)
-        #else
-        Color(.label)
-        #endif
-    }
-
-    static var adaptiveSecondaryLabel: Color {
-        #if os(macOS)
-        Color(NSColor.secondaryLabelColor)
-        #else
-        Color(.secondaryLabel)
-        #endif
-    }
-}
-
-// MARK: - Adaptive Text Field
-struct AdaptiveTextField: View {
-    let title: String
-    @Binding var text: String
-    var isURL: Bool = false
-    var isSecure: Bool = false
-    var isNumeric: Bool = false
-
-    var body: some View {
-        Group {
-            if isSecure {
-                SecureField(title, text: $text)
-            } else {
-                TextField(title, text: $text)
-                    #if os(iOS)
-                    .keyboardType(isURL ? .URL : (isNumeric ? .numberPad : .default))
-                    .autocapitalization(isURL ? .none : .sentences)
-                    #endif
-            }
-        }
-        .textFieldStyle(.roundedBorder)
-        .autocorrectionDisabled(isURL)
     }
 }
 
@@ -664,49 +440,8 @@ extension View {
         ))
     }
 
-    /// Constrains the view to a maximum readable width, centered
-    func adaptiveContentWidth(_ maxWidth: CGFloat? = nil) -> some View {
-        frame(maxWidth: maxWidth ?? AdaptiveSizing.maxContentWidth)
-    }
-
-    /// Applies padding appropriate for the current platform
-    func adaptiveContentPadding() -> some View {
-        padding(.horizontal, AdaptiveSizing.contentPadding)
-    }
-
     /// Constrains to conversation area width
     func adaptiveConversationWidth() -> some View {
         frame(maxWidth: AdaptiveSizing.conversationMaxWidth, alignment: .leading)
-    }
-}
-
-// MARK: - Adaptive Model Badge
-
-/// A model info badge that scales appropriately for different platforms
-struct AdaptiveModelBadge: View {
-    let icon: String
-    let label: String
-    let value: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: AdaptiveSizing.badgeFontSize))
-                .foregroundColor(color)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(label)
-                    .font(.system(size: AdaptiveSizing.badgeFontSize - 1))
-                    .foregroundColor(.secondary)
-                Text(value)
-                    .font(.system(size: AdaptiveSizing.badgeFontSize))
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-            }
-        }
-        .padding(.horizontal, AdaptiveSizing.badgePaddingH)
-        .padding(.vertical, AdaptiveSizing.badgePaddingV)
-        .background(color.opacity(0.1))
-        .cornerRadius(6)
     }
 }

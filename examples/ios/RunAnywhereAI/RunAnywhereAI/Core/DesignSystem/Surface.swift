@@ -36,7 +36,9 @@ extension View {
 }
 
 private struct RASurfaceModifier: ViewModifier {
-    @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorScheme)
+    private var scheme
+
     let level: RASurfaceLevel
     let radius: CGFloat
 
@@ -106,7 +108,9 @@ struct RAProminentButtonStyle: ButtonStyle {
             .background(AppColors.brand, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .opacity(configuration.isPressed ? 0.82 : 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(Motion.snappy, value: configuration.isPressed)
+            // `motionAware` and not a bare `.animation`: the press response is
+            // travel, and travel is what Reduce Motion asks us to drop.
+            .motionAware(Motion.snappy, value: configuration.isPressed)
     }
 }
 

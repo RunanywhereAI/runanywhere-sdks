@@ -329,15 +329,12 @@ final class LLMViewModel {
         guard !isViewModelInitialized else { return }
         isViewModelInitialized = true
 
-        // Conversation selection is purely intra-app state with no SDK event
-        // counterpart, so it stays on NotificationCenter. Model lifecycle flows
-        // through the SDK event bus (subscribeToModelLifecycle) instead.
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(conversationSelected(_:)),
-            name: .conversationSelected,
-            object: nil
-        )
+        // Deletion is a broadcast: `ConversationStore` cannot know which view
+        // models are looking at the row it just removed, so this one stays on
+        // NotificationCenter. Selection does not — the sidebar (Mac) and the
+        // drawer (iOS) call `loadConversation` directly, which is traceable and
+        // typed. Model lifecycle flows through the SDK event bus
+        // (`subscribeToModelLifecycle`) instead.
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(conversationDeleted(_:)),
@@ -887,13 +884,6 @@ final class LLMViewModel {
             SystemPrompt: \(savedSystemPrompt ?? "nil")
             """
         )
-    }
-
-    @objc
-    private func conversationSelected(_ notification: Notification) {
-        if let conversation = notification.object as? Conversation {
-            loadConversation(conversation)
-        }
     }
 
     @objc
