@@ -750,7 +750,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{3}model_used\0\u{3}generation_time_ms\0\u{2}\u{3}framework\0\u{4}\u{2}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{4}\u{4}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0\u{3}finish_reason\0\u{3}stop_sequence\0\u{c}\u{a}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{3}model_used\0\u{3}generation_time_ms\0\u{2}\u{3}framework\0\u{4}\u{2}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{4}\u{4}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0\u{3}finish_reason\0\u{3}stop_sequence\0\u{c}\u{7}\u{1}\u{c}\u{a}\u{1}")
 
   fileprivate class _StorageClass {
     var _text: String = String()
