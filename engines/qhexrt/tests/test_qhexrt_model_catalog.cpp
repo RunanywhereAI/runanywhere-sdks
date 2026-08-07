@@ -67,7 +67,7 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "whisper_small",        "moonshine_tiny",      "moonshine_base",  "parakeet_tdt_0_6b_v2",
         "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
         "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "kitten_nano_0_8_varlen",
-        "embeddinggemma_300m",
+        "embeddinggemma_300m", "lfm2_5_2_6b",
         "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
         "nemotron_nano_8b",     "canary_180m_flash",
         "parakeet_ctc_1_1b",    "nemotron_3_embed_1b", "magpie_tts_357m",
@@ -80,13 +80,15 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "whisper_base",   "whisper_small", "moonshine_base",
         "moonshine_tiny", "melotts_en",    "embeddinggemma_300m",
         "siglip2_base",   "lama_dilated",
-        "lfm2_5_2_6b",
+        "lfm2_5_2_6b",   "cosmos3_edge_text", "cosmos3_edge_vlm",
+        "cosmos3_edge_diffusion",
     };
     const std::unordered_set<std::string> v81 = {
         "qwen3_0_6b",
         "llama3_2_1b",
         "lfm2_5_230m",
         "lfm2_5_350m",
+        "lfm2_5_2_6b",
         "gemma4_e2b",
         "gemma4_e4b",
         "gemma3n_e4b",
@@ -97,6 +99,7 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "deepseek_r1_distill_qwen_1_5b",
         "deepseek_r1_distill_qwen_7b",
         "ternary_bonsai_1_7b",
+        "maple_preview",
         "bonsai_1_7b_1bit",
         "bonsai_27b_1bit",
         "nemotron_nano_8b",
@@ -412,7 +415,7 @@ int test_public_model_registers_without_token() {
                   RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
               RAC_SUCCESS);
     ASSERT_EQ(registered, RAC_TRUE);
-    ASSERT_EQ(g_hf_request_count, 1);
+    ASSERT_EQ(g_hf_request_count, 2);
     ASSERT_TRUE(registry_contains(id));
     rac_proto_buffer_free(&out);
 

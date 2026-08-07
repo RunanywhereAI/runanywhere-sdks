@@ -44,7 +44,7 @@ struct ModelPolicy {
     // Fail-closed gate: when true, register_for_arch_proto() skips the row until an
     // HF token is configured, which is what drives the per-SDK "bring your own HF
     // token" preflight UX. Most RunAnywhere-hosted QHexRT repos are PUBLIC and set this
-    // false; only kitten_nano_0_8_varlen is gated today. The exact set is pinned by
+    // false; private bundles are gated here. The exact set is pinned by
     // test_qhexrt_model_catalog's private_ids, so hosting a model behind a gated HF repo
     // means flipping this row AND that set — nothing else changes.
     bool requires_hf_auth;
@@ -65,6 +65,8 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"qwen3_0_6b", kV75V81, false},
     {"llama3_2_1b", kV79V81, false},
     {"ternary_bonsai_1_7b", kV75V81, false},
+    // Maple is a true-ternary MoE FastRPC bundle. Only the public v81 build is published.
+    {"maple_preview", kV81, false},
     {"bonsai_1_7b_1bit", kV81, false},
     // HF currently ships only v81 context binaries for these 1-bit Bonsai
     // bundles (no v75/). Keep policy aligned with the published tree so v75

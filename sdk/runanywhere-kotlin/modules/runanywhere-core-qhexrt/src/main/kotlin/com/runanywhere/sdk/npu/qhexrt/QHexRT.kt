@@ -26,7 +26,7 @@ private val RAC_ERROR_CAPABILITY_UNSUPPORTED = -ErrorCode.ERROR_CODE_CAPABILITY_
  * ## Pre-flight
  * ```kotlin
  * val npu = QHexRT.probeNpu()
- * if (!npu.qhexrt_supported) { /* warn; fall back to CPU engines */ }
+ * if (!npu.supported) { /* warn; fall back to CPU engines */ }
  * ```
  *
  * ## Registration
@@ -59,7 +59,7 @@ object QHexRT {
     /**
      * Probe the device's Hexagon NPU without loading QNN. Safe to call on any
      * device; returns the all-default [NpuCapability] (unknown arch,
-     * `qhexrt_supported = false`) on unsupported/unknown parts or probe
+     * `supported = false`) on unsupported/unknown parts or probe
      * failure.
      */
     fun probeNpu(): NpuCapability {

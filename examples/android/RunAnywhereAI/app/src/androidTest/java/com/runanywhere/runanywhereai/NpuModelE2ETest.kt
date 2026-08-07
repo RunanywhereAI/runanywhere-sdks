@@ -112,6 +112,7 @@ class NpuModelE2ETest {
         val baseUrl: String?,
         val treeSha256: String,
         val files: List<LocalBundleFile>,
+        val registrationFiles: List<LocalBundleFile>,
         val canonicalReceiptVerified: Boolean,
     )
 
@@ -225,7 +226,7 @@ class NpuModelE2ETest {
                 val registered =
                     if (localBundle != null) {
                         RunAnywhere.registerModel(
-                            multiFile = localBundle.files.map { it.toDescriptor(model.id, localBundle) },
+                            multiFile = localBundle.registrationFiles.map { it.toDescriptor(model.id, localBundle) },
                             id = model.id,
                             name = model.name,
                             framework = model.framework,
@@ -256,7 +257,7 @@ class NpuModelE2ETest {
                                 model = registered.copy(source = ModelSource.MODEL_SOURCE_LOCAL),
                                 source_path = localRoot.absolutePath,
                                 overwrite_existing = true,
-                                files = localBundle.files.map { it.toDescriptor(model.id, localBundle, true) },
+                                files = localBundle.registrationFiles.map { it.toDescriptor(model.id, localBundle, true) },
                             ),
                         )
                     val importOk =
@@ -611,9 +612,25 @@ class NpuModelE2ETest {
         if (outTok == 0) outTok = tokenCount
         val ttftF = if (ttft > 0) ttft else ttftWall
         val total = if (totMs > 0) totMs else totalWall
-        val decToks = if (decMs > 0) outTok * 1000.0 / decMs else if (tps > 0) tps else if (total > 0) outTok * 1000.0 / total else 0.0
+        val wallTps = if (total > 0) outTok * 1000.0 / total else 0.0
+        // A batch-style backend can finish generation before it emits its buffered
+        // stream events. In that case first-token and terminal timestamps are only
+        // milliseconds apart, so deriving "decode throughput" from that interval
+        // produces impossible five-digit tok/s. Use end-to-end wall throughput unless
+        // the backend provides a real decode duration or the stream exposes a
+        // meaningful post-TTFT decode window.
+        val hasDecodeWindow =
+            ttftF > 0 && total - ttftF >= maxOf(50.0, total * 0.05)
+        val decToks =
+            if (decMs > 0) {
+                outTok * 1000.0 / decMs
+            } else if (tps > 0 && hasDecodeWindow) {
+                tps
+            } else {
+                wallTps
+            }
         val preToks = if (preMs > 0) inTok * 1000.0 / preMs else 0.0
-        return Gen(sb.toString().trim(), tokenCount, ttftF, decToks, preToks, if (tps > 0) tps else decToks, total, outTok)
+        return Gen(sb.toString().trim(), tokenCount, ttftF, decToks, preToks, decToks, total, outTok)
     }
 
     // ---------------------------------------------------------------- VLM ----
@@ -1293,6 +1310,19 @@ class NpuModelE2ETest {
         val canonicalReceiptVerified =
             canonicalReceiptAvailable && exactManifest && exactContexts &&
                 (expectedArtifacts.isEmpty() || exactArtifacts)
+        // Commons initializes a directory-bundle backend from the first descriptor. Keep the
+        // canonical tree ordering for its digest, but hand registration the suite-pinned
+        // manifest first; nested artifacts such as MoE expert shards can sort before it.
+        val descriptorFiles =
+            if (exactManifest) {
+                files.sortedWith(
+                    compareByDescending<LocalBundleFile> {
+                        it.sha256 == expectedSuite.manifestSha256
+                    }.thenBy { it.relativePath },
+                )
+            } else {
+                files
+            }
         val mode = if (root != null) "local_adb_import" else "local_loopback_download"
         if (root != null) require(verifyBundleFiles(root, files) == computedTree) {
             "local bundle files do not match the index"
@@ -1342,7 +1372,15 @@ class NpuModelE2ETest {
                 "local bundle does not match the suite-pinned canonical artifact receipt"
             }
         }
-        return LocalBundle(mode, root, rawBaseUrl, computedTree, files, canonicalReceiptVerified)
+        return LocalBundle(
+            mode,
+            root,
+            rawBaseUrl,
+            computedTree,
+            files,
+            descriptorFiles,
+            canonicalReceiptVerified,
+        )
     }
 
     private fun verifyBundleFiles(root: File, bundle: LocalBundle): String =
