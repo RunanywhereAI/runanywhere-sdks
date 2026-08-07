@@ -43,6 +43,7 @@ import {
   runEngineRetry,
 } from '../components/model-selection';
 import { renderModelSlot, type ModelSlotView } from '../components/model-slot';
+import { icon } from '../components/icons';
 import {
   canRetryEngines,
   describeFailures,
@@ -319,9 +320,7 @@ function renderSolutionCard(solution: SolutionDef): string {
     <div class="setup-card setup-card--plain">
       <div class="setup-card__head">
         <div class="setup-card__glyph">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
-          </svg>
+          ${icon('stack', { size: 24 })}
         </div>
         <div>
           <div class="setup-card__title">${escapeHtml(solution.title)}</div>

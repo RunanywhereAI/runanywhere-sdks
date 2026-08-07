@@ -69,6 +69,7 @@ import {
   type RecommendedSelection,
 } from '../services/model-recommendation';
 import { openModal, showToast } from './dialogs';
+import { icon } from './icons';
 import { runEngineRetry } from './engine-notice';
 import { appLogger } from '../services/app-logger';
 import { openAddFromHuggingFace } from './add-from-huggingface';
@@ -197,14 +198,9 @@ export function buildToolbarModelButton(sheetOptions: OpenSheetOptions = {}): HT
   btn.className = 'toolbar-model-btn';
   btn.type = 'button';
   btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="model-icon">
-      <circle cx="12" cy="12" r="9"/>
-      <path d="M12 3c2.5 3 2.5 15 0 18M3 12h18"/>
-    </svg>
+    ${icon('model', { size: 16, className: 'model-icon' })}
     <span id="chat-toolbar-model-text">Select Model</span>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron">
-      <polyline points="6 9 12 15 18 9"/>
-    </svg>
+    ${icon('chevronDown', { size: 16, className: 'chevron' })}
   `;
   btn.addEventListener('click', () => openSheet(sheetOptions));
 
@@ -315,11 +311,7 @@ function welcomeOverlayCard(): string {
   return `
     <div class="chat-model-overlay-card">
       <div class="chat-model-overlay-glyph">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/>
-          <path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/>
-          <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>
-        </svg>
+        ${icon('sparkles', { size: 32 })}
       </div>
       <h3 class="chat-model-overlay-title">Welcome</h3>
       <p class="chat-model-overlay-description">
@@ -331,10 +323,7 @@ function welcomeOverlayCard(): string {
         Choose a Model
       </button>
       <div class="chat-model-overlay-privacy">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-        </svg>
+        ${icon('lock', { size: 16 })}
         <span>On-device AI inference</span>
       </div>
     </div>
@@ -353,10 +342,7 @@ function unavailableOverlayCard(
   return `
     <div class="chat-model-overlay-card">
       <div class="chat-model-overlay-glyph chat-model-overlay-glyph--warning">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
+        ${icon('warning', { size: 32 })}
       </div>
       <h3 class="chat-model-overlay-title">${rechecking ? 'Re-checking the AI engine' : 'AI engine didn&rsquo;t load'}</h3>
       <p class="chat-model-overlay-description">${escapeHtml(
@@ -515,19 +501,13 @@ function renderSheet(): void {
   modal.body.innerHTML = `
     <div id="model-sheet-banner"></div>
     <div class="model-search">
-      <svg class="model-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="7"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
+      ${icon('search', { size: 16, className: 'model-search__icon' })}
       <input id="model-sheet-search" class="model-search__input" type="search"
         placeholder="Search models, capabilities…" aria-label="Search models"
         autocomplete="off" spellcheck="false" />
     </div>
     <button type="button" class="btn btn-secondary btn-sm model-sheet-hf-btn" id="model-sheet-hf-btn">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true">
-        <line x1="12" y1="5" x2="12" y2="19"/>
-        <line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
+      ${icon('plus', { size: 16 })}
       Add from Hugging Face
     </button>
     <div id="model-sheet-list"></div>
@@ -600,11 +580,7 @@ function renderBanner(): void {
   host.innerHTML = `
     <div class="device-banner device-banner--${caps.tier}">
       <div class="device-banner__glyph">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="4" y="4" width="16" height="16" rx="3"/>
-          <rect x="9" y="9" width="6" height="6" rx="1"/>
-          <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>
-        </svg>
+        ${icon('chip', { size: 24 })}
       </div>
       <div class="device-banner__text">
         <div class="device-banner__title">Recommended for your device</div>
@@ -635,10 +611,7 @@ function renderEngineFailureBanner(
   host.innerHTML = `
     <div class="engine-banner" role="status">
       <div class="engine-banner__glyph">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
+        ${icon('warning', { size: 24 })}
       </div>
       <div class="engine-banner__text">
         <div class="engine-banner__title">${rechecking ? 'Re-checking the AI engine' : 'On-device AI engine unavailable'}</div>
@@ -854,9 +827,7 @@ function recommendedShell(cardsHtml: string, companionRows: string): string {
   return `
     <div class="model-section model-section--recommended">
       <div class="model-section__title model-section__title--reco">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-          <path d="M12 3l1.9 5.4L19 10l-5.1 1.6L12 17l-1.9-5.4L5 10l5.1-1.6L12 3z"/>
-        </svg>
+        ${icon('star', { size: 16 })}
         Recommended
       </div>
       ${cardsHtml}
@@ -972,9 +943,7 @@ function renderOrgCard(org: OrgGroup): string {
         </div>
         <div class="family-card__aside">
           <span class="family-card__count">${options} ${options === 1 ? 'model' : 'models'}</span>
-          <svg class="family-card__chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+          ${icon('chevronDown', { size: 16, className: 'family-card__chevron' })}
         </div>
       </button>
       ${variants}

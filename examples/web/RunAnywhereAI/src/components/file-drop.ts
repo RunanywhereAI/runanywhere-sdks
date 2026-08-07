@@ -22,6 +22,8 @@
  * attaches behaviour to whatever that markup became.
  */
 
+import { icon } from './icons';
+
 export interface FileDropOptions {
   /** Unique id prefix; the input and hint derive their ids from it. */
   id: string;
@@ -41,12 +43,7 @@ export function renderFileDrop(options: FileDropOptions): string {
     <input type="file" id="${id}-input" accept="${accept}" ${multiple ? 'multiple' : ''} hidden />
     <button type="button" class="docs-dropzone" id="${id}" aria-describedby="${id}-hint"
       ${disabled ? 'disabled' : ''}>
-      <svg class="docs-dropzone-glyph" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="17 8 12 3 7 8"/>
-        <line x1="12" y1="3" x2="12" y2="15"/>
-      </svg>
+      ${icon('upload', { size: 28, className: 'docs-dropzone-glyph' })}
       <span class="docs-dropzone-title">${title}</span>
       <span class="docs-dropzone-hint" id="${id}-hint">${hint}</span>
     </button>

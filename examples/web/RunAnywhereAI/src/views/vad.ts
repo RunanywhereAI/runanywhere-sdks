@@ -31,6 +31,7 @@ import {
   renderEngineNotice,
   wireEngineNotice,
 } from '../components/engine-notice';
+import { icon } from '../components/icons';
 import { onEngineStateChange } from '../services/engine-availability';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
@@ -160,10 +161,7 @@ function renderVad(): void {
         <h3>Activity log</h3>
         ${activityLog.length === 0
           ? `<div class="surface-empty">
-               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                 <path d="M2 12h3l2-5 3 10 3-7 2 4h7"/>
-               </svg>
+               ${icon('pulse', { size: 24 })}
                <p>Speech starts and stops will be listed here.</p>
              </div>`
           : `<ul class="docs-list" id="vad-log">

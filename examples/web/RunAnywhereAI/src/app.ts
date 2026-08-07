@@ -25,6 +25,7 @@ import {
   openSheet,
   type OpenSheetOptions,
 } from './components/model-selection';
+import { icon, type IconName } from './components/icons';
 import { appLogger } from './services/app-logger';
 import { ConversationsStore, type StoredConversation } from './services/conversations-store';
 
@@ -84,7 +85,7 @@ interface NavItem {
   id: string;
   label: string;
   description: string;
-  icon: string;
+  icon: IconName;
   tabId?: TabId;
   action?: () => void;
 }
@@ -148,29 +149,39 @@ let drawerOpen = false;
 /** Per-panel lifecycle callbacks keyed by panel id. */
 const tabLifecycles: Record<string, TabLifecycle | undefined> = {};
 
-function icon(paths: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-}
-
+/**
+ * The shell's glyph names, aliased from the shared registry.
+ *
+ * The paths themselves used to live here as a 20-entry map, with a private
+ * `icon()` helper at 1.7px alongside a byte-identical one in `views/chat.ts` at
+ * the same weight — two copies of the same function, and one of four stroke
+ * weights in the app. Both now come from `components/icons.ts` at the §7 weight.
+ *
+ * Kept as an alias rather than rewriting 21 call sites to string literals: the
+ * names read as a table of contents for the nav, and `IconName` still makes a
+ * typo a compile error.
+ */
 const ICONS = {
-  sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>',
-  menu: '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>',
-  newChat: '<path d="M12 5v14"/><path d="M5 12h14"/>',
-  model: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>',
-  storage: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
-  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 1 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.05A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.05A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.05A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.05A1.7 1.7 0 0 0 19.4 15z"/>',
-  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/><path d="M8 22h8"/>',
-  image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="M21 15l-4.5-4.5L9 18"/>',
-  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/>',
-  waveform: '<path d="M2 12h3l2-7 4 14 3-10 2 3h6"/>',
-  speaker: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M16 9.5a4 4 0 0 1 0 5"/><path d="M19 6a8 8 0 0 1 0 12"/>',
-  advanced: '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>',
-  stack: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
-  gauge: '<path d="M12 14l4-4"/><path d="M4.93 19.07A10 10 0 1 1 19.07 19.07"/><path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
-  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
-  back: '<path d="M15 18l-6-6 6-6"/>',
-} as const;
+  sparkles: 'sparkles',
+  menu: 'menu',
+  newChat: 'plus',
+  model: 'model',
+  /** The nav's "Manage downloads" row — bytes arriving, not bytes at rest. */
+  downloads: 'download',
+  storage: 'storage',
+  settings: 'settings',
+  mic: 'mic',
+  image: 'image',
+  file: 'file',
+  waveform: 'waveform',
+  speaker: 'speaker',
+  advanced: 'advanced',
+  stack: 'stack',
+  gauge: 'gauge',
+  sun: 'sun',
+  moon: 'moon',
+  back: 'back',
+} as const satisfies Record<string, IconName>;
 
 // ---------------------------------------------------------------------------
 // Theme
@@ -254,7 +265,7 @@ function navSections(): NavSection[] {
           icon: ICONS.model,
           action: () => openSheet(CHAT_SHEET_OPTIONS),
         },
-        navTab('downloads', 'Manage downloads', 'Models, cache, and local files', ICONS.storage, 'storage'),
+        navTab('downloads', 'Manage downloads', 'Models, cache, and local files', ICONS.downloads, 'storage'),
       ],
     },
     {
@@ -271,7 +282,7 @@ function navTab(
   id: string,
   label: string,
   description: string,
-  itemIcon: string,
+  itemIcon: IconName,
   tabId: TabId,
 ): NavItem {
   return { type: 'tab', id, label, description, icon: itemIcon, tabId };
@@ -325,7 +336,7 @@ export function buildAppShell(): void {
         <div class="consumer-drawer__title">RunAnywhere</div>
       </div>
       <button type="button" class="shell-icon-btn consumer-drawer__close" id="consumer-close-drawer-btn" aria-label="Close menu">
-        ${icon('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>')}
+        ${icon('close')}
       </button>
     </div>
     <button type="button" class="consumer-new-chat" id="consumer-drawer-new-chat-btn">
@@ -730,22 +741,27 @@ function formatSavedDate(timestamp: number): string {
 }
 
 function initAdvancedHub(el: HTMLElement): TabLifecycle {
+  // One glyph per row, all distinct (DESIGN_GUIDELINE.md §7). Three pairs used to
+  // collide here — waveform for both Transcribe and Voice Activity, mic for both
+  // Talk Mode and Diarization, image for both Segmentation and (elsewhere) photo
+  // attachments — so adjacent rows in the same list were visually identical and
+  // the icon column carried no information at all.
   const hubItems: Array<{
     tab: TabId;
-    icon: string;
+    icon: IconName;
     title: string;
     subtitle: string;
   }> = [
-    { tab: 'voice', icon: ICONS.mic, title: 'Talk Mode', subtitle: 'Full STT + LLM + TTS voice assistant' },
-    { tab: 'segmentation', icon: ICONS.image, title: 'Segmentation', subtitle: 'Semantic image segmentation (SegFormer)' },
-    { tab: 'documents', icon: ICONS.file, title: 'Documents & RAG', subtitle: 'Index local documents and ask grounded questions' },
-    { tab: 'transcribe', icon: ICONS.waveform, title: 'Transcribe', subtitle: 'Speech-to-text utility' },
-    { tab: 'speak', icon: ICONS.speaker, title: 'Read Aloud', subtitle: 'Text-to-speech utility' },
-    { tab: 'vad', icon: ICONS.waveform, title: 'Voice Activity', subtitle: 'Speech and silence diagnostics' },
-    { tab: 'diarization', icon: ICONS.mic, title: 'Diarization', subtitle: 'Speaker diarization — who spoke when (Sortformer)' },
-    { tab: 'storage', icon: ICONS.storage, title: 'Storage', subtitle: 'Models, cache, and browser files' },
-    { tab: 'benchmarks', icon: ICONS.gauge, title: 'Benchmarks', subtitle: 'Measure local model performance' },
-    { tab: 'solutions', icon: ICONS.stack, title: 'Solutions', subtitle: 'Run scripted SDK workflows' },
+    { tab: 'voice', icon: 'mic', title: 'Talk Mode', subtitle: 'Full STT + LLM + TTS voice assistant' },
+    { tab: 'segmentation', icon: 'segments', title: 'Segmentation', subtitle: 'Semantic image segmentation (SegFormer)' },
+    { tab: 'documents', icon: 'file', title: 'Documents & RAG', subtitle: 'Index local documents and ask grounded questions' },
+    { tab: 'transcribe', icon: 'waveform', title: 'Transcribe', subtitle: 'Speech-to-text utility' },
+    { tab: 'speak', icon: 'speaker', title: 'Read Aloud', subtitle: 'Text-to-speech utility' },
+    { tab: 'vad', icon: 'pulse', title: 'Voice Activity', subtitle: 'Speech and silence diagnostics' },
+    { tab: 'diarization', icon: 'speakers', title: 'Diarization', subtitle: 'Speaker diarization — who spoke when (Sortformer)' },
+    { tab: 'storage', icon: 'storage', title: 'Storage', subtitle: 'Models, cache, and browser files' },
+    { tab: 'benchmarks', icon: 'gauge', title: 'Benchmarks', subtitle: 'Measure local model performance' },
+    { tab: 'solutions', icon: 'stack', title: 'Solutions', subtitle: 'Run scripted SDK workflows' },
   ];
 
   el.innerHTML = `
@@ -782,7 +798,7 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
   return {};
 }
 
-function advancedRow(item: { tab: TabId; icon: string; title: string; subtitle: string }): string {
+function advancedRow(item: { tab: TabId; icon: IconName; title: string; subtitle: string }): string {
   return `
     <button type="button" class="advanced-row" data-advanced-target="${item.tab}">
       <span class="advanced-row__icon">${icon(item.icon)}</span>

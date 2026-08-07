@@ -47,6 +47,7 @@ import {
   runEngineRetry,
 } from '../components/model-selection';
 import { renderModelSlot, type ModelSlotView } from '../components/model-slot';
+import { icon } from '../components/icons';
 import {
   canRetryEngines,
   describeFailures,
@@ -352,10 +353,7 @@ function renderSetupCard(allReady: boolean): string {
     <div class="setup-card">
       <div class="setup-card__head">
         <div class="setup-card__glyph">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
-            <path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
-          </svg>
+          ${icon('mic', { size: 24 })}
         </div>
         <div>
           <div class="setup-card__title">Voice AI</div>

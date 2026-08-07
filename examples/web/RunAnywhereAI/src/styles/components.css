@@ -1758,7 +1758,7 @@
   background: var(--bg-secondary);
   box-shadow: var(--elevation-sm);
 }
-.engine-banner__glyph svg { width: 22px; height: 22px; }
+/* Size comes from the icon() call (24, on the icon scale), not from here. */
 .engine-banner__text { flex: 1; min-width: 0; }
 .engine-banner__title {
   font-weight: var(--font-weight-semibold);
@@ -2119,8 +2119,6 @@
   white-space: nowrap;
 }
 .family-card__chevron {
-  width: 18px;
-  height: 18px;
   color: var(--text-tertiary);
   transition: transform var(--duration-fast) var(--ease-out);
 }
@@ -2664,6 +2662,21 @@
 }
 .toast.show { transform: translateX(-50%) translateY(0); }
 
+/*
+ * The variant tints only the icon, via `currentColor`.
+ *
+ * The message itself stays --text-primary: a green sentence on a dark card is
+ * harder to read than a white one, and the colour is already carried by the
+ * glyph beside it. Set on the toast rather than baked into the SVG so the
+ * palette stays in one layer — the warning icon previously hardcoded
+ * `var(--color-orange, orange)`, an undefined token, and every warning toast
+ * rendered the CSS keyword `orange` (#FFA500) next to the brand's #FF6900.
+ */
+.toast--success > svg { color: var(--color-green); }
+.toast--warning > svg { color: var(--color-primary); }
+.toast--info > svg { color: var(--color-blue); }
+.toast > span { color: var(--text-primary); }
+
 /* =============================================================================
  * Voice Tab
  * ============================================================================= */
@@ -2806,6 +2819,32 @@
 
 .setting-label { font-size: var(--font-size-base); }
 .setting-value { font-size: var(--font-size-base); color: var(--text-secondary); }
+
+/*
+ * A settings row that navigates away.
+ *
+ * The colour is set on the row rather than on its label and glyph separately, so
+ * the text and the external-link icon are one accented unit and the icon needs
+ * no colour of its own — it inherits `currentColor`. Previously the label
+ * carried `.text-accent` while the inline SVG repeated the same token as a
+ * hardcoded `stroke`, which is the same value stated twice in two languages.
+ *
+ * `text-decoration: none` because the whole card is the target: an underline
+ * under one word inside a full-width tappable row reads as a second, smaller
+ * link. Hover and focus therefore have to carry the affordance instead, and
+ * focus-visible gets a real ring — this was a <div> before, so keyboard users
+ * had no way to reach it at all.
+ */
+.setting-row--link {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: background var(--duration-micro) var(--ease-standard);
+}
+.setting-row--link:hover { background: var(--bg-tertiary); }
+.setting-row--link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
 
 /*
  * Explanatory text under a setting.
@@ -3416,9 +3455,9 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 3px solid var(--color-orange);
-  background: rgba(255, 105, 0, 0.15);
-  color: var(--color-orange);
+  border: 3px solid var(--color-primary);
+  background: var(--color-primary-medium);
+  color: var(--color-primary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -4032,43 +4071,6 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ri
 .eviction-model-size {
   color: var(--text-secondary);
   flex-shrink: 0;
-}
-
-/* =============================================================================
- * Quota Bar (Storage Tab)
- * ============================================================================= */
-.quota-bar-container {
-  padding: 0 var(--space-lg) var(--space-md);
-}
-
-.quota-bar {
-  height: 8px;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.quota-bar-fill {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: width 0.4s ease;
-}
-
-.quota-bar-fill.quota-bar-fill--warning {
-  background: var(--color-orange, orange);
-}
-
-.quota-bar-fill.quota-bar-fill--critical {
-  background: var(--color-red);
-}
-
-.quota-bar-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  margin-top: var(--space-xs);
 }
 
 /* Storage model row: last-used timestamp */
