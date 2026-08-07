@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "infrastructure/download/partial_download_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -40,6 +41,18 @@ using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 namespace {
 
 constexpr size_t kRescanMaxEntryCapacity = 4096;
+
+// A directory entry that counts as evidence of a completed artifact.
+//
+// Regular file, not hidden, and not an in-flight "<final>.part" sidecar. The
+// partial is excluded because rac_http_download promotes it to the final name
+// with a single atomic rename only after validation, so its presence is proof
+// the transfer is unfinished — treating it as an artifact is what made a
+// process-killed download reappear as "downloaded".
+bool is_finished_artifact_entry(const rac_directory_entry_t& entry) {
+    return entry.is_dir != RAC_TRUE && entry.name[0] != '\0' && entry.name[0] != '.' &&
+           !rac::download::is_partial_download_filename(entry.name);
+}
 
 }  // namespace
 
@@ -151,17 +164,21 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
             const std::string model_id = entry.name;
             const std::string model_path = std::string(framework_dir) + "/" + model_id;
 
-            // Verify the model folder contains at least one regular file —
+            // Verify the model folder contains at least one finished file —
             // mirrors the Kotlin self-heal heuristic (file existence is enough;
             // we don't filter by extension because each backend defines its own
-            // file shape).
+            // file shape). An in-flight ".part" sidecar is deliberately NOT
+            // enough: it is the one file whose presence proves the transfer did
+            // not finish, and counting it linked a killed download as a
+            // downloaded model that then failed at load with "no .gguf file
+            // found". See is_finished_artifact_entry.
             if (list_directory_via_adapter(adapter, model_path.c_str(), &model_entries) !=
                 RAC_SUCCESS) {
                 continue;
             }
             bool has_regular_file = false;
             for (const rac_directory_entry_t& child : model_entries) {
-                if (child.is_dir != RAC_TRUE && child.name[0] != '\0' && child.name[0] != '.') {
+                if (is_finished_artifact_entry(child)) {
                     has_regular_file = true;
                     break;
                 }
@@ -178,8 +195,7 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                     if (list_directory_via_adapter(adapter, nested_path.c_str(), &nested) ==
                         RAC_SUCCESS) {
                         for (const rac_directory_entry_t& leaf : nested) {
-                            if (leaf.is_dir != RAC_TRUE && leaf.name[0] != '\0' &&
-                                leaf.name[0] != '.') {
+                            if (is_finished_artifact_entry(leaf)) {
                                 has_regular_file = true;
                                 break;
                             }
@@ -191,6 +207,10 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                 }
             }
             if (!has_regular_file) {
+                RAC_LOG_INFO("ModelRegistry",
+                             "Refresh rescan: '%s' holds no finished artifact (interrupted "
+                             "download) — leaving unlinked so a retry can resume",
+                             model_id.c_str());
                 continue;
             }
 

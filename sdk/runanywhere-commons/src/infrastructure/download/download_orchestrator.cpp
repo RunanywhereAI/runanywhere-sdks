@@ -56,6 +56,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "infrastructure/download/partial_download_internal.h"
 #include "infrastructure/model_management/model_manifest_internal.h"
 #include "infrastructure/rac_path_safety_internal.h"
 
@@ -942,12 +943,12 @@ int64_t file_size_or_zero(const std::string& path) {
 
 // In-flight partials are written by rac_http_download to "<final>.part" and
 // atomically renamed to "<final>" only after checksum/size validation. The
-// suffix convention is shared verbatim with the folder deleter (which removes
-// any "<name>.part" alongside the model files), so keep it identical here.
-constexpr const char* kPartSuffix = ".part";
-
+// suffix is shared with the folder deleter (which reclaims the sidecar) and the
+// registry rescan (which must not mistake it for a finished artifact), so it has
+// exactly one definition in partial_download_internal.h.
 std::string part_path_for(const std::string& final_path) {
-    return final_path.empty() ? final_path : final_path + kPartSuffix;
+    return final_path.empty() ? final_path
+                              : final_path + std::string(rac::download::kPartialSuffix);
 }
 
 // Size of the in-flight partial for a planned file — the ".part" sidecar the
