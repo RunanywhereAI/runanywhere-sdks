@@ -117,23 +117,11 @@ fun ModelSelectionSheet(
         ) {
             Header(title = viewModel.title, onCancel = onDismiss)
 
-            if (viewModel.modality == ModelSelectionContext.LLM && connectController != null) {
-                ConnectPickerSection(
-                    state = connectState,
-                    permissionDenied = localNetworkDenied,
-                    onFindHost = startConnectDiscovery,
-                    onConnect = { host -> connectController.connect(host, onDismiss) },
-                    onUseConnected = onDismiss,
-                )
-                Spacer(Modifier.height(dimens.spacingSm))
-            }
-
-            device?.let {
-                SectionLabel("Your device")
-                DeviceStatusCard(it, Modifier.padding(horizontal = dimens.spacingLg))
-                Spacer(Modifier.height(dimens.spacingXs))
-            }
-
+            // Models first. Everything that used to sit above them — a local-network
+            // host connector, its permission disclaimer, and a Model/Chip/Memory/NPU
+            // spec table — put the one model this device had already downloaded four
+            // screens below the fold, so opening the picker to switch models began
+            // with scrolling past hardware trivia.
             when {
                 state.isLoading -> CenterNote("Loading models…", showSpinner = true)
                 state.models.isEmpty() -> CenterNote("No models available")
@@ -143,6 +131,25 @@ fun ModelSelectionSheet(
                     onDelete = { pendingDelete = it },
                     onAddFromHuggingFace = { showHfSearch = true },
                 )
+            }
+
+            // Below the catalog: running a model on another machine is the most
+            // advanced thing this sheet offers, and it is the only one that asks for
+            // a permission.
+            if (viewModel.modality == ModelSelectionContext.LLM && connectController != null) {
+                Spacer(Modifier.height(dimens.spacingSm))
+                ConnectPickerSection(
+                    state = connectState,
+                    permissionDenied = localNetworkDenied,
+                    onFindHost = startConnectDiscovery,
+                    onConnect = { host -> connectController.connect(host, onDismiss) },
+                    onUseConnected = onDismiss,
+                )
+            }
+
+            device?.let {
+                Spacer(Modifier.height(dimens.spacingSm))
+                DeviceStatusCard(it, Modifier.padding(horizontal = dimens.spacingLg))
             }
 
             Text(
@@ -377,21 +384,48 @@ private fun PickerBody(
     val scopedRecommended = remember(state.models, device) {
         if (isChat) null else ModelRecommendation.recommendedFor(viewModel.modality, tier, hasNpu, state.models)
     }
-    val surfacedIds = recommendation?.allIds ?: setOfNotNull(scopedRecommended?.id)
+    // Models already on disk, loaded one first. Nothing else in this sheet is one
+    // tap from working, so nothing else earns the top: a reader opening the picker
+    // to switch models is choosing among these, and a reader who owns none sees the
+    // section vanish rather than an empty shell. Suppressed while searching or
+    // filtering, both of which are explicit requests to see something else.
+    val readyModels = remember(state.models, state.currentModelId) {
+        state.models
+            .filter { viewModel.isReady(it) }
+            .sortedWith(
+                compareByDescending<RAModelInfo> { it.id == state.currentModelId }
+                    .thenBy { it.effectiveBytes() },
+            )
+    }
+    val showReadySection = !isSearching && selectedBackend == null && readyModels.isNotEmpty()
+    if (showReadySection) {
+        SectionLabel(if (readyModels.size == 1) "Ready to use" else "Ready to use · ${readyModels.size}")
+        readyModels.forEach { model ->
+            PickerModelRow(viewModel, state, model, onSelect, onDownload, onDelete)
+        }
+        Spacer(Modifier.height(dimens.spacingMd))
+    }
 
-    // Bring-your-own model: search Hugging Face for any GGUF and download it.
-    AddFromHuggingFaceRow(onClick = onAddFromHuggingFace)
-    Spacer(Modifier.height(dimens.spacingMd))
+    // Everything surfaced above the browse list, so the org cards below don't repeat
+    // it. Ready models count only when their section actually rendered.
+    val surfacedIds = (recommendation?.allIds ?: setOfNotNull(scopedRecommended?.id)) +
+        if (showReadySection) readyModels.map { it.id }.toSet() else emptySet()
 
     // Recommended section only in the default view — hidden while searching OR when a
     // backend filter is active (the filter is an explicit "show me only this backend").
+    // A recommendation the user already owns is dropped: it is one row higher under
+    // "Ready to use", where it says something stronger than "recommended".
     if (!isSearching && selectedBackend == null) {
+        val readyIds = if (showReadySection) readyModels.map { it.id }.toSet() else emptySet()
         when {
-            recommendation != null && recommendation.recommendedLLMs.isNotEmpty() -> {
-                RecommendedSection(recommendation, device, viewModel, state, onSelect, onDownload, onDelete)
+            recommendation != null && recommendation.recommendedLLMs.any { it.id !in readyIds } -> {
+                RecommendedSection(
+                    recommendation, viewModel, state, onSelect, onDownload, onDelete,
+                    excludedIds = readyIds,
+                )
                 Spacer(Modifier.height(dimens.spacingMd))
             }
-            scopedRecommended != null -> {
+            scopedRecommended != null && scopedRecommended.id !in readyIds -> {
                 SectionLabel("Recommended for your device")
                 PickerModelRow(
                     viewModel, state, scopedRecommended, onSelect, onDownload, onDelete,
@@ -402,9 +436,13 @@ private fun PickerBody(
         }
     }
 
-    SectionLabel("Browse by model")
+    SectionLabel(if (showReadySection) "Get another model" else "Browse by model")
     SearchField(query = query, onQueryChange = { query = it })
     Spacer(Modifier.height(dimens.spacingXs))
+
+    // Bring-your-own model: search Hugging Face for any GGUF and download it. Below
+    // the search field, where someone who did not find what they wanted is looking.
+    AddFromHuggingFaceRow(onClick = onAddFromHuggingFace)
 
     // Backend/NPU filter chips — only when the picker spans more than one backend.
     if (backends.size > 1) {
@@ -440,18 +478,26 @@ private fun PickerBody(
         return
     }
 
-    // Orgs with anything ready come first; everything else follows in org order.
+    // Orgs with anything ready come first; everything else follows in org order. In the
+    // default view every ready model was already pulled up top, so this partition only
+    // splits anything while searching or filtering — and the sole remaining group needs
+    // no second heading under one that already says what the list is for.
     val (installed, downloadable) = orgs.partition { it.hasReadyVariant }
     val sections = buildList {
         if (installed.isNotEmpty()) add("On this device" to installed)
         if (downloadable.isNotEmpty()) {
-            add((if (installed.isEmpty()) "All organisations" else "More organisations") to downloadable)
+            val label = when {
+                installed.isNotEmpty() -> "More organisations"
+                showReadySection -> null
+                else -> "All organisations"
+            }
+            add(label to downloadable)
         }
     }
 
     sections.forEachIndexed { index, (label, groups) ->
         if (index > 0) Spacer(modifier = Modifier.height(dimens.spacingSm))
-        SectionLabel(label)
+        label?.let { SectionLabel(it) }
         groups.forEach { group ->
             OrgCard(
                 group = group,
@@ -471,33 +517,39 @@ private fun PickerBody(
 @Composable
 private fun RecommendedSection(
     recommendation: RecommendedSelection,
-    device: DeviceInfo?,
     viewModel: ModelSelectionViewModel,
     state: ModelSelectionState,
     onSelect: (RAModelInfo) -> Unit,
     onDownload: (RAModelInfo) -> Unit,
     onDelete: (RAModelInfo) -> Unit,
+    /**
+     * Ids already shown under "Ready to use". Recommending a model the reader has
+     * already downloaded says less than the row above it does, so it is dropped.
+     */
+    excludedIds: Set<String> = emptySet(),
 ) {
     val dimens = LocalDimens.current
     SectionLabel("Recommended for your device")
 
-    val defaultId = recommendation.defaultModel?.id
-    recommendation.defaultModel?.let { model ->
+    val default = recommendation.defaultModel?.takeIf { it.id !in excludedIds }
+    default?.let { model ->
         PickerModelRow(
             viewModel, state, model, onSelect, onDownload, onDelete,
             highlightLabel = "Top pick",
         )
     }
-    recommendation.recommendedLLMs.filter { it.id != defaultId }.forEach { model ->
-        PickerModelRow(viewModel, state, model, onSelect, onDownload, onDelete)
-    }
+    recommendation.recommendedLLMs
+        .filter { it.id != default?.id && it.id !in excludedIds }
+        .forEach { model ->
+            PickerModelRow(viewModel, state, model, onSelect, onDownload, onDelete)
+        }
 
     val companions = listOfNotNull(
         recommendation.vlm,
         recommendation.asr,
         recommendation.tts,
         recommendation.embedding,
-    )
+    ).filter { it.id !in excludedIds }
     if (companions.isNotEmpty()) {
         Spacer(Modifier.height(dimens.spacingXs))
         SectionLabel("Also recommended")
