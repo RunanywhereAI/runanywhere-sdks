@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -39,13 +40,18 @@ fun ModelRow(
     isCurrent: Boolean,
     isReady: Boolean,
     isBusy: Boolean,
-    progressPercent: Int?,
+    // Null while a transfer is starting (or when the row is not downloading); the bar then reads as
+    // indeterminate rather than pinned at zero.
+    progress: DownloadProgressInfo?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onDelete: (() -> Unit)? = null,
     // When non-null, the busy spinner becomes a tap-to-cancel control so an
     // in-flight download can be stopped. Null keeps the plain progress spinner.
     onCancel: (() -> Unit)? = null,
+    // This model's last download failed. The trailing action becomes Retry, which resumes from the
+    // bytes already on disk instead of starting the transfer over.
+    hasFailed: Boolean = false,
     highlightLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -125,18 +131,16 @@ fun ModelRow(
                         )
                     }
                 }
-                if (isBusy && progressPercent != null) {
-                    Text(
-                        "Downloading… $progressPercent%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                if (isBusy) {
+                    DownloadProgressBlock(progress)
+                } else if (hasFailed) {
+                    DownloadFailureNote()
                 }
             }
 
             Spacer(Modifier.width(dimens.spacingSm))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                TrailingAction(isCurrent, isReady, isBusy, model, onDownload, onCancel)
+                TrailingAction(isCurrent, isReady, isBusy, hasFailed, model, onDownload, onCancel)
                 if (onDelete != null && isReady) {
                     IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                         Icon(
@@ -157,6 +161,7 @@ private fun TrailingAction(
     isCurrent: Boolean,
     isReady: Boolean,
     isBusy: Boolean,
+    hasFailed: Boolean,
     model: RAModelInfo,
     onDownload: () -> Unit,
     onCancel: (() -> Unit)? = null,
@@ -165,8 +170,33 @@ private fun TrailingAction(
         isCurrent -> ModelPill("Loaded", ModelPillColors.Availability)
         isBusy -> DownloadProgressAction(onCancel)
         isReady -> ModelPill("Use", ModelPillColors.Availability)
+        // Retry before the plain download chip: a failed row's primary action is to resume, and the
+        // verb should say so rather than reading like a fresh start.
+        hasFailed -> RetryChip(onRetry = onDownload)
         else -> DownloadChip(model = model, onDownload = onDownload)
     }
+}
+
+@Composable
+private fun RetryChip(onRetry: () -> Unit) {
+    val dimens = LocalDimens.current
+    AssistChip(
+        onClick = onRetry,
+        label = {
+            Text(
+                text = "Retry",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = RACIcons.Outline.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+        },
+    )
 }
 
 // Busy-state control. With [onCancel] the spinner sits inside a tap target that

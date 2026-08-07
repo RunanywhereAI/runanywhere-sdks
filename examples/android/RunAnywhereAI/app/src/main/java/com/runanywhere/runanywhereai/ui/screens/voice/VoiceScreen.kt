@@ -43,6 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.components.ScreenLede
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.screens.models.DeviceInfo
 import com.runanywhere.runanywhereai.ui.screens.models.HardwareTier
@@ -131,7 +132,7 @@ fun VoiceScreen() {
         VoiceComponent("Listen", RACIcons.Outline.Brain, sttVm, sttModel),
         VoiceComponent("Assistant", RACIcons.Outline.MessageCircle, llmVm, llmModel),
         VoiceComponent("Speak", RACIcons.Outline.Robot, ttsVm, ttsModel),
-        VoiceComponent("Turn-taking", RACIcons.Outline.Activity, vadVm, vadModel, optional = true),
+        VoiceComponent("Turn-taking", RACIcons.Outline.Pulse, vadVm, vadModel, optional = true),
     )
 
     // Readiness: the co-resident agent path needs STT+LLM+TTS all loaded; the NPU per-turn-swap path
@@ -208,14 +209,10 @@ fun VoiceScreen() {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
-            Text("Talk Mode", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "Hands-free conversation. We picked the best voice models for your device — tap once to set them up.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ScreenLede(
+            "Hands-free conversation. We picked the best voice models for your device — " +
+                "tap once to set them up.",
+        )
 
         VoiceSetupCard(
             components = components,

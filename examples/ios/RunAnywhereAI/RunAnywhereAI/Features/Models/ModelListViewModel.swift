@@ -205,19 +205,10 @@ class ModelListViewModel: ObservableObject {
         }
     }
 
-    func downloadModel(_ model: RAModelInfo) async throws {
-        for try await event in try await RunAnywhere.models.download(id: model.id) {
-            switch event {
-            case .progress(_, _, _, _, let percent, _):
-                print("Download progress: \(Int(percent))%")
-            default:
-                break
-            }
-        }
-
-        // Reload models after download
-        await loadModelsFromRegistry()
-    }
+    // `downloadModel(_:)` was removed: it had no callers, and its progress
+    // handler only `print`ed a percentage. Downloads go through
+    // `ModelDownloadTracker`, which keeps the cancellable task and the
+    // bytes/speed/ETA snapshot the UI shows.
 
     func deleteModel(_ model: RAModelInfo) async throws {
         try await RunAnywhere.models.delete(id: model.id)

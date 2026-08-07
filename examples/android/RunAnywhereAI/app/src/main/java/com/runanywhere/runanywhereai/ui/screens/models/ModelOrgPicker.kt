@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
@@ -112,7 +113,7 @@ fun OrgCard(
                         verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
                     ) {
                         if (group.hasNpuVariant) {
-                            ModelPill("NPU", ModelPillColors.Capability, icon = RACIcons.Outline.Cpu)
+                            ModelPill("NPU", ModelPillColors.Capability, icon = RACIcons.Filled.Bolt)
                         }
                         if (readyCount > 0) {
                             ModelPill("$readyCount ready", ModelPillColors.Availability)
@@ -146,7 +147,8 @@ fun OrgCard(
                             isCurrent = state.currentModelId == model.id,
                             isReady = viewModel.isReady(model),
                             isBusy = state.busyModelId == model.id,
-                            progressPercent = if (state.busyModelId == model.id) state.progressPercent else null,
+                            progress = if (state.busyModelId == model.id) state.downloadProgress else null,
+                            hasFailed = state.failedModelId == model.id,
                             onSelect = { onSelect(model) },
                             onDownload = { onDownload(model) },
                             onCancel = { viewModel.cancelDownload(model.id) },
@@ -174,7 +176,8 @@ private fun OrgModelRow(
     isCurrent: Boolean,
     isReady: Boolean,
     isBusy: Boolean,
-    progressPercent: Int?,
+    progress: DownloadProgressInfo?,
+    hasFailed: Boolean,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onCancel: (() -> Unit)? = null,
@@ -226,12 +229,12 @@ private fun OrgModelRow(
                     )
                 }
             }
-            if (isBusy && progressPercent != null) {
-                Text(
-                    "Downloading… $progressPercent%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // Same bar and the same detail line as the flat picker list: an org-grouped row is a
+            // different layout of the same transfer, not a different amount of information.
+            if (isBusy) {
+                DownloadProgressBlock(progress)
+            } else if (hasFailed) {
+                DownloadFailureNote()
             }
         }
         Spacer(Modifier.width(dimens.spacingSm))

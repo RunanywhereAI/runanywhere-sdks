@@ -49,7 +49,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.components.AudioWaveform
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.screens.models.ModelPickerCard
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
@@ -62,7 +62,6 @@ import com.runanywhere.runanywhereai.ui.theme.ambientPeriod
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
-import com.runanywhere.sdk.public.types.RAModelInfo
 import java.text.DateFormat
 import java.util.Date
 
@@ -119,7 +118,17 @@ fun VadScreen() {
     ) {
         Header()
 
-        ModelCard(model = model) { showSheet = true }
+        ModelPickerCard(
+            label = "Detector",
+            model = model,
+            // The detector's job is to find speech in a signal, so the row wears the same
+            // burst-on-a-baseline mark as this screen's own header.
+            icon = RACIcons.Outline.Pulse,
+            // Swapping the detector out from under a live capture would pull native state
+            // away mid-stream, so the row locks while listening rather than failing later.
+            enabled = !vadVm.isListening,
+            onClick = { showSheet = true },
+        )
 
         SpeechIndicator(
             isListening = vadVm.isListening,
@@ -175,7 +184,7 @@ private fun Header() {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = RACIcons.Outline.Activity,
+                imageVector = RACIcons.Outline.Pulse,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(dimens.iconLg),
@@ -188,47 +197,6 @@ private fun Header() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-@Composable
-private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .clickable(onClick = onClick)
-                .padding(dimens.spacingLg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-        ) {
-            Icon(
-                imageVector = RACIcons.Outline.Brain,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-            ) {
-                Text("Model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(model?.name ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
-                model?.let {
-                    BackendBadge(framework = it.framework, compact = true)
-                }
-            }
-            Icon(
-                imageVector = RACIcons.Outline.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(dimens.iconSm),
-            )
-        }
     }
 }
 

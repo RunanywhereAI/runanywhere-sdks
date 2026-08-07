@@ -65,7 +65,7 @@ fun DeviceStatusCard(info: DeviceInfo, modifier: Modifier = Modifier) {
                     Line()
                     DeviceRow(RACIcons.Outline.Cpu, "Chip", info.chip)
                     Line()
-                    DeviceRow(RACIcons.Outline.Database, "Memory", info.memoryLabel)
+                    DeviceRow(RACIcons.Outline.Memory, "Memory", info.memoryLabel)
                     Line()
                     DeviceRow(
                         RACIcons.Filled.Bolt,

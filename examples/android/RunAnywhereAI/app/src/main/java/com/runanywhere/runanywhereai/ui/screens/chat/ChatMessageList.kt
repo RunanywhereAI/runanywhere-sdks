@@ -5,11 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
@@ -29,7 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -370,7 +364,7 @@ private fun AttachmentCard(attachment: ChatAttachment) {
         ) {
             Icon(
                 imageVector = when (attachment.kind) {
-                    ChatAttachmentKind.IMAGE -> RACIcons.Outline.Eye
+                    ChatAttachmentKind.IMAGE -> RACIcons.Outline.Image
                     ChatAttachmentKind.DOCUMENT -> RACIcons.Outline.FileText
                 },
                 contentDescription = null,

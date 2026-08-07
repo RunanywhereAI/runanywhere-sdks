@@ -24,6 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -62,6 +65,24 @@ fun SectionCard(
             content = content,
         )
     }
+}
+
+/**
+ * The one-line explanation a screen opens with, under the app bar's title.
+ *
+ * Deliberately title-less: the app bar already names the screen, and every one of these
+ * screens used to restate that name as an in-body `headlineSmall` immediately beneath it.
+ * Two identical headings 8dp apart is not emphasis, it is a bug the eye has to resolve —
+ * and the in-body one scrolled away, so it was the less useful of the pair.
+ */
+@Composable
+fun ScreenLede(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.fillMaxWidth(),
+    )
 }
 
 /**
@@ -107,6 +128,49 @@ fun SectionHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** How loud a [StatusNote] is: what happened, versus what went wrong. */
+enum class StatusTone { NEUTRAL, ERROR }
+
+/**
+ * A one-line status or error under a screen's content.
+ *
+ * Screens were each styling these by hand, which is how an error ended up the same weight
+ * as a progress note on some surfaces. A leading glyph carries the difference too, so the
+ * distinction survives for a user who cannot rely on the red.
+ */
+@Composable
+fun StatusNote(text: String, tone: StatusTone = StatusTone.NEUTRAL, modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
+    val color = when (tone) {
+        StatusTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+        StatusTone.ERROR -> MaterialTheme.colorScheme.error
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            // Announced politely: these lines report the outcome of something the user just
+            // asked for, and a screen reader has no other way to learn it happened.
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+        verticalAlignment = Alignment.Top,
+    ) {
+        if (tone == StatusTone.ERROR) {
+            Icon(
+                imageVector = RACIcons.Outline.AlertTriangle,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(dimens.iconSm),
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

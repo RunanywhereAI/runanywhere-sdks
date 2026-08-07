@@ -563,8 +563,8 @@ final class VoiceAgentViewModel: ObservableObject {
         }
         do {
             for try await event in try await RunAnywhere.models.download(id: model.id) {
-                if case .progress(_, _, _, _, let percent, _) = event {
-                    progress(Double(percent) / 100)
+                if case .progress(let snapshot) = event, let fraction = snapshot.fraction {
+                    progress(Double(fraction))
                 }
             }
             progress(1)

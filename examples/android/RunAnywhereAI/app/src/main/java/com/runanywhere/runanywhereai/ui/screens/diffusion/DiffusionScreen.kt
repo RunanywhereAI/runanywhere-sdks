@@ -1,6 +1,10 @@
 package com.runanywhere.runanywhereai.ui.screens.diffusion
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,14 +14,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,16 +33,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.components.EmptyState
+import com.runanywhere.runanywhereai.ui.components.GeneratingCanvas
+import com.runanywhere.runanywhereai.ui.components.ScreenLede
+import com.runanywhere.runanywhereai.ui.components.StatusNote
+import com.runanywhere.runanywhereai.ui.components.StatusTone
+import com.runanywhere.runanywhereai.ui.screens.models.ModelPickerCard
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
-import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 
 /**
@@ -66,18 +71,16 @@ fun DiffusionScreen() {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Text(
-            text = "Choose a text-to-image model from the catalog, then generate on-device.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        ScreenLede("Choose a text-to-image model from the catalog, then generate on-device.")
 
         // Lock the sheet during generation too: swapping the model under an
         // in-flight generateImage would pull native state out from under it.
-        ModelCard(
+        ModelPickerCard(
+            label = "Image model",
             model = model,
+            icon = RACIcons.Outline.Sparkles,
             busy = busy,
-            sheetLocked = busy || vm.isGenerating,
+            enabled = !(busy || vm.isGenerating),
             onClick = { showSheet = true },
         )
 
@@ -85,30 +88,44 @@ fun DiffusionScreen() {
             value = vm.prompt,
             onValueChange = vm::onPromptChange,
             label = { Text("Prompt") },
+            placeholder = { Text("a lighthouse at dusk, long exposure") },
+            supportingText = {
+                Text(
+                    if (vm.prompt.isBlank()) {
+                        "Describe what you want to see — subject, then style."
+                    } else {
+                        "Generates at ${OUTPUT_EDGE}×$OUTPUT_EDGE on this device."
+                    },
+                )
+            },
             singleLine = false,
             enabled = !vm.isGenerating,
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Button(
-            onClick = vm::generate,
-            enabled = modelLoaded && !vm.isGenerating && !busy && vm.prompt.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(if (vm.isGenerating) "Generating…" else "Generate")
+        Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
+            Button(
+                onClick = vm::generate,
+                enabled = modelLoaded && !vm.isGenerating && !busy && vm.prompt.isNotBlank(),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(if (vm.image == null) "Generate" else "Generate again")
+            }
+            // A long NPU generation with no way out is a trap. The engine call is not
+            // interruptible, so this abandons the wait rather than claiming to stop the NPU.
+            if (vm.isGenerating) {
+                OutlinedButton(onClick = vm::cancel) { Text("Stop waiting") }
+            }
         }
 
+        // Only the blocker that is actually in the way, phrased as the next step.
         if (!modelLoaded) {
-            Text(
-                "Select a model above to download and load it before generating.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            StatusNote("Choose an image model above to generate.", StatusTone.NEUTRAL)
+        } else if (vm.prompt.isBlank()) {
+            StatusNote("Describe an image to generate it.", StatusTone.NEUTRAL)
         }
 
-        vm.error?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
+        vm.error?.let { StatusNote(it, StatusTone.ERROR) }
 
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -118,34 +135,57 @@ fun DiffusionScreen() {
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(dimens.radiusLg)),
         ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                val bmp = vm.image
-                when {
-                    vm.isGenerating -> Row2 {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        Text("Generating…")
+            // Crossfaded and scaled in, so a finished picture arrives rather than replacing
+            // the placeholder in one frame.
+            AnimatedContent(
+                targetState = when {
+                    vm.isGenerating -> CanvasState.GENERATING
+                    vm.image != null -> CanvasState.RESULT
+                    else -> CanvasState.EMPTY
+                },
+                transitionSpec = {
+                    (fadeIn(AppMotion.emphasis()) + scaleIn(AppMotion.emphasis(), initialScale = 0.96f))
+                        .togetherWith(fadeOut(AppMotion.exit()))
+                },
+                label = "canvas",
+            ) { state ->
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    when (state) {
+                        CanvasState.GENERATING -> GeneratingCanvas(
+                            label = "Painting your image…",
+                            supporting = "On-device diffusion runs a fixed number of steps; " +
+                                "the first one is the slowest.",
+                        )
+                        CanvasState.RESULT -> vm.image?.let { bmp ->
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "Generated image for: ${vm.prompt}",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        CanvasState.EMPTY -> EmptyState(
+                            icon = RACIcons.Outline.Sparkles,
+                            title = "Nothing generated yet",
+                            body = "Your image appears here. Nothing is uploaded — the model " +
+                                "paints it on this device.",
+                        )
                     }
-                    bmp != null -> Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = "Generated image",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    else -> Text(
-                        "Your image will appear here",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
 
         vm.lastLatencyMs?.let {
-            Text(
-                text = "Generated in ${String.format(Locale.US, "%.1f", it / 1000.0)} s",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+            ) {
+                Text(
+                    text = "Generated in ${String.format(Locale.US, "%.1f", it / 1000.0)} s",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 
@@ -154,69 +194,8 @@ fun DiffusionScreen() {
     }
 }
 
-@Composable
-private fun ModelCard(
-    model: RAModelInfo?,
-    busy: Boolean,
-    sheetLocked: Boolean,
-    onClick: () -> Unit,
-) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .clickable(enabled = !sheetLocked, onClick = onClick)
-                .padding(dimens.spacingLg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-        ) {
-            Icon(
-                imageVector = RACIcons.Outline.Cpu,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-            ) {
-                Text(
-                    "Model",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    when {
-                        busy -> "Preparing model…"
-                        model != null -> model.name
-                        else -> "Select a model"
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                model?.let { BackendBadge(framework = it.framework, compact = true) }
-            }
-            if (busy) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-            } else {
-                Icon(
-                    imageVector = RACIcons.Outline.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
+/** What the square canvas is currently showing. */
+private enum class CanvasState { EMPTY, GENERATING, RESULT }
 
-@Composable
-private fun Row2(content: @Composable () -> Unit) {
-    val dimens = LocalDimens.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-    ) { content() }
-}
+/** Matches the `ImageOptions` the view model requests. */
+private const val OUTPUT_EDGE = 256

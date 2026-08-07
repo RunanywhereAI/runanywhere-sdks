@@ -185,7 +185,9 @@ private fun DeviceCard(info: BenchDeviceInfo) {
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
             Icon(
-                RACIcons.Outline.Cpu,
+                // The row names a handset, so it wears the handset mark; the chip glyph is
+                // the device card's "Chip" row and the gauge is the benchmark itself.
+                RACIcons.Outline.DeviceMobile,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(dimens.iconMd),

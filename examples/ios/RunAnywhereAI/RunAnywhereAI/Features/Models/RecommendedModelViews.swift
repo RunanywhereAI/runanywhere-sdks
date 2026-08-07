@@ -68,7 +68,15 @@ struct ModelPrimaryActionButton: View {
             get: { downloads.errorMessage(model.id) != nil },
             set: { if !$0 { downloads.clearError(model.id) } }
         ), presenting: downloads.errorMessage(model.id)) { _ in
-            Button("OK", role: .cancel) {}
+            // Retry from the alert, because that is where the user already is
+            // when they learn it failed. It resumes rather than restarting: the
+            // partial file is intact, so a 3 GB download that died at 90% costs
+            // the last 10%, not the whole thing again.
+            Button("Retry") {
+                downloads.clearError(model.id)
+                downloads.start(model) { onChanged() }
+            }
+            Button("Cancel", role: .cancel) {}
         } message: { Text($0) }
     }
 
@@ -80,32 +88,31 @@ struct ModelPrimaryActionButton: View {
     }
 
     @ViewBuilder private var downloadControl: some View {
-        if downloads.isDownloading(model.id) {
-            HStack(spacing: AppSpacing.xxSmall) {
-                ProgressView().scaleEffect(0.7)
-                Text("\(Int(downloads.progress(model.id) * 100))%")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
-                Button {
-                    downloads.cancel(model.id)
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Cancel download")
+        if let detail = downloads.detail(model.id) {
+            // Real progress: bytes, rate, and remaining time, not a spinner.
+            // Given a fixed width so a row does not resize as the numbers change.
+            ModelDownloadProgressView(progress: detail) {
+                downloads.cancel(model.id)
             }
+            .frame(width: 190)
         } else {
             Button {
                 downloads.start(model) { onChanged() }
             } label: {
                 HStack(spacing: AppSpacing.xxSmall) {
-                    Image(systemName: "arrow.down.circle.fill")
-                    Text("Get")
+                    // "Resume" is the honest verb once bytes are on disk: the SDK
+                    // continues from the partial rather than starting over, so
+                    // calling it "Get" would understate what the tap does.
+                    Image(systemName: downloads.canResume(model.id) ? "arrow.clockwise" : "arrow.down.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                    Text(downloads.canResume(model.id) ? "Resume" : "Get")
                 }
             }
             .buttonStyle(.bordered)
             .tint(AppColors.primaryAccent)
+            .help(downloads.canResume(model.id)
+                ? "Continue from where the download stopped"
+                : "Download this model")
         }
     }
 
@@ -117,7 +124,6 @@ struct ModelPrimaryActionButton: View {
         .font(AppTypography.caption2)
         .foregroundColor(AppColors.statusGreen)
     }
-
 }
 
 /// Rich, rounded card for a single recommended model in the hero section.

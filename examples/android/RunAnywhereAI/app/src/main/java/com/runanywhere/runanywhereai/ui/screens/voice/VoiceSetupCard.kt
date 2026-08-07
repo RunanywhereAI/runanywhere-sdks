@@ -16,7 +16,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.screens.models.DownloadProgressBlock
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
 import com.runanywhere.runanywhereai.ui.screens.models.sizeLabel
@@ -143,7 +143,7 @@ private fun ComponentRow(component: VoiceComponent, enabled: Boolean, requireLoa
     val ready = model != null &&
         (if (requireLoaded) component.viewModel.isLoaded(model) else component.viewModel.isReady(model))
     val busy = model != null && vmState.busyModelId == model.id
-    val progress = if (busy) vmState.progressPercent else null
+    val progress = if (busy) vmState.downloadProgress else null
 
     Column(
         modifier = Modifier
@@ -201,19 +201,10 @@ private fun ComponentRow(component: VoiceComponent, enabled: Boolean, requireLoa
                 )
             }
         }
-        AnimatedVisibility(visible = progress != null) {
-            Column(modifier = Modifier.padding(top = dimens.spacingSm)) {
-                LinearProgressIndicator(
-                    progress = { (progress ?: 0) / 100f },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    "Downloading… ${progress ?: 0}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = dimens.spacingXs),
-                )
-            }
+        // The setup card stages several multi-gigabyte components in sequence, so it needs the same
+        // rate and time-remaining line the picker shows — a bare percentage here reads as stalled.
+        AnimatedVisibility(visible = busy) {
+            DownloadProgressBlock(progress, modifier = Modifier.padding(top = dimens.spacingSm))
         }
     }
 }

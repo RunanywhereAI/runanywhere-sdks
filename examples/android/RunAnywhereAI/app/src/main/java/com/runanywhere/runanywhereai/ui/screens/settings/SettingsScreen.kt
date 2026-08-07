@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.components.ScreenLede
 import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatGenerationBudgetPolicy
@@ -74,29 +75,21 @@ fun SettingsScreen(
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            Text(
-                text = "Personalize the assistant, manage local models, and keep downloads private.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ScreenLede(
+            "Personalize the assistant, manage local models, and keep downloads private.",
+        )
 
         Section("App") {
             SettingsLinkRow(
                 label = "Choose chat model",
                 description = "Download or switch the model used by Ask",
-                icon = RACIcons.Outline.Cpu,
+                icon = RACIcons.Outline.Model,
                 onClick = onOpenModels,
             )
             SettingsLinkRow(
                 label = "Advanced workbench",
                 description = "Voice, documents, tools, and diagnostics",
-                icon = RACIcons.Outline.Stack,
+                icon = RACIcons.Outline.Sliders,
                 onClick = onOpenAdvanced,
             )
         }

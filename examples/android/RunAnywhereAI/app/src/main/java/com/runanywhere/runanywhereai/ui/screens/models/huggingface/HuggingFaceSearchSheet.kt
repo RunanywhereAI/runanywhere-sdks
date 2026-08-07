@@ -25,7 +25,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -46,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.data.hf.HfModelSummary
 import com.runanywhere.runanywhereai.data.hf.HfRepoFile
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.ui.screens.models.DownloadProgressBlock
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -195,7 +196,7 @@ private fun RepoRow(repo: HfModelSummary, onSelect: (String) -> Unit) {
 private fun FilesList(
     files: List<HfRepoFile>,
     downloadingPath: String?,
-    progress: Int?,
+    progress: DownloadProgressInfo?,
     onDownload: (HfRepoFile) -> Unit,
 ) {
     val dimens = LocalDimens.current
@@ -228,47 +229,47 @@ private fun FileRow(
     file: HfRepoFile,
     isDownloading: Boolean,
     anyDownloading: Boolean,
-    progress: Int?,
+    progress: DownloadProgressInfo?,
     onDownload: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = dimens.spacingSm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                file.quantLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                formatModelSize(file.sizeBytes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    file.quantLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    formatModelSize(file.sizeBytes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(dimens.spacingSm))
+            if (!isDownloading) {
+                Button(onClick = onDownload, enabled = !anyDownloading) {
+                    Icon(
+                        RACIcons.Outline.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(dimens.iconSm),
+                    )
+                    Spacer(Modifier.width(dimens.spacingXs))
+                    Text("Get")
+                }
+            }
         }
-        Spacer(Modifier.width(dimens.spacingSm))
-        when {
-            isDownloading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                LinearProgressIndicator(
-                    progress = { (progress ?: 0) / 100f },
-                    modifier = Modifier.width(DOWNLOAD_BAR_WIDTH.dp),
-                )
-                Spacer(Modifier.width(dimens.spacingSm))
-                Text("${progress ?: 0}%", style = MaterialTheme.typography.bodySmall)
-            }
-            else -> Button(onClick = onDownload, enabled = !anyDownloading) {
-                Icon(
-                    RACIcons.Outline.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(dimens.iconSm),
-                )
-                Spacer(Modifier.width(dimens.spacingXs))
-                Text("Get")
-            }
+        // A GGUF pulled straight from the Hub is the same kind of multi-gigabyte transfer as a
+        // catalog model, so it gets the same full-width bar and detail line rather than a stub bar
+        // squeezed into the trailing slot.
+        if (isDownloading) {
+            DownloadProgressBlock(progress, modifier = Modifier.padding(bottom = dimens.spacingSm))
         }
     }
 }
@@ -352,7 +353,6 @@ private fun CenterNote(text: String, showSpinner: Boolean = false) {
 }
 
 private const val SHEET_HEIGHT_FRACTION = 0.92f
-private const val DOWNLOAD_BAR_WIDTH = 96
 
 // Compact download/like counts: 12345 -> "12.3k", 2_100_000 -> "2.1M".
 private fun formatCount(value: Long): String = when {

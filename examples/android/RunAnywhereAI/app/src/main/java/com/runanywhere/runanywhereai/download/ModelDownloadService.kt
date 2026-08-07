@@ -97,29 +97,28 @@ class ModelDownloadService : Service() {
     }
 
     private suspend fun runDownload(model: RAModelInfo) {
-        _state.value = Download(model.id, progressPercent = 0, status = Status.RUNNING)
+        _state.value = Download(model.id, progress = DownloadProgressInfo(), status = Status.RUNNING)
         try {
             // Resident STT/LLM weights hold multi-GB of MemAvailable and trip the
             // download RAM preflight on mid-range phones. Free them first; the
             // user can re-select after the transfer finishes.
             freeResidentModelsForDownload()
             RunAnywhere.models.download(model.id).collect { event ->
-                val pct = when (event) {
-                    is DownloadEvent.Progress ->
-                        if (event.bytesTotal > 0) {
-                            (event.bytesDone * 100 / event.bytesTotal).toInt()
-                        } else {
-                            null
-                        }
-                    is DownloadEvent.Completed -> 100
+                val info = when (event) {
+                    is DownloadEvent.Progress -> DownloadProgressInfo.from(event)
+                    is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
                     else -> null
                 }
-                if (pct != null) {
-                    _state.value = Download(model.id, progressPercent = pct, status = Status.RUNNING)
-                    updateNotification(model, pct)
+                if (info != null) {
+                    _state.value = Download(model.id, progress = info, status = Status.RUNNING)
+                    updateNotification(model, info)
                 }
             }
-            _state.value = Download(model.id, progressPercent = 100, status = Status.COMPLETED)
+            _state.value = Download(
+                model.id,
+                progress = DownloadProgressInfo(fraction = 1f),
+                status = Status.COMPLETED,
+            )
         } catch (e: CancellationException) {
             // Cancellation is a user action (or teardown); the SDK preserves
             // resume bytes. Surface it as a terminal "cancelled" state.
@@ -141,7 +140,7 @@ class ModelDownloadService : Service() {
 
     private fun startAsForeground(model: RAModelInfo): Boolean {
         ensureChannel(this)
-        val notification = buildNotification(model, progressPercent = 0)
+        val notification = buildNotification(model, DownloadProgressInfo())
         return try {
             // dataSync FGS type matches a network model download. On Android 14+
             // the type must be declared in the manifest and passed here.
@@ -188,18 +187,23 @@ class ModelDownloadService : Service() {
         }
     }
 
-    private fun updateNotification(model: RAModelInfo, progressPercent: Int) {
+    private fun updateNotification(model: RAModelInfo, progress: DownloadProgressInfo) {
         val manager = getSystemService(NotificationManager::class.java) ?: return
-        manager.notify(NOTIFICATION_ID, buildNotification(model, progressPercent))
+        manager.notify(NOTIFICATION_ID, buildNotification(model, progress))
     }
 
-    private fun buildNotification(model: RAModelInfo, progressPercent: Int): Notification =
+    /**
+     * The notification is the only view of the transfer once the app is backgrounded, which is the
+     * normal case for a multi-gigabyte model, so it carries the same detail line the picker row does
+     * — size, rate, and time remaining — rather than a bare percentage.
+     */
+    private fun buildNotification(model: RAModelInfo, progress: DownloadProgressInfo): Notification =
         NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Downloading ${model.name}")
-            .setContentText("$progressPercent%")
+            .setContentText(progress.detailLine.ifBlank { "Starting…" })
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setOngoing(true)
-            .setProgress(100, progressPercent.coerceIn(0, 100), progressPercent <= 0)
+            .setProgress(100, progress.percent ?: 0, progress.isIndeterminate)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
@@ -237,7 +241,7 @@ class ModelDownloadService : Service() {
     /** Snapshot the picker mirrors into its own row state. */
     data class Download(
         val modelId: String,
-        val progressPercent: Int? = null,
+        val progress: DownloadProgressInfo? = null,
         val status: Status,
         val error: String? = null,
     )
@@ -286,7 +290,7 @@ class ModelDownloadService : Service() {
                 // Publish RUNNING synchronously so an observer that subscribes
                 // before the service's IO coroutine runs never reads a stale
                 // terminal snapshot from a prior download of the same model.
-                _state.value = Download(model.id, progressPercent = 0, status = Status.RUNNING)
+                _state.value = Download(model.id, progress = DownloadProgressInfo(), status = Status.RUNNING)
                 true
             } catch (e: Exception) {
                 // e.g. ForegroundServiceStartNotAllowedException from background.

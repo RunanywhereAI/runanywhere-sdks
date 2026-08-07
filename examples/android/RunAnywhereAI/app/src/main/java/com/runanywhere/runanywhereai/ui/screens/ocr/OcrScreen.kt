@@ -7,15 +7,15 @@ import android.graphics.BitmapFactory
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +25,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -44,13 +43,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.components.EmptyState
+import com.runanywhere.runanywhereai.ui.components.EmptyStateAction
+import com.runanywhere.runanywhereai.ui.components.ScreenLede
+import com.runanywhere.runanywhereai.ui.components.SectionCard
+import com.runanywhere.runanywhereai.ui.components.SectionHeader
+import com.runanywhere.runanywhereai.ui.components.StatusNote
+import com.runanywhere.runanywhereai.ui.components.StatusTone
+import com.runanywhere.runanywhereai.ui.screens.models.ModelPickerCard
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
-import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 
 /**
@@ -92,16 +98,17 @@ fun OcrScreen(viewModel: OcrViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Text(
-            text = "Extract text from invoices, receipts, and scans with Nemotron OCR on the NPU.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        ScreenLede(
+            "Extract text from invoices, receipts, and scans with Nemotron OCR on the NPU.",
         )
 
-        ModelCard(
+        ModelPickerCard(
+            label = "OCR model",
             model = model,
+            icon = RACIcons.Outline.ScanText,
             busy = busy,
-            sheetLocked = sheetLocked,
+            enabled = !sheetLocked,
+            placeholder = "Select an OCR model",
             onClick = { showSheet = true },
         )
         DocumentCard(
@@ -111,90 +118,31 @@ fun OcrScreen(viewModel: OcrViewModel = viewModel()) {
             onPickImage = { imagePicker.launch("image/*") },
         )
 
-        if (viewModel.extractedText.isNotBlank()) {
+        AnimatedVisibility(
+            visible = viewModel.extractedText.isNotBlank(),
+            enter = fadeIn(AppMotion.standard()),
+            exit = fadeOut(AppMotion.exit()),
+        ) {
             ResultCard(
                 text = viewModel.extractedText,
                 latencyMs = viewModel.latencyMs,
                 onCopy = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("OCR text", viewModel.extractedText))
+                    val clipboard =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(
+                        ClipData.newPlainText("OCR text", viewModel.extractedText),
+                    )
                     Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                 },
             )
         }
 
-        viewModel.error?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
-        if (viewModel.status.isNotEmpty()) {
-            Text(
-                viewModel.status,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        viewModel.error?.let { StatusNote(it, StatusTone.ERROR) }
+        if (viewModel.status.isNotEmpty()) StatusNote(viewModel.status, StatusTone.NEUTRAL)
     }
 
     if (showSheet) {
         ModelSelectionSheet(viewModel = modelVm, onDismiss = { showSheet = false })
-    }
-}
-
-@Composable
-private fun ModelCard(
-    model: RAModelInfo?,
-    busy: Boolean,
-    sheetLocked: Boolean,
-    onClick: () -> Unit,
-) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .clickable(enabled = !sheetLocked, onClick = onClick)
-                .padding(dimens.spacingLg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-        ) {
-            Icon(
-                imageVector = RACIcons.Outline.FileText,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-            ) {
-                Text(
-                    "OCR model",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    when {
-                        busy -> "Preparing model…"
-                        model != null -> model.name
-                        else -> "Select an OCR model"
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                model?.let { BackendBadge(framework = it.framework, compact = true) }
-            }
-            if (busy) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp))
-            } else {
-                Icon(
-                    imageVector = RACIcons.Outline.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
     }
 }
 
@@ -206,106 +154,103 @@ private fun DocumentCard(
     onPickImage: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(dimens.spacingLg),
-            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-        ) {
-            Text("Document", style = MaterialTheme.typography.titleMedium)
+    SectionCard {
+        SectionHeader(title = "Document")
 
-            val source = viewModel.image
-            if (source != null) {
-                Image(
-                    bitmap = source.asImageBitmap(),
-                    contentDescription = "Document image",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 280.dp)
-                        .clip(RoundedCornerShape(dimens.radiusMd)),
-                )
-            } else {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    shape = RoundedCornerShape(dimens.radiusMd),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "No document selected",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
-                OutlinedButton(onClick = onPickImage, enabled = !viewModel.isExtracting) {
-                    Text(if (viewModel.image == null) "Pick document…" else "Change document…")
-                }
-                Button(
-                    onClick = { viewModel.extract() },
-                    enabled = modelLoaded &&
-                        !busy &&
-                        viewModel.image != null &&
-                        !viewModel.isExtracting,
-                ) {
-                    if (viewModel.isExtracting) {
-                        CircularProgressIndicator(modifier = Modifier.height(18.dp))
+        val source = viewModel.image
+        if (source != null) {
+            Image(
+                bitmap = source.asImageBitmap(),
+                contentDescription = "Document image",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = PREVIEW_MAX_HEIGHT)
+                    .clip(RoundedCornerShape(dimens.radiusMd)),
+            )
+        } else {
+            // The empty slot is where a first-time user actually is, so it carries the
+            // action and the explanation rather than the words "no document selected".
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = RoundedCornerShape(dimens.radiusMd),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                EmptyState(
+                    icon = RACIcons.Outline.ScanText,
+                    title = "No document yet",
+                    body = if (modelLoaded) {
+                        "Pick a photo of an invoice, receipt, or scan. The text comes back as " +
+                            "characters you can select and copy."
                     } else {
-                        Text("Extract text")
-                    }
+                        "Choose an OCR model above first, then pick a photo of an invoice, " +
+                            "receipt, or scan."
+                    },
+                    primaryAction = EmptyStateAction(
+                        label = "Choose an image",
+                        enabled = !viewModel.isExtracting,
+                        onClick = onPickImage,
+                    ),
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
+            if (viewModel.image != null) {
+                OutlinedButton(onClick = onPickImage, enabled = !viewModel.isExtracting) {
+                    Text("Change document…")
                 }
             }
+            Button(
+                onClick = { viewModel.extract() },
+                enabled = modelLoaded &&
+                    !busy &&
+                    viewModel.image != null &&
+                    !viewModel.isExtracting,
+            ) {
+                if (viewModel.isExtracting) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(dimens.iconSm),
+                            strokeWidth = 2.dp,
+                        )
+                        Text("Reading…")
+                    }
+                } else {
+                    Text("Extract text")
+                }
+            }
+        }
+        // Only ever the one blocker that is actually in the way, and only once the user has
+        // done their part — a warning about a missing model above a card they have not filled
+        // in yet is noise.
+        if (!modelLoaded && viewModel.image != null) {
+            StatusNote("Choose an OCR model above to read this document.", StatusTone.NEUTRAL)
         }
     }
 }
 
 @Composable
 private fun ResultCard(text: String, latencyMs: Long?, onCopy: () -> Unit) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(dimens.spacingLg),
-            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Extracted text",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                latencyMs?.let {
-                    Text(
-                        String.format(Locale.US, "%.1f s", it / 1000.0),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            SelectionContainer {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                )
-            }
-            OutlinedButton(onClick = onCopy) {
-                Text("Copy")
-            }
+    SectionCard {
+        SectionHeader(
+            title = "Extracted text",
+            status = latencyMs?.let { String.format(Locale.US, "%.1f s", it / 1000.0) },
+        )
+        SelectionContainer {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = FontFamily.Monospace,
+                ),
+            )
         }
+        OutlinedButton(onClick = onCopy) { Text("Copy") }
     }
 }
+
+/** Tall enough to judge a scan, short enough that the actions stay on screen. */
+private val PREVIEW_MAX_HEIGHT = 280.dp

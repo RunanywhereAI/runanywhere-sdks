@@ -120,7 +120,7 @@ enum class ConsumerDestination(
         More,
         "Advanced",
         "SDK tools and diagnostics",
-        RACIcons.Outline.Stack,
+        RACIcons.Outline.Sliders,
         group = ConsumerNavGroup.ADVANCED,
     ),
 }

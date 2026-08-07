@@ -12,7 +12,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,8 +50,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.components.ScreenLede
 import com.runanywhere.runanywhereai.ui.screens.chat.MarkdownText
-import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.screens.models.ModelPickerCard
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
@@ -62,7 +62,6 @@ import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.util.readableWidth
-import com.runanywhere.sdk.public.types.RAModelInfo
 import java.util.Locale
 
 @Composable
@@ -117,17 +116,15 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
-            Text("Images & Live", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "Attach a photo, capture one, or open live camera mode with an on-device vision model.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ScreenLede(
+            "Attach a photo, capture one, or open live camera mode with an on-device " +
+                "vision model.",
+        )
 
-        ModelCard(
+        ModelPickerCard(
+            label = "Image model",
             model = model,
+            icon = RACIcons.Outline.Eye,
             enabled = !visionVm.isGenerating,
             onClick = { showSheet = true },
         )
@@ -278,47 +275,6 @@ private fun ImagePreview(bitmap: Bitmap?) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun ModelCard(model: RAModelInfo?, enabled: Boolean, onClick: () -> Unit) {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(dimens.spacingLg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-        ) {
-            Icon(
-                imageVector = RACIcons.Outline.Eye,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
-            ) {
-                Text("Image model", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(model?.name ?: "Select a model", style = MaterialTheme.typography.bodyLarge)
-                model?.let {
-                    BackendBadge(framework = it.framework, compact = true)
-                }
-            }
-            Icon(
-                imageVector = RACIcons.Outline.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(dimens.iconSm),
-            )
         }
     }
 }

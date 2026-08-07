@@ -347,7 +347,7 @@ private fun PendingAttachment.toComposerAttachment(): ComposerAttachment =
         PendingAttachmentKind.IMAGE -> ComposerAttachment(
             name = name,
             description = "Ask about this image",
-            icon = RACIcons.Outline.Eye,
+            icon = RACIcons.Outline.Image,
         )
         PendingAttachmentKind.DOCUMENT -> ComposerAttachment(
             name = name,

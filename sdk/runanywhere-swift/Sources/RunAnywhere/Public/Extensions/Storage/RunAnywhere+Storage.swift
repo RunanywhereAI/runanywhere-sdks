@@ -333,6 +333,16 @@ extension RunAnywhere {
         return try await startAndPollDownload(plan: plan, model: resolvedModel, onProgress: onProgress)
     }
 
+    /// Bytes an interrupted download left behind that a restart would continue
+    /// from, or 0 when a restart would begin from scratch.
+    ///
+    /// Reads the plan the coordinator persisted for the interrupted attempt, so
+    /// the answer survives an app relaunch. No plan on disk means no interrupted
+    /// transfer to resume.
+    internal static func resumableDownloadBytes(modelID: String) async -> Int64 {
+        BackgroundDownloadCoordinator.shared.resumableBytes(modelID: modelID)
+    }
+
     /// Drive the commons start+poll finalize for a model whose files a background
     /// transfer already placed on disk. Used by the coordinator when the app was
     /// relaunched to deliver background session events and no caller is awaiting.

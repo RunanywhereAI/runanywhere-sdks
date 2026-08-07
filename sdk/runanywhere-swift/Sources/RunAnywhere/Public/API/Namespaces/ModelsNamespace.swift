@@ -148,14 +148,27 @@ public extension RunAnywhere {
                                     percent: progress.stageProgress * 100
                                 ))
                             default:
-                                continuation.yield(.progress(
+                                continuation.yield(.progress(DownloadProgressSnapshot(
                                     operationId: operationId,
                                     sequence: nextSequence(),
                                     bytesDone: progress.bytesDownloaded,
                                     bytesTotal: progress.totalBytes,
-                                    percent: progress.overallProgress * 100,
-                                    file: progress.currentFileName.isEmpty ? nil : progress.currentFileName
-                                ))
+                                    file: progress.currentFileName.isEmpty ? nil : progress.currentFileName,
+                                    // C++ reports 0 for "not measured yet" and
+                                    // the proto leaves eta absent (or -1) for
+                                    // "unknown". Both are normalised to nil so a
+                                    // UI can tell missing from genuinely zero
+                                    // and show nothing rather than "0 B/s"
+                                    // while the transfer spins up.
+                                    bytesPerSecond: progress.bytesPerSecond > 0 ? progress.bytesPerSecond : nil,
+                                    etaSeconds: progress.hasEtaSeconds && progress.etaSeconds >= 0
+                                        ? progress.etaSeconds : nil,
+                                    retryAttempt: Int(progress.retryAttempt),
+                                    currentFileIndex: Int(progress.currentFileIndex),
+                                    totalFiles: max(Int(progress.totalFiles), 1),
+                                    overallProgress: progress.overallProgress > 0
+                                        ? progress.overallProgress : nil
+                                )))
                             }
                         }
                         let refreshed = await self.get(id: id) ?? model
@@ -177,6 +190,23 @@ public extension RunAnywhere {
                     if case .cancelled = termination { task.cancel() }
                 }
             }
+        }
+
+        /// Whether a previous, unfinished download for `id` left bytes that the
+        /// next `download(id:)` will continue from instead of re-fetching.
+        ///
+        /// Starting a download *is* resuming it (see `download_service.proto`),
+        /// so this reports nothing about how to resume — only whether resuming
+        /// would actually save work. It exists so a UI can label the action
+        /// honestly: offering "Resume" when the bytes are gone is a lie, and
+        /// offering "Get" when 90% of a 3 GB file is on disk understates it.
+        ///
+        /// Answered from disk, not from session state, so it stays correct
+        /// across an app relaunch — which is the case that matters, because an
+        /// interrupted multi-gigabyte download is usually discovered on the next
+        /// launch rather than in the session that started it.
+        public func isResumable(id: String) async -> Bool {
+            await RunAnywhere.resumableDownloadBytes(modelID: id) > 0
         }
 
         /// Delete a downloaded model's files and reset its registry path.

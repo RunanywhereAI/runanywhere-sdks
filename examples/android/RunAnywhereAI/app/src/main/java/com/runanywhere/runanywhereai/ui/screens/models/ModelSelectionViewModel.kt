@@ -11,6 +11,7 @@ import com.runanywhere.runanywhereai.data.BackendAvailability
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.isVisibleForNativeNpuCatalog
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
@@ -30,7 +31,12 @@ data class ModelSelectionState(
     val models: List<RAModelInfo> = emptyList(),
     val currentModelId: String? = null,
     val busyModelId: String? = null,
-    val progressPercent: Int? = null,
+    // Full transfer detail (rate, remaining, retry count), not just a percentage, so a row can
+    // explain a slow download instead of only claiming a number.
+    val downloadProgress: DownloadProgressInfo? = null,
+    // The model whose download failed, kept with [error] so the row can offer a retry that resumes
+    // from the bytes already on disk rather than starting over.
+    val failedModelId: String? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
 )
@@ -150,7 +156,12 @@ class ModelSelectionViewModel(
     // or other-model snapshot. Shared by the fire-and-forget picker path and the
     // awaiting prepare() path.
     private suspend fun collectForegroundDownload(model: RAModelInfo) {
-        state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
+        state = state.copy(
+            busyModelId = model.id,
+            downloadProgress = DownloadProgressInfo(),
+            failedModelId = null,
+            error = null,
+        )
         var sawOurModel = false
         ModelDownloadService.state
             .takeWhile { snapshot ->
@@ -170,7 +181,7 @@ class ModelSelectionViewModel(
                 if (snapshot?.modelId == model.id &&
                     snapshot.status == ModelDownloadService.Status.RUNNING
                 ) {
-                    state = state.copy(busyModelId = model.id, progressPercent = snapshot.progressPercent)
+                    state = state.copy(busyModelId = model.id, downloadProgress = snapshot.progress)
                 }
             }
         // The flow completed on a terminal (or preemption) snapshot; apply + clean up.
@@ -182,22 +193,26 @@ class ModelSelectionViewModel(
         snapshot: ModelDownloadService.Download?,
     ) {
         if (snapshot == null || snapshot.modelId != model.id) {
-            state = state.copy(busyModelId = null, progressPercent = null)
+            state = state.copy(busyModelId = null, downloadProgress = null)
             return
         }
         when (snapshot.status) {
             ModelDownloadService.Status.COMPLETED -> {
-                state = state.copy(busyModelId = null, progressPercent = null)
+                state = state.copy(busyModelId = null, downloadProgress = null)
                 reload()
             }
             ModelDownloadService.Status.FAILED ->
+                // Remember which model failed so the row can offer Retry. The SDK cancels with
+                // delete_partial_bytes = false, so retrying resumes from the bytes already on disk
+                // rather than re-fetching gigabytes the user already paid for.
                 state = state.copy(
                     busyModelId = null,
-                    progressPercent = null,
+                    downloadProgress = null,
+                    failedModelId = model.id,
                     error = snapshot.error ?: "Download failed",
                 )
             else ->
-                state = state.copy(busyModelId = null, progressPercent = null)
+                state = state.copy(busyModelId = null, downloadProgress = null)
         }
         ModelDownloadService.clearIfTerminal(model.id)
     }
@@ -210,7 +225,7 @@ class ModelSelectionViewModel(
             downloadJob?.cancel()
             downloadJob = null
             if (state.busyModelId == modelId) {
-                state = state.copy(busyModelId = null, progressPercent = null)
+                state = state.copy(busyModelId = null, downloadProgress = null)
             }
         }
     }
@@ -226,32 +241,37 @@ class ModelSelectionViewModel(
             )
             return false
         }
-        state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
+        state = state.copy(
+            busyModelId = model.id,
+            downloadProgress = DownloadProgressInfo(),
+            failedModelId = null,
+            error = null,
+        )
         return try {
             // Same as ModelDownloadService: free resident weights so the RAM
             // preflight can pass when another STT/LLM is still loaded.
             RuntimeModelSelection.unloadAllForDownload()
             RunAnywhere.models.download(model.id).collect { event ->
-                val pct = when (event) {
-                    is DownloadEvent.Progress ->
-                        if (event.bytesTotal > 0) {
-                            (event.bytesDone * 100 / event.bytesTotal).toInt()
-                        } else {
-                            null
-                        }
-                    is DownloadEvent.Completed -> 100
+                val info = when (event) {
+                    is DownloadEvent.Progress -> DownloadProgressInfo.from(event)
+                    is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
                     else -> null
                 }
-                if (pct != null) state = state.copy(progressPercent = pct)
+                if (info != null) state = state.copy(downloadProgress = info)
             }
-            state = state.copy(busyModelId = null, progressPercent = null, currentModelId = null)
+            state = state.copy(busyModelId = null, downloadProgress = null, currentModelId = null)
             reload()
             true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             RACLog.e("download failed: ${model.id}", e)
-            state = state.copy(busyModelId = null, progressPercent = null, error = e.message ?: "Download failed")
+            state = state.copy(
+                busyModelId = null,
+                downloadProgress = null,
+                failedModelId = model.id,
+                error = e.message ?: "Download failed",
+            )
             false
         }
     }
@@ -289,7 +309,7 @@ class ModelSelectionViewModel(
 
     fun delete(model: RAModelInfo) {
         viewModelScope.launch {
-            state = state.copy(busyModelId = model.id, progressPercent = null, error = null)
+            state = state.copy(busyModelId = model.id, downloadProgress = null, error = null)
             try {
                 if (isLlm) LlmModelChangeInterlock.awaitReadyForModelChange()
                 RunAnywhere.models.delete(model.id)
@@ -301,7 +321,7 @@ class ModelSelectionViewModel(
                 RACLog.e("delete failed: ${model.id}", e)
                 state = state.copy(error = e.message ?: "Delete failed")
             } finally {
-                state = state.copy(busyModelId = null, progressPercent = null)
+                state = state.copy(busyModelId = null, downloadProgress = null)
             }
         }
     }

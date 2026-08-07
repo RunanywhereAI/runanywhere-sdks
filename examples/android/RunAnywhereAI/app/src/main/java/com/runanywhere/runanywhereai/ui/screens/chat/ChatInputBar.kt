@@ -113,17 +113,19 @@ fun ChatInputBar(
             RACIcons.Outline.FileText,
             onAttachDocument
         ),
-        AttachmentAction("Image", "Ask about a photo", RACIcons.Outline.Eye, onAttachImage),
+        // A still photo the app will hold, versus a live camera feed it will look through.
+        // Both used to be an eye, which made the two rows of this menu near-identical.
+        AttachmentAction("Image", "Ask about a photo", RACIcons.Outline.Image, onAttachImage),
         AttachmentAction(
             "Live camera",
             "Look around with vision",
-            RACIcons.Outline.DeviceMobile,
+            RACIcons.Outline.Eye,
             onOpenLive
         ),
         AttachmentAction(
             "Advanced tools",
             "SDK demos and diagnostics",
-            RACIcons.Outline.Stack,
+            RACIcons.Outline.Sliders,
             onOpenAdvanced
         ),
     )
@@ -418,7 +420,10 @@ private fun BlockedReasonStrip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = RACIcons.Outline.Cpu,
+                // The blocker is always "no model chosen", so the strip wears the model mark
+                // rather than a chip — the user is being sent to pick a file, not to inspect
+                // their silicon.
+                imageVector = RACIcons.Outline.Model,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(dimens.iconSm),

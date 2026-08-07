@@ -46,6 +46,9 @@ fun SolutionsScreen(viewModel: SolutionsViewModel = viewModel()) {
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
             RunButton(
                 label = "Voice Agent",
+                // Two buttons side by side must not wear the same glyph, so these name what
+                // each pipeline *does* — one listens, one retrieves — rather than both
+                // wearing the "pipeline" mark that already labels this whole screen.
                 icon = RACIcons.Outline.Microphone,
                 enabled = !viewModel.isRunning && viewModel.voiceReady,
                 modifier = Modifier.weight(1f),
@@ -53,7 +56,7 @@ fun SolutionsScreen(viewModel: SolutionsViewModel = viewModel()) {
             )
             RunButton(
                 label = "RAG",
-                icon = RACIcons.Outline.FileText,
+                icon = RACIcons.Outline.Database,
                 enabled = !viewModel.isRunning && viewModel.ragReady,
                 modifier = Modifier.weight(1f),
                 onClick = viewModel::runRagSolution,

@@ -7,6 +7,7 @@ import com.runanywhere.runanywhereai.data.hf.HfModelSummary
 import com.runanywhere.runanywhereai.data.hf.HfRepoFile
 import com.runanywhere.runanywhereai.data.hf.HfSearchKind
 import com.runanywhere.runanywhereai.data.hf.HuggingFaceHubClient
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.api.DownloadEvent
@@ -30,7 +31,7 @@ data class HuggingFaceSearchState(
     val selectedRepo: String? = null,
     val files: List<HfRepoFile> = emptyList(),
     val downloadingPath: String? = null,
-    val downloadProgress: Int? = null,
+    val downloadProgress: DownloadProgressInfo? = null,
     // Set once a download completes so the host can refresh the model list.
     val addedModelId: String? = null,
     val error: String? = null,
@@ -123,7 +124,7 @@ class HuggingFaceSearchViewModel : ViewModel() {
         downloadJob = viewModelScope.launch {
             val name = "${repoId.substringAfterLast('/')} (${file.quantLabel})"
             val url = "https://huggingface.co/$repoId/resolve/main/${file.path}"
-            _state.update { it.copy(downloadingPath = file.path, downloadProgress = 0, error = null) }
+            _state.update { it.copy(downloadingPath = file.path, downloadProgress = DownloadProgressInfo(), error = null) }
             try {
                 val model = RunAnywhere.models.register(
                     ModelRegistration.url(
@@ -134,17 +135,12 @@ class HuggingFaceSearchViewModel : ViewModel() {
                     ),
                 )
                 RunAnywhere.models.download(model.id).collect { event ->
-                    val pct = when (event) {
-                        is DownloadEvent.Progress ->
-                            if (event.bytesTotal > 0) {
-                                (event.bytesDone * 100 / event.bytesTotal).toInt()
-                            } else {
-                                null
-                            }
-                        is DownloadEvent.Completed -> 100
+                    val info = when (event) {
+                        is DownloadEvent.Progress -> DownloadProgressInfo.from(event)
+                        is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
                         else -> null
                     }
-                    if (pct != null) _state.update { it.copy(downloadProgress = pct) }
+                    if (info != null) _state.update { it.copy(downloadProgress = info) }
                 }
                 _state.update {
                     it.copy(downloadingPath = null, downloadProgress = null, addedModelId = model.id)
