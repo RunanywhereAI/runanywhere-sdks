@@ -78,9 +78,30 @@ import { openAddFromHuggingFace } from './add-from-huggingface';
 // State (module-scope, one selection sheet per app)
 // ---------------------------------------------------------------------------
 
+/**
+ * What a download is doing right now.
+ *
+ * `verifying` and `extracting` were both being folded into a 100% transfer bar,
+ * which is the single worst moment to go silent: a multi-gigabyte checksum or
+ * unpack can take tens of seconds, and a bar sitting at 100% with no label is
+ * indistinguishable from a hung download. Naming the phase is what tells the
+ * user the wait is expected.
+ */
+type DownloadPhase = 'transferring' | 'verifying' | 'extracting';
+
 type RowState =
   | { status: 'registered' }      // not downloaded yet
-  | { status: 'downloading'; progress: number } // progress is 0..1
+  | {
+      status: 'downloading';
+      /** 0..1 of the current phase. */
+      progress: number;
+      phase: DownloadPhase;
+      /** Absent until the first progress event reports a total. */
+      bytesDone?: number;
+      bytesTotal?: number;
+      /** Bytes/second, smoothed. Absent until two samples exist. */
+      bytesPerSecond?: number;
+    }
   | { status: 'downloaded' }      // on disk but not loaded
   | { status: 'loading' }
   | { status: 'loaded' }
@@ -959,13 +980,78 @@ function renderOrgVariants(org: OrgGroup): string {
     .join('');
 }
 
+/** "1.2 GB of 4.1 GB · 8.4 MB/s · 6 min left" — as much of it as is known. */
+function describeTransfer(state: RowState & { status: 'downloading' }): string {
+  const parts: string[] = [];
+
+  if (state.bytesTotal !== undefined && state.bytesDone !== undefined) {
+    parts.push(`${formatBytes(state.bytesDone)} of ${formatBytes(state.bytesTotal)}`);
+  } else if (state.bytesDone !== undefined) {
+    // No total: report what has arrived rather than inventing a denominator.
+    parts.push(formatBytes(state.bytesDone));
+  }
+
+  if (state.bytesPerSecond !== undefined && state.bytesPerSecond > 0) {
+    parts.push(`${formatBytes(state.bytesPerSecond)}/s`);
+
+    if (state.bytesTotal !== undefined && state.bytesDone !== undefined) {
+      const remaining = (state.bytesTotal - state.bytesDone) / state.bytesPerSecond;
+      // Only above 2s. A "1 second left" that lingers reads as a stall, and the
+      // estimate is least reliable exactly at the end.
+      if (remaining > 2) parts.push(`${formatDuration(remaining)} left`);
+    }
+  }
+
+  return parts.join(' · ');
+}
+
+/** Coarse and honest: a download ETA is an estimate, so don't imply seconds. */
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.ceil(seconds)} sec`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`;
+}
+
+/**
+ * The progress bar plus a line saying what is happening and how fast.
+ *
+ * Was a bare percentage bar in three places, discarding the `bytesDone` /
+ * `bytesTotal` the SDK has always emitted. A percentage alone cannot answer the
+ * only question a user has while waiting on a multi-gigabyte model — "how long
+ * is this going to take" — and the two non-transfer phases had no label at all,
+ * so verification looked like a hung download stuck at 100%.
+ */
+function renderDownloadProgress(state: RowState): string {
+  if (state.status !== 'downloading') return '';
+
+  const percent = Math.round(state.progress * 100);
+  const detail = state.phase === 'transferring'
+    ? describeTransfer(state)
+    : state.phase === 'verifying'
+      ? 'Checking the download is intact…'
+      : 'Unpacking…';
+
+  // `indeterminate` while a phase reports no measurable progress, so the bar
+  // animates instead of sitting at a frozen width that reads as stuck.
+  const indeterminate = state.phase !== 'transferring' && state.progress >= 1;
+
+  return `<div class="progress-bar mt-sm${indeterminate ? ' progress-bar--indeterminate' : ''}"
+      role="progressbar" aria-valuemin="0" aria-valuemax="100"
+      ${indeterminate ? '' : `aria-valuenow="${percent}"`}
+      aria-label="${escapeHtml(state.phase === 'transferring' ? 'Download progress' : detail)}">
+      <div class="progress-fill" style="width:${percent}%"></div>
+    </div>
+    ${detail ? `<div class="progress-detail">${escapeHtml(detail)}</div>` : ''}`;
+}
+
 /** A single variant row inside an expanded family. */
 function renderVariantRow(entry: CatalogEntry, bestForDevice: boolean): string {
   const state = stateOf(entry.id);
   const isBest = bestForDevice && isRecommendable(entry);
-  const progressBar = state.status === 'downloading'
-    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
-    : '';
+  const progressBar = renderDownloadProgress(state);
   const errorBar = state.status === 'error'
     ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
     : '';
@@ -1058,9 +1144,7 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, bestForDevi
   // not actionable, and let the disabled button + reason speak instead.
   const isDefault = bestForDevice && isRecommendable(entry);
   const tags = consumerTags(entry).map(renderTagPill).join('');
-  const progressBar = state.status === 'downloading'
-    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
-    : '';
+  const progressBar = renderDownloadProgress(state);
   const errorBar = state.status === 'error'
     ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
     : '';
@@ -1092,9 +1176,7 @@ function renderTagPill(tag: ConsumerTag): string {
 
 /** Compact companion row (ASR/TTS/VLM/embedding): name, size + backend, tag. */
 function renderModelRow(entry: CatalogEntry, state: RowState): string {
-  const progressBar = state.status === 'downloading'
-    ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
-    : '';
+  const progressBar = renderDownloadProgress(state);
   const errorBar = state.status === 'error'
     ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
     : '';
@@ -1265,17 +1347,69 @@ async function startDownload(modelId: string): Promise<void> {
     );
   }
 
-  setRow(modelId, { status: 'downloading', progress: 0 });
+  setRow(modelId, { status: 'downloading', progress: 0, phase: 'transferring' });
+
+  // Rate samples for the speed readout. `performance.now()` rather than
+  // Date.now() so a clock adjustment mid-download cannot produce a negative
+  // interval and a nonsense speed.
+  let lastAt = performance.now();
+  let lastBytes = 0;
+  let smoothed: number | undefined;
 
   try {
     for await (const event of RunAnywhere.models.download(modelId)) {
-      if (event.type === 'progress') {
-        const progress = event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0;
-        setRow(modelId, { status: 'downloading', progress });
-      } else if (event.type === 'extracting') {
-        setRow(modelId, { status: 'downloading', progress: 1 });
-      } else {
-        setRow(modelId, { status: 'downloaded' });
+      switch (event.type) {
+        case 'progress': {
+          const now = performance.now();
+          const elapsed = (now - lastAt) / 1000;
+          // Sampled over at least 400ms: a per-event rate computed across a few
+          // milliseconds swings wildly and renders as an unreadable flicker.
+          if (elapsed >= 0.4 && event.bytesDone > lastBytes) {
+            const instant = (event.bytesDone - lastBytes) / elapsed;
+            // Exponential smoothing, weighted toward history, so the number is
+            // steady enough to read while still tracking a real slowdown.
+            smoothed = smoothed === undefined ? instant : smoothed * 0.7 + instant * 0.3;
+            lastAt = now;
+            lastBytes = event.bytesDone;
+          }
+          setRow(modelId, {
+            status: 'downloading',
+            phase: 'transferring',
+            progress: event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0,
+            bytesDone: event.bytesDone,
+            bytesTotal: event.bytesTotal > 0 ? event.bytesTotal : undefined,
+            bytesPerSecond: smoothed,
+          });
+          break;
+        }
+        case 'verifying':
+          // Named rather than shown as a finished transfer: verifying a
+          // multi-gigabyte file takes real time, and a full bar with no label
+          // looks exactly like a hang.
+          setRow(modelId, { status: 'downloading', progress: 1, phase: 'verifying' });
+          break;
+        case 'extracting':
+          setRow(modelId, {
+            status: 'downloading',
+            phase: 'extracting',
+            progress: event.percent === undefined ? 1 : event.percent / 100,
+          });
+          break;
+        case 'cancelled':
+          // Was falling into the same branch as `completed`, so a cancelled
+          // download claimed the model was on disk and the next Load failed
+          // with a missing-file error the user had no way to connect to it.
+          setRow(modelId, { status: 'registered' });
+          return;
+        case 'failed':
+          setRow(modelId, { status: 'error', error: event.error.message });
+          showToast(`Download failed: ${event.error.message}`, 'warning');
+          return;
+        case 'completed':
+          setRow(modelId, { status: 'downloaded' });
+          break;
+        case 'started':
+          break;
       }
     }
   } catch (err) {

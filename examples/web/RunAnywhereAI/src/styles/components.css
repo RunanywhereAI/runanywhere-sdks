@@ -2809,6 +2809,49 @@
   transition: width 0.3s ease;
 }
 
+/*
+ * A phase whose progress cannot be measured — checksum verification, unpacking.
+ *
+ * The bar is full and a highlight sweeps across it, because the alternative is a
+ * static 100% bar that is indistinguishable from a finished-but-stuck download.
+ * The sweep says "still working" without claiming a position it does not know.
+ */
+.progress-bar--indeterminate .progress-fill {
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    var(--color-primary) 35%,
+    color-mix(in srgb, var(--color-primary) 45%, white) 50%,
+    var(--color-primary) 65%,
+    var(--color-primary) 100%
+  );
+  background-size: 220% 100%;
+  animation: progress-sweep var(--ambient-shimmer) linear infinite;
+}
+
+@keyframes progress-sweep {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+/*
+ * Repeating motion is suppressed entirely rather than slowed: for a user who
+ * asked for less motion, an indefinite loop is the exact thing they opted out
+ * of. The gradient still reads as a distinct treatment from a solid bar.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar--indeterminate .progress-fill { animation: none; }
+}
+
+/* "1.2 GB of 4.1 GB · 8.4 MB/s · 6 min left", or the current phase's name. */
+.progress-detail {
+  margin-top: var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  /* Tabular figures so the digits do not shift the line as they tick. */
+  font-variant-numeric: tabular-nums;
+}
+
 /* =============================================================================
  * Toast Notification
  * ============================================================================= */
