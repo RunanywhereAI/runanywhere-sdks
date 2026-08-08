@@ -376,6 +376,11 @@ sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/DevelopmentConfig.swift
 # Swift SDK - Local XCFrameworks
 sdk/runanywhere-swift/Binaries/*.xcframework
 
+# Swift SDK - local-natives opt-in marker (must NOT be committed: when present
+# it flips Package.swift to path-based local Binaries, which breaks every remote
+# SPM consumer since the fetched package has no Binaries/).
+.runanywhere-local-natives
+
 # Swift SDK - Vendor directory (locally built xcframeworks)
 sdk/runanywhere-swift/vendor/
 
