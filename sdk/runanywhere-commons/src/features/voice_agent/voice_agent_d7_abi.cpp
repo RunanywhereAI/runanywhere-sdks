@@ -36,6 +36,7 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "features/stt/stt_transcript_text.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -625,7 +626,13 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         emit_component_failure(handle, "stt", rc, "STT transcription failed");
         return rc;
     }
-    if (!stt.text || stt.text[0] == '\0') {
+    // A no-speech engine marker is not something the user said. Whisper answers
+    // silence with `[BLANK_AUDIO]` / `[ Silence ]` / `(wind)` — non-empty, so it
+    // passed the old `stt.text[0] == '\0'` check and became the turn: shown as
+    // the user's own words, then handed to the LLM as the prompt, so the agent
+    // answered a question nobody asked, out loud. The predicate treats it as
+    // what it is: no speech.
+    if (rac::stt::transcript_is_non_speech(stt.text)) {
         rac_stt_result_free(&stt);
         if (have_lifecycle_stt) {
             rac::lifecycle::release_lifecycle_stt(&stt_ref);
@@ -1101,8 +1108,11 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
         return rac_proto_buffer_set_error(out_result, rc, "STT transcription failed");
     }
     runanywhere::v1::STTOutput output;
+    // Same normalisation as `fill_stt_output` on the proto path: an engine's
+    // no-speech marker is published as empty so every SDK renders its own honest
+    // empty state instead of showing `[BLANK_AUDIO]` as words the speaker said.
     if (stt.text)
-        output.set_text(stt.text);
+        output.set_text(rac::stt::transcript_for_display(stt.text));
     output.set_confidence(stt.confidence);
     if (stt.detected_language)
         output.set_language(stt.detected_language);

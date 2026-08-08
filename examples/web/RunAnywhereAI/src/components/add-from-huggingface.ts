@@ -39,9 +39,17 @@ import { icon } from './icons';
 // State (module-scope — one HF modal per app, like the model-selection sheet)
 // ---------------------------------------------------------------------------
 
+/**
+ * The phase a transfer is actually in. `downloading` alone was not enough: the
+ * SDK keeps working after the last byte arrives — it checksums, then unpacks —
+ * and a row that only knows a 0..1 fraction renders both of those as a bar
+ * frozen at 100%, which on a multi-gigabyte model looks like a hang for minutes.
+ */
+type TransferPhase = 'downloading' | 'verifying' | 'extracting';
+
 type FileRowState =
   | { status: 'idle' }
-  | { status: 'downloading'; progress: number } // 0..1
+  | { status: 'transferring'; phase: TransferPhase; progress: number } // 0..1
   | { status: 'downloaded'; modelId: string }
   | { status: 'loading'; modelId: string }
   | { status: 'loaded'; modelId: string }
@@ -320,7 +328,7 @@ function renderFileRow(file: HfRepoFile): string {
   const warning = !compatibility.supported
     ? `<div class="hf-file-row__warning">&#9888;&#65039; ${escapeHtml(compatibility.reason)}</div>`
     : '';
-  const progressBar = state.status === 'downloading'
+  const progressBar = state.status === 'transferring'
     ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round(state.progress * 100)}%"></div></div>`
     : '';
   const errorBar = state.status === 'error'
@@ -348,8 +356,8 @@ function renderFileAction(state: FileRowState): string {
   switch (state.status) {
     case 'idle':
       return '<button type="button" class="model-action-btn download" data-hf-action="download">Download</button>';
-    case 'downloading':
-      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${Math.round(state.progress * 100)}%</button>`;
+    case 'transferring':
+      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${escapeHtml(transferLabel(state.phase, state.progress))}</button>`;
     case 'downloaded':
       return '<button type="button" class="model-action-btn load" data-hf-action="load">Use</button>';
     case 'loading':
@@ -358,6 +366,25 @@ function renderFileAction(state: FileRowState): string {
       return '<button type="button" class="model-action-btn loaded" disabled>&#10003; Active</button>';
     case 'error':
       return '<button type="button" class="model-action-btn model-action-btn--retry" data-hf-action="download">Retry</button>';
+  }
+}
+
+/**
+ * What the disabled action button says mid-transfer.
+ *
+ * A percentage is only meaningful while bytes are moving. Checksumming and
+ * unpacking both happen at 100% of the *download*, so showing "100%" for them
+ * reads as a stall on exactly the models where those steps take longest. Naming
+ * the step instead costs nothing and is the truth.
+ */
+function transferLabel(phase: TransferPhase, progress: number): string {
+  switch (phase) {
+    case 'downloading':
+      return `${Math.round(progress * 100)}%`;
+    case 'verifying':
+      return 'Checking…';
+    case 'extracting':
+      return 'Unpacking…';
   }
 }
 
@@ -386,7 +413,7 @@ async function downloadFile(repoId: string, file: HfRepoFile): Promise<void> {
     showToast(compatibility.reason, 'warning');
   }
 
-  setFileState(file.path, { status: 'downloading', progress: 0 });
+  setFileState(file.path, { status: 'transferring', phase: 'downloading', progress: 0 });
 
   try {
     const url = hfResolveUrl(repoId, file.path);
@@ -405,20 +432,71 @@ async function downloadFile(repoId: string, file: HfRepoFile): Promise<void> {
       memoryRequiredBytes: file.sizeBytes,
     });
 
+    // Every arm is named. This loop used to be two `if`s and an `else`, and that
+    // `else` swallowed `failed` and `cancelled` along with `completed` — so a
+    // download that died mid-transfer set the row to "downloaded" and toasted
+    // "Downloaded <name>" for a model that was not on disk. `models.download()`
+    // reports failure as a terminal `failed` event and then ends the iteration
+    // normally; it does NOT throw, so the `catch` below never saw it either.
+    // The same bug was proven on Android by killing the network mid-transfer.
+    let outcome: 'completed' | 'failed' | 'cancelled' | 'ended' = 'ended';
     for await (const event of RunAnywhere.models.download(model.id)) {
-      if (event.type === 'progress') {
-        const progress = event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0;
-        setFileState(file.path, { status: 'downloading', progress });
-      } else if (event.type === 'extracting') {
-        setFileState(file.path, { status: 'downloading', progress: 1 });
-      } else {
-        setFileState(file.path, { status: 'downloaded', modelId: model.id });
+      switch (event.type) {
+        case 'progress':
+          setFileState(file.path, {
+            status: 'transferring',
+            phase: 'downloading',
+            progress: event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0,
+          });
+          break;
+        case 'verifying':
+          setFileState(file.path, { status: 'transferring', phase: 'verifying', progress: 1 });
+          break;
+        case 'extracting':
+          setFileState(file.path, {
+            status: 'transferring',
+            phase: 'extracting',
+            // `percent` is the unpack's own progress and is optional; without it
+            // hold the bar full rather than snapping back to zero.
+            progress: event.percent !== undefined ? event.percent / 100 : 1,
+          });
+          break;
+        case 'completed':
+          outcome = 'completed';
+          setFileState(file.path, { status: 'downloaded', modelId: event.modelId });
+          break;
+        case 'failed':
+          outcome = 'failed';
+          setFileState(file.path, { status: 'error', error: event.error.message });
+          break;
+        case 'cancelled':
+          outcome = 'cancelled';
+          // Back to idle, not to an error: the user asked for this, so the row
+          // should offer Download again rather than accuse them of a failure.
+          setFileState(file.path, { status: 'idle' });
+          break;
+        case 'started':
+          break;
       }
     }
 
-    if ((fileStates.get(file.path) ?? { status: 'idle' }).status === 'downloaded') {
+    if (outcome === 'completed') {
       showToast(`Downloaded ${name}`, 'success');
       refreshModelSelectionState();
+    } else if (outcome === 'failed') {
+      const state = fileStates.get(file.path);
+      showToast(
+        `Download failed: ${state?.status === 'error' ? state.error : 'unknown error'}`,
+        'warning',
+      );
+    } else if (outcome === 'ended') {
+      // The stream finished without a terminal event. Nothing can be claimed
+      // about the file, so say exactly that instead of guessing either way.
+      setFileState(file.path, {
+        status: 'error',
+        error: 'The download ended without reporting a result. Try again.',
+      });
+      showToast('Download ended without a result', 'warning');
     }
   } catch (err) {
     const message = formatError(err);
