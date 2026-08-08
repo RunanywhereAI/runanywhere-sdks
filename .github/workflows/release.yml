@@ -131,6 +131,19 @@ jobs:
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
+      # The NeuRT (Apple ANE) engine is implemented in the sibling private
+      # `neurun` repo. Unlike pr-build.yml (which sets RAC_ALLOW_NEURT_STUB=1 to
+      # prove compile/link), the release must build the REAL engine, so we check
+      # neurun out here and point NEURT_ROOT at it. Pinned to a commit so the
+      # published binaries stay reproducible and match the committed checksums.
+      # Requires a NEURUN_TOKEN secret (PAT/app token with read on RunanywhereAI/neurun).
+      - name: Checkout neurun (NeuRT engine source)
+        uses: actions/checkout@v7
+        with:
+          repository: RunanywhereAI/neurun
+          ref: 1c44fd150c84976dea1ab4c894f2f03ebcdcee04
+          token: ${{ secrets.NEURUN_TOKEN }}
+          path: neurun
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
@@ -148,6 +161,8 @@ jobs:
         # and the Package.swift binary targets expect.
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          # Build the real NeuRT engine from the checked-out neurun source.
+          NEURT_ROOT: ${{ github.workspace }}/neurun
         run: bash sdk/runanywhere-commons/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v7
