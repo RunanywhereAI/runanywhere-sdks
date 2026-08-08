@@ -71,8 +71,10 @@ import com.runanywhere.runanywhereai.ui.theme.BrandGradient
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.Neutral100
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import com.runanywhere.runanywhereai.ui.theme.motionSpec
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -226,6 +228,23 @@ fun VoiceScreen() {
         }
     }
 
+    // A listening agent that has heard nothing is indistinguishable from a hung one: the utterance
+    // segmenter closes a turn on measured energy, so speech that is perfectly intelligible but
+    // quiet — a distant mic, a low input gain — simply never crosses the threshold, and the panel
+    // sits on "Listening…" forever with no transcript and no error. After a stretch of that, say
+    // so. Reset by any state change, any new turn, and by the detector actually firing, so the
+    // hint only ever describes the silence in front of it.
+    var quietMic by remember { mutableStateOf(false) }
+    LaunchedEffect(voiceVm.state, voiceVm.turns.size, voiceVm.isSpeechDetected, voiceVm.partialTranscript) {
+        quietMic = false
+        if (voiceVm.state == VoiceState.LISTENING && !voiceVm.isSpeechDetected &&
+            voiceVm.partialTranscript == null && !isNpuSwap
+        ) {
+            delay(QUIET_MIC_HINT_DELAY_MS)
+            quietMic = true
+        }
+    }
+
     // The live hypothesis is a list row of its own, so the follow target is the partial when one is
     // showing — otherwise the words being recognised right now scroll off the bottom.
     val transcriptRows = voiceVm.turns.size + if (voiceVm.partialTranscript != null) 1 else 0
@@ -241,8 +260,12 @@ fun VoiceScreen() {
         verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
         ScreenLede(
-            "Hands-free conversation. We picked the best voice models for your device — " +
-                "tap once to set them up.",
+            // "Between turns", not a flat "hands-free conversation": the agent is half-duplex, so
+            // the loop of speak -> pause -> answer needs no tap, but talking *over* a reply is not
+            // heard at all. A bare hands-free claim invites exactly the one thing that does not
+            // work; the status line names the paused mic when it matters.
+            "Hands-free between turns: speak, pause, and it answers. We picked the best voice " +
+                "models for your device — tap once to set them up.",
         )
 
         VoiceSetupCard(
@@ -321,6 +344,7 @@ fun VoiceScreen() {
                 text = statusText(voiceVm.state, ready, isNpuSwap),
                 hearing = voiceVm.isSpeechDetected,
             )
+            QuietMicHint(visible = quietMic)
             MicButton(
                 state = voiceVm.state,
                 // Disabled while an interrupt is settling. The SDK's interrupt resolves only once
@@ -383,7 +407,12 @@ private fun statusText(state: VoiceState, ready: Boolean, pushToTalk: Boolean): 
         if (pushToTalk) "Recording — tap when you're done" else "Listening… speak, then pause"
     VoiceState.TRANSCRIBING -> "Transcribing…"
     VoiceState.THINKING -> "Thinking…"
-    VoiceState.SPEAKING -> "Speaking — tap to take the turn back"
+    // "Mic paused" is the fact a listener cannot otherwise discover. The agent takes turns: while a
+    // reply plays, captured frames are dropped rather than fed to the recognizer (see
+    // VoiceAgentMicDriver's half-duplex note), so someone who simply talks over the assistant is
+    // silently ignored. Naming the pause is what makes the tap read as the way to take the floor
+    // rather than as one option among two.
+    VoiceState.SPEAKING -> "Speaking — mic paused, tap to take the turn back"
 }
 
 /** The empty transcript, phrased for whatever the agent is doing at that moment. */
@@ -393,7 +422,7 @@ private fun emptyTranscriptText(state: VoiceState, ready: Boolean): String = whe
     VoiceState.LISTENING -> "Go ahead — say something."
     VoiceState.TRANSCRIBING -> "Working out what you said…"
     VoiceState.THINKING -> "Working out a reply…"
-    VoiceState.SPEAKING -> "Speaking."
+    VoiceState.SPEAKING -> "Speaking. Tap the button to take the turn back."
 }
 
 /**
@@ -437,6 +466,32 @@ private fun StatusLine(text: String, hearing: Boolean) {
                 )
             }
         }
+    }
+}
+
+/**
+ * The "we are listening but hearing nothing" line.
+ *
+ * Advice, not an error: the session is healthy and the microphone is open, so this is styled as
+ * the secondary note it is rather than in the error colour. Its own polite live region, because it
+ * appears long after the status line above it last changed and would otherwise never be announced.
+ */
+@Composable
+private fun QuietMicHint(visible: Boolean) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(motionSpec { AppMotion.standard() }),
+        exit = fadeOut(motionSpec { AppMotion.exit() }),
+    ) {
+        Text(
+            text = "Not hearing anything yet — try speaking up, or move closer to the mic.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        )
     }
 }
 
@@ -586,6 +641,14 @@ private fun MicButton(
 
 /** Stable list key for the single provisional row, so it is never confused with a settled turn. */
 private const val PARTIAL_TURN_KEY = "voice-partial-transcript"
+
+/**
+ * How long the agent may listen in silence before the screen admits it has heard nothing.
+ *
+ * Long enough that an ordinary pause — thinking about the question, drawing breath — never trips
+ * it, short enough that it lands well before a user concludes the app has hung.
+ */
+private const val QUIET_MIC_HINT_DELAY_MS = 12_000L
 
 private val MIC_BUTTON_SIZE = 88.dp
 private val MIC_GLYPH_SIZE = 36.dp

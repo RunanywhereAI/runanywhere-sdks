@@ -40,9 +40,37 @@ import kotlin.coroutines.cancellation.CancellationException
  * to stop the session (capture teardown is handled in a finally block).
  *
  * Segmentation/endpointing lives in the C core, which re-runs its own VAD over
- * each utterance and is strictly turn-taking (no barge-in). Mic frames that
- * arrive while a turn is processing are dropped by the bounded channel, which
- * also avoids transcribing the device's own TTS output.
+ * each utterance.
+ *
+ * ## Why this loop is half-duplex, and what it would take to change
+ *
+ * The agent takes turns: while a reply is playing out, captured frames are
+ * dropped instead of fed. Interruption is therefore an explicit control
+ * ([stopPlayback]) and never something the user can do by simply talking over
+ * the agent — which is why every UI mounted on this driver has to say so rather
+ * than imply the mic is still listening. Swift `VoiceAgentMicDriver` is the
+ * same shape for the same reasons, so the two platforms make the same promise.
+ *
+ * Two things are missing for hands-free barge-in, and neither can be supplied
+ * from here:
+ *
+ *  1. **A speech signal during playout.** `rac_voice_agent_feed_audio_proto`
+ *     answers a frame with a *completed turn* or with nothing; it reports
+ *     nothing at the moment it first hears a voice. Feeding through the playout
+ *     would therefore let the core capture the barge-in, but this layer would
+ *     not learn of it until the whole replacement turn (STT -> LLM -> TTS,
+ *     seconds) had run — far too late to cut the sentence the user talked over.
+ *     Cutting it promptly needs the core to emit speech-start from its
+ *     segmenter; synthesizing it here would be an SDK-side VAD, duplicating the
+ *     core's segmenter on one platform only.
+ *  2. **Echo cancellation on the capture path.** Feeding while the speaker is
+ *     live re-feeds the device's own reply, which the core segments as a user
+ *     utterance and answers — the agent talks to itself. Suppressing that is
+ *     `AcousticEchoCanceler` on a `VOICE_COMMUNICATION` capture, which not
+ *     every device (nor the emulator's audio HAL) provides.
+ *
+ * Until both exist, dropping the frames is the honest behaviour: the bounded
+ * channel bounds memory and keeps the device's own TTS out of the next turn.
  */
 internal class VoiceAgentMicDriver(
     private val handle: Long,
@@ -125,7 +153,10 @@ internal class VoiceAgentMicDriver(
                 logger.info("Playing agent reply (${reply.size} WAV bytes)")
                 playReply(reply.toByteArray())
                 // Drop frames captured while the turn ran / the device spoke so
-                // stale audio is not folded into the next turn.
+                // stale audio is not folded into the next turn. See the
+                // half-duplex note on the class: without echo cancellation these
+                // frames are mostly the device's own reply, and feeding them
+                // back would have the agent answer itself.
                 while (chunks.tryReceive().isSuccess) Unit
             }
         }
@@ -173,7 +204,8 @@ internal class VoiceAgentMicDriver(
          * Bounded mic ingress buffer. The capture callback trySends while the
          * consumer pauses for the duration of each turn, so an unbounded channel
          * could grow without limit on long turns. DROP_OLDEST bounds memory;
-         * frames captured mid-turn are discarded anyway (no barge-in).
+         * frames captured mid-turn are discarded anyway (the class note explains
+         * what hands-free barge-in would need first).
          */
         const val MIC_CHANNEL_CAPACITY = RADefaults.AudioCapture.MIC_CHANNEL_CAPACITY
     }

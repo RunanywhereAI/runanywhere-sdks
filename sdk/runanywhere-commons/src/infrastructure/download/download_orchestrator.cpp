@@ -158,6 +158,13 @@ int64_t filesystem_available_bytes(const std::string& path) {
 // or a missing Hugging Face token) from a genuine "server sent no
 // Content-Length". A -1 return with a 401/403 status is an access failure, not
 // an unknown size.
+//
+// The probe is an optimisation, never a gate. Every failure mode — no
+// transport, a refused request, a fault inside a platform transport — has to
+// land on "size unknown" so the caller keeps the catalogue's
+// download_size_bytes and the plan still starts. A probe that propagates a
+// failure outward instead kills the plan before a single byte is requested,
+// which is how a working artifact ends up looking like a dead one.
 int64_t http_head_content_length(const std::string& url, int32_t* out_http_status = nullptr) {
     if (out_http_status)
         *out_http_status = 0;
@@ -181,43 +188,58 @@ int64_t http_head_content_length(const std::string& url, int32_t* out_http_statu
     req.header_count = 1;
     rac_http_response_t resp{};
     int64_t len = -1;
-    rac_result_t rc = rac_http_request_send(client, &req, &resp);
-    if (out_http_status && rc == RAC_SUCCESS)
-        *out_http_status = resp.status;
-    if (rc == RAC_SUCCESS && (resp.status == 401 || resp.status == 403)) {
-        RAC_LOG_WARNING(LOG_TAG,
-                        "HEAD probe rejected with HTTP %d (authentication/authorization failure) — "
-                        "the size is unknown because access was denied, not because the server "
-                        "omitted Content-Length",
-                        static_cast<int>(resp.status));
-    }
-    if (rc == RAC_SUCCESS && resp.status >= 200 && resp.status < 300 && resp.headers != nullptr) {
-        for (size_t i = 0; i < resp.header_count; ++i) {
-            const char* name = resp.headers[i].name;
-            const char* value = resp.headers[i].value;
-            if (name == nullptr || value == nullptr)
-                continue;
-            static const char* kWant = "content-length";
-            const size_t n = std::strlen(kWant);
-            if (std::strlen(name) != n)
-                continue;
-            bool match = true;
-            for (size_t k = 0; k < n; ++k) {
-                char c = name[k];
-                if (c >= 'A' && c <= 'Z')
-                    c = static_cast<char>(c - 'A' + 'a');
-                if (c != kWant[k]) {
-                    match = false;
+    // Platform transports are free to fault rather than return an error code —
+    // the WASM adapter in particular can have a JS exception thrown back across
+    // this frame by emscripten's glue. Contain it here so the worst a broken
+    // probe can do is leave the size unknown.
+    try {
+        rac_result_t rc = rac_http_request_send(client, &req, &resp);
+        if (out_http_status && rc == RAC_SUCCESS)
+            *out_http_status = resp.status;
+        if (rc == RAC_SUCCESS && (resp.status == 401 || resp.status == 403)) {
+            RAC_LOG_WARNING(
+                LOG_TAG,
+                "HEAD probe rejected with HTTP %d (authentication/authorization failure) — "
+                "the size is unknown because access was denied, not because the server "
+                "omitted Content-Length",
+                static_cast<int>(resp.status));
+        }
+        if (rc == RAC_SUCCESS && resp.status >= 200 && resp.status < 300 &&
+            resp.headers != nullptr) {
+            for (size_t i = 0; i < resp.header_count; ++i) {
+                const char* name = resp.headers[i].name;
+                const char* value = resp.headers[i].value;
+                if (name == nullptr || value == nullptr)
+                    continue;
+                static const char* kWant = "content-length";
+                const size_t n = std::strlen(kWant);
+                if (std::strlen(name) != n)
+                    continue;
+                bool match = true;
+                for (size_t k = 0; k < n; ++k) {
+                    char c = name[k];
+                    if (c >= 'A' && c <= 'Z')
+                        c = static_cast<char>(c - 'A' + 'a');
+                    if (c != kWant[k]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    long long v = std::strtoll(value, nullptr, 10);
+                    if (v > 0)
+                        len = static_cast<int64_t>(v);
                     break;
                 }
             }
-            if (match) {
-                long long v = std::strtoll(value, nullptr, 10);
-                if (v > 0)
-                    len = static_cast<int64_t>(v);
-                break;
-            }
         }
+    } catch (...) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "HEAD probe faulted — treating the download size as unknown and "
+                        "falling back to the catalog size");
+        len = -1;
+        if (out_http_status)
+            *out_http_status = 0;
     }
     rac_http_response_free(&resp);
     rac_http_client_destroy(client);
