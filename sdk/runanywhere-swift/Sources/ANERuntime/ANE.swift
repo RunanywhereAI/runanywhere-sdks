@@ -1,0 +1,106 @@
+//
+//  ANE.swift
+//  ANERuntime Module
+//
+//  Thin wrapper that registers the Apple NeuRT engine (Apple Neural Engine LLM
+//  + CoreML diffusion) with the commons plugin registry. Mirrors ONNX.swift's
+//  Sherpa registration: the shipped RABackendNeuRT.xcframework exports only the
+//  `rac_plugin_entry_neurt` entry symbol, so we register by handing its vtable
+//  to `rac_plugin_register(...)` directly.
+//
+
+import CRACommons
+import ANEBackend
+import RunAnywhere
+
+// MARK: - ANE Module
+
+/// Apple Neural Engine (NeuRT) backend module.
+///
+/// Serves on-device text generation on the Apple Neural Engine and image
+/// generation (diffusion) over CoreML. Import this module and register it to
+/// route `framework == .neurt` model loads through the commons plugin router.
+///
+/// ## Registration
+///
+/// ```swift
+/// import ANERuntime
+///
+/// // Register the backend (also happens automatically via `autoRegister`).
+/// ANE.register()
+/// ```
+public enum ANE {
+    private static let logger = SDKLogger(category: "ANE")
+
+    // MARK: - Module Info
+
+    /// Current version of the ANE Runtime module.
+    public static let version = "1.0.0"
+
+    // MARK: - Registration State
+
+    @MainActor private static var isRegistered = false
+
+    // MARK: - Registration
+
+    /// Register the NeuRT engine plugin with the commons plugin registry.
+    ///
+    /// Safe to call multiple times — subsequent calls are no-ops, and a native
+    /// "already registered" result is treated as success.
+    ///
+    /// - Parameter priority: Ignored (C++ uses its own priority system).
+    @MainActor
+    public static func register(priority _: Int = 100) {
+        guard !isRegistered else {
+            logger.debug("ANE already registered, returning")
+            return
+        }
+
+        guard let vtable = rac_plugin_entry_neurt() else {
+            // warning level so this surfaces even under the production default
+            // (.warning) during early-boot backend registration.
+            logger.warning("NeuRT plugin entry returned null — ANE LLM/diffusion will not route")
+            return
+        }
+
+        let registerResult = vtable.withMemoryRebound(
+            to: rac_engine_vtable_t.self, capacity: 1
+        ) { typedPointer -> rac_result_t in
+            return rac_plugin_register(typedPointer)
+        }
+
+        if registerResult == RAC_SUCCESS ||
+           registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
+            isRegistered = true
+            logger.info("NeuRT engine plugin registered (ANE text generation + CoreML diffusion)")
+        } else {
+            let errorMsg = String(cString: rac_error_message(registerResult))
+            logger.error("NeuRT plugin registration failed: \(errorMsg)")
+        }
+    }
+
+    /// Unregister the NeuRT engine plugin from the commons registry.
+    ///
+    /// `@MainActor` so the `isRegistered` flag stays in the same isolation
+    /// domain as `register(priority:)` and the `autoRegister` Task hop.
+    @MainActor
+    public static func unregister() {
+        guard isRegistered else { return }
+
+        _ = rac_plugin_unregister("neurt")
+        isRegistered = false
+        logger.info("NeuRT engine plugin unregistered")
+    }
+}
+
+// MARK: - Auto-Registration
+
+extension ANE {
+    /// Enable auto-registration for this module.
+    /// Access this property to trigger backend registration.
+    public static let autoRegister: Void = {
+        Task { @MainActor in
+            ANE.register()
+        }
+    }()
+}
