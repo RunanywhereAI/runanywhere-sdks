@@ -697,6 +697,12 @@ struct BackendPill: View {
             .font(AppTypography.caption2)
             .fontWeight(.medium)
             .foregroundColor(AppColors.textSecondary)
+            // A pill is one short token and must stay one line. Without this it
+            // is squeezed by whatever shares its row — a download row's progress
+            // control, for one — and SwiftUI hyphenates it into "Lla-/ma CPP",
+            // which reads as a rendering fault rather than a backend name.
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, AppSpacing.small)
             .padding(.vertical, AppSpacing.xxSmall)
             .background(AppColors.backgroundSecondary)

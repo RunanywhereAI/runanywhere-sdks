@@ -56,24 +56,6 @@ struct AdaptiveSizing {
         }
     }
 
-    /// Secondary action button size
-    static var actionButtonSize: CGFloat {
-        switch DeviceFormFactor.current {
-        case .phone: return 44
-        case .tablet: return 50
-        case .desktop: return 56
-        }
-    }
-
-    /// Maximum content width for readable text
-    static var maxContentWidth: CGFloat {
-        switch DeviceFormFactor.current {
-        case .phone: return .infinity
-        case .tablet: return 700
-        case .desktop: return 800
-        }
-    }
-
     /// Conversation area max width
     static var conversationMaxWidth: CGFloat {
         switch DeviceFormFactor.current {
@@ -269,80 +251,6 @@ private struct AdaptiveSheetChrome<Content: View>: View {
 }
 #endif
 
-// MARK: - Adaptive Form Style
-struct AdaptiveFormStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        #if os(macOS)
-        content
-            .formStyle(.grouped)
-            .scrollContentBackground(.visible)
-        #else
-        content
-            .formStyle(.automatic)
-        #endif
-    }
-}
-
-// MARK: - Adaptive Navigation
-struct AdaptiveNavigation<Content: View>: View {
-    let title: String
-    let content: () -> Content
-
-    var body: some View {
-        #if os(macOS)
-        VStack(spacing: 0) {
-            // Custom title bar for macOS
-            HStack {
-                Text(title)
-                    .font(.headline)
-                Spacer()
-            }
-            .padding()
-            .background(Color(NSColor.windowBackgroundColor))
-
-            Divider()
-
-            content()
-        }
-        #else
-        NavigationView {
-            content()
-                .navigationTitle(title)
-                .navigationBarTitleDisplayModeCompat(.inline)
-        }
-        #endif
-    }
-}
-
-// MARK: - Adaptive Button Style
-struct AdaptiveButtonStyle: ButtonStyle {
-    let isPrimary: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        #if os(macOS)
-        if isPrimary {
-            configuration.label
-                .buttonStyle(.borderedProminent)
-                .tint(AppColors.primaryAccent)
-                .controlSize(.regular)
-        } else {
-            configuration.label
-                .buttonStyle(.bordered)
-                .tint(AppColors.primaryAccent)
-                .controlSize(.regular)
-        }
-        #else
-        configuration.label
-            .padding(.horizontal, isPrimary ? 16 : 12)
-            .padding(.vertical, isPrimary ? 12 : 8)
-            .background(isPrimary ? AppColors.primaryAccent : Color.secondary.opacity(0.2))
-            .foregroundColor(isPrimary ? .white : .primary)
-            .cornerRadius(8)
-            .opacity(configuration.isPressed ? 0.8 : 1.0)
-        #endif
-    }
-}
-
 // MARK: - View Extensions
 extension View {
     func adaptiveSheet<Content: View>(
@@ -355,138 +263,6 @@ extension View {
             onDismiss: onDismiss,
             sheetContent: content
         ))
-    }
-
-    func adaptiveFormStyle() -> some View {
-        modifier(AdaptiveFormStyle())
-    }
-
-    func adaptiveButtonStyle(isPrimary: Bool = false) -> some View {
-        buttonStyle(AdaptiveButtonStyle(isPrimary: isPrimary))
-    }
-
-    func adaptiveFrame() -> some View {
-        #if os(macOS)
-        self.frame(
-            minWidth: 400,
-            idealWidth: 600,
-            maxWidth: 900,
-            minHeight: 300,
-            idealHeight: 500,
-            maxHeight: 800
-        )
-        #else
-        self
-        #endif
-    }
-
-    func adaptiveToolbar<Leading: View, Trailing: View>(
-        @ViewBuilder leading: () -> Leading,
-        @ViewBuilder trailing: () -> Trailing
-    ) -> some View {
-        #if os(macOS)
-        self.toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                leading()
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                trailing()
-            }
-        }
-        #else
-        self.toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                leading()
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                trailing()
-            }
-        }
-        #endif
-    }
-}
-
-// MARK: - Platform-Specific Colors
-extension Color {
-    static var adaptiveBackground: Color {
-        #if os(macOS)
-        Color(NSColor.windowBackgroundColor)
-        #else
-        Color(.systemBackground)
-        #endif
-    }
-
-    static var adaptiveSecondaryBackground: Color {
-        #if os(macOS)
-        Color(NSColor.controlBackgroundColor)
-        #else
-        Color(.secondarySystemBackground)
-        #endif
-    }
-
-    static var adaptiveTertiaryBackground: Color {
-        #if os(macOS)
-        Color(NSColor.textBackgroundColor)
-        #else
-        Color(.tertiarySystemBackground)
-        #endif
-    }
-
-    static var adaptiveGroupedBackground: Color {
-        #if os(macOS)
-        Color(NSColor.controlBackgroundColor)
-        #else
-        Color(.systemGroupedBackground)
-        #endif
-    }
-
-    static var adaptiveSeparator: Color {
-        #if os(macOS)
-        Color(NSColor.separatorColor)
-        #else
-        Color(.separator)
-        #endif
-    }
-
-    static var adaptiveLabel: Color {
-        #if os(macOS)
-        Color(NSColor.labelColor)
-        #else
-        Color(.label)
-        #endif
-    }
-
-    static var adaptiveSecondaryLabel: Color {
-        #if os(macOS)
-        Color(NSColor.secondaryLabelColor)
-        #else
-        Color(.secondaryLabel)
-        #endif
-    }
-}
-
-// MARK: - Adaptive Text Field
-struct AdaptiveTextField: View {
-    let title: String
-    @Binding var text: String
-    var isURL: Bool = false
-    var isSecure: Bool = false
-    var isNumeric: Bool = false
-
-    var body: some View {
-        Group {
-            if isSecure {
-                SecureField(title, text: $text)
-            } else {
-                TextField(title, text: $text)
-                    #if os(iOS)
-                    .keyboardType(isURL ? .URL : (isNumeric ? .numberPad : .default))
-                    .autocapitalization(isURL ? .none : .sentences)
-                    #endif
-            }
-        }
-        .textFieldStyle(.roundedBorder)
-        .autocorrectionDisabled(isURL)
     }
 }
 
@@ -525,25 +301,16 @@ struct AdaptiveMicButton: View {
 
     private var micContent: some View {
         ZStack {
-            // Background circle
+            // The halo sits behind the button, so a capture state reads at a
+            // glance from across a desk without the icon ever being obscured.
+            if isPulsing {
+                MicCaptureHalo(diameter: AdaptiveSizing.micButtonSize)
+            }
+
             Circle()
                 .fill(isActive ? activeColor : inactiveColor)
                 .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
 
-            // Pulsing effect when active
-            if isPulsing {
-                Circle()
-                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                    .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
-                    .scaleEffect(1.3)
-                    .opacity(0)
-                    .animation(
-                        .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                        value: isPulsing
-                    )
-            }
-
-            // Icon or loading indicator
             if isLoading {
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -553,7 +320,9 @@ struct AdaptiveMicButton: View {
                     .font(.system(size: AdaptiveSizing.micIconSize))
                     .foregroundColor(.white)
                     .contentTransition(.symbolEffect(.replace))
-                    .animation(.smooth(duration: 0.3), value: icon)
+                    // Icon swap is a micro-interaction, and it now routes
+                    // through the token path so Reduce Motion is handled.
+                    .motionAware(Motion.microFade, value: icon)
             }
         }
     }
@@ -591,10 +360,73 @@ struct AdaptiveMicButton: View {
     }
 }
 
+// MARK: - Mic Capture Halo
+
+/// The "capture is live" ring behind the mic button.
+///
+/// This has an informational job — it is the difference between a mic that is
+/// armed and a mic that is merely tinted — so unlike a decorative pulse it is
+/// allowed to repeat. What it is not allowed to do is drift: the previous
+/// version set `scaleEffect(1.3)` and `opacity(0)` as *constants* and then
+/// attached a `repeatForever`, so the ring was permanently invisible and
+/// animated nothing at all. It was a pulse that had never once pulsed.
+///
+/// Driven by a clock rather than a toggled `@State` so two mics on screen stay
+/// in phase and a re-render mid-cycle cannot restart the curve. Suppressed
+/// entirely under Reduce Motion, where the static ring still marks the state.
+private struct MicCaptureHalo: View {
+    let diameter: CGFloat
+
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
+    /// One expansion per 1.6s — the canonical ambient breathe.
+    private static let period: Double = 1.6
+
+    var body: some View {
+        if reduceMotion {
+            ring(scale: 1.18, opacity: 0.5)
+        } else {
+            TimelineView(.animation) { context in
+                let phase = Self.phase(at: context.date)
+                // Expand outward and fade as it goes: the ring reads as
+                // something *leaving* the mic, which is the direction sound
+                // travels. Fading to zero at the outer edge means no hard pop
+                // when the cycle restarts at the center.
+                ring(scale: 1.0 + 0.30 * phase, opacity: 0.55 * (1 - phase))
+            }
+        }
+    }
+
+    private func ring(scale: CGFloat, opacity: Double) -> some View {
+        Circle()
+            .stroke(Color.white.opacity(opacity), lineWidth: Stroke.regular)
+            .frame(width: diameter, height: diameter)
+            .scaleEffect(scale)
+            // Transform and opacity only — no layout pass per frame.
+            .allowsHitTesting(false)
+    }
+
+    private static func phase(at date: Date) -> CGFloat {
+        let elapsed = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period)
+        return CGFloat(elapsed / period)
+    }
+}
+
 // MARK: - Adaptive Audio Level Indicator
 
-/// Audio level visualization that scales for different platforms
+/// A real level meter, on the shared audio figure.
+///
+/// The previous implementation lit `index < Int(level * barCount)` bars fully
+/// green and left the rest grey — a segmented battery gauge, which at 10 bars
+/// quantises a continuous microphone level into 10 visible steps and jitters
+/// between two of them at a steady speaking volume.
+///
+/// It now delegates to `AudioActivityBars.level`, so the three voice screens
+/// that show audio all show the *same* figure with the same silhouette, spacing,
+/// and motion signature, and the meter is a genuine readout of the signal.
 struct AdaptiveAudioLevelIndicator: View {
+    /// Current input level, 0...1.
     let level: Float
     let barCount: Int
 
@@ -604,13 +436,12 @@ struct AdaptiveAudioLevelIndicator: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<barCount, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(index < Int(level * Float(barCount)) ? Color.green : Color.gray.opacity(0.3))
-                    .frame(width: AdaptiveSizing.audioBarWidth, height: AdaptiveSizing.audioBarHeight)
-            }
-        }
+        AudioActivityBars(
+            mode: .level(level),
+            tint: AppColors.statusGreen,
+            barCount: barCount,
+            height: AdaptiveSizing.audioBarHeight
+        )
     }
 }
 
@@ -664,49 +495,8 @@ extension View {
         ))
     }
 
-    /// Constrains the view to a maximum readable width, centered
-    func adaptiveContentWidth(_ maxWidth: CGFloat? = nil) -> some View {
-        frame(maxWidth: maxWidth ?? AdaptiveSizing.maxContentWidth)
-    }
-
-    /// Applies padding appropriate for the current platform
-    func adaptiveContentPadding() -> some View {
-        padding(.horizontal, AdaptiveSizing.contentPadding)
-    }
-
     /// Constrains to conversation area width
     func adaptiveConversationWidth() -> some View {
         frame(maxWidth: AdaptiveSizing.conversationMaxWidth, alignment: .leading)
-    }
-}
-
-// MARK: - Adaptive Model Badge
-
-/// A model info badge that scales appropriately for different platforms
-struct AdaptiveModelBadge: View {
-    let icon: String
-    let label: String
-    let value: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: AdaptiveSizing.badgeFontSize))
-                .foregroundColor(color)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(label)
-                    .font(.system(size: AdaptiveSizing.badgeFontSize - 1))
-                    .foregroundColor(.secondary)
-                Text(value)
-                    .font(.system(size: AdaptiveSizing.badgeFontSize))
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-            }
-        }
-        .padding(.horizontal, AdaptiveSizing.badgePaddingH)
-        .padding(.vertical, AdaptiveSizing.badgePaddingV)
-        .background(color.opacity(0.1))
-        .cornerRadius(6)
     }
 }

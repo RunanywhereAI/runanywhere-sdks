@@ -30,6 +30,7 @@
 #include "features/common/rac_component_lifecycle_internal.h"
 #include "features/rac_nonllm_lifecycle_bridge.h"
 #include "features/stt/rac_stt_stream_internal.h"
+#include "features/stt/stt_transcript_text.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -399,7 +400,11 @@ int64_t estimate_audio_length_ms(size_t audio_size, int32_t sample_rate) {
 void fill_stt_output(const rac_stt_result_t& result, const rac_stt_options_t& options,
                      size_t audio_size, const char* model_id, runanywhere::v1::STTOutput* out) {
     if (result.text) {
-        out->set_text(result.text);
+        // An engine's own no-speech marker is not a transcription; publishing it
+        // as one made every SDK render "[ Silence ]" / "(wind)" in the same
+        // typography as real speech. Empty is what lets each app show the
+        // honest empty state it already has.
+        out->set_text(rac::stt::transcript_for_display(result.text));
     }
     if (result.detected_language && result.detected_language[0] != '\0') {
         out->set_language(result.detected_language);
@@ -1445,6 +1450,9 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
 
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* ctx = static_cast<StreamContext*>(opaque);
+        // Same rule as the batch path: an engine no-speech marker is published
+        // as empty text, never as words the speaker said.
+        const std::string spoken = rac::stt::transcript_for_display(partial_text);
         runanywhere::v1::STTStreamEvent event;
         event.set_seq(ctx->next_seq++);
         event.set_timestamp_us(current_time_us());
@@ -1453,7 +1461,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
                                             : runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL);
         auto* partial = event.mutable_partial();
         if (partial_text) {
-            partial->set_text(partial_text);
+            partial->set_text(spoken);
         }
         partial->set_is_final(is_final == RAC_TRUE);
         if (ctx->options.language && ctx->options.language[0] != '\0') {
@@ -1462,7 +1470,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         if (is_final == RAC_TRUE) {
             auto* final_output = event.mutable_final_output();
             if (partial_text) {
-                final_output->set_text(partial_text);
+                final_output->set_text(spoken);
             }
             if (ctx->options.language && ctx->options.language[0] != '\0') {
                 final_output->set_language(ctx->options.language);
@@ -1519,6 +1527,23 @@ struct PersistentStreamHandle {
 };
 
 }  // namespace
+
+namespace rac::stt {
+
+// Declared in rac_stt_stream_internal.h — see there for why a stream session
+// cannot read this off its own STTOptions.
+int32_t configured_stream_sample_rate(rac_handle_t handle) {
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease) {
+        return RAC_STT_DEFAULT_SAMPLE_RATE;
+    }
+    auto* component = component_lease.component();
+    std::lock_guard<std::mutex> lock(component->mtx);
+    return component->config.sample_rate > 0 ? component->config.sample_rate
+                                             : RAC_STT_DEFAULT_SAMPLE_RATE;
+}
+
+}  // namespace rac::stt
 
 extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
                                                         const rac_stt_options_t* options,
@@ -1979,6 +2004,9 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
 
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* c = static_cast<StreamCtx*>(opaque);
+        // Same rule as the batch path: an engine no-speech marker is published
+        // as empty text, never as words the speaker said.
+        const std::string spoken = rac::stt::transcript_for_display(partial_text);
         runanywhere::v1::STTStreamEvent event;
         event.set_seq(c->next_seq++);
         event.set_timestamp_us(rac_get_current_time_ms() * 1000);
@@ -1987,7 +2015,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
                                             : runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL);
         auto* partial = event.mutable_partial();
         if (partial_text) {
-            partial->set_text(partial_text);
+            partial->set_text(spoken);
         }
         partial->set_is_final(is_final == RAC_TRUE);
         if (!c->language.empty()) {
@@ -1996,7 +2024,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
         if (is_final == RAC_TRUE) {
             auto* final_output = event.mutable_final_output();
             if (partial_text) {
-                final_output->set_text(partial_text);
+                final_output->set_text(spoken);
             }
             if (!c->language.empty()) {
                 final_output->set_language(c->language);

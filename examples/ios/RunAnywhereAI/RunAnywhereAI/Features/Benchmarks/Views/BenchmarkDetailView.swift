@@ -132,7 +132,7 @@ struct BenchmarkDetailView: View {
                         .shadow(color: AppColors.shadowLight, radius: AppSpacing.shadowSmall)
                         .padding(.bottom, AppSpacing.xxLarge)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .animation(.easeInOut(duration: 0.3), value: toast)
+                        .motionAware(Motion.standardFade, value: toast)
                 }
             }
         }

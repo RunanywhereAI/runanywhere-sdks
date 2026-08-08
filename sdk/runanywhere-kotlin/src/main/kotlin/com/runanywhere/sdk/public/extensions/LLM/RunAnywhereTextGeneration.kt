@@ -260,6 +260,53 @@ suspend fun RunAnywhere.aggregateStream(
  * top-level `Double`. `TokenUsage.tokens_per_second` was renamed
  * `decode_tokens_per_second`.
  */
+
+/**
+ * Batch-style backends (Maple/Bonsai) finish generate before dumping stream
+ * chunks. Wall-to-first-token ≈ total, so "decode = total − ttft" is a few ms
+ * and produces impossible five-digit tok/s; TTFT also is not a prefill metric.
+ * Match commons `compute_stream_timing_metrics` and Plane-B's NpuModelE2ETest.
+ */
+internal data class SanitizedStreamMetrics(
+    val decodeTokensPerSecond: Double,
+    val ttftMs: Long,
+)
+
+internal fun sanitizeStreamMetrics(
+    totalMs: Double,
+    outputTokens: Int,
+    reportedTps: Double?,
+    reportedTtftMs: Long?,
+): SanitizedStreamMetrics {
+    val wallTps =
+        if (totalMs > 0.0 && outputTokens > 0) outputTokens / (totalMs / 1000.0) else 0.0
+    val ttft = reportedTtftMs?.takeIf { it > 0L }
+    val decodeWindowMs = if (ttft != null) totalMs - ttft.toDouble() else totalMs
+    val steadyTps =
+        if (ttft != null && decodeWindowMs > 0.0 && outputTokens > 1) {
+            (outputTokens - 1) / (decodeWindowMs / 1000.0)
+        } else {
+            wallTps
+        }
+    // Batch-buffered: first stream token arrives only after the full generate
+    // (Maple/Bonsai), so post-TTFT decode collapses to a few ms. Also catch
+    // absurd reported rates even when TTFT was already cleared/zeroed.
+    val batchBuffered =
+        (ttft != null && decodeWindowMs < maxOf(50.0, totalMs * 0.05)) ||
+            (reportedTps != null && reportedTps > maxOf(2_000.0, wallTps * 5.0) && wallTps > 0.0) ||
+            (ttft != null && totalMs > 0.0 && ttft.toDouble() >= totalMs * 0.95)
+    return if (batchBuffered) {
+        // Keep TTFT: for Maple/Bonsai it is time to the first streamed token
+        // (first thinking token when reasoning is on). Only tok/s must use wall.
+        SanitizedStreamMetrics(decodeTokensPerSecond = wallTps, ttftMs = ttft ?: 0L)
+    } else {
+        SanitizedStreamMetrics(
+            decodeTokensPerSecond = reportedTps?.takeIf { it > 0.0 } ?: steadyTps,
+            ttftMs = ttft ?: 0L,
+        )
+    }
+}
+
 internal suspend fun aggregateLLMStream(
     prompt: String,
     events: Flow<RALLMStreamEvent>,
@@ -314,19 +361,30 @@ internal suspend fun aggregateLLMStream(
     val final = finalEvent?.result
     val inputTokens = final?.usage?.input_tokens ?: maxOf(1, prompt.length / 4)
     val tokensGenerated = final?.usage?.output_tokens ?: tokenCount
-    val decodeTokensPerSecond =
-        final?.usage?.decode_tokens_per_second
-            ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0
-    val ttftFromFinal = final?.usage?.ttft_ms?.takeIf { it > 0L }
+    val generationTimeMs = final?.generation_time_ms?.takeIf { it > 0.0 } ?: totalLatencyMs
+    val metrics =
+        sanitizeStreamMetrics(
+            totalMs = generationTimeMs,
+            outputTokens = tokensGenerated,
+            reportedTps = final?.usage?.decode_tokens_per_second,
+            reportedTtftMs = final?.usage?.ttft_ms?.takeIf { it > 0L } ?: ttftMs,
+        )
     return RALLMGenerationResult(
         text = final?.text ?: answerResponse.toString(),
         thinking_content = final?.thinking_content ?: thinkingResponse.toString().takeIf { it.isNotEmpty() },
         response_tokens = tokensGenerated,
         model_used = modelIdentity.modelID,
-        generation_time_ms = final?.generation_time_ms ?: totalLatencyMs,
+        generation_time_ms = generationTimeMs,
         framework = modelIdentity.framework,
-        prompt_eval_time_ms = final?.prompt_eval_time_ms ?: 0L,
-        decode_time_ms = final?.decode_time_ms ?: 0L,
+        prompt_eval_time_ms =
+            if (metrics.ttftMs > 0L) (final?.prompt_eval_time_ms?.takeIf { it > 0L } ?: metrics.ttftMs) else 0L,
+        decode_time_ms =
+            final?.decode_time_ms?.takeIf { it > 0L }
+                ?: if (metrics.ttftMs > 0L && generationTimeMs > metrics.ttftMs) {
+                    (generationTimeMs - metrics.ttftMs).toLong()
+                } else {
+                    generationTimeMs.toLong()
+                },
         finish_reason = finishReason,
         error = terminalError,
         usage =
@@ -334,8 +392,8 @@ internal suspend fun aggregateLLMStream(
                 input_tokens = inputTokens,
                 output_tokens = tokensGenerated,
                 total_tokens = final?.usage?.total_tokens ?: (inputTokens + tokensGenerated),
-                decode_tokens_per_second = decodeTokensPerSecond,
-                ttft_ms = ttftFromFinal ?: (ttftMs ?: 0L),
+                decode_tokens_per_second = metrics.decodeTokensPerSecond,
+                ttft_ms = metrics.ttftMs,
             ),
     )
 }

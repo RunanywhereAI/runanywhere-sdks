@@ -1,5 +1,10 @@
 package com.runanywhere.runanywhereai.ui.screens.models.huggingface
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
@@ -25,10 +31,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -36,8 +42,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -46,9 +57,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.data.hf.HfModelSummary
 import com.runanywhere.runanywhereai.data.hf.HfRepoFile
+import com.runanywhere.runanywhereai.data.hf.HfSuggestedModel
+import com.runanywhere.runanywhereai.data.hf.formatParameterCount
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.download.ModelDownloadService
+import com.runanywhere.runanywhereai.ui.screens.models.DownloadProgressBlock
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import com.runanywhere.runanywhereai.ui.theme.motionSpec
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +78,27 @@ fun HuggingFaceSearchSheet(
     val dimens = LocalDimens.current
     val state by viewModel.state.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
+
+    // A community GGUF downloads through the same foreground service the catalogue uses, whose
+    // progress notification Android 13+ silently suppresses without POST_NOTIFICATIONS. Asked once,
+    // just-in-time, before the first file — and the download proceeds either way, because the
+    // notification is how the transfer is *watched*, not what makes it run.
+    val pendingDownload = remember { mutableStateOf<HfRepoFile?>(null) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        pendingDownload.value?.let { viewModel.download(state.selectedRepo.orEmpty(), it) }
+        pendingDownload.value = null
+    }
+    val onDownload: (HfRepoFile) -> Unit = { file ->
+        if (ModelDownloadService.notificationsPermitted(context)) {
+            viewModel.download(state.selectedRepo.orEmpty(), file)
+        } else {
+            pendingDownload.value = file
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     // A completed download refreshes the host picker exactly once.
     LaunchedEffect(state.addedModelId) {
@@ -87,7 +126,7 @@ fun HuggingFaceSearchSheet(
             Header(
                 title = state.selectedRepo?.substringAfterLast('/') ?: "Add from Hugging Face",
                 showBack = state.selectedRepo != null,
-                onBack = viewModel::backToResults,
+                onBack = viewModel::back,
                 onCancel = onDismiss,
             )
 
@@ -111,22 +150,36 @@ fun HuggingFaceSearchSheet(
             Box(modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()) {
-                when (state.phase) {
-                    HuggingFacePhase.IDLE ->
-                        CenterNote("Search Hugging Face for downloadable GGUF models.")
-                    HuggingFacePhase.SEARCHING ->
-                        CenterNote("Searching…", showSpinner = true)
-                    HuggingFacePhase.LOADING_FILES ->
-                        CenterNote("Loading files…", showSpinner = true)
-                    HuggingFacePhase.RESULTS ->
-                        ResultsList(state.results, onSelect = viewModel::openRepo)
-                    HuggingFacePhase.REPO_DETAIL ->
-                        FilesList(
-                            files = state.files,
-                            downloadingPath = state.downloadingPath,
-                            progress = state.downloadProgress,
-                            onDownload = { file -> viewModel.download(state.selectedRepo.orEmpty(), file) },
-                        )
+                // The body swaps between five unrelated panels that share no layout, so the
+                // honest transition is a crossfade at the standard tier rather than a slide
+                // implying a spatial relationship. motionSpec collapses it under reduce-motion.
+                Crossfade(
+                    targetState = state.phase,
+                    animationSpec = motionSpec { AppMotion.standard() },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "hfPhase",
+                ) { phase ->
+                    when (phase) {
+                        HuggingFacePhase.IDLE ->
+                            SuggestionsList(state.suggestions, onSelect = viewModel::openRepo)
+                        HuggingFacePhase.SEARCHING ->
+                            CenterNote("Searching…", showSpinner = true)
+                        HuggingFacePhase.LOADING_FILES ->
+                            CenterNote("Loading files…", showSpinner = true)
+                        HuggingFacePhase.RESULTS ->
+                            ResultsList(
+                                results = state.results,
+                                failed = state.error != null,
+                                onSelect = viewModel::openRepo,
+                            )
+                        HuggingFacePhase.REPO_DETAIL ->
+                            FilesList(
+                                files = state.files,
+                                downloadingPath = state.downloadingPath,
+                                progress = state.downloadProgress,
+                                onDownload = onDownload,
+                            )
+                    }
                 }
             }
 
@@ -140,11 +193,141 @@ fun HuggingFaceSearchSheet(
     }
 }
 
+/**
+ * What the sheet opens on. A search box with nothing in it gives the user no idea what is
+ * worth downloading, so the idle state is a curated list of verified sub-1B repos instead.
+ *
+ * Deliberately shows no download or like counts: those are authored numbers here, not live
+ * ones, and a stale count that looks live is worse than no count. Live counts stay on the
+ * search rows, where they come from the API. Tapping a tile goes through the same
+ * `openRepo` path a search hit does — there is no second download flow.
+ */
 @Composable
-private fun ResultsList(results: List<HfModelSummary>, onSelect: (String) -> Unit) {
+private fun SuggestionsList(suggestions: List<HfSuggestedModel>, onSelect: (String) -> Unit) {
+    val dimens = LocalDimens.current
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(
+            start = dimens.spacingLg,
+            end = dimens.spacingLg,
+            top = dimens.spacingXs,
+            bottom = dimens.spacingLg,
+        ),
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+    ) {
+        item(key = "suggestions-header") {
+            Column(
+                modifier = Modifier.padding(bottom = dimens.spacingXs),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
+                Text(
+                    "Suggested small models",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "All under 1B parameters.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        items(suggestions, key = { it.repoId }) { model -> SuggestionTile(model, onSelect) }
+    }
+}
+
+@Composable
+private fun SuggestionTile(model: HfSuggestedModel, onSelect: (String) -> Unit) {
+    val dimens = LocalDimens.current
+    // A raised tile rather than the flat row used for search hits: these are recommendations
+    // the app stands behind, and the difference in treatment says so without extra copy.
+    Surface(
+        onClick = { onSelect(model.repoId) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.radiusMd),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.padding(dimens.spacingMd),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                ) {
+                    Text(
+                        model.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    ParameterBadge(model.params)
+                }
+                // The repo id stays on screen so the recommendation is verifiable — the user
+                // can see exactly which upload they are about to pull.
+                Text(
+                    model.repoId,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    model.blurb,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(dimens.spacingSm))
+            Icon(
+                RACIcons.Outline.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * The parameter count — the one number this screen is filtering on — so it takes the brand
+ * container rather than the neutral tint the runtime badges use. Screen readers get the unit
+ * spelled out, because "135M" on its own could be a file size.
+ */
+@Composable
+private fun ParameterBadge(params: Long) {
+    val dimens = LocalDimens.current
+    val label = formatParameterCount(params)
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        maxLines = 1,
+        modifier = Modifier
+            .background(
+                MaterialTheme.colorScheme.primaryContainer,
+                RoundedCornerShape(dimens.radiusSm),
+            )
+            .padding(horizontal = dimens.spacingSm, vertical = dimens.spacingXs)
+            .semantics { contentDescription = "$label parameters" },
+    )
+}
+
+@Composable
+private fun ResultsList(results: List<HfModelSummary>, failed: Boolean, onSelect: (String) -> Unit) {
     val dimens = LocalDimens.current
     if (results.isEmpty()) {
-        CenterNote("No models match your search.")
+        // "No matches" and "the request failed" are different outcomes. A failed search has
+        // already said so in the error banner above this panel; claiming the Hub returned
+        // nothing would be a second, untrue explanation for the same empty list.
+        if (!failed) CenterNote("No models match your search.")
         return
     }
     LazyColumn(
@@ -168,6 +351,7 @@ private fun RepoRow(repo: HfModelSummary, onSelect: (String) -> Unit) {
             .clickable { onSelect(repo.id) }
             .padding(vertical = dimens.spacingSm),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -183,6 +367,9 @@ private fun RepoRow(repo: HfModelSummary, onSelect: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // Only when the Hub actually published `gguf.total`. A repo without one gets no
+        // badge at all — never a "0" or an "unknown" that reads like a real measurement.
+        repo.params?.let { ParameterBadge(it) }
         Icon(
             RACIcons.Outline.ChevronRight,
             contentDescription = null,
@@ -195,7 +382,7 @@ private fun RepoRow(repo: HfModelSummary, onSelect: (String) -> Unit) {
 private fun FilesList(
     files: List<HfRepoFile>,
     downloadingPath: String?,
-    progress: Int?,
+    progress: DownloadProgressInfo?,
     onDownload: (HfRepoFile) -> Unit,
 ) {
     val dimens = LocalDimens.current
@@ -228,47 +415,47 @@ private fun FileRow(
     file: HfRepoFile,
     isDownloading: Boolean,
     anyDownloading: Boolean,
-    progress: Int?,
+    progress: DownloadProgressInfo?,
     onDownload: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = dimens.spacingSm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                file.quantLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                formatModelSize(file.sizeBytes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    file.quantLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    formatModelSize(file.sizeBytes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(dimens.spacingSm))
+            if (!isDownloading) {
+                Button(onClick = onDownload, enabled = !anyDownloading) {
+                    Icon(
+                        RACIcons.Outline.Download,
+                        contentDescription = null,
+                        modifier = Modifier.size(dimens.iconSm),
+                    )
+                    Spacer(Modifier.width(dimens.spacingXs))
+                    Text("Get")
+                }
+            }
         }
-        Spacer(Modifier.width(dimens.spacingSm))
-        when {
-            isDownloading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                LinearProgressIndicator(
-                    progress = { (progress ?: 0) / 100f },
-                    modifier = Modifier.width(DOWNLOAD_BAR_WIDTH.dp),
-                )
-                Spacer(Modifier.width(dimens.spacingSm))
-                Text("${progress ?: 0}%", style = MaterialTheme.typography.bodySmall)
-            }
-            else -> Button(onClick = onDownload, enabled = !anyDownloading) {
-                Icon(
-                    RACIcons.Outline.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(dimens.iconSm),
-                )
-                Spacer(Modifier.width(dimens.spacingXs))
-                Text("Get")
-            }
+        // A GGUF pulled straight from the Hub is the same kind of multi-gigabyte transfer as a
+        // catalog model, so it gets the same full-width bar and detail line rather than a stub bar
+        // squeezed into the trailing slot.
+        if (isDownloading) {
+            DownloadProgressBlock(progress, modifier = Modifier.padding(bottom = dimens.spacingSm))
         }
     }
 }
@@ -352,7 +539,6 @@ private fun CenterNote(text: String, showSpinner: Boolean = false) {
 }
 
 private const val SHEET_HEIGHT_FRACTION = 0.92f
-private const val DOWNLOAD_BAR_WIDTH = 96
 
 // Compact download/like counts: 12345 -> "12.3k", 2_100_000 -> "2.1M".
 private fun formatCount(value: Long): String = when {

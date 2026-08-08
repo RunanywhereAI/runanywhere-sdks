@@ -10,13 +10,15 @@ package com.runanywhere.sdk.public.api
 import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 private val vadStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -132,22 +134,33 @@ public class VadNamespace internal constructor() {
         audio: Flow<AudioInput>,
         options: VadOptions? = null,
     ): Flow<VadEvent> =
-        flow {
+        channelFlow {
+            // Transitions are forwarded as the detector reports them, concurrently with the
+            // audio still arriving. The previous shape drained `audio.collect { … }` first
+            // and only then `emitAll(live.events)`, so speech-started/ended could not
+            // surface until the microphone had already closed — and a caller that cancels
+            // on stop (the usual shape) never saw a single event at all.
             var stream: VadStream? = null
             var format: AudioFormatSpec? = null
-            audio.collect { chunk ->
-                if (format == null) {
-                    format = chunk.format
-                    stream = openStream(chunk.format, options)
-                } else if (chunk.format != format) {
-                    throw SDKException.invalidConfiguration(
-                        "vad.detectStream requires every chunk to share one audio format.",
-                    )
+            var forwarder: Job? = null
+            try {
+                audio.collect { chunk ->
+                    if (stream == null) {
+                        val opened = openStream(chunk.format, options)
+                        format = chunk.format
+                        stream = opened
+                        forwarder = launch { opened.events.collect { send(it) } }
+                    } else if (chunk.format != format) {
+                        throw SDKException.invalidConfiguration(
+                            "vad.detectStream requires every chunk to share one audio format.",
+                        )
+                    }
+                    stream?.pushFrame(AudioFrame(chunk.bytes, chunk.bytes.size))
                 }
-                stream?.pushFrame(AudioFrame(chunk.bytes, chunk.bytes.size))
+                stream?.finish()
+                forwarder?.join()
+            } finally {
+                withContext(NonCancellable) { stream?.close() }
             }
-            val live = stream ?: return@flow
-            live.finish()
-            emitAll(live.events)
         }
 }

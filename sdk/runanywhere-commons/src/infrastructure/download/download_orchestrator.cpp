@@ -56,6 +56,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "infrastructure/download/partial_download_internal.h"
 #include "infrastructure/model_management/model_manifest_internal.h"
 #include "infrastructure/rac_path_safety_internal.h"
 
@@ -157,6 +158,13 @@ int64_t filesystem_available_bytes(const std::string& path) {
 // or a missing Hugging Face token) from a genuine "server sent no
 // Content-Length". A -1 return with a 401/403 status is an access failure, not
 // an unknown size.
+//
+// The probe is an optimisation, never a gate. Every failure mode — no
+// transport, a refused request, a fault inside a platform transport — has to
+// land on "size unknown" so the caller keeps the catalogue's
+// download_size_bytes and the plan still starts. A probe that propagates a
+// failure outward instead kills the plan before a single byte is requested,
+// which is how a working artifact ends up looking like a dead one.
 int64_t http_head_content_length(const std::string& url, int32_t* out_http_status = nullptr) {
     if (out_http_status)
         *out_http_status = 0;
@@ -180,43 +188,58 @@ int64_t http_head_content_length(const std::string& url, int32_t* out_http_statu
     req.header_count = 1;
     rac_http_response_t resp{};
     int64_t len = -1;
-    rac_result_t rc = rac_http_request_send(client, &req, &resp);
-    if (out_http_status && rc == RAC_SUCCESS)
-        *out_http_status = resp.status;
-    if (rc == RAC_SUCCESS && (resp.status == 401 || resp.status == 403)) {
-        RAC_LOG_WARNING(LOG_TAG,
-                        "HEAD probe rejected with HTTP %d (authentication/authorization failure) — "
-                        "the size is unknown because access was denied, not because the server "
-                        "omitted Content-Length",
-                        static_cast<int>(resp.status));
-    }
-    if (rc == RAC_SUCCESS && resp.status >= 200 && resp.status < 300 && resp.headers != nullptr) {
-        for (size_t i = 0; i < resp.header_count; ++i) {
-            const char* name = resp.headers[i].name;
-            const char* value = resp.headers[i].value;
-            if (name == nullptr || value == nullptr)
-                continue;
-            static const char* kWant = "content-length";
-            const size_t n = std::strlen(kWant);
-            if (std::strlen(name) != n)
-                continue;
-            bool match = true;
-            for (size_t k = 0; k < n; ++k) {
-                char c = name[k];
-                if (c >= 'A' && c <= 'Z')
-                    c = static_cast<char>(c - 'A' + 'a');
-                if (c != kWant[k]) {
-                    match = false;
+    // Platform transports are free to fault rather than return an error code —
+    // the WASM adapter in particular can have a JS exception thrown back across
+    // this frame by emscripten's glue. Contain it here so the worst a broken
+    // probe can do is leave the size unknown.
+    try {
+        rac_result_t rc = rac_http_request_send(client, &req, &resp);
+        if (out_http_status && rc == RAC_SUCCESS)
+            *out_http_status = resp.status;
+        if (rc == RAC_SUCCESS && (resp.status == 401 || resp.status == 403)) {
+            RAC_LOG_WARNING(
+                LOG_TAG,
+                "HEAD probe rejected with HTTP %d (authentication/authorization failure) — "
+                "the size is unknown because access was denied, not because the server "
+                "omitted Content-Length",
+                static_cast<int>(resp.status));
+        }
+        if (rc == RAC_SUCCESS && resp.status >= 200 && resp.status < 300 &&
+            resp.headers != nullptr) {
+            for (size_t i = 0; i < resp.header_count; ++i) {
+                const char* name = resp.headers[i].name;
+                const char* value = resp.headers[i].value;
+                if (name == nullptr || value == nullptr)
+                    continue;
+                static const char* kWant = "content-length";
+                const size_t n = std::strlen(kWant);
+                if (std::strlen(name) != n)
+                    continue;
+                bool match = true;
+                for (size_t k = 0; k < n; ++k) {
+                    char c = name[k];
+                    if (c >= 'A' && c <= 'Z')
+                        c = static_cast<char>(c - 'A' + 'a');
+                    if (c != kWant[k]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) {
+                    long long v = std::strtoll(value, nullptr, 10);
+                    if (v > 0)
+                        len = static_cast<int64_t>(v);
                     break;
                 }
             }
-            if (match) {
-                long long v = std::strtoll(value, nullptr, 10);
-                if (v > 0)
-                    len = static_cast<int64_t>(v);
-                break;
-            }
         }
+    } catch (...) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "HEAD probe faulted — treating the download size as unknown and "
+                        "falling back to the catalog size");
+        len = -1;
+        if (out_http_status)
+            *out_http_status = 0;
     }
     rac_http_response_free(&resp);
     rac_http_client_destroy(client);
@@ -942,12 +965,12 @@ int64_t file_size_or_zero(const std::string& path) {
 
 // In-flight partials are written by rac_http_download to "<final>.part" and
 // atomically renamed to "<final>" only after checksum/size validation. The
-// suffix convention is shared verbatim with the folder deleter (which removes
-// any "<name>.part" alongside the model files), so keep it identical here.
-constexpr const char* kPartSuffix = ".part";
-
+// suffix is shared with the folder deleter (which reclaims the sidecar) and the
+// registry rescan (which must not mistake it for a finished artifact), so it has
+// exactly one definition in partial_download_internal.h.
 std::string part_path_for(const std::string& final_path) {
-    return final_path.empty() ? final_path : final_path + kPartSuffix;
+    return final_path.empty() ? final_path
+                              : final_path + std::string(rac::download::kPartialSuffix);
 }
 
 // Size of the in-flight partial for a planned file — the ".part" sidecar the
@@ -3148,13 +3171,21 @@ void build_download_plan(const rav1::DownloadPlanRequest& request, rav1::Downloa
     //     unsized PLAIN file (unsized_nonarchive_file) trips the unknown-total
     //     refusal, because there we truly cannot bound the disk consumed.
     //   - WASM/MEMFS reports available_bytes == -1 (no POSIX statvfs) and the
-    //     browser enforces its own quota, so the free-space fail-closed is
-    //     scoped to native platforms.
+    //     browser enforces its own quota, so BOTH storage fail-closed arms are
+    //     scoped to native platforms. There is no device filesystem here to fill
+    //     and no figure to compare against, so refusing an unsized plain file
+    //     protects nothing — it only converts a download that would have
+    //     succeeded into a hard failure with no request issued, which is exactly
+    //     how every bare .gguf in the web catalogue came to look like a dead
+    //     artifact. The browser is the authority on its own quota and reports a
+    //     real quota error if the write does not fit.
     const bool free_space_known = available_bytes > 0;
 #if defined(__EMSCRIPTEN__)
     const bool require_free_space = false;
+    const bool require_plain_file_size = false;
 #else
     const bool require_free_space = true;
+    const bool require_plain_file_size = true;
 #endif
     if (invalid_existing_bytes) {
         result.set_can_start(false);
@@ -3163,27 +3194,33 @@ void build_download_plan(const rav1::DownloadPlanRequest& request, rav1::Downloa
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
     } else if (result.files_size() == 0) {
         result.set_can_start(false);
-    } else if (unsized_nonarchive_file) {
-        // A plain (non-archive) file has an unknown size — we cannot size the
-        // storage gate for it, so refuse rather than risk filling the disk.
+    } else if (unsized_nonarchive_file && head_auth_denied) {
+        // Access was denied, not merely unsized. Worth refusing on every
+        // platform: the download itself is going to fail the same way, and the
+        // caller has something actionable to do about it.
         result.set_can_start(false);
-        if (head_auth_denied) {
-            // The size is unknown because the HEAD probe was denied (401/403),
-            // not because the server omitted it — surface the actionable cause.
-            rac::foundation::populate_sdk_error(result.mutable_error(),
-                                                RAC_ERROR_AUTHENTICATION_FAILED);
-            result.mutable_error()->set_message(
-                "authentication failed while checking the download — check your Hugging Face "
-                "token / repo access, then try again.");
-        } else {
-            // The caller can retry once the server exposes a Content-Length.
-            rac::foundation::populate_sdk_error(result.mutable_error(),
-                                                RAC_ERROR_INSUFFICIENT_STORAGE);
-            result.mutable_error()->set_message(
-                "Cannot verify there is enough storage: the total download size is unknown (the "
-                "server did not report a file size). Try again later or check the model source.");
-        }
+        rac::foundation::populate_sdk_error(result.mutable_error(),
+                                            RAC_ERROR_AUTHENTICATION_FAILED);
+        result.mutable_error()->set_message(
+            "authentication failed while checking the download — check your Hugging Face "
+            "token / repo access, then try again.");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
+    } else if (unsized_nonarchive_file && require_plain_file_size) {
+        // A plain (non-archive) file has an unknown size — on a device we cannot
+        // size the storage gate for it, so refuse rather than risk filling the
+        // disk. The caller can retry once the server exposes a Content-Length.
+        result.set_can_start(false);
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INSUFFICIENT_STORAGE);
+        result.mutable_error()->set_message(
+            "Cannot verify there is enough storage: the total download size is unknown (the "
+            "server did not report a file size). Try again later or check the model source.");
+        result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
+    } else if (unsized_nonarchive_file) {
+        // Browser target: start with the size unknown. Progress is indeterminate
+        // until the response declares a length, which is the honest state and is
+        // what every SDK's unknown-total path already renders.
+        result.add_warnings("download size is unknown; progress will be indeterminate");
+        result.set_can_start(true);
     } else if (total_bytes > 0 && require_free_space && !free_space_known) {
         // We know the payload is non-trivial but could not read free space —
         // fail closed instead of proceeding blind.

@@ -132,7 +132,14 @@ describe('VoiceAgentMicDriver', () => {
     await flush();
 
     expect(mocks.playback.playEncoded).toHaveBeenCalledOnce();
-    expect(phases.at(-1)).toBe('processing');
+    // While the reply is audible the phase is `speaking`, not `processing`.
+    // The driver owns playout, so it is the only layer that knows when sound is
+    // actually leaving the speaker — the pipeline's own states are emitted
+    // around synthesis, before any of it is played. Asserting `processing` here
+    // pinned the behaviour that put "Listening" on screen over an audible reply
+    // and hid the interrupt control mounted on the speaking state.
+    expect(phases).toContain('processing');
+    expect(phases.at(-1)).toBe('speaking');
     expect(capture.clearCount).toBe(12);
 
     playback.resolve();

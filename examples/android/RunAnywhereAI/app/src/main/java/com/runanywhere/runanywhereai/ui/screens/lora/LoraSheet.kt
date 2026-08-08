@@ -39,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.ui.screens.models.DownloadProgressBlock
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
@@ -89,7 +91,7 @@ fun LoraSheet(viewModel: LoraViewModel, onDismiss: () -> Unit) {
                         isActive = state.activeId == entry.id,
                         isDownloaded = viewModel.isDownloaded(entry),
                         isBusy = state.busyId == entry.id,
-                        progressPercent = if (state.busyId == entry.id) state.progressPercent else null,
+                        progress = if (state.busyId == entry.id) state.progress else null,
                         onDownload = { viewModel.download(entry) },
                         onApply = { scale -> viewModel.apply(entry, scale) },
                         onRemove = viewModel::clear,
@@ -122,7 +124,7 @@ private fun LoraRow(
     isActive: Boolean,
     isDownloaded: Boolean,
     isBusy: Boolean,
-    progressPercent: Int?,
+    progress: DownloadProgressInfo?,
     onDownload: () -> Unit,
     onApply: (Float) -> Unit,
     onRemove: () -> Unit,
@@ -159,12 +161,15 @@ private fun LoraRow(
                     isActive = isActive,
                     isDownloaded = isDownloaded,
                     isBusy = isBusy,
-                    progressPercent = progressPercent,
                     onDownload = onDownload,
                     onApply = { onApply(scale) },
                     onRemove = onRemove,
                 )
             }
+
+            // An adapter is a smaller file than a model but the same kind of wait, so it reports the
+            // same way: one bar, one line of real numbers.
+            if (isBusy) DownloadProgressBlock(progress)
 
             if (isDownloaded && !isActive) {
                 StrengthControl(scale = scale, onScaleChange = { scale = it })
@@ -213,22 +218,14 @@ private fun LoraAction(
     isActive: Boolean,
     isDownloaded: Boolean,
     isBusy: Boolean,
-    progressPercent: Int?,
     onDownload: () -> Unit,
     onApply: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val dimens = LocalDimens.current
     when {
-        progressPercent != null -> Row(verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(modifier = Modifier.size(dimens.iconSm), strokeWidth = 2.dp)
-            Text(
-                text = "$progressPercent%",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = dimens.spacingSm),
-            )
-        }
+        // The percentage lives in the row's progress block; the trailing slot stays a plain spinner
+        // so the same number is never printed twice.
         isBusy -> CircularProgressIndicator(modifier = Modifier.size(dimens.iconSm), strokeWidth = 2.dp)
         isActive -> Row(verticalAlignment = Alignment.CenterVertically) {
             Pill("Active", primaryGreen)

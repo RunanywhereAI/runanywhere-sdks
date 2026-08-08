@@ -36,6 +36,27 @@ fun InferenceFramework.shortLabel(): String = when (this) {
     else -> displayName
 }
 
+/**
+ * What to call the runtime on a consumer surface, where the reader did not ask
+ * which library is executing anything.
+ *
+ * Distinct from [shortLabel] on purpose, and the split mirrors iOS: a model row
+ * in the picker is a spec sheet, so naming the engine there is informative
+ * ([shortLabel] / iOS `consumerBackendShortLabel` -> `consumerBackendBadgeLabel`),
+ * while the chat header sits above every conversation and is read by someone who
+ * only wants to know *where* their words are going. "Llama CPP" answers a
+ * question nobody asked; "Local" answers the one they have.
+ */
+fun InferenceFramework.consumerBackendShortLabel(): String = when (this) {
+    // Not "Llama CPP": the fact worth stating is that the model runs here, on
+    // this device, which is the product's entire premise.
+    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Local"
+    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "NPU"
+    InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Apple"
+    InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "NeuRT"
+    else -> shortLabel()
+}
+
 fun InferenceFramework.consumerBackendLabel(): String = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Llama CPP"
     InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX Runtime"
@@ -59,17 +80,34 @@ fun InferenceFramework.consumerBackendLabel(): String = when (this) {
     else -> displayName
 }
 
+/**
+ * The badge glyph for a backend, chosen by *what kind of runtime it is* — a general LLM
+ * framework, a compute-graph runtime, an audio engine, or accelerator silicon.
+ *
+ * Every arm here has to be legible next to every other arm, because these badges appear
+ * side by side in the model list. Four of them used to collide: ONNX and Fluid Audio both
+ * drew the signal trace the VAD screen used for speech detection, and QHexRT, CoreML and
+ * MLX all drew the same chip the device card used for "Chip" and the Benchmarks row used
+ * for itself. Accelerated backends now share [RACIcons.Outline.Cpu] *only* with each other
+ * — which is correct, since "runs on an accelerator" is genuinely one meaning — while the
+ * device's own silicon row and the benchmark entry moved off it entirely.
+ */
 fun InferenceFramework.backendIcon(): ImageVector = when (this) {
     InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> RACIcons.Outline.Stack
-    InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> RACIcons.Outline.Activity
+    // A compute graph, which is literally what an ONNX file holds.
+    InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> RACIcons.Outline.Graph
     InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> RACIcons.Filled.Bolt
     InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> RACIcons.Outline.Robot
-    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> RACIcons.Outline.Cpu
-    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> RACIcons.Outline.Microphone
-    InferenceFramework.INFERENCE_FRAMEWORK_COREML -> RACIcons.Outline.Cpu
-    InferenceFramework.INFERENCE_FRAMEWORK_MLX -> RACIcons.Outline.Cpu
+    // Accelerator-backed runtimes. One glyph, one meaning: "this runs on dedicated silicon."
+    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+    InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+    InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+    -> RACIcons.Outline.Cpu
+    // Speech engines: the subject is the audio signal, not the microphone that captured it.
+    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO,
+    -> RACIcons.Outline.Waveform
     InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> RACIcons.Outline.Robot
-    InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> RACIcons.Outline.Activity
     InferenceFramework.INFERENCE_FRAMEWORK_TFLITE,
     InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH,
     InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE,
@@ -158,13 +196,32 @@ fun RAModelInfo.intelligence(): ModelIntelligence {
     }
 }
 
-// Parses a parameter count in billions from tokens like "0.6b", "1.5b", "350m", "7b".
-private fun RAModelInfo.estimatedParamsBillions(): Double? {
-    val haystack = "$id $name".lowercase()
-    Regex("""(\d+(?:\.\d+)?)\s*b\b""").find(haystack)?.let {
+private val paramsBillionsRegex = Regex("""(\d+(?:\.\d+)?)\s*b\b""")
+private val paramsMillionsRegex = Regex("""(\d+(?:\.\d+)?)\s*m\b""")
+
+/**
+ * Parameter count in billions, parsed from tokens like "0.6b", "1.5b", "350m", "7b".
+ *
+ * The NAME is read first and the id is only a fallback, because an id cannot contain a
+ * dot — a QNN bundle is a directory — so the NPU catalog spells decimals with an
+ * underscore: `qwen3_0_6b`. Searching that yields the token "6b" and reports SIX billion
+ * parameters, which labelled the 0.6B NPU row "Smart" while the identical llama.cpp row
+ * read "Fast", side by side in the picker. The name ("Qwen3 0.6B") already carries the
+ * decimal, and every LLM in the catalog has one, so this path is the accurate one.
+ *
+ * Restoring the underscores instead is what it looks like it should do and is wrong:
+ * `lfm2_5_350m` would become "lfm2.5.350m", whose leftmost match is "5.350" — five
+ * million parameters for a 350M model. Version numbers and parameter counts are not
+ * distinguishable once both are dotted.
+ */
+private fun RAModelInfo.estimatedParamsBillions(): Double? =
+    parseParamsBillions(name.lowercase()) ?: parseParamsBillions(id.lowercase())
+
+private fun parseParamsBillions(haystack: String): Double? {
+    paramsBillionsRegex.find(haystack)?.let {
         return it.groupValues[1].toDoubleOrNull()
     }
-    Regex("""(\d+(?:\.\d+)?)\s*m\b""").find(haystack)?.let {
+    paramsMillionsRegex.find(haystack)?.let {
         return it.groupValues[1].toDoubleOrNull()?.div(1000.0)
     }
     return null

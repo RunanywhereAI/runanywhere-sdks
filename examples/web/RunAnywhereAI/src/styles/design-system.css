@@ -31,12 +31,36 @@
   --color-yellow: #EAB308;
   --color-purple: #8B5CF6;
 
-  /* ---- Text Colors (Dark) ---- */
-  --text-primary: #F0EEEB;
-  --text-secondary: #A8A29B;
-  --text-tertiary: #757069;
+  /* ---- Text Colors (Dark) ----
+   * The three-step ramp is tuned so even --text-tertiary, the faintest step,
+   * clears WCAG AA 4.5:1 on every background token this app actually paints
+   * behind text (--bg-primary #191817 through --bg-gray5 #2E2B29). The old
+   * tertiary (#757069) measured 3.03–3.61:1 and was used for 11–12px metadata —
+   * timestamps, model sizes, hints — which is exactly the copy that needs
+   * contrast most. Hierarchy is preserved by keeping a clear luminance gap
+   * between the steps rather than by pushing the last one below legibility. */
+  --text-primary: #F0EEEB;   /* 12.1:1 min */
+  --text-secondary: #B7B1A9; /*  6.6:1 min */
+  --text-tertiary: #99938B;  /*  4.6:1 min */
   --text-white: #FFFFFF;
-  --text-on-primary: #FFFFFF;
+  /* Ink, not white. Per DESIGN_GUIDELINE.md §5, white on solid #FF6900 is
+   * 2.89:1 and fails AA; ink is 6.12:1 (and 5.02:1 on the #E65E00 hover tone).
+   * Every label and control glyph sitting on a SOLID orange fill uses this —
+   * the primary button, the new-chat pill, the composer's send action, the
+   * model Download action — because all of them are small or normal-weight,
+   * the case the guideline explicitly forbids white for. It is the same hex as
+   * iOS `AppColors.onBrand` and Android's `OnBrandInk`, so the primary action
+   * reads identically on all four surfaces. The white-on-orange deviation
+   * stays allowed for large/bold brand moments, which use --text-white on the
+   * GRADIENT instead (the user's chat bubble). Darkening #FF6900 is not an
+   * option: the hue is locked brand identity. */
+  --text-on-primary: #10182B;
+
+  /* Danger as TEXT. `--color-red` is a fill/glyph value: #EF4444 measures 4.7:1
+   * on `--bg-primary` in dark, which clears AA, but only 3.8:1 on paper. A failed
+   * chat turn is a whole paragraph of it, so light needs its own ink below. iOS
+   * models the identical split as `danger` vs `dangerText`. */
+  --text-danger: var(--color-red);
 
   /* ---- Background Colors (Dark, warm neutral) ---- */
   --bg-primary: #191817;
@@ -82,10 +106,27 @@
   --separator: #2E2B29;
   --divider: #2E2B29;
 
+  /* ---- Inert control track ----
+   * Its own token rather than a surface grey, because a track is a *control
+   * boundary*: WCAG 1.4.11 asks 3:1 against the surface behind it, and a white
+   * knob asks the same against the track. The old --bg-gray5 measured 1.17:1 on
+   * the card and 14:1 against the knob, so an off switch read as a blank slab —
+   * nothing to see until you touched it. #7E766E is 3.69:1 on the card and
+   * 4.46:1 under the knob, so both edges of the control are visible when it is
+   * off. Shared by the switch (off state; on is brand orange, 5.7:1 on the card)
+   * and the slider's unfilled track, which had the same invisible grey. */
+  --control-track-off: #7E766E;
+
   /* ---- Shadow Colors & Elevation ---- */
   --shadow-default: rgba(0, 0, 0, 0.25);
   --shadow-medium: rgba(0, 0, 0, 0.35);
   --shadow-accent: rgba(255, 105, 0, 0.22);
+  /* The expanding-ring pulse on a live control (mic listening). Stronger than
+     `--shadow-accent` because it has to read through a 20px spread as it fades,
+     and it must end at fully transparent brand — not at `transparent`, which
+     some engines interpolate through black and shows as a grey halo. */
+  --ring-pulse-from: rgba(255, 105, 0, 0.4);
+  --ring-pulse-to: rgba(255, 105, 0, 0);
   --elevation-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
   --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.24);
   --elevation-lg: 0 12px 40px rgba(0, 0, 0, 0.34);
@@ -147,14 +188,61 @@
   --radius-composer: 28px;
   --radius-full: 9999px;
 
-  /* ---- Motion ---- */
-  --duration-quick: 0.15s;
-  --duration-fast: 0.25s;
-  --duration-regular: 0.3s;
-  --duration-slow: 0.5s;
-  --duration-very-slow: 0.6s;
+  /* ---- Motion ----
+   *
+   * The four tiers from DESIGN_GUIDELINE.md §6, shared with iOS and Android so
+   * the same interaction runs at the same speed on all three. This file
+   * previously had five tiers of its own (150/250/300/500/600ms) while iOS used
+   * 120/240/400/700 and Android 200/300/450/550 — three apps, three speeds for
+   * the same gesture. The old names are kept as aliases below because 60+ call
+   * sites reference them; the values are what changed.
+   *
+   * A duration outside these four is a bug, not a preference. Continuous motion
+   * (spinners, breathing, shimmer) is exempt and specified separately. */
+  --duration-micro: 0.12s;     /* tap feedback, chip select, icon swap, hover */
+  --duration-standard: 0.24s;  /* the default: row insert, disclosure, state */
+  --duration-emphasis: 0.4s;   /* sheets, hero swaps, large travel */
+  --duration-hero: 0.7s;       /* once-per-session brand moments only */
+
+  /* Aliases for the pre-existing names, mapped onto the canonical tiers. */
+  --duration-quick: var(--duration-micro);
+  --duration-fast: var(--duration-standard);
+  --duration-regular: var(--duration-standard);
+  --duration-slow: var(--duration-emphasis);
+  --duration-very-slow: var(--duration-hero);
+
+  /* ---- Easing ----
+   * `--ease-out` is the workhorse: entrances and settle-to-rest.
+   * `--ease-in-out` for moves where both ends matter (a bar filling, a value
+   * ticking). `--ease-in` for exits ONLY — it starts too slowly to feel
+   * responsive on the way in.
+   * `--ease-spring` is the CSS stand-in for the `bouncy` spring, and carries
+   * that spring's restriction: arrival and success moments only. An overshoot
+   * on a progress bar or a spinner reads as instability, not delight. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* ---- Ambient (continuous) motion ----
+   * Always `linear`: an eased curve reads as a stutter every time it loops.
+   * Three periods, because eight was what this file had grown to — 0.8s, 1s,
+   * 1.4s, 1.5s, 2s, 2s, 2s and 8s, each chosen locally, so nothing on screen
+   * was ever in phase with anything else. */
+  --ambient-breathe: 1.6s;  /* pulses, glows, listening indicators */
+  --ambient-shimmer: 1.2s;  /* skeleton / loading sweeps */
+  --ambient-spin: 1s;       /* spinner rotation */
+
+  /* ---- Data visualisation ----
+   * The colour a chart mark is painted with. Its own token rather than
+   * `--color-primary` used directly, because a bar is a non-text graphical
+   * object and WCAG 1.4.11 asks 3:1 against the surface behind it: #FF6900
+   * measures 6.2:1 on the dark background and only 2.8:1 on the light one. Dark
+   * keeps the brand orange; light steps to the brand's interactive tone, which
+   * is 3.4:1 there and the same hue. One accent, because every chart in this app
+   * plots a single series — a second hue would imply a distinction that is not
+   * in the data. */
+  --chart-accent: var(--color-primary);
 
   /* ---- Component Sizes ---- */
   --icon-sm: 18px;
@@ -169,19 +257,46 @@
 
   --tab-bar-height: 56px;
   --toolbar-height: 48px;
+
+  /* ---- Hit targets ----
+   * Two numbers, because the two standards they come from disagree on purpose.
+   *
+   * --hit-min (24px) is WCAG 2.5.8 AA: the floor for *every* pointer, mouse
+   * included. Nothing interactive may measure less on either axis.
+   *
+   * --hit-touch (44px) is the finger figure Apple's HIG and Material both land
+   * on, applied under `(pointer: coarse)` where a fingertip is the pointer. It
+   * is deliberately not applied to mice: forcing 44px everywhere inflates dense
+   * desktop toolbars for no gain.
+   *
+   * These are enforced with padding and ::after hit-area extensions rather than
+   * by growing every control, so the visual scale of the UI is unchanged —
+   * a 22px "Change" link still *looks* like a 22px link. --button-height-md was
+   * already 44px here and consumed by nothing at all, which is how 18 control
+   * signatures drifted under the line. */
+  --hit-min: 24px;
+  --hit-touch: 44px;
 }
 
 /* =============================================================================
  * Light Theme (warm paper surfaces)
- * Applied twice on purpose: once for the explicit toggle, once for system
- * preference when the user has not explicitly chosen dark.
+ *
+ * Declared ONCE, keyed only on the explicit attribute. There is deliberately no
+ * second `@media (prefers-color-scheme: light)` copy: the system preference is
+ * resolved to a concrete `data-theme` value in JS before first paint (the inline
+ * script in index.html, then `renderTheme()` in app.ts on preference change), so
+ * `<html>` always carries either "light" or "dark" and CSS never has to guess.
+ * The palette previously existed twice — a toggle copy and a media-query copy —
+ * which is 30 duplicated hex values that drift the moment one is edited.
  * ============================================================================= */
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --text-primary: #1D1B19;
-  --text-secondary: #57534D;
-  --text-tertiary: #8A857E;
+  /* Same AA-clearing three-step ramp as dark, mirrored onto paper: the faintest
+   * step still measures 4.6:1 on the lightest surface it is painted on. */
+  --text-primary: #1D1B19;   /* 13.2:1 min */
+  --text-secondary: #4E4A45; /*  6.8:1 min */
+  --text-tertiary: #68625C;  /*  4.6:1 min */
 
   --bg-primary: #FCFBFA;
   --bg-secondary: #F6F4F1;
@@ -193,6 +308,12 @@
   --bg-input: #F6F4F1;
 
   --color-primary-hover: #CC5400;
+  /* See the token's definition above: brand orange is under the 3:1 floor on
+     paper, the brand-strong tone clears it at the same hue. */
+  --chart-accent: var(--color-primary-strong);
+  /* iOS `AppColors.dangerText`'s light value — the same hue one step of ink
+     darker: 5.6:1 on --bg-primary and 5.3:1 on --bg-secondary. */
+  --text-danger: #C4262A;
   --bubble-assistant-start: #EFECE8;
   --bubble-assistant-end: #F4F1ED;
 
@@ -206,50 +327,16 @@
   --separator: #E5E1DC;
   --divider: #D6D1CA;
 
+  /* Darker than the dark theme's, not lighter: on paper the track has to stand
+   * *away* from a near-white card while still holding 3:1 under a white knob.
+   * 3.3:1 on the card, 3.62:1 under the knob. */
+  --control-track-off: #8E857D;
+
   --shadow-default: rgba(29, 27, 25, 0.08);
   --shadow-medium: rgba(29, 27, 25, 0.12);
   --elevation-sm: 0 1px 2px rgba(29, 27, 25, 0.06);
   --elevation-md: 0 4px 16px rgba(29, 27, 25, 0.08);
   --elevation-lg: 0 12px 40px rgba(29, 27, 25, 0.12);
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
-
-    --text-primary: #1D1B19;
-    --text-secondary: #57534D;
-    --text-tertiary: #8A857E;
-
-    --bg-primary: #FCFBFA;
-    --bg-secondary: #F6F4F1;
-    --bg-tertiary: #EFECE8;
-    --bg-grouped: #F6F4F1;
-    --bg-gray5: #E5E1DC;
-    --bg-gray6: #EFECE8;
-    --bg-elevated: #FFFFFF;
-    --bg-input: #F6F4F1;
-
-    --color-primary-hover: #CC5400;
-    --bubble-assistant-start: #EFECE8;
-    --bubble-assistant-end: #F4F1ED;
-
-    --thinking-content-bg: #F4F1ED;
-
-    --badge-gray: rgba(87, 83, 77, 0.14);
-
-    --border-light: rgba(29, 27, 25, 0.08);
-    --border-medium: rgba(29, 27, 25, 0.05);
-    --border-strong: rgba(29, 27, 25, 0.14);
-    --separator: #E5E1DC;
-    --divider: #D6D1CA;
-
-    --shadow-default: rgba(29, 27, 25, 0.08);
-    --shadow-medium: rgba(29, 27, 25, 0.12);
-    --elevation-sm: 0 1px 2px rgba(29, 27, 25, 0.06);
-    --elevation-md: 0 4px 16px rgba(29, 27, 25, 0.08);
-    --elevation-lg: 0 12px 40px rgba(29, 27, 25, 0.12);
-  }
 }
 
 /* =============================================================================
@@ -324,4 +411,31 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
+}
+
+/* =============================================================================
+ * Accessibility utilities
+ * ============================================================================= */
+/*
+ * Available to assistive tech, absent from the layout.
+ *
+ * For a control whose purpose is obvious from its surroundings to a sighted user
+ * but has no programmatic name — a question box under an "Ask a question"
+ * heading, say. Preferred over `aria-label` on a `<textarea>` because a real
+ * `<label for>` also makes the text a click target and survives translation.
+ *
+ * `clip-path` plus a 1px box rather than `display: none`, which would remove it
+ * from the accessibility tree entirely, and rather than a negative-offset box,
+ * which some browsers still read as an off-screen scroll target.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+  clip-path: inset(50%);
 }

@@ -1,11 +1,12 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,17 +22,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,15 +42,47 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.ui.components.GlyphPlate
+import com.runanywhere.runanywhereai.ui.components.rememberBreath
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
+import com.runanywhere.runanywhereai.ui.theme.BrandGradient
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.theme.Neutral100
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
 import java.io.File
+import kotlinx.coroutines.delay
+
+/**
+ * What a reader can do with one turn, by transcript position.
+ *
+ * A value of nullable callbacks rather than a [ChatViewModel] reference: the
+ * transcript stays a pure function of its messages, so a token landing in the
+ * tail cannot invalidate every earlier row. A null callback means the action is
+ * withheld — which is how a running generation hides everything that would
+ * renumber the list under an in-flight turn. Copy is not here because it mutates
+ * nothing and the row owns it outright.
+ *
+ * Positions, not identities: [ChatMessage] has no id, so the transcript is
+ * addressed by index exactly as `ChatViewModel` is.
+ */
+data class ChatMessageActions(
+    val onRegenerate: ((Int) -> Unit)? = null,
+    val onEdit: ((Int) -> Unit)? = null,
+    val onDelete: ((Int) -> Unit)? = null,
+)
 
 @Composable
 fun ChatMessageList(
@@ -56,13 +90,22 @@ fun ChatMessageList(
     listState: LazyListState,
     modifier: Modifier = Modifier,
     isGenerating: Boolean = false,
+    actions: ChatMessageActions = ChatMessageActions(),
+    hasModel: Boolean = true,
+    onChooseModel: () -> Unit = {},
 ) {
     val dimens = LocalDimens.current
 
     if (messages.isEmpty()) {
-        EmptyChatHero(modifier = modifier)
+        EmptyChatHero(modifier = modifier, hasModel = hasModel, onChooseModel = onChooseModel)
         return
     }
+
+    // The newest turn shows its actions unprompted — it is the one a reader wants
+    // to copy or retry — and any older turn reveals them on tap. Android has no
+    // hover to lean on, and a long press on a wall of text is undiscoverable, so
+    // tap-to-reveal is the affordance rather than a hidden context menu.
+    var revealedIndex by remember { mutableStateOf(-1) }
 
     LazyColumn(
         modifier = modifier,
@@ -70,16 +113,131 @@ fun ChatMessageList(
         contentPadding = PaddingValues(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        items(messages) { message ->
-            if (message.isUser) {
-                UserBubble(message)
-            } else {
-                AssistantMessage(
+        itemsIndexed(messages) { index, message ->
+            val isStreamingTail = isGenerating && index == messages.lastIndex
+            Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                if (message.isUser) {
+                    UserBubble(
+                        message = message,
+                        onToggleActions = {
+                            revealedIndex = if (revealedIndex == index) -1 else index
+                        },
+                    )
+                } else {
+                    AssistantMessage(
+                        message = message,
+                        isStreamingTail = isStreamingTail,
+                        onToggleActions = {
+                            revealedIndex = if (revealedIndex == index) -1 else index
+                        },
+                    )
+                }
+                // A turn still receiving tokens has nothing settled to act on: its
+                // text is moving and regenerating it would renumber the list the
+                // stream is writing into.
+                MessageActionRow(
                     message = message,
-                    isStreamingTail = isGenerating && message === messages.lastOrNull(),
+                    index = index,
+                    actions = actions,
+                    visible = !isStreamingTail &&
+                        (index == messages.lastIndex || revealedIndex == index) &&
+                        (message.text.isNotEmpty() || message.attachment != null),
                 )
             }
         }
+    }
+}
+
+/**
+ * Copy, plus whichever of retry / edit / delete [actions] offers for this turn.
+ *
+ * Copy reports itself in place: the clipboard gives no feedback of its own, and
+ * a Toast would duplicate the one Android 13+ already shows. The tick reverts
+ * after two seconds so the row stops claiming a copy from minutes ago is still
+ * what is on the clipboard.
+ */
+@Composable
+private fun MessageActionRow(
+    message: ChatMessage,
+    index: Int,
+    actions: ChatMessageActions,
+    visible: Boolean,
+) {
+    val dimens = LocalDimens.current
+    val context = LocalContext.current
+    var didCopy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(didCopy) {
+        if (didCopy) {
+            delay(2_000)
+            didCopy = false
+        }
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(AppMotion.micro()),
+        exit = fadeOut(AppMotion.exit()),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+                MessageActionButton(
+                    icon = if (didCopy) RACIcons.Outline.Check else RACIcons.Outline.Copy,
+                    label = if (didCopy) "Copied" else "Copy",
+                ) {
+                    val clipboard =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Message", message.text))
+                    didCopy = true
+                }
+                if (!message.isUser) {
+                    actions.onRegenerate?.let { regenerate ->
+                        MessageActionButton(RACIcons.Outline.Refresh, "Regenerate") { regenerate(index) }
+                    }
+                }
+                if (message.isUser) {
+                    actions.onEdit?.let { edit ->
+                        MessageActionButton(RACIcons.Outline.Pencil, "Edit and resend") { edit(index) }
+                    }
+                }
+                actions.onDelete?.let { delete ->
+                    MessageActionButton(
+                        icon = RACIcons.Outline.Trash,
+                        label = if (message.isUser) "Delete exchange" else "Delete reply",
+                    ) { delete(index) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageActionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    val haptics = LocalHapticFeedback.current
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(dimens.radiusSm))
+            .clickable(role = Role.Button, onClickLabel = label) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(dimens.iconSm),
+        )
     }
 }
 
@@ -90,29 +248,44 @@ private fun greeting(hour: Int): String = when (hour) {
     else -> "Good evening"
 }
 
+/**
+ * The launch screen. Its job is to make the very first second legible: what this app is,
+ * that inference is local, and — crucially — that a model has to exist before anything can
+ * answer. The unqualified old copy ("Ask anything") was a promise the app could not keep on
+ * a fresh install, where no model is resident.
+ *
+ * The mark breathes on the 1.6 s ambient period, which is the one piece of decorative
+ * motion here and the app's only idle brand moment.
+ */
 @Composable
-private fun EmptyChatHero(modifier: Modifier = Modifier) {
+private fun EmptyChatHero(
+    modifier: Modifier = Modifier,
+    hasModel: Boolean = true,
+    onChooseModel: () -> Unit = {},
+) {
     val dimens = LocalDimens.current
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    val breath = rememberBreath(min = 0.55f, max = 1f, label = "heroBreath")
+    Box(
+        modifier = modifier.padding(horizontal = dimens.screenPadding),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = RACIcons.Outline.Bolt,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp),
-                )
-            }
+            GlyphPlate(
+                icon = RACIcons.Outline.Bolt,
+                diameter = 76.dp,
+                modifier = Modifier.graphicsLayer {
+                    // Scale, not alpha: a mark that dims looks disabled, while one that
+                    // breathes looks alive. Amplitude stays under 3% so it never competes
+                    // with the text for attention.
+                    val scale = 0.98f + breath * 0.03f
+                    scaleX = scale
+                    scaleY = scale
+                },
+            )
             Text(
                 text = greeting(hour),
                 style = MaterialTheme.typography.headlineMedium,
@@ -120,18 +293,38 @@ private fun EmptyChatHero(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Ask anything — AI runs locally on your device by default.",
+                text = if (hasModel) {
+                    "Ask anything — it runs on this device, offline, and nothing leaves it."
+                } else {
+                    "Pick a model to get started. It downloads once, then runs on this " +
+                        "device — offline, and nothing leaves it."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.widthIn(max = 280.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.widthIn(max = dimens.bubbleMaxWidth),
+                textAlign = TextAlign.Center,
             )
+            // The empty state carries the action that resolves it, instead of leaving the
+            // reader to discover the composer strip or the top-bar chip on their own.
+            if (!hasModel) {
+                Button(onClick = onChooseModel) { Text("Choose a model") }
+            }
         }
     }
 }
 
+/**
+ * The user's own turn — the one surface in the app that paints the full logo gradient.
+ *
+ * The gradient, and white on it, is deliberate and matches iOS `ChatMessageComponents` and the
+ * web `--bubble-user-start`/`--bubble-user-end` pair exactly: DESIGN_GUIDELINE §5 keeps
+ * white-on-orange for the gradient CTA and large/bold brand moments, and this is the app's brand
+ * moment. It is NOT the solid `primary` fill it used to be — that path took its foreground from
+ * `onPrimary`, which is now ink for the filled buttons, and ink on the gradient would read as
+ * the assistant's voice rather than the reader's own.
+ */
 @Composable
-private fun UserBubble(message: ChatMessage) {
+private fun UserBubble(message: ChatMessage, onToggleActions: () -> Unit = {}) {
     val dimens = LocalDimens.current
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Box(
@@ -145,7 +338,11 @@ private fun UserBubble(message: ChatMessage) {
                         bottomEnd = dimens.radiusSm,
                     )
                 )
-                .background(MaterialTheme.colorScheme.primary)
+                .background(BrandGradient)
+                .clickable(
+                    onClickLabel = "Show message actions",
+                    onClick = onToggleActions,
+                )
                 .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingMd),
             contentAlignment = Alignment.CenterStart
         ) {
@@ -154,21 +351,22 @@ private fun UserBubble(message: ChatMessage) {
                 Text(
                     text = message.text,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = Neutral100,
                 )
             }
         }
     }
 }
 
+/** Only ever drawn inside [UserBubble], so its foreground is the bubble's white, not `onPrimary`. */
 @Composable
 private fun AttachmentCard(attachment: ChatAttachment) {
     val dimens = LocalDimens.current
     var showPreview by remember { mutableStateOf(false) }
     Surface(
         shape = RoundedCornerShape(dimens.radiusSm),
-        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.14f),
-        contentColor = MaterialTheme.colorScheme.onPrimary,
+        color = Neutral100.copy(alpha = 0.16f),
+        contentColor = Neutral100,
     ) {
         Row(
             modifier = Modifier
@@ -179,7 +377,7 @@ private fun AttachmentCard(attachment: ChatAttachment) {
         ) {
             Icon(
                 imageVector = when (attachment.kind) {
-                    ChatAttachmentKind.IMAGE -> RACIcons.Outline.Eye
+                    ChatAttachmentKind.IMAGE -> RACIcons.Outline.Image
                     ChatAttachmentKind.DOCUMENT -> RACIcons.Outline.FileText
                 },
                 contentDescription = null,
@@ -197,7 +395,7 @@ private fun AttachmentCard(attachment: ChatAttachment) {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+                        color = Neutral100.copy(alpha = 0.82f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -267,6 +465,7 @@ private fun DocumentAttachmentPreview(attachment: ChatAttachment) {
 private fun AssistantMessage(
     message: ChatMessage,
     isStreamingTail: Boolean = false,
+    onToggleActions: () -> Unit = {},
 ) {
     val dimens = LocalDimens.current
     var showToolSheet by remember { mutableStateOf(false) }
@@ -291,16 +490,50 @@ private fun AssistantMessage(
         }
 
         when {
-            isWaiting -> TypingDots()
+            // A named, escalating wait with a shimmering skeleton, rather than three
+            // anonymous dots: the gap to the first token is seconds long, and a reader
+            // needs to know it is loading and roughly why.
+            isWaiting -> PendingReplyIndicator()
+            // A failure report is the app speaking, not the model, so it is NOT run through
+            // MarkdownText: rendering it as model output would let an error string's own
+            // punctuation become bold or italic, and it would read in the same ink as a real
+            // reply. Danger colour plus a plain paragraph, matching iOS `assistantBody`,
+            // which paints `isError` turns in `AppColors.dangerText`.
+            message.isError && message.text.isNotEmpty() -> Text(
+                text = message.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.clickable(
+                    interactionSource = null,
+                    indication = null,
+                    onClickLabel = "Show message actions",
+                    onClick = onToggleActions,
+                ),
+            )
             message.text.isNotEmpty() -> MarkdownText(
                 markdown = message.text,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
+                // No indication: a ripple washing across a full-width wall of
+                // prose reads as a mis-tap, not as feedback. Links inside the
+                // markdown consume their own taps first, so following one never
+                // also toggles the action row.
+                modifier = Modifier
+                    // Arriving text rises out of a soft bottom edge instead of snapping
+                    // in. A draw-time mask, so it never re-lays-out the paragraph the
+                    // reader is already partway through.
+                    .streamingReveal(active = isStreamingTail)
+                    .clickable(
+                        interactionSource = null,
+                        indication = null,
+                        onClickLabel = "Show message actions",
+                        onClick = onToggleActions,
+                    ),
             )
         }
 
         if (isStreamingTail && message.text.isNotEmpty()) {
-            StreamingCursorDot()
+            StreamingTail()
         }
 
         if (message.sources.isNotEmpty()) {
@@ -330,26 +563,6 @@ private fun ChatMessage.thinkingPresentation(isStreamingTail: Boolean): Thinking
         phase = ThinkingPhase.COMPLETE,
     )
     else -> null
-}
-
-@Composable
-private fun StreamingCursorDot() {
-    val transition = rememberInfiniteTransition(label = "cursor")
-    val alpha by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 450),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "cursorAlpha",
-    )
-    Box(
-        modifier = Modifier
-            .size(9.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
-    )
 }
 
 @Composable
@@ -401,32 +614,6 @@ private fun SourceStrip(sources: List<ChatSource>) {
     }
 }
 
-@Composable
-private fun TypingDots() {
-    val transition = rememberInfiniteTransition(label = "typing")
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        repeat(3) { index ->
-            val alpha by transition.animateFloat(
-                initialValue = 0.3f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 600, delayMillis = index * 150),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "dot$index",
-            )
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
-            )
-        }
-    }
-}
 
 private val previewMessages = listOf(
     ChatMessage(
@@ -469,6 +656,11 @@ private fun ChatMessageListPreview(darkTheme: Boolean) {
                 messages = previewMessages,
                 listState = rememberLazyListState(),
                 modifier = Modifier.fillMaxSize(),
+                actions = ChatMessageActions(
+                    onRegenerate = {},
+                    onEdit = {},
+                    onDelete = {},
+                ),
             )
         }
     }

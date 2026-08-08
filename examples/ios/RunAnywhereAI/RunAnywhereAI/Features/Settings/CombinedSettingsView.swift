@@ -2,11 +2,22 @@
 //  CombinedSettingsView.swift
 //  RunAnywhereAI
 //
-//  Combined Settings and Storage view
-//  Refactored to use SettingsViewModel (MVVM pattern)
+//  Settings. A `Form` on both platforms.
 //
-
-// swiftlint:disable file_length
+//  The Mac path used to be a `ScrollView` of hand-drawn cards in which every
+//  label sat in a `Text(...).frame(width: 150)` gutter — so "Save Performance
+//  History" wrapped to two lines inside a 150pt box while the switch it belonged
+//  to floated 150pt away from it, and the two-column rhythm broke on every row
+//  whose label happened to be longer. `Form` + `.formStyle(.grouped)` gets the
+//  alignment, the row separators, the group insets, and the label/control
+//  pairing from AppKit for free, and it is the only thing on the Mac that looks
+//  like System Settings rather than like a web page.
+//
+//  On the Mac this view is the content of the `Settings { }` scene, so it lives
+//  behind ⌘, in its own window with real preference tabs. On iOS it is one
+//  scrolling `Form` pushed from the chat drawer, because a phone has no
+//  preferences window and tabs inside a sheet are a maze.
+//
 
 import SwiftUI
 import RunAnywhere
@@ -16,11 +27,16 @@ struct CombinedSettingsView: View {
     // ViewModel - all business logic is here
     @ObservedObject private var viewModel = SettingsViewModel.shared
     @StateObject private var toolViewModel = ToolSettingsViewModel.shared
+    @StateObject private var storageViewModel = StorageViewModel.shared
 
     var body: some View {
         Group {
             #if os(macOS)
-            MacOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
+            MacSettingsTabs(
+                viewModel: viewModel,
+                toolViewModel: toolViewModel,
+                storageViewModel: storageViewModel
+            )
             #else
             IOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #endif
@@ -32,14 +48,17 @@ struct CombinedSettingsView: View {
             await viewModel.loadStorageData()
             await toolViewModel.refreshRegisteredTools()
         }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
+        // A `.constant(...)` binding cannot write `false` back, so the previous
+        // version of this alert could be dismissed visually and then reappear on
+        // the next redraw — the OK button cleared the message, but nothing
+        // cleared it if the alert was dismissed any other way.
+        .alert("Something went wrong", isPresented: Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
+        )) {
+            Button("OK") { viewModel.errorMessage = nil }
         } message: {
-            if let error = viewModel.errorMessage {
-                Text(error)
-            }
+            Text(viewModel.errorMessage ?? "")
         }
         .alert("Restart Required", isPresented: $viewModel.showRestartAlert) {
             Button("OK") {
@@ -294,223 +313,282 @@ private struct SettingsNavigationRow: View {
 
 // MARK: - macOS Layout
 
-private struct MacOSSettingsContent: View {
+#if os(macOS)
+
+/// Which preference pane is showing. Persisted so ⌘, reopens where you left.
+private enum SettingsPane: String {
+    case general
+    case models
+    case tools
+    case advanced
+    case about
+}
+
+private struct MacSettingsTabs: View {
     @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject var toolViewModel: ToolSettingsViewModel
+    @ObservedObject var storageViewModel: StorageViewModel
+
+    @AppStorage("mac.settings.pane") private var storedPane: String = SettingsPane.general.rawValue
+
+    private var pane: Binding<SettingsPane> {
+        Binding(
+            get: { SettingsPane(rawValue: storedPane) ?? .general },
+            set: { storedPane = $0.rawValue }
+        )
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.xxLarge) {
-                Text("Settings")
-                    .font(AppTypography.largeTitleBold)
-                    .padding(.bottom, AppSpacing.medium)
+        // The value-based `Tab(...)` DSL is macOS 15+; this app's floor is 14.5,
+        // so panes are declared with `.tabItem` + `.tag`.
+        TabView(selection: pane) {
+            GeneralPane(viewModel: viewModel)
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(SettingsPane.general)
 
-                AssistantSettingsCard()
-                GenerationSettingsCard(viewModel: viewModel)
-                ToolSettingsCard(viewModel: toolViewModel)
-                #if DEBUG
-                APIConfigurationCard(viewModel: viewModel)
-                #endif
-                PrivateDownloadsCard(viewModel: viewModel)
-                LoggingConfigurationCard(viewModel: viewModel)
-                BenchmarksCard()
-                AboutCard()
+            ModelsPane(viewModel: viewModel, storageViewModel: storageViewModel)
+                .tabItem { Label("Models", systemImage: "square.stack.3d.up") }
+                .tag(SettingsPane.models)
 
-                Spacer()
-            }
-            .padding(AppSpacing.xxLarge)
-            .frame(maxWidth: AppLayout.maxContentWidth, alignment: .leading)
+            ToolsPane(toolViewModel: toolViewModel)
+                .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                .tag(SettingsPane.tools)
+
+            AdvancedPane(viewModel: viewModel)
+                .tabItem { Label("Advanced", systemImage: "slider.horizontal.3") }
+                .tag(SettingsPane.advanced)
+
+            AboutPane()
+                .tabItem { Label("About", systemImage: "info.circle") }
+                .tag(SettingsPane.about)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.backgroundPrimary)
+        // A preferences window is sized by its content, not dragged to fit. One
+        // frame for every pane keeps the window from resizing under the pointer
+        // each time a tab is clicked.
+        .frame(width: 560, height: 460)
     }
 }
 
-// MARK: - macOS Settings Cards
-
-private struct AssistantSettingsCard: View {
-    var body: some View {
-        SettingsCard(title: "Assistant") {
-            VStack(alignment: .leading, spacing: AppSpacing.large) {
-                NavigationLink(destination: SimplifiedModelsView()) {
-                    SettingsNavigationRow(
-                        icon: "square.stack.3d.up",
-                        color: AppColors.primaryAccent,
-                        title: "Manage Downloads",
-                        subtitle: "Choose and identify models across all local backends"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink(destination: ConsumerAdvancedHubView()) {
-                    SettingsNavigationRow(
-                        icon: "slider.horizontal.3",
-                        color: AppColors.primaryPurple,
-                        title: "AI Tools",
-                        subtitle: "Voice, performance, and model controls"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                HStack {
-                    Image(systemName: "lock.shield")
-                        .foregroundColor(AppColors.statusGreen)
-                    Text("Chats and downloads stay on this Mac unless you export or delete them.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-            }
-        }
-    }
-}
-
-private struct GenerationSettingsCard: View {
+private struct GeneralPane: View {
     @ObservedObject var viewModel: SettingsViewModel
 
     var body: some View {
-        SettingsCard(title: "Generation Settings") {
-            VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
-                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                    HStack {
-                        Text("Temperature")
-                            .frame(width: 150, alignment: .leading)
-                        Text("\(String(format: "%.2f", viewModel.temperature))")
-                            .font(AppTypography.monospaced)
-                            .foregroundColor(AppColors.primaryAccent)
-                    }
-                    HStack {
-                        Text("")
-                            .frame(width: 150)
+        Form {
+            Section {
+                LabeledContent("Creativity") {
+                    HStack(spacing: Space.md) {
                         Slider(value: $viewModel.temperature, in: 0...2, step: 0.1)
-                            .frame(maxWidth: 400)
+                        Text(viewModel.temperature, format: .number.precision(.fractionLength(2)))
+                            .monospacedDigit()
+                            .contentTransition(.numericText(value: viewModel.temperature))
+                            .foregroundStyle(AppColors.primaryAccent)
+                            .frame(width: 44, alignment: .trailing)
                     }
                 }
 
-                HStack {
-                    Text("Max Tokens")
-                        .frame(width: 150, alignment: .leading)
+                LabeledContent("Max Response Length") {
                     Stepper(
-                        "\(viewModel.maxTokens)",
                         value: $viewModel.maxTokens,
                         in: 500...20000,
                         step: 500
-                    )
-                    .frame(maxWidth: 200)
-                }
-
-                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                    HStack(alignment: .top) {
-                        Text("System Prompt")
-                            .frame(width: 150, alignment: .leading)
-                        TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
-                            .lineLimit(3...8)
-                            .textFieldStyle(.plain)
-                            .padding(AppSpacing.small)
-                            .background(AppColors.backgroundTertiary)
-                            .cornerRadius(AppSpacing.cornerRadiusRegular)
-                            .frame(maxWidth: 400)
+                    ) {
+                        Text("\(viewModel.maxTokens) tokens")
+                            .monospacedDigit()
                     }
                 }
 
-                HStack {
-                    Text("Thinking Mode")
-                        .frame(width: 150, alignment: .leading)
-
-                    Toggle("", isOn: $viewModel.thinkingModeEnabled)
-                        .disabled(!viewModel.loadedModelSupportsThinking)
-
-                    Spacer()
-
-                    Text(viewModel.thinkingModeEnabled ? "Enabled" : "Disabled")
-                        .font(AppTypography.caption)
-                        .foregroundColor(
-                            viewModel.thinkingModeEnabled
-                                ? AppColors.primaryPurple
-                                : AppColors.textSecondary
-                        )
-                }
-
+                Toggle("Thinking Mode", isOn: $viewModel.thinkingModeEnabled)
+                    .disabled(!viewModel.loadedModelSupportsThinking)
+            } header: {
+                Text("Responses")
+            } footer: {
                 Text(thinkingModeDescription(for: viewModel))
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Section {
+                TextField("How should RunAnywhere respond?", text: $viewModel.systemPrompt, axis: .vertical)
+                    .lineLimit(3...8)
+            } header: {
+                Text("System Prompt")
+            } footer: {
+                Text("Sent ahead of every conversation to set tone and behavior.")
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Section {
+                Toggle("Save Performance History", isOn: $viewModel.analyticsLogToLocal)
+            } header: {
+                Text("Privacy")
+            } footer: {
+                Text("Chats, downloads, and performance history stay on this Mac.")
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
             }
         }
+        .formStyle(.grouped)
     }
 }
 
-private struct APIConfigurationCard: View {
+private struct ModelsPane: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject var storageViewModel: StorageViewModel
 
     var body: some View {
-        SettingsCard(title: "API Configuration (Testing)") {
-            VStack(alignment: .leading, spacing: AppSpacing.padding15) {
+        Form {
+            Section {
+                LabeledContent("Models on This Mac", value: storageViewModel.formattedModelStorage)
+                LabeledContent("Free Space", value: storageViewModel.formattedAvailableSpace)
+                LabeledContent("Downloaded", value: "\(storageViewModel.storedModels.count)")
+            } header: {
                 HStack {
-                    Text("API Key")
-                        .frame(width: 150, alignment: .leading)
-
-                    if viewModel.isApiKeyConfigured {
-                        Text("Configured")
-                            .foregroundColor(AppColors.statusGreen)
-                            .font(AppTypography.caption)
-                    } else {
-                        Text("Not Set")
-                            .foregroundColor(AppColors.statusOrange)
-                            .font(AppTypography.caption)
-                    }
-
+                    Text("Storage")
                     Spacer()
-                }
-
-                HStack {
-                    Text("Base URL")
-                        .frame(width: 150, alignment: .leading)
-
-                    if viewModel.isBaseURLConfigured {
-                        Text("Configured")
-                            .foregroundColor(AppColors.statusGreen)
-                            .font(AppTypography.caption)
-                    } else {
-                        Text("Using Default")
-                            .foregroundColor(AppColors.textSecondary)
-                            .font(AppTypography.caption)
+                    Button {
+                        Task { await storageViewModel.refreshData() }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                            .labelStyle(.iconOnly)
                     }
-
-                    Spacer()
+                    .buttonStyle(.borderless)
+                    .help("Recount storage")
                 }
+            }
 
-                HStack {
-                    Button("Configure") {
-                        viewModel.showApiKeySheet()
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(AppColors.primaryAccent)
-
-                    if viewModel.isApiConfigurationComplete {
-                        Button("Clear") {
-                            viewModel.clearApiConfiguration()
+            Section("Downloaded Models") {
+                if storageViewModel.storedModels.isEmpty {
+                    Text("No models downloaded yet.")
+                        .appType(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                } else {
+                    ForEach(storageViewModel.storedModels, id: \.id) { model in
+                        StoredModelRow(model: model) {
+                            await storageViewModel.deleteModel(model)
                         }
-                        .buttonStyle(.bordered)
-                        .tint(AppColors.primaryRed)
                     }
                 }
+            }
 
-                Text("Configure custom API key and base URL for testing. Requires app restart.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
+            Section {
+                Button("Clear Cache") {
+                    Task { await storageViewModel.clearCache() }
+                }
+                Button("Clean Temporary Files") {
+                    Task { await storageViewModel.cleanTempFiles() }
+                }
+            } header: {
+                Text("Maintenance")
+            } footer: {
+                Text("Neither removes a downloaded model. Delete those above.")
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
             }
         }
+        .formStyle(.grouped)
+        .task { await storageViewModel.loadData() }
     }
 }
 
-private struct PrivateDownloadsCard: View {
+private struct ToolsPane: View {
+    @ObservedObject var toolViewModel: ToolSettingsViewModel
+
+    var body: some View {
+        Form {
+            ToolSettingsSection(viewModel: toolViewModel)
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct AdvancedPane: View {
     @ObservedObject var viewModel: SettingsViewModel
 
     var body: some View {
-        SettingsCard(title: "Private Downloads") {
-            PrivateDownloadsControls(viewModel: viewModel)
+        Form {
+            Section {
+                PrivateDownloadsControls(viewModel: viewModel)
+            } header: {
+                Text("Private Downloads")
+            }
+
+            #if DEBUG
+            Section {
+                LabeledContent("API Key") {
+                    StatusText(
+                        viewModel.isApiKeyConfigured ? "Configured" : "Not Set",
+                        isSet: viewModel.isApiKeyConfigured
+                    )
+                }
+                LabeledContent("Base URL") {
+                    StatusText(
+                        viewModel.isBaseURLConfigured ? "Configured" : "Using Default",
+                        isSet: viewModel.isBaseURLConfigured
+                    )
+                }
+
+                HStack {
+                    Button("Configure…") { viewModel.showApiKeySheet() }
+                    if viewModel.isApiConfigurationComplete {
+                        Button("Clear") { viewModel.clearApiConfiguration() }
+                    }
+                }
+            } header: {
+                Text("Connection")
+            } footer: {
+                Text("Requires a restart to take effect.")
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+            #endif
         }
+        .formStyle(.grouped)
     }
 }
+
+/// A configured/not-configured value, colored the same way everywhere.
+private struct StatusText: View {
+    let text: String
+    let isSet: Bool
+
+    init(_ text: String, isSet: Bool) {
+        self.text = text
+        self.isSet = isSet
+    }
+
+    var body: some View {
+        Text(text)
+            .appType(.caption)
+            .foregroundStyle(isSet ? AppColors.statusGreen : AppColors.textSecondary)
+    }
+}
+
+private struct AboutPane: View {
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("RunAnywhere", value: Bundle.main.displayVersion)
+
+                if let docsURL = URL(string: "https://docs.runanywhere.ai") {
+                    Link("Documentation", destination: docsURL)
+                }
+                if let xURL = URL(string: "https://x.com/RunanywhereAI") {
+                    Link("Follow on X", destination: xURL)
+                }
+            } footer: {
+                Text("An example app for the RunAnywhere on-device AI SDK.")
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+#endif
+
+// MARK: - Reusable Components
 
 private struct PrivateDownloadsControls: View {
     @ObservedObject var viewModel: SettingsViewModel
@@ -550,6 +628,7 @@ private struct PrivateDownloadsControls: View {
 
                 if viewModel.isSavingHfToken {
                     ProgressView()
+                        .controlSize(.small)
                 }
             }
 
@@ -559,285 +638,6 @@ private struct PrivateDownloadsControls: View {
                     .foregroundColor(viewModel.hfTokenMessageIsError ? AppColors.primaryRed : AppColors.statusGreen)
             }
         }
-    }
-}
-
-private struct StorageCard: View {
-    @ObservedObject var viewModel: SettingsViewModel
-
-    var body: some View {
-        SettingsCardWithTrailing(
-            title: "Storage",
-            trailing: {
-                Button(
-                    action: {
-                        Task {
-                            await viewModel.refreshStorageData()
-                        }
-                    },
-                    label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                )
-                .buttonStyle(.bordered)
-                .tint(AppColors.primaryAccent)
-            },
-            content: {
-                VStack(alignment: .leading, spacing: AppSpacing.large) {
-                    StorageOverviewRows(viewModel: viewModel)
-                }
-            }
-        )
-    }
-}
-
-private struct DownloadedModelsCard: View {
-    @ObservedObject var viewModel: SettingsViewModel
-
-    var body: some View {
-        SettingsCard(title: "Downloaded Models") {
-            VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-                if viewModel.storedModels.isEmpty {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: AppSpacing.mediumLarge) {
-                            Image(systemName: "cube")
-                                .font(AppTypography.system48)
-                                .foregroundColor(AppColors.textSecondary.opacity(0.5))
-                            Text("No models downloaded yet")
-                                .foregroundColor(AppColors.textSecondary)
-                                .font(AppTypography.callout)
-                        }
-                        .padding(.vertical, AppSpacing.xxLarge)
-                        Spacer()
-                    }
-                } else {
-                    ForEach(viewModel.storedModels, id: \.id) { model in
-                        StoredModelRow(model: model) {
-                            await viewModel.deleteModel(model)
-                        }
-                        if model.id != viewModel.storedModels.last?.id {
-                            Divider()
-                                .padding(.vertical, AppSpacing.xSmall)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private struct StorageManagementCard: View {
-    @ObservedObject var viewModel: SettingsViewModel
-
-    var body: some View {
-        SettingsCard(title: "Storage Management") {
-            VStack(spacing: AppSpacing.large) {
-                StorageManagementButton(
-                    title: "Clear Cache",
-                    subtitle: "Free up space by clearing cached data",
-                    icon: "trash",
-                    color: AppColors.primaryRed
-                ) {
-                    await viewModel.clearCache()
-                }
-
-                StorageManagementButton(
-                    title: "Clean Temporary Files",
-                    subtitle: "Remove temporary files and logs",
-                    icon: "trash",
-                    color: AppColors.primaryOrange
-                ) {
-                    await viewModel.cleanTempFiles()
-                }
-            }
-        }
-    }
-}
-
-private struct LoggingConfigurationCard: View {
-    @ObservedObject var viewModel: SettingsViewModel
-
-    var body: some View {
-        SettingsCard(title: "Privacy") {
-            VStack(alignment: .leading, spacing: AppSpacing.padding15) {
-                HStack {
-                    Text("Save Performance History")
-                        .frame(width: 150, alignment: .leading)
-
-                    Toggle("", isOn: $viewModel.analyticsLogToLocal)
-
-                    Spacer()
-
-                    Text(viewModel.analyticsLogToLocal ? "Enabled" : "Disabled")
-                        .font(AppTypography.caption)
-                        .foregroundColor(
-                            viewModel.analyticsLogToLocal
-                                ? AppColors.statusGreen
-                                : AppColors.textSecondary
-                        )
-                }
-
-                Text("When enabled, performance history is stored locally on this Mac.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-        }
-    }
-}
-
-private struct AboutCard: View {
-    var body: some View {
-        SettingsCard(title: "About") {
-            VStack(alignment: .leading, spacing: AppSpacing.padding15) {
-                HStack {
-                    Image(systemName: "app")
-                        .foregroundColor(AppColors.primaryAccent)
-                    VStack(alignment: .leading) {
-                        Text("RunAnywhere")
-                            .font(AppTypography.headline)
-                        Text(Bundle.main.displayVersion)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-                }
-
-                if let docsURL = URL(string: "https://docs.runanywhere.ai") {
-                    Link(destination: docsURL) {
-                        HStack {
-                            Image(systemName: "book")
-                            Text("Documentation")
-                        }
-                    }
-                }
-
-                if let xURL = URL(string: "https://x.com/RunanywhereAI") {
-                    Link(destination: xURL) {
-                        HStack {
-                            Image(systemName: "person.crop.circle.badge.plus")
-                            Text("Follow on X")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Reusable Components
-
-private struct StorageOverviewRows: View {
-    @ObservedObject var viewModel: SettingsViewModel
-
-    var body: some View {
-        Group {
-            HStack {
-                Label("Total Usage", systemImage: "externaldrive")
-                Spacer()
-                Text(viewModel.formatBytes(viewModel.totalStorageSize))
-                    .foregroundColor(AppColors.textSecondary)
-            }
-
-            HStack {
-                Label("Available Space", systemImage: "externaldrive.badge.plus")
-                Spacer()
-                Text(viewModel.formatBytes(viewModel.availableSpace))
-                    .foregroundColor(AppColors.primaryGreen)
-            }
-
-            HStack {
-                Label("Models Storage", systemImage: "cpu")
-                Spacer()
-                Text(viewModel.formatBytes(viewModel.modelStorageSize))
-                    .foregroundColor(AppColors.primaryAccent)
-            }
-
-            HStack {
-                Label("Downloaded Models", systemImage: "number")
-                Spacer()
-                Text("\(viewModel.storedModels.count)")
-                    .foregroundColor(AppColors.textSecondary)
-            }
-        }
-    }
-}
-
-private struct SettingsCard<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
-            Text(title)
-                .font(AppTypography.headline)
-                .foregroundColor(AppColors.textSecondary)
-
-            content()
-                .padding(AppSpacing.large)
-                .background(AppColors.backgroundSecondary)
-                .cornerRadius(AppSpacing.cornerRadiusLarge)
-        }
-    }
-}
-
-private struct SettingsCardWithTrailing<Content: View, Trailing: View>: View {
-    let title: String
-    @ViewBuilder let trailing: () -> Trailing
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
-            HStack {
-                Text(title)
-                    .font(AppTypography.headline)
-                    .foregroundColor(AppColors.textSecondary)
-                Spacer()
-                trailing()
-            }
-
-            content()
-                .padding(AppSpacing.large)
-                .background(AppColors.backgroundSecondary)
-                .cornerRadius(AppSpacing.cornerRadiusLarge)
-        }
-    }
-}
-
-private struct StorageManagementButton: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let color: Color
-    let action: () async -> Void
-
-    var body: some View {
-        Button(
-            action: {
-                Task {
-                    await action()
-                }
-            },
-            label: {
-                HStack {
-                    Image(systemName: icon)
-                        .foregroundColor(color)
-                    Text(title)
-                    Spacer()
-                    Text(subtitle)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        )
-        .buttonStyle(.plain)
-        .padding(AppSpacing.mediumLarge)
-        .background(color.opacity(0.1))
-        .cornerRadius(AppSpacing.cornerRadiusRegular)
-        .overlay(
-            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusRegular)
-                .stroke(color.opacity(0.3), lineWidth: AppSpacing.strokeRegular)
-        )
     }
 }
 
@@ -935,10 +735,16 @@ private struct ApiConfigurationSheet: View {
 
 // MARK: - Supporting Views
 
+#if os(macOS)
+/// One downloaded model: what it is, how big, and how to remove it.
+///
+/// Deliberately a single `LabeledContent`-shaped row rather than the previous
+/// expanding "Details" disclosure that showed the size a second time next to
+/// the size it was already showing.
 private struct StoredModelRow: View {
     let model: ModelInfo
     let onDelete: () async -> Void
-    @State private var showingDetails = false
+
     @State private var showingDeleteConfirmation = false
     @State private var isDeleting = false
 
@@ -946,81 +752,43 @@ private struct StoredModelRow: View {
         model.name.isEmpty ? model.id : model.name
     }
 
-    private var backend: InferenceFramework? {
-        model.framework
-    }
-
-    private var lastUsedDate: Date? {
-        guard model.hasLastUsedAtUnixMs else { return nil }
-        return Date(timeIntervalSince1970: TimeInterval(model.lastUsedAtUnixMs) / 1000.0)
-    }
-
-    private var isDeletable: Bool {
-        !model.id.isEmpty
+    private var subtitle: String {
+        let size = ByteCountFormatter.string(fromByteCount: model.downloadSizeBytes, countStyle: .file)
+        return "\(size) · \(model.framework.consumerBackendLabel)"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-            HStack {
-                VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-                    Text(displayName)
-                        .font(AppTypography.subheadlineMedium)
-
-                    HStack(spacing: AppSpacing.small) {
-                        Text(ByteCountFormatter.string(fromByteCount: model.downloadSizeBytes, countStyle: .file))
-                            .font(AppTypography.caption2)
-                            .foregroundColor(AppColors.textSecondary)
-                        if let backend {
-                            backendBadge(backend)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: AppSpacing.xSmall) {
-                    Text(ByteCountFormatter.string(fromByteCount: model.downloadSizeBytes, countStyle: .file))
-                        .font(AppTypography.captionMedium)
-
-                    HStack(spacing: AppSpacing.xSmall) {
-                        Button(showingDetails ? "Hide" : "Details") {
-                            withAnimation {
-                                showingDetails.toggle()
-                            }
-                        }
-                        .font(AppTypography.caption2)
-                        .buttonStyle(.bordered)
-                        .tint(AppColors.primaryAccent)
-                        .controlSize(.mini)
-
-                        // ONLY show delete button if deletable
-                        if isDeletable {
-                            Button(
-                                action: {
-                                    showingDeleteConfirmation = true
-                                },
-                                label: {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(AppColors.primaryRed)
-                                }
-                            )
-                            .font(AppTypography.caption2)
-                            .buttonStyle(.bordered)
-                            .tint(AppColors.primaryRed)
-                            .controlSize(.mini)
-                            .disabled(isDeleting)
-                        }
-                    }
-                }
+        HStack(spacing: Space.md) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(displayName)
+                    .appType(.body)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
             }
 
-            if showingDetails {
-                modelDetailsView
+            Spacer(minLength: Space.sm)
+
+            if isDeleting {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.borderless)
+                .help("Delete \(displayName) from this Mac")
+                .disabled(model.id.isEmpty)
             }
         }
-        .padding(.vertical, AppSpacing.xSmall)
-        .alert("Delete Model", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
+        .confirmationDialog(
+            "Delete \(displayName)?",
+            isPresented: $showingDeleteConfirmation
+        ) {
             Button("Delete", role: .destructive) {
                 Task {
                     isDeleting = true
@@ -1028,77 +796,13 @@ private struct StoredModelRow: View {
                     isDeleting = false
                 }
             }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to delete \(displayName)? This action cannot be undone.")
-        }
-    }
-
-    @ViewBuilder
-    private func backendBadge(_ framework: InferenceFramework) -> some View {
-        HStack(spacing: AppSpacing.xxSmall) {
-            Image(systemName: framework.consumerBackendIcon)
-            Text(framework.consumerBackendLabel)
-        }
-        .font(AppTypography.caption2Medium)
-        .foregroundColor(framework.consumerBackendColor)
-        .padding(.horizontal, AppSpacing.xSmall)
-        .padding(.vertical, 2)
-        .background(framework.consumerBackendColor.opacity(0.12))
-        .cornerRadius(AppSpacing.cornerRadiusSmall)
-    }
-
-    private var modelDetailsView: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.small) {
-            if let lastUsedDate {
-                HStack {
-                    Text("Last used:")
-                        .font(AppTypography.caption2Medium)
-                    Text(lastUsedDate, style: .date)
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-            } else {
-                Text("Last used: Never")
-                    .font(AppTypography.caption2Medium)
-            }
-
-            HStack {
-                Text("Size:")
-                    .font(AppTypography.caption2Medium)
-                Text(ByteCountFormatter.string(fromByteCount: model.downloadSizeBytes, countStyle: .file))
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-        }
-        .padding(.top, AppSpacing.xSmall)
-        .padding(.horizontal, AppSpacing.smallMedium)
-        .padding(.vertical, AppSpacing.small)
-        .background(AppColors.backgroundTertiary)
-        .cornerRadius(AppSpacing.cornerRadiusRegular)
-    }
-}
-
-private struct BenchmarksCard: View {
-    var body: some View {
-        SettingsCard(title: "Performance") {
-            VStack(alignment: .leading, spacing: AppSpacing.padding15) {
-                NavigationLink(destination: BenchmarkDashboardView()) {
-                    HStack {
-                        Image(systemName: "gauge.with.dots.needle.33percent")
-                            .foregroundColor(AppColors.primaryAccent)
-                        Text("Benchmarks")
-                        Spacer()
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Text("Measure performance of on-device AI models.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            }
+            Text("The file is removed from this Mac. You can download it again later.")
         }
     }
 }
+#endif
 
 private extension Bundle {
     var displayVersion: String {
@@ -1109,7 +813,7 @@ private extension Bundle {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         CombinedSettingsView()
     }
 }

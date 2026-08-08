@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -20,7 +21,7 @@ data class LoraUiState(
     val adapters: List<LoraAdapterCatalogEntry> = emptyList(),
     val activeId: String? = null,
     val busyId: String? = null,
-    val progressPercent: Int? = null,
+    val progress: DownloadProgressInfo? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
 )
@@ -41,7 +42,7 @@ class LoraViewModel : ViewModel() {
     fun download(entry: LoraAdapterCatalogEntry) {
         if (isDownloaded(entry)) return
         viewModelScope.launch {
-            state = state.copy(busyId = entry.id, progressPercent = 0, error = null)
+            state = state.copy(busyId = entry.id, progress = DownloadProgressInfo(), error = null)
             try {
                 val path =
                     adapterLocalPath(entry) ?: run {
@@ -55,26 +56,20 @@ class LoraViewModel : ViewModel() {
                         val artifact = RunAnywhere.models.get(loraArtifactModelId(entry.id))
                             ?: throw SDKException.modelNotFound(entry.id)
                         RunAnywhere.loraCatalog.download(entry, artifact) { progress ->
-                            val pct =
-                                if (progress.total_bytes > 0) {
-                                    (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
-                                } else {
-                                    (progress.stage_progress.coerceIn(0f, 1f) * 100).toInt()
-                                }
-                            state = state.copy(progressPercent = pct)
+                            state = state.copy(progress = DownloadProgressInfo.from(progress))
                         }
                     }
 
                 if (path.isNotBlank()) {
                     downloadedPaths[entry.id] = path
                 }
-                state = state.copy(busyId = null, progressPercent = null)
+                state = state.copy(busyId = null, progress = null)
                 reload()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("lora download failed: ${entry.id}", e)
-                state = state.copy(busyId = null, progressPercent = null, error = e.message ?: "Download failed")
+                state = state.copy(busyId = null, progress = null, error = e.message ?: "Download failed")
             }
         }
     }

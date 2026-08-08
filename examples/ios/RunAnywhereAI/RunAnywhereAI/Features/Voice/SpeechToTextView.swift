@@ -9,25 +9,23 @@ import AppKit
 struct SpeechToTextView: View {
     @StateObject private var viewModel = STTViewModel()
     @State private var showModelPicker = false
-    @State private var breathingAnimation = false
 
     private var hasModelSelected: Bool {
         viewModel.selectedModelName != nil
     }
 
-    private var statusMessage: String {
-        ""
-    }
-
-    private var waveHeights: [CGFloat] {
-        breathingAnimation
-            ? [24, 40, 32, 48, 28]
-            : [16, 24, 20, 28, 18]
-    }
-
     var body: some View {
         Group {
-            NavigationView {
+            // A `NavigationView` wrapping a single child renders that child as
+            // the *sidebar* column of a Mac split view, which is why this screen
+            // drew all of its content in a ~200pt strip against the left edge of
+            // a 1450pt detail pane — mode chips clipped to "Hyb…", the model chip
+            // truncated, the record button pinned to the window's bottom edge.
+            // This screen is pushed from a NavigationLink, so the window already
+            // owns a navigation container: on the Mac it is plain content in a
+            // centred column, and the `.toolbar` items attach to the window's
+            // own bar. iPhone keeps the NavigationView it needs for its title.
+            navigationHost {
                 ZStack {
                     VStack(spacing: 0) {
                         // Mode selection - Modern pill button style
@@ -55,47 +53,38 @@ struct SpeechToTextView: View {
                             VStack(spacing: 0) {
                                 Spacer()
 
-                                VStack(spacing: 48) {
-                                    // Minimal waveform visualization
-                                    HStack(spacing: 4) {
-                                        ForEach(0..<5) { index in
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: [
-                                                            AppColors.primaryAccent.opacity(0.8),
-                                                            AppColors.primaryAccent.opacity(0.4)
-                                                        ],
-                                                        startPoint: .top,
-                                                        endPoint: .bottom
-                                                    )
-                                                )
-                                                .frame(width: 6, height: waveHeights[index])
-                                                .animation(
-                                                    .easeInOut(duration: 0.8)
-                                                        .repeatForever(autoreverses: true)
-                                                        .delay(Double(index) * 0.1),
-                                                    value: breathingAnimation
-                                                )
-                                        }
-                                    }
+                                VStack(spacing: Space.xxl) {
+                                    // Still, deliberately. This is the idle
+                                    // state: the microphone is closed and there
+                                    // is nothing to measure. It used to breathe
+                                    // five bars forever on a 0.8s stagger,
+                                    // which looked like live audio while
+                                    // nothing was being recorded.
+                                    EmptyStateMark(systemImage: "waveform", diameter: 96)
 
-                                    // Clean typography
-                                    VStack(spacing: 12) {
-                                        Text("Ready to transcribe")
-                                            .font(.system(size: 24, weight: .semibold, design: .rounded))
-                                            .foregroundColor(.primary)
+                                    VStack(spacing: Space.sm) {
+                                        // "Recorded, nothing recognised" and
+                                        // "nothing recorded yet" are different
+                                        // facts; this pane used to show the
+                                        // second for both, telling the user
+                                        // they never recorded when in fact the
+                                        // audio came back with no speech in it.
+                                        Text(viewModel.noSpeechDetected
+                                             ? "No speech detected"
+                                             : "Ready to transcribe")
+                                            .appType(.title)
+                                            .foregroundStyle(AppColors.textPrimary)
 
-                                        Text(readyModeDescription)
-                                            .font(.system(size: 15, weight: .regular))
-                                            .foregroundColor(.secondary)
+                                        Text(viewModel.noSpeechDetected
+                                             ? "Nothing was recognised in that recording. Check your input device, then try again."
+                                             : readyModeDescription)
+                                            .appType(.secondary)
+                                            .foregroundStyle(AppColors.textSecondary)
+                                            .multilineTextAlignment(.center)
                                     }
                                 }
 
                                 Spacer()
-                            }
-                            .onAppear {
-                                breathingAnimation = true
                             }
                         } else if viewModel.isTranscribing && viewModel.transcription.isEmpty {
                             // Processing state - Clean and centered
@@ -214,12 +203,13 @@ struct SpeechToTextView: View {
                                 viewModel.isProcessing ||
                                 viewModel.isTranscribing ? 0.6 : 1.0
                             )
-
-                            if !statusMessage.isEmpty {
-                                Text(statusMessage)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            // The Mac's accessibility tree reported this as a
+                            // bare `AXButton`: no title, no value, nothing to
+                            // distinguish it from any other button on screen.
+                            .accessibilityLabel(viewModel.isRecording
+                                ? "Stop recording"
+                                : "Start recording")
+                            .accessibilityValue(viewModel.isTranscribing ? "Transcribing" : "")
                         }
                         .padding()
                         #if os(iOS)
@@ -259,9 +249,6 @@ struct SpeechToTextView: View {
                 }
             }
             }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
         .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .stt) { model in
                 Task {
@@ -278,6 +265,19 @@ struct SpeechToTextView: View {
             viewModel.cleanup()
         }
         }
+    }
+
+    /// The navigation container this platform actually needs — see `body`.
+    @ViewBuilder
+    private func navigationHost<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        #if os(macOS)
+        content()
+            .frame(maxWidth: AdaptiveSizing.conversationMaxWidth)
+            .frame(maxWidth: .infinity)
+        #else
+        NavigationView { content() }
+            .navigationViewStyle(.stack)
+        #endif
     }
 
     // MARK: - View Components
@@ -329,6 +329,13 @@ struct SpeechToTextView: View {
                     )
             )
         }
+        // Two stacked words each ("Batch"/"Record") read as four fragments to a
+        // screen reader, and selection was carried only by tint. One name, one
+        // spoken selected state.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) mode")
+        .accessibilityHint(mode.description)
+        .accessibilityAddTraits(viewModel.selectedMode == mode ? [.isButton, .isSelected] : .isButton)
     }
 
     private var hybridConfigurationSection: some View {
@@ -383,62 +390,11 @@ struct SpeechToTextView: View {
     }
 
     private var modelButton: some View {
-        Button {
+        VoiceModelChip(
+            modelName: viewModel.selectedModelName,
+            framework: viewModel.selectedFramework
+        ) {
             showModelPicker = true
-        } label: {
-            HStack(spacing: 6) {
-                // Model logo instead of cube icon
-                if let modelName = viewModel.selectedModelName {
-                    Image(getModelLogo(for: modelName))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 36, height: 36)
-                        .cornerRadius(AppSpacing.cornerRadiusSmall)
-                } else {
-                    Image(systemName: "cube")
-                        .font(AppTypography.system14)
-                }
-
-                if let modelName = viewModel.selectedModelName {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName.shortModelName())
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-
-                        // Framework indicator
-                        if let framework = viewModel.selectedFramework {
-                            HStack(spacing: 3) {
-                                Image(systemName: frameworkIcon(for: framework))
-                                    .font(.system(size: 7))
-                                Text(framework.displayName)
-                                    .font(.system(size: 8, weight: .medium))
-                            }
-                            .foregroundColor(frameworkColor(for: framework))
-                        }
-                    }
-                } else {
-                    Text("Select Model")
-                        .font(.caption)
-                }
-            }
-        }
-    }
-
-
-    private func frameworkIcon(for framework: InferenceFramework) -> String {
-        switch framework {
-        case .onnx: return "square.stack.3d.up"
-        case .foundationModels: return "apple.logo"
-        default: return "cube"
-        }
-    }
-
-    private func frameworkColor(for framework: InferenceFramework) -> Color {
-        switch framework {
-        case .onnx: return AppColors.primaryPurple
-        case .foundationModels: return .primary
-        default: return AppColors.statusGray
         }
     }
 }

@@ -2,14 +2,25 @@
 //  ModelStatusComponents.swift
 //  RunAnywhereAI
 //
-//  Reusable components for displaying model status and onboarding
+//  The "you need a model first" screen, shared by seven surfaces (chat, STT,
+//  TTS, VAD, VLM, diarization, segmentation).
+//
+//  This is the most-seen empty state in the app — it is what a first launch
+//  looks like — so it is built on the shared `EmptyStateView`/`EmptyStateMark`
+//  rather than on a bespoke hero. Previously it hand-rolled a 30pt rounded
+//  title, three blurred circles drifting on an 8-second ease, and a 2.2s halo:
+//  five durations, none of them in the spec, and three parallel background
+//  systems (`Color(.systemBackground)`, a raw `NSColor`, and blurred tinted
+//  circles). One figure, one background, four tiers.
+//
+//  `ModelStatusBanner` and `CompactModelIndicator` lived here with zero call
+//  sites and their own font/color/radius vocabulary; they are gone. The live
+//  status surface is `ChatInterfaceView`'s `navigationSubtitle` on Mac and its
+//  header on iOS.
 //
 
 import SwiftUI
 import RunAnywhere
-#if os(macOS)
-import AppKit
-#endif
 
 // MARK: - Model Load State (Local UI type)
 
@@ -31,442 +42,152 @@ enum ModelLoadState: Equatable {
     }
 }
 
-// MARK: - Model Status Banner
-
-/// A banner that shows the current model status (framework + model name) or prompts to select a model
-struct ModelStatusBanner: View {
-    let framework: InferenceFramework?
-    let modelName: String?
-    let isLoading: Bool
-    let supportsStreaming: Bool
-    let onSelectModel: () -> Void
-
-    init(framework: InferenceFramework?, modelName: String?, isLoading: Bool, supportsStreaming: Bool = true, onSelectModel: @escaping () -> Void) {
-        self.framework = framework
-        self.modelName = modelName
-        self.isLoading = isLoading
-        self.supportsStreaming = supportsStreaming
-        self.onSelectModel = onSelectModel
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            if isLoading {
-                // Loading state
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Loading model...")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            } else if let framework = framework, let modelName = modelName {
-                // Model loaded state
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(AppColors.statusGreen)
-                        .font(.system(size: 14, weight: .semibold))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text(framework.displayName)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-
-                            // Streaming mode indicator
-                            streamingModeIndicator
-                        }
-                        Text(modelName)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .lineLimit(1)
-                    }
-
-                    Spacer()
-
-                    Button(action: onSelectModel) {
-                        Text("Change")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(AppColors.primaryAccent)
-                    .controlSize(.small)
-                }
-            } else {
-                // No model state
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(AppColors.statusOrange)
-
-                    Text("No model selected")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Button(action: onSelectModel) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "cube.fill")
-                            Text("Select Model")
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppColors.primaryAccent)
-                    .controlSize(.small)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        #if os(iOS)
-        .background(Color(.secondarySystemBackground))
-        #else
-        .background(Color(NSColor.controlBackgroundColor))
-        #endif
-        .cornerRadius(AppSpacing.cornerRadiusXLarge)
-    }
-
-    /// Streaming mode indicator badge
-    @ViewBuilder private var streamingModeIndicator: some View {
-        HStack(spacing: 3) {
-            Image(systemName: supportsStreaming ? "bolt.fill" : "square.fill")
-                .font(.system(size: 8))
-            Text(supportsStreaming ? "Streaming" : "Batch")
-                .font(.system(size: 9, weight: .medium))
-        }
-        .foregroundColor(supportsStreaming ? AppColors.statusGreen : AppColors.statusOrange)
-        .padding(.horizontal, 5)
-        .padding(.vertical, 2)
-        .background(
-            Capsule()
-                .fill(supportsStreaming ? AppColors.statusGreen.opacity(0.15) : AppColors.statusOrange.opacity(0.15))
-        )
-    }
-
-    private func frameworkIcon(for framework: InferenceFramework) -> String {
-        switch framework {
-        case .llamaCpp: return "cpu"
-        case .mlx: return "bolt.horizontal"
-        case .onnx: return "square.stack.3d.up"
-        case .foundationModels: return "apple.logo"
-        default: return "cube"
-        }
-    }
-
-    private func frameworkColor(for framework: InferenceFramework) -> Color {
-        switch framework {
-        case .llamaCpp: return AppColors.primaryAccent
-        case .mlx: return AppColors.primaryBlue
-        case .onnx: return AppColors.primaryPurple
-        case .foundationModels: return .primary
-        default: return AppColors.statusGray
-        }
-    }
-}
-
 // MARK: - Model Required Overlay
 
-/// An overlay that covers the screen when no model is selected, prompting the user to select one
+/// Full-surface first-run state: what this modality does, and the one button
+/// that starts it.
 struct ModelRequiredOverlay: View {
     let modality: ModelSelectionContext
     let onSelectModel: () -> Void
 
-    @State private var circle1Offset: CGFloat = -100
-    @State private var circle2Offset: CGFloat = 100
-    @State private var circle3Offset: CGFloat = 0
-    @State private var haloScale: CGFloat = 0.9
-
-    private var heroGradient: LinearGradient {
-        LinearGradient(
-            colors: [modalityColor, modalityColor.opacity(0.65)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     var body: some View {
-        ZStack {
-            floatingBackground
+        EmptyStateView(
+            systemImage: modality.emptyStateGlyph,
+            title: modality.emptyStateTitle,
+            message: modality.emptyStateMessage,
+            tint: modality.accent
+        ) {
+            VStack(spacing: Space.lg) {
+                Button(action: onSelectModel) {
+                    // The label names the destination. "Get Started" could open
+                    // anything; "Choose a model" says what the tap does, which
+                    // is what makes the button safe to press.
+                    Label(modality.emptyStateActionTitle, systemImage: "square.stack.3d.up")
+                        .frame(maxWidth: 280)
+                }
+                .buttonStyle(RAProminentButtonStyle(radius: Radius.md))
+                .keyboardShortcut(.defaultAction)
 
-            VStack(spacing: 0) {
-                Spacer(minLength: AppSpacing.xLarge)
-
-                heroIcon
-
-                Text(modalityTitle)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .multilineTextAlignment(.center)
-                    .padding(.top, AppSpacing.xLarge)
-
-                Text(modalityDescription)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, AppSpacing.xxxLarge)
-                    .padding(.top, AppSpacing.mediumLarge)
-
-                valuePropRow
-                    .padding(.top, AppSpacing.xLarge)
-
-                Spacer()
-
-                bottomSection
+                privacyNote
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        #if os(iOS)
-        .background(Color(.systemBackground))
-        #else
-        .background(Color(NSColor.windowBackgroundColor))
-        #endif
+        // A real background, not a transparent overlay: this covers the surface
+        // completely, and a see-through empty state over a half-built screen is
+        // how the old build ended up with text on text.
+        .background(AppColors.background)
     }
 
-    private var floatingBackground: some View {
-        ZStack {
-            Circle()
-                .fill(modalityColor.opacity(0.15))
-                .blur(radius: 80)
-                .frame(width: 300, height: 300)
-                .offset(x: circle1Offset, y: -200)
+    /// The one claim worth making on a first run, and the only one this app can
+    /// make that a cloud assistant cannot.
+    private var privacyNote: some View {
+        HStack(spacing: Space.xs) {
+            Image(systemName: "lock.shield")
+                .symbolRenderingMode(.hierarchical)
+                .appType(.caption)
 
-            Circle()
-                .fill(modalityColor.opacity(0.12))
-                .blur(radius: 100)
-                .frame(width: 250, height: 250)
-                .offset(x: circle2Offset, y: 300)
-
-            Circle()
-                .fill(modalityColor.opacity(0.08))
-                .blur(radius: 90)
-                .frame(width: 280, height: 280)
-                .offset(x: -circle3Offset, y: circle3Offset)
+            Text("Runs on this device. Nothing is uploaded.")
+                .appType(.caption)
         }
-        .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
-                circle1Offset = 100
-                circle2Offset = -100
-                circle3Offset = 80
-            }
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                haloScale = 1.12
-            }
-        }
+        .foregroundStyle(AppColors.textTertiary)
     }
+}
 
-    private var heroIcon: some View {
-        ZStack {
-            Circle()
-                .fill(modalityColor.opacity(0.22))
-                .frame(width: 132, height: 132)
-                .blur(radius: 24)
-                .scaleEffect(haloScale)
+// MARK: - Per-modality copy
 
-            Circle()
-                .fill(.ultraThinMaterial)
-                .frame(width: 116, height: 116)
-                .shadow(color: modalityColor.opacity(0.28), radius: 22, x: 0, y: 12)
-
-            Image(systemName: modalityIcon)
-                .font(.system(size: 46, weight: .medium))
-                .foregroundStyle(heroGradient)
-        }
-    }
-
-    private var valuePropRow: some View {
-        HStack(spacing: AppSpacing.smallMedium) {
-            valueChip(icon: "lock.shield.fill", label: "Private")
-            valueChip(icon: "wifi.slash", label: "Offline")
-            valueChip(icon: "bolt.fill", label: "On-device")
-        }
-    }
-
-    private func valueChip(icon: String, label: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-        }
-        .foregroundColor(modalityColor)
-        .padding(.horizontal, AppSpacing.mediumLarge)
-        .padding(.vertical, AppSpacing.smallMedium)
-        .background(Capsule().fill(modalityColor.opacity(0.12)))
-    }
-
-    private var bottomSection: some View {
-        VStack(spacing: AppSpacing.mediumLarge) {
-            Button(action: onSelectModel) {
-                ctaLabel
-                    .foregroundColor(.white)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusCard)
-                            .fill(modalityColor)
-                            .shadow(color: modalityColor.opacity(0.4), radius: 14, x: 0, y: 8)
-                    )
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, AppSpacing.xLarge)
-
-            HStack(spacing: 6) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.caption2)
-                Text("Your data never leaves this device")
-                    .font(.caption)
-            }
-            .foregroundColor(.secondary)
-        }
-        .padding(.bottom, AppSpacing.xxLarge)
-    }
-
-    private var ctaLabel: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-            Text("Get Started")
-        }
-        .font(.headline)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, AppSpacing.large)
-    }
-
-    private var modalityIcon: String {
-        switch modality {
-        case .llm: return "sparkles"
+/// Empty-state vocabulary lives on the context, not in the view, so a new
+/// modality cannot be added without deciding what its first run says.
+private extension ModelSelectionContext {
+    /// One glyph, one meaning, app-wide (DESIGN_GUIDELINE §7): a microphone is
+    /// always capture, a waveform is always audio content, a document is always
+    /// a corpus file.
+    var emptyStateGlyph: String {
+        switch self {
+        case .llm: return "bubble.left.and.bubble.right"
         case .stt: return "waveform"
-        case .tts: return "speaker.wave.2.fill"
+        case .tts: return "speaker.wave.2"
         case .vad: return "waveform.badge.mic"
-        case .voice: return "mic.circle.fill"
+        case .voice: return "mic"
         case .vlm: return "camera.viewfinder"
         case .ragEmbedding: return "doc.text.magnifyingglass"
-        case .ragLLM: return "text.bubble.fill"
+        case .ragLLM: return "text.bubble"
         case .diarization: return "person.2.wave.2"
         case .segmentation: return "square.3.layers.3d.down.right"
         }
     }
 
-    private var modalityColor: Color {
-        switch modality {
-        case .llm: return AppColors.primaryAccent
-        case .stt: return AppColors.statusGreen
-        case .tts: return AppColors.primaryPurple
-        case .vad: return .cyan
-        case .voice: return AppColors.primaryAccent
-        case .vlm: return AppColors.primaryAccent
+    var accent: Color {
+        switch self {
+        case .llm, .voice, .vlm, .ragLLM: return AppColors.brand
+        case .stt, .diarization: return AppColors.statusGreen
+        case .tts, .segmentation: return AppColors.primaryPurple
+        case .vad: return AppColors.primaryBlue
         case .ragEmbedding: return AppColors.primaryBlue
-        case .ragLLM: return AppColors.primaryAccent
-        case .diarization: return AppColors.statusGreen
-        case .segmentation: return AppColors.primaryPurple
         }
     }
 
-    private var modalityTitle: String {
-        switch modality {
-        case .llm: return "Welcome!"
-        case .stt: return "Voice to Text"
-        case .tts: return "Read Aloud"
-        case .vad: return "Voice Activity Detection"
-        case .voice: return "Voice Assistant"
-        case .vlm: return "Live Mode"
-        case .ragEmbedding: return "Embedding Model"
-        case .ragLLM: return "Language Model"
-        case .diarization: return "Speaker Diarization"
-        case .segmentation: return "Image Segmentation"
+    /// Titles name the capability, not the app's excitement about it. "Welcome!"
+    /// told a first-run reader nothing about what the screen would do.
+    var emptyStateTitle: String {
+        switch self {
+        case .llm: return "Start a conversation"
+        case .stt: return "Voice to text"
+        case .tts: return "Read text aloud"
+        case .vad: return "Detect speech"
+        case .voice: return "Talk with your assistant"
+        case .vlm: return "Understand what it sees"
+        case .ragEmbedding: return "Index your documents"
+        case .ragLLM: return "Answer from your documents"
+        case .diarization: return "Identify who spoke"
+        case .segmentation: return "Segment an image"
         }
     }
 
-    private var modalityDescription: String {
-        switch modality {
-        case .llm: return "Choose your AI assistant and start chatting. Everything runs privately on your device."
-        case .stt: return "Transcribe your speech to text with powerful on-device voice recognition."
-        case .tts: return "Have any text read aloud with natural-sounding voices."
-        case .vad: return "Detect speech activity in real-time using on-device voice detection."
-        case .voice: return "Talk naturally with your AI assistant. Let's set up the components together."
-        case .vlm: return "Choose a vision model to understand photos and the live camera."
-        case .ragEmbedding: return "Select an embedding model to convert documents into searchable vectors."
-        case .ragLLM: return "Select a language model to generate answers from your documents."
-        case .diarization: return "Download NVIDIA Sortformer, then record audio to identify who spoke when — fully on-device."
-        case .segmentation: return "Download SegFormer B0, then pick an image to segment classes on-device."
-        }
-    }
-}
-
-// MARK: - Compact Model Indicator (for headers)
-
-/// A compact indicator showing current model status for use in navigation bars
-struct CompactModelIndicator: View {
-    let framework: InferenceFramework?
-    let modelName: String?
-    let isLoading: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 6) {
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                } else if let framework = framework {
-                    Circle()
-                        .fill(frameworkColor(for: framework))
-                        .frame(width: 8, height: 8)
-
-                    Text(modelName ?? framework.displayName)
-                        .font(.caption)
-                        .lineLimit(1)
-                } else {
-                    Image(systemName: "cube")
-                        .font(.caption)
-                    Text("Select Model")
-                        .font(.caption)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(framework != nil ? AppColors.primaryAccent.opacity(0.1) : AppColors.primaryAccent.opacity(0.2))
-            .foregroundColor(AppColors.primaryAccent)
-            .cornerRadius(AppSpacing.cornerRadiusRegular)
+    var emptyStateMessage: String {
+        switch self {
+        case .llm:
+            return "Choose a language model and chat with it. It runs entirely on this device."
+        case .stt:
+            return "Transcribe speech with on-device recognition — no network, no upload."
+        case .tts:
+            return "Turn any text into natural-sounding speech, generated locally."
+        case .vad:
+            return "Find where speech starts and stops in live audio, frame by frame."
+        case .voice:
+            return "A full spoken conversation: it listens, thinks, and replies out loud."
+        case .vlm:
+            return "Point the camera at anything, or pick a photo, and ask about it."
+        case .ragEmbedding:
+            return "An embedding model turns your documents into vectors this app can search."
+        case .ragLLM:
+            return "A language model writes the answers, grounded in the documents you added."
+        case .diarization:
+            return "Separate a recording by speaker and see who said what, on-device."
+        case .segmentation:
+            return "Outline the objects in an image and label them class by class."
         }
     }
 
-    private func frameworkColor(for framework: InferenceFramework) -> Color {
-        switch framework {
-        case .llamaCpp: return AppColors.primaryAccent
-        case .mlx: return AppColors.primaryBlue
-        case .onnx: return AppColors.primaryPurple
-        case .foundationModels: return .primary
-        default: return AppColors.statusGray
+    /// The two-model surfaces say *which* model, because "Choose a model" on the
+    /// RAG screen is ambiguous — it has two slots to fill.
+    var emptyStateActionTitle: String {
+        switch self {
+        case .ragEmbedding: return "Choose an embedding model"
+        case .ragLLM: return "Choose a language model"
+        default: return "Choose a model"
         }
     }
 }
 
 // MARK: - Previews
 
-#Preview("Model Status Banner - Loaded") {
-    VStack(spacing: 20) {
-        ModelStatusBanner(
-            framework: .llamaCpp,
-            modelName: "SmolLM2-135M",
-            isLoading: false
-        ) {}
-
-        ModelStatusBanner(
-            framework: nil,
-            modelName: nil,
-            isLoading: false
-        ) {}
-
-        ModelStatusBanner(
-            framework: .onnx,
-            modelName: "whisper-tiny",
-            isLoading: true
-        ) {}
-    }
-    .padding()
+#Preview("Chat") {
+    ModelRequiredOverlay(modality: .llm) {}
 }
 
-#Preview("Model Required Overlay") {
+#Preview("Speech to text") {
     ModelRequiredOverlay(modality: .stt) {}
+}
+
+#Preview("RAG embedding") {
+    ModelRequiredOverlay(modality: .ragEmbedding) {}
 }

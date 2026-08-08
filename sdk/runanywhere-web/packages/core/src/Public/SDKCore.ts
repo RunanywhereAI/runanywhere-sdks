@@ -18,6 +18,7 @@ import {
 import {
   DownloadFailureReason,
   DownloadState,
+  downloadFailureReasonToJSON,
   type DownloadPlanRequest,
   type DownloadPlanResult,
   type DownloadProgress,
@@ -863,16 +864,104 @@ async function assertBrowserStorageQuota(
 }
 
 /** Map a failed download plan/start/terminal state to a storage or download error. */
-function throwDownloadFailure(feature: string, message: string, reason?: DownloadFailureReason): never {
+function throwDownloadFailure(
+  feature: string,
+  message: string,
+  reason?: DownloadFailureReason,
+  retryable = false,
+): never {
   const storageFailure = reason === DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE
     || /not enough storage|insufficient (browser )?storage|free space/i.test(message);
-  throw SDKException.fromCode(
-    storageFailure
-      ? -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR
-      : -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-    message,
-    feature,
-  );
+  const code = storageFailure
+    ? -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR
+    : -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED;
+  const failure = SDKException.fromCode(code, message, feature);
+  // `retryable` is the honest answer to "would pressing Retry change anything?".
+  // A caller that offers a retry on every download error sends the user back
+  // into an identical failure; the planner already knows which refusals are
+  // permanent, so the error carries that verdict instead of the UI guessing.
+  throw new SDKException({ ...failure.proto, retryable });
+}
+
+/**
+ * Why a download plan refused to start, in words the caller can show, plus
+ * whether a retry could plausibly change the outcome.
+ *
+ * Commons populates `error.message` on most refusals, but not on all of them —
+ * the zero-file branch sets `can_start=false` with no message and no reason, and
+ * a planner that never answered at all leaves no plan to read. Both used to
+ * collapse into "Download plan for '<id>' could not start.", a sentence that
+ * names no cause and no next step, beside a Retry that reproduced it exactly.
+ * Every branch here says what is wrong and whether retrying is pointless.
+ */
+function describePlanRejection(
+  modelId: string,
+  plan: DownloadPlanResult | null,
+): { message: string; reason?: DownloadFailureReason; retryable: boolean } {
+  if (!plan) {
+    return {
+      message: `Could not plan the download for '${modelId}': the registered backend did not answer `
+        + 'the download planner. The engine that owns model storage is missing or failed to load — '
+        + 'reload the page to register it again; retrying the download alone cannot fix this.',
+      retryable: false,
+    };
+  }
+
+  const reason = plan.failureReason;
+  const detail = plan.error?.message?.trim();
+  if (detail) {
+    // Commons wrote a cause; keep its words and only add the retry verdict.
+    return {
+      message: detail,
+      reason,
+      retryable: reason === DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE,
+    };
+  }
+
+  switch (reason) {
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE:
+      return {
+        message: `Not enough browser storage to download '${modelId}'. Free some space — `
+          + 'the Storage screen can delete models you no longer need — then try again.',
+        reason,
+        retryable: true,
+      };
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES:
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED:
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET:
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME:
+      return {
+        message: `A partial download of '${modelId}' left behind bytes that no longer match the file `
+          + 'on the server, so it cannot be resumed. Delete the partial download from the Storage '
+          + 'screen and start it again.',
+        reason,
+        retryable: false,
+      };
+    default:
+      break;
+  }
+
+  if (plan.files.length === 0) {
+    return {
+      // Deliberately not "the catalogue entry is incomplete": the file list is
+      // resolved by the planner from the entry, and either side can be at
+      // fault. Say what is observably true — no files came back — and that a
+      // retry replays the same empty plan.
+      message: `No files were resolved for '${modelId}', so there is nothing to fetch. The file list `
+        + 'is settled before any bytes are requested, so retrying produces the same empty plan. Pick '
+        + 'another model, and report this one if it is listed as downloadable.',
+      reason,
+      retryable: false,
+    };
+  }
+
+  return {
+    message: `The download planner refused '${modelId}' without giving a reason `
+      + `(failure reason ${downloadFailureReasonToJSON(reason)}). This is a bug in the planner rather `
+      + 'than something to retry — please report it with the console log.',
+    reason,
+    retryable: false,
+  };
 }
 
 async function pollDownloadWithRetry(
@@ -1571,10 +1660,12 @@ export const SDKCore = {
     };
     const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
     if (!plan?.canStart) {
+      const rejection = describePlanRejection(request.modelId, plan ?? null);
       throwDownloadFailure(
         'downloadModel',
-        plan?.error?.message || `Download plan for '${request.modelId}' could not start.`,
-        plan?.failureReason,
+        rejection.message,
+        rejection.reason,
+        rejection.retryable,
       );
     }
     await assertBrowserStorageQuota(

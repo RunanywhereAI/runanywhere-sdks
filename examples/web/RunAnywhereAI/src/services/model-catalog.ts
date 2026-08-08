@@ -90,6 +90,14 @@ export interface CatalogFileEntry {
  */
 export enum WebModelCompatibilityCode {
   WASM32_ADDRESS_SPACE = 'wasm32-address-space',
+  /**
+   * The engine package that runs this model failed to register this session, so
+   * the model cannot load no matter how small it is or how much memory the
+   * machine has. Produced by `services/engine-availability.ts`, which owns the
+   * per-engine registration outcome; kept in this enum so every "why this model
+   * is not actionable" reason the UI can render is one closed set.
+   */
+  ENGINE_UNAVAILABLE = 'engine-unavailable',
 }
 
 export type WebModelCompatibility =
@@ -707,6 +715,23 @@ export function registerModelCatalog(): number {
 /** Get the declarative catalog. Safe to call before SDK initialization. */
 export function getCatalog(): readonly CatalogEntry[] {
   return CATALOG;
+}
+
+/**
+ * The catalog entries a single-modality surface deals in.
+ *
+ * A surface must scope its engine-failure question to the models it can
+ * actually offer: Read Aloud has no business reporting that llama.cpp failed,
+ * and Documents has to follow whichever framework its selected embedding model
+ * uses. Categories are the same axis the model sheet already filters on
+ * (`OpenSheetOptions.filterCategories`), so a view passes one list and gets a
+ * consistent picker and notice.
+ */
+export function getCatalogForCategories(
+  categories: readonly ModelCategory[],
+): readonly CatalogEntry[] {
+  if (categories.length === 0) return CATALOG;
+  return CATALOG.filter((entry) => categories.includes(entry.category));
 }
 
 /**

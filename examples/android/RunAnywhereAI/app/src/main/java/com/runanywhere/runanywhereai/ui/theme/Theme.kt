@@ -9,7 +9,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 
 private val LightColorScheme = lightColorScheme(
     primary = Primary60,
-    onPrimary = Neutral99,
+    // Ink, not a near-white: see [OnBrandInk]. Every M3 filled Button, the composer's send
+    // action and the selected filter chips take their foreground from this one token.
+    onPrimary = OnBrandInk,
     primaryContainer = Primary90,
     onPrimaryContainer = Primary20,
     secondary = Secondary40,
@@ -45,7 +47,8 @@ private val LightColorScheme = lightColorScheme(
 )
 private val DarkColorScheme = darkColorScheme(
     primary = BrandOrange,
-    onPrimary = Neutral100,
+    // Ink, not white: see [OnBrandInk].
+    onPrimary = OnBrandInk,
     primaryContainer = Primary30,
     onPrimaryContainer = Primary90,
     secondary = Secondary80,
@@ -85,7 +88,12 @@ fun RunAnywhereAITheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    CompositionLocalProvider(LocalDimens provides CompactDimens) {
+    CompositionLocalProvider(
+        LocalDimens provides CompactDimens,
+        // Read once at the theme root so every animated surface can honour
+        // reduce-motion (DESIGN_GUIDELINE §6.5) without touching a ContentResolver.
+        LocalReduceMotion provides rememberSystemReduceMotion(),
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
             typography = Typography,

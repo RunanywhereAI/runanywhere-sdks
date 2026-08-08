@@ -2,7 +2,7 @@
 //  DocumentService.swift
 //  RunAnywhereAI
 //
-//  Utility for extracting plain text from PDF and JSON files.
+//  Utility for extracting plain text from PDF, JSON, and text files.
 //  Used to prepare document content for RAG ingestion.
 //
 
@@ -14,12 +14,20 @@ import PDFKit
 enum DocumentType {
     case pdf
     case json
+    /// Anything already readable as text: notes, transcripts, source, Markdown.
+    ///
+    /// Added because the composer now accepts dropped and pasted files, and a
+    /// `.md` file is the single most common thing anyone drags onto a chat.
+    /// Refusing it while accepting a PDF of the same notes was arbitrary, and it
+    /// was the one place iOS accepted less than the web app.
+    case plainText
     case unsupported
 
     init(url: URL) {
         switch url.pathExtension.lowercased() {
         case "pdf": self = .pdf
         case "json": self = .json
+        case "txt", "md", "markdown": self = .plainText
         default: self = .unsupported
         }
     }
@@ -36,7 +44,7 @@ enum DocumentServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupportedFormat(let ext):
-            return "Unsupported document format: .\(ext). Only PDF and JSON files are supported."
+            return "Unsupported document format: .\(ext). Attach a PDF, .txt, .md, or .json file."
         case .pdfExtractionFailed:
             return "Failed to extract text from the PDF. The file may be corrupted or image-only."
         case .jsonExtractionFailed(let message):
@@ -52,7 +60,7 @@ enum DocumentServiceError: LocalizedError {
 struct DocumentService {
     /// Extract plain text from a file at the given URL.
     ///
-    /// Supports PDF (via PDFKit) and JSON (via JSONSerialization).
+    /// Supports PDF (via PDFKit), JSON (via JSONSerialization), and plain text.
     /// Calls `startAccessingSecurityScopedResource` for files from UIDocumentPickerViewController.
     ///
     /// - Parameter url: The file URL to extract text from.
@@ -71,6 +79,8 @@ struct DocumentService {
             return try extractPDFText(from: url)
         case .json:
             return try extractJSONText(from: url)
+        case .plainText:
+            return try extractPlainText(from: url)
         case .unsupported:
             throw DocumentServiceError.unsupportedFormat(url.pathExtension)
         }
@@ -102,6 +112,31 @@ struct DocumentService {
         }
 
         return result
+    }
+
+    /// Read a text file, tolerating an encoding that is not UTF-8.
+    ///
+    /// `String(contentsOf:encoding:.utf8)` throws outright on a file saved as
+    /// Latin-1 or UTF-16, which is a common enough export that failing the whole
+    /// attachment over it is the wrong trade. `encoding:` (the sniffing
+    /// overload) is the fallback, and only a file that is genuinely not text
+    /// reaches the error.
+    private static func extractPlainText(from url: URL) throws -> String {
+        let text: String
+        do {
+            text = try String(contentsOf: url, encoding: .utf8)
+        } catch {
+            var detected = String.Encoding.utf8
+            guard let sniffed = try? String(contentsOf: url, usedEncoding: &detected) else {
+                throw DocumentServiceError.fileReadFailed(error.localizedDescription)
+            }
+            text = sniffed
+        }
+
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw DocumentServiceError.fileReadFailed("The file has no readable text.")
+        }
+        return text
     }
 
     private static func extractJSONText(from url: URL) throws -> String {

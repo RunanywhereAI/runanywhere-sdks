@@ -18,6 +18,9 @@ public final class VoiceSession: @unchecked Sendable {
         var micTask: Task<Void, Never>?
         var driver: VoiceAgentMicDriver?
         var isClosed = false
+        /// Subscribers of `events`, so the driver's playout phase can be merged
+        /// into the same stream the core's events arrive on.
+        var subscribers: [UUID: AsyncThrowingStream<VoiceEvent, Error>.Continuation] = [:]
     }
 
     private let handle: CppBridge.VoiceAgentHandle
@@ -38,10 +41,32 @@ public final class VoiceSession: @unchecked Sendable {
     /// Turn-by-turn activity from the pipeline.
     ///
     /// Iterating this does not start audio capture.
+    ///
+    /// Carries two merged sources: the core's own voice events, and the
+    /// `.speaking`/`.listening` phase the mic driver reports around real
+    /// playout. The core cannot supply the latter — it emits `PLAYING_TTS`
+    /// before synthesis and hands the audio back for the platform to play — so
+    /// without the merge a subscriber is told the agent is speaking while the
+    /// speaker is silent, and is never told when it stops.
     public var events: AsyncThrowingStream<VoiceEvent, Error> {
-        AsyncThrowingStream { continuation in
-            let task = Task { [adapter] in
-                for await proto in adapter.stream() {
+        // `adapter.stream()` is what installs the native proto callback, and it
+        // has to run before this getter returns. It used to be called inside the
+        // pump `Task` below, which only *scheduled* the installation: a caller
+        // that reads `session.events` and then immediately calls `start()` could
+        // open the microphone and run an entire turn before the callback
+        // existed, and every event of that turn — transcript, reply, agent
+        // state — was dropped on the floor. Playback survived regardless,
+        // because the mic driver plays the audio the feed call returns inline,
+        // so the panel sat dead while the product talked out loud. Attaching
+        // here makes the subscription a fact by the time `events` is handed back.
+        let protoStream = adapter.stream()
+
+        return AsyncThrowingStream { continuation in
+            let id = UUID()
+            state.withLock { $0.subscribers[id] = continuation }
+
+            let task = Task {
+                for await proto in protoStream {
                     if Task.isCancelled { break }
                     if let event = VoiceEvent.from(proto: proto) {
                         continuation.yield(event)
@@ -49,8 +74,17 @@ public final class VoiceSession: @unchecked Sendable {
                 }
                 continuation.finish()
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
+            continuation.onTermination = { @Sendable [state] _ in
+                state.withLock { $0.subscribers[id] = nil }
+                task.cancel()
+            }
         }
+    }
+
+    /// Fan one locally-observed event out to every `events` subscriber.
+    private func publish(_ event: VoiceEvent) {
+        let continuations = state.withLock { Array($0.subscribers.values) }
+        for continuation in continuations { continuation.yield(event) }
     }
 
     /// Open the microphone and begin the turn-taking loop.
@@ -68,7 +102,9 @@ public final class VoiceSession: @unchecked Sendable {
             }
             guard locked.micTask == nil else { return }
 
-            let driver = VoiceAgentMicDriver(handle: handle)
+            let driver = VoiceAgentMicDriver(handle: handle) { [weak self] phase in
+                self?.publish(.agentStateChanged(phase))
+            }
             locked.driver = driver
             locked.micTask = Task { [logger] in
                 do {

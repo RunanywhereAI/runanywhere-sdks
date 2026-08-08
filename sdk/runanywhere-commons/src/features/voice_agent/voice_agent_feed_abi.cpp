@@ -20,11 +20,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <string>
 #include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
@@ -80,8 +82,15 @@ float frame_rms(const uint8_t* data, size_t bytes) {
 // device's own TTS playout is not folded into the next turn (mirrors the SDK's
 // former discard-pending-chunks behavior). The adaptive noise floor persists
 // across turns; only transient state resets.
+//
+// @p out_speech_started is set when the energy gate opened during this call.
+// That is the moment the core first hears a voice, and it is the whole reason
+// hands-free barge-in was impossible: this function used to answer a frame only
+// with a *completed turn*, seconds later, so an SDK feeding through playout
+// could not learn in time to cut the sentence the user talked over. Reporting
+// the onset separately is what lets it.
 bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, bool is_final,
-                  std::string* out_utterance) {
+                  std::string* out_utterance, bool* out_speech_started) {
     if (data && size > 0) {
         const uint8_t* bytes = static_cast<const uint8_t*>(data);
         s.frame_accum.insert(s.frame_accum.end(), bytes, bytes + size);
@@ -121,6 +130,8 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
                     s.utterance.append(reinterpret_cast<const char*>(buffered.data()),
                                        buffered.size());
                 s.pre_roll.clear();
+                if (out_speech_started)
+                    *out_speech_started = true;
             }
             continue;
         }
@@ -169,6 +180,59 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
         s.frame_accum.clear();
     }
     return completed;
+}
+
+// How long the reply we just handed the SDK will be audible for, in ms.
+//
+// This is what bounds the barge-in window, and the bound is what keeps the
+// signal honest for BOTH driver shapes. A half-duplex driver stops feeding for
+// the duration of playout, so its next onset necessarily lands after this
+// window and is an ordinary new turn. A driver that keeps feeding produces an
+// onset inside the window, and that one really is the user talking over the
+// agent. Without the bound every first utterance after any reply would be
+// reported as a barge-in.
+//
+// The bytes are a canonical WAV this file's own pipeline produced
+// (rac_audio_float32_to_wav), so the fixed header layout is safe to read.
+// Returns 0 for anything that does not match it — an unarmed window reports no
+// barge-in, which is the right way to be wrong.
+int64_t wav_duration_ms(const std::string& wav) {
+    constexpr size_t kHeaderBytes = 44;
+    if (wav.size() < kHeaderBytes)
+        return 0;
+    const auto* bytes = reinterpret_cast<const uint8_t*>(wav.data());
+    auto tag_is = [bytes](size_t offset, const char* tag) {
+        return std::memcmp(bytes + offset, tag, 4) == 0;
+    };
+    if (!tag_is(0, "RIFF") || !tag_is(8, "WAVE") || !tag_is(12, "fmt ") || !tag_is(36, "data"))
+        return 0;
+    auto read_u32 = [bytes](size_t offset) {
+        uint32_t value = 0;
+        std::memcpy(&value, bytes + offset, sizeof(value));
+        return value;
+    };
+    const uint32_t byte_rate = read_u32(28);
+    const uint32_t data_bytes = read_u32(40);
+    if (byte_rate == 0 || data_bytes == 0)
+        return 0;
+    return static_cast<int64_t>(data_bytes) * 1000 / static_cast<int64_t>(byte_rate);
+}
+
+// Tell the SDK the user has started talking over an audible reply. Only the SDK
+// can stop the speaker, and only the core knows a voice arrived, so this event
+// is the whole handshake. It fires on speech ONSET rather than on the closed
+// utterance: waiting for the endpoint (and then a full replacement turn) would
+// arrive seconds after the sentence the user interrupted had finished playing.
+void emit_user_barge_in(rac_voice_agent_handle_t handle) {
+    runanywhere::v1::VoiceEvent event;
+    event.set_timestamp_ms(rac_get_current_time_ms());
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
+    event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
+    auto* interrupted = event.mutable_interrupted();
+    interrupted->set_reason(runanywhere::v1::INTERRUPT_REASON_USER_BARGE_IN);
+    interrupted->set_detail("user started speaking while the reply was playing");
+    rac::voice_agent::detail::emit_generated_voice_event(handle, event);
 }
 
 }  // namespace
@@ -226,12 +290,29 @@ extern "C" rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_
 
     // Segment under the feed lock only; the multi-second turn pipeline runs
     // outside it so a slow turn never blocks buffering of the next frame.
+    // Events are emitted after the lock is released: they run caller callbacks.
     std::string utterance;
     bool have_utterance = false;
+    bool speech_started = false;
+    bool barge_in = false;
     {
         std::lock_guard<std::mutex> seg_lock(handle->feed.mutex);
-        have_utterance =
-            feed_segment(handle->feed, audio_data, audio_size, is_final == RAC_TRUE, &utterance);
+        have_utterance = feed_segment(handle->feed, audio_data, audio_size, is_final == RAC_TRUE,
+                                      &utterance, &speech_started);
+        if (speech_started) {
+            // An onset while the reply is still audible is a barge-in. Reported
+            // once per reply: the window is closed here so the rest of the same
+            // utterance does not repeat it.
+            barge_in = handle->feed.reply_audible_until_ms > rac_get_current_time_ms();
+            handle->feed.reply_audible_until_ms = 0;
+        }
+    }
+
+    if (speech_started) {
+        if (barge_in) {
+            emit_user_barge_in(handle);
+        }
+        emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED);
     }
 
     if (!have_utterance) {
@@ -240,6 +321,7 @@ extern "C" rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_
         runanywhere::v1::VoiceAgentResult empty;
         return copy_proto_message(empty, out_result);
     }
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED);
 
     const std::string turn_id = event_id("turn");
     runanywhere::v1::VoiceAgentResult result;
@@ -249,6 +331,16 @@ extern "C" rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_
         &result);
     if (rc != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_result, rc, "voice turn failed");
+    }
+    // The SDK is about to make this audible. For as long as it is, the agent is
+    // the one talking — which is what turns an onset in that window into a
+    // barge-in rather than an ordinary new turn.
+    if (result.has_synthesized_audio()) {
+        const int64_t audible_ms = wav_duration_ms(result.synthesized_audio());
+        if (audible_ms > 0) {
+            std::lock_guard<std::mutex> seg_lock(handle->feed.mutex);
+            handle->feed.reply_audible_until_ms = rac_get_current_time_ms() + audible_ms;
+        }
     }
     return copy_proto_message(result, out_result);
 #endif

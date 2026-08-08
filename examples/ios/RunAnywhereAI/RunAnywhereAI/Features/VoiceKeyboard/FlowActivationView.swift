@@ -106,11 +106,17 @@ struct FlowActivationView: View {
                 .padding(.bottom, 40)
 
                 // MARK: Animated Phone Illustration
+                // This loop teaches a gesture the user has to perform, so the
+                // motion *is* the instruction — the one category of repeating
+                // animation that carries information. It moves on the emphasis
+                // tier (a demonstrated gesture should be followable, not
+                // flicked) and honours Reduce Motion, where the two frames
+                // crossfade instead of sliding.
                 PhoneIllustrationView(showSecondFrame: showSecondFrame)
                     .frame(width: 180, height: 300)
                     .padding(.bottom, 36)
                     .onReceive(animationTimer) { _ in
-                        withAnimation(.easeInOut(duration: 0.5)) {
+                        withMotion(Motion.emphasisFade) {
                             showSecondFrame.toggle()
                         }
                     }
@@ -218,17 +224,42 @@ private struct PhoneIllustrationView: View {
     }
 }
 
+/// The fingertip in the swipe demonstration.
+///
+/// Part of the instructional loop, so it is allowed to repeat — but on the
+/// canonical 1.6s ambient period rather than its own 0.8s, and driven by a clock
+/// rather than a toggled `@State` so it cannot drift out of step with the phone
+/// frames beside it. Under Reduce Motion it holds at full size and opacity: the
+/// finger still marks where to touch, it just doesn't throb.
 private struct SwipeIndicator: View {
-    @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
+
+    private static let period: Double = 1.6
+    private static let diameter: CGFloat = 22
 
     var body: some View {
+        if reduceMotion {
+            dot(scale: 1.0, opacity: 0.85)
+        } else {
+            TimelineView(.animation) { context in
+                let wave = Self.wave(at: context.date)
+                dot(scale: 0.90 + 0.35 * wave, opacity: 1.0 - 0.5 * wave)
+            }
+        }
+    }
+
+    private func dot(scale: CGFloat, opacity: Double) -> some View {
         Circle()
-            .fill(AppColors.primaryAccent.opacity(0.7))
-            .frame(width: 22, height: 22)
-            .scaleEffect(isAnimating ? 1.25 : 0.9)
-            .opacity(isAnimating ? 0.5 : 1.0)
-            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimating)
-            .onAppear { isAnimating = true }
+            .fill(AppColors.primaryAccent.opacity(opacity))
+            .frame(width: Self.diameter, height: Self.diameter)
+            .scaleEffect(scale)
+    }
+
+    /// A sine, so the turnaround eases instead of kinking at the seam.
+    private static func wave(at date: Date) -> CGFloat {
+        let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
+        return CGFloat((sin(phase * 2 * .pi - .pi / 2) + 1) / 2)
     }
 }
 

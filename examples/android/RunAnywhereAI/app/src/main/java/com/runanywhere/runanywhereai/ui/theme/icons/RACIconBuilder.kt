@@ -13,7 +13,14 @@ import androidx.compose.ui.unit.dp
 // To add one: copy the path data from tabler.io/icons into RACIcons.Outline/Filled.
 
 private const val VIEWPORT_SIZE = 24f
-private const val TABLER_STROKE_WIDTH = 2f
+
+/**
+ * 1.5 on the 24 grid, per `examples/DESIGN_GUIDELINE.md` §7 — the same weight the iOS and
+ * Web apps stroke at, so a glyph reads identically across the three. Tabler ships its paths
+ * drawn for a 2.0 stroke; at 1.5 they sit closer to Material Symbols Rounded 400, which is
+ * what the guideline actually names for Android.
+ */
+private const val ICON_STROKE_WIDTH = 1.5f
 
 internal fun racOutlineIcon(name: String, vararg pathData: String): ImageVector =
     ImageVector.Builder(
@@ -27,7 +34,7 @@ internal fun racOutlineIcon(name: String, vararg pathData: String): ImageVector 
             addPath(
                 pathData = addPathNodes(d),
                 stroke = SolidColor(Color.Black),
-                strokeLineWidth = TABLER_STROKE_WIDTH,
+                strokeLineWidth = ICON_STROKE_WIDTH,
                 strokeLineCap = StrokeCap.Round,
                 strokeLineJoin = StrokeJoin.Round,
             )

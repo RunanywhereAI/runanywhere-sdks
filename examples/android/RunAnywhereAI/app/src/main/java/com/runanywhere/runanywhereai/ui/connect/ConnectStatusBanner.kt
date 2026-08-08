@@ -121,7 +121,9 @@ fun ConnectStatusBanner(
                     }
                     ConnectStatus.CONNECTED -> Unit
                 }
-                IconButton(onClick = { dismissedKey = key }, modifier = Modifier.size(36.dp)) {
+                // 44 dp, not 36: dismissing a banner is a one-shot target with nothing forgiving
+                // about a miss, and it sits directly beside the Connect action.
+                IconButton(onClick = { dismissedKey = key }, modifier = Modifier.size(44.dp)) {
                     Icon(RACIcons.Outline.Close, contentDescription = "Dismiss Connect status")
                 }
             }

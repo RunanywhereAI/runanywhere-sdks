@@ -15,6 +15,8 @@ data class Dimens(
     val iconSm: Dp,
     val iconMd: Dp,
     val iconLg: Dp,
+    /** Diameter of the tinted circle behind an empty-state or hero glyph. */
+    val artCircle: Dp,
     val radiusSm: Dp,
     val radiusMd: Dp,
     val radiusLg: Dp,
@@ -35,6 +37,7 @@ val CompactDimens = Dimens(
     iconSm = 18.dp,
     iconMd = 22.dp,
     iconLg = 28.dp,
+    artCircle = 64.dp,
     radiusSm = 8.dp,
     radiusMd = 12.dp,
     radiusLg = 20.dp,

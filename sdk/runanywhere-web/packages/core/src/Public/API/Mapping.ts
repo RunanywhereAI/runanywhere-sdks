@@ -33,6 +33,7 @@ import type { RAGResult, RAGSearchResult, RAGStatistics } from '@runanywhere/pro
 import type { VLMResult } from '@runanywhere/proto-ts/vlm_options';
 import type { LoraState as ProtoLoraState } from '@runanywhere/proto-ts/lora_options';
 import { Runtime } from '../../Foundation/RuntimeConfig.js';
+import { spokenTranscript } from '../../Foundation/TranscriptText.js';
 import type {
   Backend,
   DiarizationOptions,
@@ -366,10 +367,17 @@ export function toProtoSttOptions(options?: SttOptions): STTOptions {
   };
 }
 
-/** Convert a proto transcription to the public shape. */
+/**
+ * Convert a proto transcription to the public shape.
+ *
+ * `text` goes through `spokenTranscript` so a recording the model heard no
+ * speech in arrives as `''` rather than as Whisper's own `[ Silence ]` marker.
+ * Callers already treat empty text as "nothing was said" and have a real empty
+ * state for it; a marker rendered as a transcript looked like recognised words.
+ */
 export function toTranscription(output: STTOutput): Transcription {
   return {
-    text: output.text,
+    text: spokenTranscript(output.text),
     language: output.language,
     confidence: output.confidence,
     durationMs: output.durationMs,

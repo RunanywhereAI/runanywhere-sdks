@@ -148,6 +148,19 @@ export class SDKException extends Error {
   }
 
   /**
+   * Whether repeating the operation could plausibly succeed.
+   *
+   * The proto has carried this verdict all along, but with no accessor a UI
+   * had to guess — and every download error came back with the same Retry
+   * button, including the ones the planner had already ruled out permanently.
+   * Read it before offering a retry: `false` means the same call will fail the
+   * same way, and the user deserves a different next step.
+   */
+  get retryable(): boolean {
+    return this.proto.retryable ?? false;
+  }
+
+  /**
    * Structured validation field-path accessor.
    *
    * Byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException. Reads the

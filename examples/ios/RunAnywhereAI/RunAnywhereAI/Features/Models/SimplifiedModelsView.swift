@@ -129,6 +129,10 @@ struct SimplifiedModelsView: View {
     private func loadInitialData() async {
         await viewModel.loadModelsFromRegistry()
         await storageViewModel.loadData()
+        // An interrupted download is usually discovered on a later launch, so ask
+        // the SDK which models still have recoverable bytes and label their action
+        // "Resume" rather than "Get".
+        await ModelDownloadTracker.shared.refreshResumable(viewModel.availableModels.map(\.id))
     }
 
     /// Clean search: matches friendly family/variant names + tags only — never

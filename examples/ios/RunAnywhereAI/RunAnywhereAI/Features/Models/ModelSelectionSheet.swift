@@ -471,7 +471,13 @@ struct ModelSelectionSheet: View {
                             Text("Add from Hugging Face")
                                 .font(AppTypography.subheadline.weight(.semibold))
                                 .foregroundColor(AppColors.textPrimary)
-                            Text("Search and download any GGUF model")
+                            // A row's subtitle exists to tell a hesitant reader what is
+                            // behind it, and "GGUF" is the one word that guarantees they
+                            // stop — it names a container format nobody outside the field
+                            // has heard of. The format constraint is real, so it is stated
+                            // inside the search sheet as a consequence, not as this row's
+                            // promise. Android and the web sheet carry the same wording.
+                            Text("Browse thousands of community chat models")
                                 .font(AppTypography.caption)
                                 .foregroundColor(AppColors.textSecondary)
                         }

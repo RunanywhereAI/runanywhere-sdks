@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.ui.screens.models
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -14,14 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
@@ -112,7 +111,7 @@ fun OrgCard(
                         verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
                     ) {
                         if (group.hasNpuVariant) {
-                            ModelPill("NPU", ModelPillColors.Capability, icon = RACIcons.Outline.Cpu)
+                            ModelPill("NPU", ModelPillColors.Capability, icon = RACIcons.Filled.Bolt)
                         }
                         if (readyCount > 0) {
                             ModelPill("$readyCount ready", ModelPillColors.Availability)
@@ -146,10 +145,17 @@ fun OrgCard(
                             isCurrent = state.currentModelId == model.id,
                             isReady = viewModel.isReady(model),
                             isBusy = state.busyModelId == model.id,
-                            progressPercent = if (state.busyModelId == model.id) state.progressPercent else null,
+                            progress = state.downloadProgress.takeIf { state.downloadingModelId == model.id },
+                            interruption = state.interruptionFor(model.id),
                             onSelect = { onSelect(model) },
                             onDownload = { onDownload(model) },
-                            onCancel = { viewModel.cancelDownload(model.id) },
+                            // Only a transfer can be cancelled: offering the control while the row
+                            // is loading would be a button that does nothing.
+                            onCancel = if (state.downloadingModelId == model.id) {
+                                { viewModel.cancelDownload(model.id) }
+                            } else {
+                                null
+                            },
                             onDelete = if (viewModel.isDeletable(model)) ({ onDelete(model) }) else null,
                         )
                         if (index < group.models.lastIndex) {
@@ -174,13 +180,15 @@ private fun OrgModelRow(
     isCurrent: Boolean,
     isReady: Boolean,
     isBusy: Boolean,
-    progressPercent: Int?,
+    progress: DownloadProgressInfo?,
+    interruption: ModelDownloadService.Interrupted?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onCancel: (() -> Unit)? = null,
     onDelete: (() -> Unit)?,
 ) {
     val dimens = LocalDimens.current
+    val interruptionKind = interruption.kind()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -226,19 +234,31 @@ private fun OrgModelRow(
                     )
                 }
             }
-            if (isBusy && progressPercent != null) {
-                Text(
-                    "Downloading… $progressPercent%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Same bar and the same detail line as the flat picker list: an org-grouped row is a
+            // different layout of the same transfer, not a different amount of information.
+            if (progress != null) {
+                DownloadProgressBlock(progress)
+            } else if (!isBusy && interruptionKind != null) {
+                DownloadInterruptionNote(
+                    kind = interruptionKind,
+                    detail = interruption?.message,
+                    kept = interruption?.progress?.keptLabel,
                 )
             }
         }
         Spacer(Modifier.width(dimens.spacingSm))
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-            OrgModelAction(isCurrent, isReady, isBusy, model, onDownload, onCancel)
+            DownloadRowAction(
+                model = model,
+                isCurrent = isCurrent,
+                isReady = isReady,
+                isBusy = isBusy,
+                interruption = interruptionKind,
+                onDownload = onDownload,
+                onCancel = onCancel,
+            )
             if (onDelete != null && isReady) {
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(ROW_TAP_TARGET)) {
                     Icon(
                         imageVector = RACIcons.Outline.Trash,
                         contentDescription = "Delete ${model.name}",
@@ -251,62 +271,3 @@ private fun OrgModelRow(
     }
 }
 
-@Composable
-private fun OrgModelAction(
-    isCurrent: Boolean,
-    isReady: Boolean,
-    isBusy: Boolean,
-    model: RAModelInfo,
-    onDownload: () -> Unit,
-    onCancel: (() -> Unit)? = null,
-) {
-    when {
-        isCurrent -> ModelPill("Loaded", ModelPillColors.Availability)
-        isBusy -> OrgProgressAction(onCancel)
-        isReady -> ModelPill("Use", ModelPillColors.Availability)
-        else -> {
-            val dimens = LocalDimens.current
-            val needsToken = model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
-            TextButton(onClick = onDownload) {
-                Icon(
-                    imageVector = RACIcons.Outline.Download,
-                    contentDescription = null,
-                    modifier = Modifier.size(dimens.iconSm),
-                )
-                Spacer(modifier = Modifier.width(dimens.spacingXs))
-                Text(
-                    text = if (needsToken) "Set token" else "Get",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OrgProgressAction(onCancel: (() -> Unit)?) {
-    if (onCancel == null) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        return
-    }
-    IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Icon(
-                imageVector = RACIcons.Outline.Close,
-                contentDescription = "Cancel download",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(12.dp),
-            )
-        }
-    }
-}

@@ -16,7 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.screens.models.DownloadProgressBlock
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
 import com.runanywhere.runanywhereai.ui.screens.models.sizeLabel
@@ -118,14 +119,26 @@ fun VoiceSetupCard(
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            // The button is disabled while it spins, so its content colour is the
+                            // disabled one — a hardcoded onPrimary put white on grey and the
+                            // spinner all but vanished at the moment it mattered most.
+                            color = LocalContentColor.current,
                         )
                         Spacer(Modifier.size(dimens.spacingSm))
                         Text("Setting up…")
                     } else {
-                        Icon(RACIcons.Outline.Download, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+                        // A download arrow over four components that are already on disk promises a
+                        // fetch that will not happen — all that is left then is loading them into
+                        // memory, which is seconds rather than hundreds of megabytes. Say which of
+                        // the two the tap is about to do.
+                        val fetches = components.any { c -> c.model?.let { !c.viewModel.isReady(it) } == true }
+                        Icon(
+                            imageVector = if (fetches) RACIcons.Outline.Download else RACIcons.Outline.Bolt,
+                            contentDescription = null,
+                            modifier = Modifier.size(dimens.iconSm),
+                        )
                         Spacer(Modifier.size(dimens.spacingSm))
-                        Text("Set up Voice AI")
+                        Text(if (fetches) "Set up Voice AI" else "Load Voice AI")
                     }
                 }
             }
@@ -142,8 +155,12 @@ private fun ComponentRow(component: VoiceComponent, enabled: Boolean, requireLoa
     // DOWNLOADED for the NPU per-turn-swap path (which loads on demand) — otherwise the check lies.
     val ready = model != null &&
         (if (requireLoaded) component.viewModel.isLoaded(model) else component.viewModel.isReady(model))
+    // Distinct from [ready]: staging the next component unloads this one to free RAM, so a model
+    // can be on disk and not resident. Without this the row flipped back to a download glyph
+    // mid-setup and looked like the file it had just fetched had been thrown away.
+    val onDisk = model != null && component.viewModel.isReady(model)
     val busy = model != null && vmState.busyModelId == model.id
-    val progress = if (busy) vmState.progressPercent else null
+    val progress = if (busy) vmState.downloadProgress else null
 
     Column(
         modifier = Modifier
@@ -187,7 +204,7 @@ private fun ComponentRow(component: VoiceComponent, enabled: Boolean, requireLoa
                     }
                 }
             }
-            StatusIndicator(ready = ready, busy = busy)
+            StatusIndicator(ready = ready, onDisk = onDisk, busy = busy)
             if (enabled && model != null) {
                 Text(
                     "Change",
@@ -201,25 +218,23 @@ private fun ComponentRow(component: VoiceComponent, enabled: Boolean, requireLoa
                 )
             }
         }
-        AnimatedVisibility(visible = progress != null) {
-            Column(modifier = Modifier.padding(top = dimens.spacingSm)) {
-                LinearProgressIndicator(
-                    progress = { (progress ?: 0) / 100f },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    "Downloading… ${progress ?: 0}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = dimens.spacingXs),
-                )
-            }
+        // The setup card stages several multi-gigabyte components in sequence, so it needs the same
+        // rate and time-remaining line the picker shows — a bare percentage here reads as stalled.
+        AnimatedVisibility(visible = busy) {
+            DownloadProgressBlock(progress, modifier = Modifier.padding(top = dimens.spacingSm))
         }
     }
 }
 
+/**
+ * Three states, not two.
+ *
+ * "On disk but not resident" is its own thing here — the setup sequence unloads each component to
+ * make room for the next download — and collapsing it into "needs download" put a download arrow
+ * beside a file that was already fetched, which reads as the app having lost it.
+ */
 @Composable
-private fun StatusIndicator(ready: Boolean, busy: Boolean) {
+private fun StatusIndicator(ready: Boolean, onDisk: Boolean, busy: Boolean) {
     val dimens = LocalDimens.current
     when {
         busy -> CircularProgressIndicator(
@@ -231,6 +246,14 @@ private fun StatusIndicator(ready: Boolean, busy: Boolean) {
             RACIcons.Filled.Check,
             contentDescription = "Ready",
             tint = primaryGreen,
+            modifier = Modifier.size(dimens.iconSm),
+        )
+        onDisk -> Icon(
+            // The same tick, in the low-emphasis colour: the file is here, it simply is not the
+            // one currently loaded.
+            RACIcons.Outline.Check,
+            contentDescription = "Downloaded — loads when the pipeline starts",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(dimens.iconSm),
         )
         else -> Icon(
