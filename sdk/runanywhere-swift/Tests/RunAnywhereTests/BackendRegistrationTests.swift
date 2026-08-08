@@ -41,10 +41,12 @@ import ONNXRuntime
 @MainActor
 final class BackendRegistrationTests: XCTestCase {
 
-    /// True when the commons plugin router can resolve a backend for `primitive`
-    /// (i.e. some routable plugin serving it is registered).
-    private func canRoute(_ primitive: rac_primitive_t) -> Bool {
-        rac_plugin_find(primitive) != nil
+    /// True when the *named* engine is registered and routable for `primitive`.
+    /// Uses `rac_plugin_find_for_engine` (not `rac_plugin_find`) so a stale
+    /// plugin left registered by another test can't satisfy the assertion — the
+    /// resolved plugin must actually be the backend under test.
+    private func routes(_ primitive: rac_primitive_t, engine: String) -> Bool {
+        rac_plugin_find_for_engine(primitive, engine) != nil
     }
 
     // MARK: - LlamaCPP (LLM / GENERATE_TEXT)
@@ -59,12 +61,12 @@ final class BackendRegistrationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(afterFirst, baseline, "registration must not shrink the registry")
         XCTAssertEqual(afterFirst, afterSecond, "re-registering llama.cpp must not add a duplicate plugin")
 
-        guard canRoute(RAC_PRIMITIVE_GENERATE_TEXT) else {
+        guard routes(RAC_PRIMITIVE_GENERATE_TEXT, engine: "llamacpp") else {
             throw XCTSkip("llama.cpp LLM not routable in the linked XCFramework; validated by the release build")
         }
         XCTAssertNotNil(
-            rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT),
-            "llama.cpp must serve GENERATE_TEXT once registered"
+            rac_plugin_find_for_engine(RAC_PRIMITIVE_GENERATE_TEXT, "llamacpp"),
+            "the llama.cpp engine must serve GENERATE_TEXT once registered"
         )
     }
 
@@ -79,7 +81,7 @@ final class BackendRegistrationTests: XCTestCase {
 
         // Sherpa speech (STT/TTS/VAD) only routes when RABackendSherpa was built
         // routable (RAC_SHERPA_ROUTABLE=1); the shipped slice may be a stub.
-        if !canRoute(RAC_PRIMITIVE_TRANSCRIBE) {
+        if !routes(RAC_PRIMITIVE_TRANSCRIBE, engine: "sherpa") {
             throw XCTSkip("Sherpa speech not routable in the linked XCFramework; validated by the release build")
         }
     }
@@ -95,20 +97,27 @@ final class BackendRegistrationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(afterFirst, baseline)
         XCTAssertFalse(ANE.version.isEmpty, "ANE module must report a version")
 
-        // Registration + unregistration must be symmetric and crash-free even
-        // when the NeuRT slice is a stub.
+        // Teardown then re-register must be crash-free and keep the registry
+        // consistent (verified via rac_plugin_count before/after each step).
         ANE.unregister()
-        ANE.register() // must be able to re-register after teardown
+        let afterUnregister = rac_plugin_count()
+        XCTAssertLessThanOrEqual(afterUnregister, afterFirst, "unregister must not grow the registry")
+
+        ANE.register()
+        XCTAssertGreaterThanOrEqual(
+            rac_plugin_count(), afterUnregister,
+            "re-registering after teardown must not shrink the registry"
+        )
     }
 
     func testANERoutesDiffusionWhenRoutable() throws {
         ANE.register()
-        guard canRoute(RAC_PRIMITIVE_DIFFUSION) else {
+        guard routes(RAC_PRIMITIVE_DIFFUSION, engine: "neurt") else {
             throw XCTSkip("NeuRT is a stub on the linked binaries; ANE diffusion routing is validated by the routable release build")
         }
         XCTAssertNotNil(
-            rac_plugin_find(RAC_PRIMITIVE_DIFFUSION),
-            "NeuRT must serve DIFFUSION once ANE is registered against routable binaries"
+            rac_plugin_find_for_engine(RAC_PRIMITIVE_DIFFUSION, "neurt"),
+            "the neurt engine must serve DIFFUSION once ANE is registered against routable binaries"
         )
     }
 

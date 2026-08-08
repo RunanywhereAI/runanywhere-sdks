@@ -9,8 +9,8 @@
 //  to `rac_plugin_register(...)` directly.
 //
 
-import CRACommons
 import ANEBackend
+import CRACommons
 import RunAnywhere
 
 // MARK: - ANE Module
@@ -69,10 +69,15 @@ public enum ANE {
             return rac_plugin_register(typedPointer)
         }
 
-        if registerResult == RAC_SUCCESS ||
-           registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
+        if registerResult == RAC_SUCCESS {
+            // This module registered the plugin, so it owns teardown.
             isRegistered = true
             logger.info("NeuRT engine plugin registered (ANE text generation + CoreML diffusion)")
+        } else if registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
+            // Already present (e.g. the commons static bootstrap registered it):
+            // available, but not owned here, so teardown is left to whoever
+            // registered it first. Deliberately do NOT set isRegistered.
+            logger.debug("NeuRT engine plugin already registered; leaving ownership with the existing registrant")
         } else {
             let errorMsg = String(cString: rac_error_message(registerResult))
             logger.error("NeuRT plugin registration failed: \(errorMsg)")
@@ -85,11 +90,19 @@ public enum ANE {
     /// domain as `register(priority:)` and the `autoRegister` Task hop.
     @MainActor
     public static func unregister() {
+        // Only tear down a registration this module owns; if NeuRT was already
+        // registered by the static bootstrap, leave it in place.
         guard isRegistered else { return }
 
-        _ = rac_plugin_unregister("neurt")
-        isRegistered = false
-        logger.info("NeuRT engine plugin unregistered")
+        let result = rac_plugin_unregister("neurt")
+        if result == RAC_SUCCESS {
+            isRegistered = false
+            logger.info("NeuRT engine plugin unregistered")
+        } else {
+            // Keep ownership so a later retry can still tear it down.
+            let errorMsg = String(cString: rac_error_message(result))
+            logger.error("NeuRT plugin unregistration failed: \(errorMsg)")
+        }
     }
 }
 
