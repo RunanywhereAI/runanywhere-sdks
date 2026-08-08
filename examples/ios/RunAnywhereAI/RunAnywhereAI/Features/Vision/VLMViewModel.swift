@@ -62,7 +62,11 @@ enum VLMRunStatus: Equatable {
     case running
     /// Finished with text. `outputTokens == 0` means the backend reported no
     /// counters, not that it emitted nothing — that case is `producedNothing`.
-    case completed(outputTokens: Int, tokensPerSecond: Double)
+    ///
+    /// `tokensPerSecond` is `Float` because `GenerationResult` reports it as one;
+    /// widening it here would have every construction site do a conversion that
+    /// buys the screen nothing.
+    case completed(outputTokens: Int, tokensPerSecond: Float)
     /// Finished cleanly and emitted no text at all.
     case producedNothing
     case cancelled
@@ -113,6 +117,16 @@ final class VLMViewModel: NSObject {
 
     var isAutoStreamingEnabled = false
     static let autoStreamInterval: TimeInterval = 2.5
+
+    /// The interval as a sentence, so the copy on screen and the timer that
+    /// drives it cannot drift apart. `Int(2.5)` reads "every 2 seconds", which is
+    /// a promise the loop does not keep.
+    static var autoStreamIntervalLabel: String {
+        autoStreamInterval == autoStreamInterval.rounded()
+            ? "\(Int(autoStreamInterval)) seconds"
+            : String(format: "%.1f seconds", autoStreamInterval)
+    }
+
     private static let singleShotMaxTokens = 128
     private static let autoStreamMaxTokens = 64
 
@@ -214,12 +228,15 @@ final class VLMViewModel: NSObject {
     /// ends with the way forward, because "load an image" is a real answer here
     /// and "open Settings" is not.
     private static var noCaptureDeviceMessage: String {
+        // "Choose an image", not "load an image" — the button beneath these
+        // sentences says Choose Image, and copy that names a control by a
+        // different word than the control's own label sends the reader hunting.
         #if targetEnvironment(simulator)
-        return "The Simulator has no camera. Load an image instead, or run on a device."
+        return "The Simulator has no camera. Choose an image instead, or run on a device."
         #elseif os(macOS)
-        return "No camera is connected to this Mac. Attach one, or load an image instead."
+        return "No camera is connected to this Mac. Attach one, or choose an image instead."
         #else
-        return "No camera is available on this device. Load an image instead."
+        return "No camera is available on this device. Choose an image instead."
         #endif
     }
 
@@ -312,6 +329,21 @@ final class VLMViewModel: NSObject {
         }
         session.addOutput(output)
 
+        #if os(iOS)
+        // Rotate the *frames* the way the preview layer already rotates itself.
+        //
+        // `AVCaptureVideoPreviewLayer` defaults to portrait, but a video data
+        // output hands back the sensor's native landscape buffer — so on a
+        // portrait phone the user saw an upright scene while the model was asked
+        // about a picture lying on its side. Rotating text 90° is exactly the
+        // input a VLM cannot read, which made "read this sign" fail for reasons
+        // nothing on screen explained.
+        if let connection = output.connection(with: .video),
+           connection.isVideoRotationAngleSupported(90) {
+            connection.videoRotationAngle = 90
+        }
+        #endif
+
         captureSession = session
         cameraStatus = .ready
         return true
@@ -329,7 +361,7 @@ final class VLMViewModel: NSObject {
         DispatchQueue.global(qos: .userInitiated).async { session.stopRunning() }
     }
 
-    fileprivate func receive(frame: CVPixelBuffer) {
+    private func receive(frame: CVPixelBuffer) {
         currentFrame = frame
         // Written through a guard so the property only changes once per session;
         // assigning `true` on every frame would notify observers 30 times a
@@ -349,6 +381,10 @@ final class VLMViewModel: NSObject {
         // re-describing a photo that never changes.
         isAutoStreamingEnabled = false
         cancel()
+        // And the camera stops. Nothing is showing its preview any more, so a
+        // running session only drains the battery and holds the platform's
+        // camera-in-use indicator on over a screen that is displaying a photo.
+        stopCamera()
         pickedImage = VLMPickedImage(
             filename: attachment.filename,
             input: attachment.image,
@@ -359,10 +395,14 @@ final class VLMViewModel: NSObject {
     }
 
     /// Hand the camera back the subject.
-    func clearPickedImage() {
+    ///
+    /// Restarts the session `usePickedImage` stopped — the caller does not have
+    /// to remember that the picked-image path turned it off.
+    func clearPickedImage() async {
         pickedImage = nil
         currentDescription = ""
         runStatus = .idle
+        await startCameraIfPossible()
     }
 
     private static func previewImage(from data: Data) -> Image? {
@@ -377,10 +417,17 @@ final class VLMViewModel: NSObject {
 
     // MARK: - Asking
 
+    /// True when there is a picture for a question to be about.
+    ///
+    /// Separate from `canAsk` because the Live toggle needs the same fact while a
+    /// run is in flight, and `canAsk` is false then.
+    var hasSubject: Bool {
+        pickedImage != nil || hasCameraFrame
+    }
+
     /// True when the Ask control can do what its label promises.
     var canAsk: Bool {
-        guard isModelLoaded, !isProcessing else { return false }
-        return pickedImage != nil || hasCameraFrame
+        isModelLoaded && !isProcessing && hasSubject
     }
 
     /// Ask one question about the current subject.
@@ -415,7 +462,14 @@ final class VLMViewModel: NSObject {
     /// kept generating into a view nobody was watching.
     func runAutoStreamLoop() async {
         while !Task.isCancelled {
-            await run(maxTokens: Self.autoStreamMaxTokens, clearOnFirstToken: true)
+            // Skip the turn rather than run one that can only fail. Live can be
+            // switched on in the beat before the first frame lands, and it stays
+            // on if the camera is later stopped — both would otherwise post
+            // "there's nothing to look at" every 2.5 seconds as if the model had
+            // failed.
+            if hasSubject {
+                await run(maxTokens: Self.autoStreamMaxTokens, clearOnFirstToken: true)
+            }
             if Task.isCancelled { return }
             try? await Task.sleep(nanoseconds: UInt64(Self.autoStreamInterval * 1_000_000_000))
         }
@@ -467,47 +521,12 @@ final class VLMViewModel: NSObject {
             var sawTerminal = false
 
             for try await event in stream {
-                switch event {
-                case .textDelta(_, _, _, _, let text):
-                    guard !text.isEmpty else { continue }
-                    if isFirstToken {
-                        isFirstToken = false
-                        if clearOnFirstToken { currentDescription = "" }
-                    }
-                    currentDescription += text
-
-                case .completed(_, let result):
-                    sawTerminal = true
-                    if currentDescription.isEmpty, !result.text.isEmpty {
-                        currentDescription = result.text
-                    }
-                    runStatus = currentDescription.isEmpty
-                        ? .producedNothing
-                        : .completed(
-                            outputTokens: result.outputTokens,
-                            tokensPerSecond: result.tokensPerSecond
-                        )
-                    logger.info(
-                        "VLM run completed: \(result.outputTokens) tokens, \(result.tokensPerSecond) tok/s"
-                    )
-
-                case .failed(_, _, let error):
-                    // `vlm.generateStream` reports failure as an *event*, not by
-                    // throwing (same grammar as `llm.generateStream`). Without
-                    // this branch a run that died mid-answer was indistinguishable
-                    // from one that simply finished early, and the screen said
-                    // nothing at all.
-                    sawTerminal = true
-                    runStatus = .failed(error.localizedDescription)
-                    logger.error("VLM run failed: \(error.localizedDescription)")
-
-                case .cancelled:
-                    sawTerminal = true
-                    runStatus = .cancelled
-
-                default:
-                    break
-                }
+                let isTerminal = apply(
+                    event,
+                    isFirstToken: &isFirstToken,
+                    clearOnFirstToken: clearOnFirstToken
+                )
+                sawTerminal = sawTerminal || isTerminal
             }
 
             if !sawTerminal {
@@ -518,6 +537,57 @@ final class VLMViewModel: NSObject {
         } catch {
             runStatus = .failed(error.localizedDescription)
             logger.error("VLM run failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Fold one stream event into the screen's state. Returns true when the event
+    /// was a terminal one, so the caller knows the stream said how it ended
+    /// rather than merely stopping.
+    private func apply(
+        _ event: GenerationEvent,
+        isFirstToken: inout Bool,
+        clearOnFirstToken: Bool
+    ) -> Bool {
+        switch event {
+        case .textDelta(_, _, _, _, let text):
+            guard !text.isEmpty else { return false }
+            if isFirstToken {
+                isFirstToken = false
+                if clearOnFirstToken { currentDescription = "" }
+            }
+            currentDescription += text
+            return false
+
+        case .completed(_, let result):
+            if currentDescription.isEmpty, !result.text.isEmpty {
+                currentDescription = result.text
+            }
+            runStatus = currentDescription.isEmpty
+                ? .producedNothing
+                : .completed(
+                    outputTokens: result.outputTokens,
+                    tokensPerSecond: result.tokensPerSecond
+                )
+            logger.info(
+                "VLM run completed: \(result.outputTokens) tokens, \(result.tokensPerSecond) tok/s"
+            )
+            return true
+
+        case .failed(_, _, let error):
+            // `vlm.generateStream` reports failure as an *event*, not by throwing
+            // (same grammar as `llm.generateStream`). Without this branch a run
+            // that died mid-answer was indistinguishable from one that simply
+            // finished early, and the screen said nothing at all.
+            runStatus = .failed(error.localizedDescription)
+            logger.error("VLM run failed: \(error.localizedDescription)")
+            return true
+
+        case .cancelled:
+            runStatus = .cancelled
+            return true
+
+        default:
+            return false
         }
     }
 

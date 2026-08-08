@@ -66,6 +66,9 @@ const DOCS_CATEGORIES: readonly ModelCategory[] = [
  */
 const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.json'] as const;
 
+/** Matches the chat composer's document limit, so one app has one answer. */
+const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
+
 /**
  * Why a corpus session could not be opened.
  *
@@ -247,6 +250,9 @@ function refreshEngineNotice(): void {
   host.innerHTML = renderEngineNotice(notice);
   wireEngineNotice(host, notice);
   setControlsBlocked(isEngineBlocked(notice));
+  // Ask is the one control with a second reason to be disabled (an answer is in
+  // flight), so its state is owned in one place rather than split across two.
+  refreshAskButton();
 }
 
 /** True when an engine failure means nothing on this tab can succeed. */
@@ -262,7 +268,7 @@ function enginesBlocked(): boolean {
  * and silently discards it.
  */
 function setControlsBlocked(blocked: boolean): void {
-  const ids = ['#docs-dropzone', '#docs-clear-btn', '#docs-ask-btn'] as const;
+  const ids = ['#docs-dropzone', '#docs-clear-btn'] as const;
   for (const id of ids) {
     const el = container.querySelector<HTMLButtonElement>(id);
     if (el) el.disabled = blocked;
@@ -474,6 +480,17 @@ async function ingestFiles(files: File[]): Promise<void> {
     return;
   }
 
+  // Chunking and embedding happen on the main thread, so an accidental
+  // multi-hundred-megabyte log file would freeze the tab with no way back.
+  const oversized = supported.filter((file) => file.size > MAX_DOCUMENT_BYTES);
+  if (oversized.length > 0) {
+    setStatus(
+      `${describeFileList(oversized)} is over ${formatMegabytes(MAX_DOCUMENT_BYTES)} — indexing that much text in the browser would lock up this tab.`,
+      'error',
+    );
+    return;
+  }
+
   isBusy = true;
   try {
     const outcome = await ensureRAGSession();
@@ -584,6 +601,18 @@ async function ingestPastedText(text: string): Promise<void> {
 
 async function clearAllDocs(): Promise<void> {
   if (isBusy) return;
+  // Clearing nothing must not open a session. `ensureRAGSession` loads both
+  // models into memory, so pressing "Clear all" on an empty index used to be the
+  // most expensive button on the tab — and it reported a pipeline error when the
+  // models were not downloaded, for an index that was already empty.
+  if (!ragSession) {
+    ingestedDocuments.length = 0;
+    pastedNoteCount = 0;
+    await renderDocList();
+    renderIdleAnswer();
+    setStatus('Nothing is indexed yet.');
+    return;
+  }
   isBusy = true;
   try {
     const outcome = await ensureRAGSession();
@@ -607,7 +636,29 @@ async function clearAllDocs(): Promise<void> {
 // Query
 // ---------------------------------------------------------------------------
 
+/** Stops the in-flight answer; `null` when nothing is being answered. */
+let cancelAnswer: (() => void) | null = null;
+
+/**
+ * Reflect the ask state on the one control that starts and stops it.
+ *
+ * A silent early `return` on a second click was indistinguishable from a dead
+ * button, and there was no way at all to abandon a long answer.
+ */
+function refreshAskButton(): void {
+  const btn = container.querySelector<HTMLButtonElement>('#docs-ask-btn');
+  if (!btn) return;
+  const answering = cancelAnswer !== null;
+  btn.textContent = answering ? 'Stop' : 'Ask';
+  btn.disabled = enginesBlocked() || (isBusy && !answering);
+  btn.title = answering ? 'Stop writing this answer' : 'Answer from the indexed files';
+}
+
 async function askQuestion(): Promise<void> {
+  if (cancelAnswer) {
+    cancelAnswer();
+    return;
+  }
   if (isBusy) return;
   const queryEl = container.querySelector('#docs-query') as HTMLTextAreaElement;
   const question = queryEl.value.trim();
@@ -620,17 +671,16 @@ async function askQuestion(): Promise<void> {
   }
 
   isBusy = true;
-  setAnswerText('Searching...');
+  refreshAskButton();
+  setAnswerText('Looking through the indexed files…');
   try {
     const outcome = await ensureRAGSession();
     if (!outcome.ok) {
-      // The failure already said what went wrong, in the ingest section's status
-      // line. Point at it rather than restating it here in different words —
-      // this is where the false "select models first" used to appear beside the
-      // real error, with both selects visibly populated.
-      setAnswerText(outcome.reason === 'open-failed'
-        ? `${outcome.message} Fix that above, then ask again.`
-        : outcome.message);
+      // The failure already said what went wrong, and now says what to do about
+      // it, so it is repeated verbatim rather than paraphrased — this is where
+      // the false "select models first" used to appear beside the real error,
+      // with both selects visibly populated.
+      setAnswerText(outcome.message);
       return;
     }
     const session = outcome.session;
@@ -641,23 +691,64 @@ async function askQuestion(): Promise<void> {
 
     const suppressThinking = selectedLlmSupportsThinking()
       && !getGenerationSettings().thinkingModeEnabled;
-    const result = await session.query(question, {
+    // Streamed rather than one-shot, for the reason iOS moved
+    // (LLMViewModel+Documents.swift:72-77): the v4 pipeline can resolve the
+    // one-shot `query` with an empty answer, and a reader watching "Searching…"
+    // for thirty seconds cannot tell a working pipeline from a stuck one.
+    const events = session.queryStream(question, {
       generation: {
         maxOutputTokens: 512,
         temperature: 0.4,
         reasoning: suppressThinking ? { mode: 'off' } : { mode: 'on', includeInOutput: true },
       },
     });
+    const iterator = events[Symbol.asyncIterator]();
+    let stopped = false;
+    cancelAnswer = () => {
+      stopped = true;
+      void iterator.return?.();
+    };
+    refreshAskButton();
 
-    if (result.sources.length === 0) {
-      setAnswerText('No relevant chunks found.');
+    let answer = '';
+    let sources: Match[] = [];
+    for (let step = await iterator.next(); !step.done; step = await iterator.next()) {
+      const event = step.value;
+      if (event.type === 'retrieved') {
+        sources = event.matches;
+        // Citations are known before the first token, so show them immediately:
+        // the passages are the evidence, and seeing them arrive is what makes
+        // the wait for the sentence legible.
+        setAnswerHtml(formatAnswer(answer, sources));
+      } else if (event.type === 'textDelta') {
+        answer += event.text;
+        setAnswerHtml(formatAnswer(answer, sources));
+      } else if (event.type === 'completed') {
+        answer = event.result.answer || answer;
+        if (event.result.sources.length > 0) sources = event.result.sources;
+        setAnswerHtml(formatAnswer(answer, sources));
+      } else if (event.type === 'failed') {
+        throw new Error(event.error.message || 'The answer could not be generated.');
+      }
+    }
+
+    if (sources.length === 0) {
+      setAnswerText('Nothing in the indexed files matched that question.');
       return;
     }
-    setAnswerHtml(formatAnswer(result.answer, result.sources));
+    if (!answer.trim()) {
+      setAnswerText(stopped
+        ? 'Stopped before the answer started.'
+        : 'The passages above matched, but the model did not write an answer. Try rephrasing the question.');
+      return;
+    }
+    setAnswerHtml(formatAnswer(answer, sources));
   } catch (err) {
     setAnswerText(`Failed: ${formatError(err)}`);
   } finally {
+    cancelAnswer = null;
     isBusy = false;
+    refreshAskButton();
   }
 }
 
@@ -757,8 +848,13 @@ function setAnswerHtml(html: string): void {
 }
 
 /**
- * Open (or reuse) the corpus session for the selected model pair. `rag.open`
- * loads and downloads both models itself, so nothing is pre-staged here.
+ * Open (or reuse) the corpus session for the selected model pair.
+ *
+ * `rag.open` validates that both models are already on disk and throws when
+ * either is not — it does not fetch them. That is what the two Download buttons
+ * above the pickers are for, and why a not-downloaded failure is translated into
+ * a sentence pointing at them rather than passed through as
+ * "…set validate_availability", which names a flag no user can set.
  */
 async function ensureRAGSession(): Promise<SessionOutcome> {
   // Belt and braces alongside the disabled controls: paste-to-index listens on
@@ -791,10 +887,27 @@ async function ensureRAGSession(): Promise<SessionOutcome> {
     await closeRAGSession();
     // Report the actual failure. This used to be paraphrased by the caller as
     // "select models first" — advice the user had already followed.
-    const message = `Couldn't start the document pipeline: ${formatError(err)}`;
+    const message = describeOpenFailure(err);
     setStatus(message, 'error');
     return { ok: false, reason: 'open-failed', message };
   }
+}
+
+/**
+ * The one failure worth rewriting: a model that is registered but not on disk.
+ *
+ * `rag.open` reports it as "Embedding model 'x': model is not downloaded —
+ * download it first or set validate_availability". The second half is an
+ * instruction to a caller, not to a reader, and the first half does not mention
+ * the Download button sitting a few pixels above.
+ */
+function describeOpenFailure(err: unknown): string {
+  const detail = formatError(err);
+  if (/not downloaded/i.test(detail)) {
+    const which = /embedding/i.test(detail) ? 'indexing' : 'answering';
+    return `The ${which} model isn't on this device yet. Press Download next to it above, then try again.`;
+  }
+  return `Couldn't start the document pipeline: ${detail}`;
 }
 
 async function closeRAGSession(): Promise<void> {
@@ -847,6 +960,10 @@ function formatAnswer(text: string, sources: Match[]): string {
   // over in Chat. `renderMarkdown` escapes every span itself.
   return `${thinkingHtml}<div class="docs-answer-text">${renderMarkdown(split.answer)}</div>`
     + `<div class="docs-sources">${sourcesHtml}</div>`;
+}
+
+function formatMegabytes(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
 function createDocumentId(): string {

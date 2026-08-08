@@ -46,11 +46,25 @@ struct VoiceAISetupCard: View {
                 .foregroundColor(AppColors.primaryAccent)
             Text("Voice AI")
                 .font(AppTypography.title2Semibold)
-            Text("We picked the best voice setup for your device. Get it ready in one tap.")
+            Text(headerSubtitle)
                 .font(AppTypography.subheadline)
                 .foregroundColor(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
         }
+    }
+
+    /// This card is also the Talk screen's Models sheet, which can be opened
+    /// mid-conversation. It was written for the pre-setup state only, so during
+    /// a live session it invited the user to "get it ready in one tap" while the
+    /// status pill behind it read "Listening" — telling them to start something
+    /// that was already running. The copy branches on the session, not just on
+    /// which models happen to be resident.
+    private var headerSubtitle: String {
+        if viewModel.isActive {
+            return "This conversation is live. Change a component below to swap it for the next one."
+        }
+        return "We picked the best voice setup for your device. "
+            + "Get it ready in one \(VoiceAgentViewModel.pressVerb.lowercased())."
     }
 
     // MARK: - Component card
@@ -68,6 +82,7 @@ struct VoiceAISetupCard: View {
             componentRow(component: .init(
                 title: "Speech-to-text",
                 subtitle: "Turns your voice into text",
+                spokenSlot: "speech-to-text",
                 icon: RAModelCategory.speechRecognition.consumerCapabilityIcon,
                 color: AppColors.statusGreen,
                 name: viewModel.sttModel?.name.modelNameFromID(),
@@ -78,6 +93,7 @@ struct VoiceAISetupCard: View {
             componentRow(component: .init(
                 title: "Chat model",
                 subtitle: "Understands and replies",
+                spokenSlot: "chat",
                 icon: RAModelCategory.language.consumerCapabilityIcon,
                 color: AppColors.primaryAccent,
                 name: viewModel.llmModel?.name.modelNameFromID(),
@@ -88,6 +104,7 @@ struct VoiceAISetupCard: View {
             componentRow(component: .init(
                 title: "Text-to-speech",
                 subtitle: "Speaks replies aloud",
+                spokenSlot: "text-to-speech",
                 icon: RAModelCategory.speechSynthesis.consumerCapabilityIcon,
                 color: AppColors.primaryPurple,
                 name: viewModel.ttsModel?.name.modelNameFromID(),
@@ -109,6 +126,11 @@ struct VoiceAISetupCard: View {
     private struct Component {
         let title: String
         let subtitle: String
+        /// What the row's controls call this slot when they are read aloud.
+        /// Separate from `title` because the announcement is a phrase, not a
+        /// heading: composing it from the title produced "Change chat model
+        /// model" for the row headed "Chat model".
+        let spokenSlot: String
         let icon: String
         let color: Color
         let name: String?
@@ -138,6 +160,7 @@ struct VoiceAISetupCard: View {
             Spacer(minLength: 0)
 
             statusView(
+                slot: component.spokenSlot,
                 state: component.state,
                 progress: component.progress,
                 hasSelection: component.name != nil,
@@ -149,6 +172,7 @@ struct VoiceAISetupCard: View {
 
     @ViewBuilder
     private func statusView(
+        slot: String,
         state: ModelLoadState,
         progress: Double,
         hasSelection: Bool,
@@ -159,7 +183,8 @@ struct VoiceAISetupCard: View {
             HStack(spacing: AppSpacing.xxSmall) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(AppColors.statusGreen)
-                changeButton(onChange)
+                    .accessibilityLabel("Ready")
+                changeButton(slot: slot, onChange)
             }
         case .loading:
             progressBadge(progress)
@@ -167,13 +192,14 @@ struct VoiceAISetupCard: View {
             HStack(spacing: AppSpacing.xxSmall) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(AppColors.statusOrange)
-                changeButton(onChange)
+                    .accessibilityLabel("Failed")
+                changeButton(slot: slot, onChange)
             }
         case .notLoaded:
             if viewModel.isSettingUpPipeline, progress > 0, progress < 1 {
                 progressBadge(progress)
             } else if hasSelection {
-                changeButton(onChange)
+                changeButton(slot: slot, onChange)
             } else {
                 Button("Choose", action: onChange)
                     .font(AppTypography.caption)
@@ -181,6 +207,7 @@ struct VoiceAISetupCard: View {
                     .buttonStyle(.bordered)
                     .tint(AppColors.primaryAccent)
                     .controlSize(.small)
+                    .accessibilityLabel("Choose \(slot) model")
             }
         }
     }
@@ -196,13 +223,36 @@ struct VoiceAISetupCard: View {
         }
     }
 
-    private func changeButton(_ onChange: @escaping () -> Void) -> some View {
-        Button("Change", action: onChange)
-            .font(AppTypography.caption)
-            .foregroundColor(AppColors.primaryAccent)
-            .buttonStyle(.plain)
-            .disabled(viewModel.isSettingUpPipeline)
+    /// The only way to override a pipeline slot.
+    ///
+    /// It was `Button("Change").buttonStyle(.plain)` with caption typography and
+    /// no padding, so the hit area was the glyph box — the Mac's accessibility
+    /// tree measured all three at 37x13 pt, roughly half the 24 pt minimum and a
+    /// third of the 44 pt a pointer needs. The padding below is what the target
+    /// is made of, and `contentShape` makes the padded rect hit-test rather than
+    /// just the text.
+    private func changeButton(slot: String, _ onChange: @escaping () -> Void) -> some View {
+        Button(action: onChange) {
+            Text("Change")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.primaryAccent)
+                .padding(.horizontal, AppSpacing.smallMedium)
+                // The padding lives inside the label on purpose: a Button
+                // hit-tests its label, so padding applied outside the Button
+                // would have moved the button without growing its target.
+                .frame(minWidth: Self.minimumHitTarget, minHeight: Self.minimumHitTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // Three identically-titled buttons in one card; the slot is the only
+        // thing that tells them apart.
+        .accessibilityLabel("Change \(slot) model")
+        .disabled(viewModel.isSettingUpPipeline)
     }
+
+    /// 44 pt: the coarse-pointer minimum, which also satisfies the 24 pt floor.
+    /// Both platforms get it — a trackpad is a coarse pointer too.
+    private static let minimumHitTarget: CGFloat = 44
 
     private var vadRow: some View {
         HStack(spacing: AppSpacing.mediumLarge) {
@@ -234,36 +284,61 @@ struct VoiceAISetupCard: View {
 
     // MARK: - Primary action
 
-    @ViewBuilder
-    private var primaryAction: some View {
+    /// The one primary action, and — while it runs — a way out of it.
+    ///
+    /// The running state used to be a lone `ProgressView` with no step text
+    /// (`pipelineSetupStatus` was only set after the first step began), no
+    /// per-component percentage and nothing to press. A first attempt that
+    /// stalled sat like that for eleven measured minutes with no way to retry or
+    /// abandon it. Every branch below now names what is happening and, while
+    /// work is in flight, offers Cancel.
+    @ViewBuilder private var primaryAction: some View {
         if viewModel.isSettingUpPipeline {
             VStack(spacing: AppSpacing.smallMedium) {
                 ProgressView()
-                if let status = viewModel.pipelineSetupStatus {
-                    Text(status)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
+                Text(viewModel.pipelineSetupStatus ?? "Getting started…")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                Button("Cancel") { viewModel.cancelPipelineSetup() }
+                    .font(AppTypography.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityLabel("Cancel Voice AI setup")
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, AppSpacing.large)
         } else if viewModel.allModelsLoaded {
             readyBadge
         } else {
-            Button {
-                Task { await viewModel.downloadAndLoadAll() }
-            } label: {
-                HStack(spacing: AppSpacing.smallMedium) {
-                    Image(systemName: "arrow.down.circle.fill")
-                    Text("Set up Voice AI")
+            VStack(spacing: AppSpacing.smallMedium) {
+                if viewModel.didCancelSetup {
+                    // A cancelled setup is neither a failure nor an untouched
+                    // card, and saying so is what tells the user their press
+                    // registered and that resuming will not start over.
+                    Text("Setup cancelled. What already downloaded is kept.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
-                .font(AppTypography.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, AppSpacing.large)
+                Button {
+                    viewModel.startPipelineSetup()
+                } label: {
+                    HStack(spacing: AppSpacing.smallMedium) {
+                        Image(systemName: "arrow.down.circle.fill")
+                        Text(viewModel.didCancelSetup ? "Resume setup" : "Set up Voice AI")
+                    }
+                    .font(AppTypography.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppSpacing.large)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppColors.primaryAccent)
+                .disabled(!canSetup)
+                .accessibilityLabel(viewModel.didCancelSetup
+                    ? "Resume Voice AI setup"
+                    : "Set up Voice AI")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.primaryAccent)
-            .disabled(!canSetup)
         }
     }
 
@@ -271,12 +346,18 @@ struct VoiceAISetupCard: View {
         HStack(spacing: AppSpacing.smallMedium) {
             Image(systemName: "checkmark.seal.fill")
                 .foregroundColor(AppColors.statusGreen)
-            Text("Ready — \(VoiceAgentViewModel.pressVerb.lowercased()) the mic to talk")
+            // A live session is not "ready to start" — it is running. Same
+            // reason as `headerSubtitle`: this card doubles as the mid-session
+            // Models sheet.
+            Text(viewModel.isActive
+                 ? "Conversation running"
+                 : "Ready — \(VoiceAgentViewModel.pressVerb.lowercased()) the mic to talk")
                 .font(AppTypography.subheadlineSemibold)
                 .foregroundColor(AppColors.statusGreen)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppSpacing.large)
+        .accessibilityElement(children: .combine)
     }
 
     private var canSetup: Bool {

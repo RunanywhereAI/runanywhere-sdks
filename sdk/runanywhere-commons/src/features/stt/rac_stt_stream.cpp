@@ -73,6 +73,60 @@ enum class SessionTermination {
     kCancel,
 };
 
+// ---------------------------------------------------------------------------
+// Fallback endpointing for one-shot engines (Whisper via Sherpa, QHexRT).
+//
+// These backends leave the persistent stream_* slots unimplemented, so commons
+// has to decide for itself when the speaker has finished a phrase and hand the
+// recognizer one whole utterance. Two properties matter, and getting either
+// wrong looks identical from the app: the transcript is empty or reads as an
+// engine marker rather than words.
+//
+//   - The clock has to be in real time. Every duration below is milliseconds of
+//     the caller's audio, derived from the session's sample rate. Every SDK
+//     resamples its capture to 16 kHz today, but a component configured for a
+//     different rate would otherwise clock every threshold here by the ratio
+//     between the two — closing utterances mid-word and handing the recognizer
+//     fragments too short to be words.
+//   - The clip handed over has to keep the whole phrase in it — the onset that
+//     preceded the energy gate opening, and the trailing silence. A recognizer
+//     given a mid-word fragment answers with a marker, not with words.
+//
+// KNOWN WEAKNESS, deliberately left alone here: the speech test below is a
+// fixed absolute RMS, and a fixed threshold is wrong in both directions. Under a
+// quiet capture the gate never opens and the speaker's words are dropped with no
+// explanation. Under a room whose ambient already exceeds it, nothing ever reads
+// as silence, so the endpoint only fires at kFallbackMaxUtteranceMs and the
+// recognizer is handed fifteen seconds of noise — which comes back as the
+// non-speech marker the app then has to render.
+//
+// The fix is an adaptive ambient floor, and the shape is already established in
+// this codebase twice: the voice-agent segmenter in voice_agent_feed_abi.cpp
+// (absolute floor OR ambient x multiplier, adapted only between utterances) and
+// the energy VAD's explicit calibration phase in features/vad/energy_vad.cpp.
+// Neither transplants cleanly. The voice-agent shape cannot raise its floor once
+// the gate has latched, so seeded low it never recovers in the noisy case that
+// needs it most; the energy-VAD shape spends its calibration frames before the
+// gate may open, which drops a phrase from a caller who is already speaking when
+// the stream starts. Choosing between them needs measurement against real
+// captures — quiet, noisy, and speaking-from-the-first-frame — not a guess.
+// ---------------------------------------------------------------------------
+constexpr int kFallbackFrameMs = 100;
+// Speech evidence required before a closed window is worth an inference.
+constexpr int kFallbackMinSpeechMs = 300;
+constexpr int kFallbackEndSilenceMs = 800;
+constexpr int kFallbackMaxUtteranceMs = 15000;
+// Bounds on a caller-supplied STTOptions.silence_duration_ms. Below ~200 ms an
+// inter-word pause closes the utterance; above the max cap the endpoint would
+// never fire before the duration cap does.
+constexpr int kFallbackMinEndSilenceMs = 200;
+constexpr int kFallbackMaxEndSilenceMs = 5000;
+// See the KNOWN WEAKNESS note above before changing this number.
+constexpr float kFallbackSpeechRms = 0.01f;
+// Retained pre-speech audio, so the consonant that opened the phrase is still
+// in the buffer by the time the energy gate agrees it was speech.
+constexpr size_t kFallbackPreRollFrames = 5;
+
 // Feed/provider calls and callback dispatches outlive the short critical
 // sections protecting g_sessions(). Keep their lifetime state separately so a
 // stop/cancel can close the session, wait for external callers, or defer
@@ -126,6 +180,9 @@ struct StreamSession {
     bool fallback_in_speech = false;
     int fallback_speech_ms = 0;
     int fallback_silence_ms = 0;
+    // Trailing silence that closes an utterance, from STTOptions
+    // .silence_duration_ms when the caller set it.
+    int fallback_endpoint_silence_ms = kFallbackEndSilenceMs;
     // Session aggregates for the ONE telemetry summary emitted at stop —
     // per-chunk events are PUBLIC-only so a live session does not produce a
     // telemetry row (and an HTTP flush) per chunk.
@@ -226,17 +283,24 @@ void release_current_thread_stream_teardown(rac_handle_t handle) {
     }
 }
 
-constexpr int kFallbackFrameMs = 100;
-constexpr int kFallbackMinSpeechMs = 300;
-constexpr int kFallbackEndSilenceMs = 800;
-constexpr int kFallbackMaxUtteranceMs = 15000;
-constexpr float kFallbackSpeechRms = 0.01f;
+int32_t fallback_sample_rate(const StreamSession& session) {
+    return session.sample_rate > 0 ? session.sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
+}
 
 size_t fallback_frame_bytes(const StreamSession& session) {
-    const int32_t sample_rate =
-        session.sample_rate > 0 ? session.sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
-    return (static_cast<size_t>(sample_rate) * static_cast<size_t>(kFallbackFrameMs) / 1000U) *
+    return (static_cast<size_t>(fallback_sample_rate(session)) *
+            static_cast<size_t>(kFallbackFrameMs) / 1000U) *
            sizeof(int16_t);
+}
+
+// Milliseconds of audio held in @p bytes at the session's sample rate.
+int fallback_duration_ms(const StreamSession& session, size_t bytes) {
+    const size_t bytes_per_second =
+        static_cast<size_t>(fallback_sample_rate(session)) * sizeof(int16_t);
+    if (bytes_per_second == 0) {
+        return 0;
+    }
+    return static_cast<int>(bytes * 1000U / bytes_per_second);
 }
 
 float fallback_frame_rms(const uint8_t* bytes, size_t size) {
@@ -262,10 +326,17 @@ void reset_fallback_utterance(StreamSession& session) {
     session.fallback_silence_ms = 0;
 }
 
+// Move the buffered utterance out to @p out_audio and rearm for the next one.
+void take_fallback_utterance(StreamSession& session, std::string* out_audio) {
+    out_audio->assign(reinterpret_cast<const char*>(session.fallback_utterance.data()),
+                      session.fallback_utterance.size());
+    reset_fallback_utterance(session);
+}
+
 bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes, size_t audio_size,
                              bool is_final, std::string* out_audio) {
     const size_t frame_bytes = fallback_frame_bytes(session);
-    const size_t pre_roll_bytes = frame_bytes * 3U;
+    const size_t pre_roll_bytes = frame_bytes * kFallbackPreRollFrames;
     if (frame_bytes == 0) {
         return false;
     }
@@ -276,7 +347,8 @@ bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
 
     while (session.fallback_frame_accum.size() >= frame_bytes) {
         const uint8_t* frame = session.fallback_frame_accum.data();
-        const bool is_speech = fallback_frame_rms(frame, frame_bytes) >= kFallbackSpeechRms;
+        const float level = fallback_frame_rms(frame, frame_bytes);
+        const bool is_speech = level >= kFallbackSpeechRms;
 
         session.fallback_utterance.insert(session.fallback_utterance.end(), frame,
                                           frame + frame_bytes);
@@ -306,17 +378,11 @@ bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
             session.fallback_silence_ms += kFallbackFrameMs;
         }
 
-        const int utterance_ms = static_cast<int>(
-            session.fallback_utterance.size() * 1000 /
-            (static_cast<size_t>(session.sample_rate > 0 ? session.sample_rate
-                                                         : RAC_STT_DEFAULT_SAMPLE_RATE) *
-             sizeof(int16_t)));
-        if (session.fallback_silence_ms >= kFallbackEndSilenceMs ||
+        const int utterance_ms = fallback_duration_ms(session, session.fallback_utterance.size());
+        if (session.fallback_silence_ms >= session.fallback_endpoint_silence_ms ||
             utterance_ms >= kFallbackMaxUtteranceMs) {
             if (session.fallback_speech_ms >= kFallbackMinSpeechMs) {
-                out_audio->assign(reinterpret_cast<const char*>(session.fallback_utterance.data()),
-                                  session.fallback_utterance.size());
-                reset_fallback_utterance(session);
+                take_fallback_utterance(session, out_audio);
                 // Do not retain mic frames captured behind an expensive
                 // one-shot inference; they are stale by the time it returns.
                 session.fallback_frame_accum.clear();
@@ -333,11 +399,23 @@ bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
                                               session.fallback_frame_accum.end());
             session.fallback_frame_accum.clear();
         }
-        if (session.fallback_in_speech && session.fallback_speech_ms >= kFallbackMinSpeechMs &&
-            !session.fallback_utterance.empty()) {
-            out_audio->assign(reinterpret_cast<const char*>(session.fallback_utterance.data()),
-                              session.fallback_utterance.size());
-            reset_fallback_utterance(session);
+        // The caller has stopped the stream and is waiting for their words, so
+        // this is the last chance to say them. An open gate is enough on its own
+        // here: mid-stream the kFallbackMinSpeechMs floor decides whether a
+        // window is worth an inference, but at the end it must not also be what
+        // decides a finished recording was not speech. A phrase whose energy
+        // dipped below the threshold often enough to keep resetting
+        // fallback_speech_ms is still a phrase, and dropping it left the speaker
+        // with nothing and no explanation. Whether it contained words is the
+        // recognizer's call, and a non-speech answer is already suppressed.
+        //
+        // A gate that never opened has nothing to hand over: while it is shut
+        // the buffer is trimmed to the pre-roll every frame, so all that survives
+        // is a fraction of a second of the ambient we already judged silent.
+        // Transcribing that would spend a multi-second inference on every stop
+        // to produce a marker we would then discard.
+        if (session.fallback_in_speech && !session.fallback_utterance.empty()) {
+            take_fallback_utterance(session, out_audio);
             return true;
         }
         reset_fallback_utterance(session);
@@ -382,6 +460,14 @@ struct StreamBridgeContext {
     rac_handle_t handle;
     std::string language;
     uint64_t session_id;
+    // Set on the one-shot fallback path, where one backend call transcribes one
+    // segmenter utterance. The backend may report several finals for that single
+    // utterance (Whisper decodes in segments), and a FINAL is the event every SDK
+    // treats as "this is what the user said" — several of them for one phrase read
+    // as the user having said it several times. Capture them here instead and let
+    // transcribe_fallback_utterance publish exactly one.
+    bool coalesce_final = false;
+    std::string coalesced_final_text;
 };
 
 void dispatch_stream_result(const char* text, rac_bool_t is_final, void* opaque) {
@@ -390,16 +476,27 @@ void dispatch_stream_result(const char* text, rac_bool_t is_final, void* opaque)
     // transcription. Published as empty so every SDK renders its honest empty
     // state instead of showing engine internals as words the speaker said.
     const std::string spoken = rac::stt::transcript_for_display(text);
+    bool publish_as_final = is_final == RAC_TRUE;
+    if (publish_as_final && context->coalesce_final) {
+        // Keep the last non-empty reading. A later segment that decodes to a
+        // marker must not erase words an earlier one produced.
+        if (!spoken.empty()) {
+            context->coalesced_final_text = spoken;
+        }
+        // Still surface the text now, as a partial, so a live transcript keeps
+        // updating while the remaining segments decode.
+        publish_as_final = false;
+    }
     runanywhere::v1::STTPartialResult partial;
     if (text) {
         partial.set_text(spoken);
     }
-    partial.set_is_final(is_final == RAC_TRUE);
+    partial.set_is_final(publish_as_final);
     if (!context->language.empty()) {
         partial.set_language(context->language);
     }
 
-    if (is_final == RAC_TRUE) {
+    if (publish_as_final) {
         runanywhere::v1::STTOutput final_output;
         if (text) {
             final_output.set_text(spoken);
@@ -427,7 +524,8 @@ rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64
 
     StreamBridgeContext context{.handle = component_handle,
                                 .language = options.language ? options.language : "",
-                                .session_id = session_id};
+                                .session_id = session_id,
+                                .coalesce_final = true};
 
     const rac_result_t rc = rac_stt_component_transcribe_stream(
         component_handle, audio.data(), audio.size(), &options, dispatch_stream_result, &context);
@@ -436,7 +534,30 @@ rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64
                                             runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
                                             /*partial=*/nullptr, /*final_output=*/nullptr,
                                             "STT streaming utterance failed", rc, session_id);
+        return rc;
     }
+
+    // One FINAL for the one utterance we handed over — and none at all when the
+    // recognizer found no words in it. An empty FINAL is not the honest empty
+    // state here the way it is for a batch transcription: mid-session it tells
+    // every SDK "the user's last phrase was nothing", which wipes the transcript
+    // the earlier phrases built up. Saying nothing leaves that text standing,
+    // which is the truth — we heard sound, it was not speech.
+    if (context.coalesced_final_text.empty()) {
+        return rc;
+    }
+    runanywhere::v1::STTPartialResult partial;
+    partial.set_text(context.coalesced_final_text);
+    partial.set_is_final(true);
+    runanywhere::v1::STTOutput final_output;
+    final_output.set_text(context.coalesced_final_text);
+    if (!context.language.empty()) {
+        partial.set_language(context.language);
+        final_output.set_language(context.language);
+    }
+    rac::stt::dispatch_stt_stream_event(
+        component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
+        /*error_message=*/nullptr, /*error_code=*/0, session_id);
     return rc;
 }
 
@@ -994,6 +1115,10 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         return RAC_ERROR_DECODING_ERROR;
     }
 
+    // Read before taking g_mu(): this takes the component mutex, and a backend
+    // feed running under that same mutex dispatches events that take g_mu().
+    const int32_t component_sample_rate = rac::stt::configured_stream_sample_rate(handle);
+
     const uint64_t id = g_session_ids.next();
     {
         std::lock_guard<std::mutex> lock(g_mu());
@@ -1026,10 +1151,17 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.enable_diarization = parsed.diarize();
         s.max_speakers = parsed.has_speakers_expected() ? parsed.speakers_expected() : 0;
         s.enable_timestamps = parsed.enable_word_timestamps();
-        // Audio properties live on STTAudioSource now; the persistent session
-        // feeds raw PCM at the component default rate until the stream-start
-        // request grows its own audio-source envelope (task: layer matrix).
-        s.sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE;
+        // Audio properties live on STTAudioSource, which the stream-start
+        // request has no envelope for, so take the rate the component was
+        // configured with rather than assuming 16 kHz.
+        s.sample_rate = component_sample_rate;
+        // The caller's endpoint preference, clamped to a range where it can
+        // still separate phrases (too small closes on inter-word pauses) and
+        // still fire before the duration cap (too large never closes).
+        if (parsed.silence_duration_ms() > 0) {
+            s.fallback_endpoint_silence_ms = std::clamp(
+                parsed.silence_duration_ms(), kFallbackMinEndSilenceMs, kFallbackMaxEndSilenceMs);
+        }
         // STTOptions.beam_size and .max_alternatives have no equivalent slots
         // on rac_stt_options_t today; backends that need them must surface
         // them through STTConfiguration.

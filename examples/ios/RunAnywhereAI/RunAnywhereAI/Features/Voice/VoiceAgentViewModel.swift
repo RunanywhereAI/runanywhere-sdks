@@ -117,8 +117,16 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Human-readable status for the current setup step (e.g. "Downloading voice…").
     @Published private(set) var pipelineSetupStatus: String?
 
+    /// True when the user stopped the setup themselves. A cancelled setup is not
+    /// a failure, so it gets its own state instead of borrowing the error one or
+    /// silently reverting to the untouched card.
+    @Published private(set) var didCancelSetup = false
+
     /// Whether the best-for-device trio has been pre-selected into the slots.
     @Published private(set) var didPreselectPipeline = false
+
+    /// The in-flight one-tap setup, held so Cancel has something to cancel.
+    private var setupTask: Task<Void, Never>?
 
     // MARK: - Computed Properties (for View)
 
@@ -233,28 +241,49 @@ final class VoiceAgentViewModel: ObservableObject {
     /// while connected, neither of which the button did — a tap is ignored in
     /// every state except idle. A control that names an action it will not
     /// perform is worse than an unlabelled one, so the copy now describes only
-    /// what is actually wired: start when idle, interrupt while the agent is
-    /// talking, and long-press to end.
+    /// what is actually wired: start when idle, and interrupt while the agent is
+    /// talking.
+    ///
+    /// It no longer says "hold to end" either. Ending was reachable only through
+    /// an invisible long press on the mic, and two measured 1.2 s / 1.5 s holds
+    /// changed nothing — a gesture with no affordance, sitting under an
+    /// interactive-glass layer that has already had to be worked around for
+    /// taps. Ending is a visible `End` button now (`endButton` in
+    /// `VoiceAssistantView`), so this line no longer has to teach a gesture.
     var instructionText: String {
         switch sessionState {
         case .listening:
-            return isSpeechDetected ? "Listening · hold to end" : "Go ahead — hold to end"
+            return isSpeechDetected ? "Listening…" : "Go ahead — I'm listening"
         case .processing:
-            return "Working out a reply · hold to end"
+            return "Working out a reply…"
         case .speaking:
             // "Take the turn back" is the phrase all four apps use for this
             // moment. It also names the only thing that works: the agent is
             // half-duplex (the mic is gated while TTS plays), so speaking over
             // it is not heard — the control has to be used.
-            return isInterrupting ? "Stopping…" : "\(Self.pressVerb) to take the turn back · hold to end"
+            return isInterrupting ? "Stopping…" : "\(Self.pressVerb) to take the turn back"
         case .connecting:
             return "Connecting…"
         case .connected:
-            return "Ready · hold to end"
+            return "Ready when you are"
         case .error:
             return "\(Self.pressVerb) to try again"
         case .disconnected:
             return "\(Self.pressVerb) to start conversation"
+        }
+    }
+
+    /// What the mic button does right now, for VoiceOver and for the tooltip on
+    /// a pointer platform. The Mac's accessibility tree reported this control as
+    /// a bare 88x88 `AXButton` with no title, description or value, so a
+    /// VoiceOver user could not tell it from the four other unnamed buttons on
+    /// the same screen.
+    var micButtonAccessibilityLabel: String {
+        switch sessionState {
+        case .speaking: return isInterrupting ? "Stopping the reply" : "Take the turn back"
+        case .listening, .processing, .connecting, .connected: return "Voice conversation in progress"
+        case .disconnected: return "Start conversation"
+        case .error: return "Retry starting the conversation"
         }
     }
 
@@ -605,6 +634,32 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Preselected voice pipeline (tier: \(tier.displayName, privacy: .public))")
     }
 
+    /// Start the one-tap setup, keeping the task so it can be cancelled.
+    ///
+    /// The view used to spawn this in an anonymous `Task`, so the only thing on
+    /// screen while it ran was a spinner nobody could stop — and a first-run
+    /// attempt that stalled left the user with no step, no percentage and no way
+    /// out. Owning the task is what makes Cancel possible.
+    func startPipelineSetup() {
+        guard setupTask == nil else { return }
+        setupTask = Task { [weak self] in
+            await self?.downloadAndLoadAll()
+            await MainActor.run { self?.setupTask = nil }
+        }
+    }
+
+    /// Abandon the in-flight setup. Whatever already landed on disk stays there,
+    /// so pressing "Set up Voice AI" again resumes rather than starts over.
+    func cancelPipelineSetup() {
+        guard let task = setupTask else { return }
+        logger.info("Cancelling voice pipeline setup")
+        setupTask = nil
+        task.cancel()
+        isSettingUpPipeline = false
+        pipelineSetupStatus = nil
+        didCancelSetup = true
+    }
+
     /// Download (if needed) and load all three pipeline components in sequence,
     /// reporting per-component progress. VAD is downloaded when needed; the SDK
     /// auto-loads it during `startConversation()`.
@@ -612,6 +667,7 @@ final class VoiceAgentViewModel: ObservableObject {
         guard !isSettingUpPipeline else { return }
         isSettingUpPipeline = true
         errorMessage = nil
+        didCancelSetup = false
         defer {
             isSettingUpPipeline = false
             pipelineSetupStatus = nil
@@ -623,10 +679,16 @@ final class VoiceAgentViewModel: ObservableObject {
             return models.first { $0.id == id }
         }
 
-        // VAD first (no user-facing slot, but required by the pipeline).
+        // VAD first (no user-facing slot, but required by the pipeline). The
+        // status is set BEFORE the step, not after it: setting it afterwards
+        // meant the whole first step — a download, on a fresh install — ran
+        // behind a status of `nil`, i.e. a bare spinner that said nothing about
+        // what was happening or whether it was stuck.
         if let vad = model(vadModel?.id) {
+            pipelineSetupStatus = "Setting up speech detection…"
             await ensureDownloaded(vad) { _ in }
         }
+        if Task.isCancelled { return }
 
         if let stt = model(sttModel?.id) {
             pipelineSetupStatus = "Setting up speech recognition…"
@@ -634,12 +696,14 @@ final class VoiceAgentViewModel: ObservableObject {
                 self?.sttDownloadProgress = value
             }
         }
+        if Task.isCancelled { return }
         if let llm = model(llmModel?.id) {
             pipelineSetupStatus = "Setting up the assistant…"
             await setup(llm) { [weak self] value in
                 self?.llmDownloadProgress = value
             }
         }
+        if Task.isCancelled { return }
         if let tts = model(ttsModel?.id) {
             pipelineSetupStatus = "Setting up the voice…"
             await setup(tts) { [weak self] value in
@@ -656,23 +720,66 @@ final class VoiceAgentViewModel: ObservableObject {
         SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
     }
 
+    /// How a component download ended. `.cancelled` is the default rather than
+    /// `.succeeded` on purpose: cancelling the consuming Task terminates the
+    /// sequence without delivering the SDK's `.cancelled`, so defaulting to
+    /// success would make a cancel look like a finished download.
+    private enum DownloadOutcome {
+        case succeeded
+        case failed(String)
+        case cancelled
+    }
+
     /// Download a model if it isn't already local/built-in, reporting progress.
-    private func ensureDownloaded(_ model: RAModelInfo, progress: @escaping (Double) -> Void) async {
+    ///
+    /// Every case of `DownloadEvent` is folded, because
+    /// `RunAnywhere.models.download(id:)` reports failure as a terminal
+    /// `.failed` event and then finishes the sequence *normally* — it does not
+    /// throw. The previous `if case .progress` filter therefore fell out of the
+    /// bottom of the loop on failure, called `progress(1)`, and let `setup()`
+    /// go on to load a model that was never on disk. The user saw a full
+    /// progress bar and then a load error about the wrong thing.
+    private func ensureDownloaded(
+        _ model: RAModelInfo,
+        progress: @escaping (Double) -> Void
+    ) async -> DownloadOutcome {
         guard !model.isBuiltIn, model.localPathURL == nil else {
             progress(1)
-            return
+            return .succeeded
         }
+        var outcome: DownloadOutcome = .cancelled
         do {
             for try await event in try await RunAnywhere.models.download(id: model.id) {
-                if case .progress(let snapshot) = event, let fraction = snapshot.fraction {
-                    progress(Double(fraction))
+                switch event {
+                case .progress(let snapshot):
+                    if let fraction = snapshot.fraction {
+                        progress(Double(fraction))
+                    }
+                case .verifying, .extracting:
+                    // Bytes have all arrived; what remains has no measurable
+                    // position, so hold the bar full rather than implying more
+                    // transfer is pending.
+                    progress(1)
+                case .completed:
+                    progress(1)
+                    outcome = .succeeded
+                case .failed(_, _, let error):
+                    outcome = .failed(error.localizedDescription)
+                case .cancelled:
+                    outcome = .cancelled
+                case .started:
+                    break
                 }
             }
-            progress(1)
         } catch {
-            let reason = error.localizedDescription
-            logger.error("Voice component download failed for \(model.id, privacy: .public): \(reason, privacy: .public)")
+            outcome = .failed(error.localizedDescription)
         }
+        if case .failed(let reason) = outcome {
+            logger.error(
+                "Voice component download failed for \(model.id, privacy: .public): \(reason, privacy: .public)"
+            )
+        }
+        return outcome
     }
 
     /// Download (if needed) then load one component into its SDK lifecycle slot.
@@ -681,7 +788,18 @@ final class VoiceAgentViewModel: ObservableObject {
         _ model: RAModelInfo,
         progress: @escaping (Double) -> Void
     ) async {
-        await ensureDownloaded(model, progress: progress)
+        // Only load what actually arrived. Loading after a failed download
+        // produces a second, misleading error about the load rather than
+        // telling the user the download is what went wrong.
+        switch await ensureDownloaded(model, progress: progress) {
+        case .failed(let reason):
+            errorMessage = "Couldn't download \(model.name): \(reason)"
+            return
+        case .cancelled:
+            return
+        case .succeeded:
+            break
+        }
 
         do {
             try await RunAnywhere.models.load(id: model.id)
@@ -725,6 +843,17 @@ final class VoiceAgentViewModel: ObservableObject {
         }
         eventTask?.cancel()
         eventTask = nil
+
+        // Restarting from `.error` used to assign a fresh session straight over
+        // the failed one, so the previous VoiceAgentMicDriver and its
+        // AVAudioEngine kept capturing: two capture engines on one microphone,
+        // and the Mac's menu-bar mic indicator lit while the panel said "Error".
+        // Close whatever survived before building anything, exactly as
+        // stopConversation does, so "try again" can never stack sessions.
+        if let stale = session {
+            session = nil
+            await stale.close()
+        }
 
         sessionState = .connecting
         currentStatus = "Connecting..."
@@ -857,8 +986,26 @@ final class VoiceAgentViewModel: ObservableObject {
                 currentStatus = "Error"
                 isInterrupting = false
                 isSpeechDetected = false
+                releaseFailedSession()
             }
         }
+    }
+
+    /// Hand the microphone back after a fatal session error.
+    ///
+    /// `.error` used to be a pure UI state: the session object, its mic driver
+    /// and that driver's AVAudioEngine all kept running behind a panel reading
+    /// "Tap to try again", which is why the Mac's menu-bar recording indicator
+    /// stayed lit for minutes after the pipeline had died. A dead pipeline must
+    /// not hold a live microphone, so the session is released here and the next
+    /// start builds a clean one.
+    private func releaseFailedSession() {
+        eventTask?.cancel()
+        eventTask = nil
+        audioLevel = 0.0
+        guard let closing = session else { return }
+        session = nil
+        Task { await closing.close() }
     }
 
     private func apply(_ state: AgentState) {
@@ -893,6 +1040,8 @@ final class VoiceAgentViewModel: ObservableObject {
         sessionState = .error(error.localizedDescription)
         currentStatus = "Error"
         isSpeechDetected = false
+        isInterrupting = false
+        releaseFailedSession()
     }
 
     // MARK: - Cleanup
@@ -900,6 +1049,10 @@ final class VoiceAgentViewModel: ObservableObject {
     func cleanup() {
         eventTask?.cancel()
         eventTask = nil
+        setupTask?.cancel()
+        setupTask = nil
+        isSettingUpPipeline = false
+        pipelineSetupStatus = nil
         cancellables.removeAll()
         // Reset ALL init/idempotency state together (matches
         // VoiceComponentViewModelBase.cleanupBase()). The View's onAppear gates

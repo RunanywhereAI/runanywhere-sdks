@@ -138,6 +138,16 @@ public extension RunAnywhere {
                             // RADownloadStage was folded into RADownloadState
                             // (idl/download_service.proto) — switch on
                             // `.state` directly.
+                            //
+                            // The terminal states are named so they cannot fall
+                            // into the progress branch: `performDownload`
+                            // reports each of them again a few lines below as
+                            // the stream's own terminal event, and a progress
+                            // snapshot emitted alongside would announce a live
+                            // byte count for a transfer that has already
+                            // stopped. Everything else — pending, downloading,
+                            // retrying, paused, resuming — is a transfer still
+                            // in motion and reads as progress.
                             switch progress.state {
                             case .validating:
                                 continuation.yield(.verifying(operationId: operationId, sequence: nextSequence()))
@@ -147,6 +157,8 @@ public extension RunAnywhere {
                                     sequence: nextSequence(),
                                     percent: progress.stageProgress * 100
                                 ))
+                            case .completed, .failed, .cancelled:
+                                break
                             default:
                                 continuation.yield(.progress(DownloadProgressSnapshot(
                                     operationId: operationId,

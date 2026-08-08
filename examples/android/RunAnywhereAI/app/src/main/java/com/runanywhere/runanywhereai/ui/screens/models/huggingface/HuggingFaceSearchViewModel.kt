@@ -10,12 +10,14 @@ import com.runanywhere.runanywhereai.data.hf.HfSuggestedModel
 import com.runanywhere.runanywhereai.data.hf.HuggingFaceCatalog
 import com.runanywhere.runanywhereai.data.hf.HuggingFaceHubClient
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.download.DownloadUpdate
+import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.api.DownloadEvent
 import com.runanywhere.sdk.public.api.ModelRegistration
 import com.runanywhere.sdk.public.api.models
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -175,16 +177,22 @@ class HuggingFaceSearchViewModel : ViewModel() {
                         memoryBytes = file.sizeBytes.takeIf { it > 0 },
                     ),
                 )
-                RunAnywhere.models.download(model.id).collect { event ->
-                    val info = when (event) {
-                        is DownloadEvent.Progress -> DownloadProgressInfo.from(event)
-                        is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
-                        else -> null
-                    }
-                    if (info != null) _state.update { it.copy(downloadProgress = info) }
+                // Same foreground service the model picker uses. A community GGUF is the same
+                // several gigabytes as a catalogue one, so it gets the same wake lock, the same
+                // progress notification and the same survival when the user leaves the app —
+                // downloading it inside this sheet's scope meant closing the sheet lost it.
+                val stopped = if (ModelDownloadService.start(model)) {
+                    awaitForegroundDownload(model.id)
+                } else {
+                    downloadInProcess(model.id)
                 }
                 _state.update {
-                    it.copy(downloadingPath = null, downloadProgress = null, addedModelId = model.id)
+                    it.copy(
+                        downloadingPath = null,
+                        downloadProgress = null,
+                        addedModelId = model.id.takeIf { stopped == null },
+                        error = stopped?.message,
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -199,6 +207,58 @@ class HuggingFaceSearchViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    /**
+     * Mirror the foreground service's transfer of [modelId] into this sheet, and return how it
+     * ended — null when the bytes are all on disk.
+     *
+     * The progress mirror is a child job rather than a `takeWhile`, so the wait for the terminal
+     * state and the drawing of the bar cannot disagree about which snapshot was the last one.
+     */
+    private suspend fun awaitForegroundDownload(modelId: String): ModelDownloadService.Interrupted? =
+        coroutineScope {
+            val mirror = launch {
+                ModelDownloadService.active.collect { snapshot ->
+                    if (snapshot?.modelId == modelId) {
+                        _state.update { it.copy(downloadProgress = snapshot.progress) }
+                    }
+                }
+            }
+            ModelDownloadService.awaitFinish(modelId)
+            mirror.cancel()
+            ModelDownloadService.interrupted.value[modelId]
+        }
+
+    /**
+     * The fallback for when the foreground service cannot be started (the app is already in the
+     * background). No wake lock and it dies with this ViewModel, so it is a last resort — but it
+     * reports the same outcome, and records the same resume point, as the service path.
+     */
+    private suspend fun downloadInProcess(modelId: String): ModelDownloadService.Interrupted? {
+        var latest = DownloadProgressInfo()
+        // The SDK reports a failure as a terminal event and then ends the stream normally, so
+        // reaching the end of the stream is not on its own proof the file arrived. This used to
+        // announce the repo as added over a download that never finished.
+        var stopped: ModelDownloadService.Interrupted? = null
+        RunAnywhere.models.download(modelId).collect { event ->
+            when (val update = DownloadProgressInfo.advance(latest, event)) {
+                is DownloadUpdate.Advanced -> {
+                    latest = update.info
+                    _state.update { it.copy(downloadProgress = update.info) }
+                }
+                is DownloadUpdate.Stopped -> stopped = ModelDownloadService.Interrupted(
+                    cancelled = update.cancelled,
+                    message = update.message,
+                    progress = latest.takeIf { it.bytesDone > 0 },
+                )
+                DownloadUpdate.Finished, DownloadUpdate.Ignored -> Unit
+            }
+        }
+        stopped?.let {
+            ModelDownloadService.noteInterrupted(modelId, it.cancelled, it.message, it.progress)
+        }
+        return stopped
     }
 
     /** Consume the one-shot completion signal after the host has refreshed its list. */

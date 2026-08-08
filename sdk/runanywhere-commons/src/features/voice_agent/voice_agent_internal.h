@@ -76,6 +76,14 @@ struct rac_voice_agent_feed_state {
     /// Adaptive ambient floor; seeded to the absolute speech threshold and
     /// never reset across turns (only adapted while idle).
     float noise_floor{0.015f};
+    /// Wall-clock instant the reply we last handed the SDK stops being audible,
+    /// derived from that reply's own duration. 0 = no reply outstanding. A
+    /// speech onset before this instant is the user talking over the agent,
+    /// which is the one moment worth telling the SDK about immediately, because
+    /// only the SDK can stop the speaker. An onset after it is an ordinary new
+    /// turn — which is what a half-duplex driver, silent for the whole playout,
+    /// always produces.
+    int64_t reply_audible_until_ms{0};
     /// Serializes feed-call segmentation; the heavy turn pipeline runs
     /// outside this lock so concurrent feeds only contend on buffering.
     std::mutex mutex;

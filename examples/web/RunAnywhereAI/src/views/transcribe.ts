@@ -58,6 +58,16 @@ let selectedMode: STTMode = 'batch';
 let transcript = '';
 /** True while the on-screen transcript is a revisable hypothesis, not a result. */
 let isTranscriptPartial = false;
+/**
+ * The status line, held in view state rather than only written into the DOM.
+ *
+ * Every flow ends by re-rendering, and a render rebuilds the status element
+ * from scratch — so an outcome poked straight into the node ("Done.", "No
+ * speech detected.", "Transcribe failed: …") was erased microseconds after it
+ * was set, and a finished recording explained itself to nobody. Rendering the
+ * message from state is what makes it survive the render that follows it.
+ */
+let statusText = '';
 let unsubscribeState: (() => void) | null = null;
 let unsubscribeEngine: (() => void) | null = null;
 
@@ -117,7 +127,17 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   };
 }
 
-/** What each mode means, in the user's terms rather than the SDK verb's. */
+/**
+ * What each mode means, in the user's terms rather than the SDK verb's.
+ *
+ * The live wording is deliberately specific about *when* words appear. The mode
+ * used to claim "Shows words as they are recognised" while showing nothing at
+ * all until the microphone closed; now the SDK re-reads the audio captured so
+ * far while capture is open, so a first guess lands about a second in and is
+ * rewritten as more of the sentence arrives. Saying "guess" and naming the
+ * settle point is what keeps the sentence true of a whole-window model like
+ * Whisper, which revises words it has already shown.
+ */
 const MODE_COPY: Record<STTMode, { label: string; detail: string }> = {
   batch: {
     label: 'Record, then transcribe',
@@ -125,7 +145,8 @@ const MODE_COPY: Record<STTMode, { label: string; detail: string }> = {
   },
   live: {
     label: 'Transcribe as I speak',
-    detail: 'Shows words as they are recognised. Earlier guesses are corrected as it goes.',
+    detail: 'Shows a running guess about a second in and rewrites it as you keep talking. '
+      + 'The transcript settles when you stop.',
   },
 };
 
@@ -193,7 +214,7 @@ function renderTranscribe(): void {
       </div>
       <div class="docs-section">
         <h3>Transcript</h3>
-        <div id="transcribe-status" class="docs-status" role="status" aria-live="polite">${isProcessing ? 'Transcribing…' : ''}</div>
+        <div id="transcribe-status" class="docs-status" role="status" aria-live="polite">${escapeHtml(statusText)}</div>
         ${transcript
           ? `<pre id="transcribe-output" class="docs-pre${isTranscriptPartial ? ' docs-pre--partial' : ''}">${escapeHtml(transcript)}</pre>`
           : `<div class="surface-empty" id="transcribe-output">
@@ -220,6 +241,7 @@ function renderTranscribe(): void {
       if (selectedMode !== mode) {
         transcript = '';
         isTranscriptPartial = false;
+        statusText = '';
       }
       selectedMode = mode;
       renderTranscribe();
@@ -230,6 +252,8 @@ function renderTranscribe(): void {
   });
   container.querySelector('#clear-btn')?.addEventListener('click', () => {
     transcript = '';
+    isTranscriptPartial = false;
+    statusText = '';
     renderTranscribe();
   });
   wireFileDrop(container, 'transcribe-drop', (files) => {
@@ -264,11 +288,13 @@ async function startMic(): Promise<void> {
     isCapturing = true;
     transcript = '';
     isTranscriptPartial = false;
+    // Set before the render so the previous run's outcome ("Done.", "No speech
+    // detected.") cannot sit over a recording that has just started.
+    statusText = live
+      ? 'Listening — the first guess appears about a second in.'
+      : 'Recording — press stop when you have finished speaking.';
     renderTranscribe();
-    if (live) {
-      setStatus('Listening — words appear as they are recognised.');
-      liveStreamTask = runTranscribeStream();
-    }
+    if (live) liveStreamTask = runTranscribeStream();
   } catch (err) {
     streamDone = true;
     setStatus(`Microphone error: ${formatError(err)}`);
@@ -289,7 +315,7 @@ async function stopMicAndTranscribe(): Promise<void> {
     streamDone = true;
     notifyChunk?.();
     isProcessing = true;
-    setStatus('Finishing up…');
+    setStatus('Settling the transcript…');
     renderTranscribe();
     await liveStreamTask;
     liveStreamTask = null;
@@ -326,8 +352,8 @@ async function transcribeFile(file: File): Promise<void> {
 /** Batch mode — one-shot transcription (iOS parity: STTViewModel.swift:252). */
 async function runTranscribe(samples: Float32Array): Promise<void> {
   isProcessing = true;
-  renderTranscribe();
   setStatus(`Transcribing ${(samples.length / 16000).toFixed(2)}s of audio...`);
+  renderTranscribe();
   try {
     const output = await RunAnywhere.stt.transcribe(RunAnywhere.AudioInput.float32(samples));
     transcript = output.text;
@@ -406,23 +432,39 @@ async function runTranscribeStream(): Promise<void> {
  *
  * The empty state is a different element from the transcript, so the first
  * partial has to swap them — writing `textContent` into the empty-state block
- * would erase its icon and leave a bare line of text. Once a `<pre>` is on
- * screen, later partials mutate it in place: a full re-render per token would
- * rebuild the toolbar and the drop zone mid-utterance.
+ * would erase its icon and leave a bare line of text. The swap is done in place
+ * rather than by re-rendering the panel: a full render mid-utterance rebuilds
+ * the toolbar and the drop zone and resets the status line, so the "listening"
+ * message vanished at exactly the moment the first words arrived. Later
+ * partials just mutate the `<pre>`.
  */
 function updateOutput(): void {
-  const pre = container.querySelector<HTMLPreElement>('pre#transcribe-output');
-  if (pre) {
-    pre.textContent = transcript;
-    // Same treatment the Talk panel gives a revisable hypothesis, so a partial
-    // reads as one on both screens instead of only on one of them.
-    pre.classList.toggle('docs-pre--partial', isTranscriptPartial);
+  const existing = container.querySelector<HTMLElement>('#transcribe-output');
+  if (!existing) {
+    renderTranscribe();
     return;
   }
-  renderTranscribe();
+  const pre = existing instanceof HTMLPreElement
+    ? existing
+    : swapEmptyStateForTranscript(existing);
+  pre.textContent = transcript;
+  // Same treatment the Talk panel gives a revisable hypothesis, so a partial
+  // reads as one on both screens instead of only on one of them.
+  pre.classList.toggle('docs-pre--partial', isTranscriptPartial);
 }
 
+/** Swap the waveform empty state for the transcript block that supersedes it. */
+function swapEmptyStateForTranscript(emptyState: HTMLElement): HTMLPreElement {
+  const pre = document.createElement('pre');
+  pre.id = 'transcribe-output';
+  pre.className = 'docs-pre';
+  emptyState.replaceWith(pre);
+  return pre;
+}
+
+/** Record the status in view state and patch it in without a full render. */
 function setStatus(text: string): void {
+  statusText = text;
   const banner = container.querySelector<HTMLDivElement>('#transcribe-status');
   if (banner) banner.textContent = text;
 }

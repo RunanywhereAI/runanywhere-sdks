@@ -1,5 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.models.huggingface
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,8 +42,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +60,7 @@ import com.runanywhere.runanywhereai.data.hf.HfRepoFile
 import com.runanywhere.runanywhereai.data.hf.HfSuggestedModel
 import com.runanywhere.runanywhereai.data.hf.formatParameterCount
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.ui.screens.models.DownloadProgressBlock
 import com.runanywhere.runanywhereai.ui.screens.models.formatModelSize
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
@@ -71,6 +78,27 @@ fun HuggingFaceSearchSheet(
     val dimens = LocalDimens.current
     val state by viewModel.state.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val context = LocalContext.current
+
+    // A community GGUF downloads through the same foreground service the catalogue uses, whose
+    // progress notification Android 13+ silently suppresses without POST_NOTIFICATIONS. Asked once,
+    // just-in-time, before the first file — and the download proceeds either way, because the
+    // notification is how the transfer is *watched*, not what makes it run.
+    val pendingDownload = remember { mutableStateOf<HfRepoFile?>(null) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        pendingDownload.value?.let { viewModel.download(state.selectedRepo.orEmpty(), it) }
+        pendingDownload.value = null
+    }
+    val onDownload: (HfRepoFile) -> Unit = { file ->
+        if (ModelDownloadService.notificationsPermitted(context)) {
+            viewModel.download(state.selectedRepo.orEmpty(), file)
+        } else {
+            pendingDownload.value = file
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     // A completed download refreshes the host picker exactly once.
     LaunchedEffect(state.addedModelId) {
@@ -149,7 +177,7 @@ fun HuggingFaceSearchSheet(
                                 files = state.files,
                                 downloadingPath = state.downloadingPath,
                                 progress = state.downloadProgress,
-                                onDownload = { file -> viewModel.download(state.selectedRepo.orEmpty(), file) },
+                                onDownload = onDownload,
                             )
                     }
                 }

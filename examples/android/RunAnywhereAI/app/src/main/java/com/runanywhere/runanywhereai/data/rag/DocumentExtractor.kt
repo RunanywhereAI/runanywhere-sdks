@@ -8,12 +8,14 @@ import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import org.json.JSONTokener
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 
 data class ExtractedDocument(val name: String, val text: String) {
     val metadata: Map<String, String>
@@ -29,21 +31,54 @@ object DocumentExtractor {
     internal const val MAX_PDF_PAGES = 200
     private const val PDF_MAIN_MEMORY_BYTES = 4L * 1024 * 1024
     private const val PDF_SCRATCH_BYTES = 64L * 1024 * 1024
+    private const val BYTES_PER_MB = 1024 * 1024
 
     fun extract(context: Context, uri: Uri): ExtractedDocument {
         val info = documentInfo(context, uri)
         val name = info.name ?: "document"
-        require(info.size == null || info.size <= MAX_SOURCE_BYTES) {
-            "The selected file is larger than the 10 MB document limit."
-        }
-        val text = when (name.substringAfterLast('.', "").lowercase()) {
-            "pdf" -> extractPdf(context, uri)
-            "json" -> extractJson(context, uri)
-            else -> readText(context, uri)
+        require(info.size == null || info.size <= MAX_SOURCE_BYTES) { sourceTooLargeMessage() }
+        val text = when (formatOf(context, uri, name)) {
+            DocumentFormat.PDF -> extractPdf(context, uri)
+            DocumentFormat.JSON -> extractJson(context, uri, name)
+            DocumentFormat.TEXT -> readText(context, uri)
         }
         require(text.isNotBlank()) { "No readable text found in $name." }
         return ExtractedDocument(name, enforceTextLimit(text).trim())
     }
+
+    /** How the bytes behind a URI have to be read to get text out of them. */
+    private enum class DocumentFormat { PDF, JSON, TEXT }
+
+    /**
+     * Declared type first, filename second, magic bytes last.
+     *
+     * Dispatching on the extension alone sent every provider that reports a name without one — a
+     * scanner app's "Document", a share-sheet temp file, a Drive export — down the plain-text
+     * path, so a PDF reached the model as its own binary header decoded as UTF-8. The provider's
+     * declared MIME type survives a missing extension, and the `%PDF-` signature survives both
+     * being wrong.
+     */
+    private fun formatOf(context: Context, uri: Uri, name: String): DocumentFormat {
+        val mime = context.contentResolver.getType(uri)?.lowercase(Locale.US)
+        val extension = name.substringAfterLast('.', "").lowercase(Locale.US)
+        return when {
+            mime == "application/pdf" || extension == "pdf" -> DocumentFormat.PDF
+            mime == "application/json" || extension == "json" -> DocumentFormat.JSON
+            looksLikePdf(context, uri) -> DocumentFormat.PDF
+            else -> DocumentFormat.TEXT
+        }
+    }
+
+    /** True when the stream opens with the PDF signature, whatever the provider claims. */
+    private fun looksLikePdf(context: Context, uri: Uri): Boolean =
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val header = ByteArray(PDF_SIGNATURE.size)
+                stream.read(header) == header.size && header.contentEquals(PDF_SIGNATURE)
+            } ?: false
+        }.getOrDefault(false)
+
+    private val PDF_SIGNATURE = "%PDF-".toByteArray(StandardCharsets.US_ASCII)
 
     private fun extractPdf(context: Context, uri: Uri): String {
         PDFBoxResourceLoader.init(context.applicationContext)
@@ -68,9 +103,17 @@ object DocumentExtractor {
         }
     }
 
-    private fun extractJson(context: Context, uri: Uri): String {
+    private fun extractJson(context: Context, uri: Uri, name: String): String {
+        val parsed = try {
+            JSONTokener(readText(context, uri)).nextValue()
+        } catch (e: JSONException) {
+            // The tokener reports a character offset ("Unterminated object at character 412"),
+            // which tells the reader nothing they can act on. Name the file instead — the remedy
+            // is to pick a different one, not to count bytes.
+            throw IllegalArgumentException("$name is not valid JSON.", e)
+        }
         val strings = mutableListOf<String>()
-        collectStrings(JSONTokener(readText(context, uri)).nextValue(), strings)
+        collectStrings(parsed, strings)
         return enforceTextLimit(strings.joinToString("\n"))
     }
 
@@ -118,10 +161,16 @@ object DocumentExtractor {
 
     internal fun enforceTextLimit(text: String): String {
         require(text.length <= MAX_TEXT_CHARS) {
-            "The selected document exceeds the $MAX_TEXT_CHARS character text limit."
+            "That document holds more text than this app can index " +
+                "(over ${MAX_TEXT_CHARS / THOUSAND}k characters)."
         }
         return text
     }
+
+    private fun sourceTooLargeMessage(): String =
+        "That file is larger than the ${MAX_SOURCE_BYTES / BYTES_PER_MB} MB document limit."
+
+    private const val THOUSAND = 1_000
 
     private inline fun copyWithLimit(input: InputStream, write: (ByteArray, Int, Int) -> Unit) {
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
@@ -130,9 +179,7 @@ object DocumentExtractor {
             val count = input.read(buffer)
             if (count < 0) break
             total += count
-            require(total <= MAX_SOURCE_BYTES) {
-                "The selected file is larger than the 10 MB document limit."
-            }
+            require(total <= MAX_SOURCE_BYTES) { sourceTooLargeMessage() }
             write(buffer, 0, count)
         }
     }

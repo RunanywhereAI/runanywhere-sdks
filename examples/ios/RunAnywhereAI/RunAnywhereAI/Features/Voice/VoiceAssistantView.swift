@@ -342,14 +342,19 @@ extension VoiceAssistantView {
                     .background(Color(.tertiarySystemBackground))
                     .clipShape(Circle())
             })
+            .accessibilityLabel(showModelInfo ? "Hide pipeline details" : "Show pipeline details")
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
         .padding(.bottom, 10)
     }
 
+    /// Deliberately empty: on iPhone the transcript and the reply are rendered
+    /// just above the mic in `iOSControlArea`, so the particle field owns this
+    /// space. The comment here used to say the messages appeared "as toast at
+    /// bottom", which was never true of any build and sent readers looking for a
+    /// toast that does not exist.
     private var iOSConversationArea: some View {
-        // Conversation area is now hidden - messages shown as toast at bottom
         Spacer()
     }
 
@@ -407,6 +412,22 @@ extension VoiceAssistantView {
                 }
                 .frame(maxHeight: 150)
                 .animation(.none, value: viewModel.assistantResponse)
+                // A long reply is taller than this box, and it used to be cut
+                // straight through the middle of a glyph line — which reads as
+                // broken rendering, not as content that continues. The fade
+                // makes the bottom edge mean "more below", and lands on a soft
+                // boundary instead of half a row of letters.
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.86),
+                            .init(color: .clear, location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
             }
 
             micButtonSection
@@ -418,6 +439,8 @@ extension VoiceAssistantView {
                 // The line changes wording every turn; a crossfade keeps it from
                 // snapping while the particle field behind it is still moving.
                 .motionAware(Motion.standardFade, value: viewModel.instructionText)
+
+            endButton
         }
         .motionAware(Motion.standardSpring, value: viewModel.currentTranscript.isEmpty)
         .padding(.bottom, Space.xl)
@@ -511,8 +534,44 @@ extension VoiceAssistantView {
                 .foregroundStyle(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .motionAware(Motion.standardFade, value: viewModel.instructionText)
+
+            endButton
         }
         .padding(.bottom, Space.xl)
+    }
+
+    /// Ends the session, visibly.
+    ///
+    /// Ending used to be reachable only by long-pressing the mic — a gesture
+    /// with no affordance anywhere on screen, and one that did not fire:
+    /// measured 1.2 s and 1.5 s holds at verified coordinates produced no state
+    /// change at all, while taps at the same point worked every time (the
+    /// `LongPressGesture` is attached with `.simultaneousGesture` to a Button
+    /// under `.glassEffect(.interactive())`, the same layer that already had to
+    /// be worked around for taps). Hanging up is not an advanced action and does
+    /// not belong behind a hidden gesture, so it is a button. The long press
+    /// stays wired as a shortcut for anyone who learned it.
+    @ViewBuilder private var endButton: some View {
+        if viewModel.isActive || viewModel.sessionState == .connected {
+            Button {
+                Task { await viewModel.stopConversation() }
+            } label: {
+                HStack(spacing: Space.sm) {
+                    Image(systemName: "phone.down.fill")
+                    Text("End")
+                }
+                .appType(.caption)
+                .padding(.horizontal, Space.lg)
+                .frame(minHeight: 44)
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppColors.textSecondary)
+            .background(
+                Capsule().fill(AppColors.backgroundSecondary)
+            )
+            .accessibilityLabel("End conversation")
+        }
     }
 
     private var micButtonSection: some View {
@@ -557,6 +616,13 @@ extension VoiceAssistantView {
                     Task { await viewModel.stopConversation() }
                 }
             )
+            // The Mac's accessibility tree reported this 88x88 control as a bare
+            // `AXButton` with no title, description or value — one of five
+            // unnamed buttons on the screen. The label names the action for the
+            // current state; the value carries the state itself, so neither is
+            // inferred from the button's colour.
+            .accessibilityLabel(viewModel.micButtonAccessibilityLabel)
+            .accessibilityValue(viewModel.statusLabel)
 
             Spacer()
         }

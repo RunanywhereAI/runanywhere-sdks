@@ -16,7 +16,16 @@ struct SpeechToTextView: View {
 
     var body: some View {
         Group {
-            NavigationView {
+            // A `NavigationView` wrapping a single child renders that child as
+            // the *sidebar* column of a Mac split view, which is why this screen
+            // drew all of its content in a ~200pt strip against the left edge of
+            // a 1450pt detail pane — mode chips clipped to "Hyb…", the model chip
+            // truncated, the record button pinned to the window's bottom edge.
+            // This screen is pushed from a NavigationLink, so the window already
+            // owns a navigation container: on the Mac it is plain content in a
+            // centred column, and the `.toolbar` items attach to the window's
+            // own bar. iPhone keeps the NavigationView it needs for its title.
+            navigationHost {
                 ZStack {
                     VStack(spacing: 0) {
                         // Mode selection - Modern pill button style
@@ -194,6 +203,13 @@ struct SpeechToTextView: View {
                                 viewModel.isProcessing ||
                                 viewModel.isTranscribing ? 0.6 : 1.0
                             )
+                            // The Mac's accessibility tree reported this as a
+                            // bare `AXButton`: no title, no value, nothing to
+                            // distinguish it from any other button on screen.
+                            .accessibilityLabel(viewModel.isRecording
+                                ? "Stop recording"
+                                : "Start recording")
+                            .accessibilityValue(viewModel.isTranscribing ? "Transcribing" : "")
                         }
                         .padding()
                         #if os(iOS)
@@ -233,9 +249,6 @@ struct SpeechToTextView: View {
                 }
             }
             }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
         .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .stt) { model in
                 Task {
@@ -252,6 +265,19 @@ struct SpeechToTextView: View {
             viewModel.cleanup()
         }
         }
+    }
+
+    /// The navigation container this platform actually needs — see `body`.
+    @ViewBuilder
+    private func navigationHost<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        #if os(macOS)
+        content()
+            .frame(maxWidth: AdaptiveSizing.conversationMaxWidth)
+            .frame(maxWidth: .infinity)
+        #else
+        NavigationView { content() }
+            .navigationViewStyle(.stack)
+        #endif
     }
 
     // MARK: - View Components
@@ -303,6 +329,13 @@ struct SpeechToTextView: View {
                     )
             )
         }
+        // Two stacked words each ("Batch"/"Record") read as four fragments to a
+        // screen reader, and selection was carried only by tint. One name, one
+        // spoken selected state.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) mode")
+        .accessibilityHint(mode.description)
+        .accessibilityAddTraits(viewModel.selectedMode == mode ? [.isButton, .isSelected] : .isButton)
     }
 
     private var hybridConfigurationSection: some View {

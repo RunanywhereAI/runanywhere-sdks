@@ -26,6 +26,9 @@ struct DownloadProgressSample {
     /// 0-based position of the file that produced this sample.
     let fileIndex: Int
     let fileCount: Int
+    /// Name of the file this sample is about, so a caller can say which of a
+    /// multi-file model is moving instead of only "file 2 of 3".
+    let fileName: String
     /// How long this transfer has been running.
     let elapsed: TimeInterval
     /// Bytes *this* transfer actually moved — total on disk minus what was already
@@ -34,6 +37,14 @@ struct DownloadProgressSample {
     /// figure a throughput average may be computed from: a download resumed at
     /// 1.4 GB would otherwise report several gigabytes per second for one sample.
     let bytesMoved: Int64
+    /// Which phase produced this sample.
+    ///
+    /// Carried rather than assumed `.downloading` because the bytes landing is
+    /// not the end of the work: this path still has to checksum a file that can
+    /// be several gigabytes, and a UI told only "100%" for the length of that
+    /// hash reads as a freeze. Commons reports the same phase through the same
+    /// field on its own transfer path, so both paths stay legible to one switch.
+    var state: RADownloadState = .downloading
 
     /// Fraction complete, 0...1.
     var fraction: Double {
@@ -55,14 +66,19 @@ struct DownloadProgressSample {
         // RADownloadStage was folded into RADownloadState
         // (idl/download_service.proto); `.state` alone now carries what
         // `.stage` used to.
-        progress.state = .downloading
+        progress.state = state
         progress.bytesDownloaded = bytesDone
         progress.totalBytes = bytesTotal
         progress.totalFiles = Int32(fileCount)
         progress.currentFileIndex = Int32(fileIndex)
+        progress.currentFileName = fileName
         progress.overallProgress = Float(fraction)
 
-        guard elapsed > 0, bytesMoved > 0 else { return progress }
+        // A rate and a finish time describe bytes in flight. Once the transfer
+        // has moved to verification nothing is moving, so reporting the last
+        // measured speed would claim the connection is still working and the
+        // ETA would count down to a moment that has already passed.
+        guard state == .downloading, elapsed > 0, bytesMoved > 0 else { return progress }
         let speed = Double(bytesMoved) / elapsed
         progress.bytesPerSecond = Float(speed)
         if bytesTotal > bytesDone {

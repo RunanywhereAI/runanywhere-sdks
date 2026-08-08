@@ -126,15 +126,22 @@ struct ModelVariantRow: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
+                // A size and a backend name are single tokens, so they hold their
+                // width; the feel descriptor is the one part that may truncate.
+                // Left to wrap, a download in progress squeezes this row and
+                // SwiftUI hyphenates mid-word — "762.9 / MB" — which reads as
+                // broken rather than as a compact row.
                 HStack(spacing: AppSpacing.smallMedium) {
                     Text(variant.consumerSizeLabel)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
+                        .fixedSize(horizontal: true, vertical: false)
                     BackendPill(framework: variant.framework)
                     if let feelDescriptor {
                         Text(feelDescriptor)
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
+                            .lineLimit(1)
                     }
                 }
 

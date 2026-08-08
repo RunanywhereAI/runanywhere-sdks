@@ -27,26 +27,36 @@ data class StagedAttachment(
  *
  * Every limit here is the one the downstream path actually enforces: documents defer to
  * [DocumentExtractor], so the two can never disagree about the same file.
+ *
+ * Shared with the Vision screen, which stages images through the same funnel — one definition of
+ * "can this file be attached" rather than two that drift.
  */
 object ComposerAttachmentPolicy {
 
+    /** Which mode a file belongs to, or null when neither can take it. */
+    fun kindFor(context: Context, uri: Uri): ComposerAttachmentKind? =
+        kindFor(
+            mimeType = context.contentResolver.getType(uri),
+            displayName = DocumentExtractor.documentInfo(context, uri).name,
+        )
+
     /**
-     * Which mode a file belongs to, or null when neither can take it.
+     * The same decision from facts already read.
      *
-     * MIME first, extension second: providers routinely hand over Markdown as
-     * `application/octet-stream`, and a strict MIME check would reject a file the ingest path reads
-     * perfectly well.
+     * MIME first, filename second: providers routinely hand over Markdown as
+     * `application/octet-stream`, and a strict MIME check would reject a file the ingest path
+     * reads perfectly well. Taking the two facts as parameters lets [reasonToReject] resolve a
+     * kind *and* a size from a single provider query instead of three.
      */
-    fun kindFor(context: Context, uri: Uri): ComposerAttachmentKind? {
-        val mime = context.contentResolver.getType(uri)?.lowercase(Locale.US)
+    internal fun kindFor(mimeType: String?, displayName: String?): ComposerAttachmentKind? {
+        val mime = mimeType?.lowercase(Locale.US)
         if (mime != null && mime.startsWith("image/")) return ComposerAttachmentKind.IMAGE
         if (mime != null && (mime.startsWith("text/") || mime in DOCUMENT_MIME_TYPES)) {
             return ComposerAttachmentKind.DOCUMENT
         }
-        val name = DocumentExtractor.documentInfo(context, uri).name?.lowercase(Locale.US)
-        if (name != null && DOCUMENT_EXTENSIONS.any(name::endsWith)) {
-            return ComposerAttachmentKind.DOCUMENT
-        }
+        val name = displayName?.lowercase(Locale.US) ?: return null
+        if (IMAGE_EXTENSIONS.any(name::endsWith)) return ComposerAttachmentKind.IMAGE
+        if (DOCUMENT_EXTENSIONS.any(name::endsWith)) return ComposerAttachmentKind.DOCUMENT
         return null
     }
 
@@ -55,13 +65,12 @@ object ComposerAttachmentPolicy {
         val info = DocumentExtractor.documentInfo(context, uri)
         if (info.size == 0L) return "That file is empty."
 
-        val actual = kindFor(context, uri)
-        if (actual != null && actual != kind) {
-            return when (kind) {
-                ComposerAttachmentKind.IMAGE -> "That is not an image. Attach a PNG, JPEG, WebP, or GIF."
-                ComposerAttachmentKind.DOCUMENT ->
-                    "That file type is not supported. Attach a PDF, JSON, or plain-text file."
-            }
+        // A type *neither* mode recognises used to fall straight through as acceptable, because
+        // only a positively-mismatched kind was refused. Such a file was staged, sent, and then
+        // failed seconds later inside extraction — the one place where the message reads as the
+        // model's fault. Anything we cannot name is refused here instead.
+        if (kindFor(context.contentResolver.getType(uri), info.name) != kind) {
+            return unsupportedTypeReason(kind)
         }
 
         val limit = when (kind) {
@@ -82,6 +91,12 @@ object ComposerAttachmentPolicy {
         DocumentExtractor.documentInfo(context, uri).name
             ?: if (kind == ComposerAttachmentKind.IMAGE) "Selected image" else "Selected document"
 
+    private fun unsupportedTypeReason(kind: ComposerAttachmentKind): String = when (kind) {
+        ComposerAttachmentKind.IMAGE -> "That is not an image. Attach a PNG, JPEG, WebP, HEIC, or GIF."
+        ComposerAttachmentKind.DOCUMENT ->
+            "That file type is not supported. Attach a PDF, JSON, or plain-text file."
+    }
+
     /**
      * Images are decoded and downscaled before they reach the model, so the ceiling only has to
      * keep a single decode off the heap rather than match any model input size.
@@ -92,4 +107,12 @@ object ComposerAttachmentPolicy {
 
     private val DOCUMENT_MIME_TYPES = listOf("application/pdf", "application/json")
     private val DOCUMENT_EXTENSIONS = listOf(".pdf", ".json", ".txt", ".md", ".markdown", ".csv")
+
+    /**
+     * The filename fallback for images, which the extension check used to lack entirely. It is
+     * needed for the same reason the document list is: a provider that reports a PNG as
+     * `application/octet-stream` would otherwise be told its own photo is not an image.
+     */
+    private val IMAGE_EXTENSIONS =
+        listOf(".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".heic", ".heif")
 }

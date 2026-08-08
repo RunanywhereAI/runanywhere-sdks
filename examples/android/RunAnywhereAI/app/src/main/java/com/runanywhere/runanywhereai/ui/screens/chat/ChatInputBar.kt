@@ -56,6 +56,14 @@ data class ComposerAttachment(
     val name: String,
     val description: String,
     val icon: ImageVector,
+    /**
+     * What the editor invites while this attachment is staged.
+     *
+     * Sending with an empty box is allowed — the send path supplies its own default question —
+     * so the placeholder has to say so. "Ask anything..." implies a question is required and
+     * gives no hint that the file is what will be answered about.
+     */
+    val placeholder: String = "Add a question, or send to describe this file",
 )
 
 private data class AttachmentAction(
@@ -160,14 +168,35 @@ fun ChatInputBar(
                     ),
                 )
             }
-            AnimatedVisibility(
-                visible = attachmentRejection != null,
-                enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
-                exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
-            ) {
-                AttachmentRejectionStrip(
-                    reason = attachmentRejection.orEmpty(),
-                    onDismiss = onDismissAttachmentRejection,
+        }
+        // Deliberately *not* inside the `!compact` gate, unlike the rest of the status strips.
+        // These two are the only ones that change what the Send button does, and hiding them in a
+        // short landscape viewport meant a staged file was sent with no way to see or remove it,
+        // while a refused file vanished as if the picker had never returned.
+        AnimatedVisibility(
+            visible = attachmentRejection != null,
+            enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
+            exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
+        ) {
+            AttachmentRejectionStrip(
+                reason = attachmentRejection.orEmpty(),
+                onDismiss = onDismissAttachmentRejection,
+                modifier = Modifier.padding(
+                    start = dimens.spacingMd,
+                    top = dimens.spacingSm,
+                    end = dimens.spacingMd,
+                ),
+            )
+        }
+        AnimatedVisibility(
+            visible = pendingAttachment != null,
+            enter = fadeIn(AppMotion.standard()) + expandVertically(AppMotion.springDefault()),
+            exit = fadeOut(AppMotion.exit()) + shrinkVertically(AppMotion.exit()),
+        ) {
+            pendingAttachment?.let {
+                AttachmentStatusPill(
+                    attachment = it,
+                    onClear = onClearAttachment,
                     modifier = Modifier.padding(
                         start = dimens.spacingMd,
                         top = dimens.spacingSm,
@@ -175,23 +204,8 @@ fun ChatInputBar(
                     ),
                 )
             }
-            AnimatedVisibility(
-                visible = pendingAttachment != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                pendingAttachment?.let {
-                    AttachmentStatusPill(
-                        attachment = it,
-                        onClear = onClearAttachment,
-                        modifier = Modifier.padding(
-                            start = dimens.spacingMd,
-                            top = dimens.spacingSm,
-                            end = dimens.spacingMd,
-                        ),
-                    )
-                }
-            }
+        }
+        if (!compact) {
             AnimatedVisibility(
                 visible = toolsEnabled || toolsUnavailableMessage != null,
                 enter = fadeIn() + expandVertically(),
@@ -352,7 +366,10 @@ fun ChatInputBar(
             ) {
                 if (input.isEmpty()) {
                     Text(
-                        text = if (toolsEnabled) "Ask with web and tools..." else "Ask anything...",
+                        // The attachment wins over the tools hint: it is the more specific fact
+                        // about what pressing Send will do right now.
+                        text = pendingAttachment?.placeholder
+                            ?: if (toolsEnabled) "Ask with web and tools..." else "Ask anything...",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     )

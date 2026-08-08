@@ -127,9 +127,18 @@ fun VoiceSetupCard(
                         Spacer(Modifier.size(dimens.spacingSm))
                         Text("Setting up…")
                     } else {
-                        Icon(RACIcons.Outline.Download, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+                        // A download arrow over four components that are already on disk promises a
+                        // fetch that will not happen — all that is left then is loading them into
+                        // memory, which is seconds rather than hundreds of megabytes. Say which of
+                        // the two the tap is about to do.
+                        val fetches = components.any { c -> c.model?.let { !c.viewModel.isReady(it) } == true }
+                        Icon(
+                            imageVector = if (fetches) RACIcons.Outline.Download else RACIcons.Outline.Bolt,
+                            contentDescription = null,
+                            modifier = Modifier.size(dimens.iconSm),
+                        )
                         Spacer(Modifier.size(dimens.spacingSm))
-                        Text("Set up Voice AI")
+                        Text(if (fetches) "Set up Voice AI" else "Load Voice AI")
                     }
                 }
             }

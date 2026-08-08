@@ -69,10 +69,12 @@ struct ModelPrimaryActionButton: View {
             set: { if !$0 { downloads.clearError(model.id) } }
         ), presenting: downloads.errorMessage(model.id)) { _ in
             // Retry from the alert, because that is where the user already is
-            // when they learn it failed. It resumes rather than restarting: the
-            // partial file is intact, so a 3 GB download that died at 90% costs
-            // the last 10%, not the whole thing again.
-            Button("Retry") {
+            // when they learn it failed. Whether it resumes is the SDK's answer,
+            // not a promise this button makes: a network drop keeps the partial
+            // so a 3 GB download that died at 90% costs the last 10%, but a
+            // checksum failure deliberately throws those bytes away and the next
+            // attempt genuinely starts over. The verb says which one happened.
+            Button(downloads.canResume(model.id) ? "Resume" : "Try Again") {
                 downloads.clearError(model.id)
                 downloads.start(model) { onChanged() }
             }
@@ -153,10 +155,15 @@ struct RecommendedModelCard: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
+                // Same reason as `ModelVariantRow`: an in-flight download takes
+                // its share of the row, and a wrapping size label hyphenates
+                // into "762.9 / MB" instead of simply getting tighter.
                 HStack(spacing: AppSpacing.smallMedium) {
                     Text(subtitle)
                         .font(AppTypography.caption2)
                         .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     BackendPill(framework: model.framework)
                 }
 

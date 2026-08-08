@@ -13,6 +13,7 @@ import {
   SDKException,
 } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
+import { spokenTranscript } from '../../Foundation/TranscriptText.js';
 import {
   AudioFormat,
   ModelCategory,
@@ -639,7 +640,11 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         language: config.language,
       });
       this.assertCurrent(lifecycleVersion);
-      const transcription = stt.text.trim();
+      // `spokenTranscript` collapses Whisper's own no-speech markers
+      // (`[ Silence ]`, `[BLANK_AUDIO]`) to empty, so a turn the model heard
+      // nothing in falls into the "back to listening" branch below instead of
+      // being sent to the LLM as something the user said.
+      const transcription = spokenTranscript(stt.text).trim();
 
       if (!transcription) {
         this.emitState(

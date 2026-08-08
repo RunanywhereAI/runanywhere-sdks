@@ -51,26 +51,30 @@ import kotlin.coroutines.cancellation.CancellationException
  * than imply the mic is still listening. Swift `VoiceAgentMicDriver` is the
  * same shape for the same reasons, so the two platforms make the same promise.
  *
- * Two things are missing for hands-free barge-in, and neither can be supplied
- * from here:
+ * Two things are needed for hands-free barge-in. The core now supplies the
+ * first; the second is a device capability this checkout cannot assume:
  *
- *  1. **A speech signal during playout.** `rac_voice_agent_feed_audio_proto`
- *     answers a frame with a *completed turn* or with nothing; it reports
- *     nothing at the moment it first hears a voice. Feeding through the playout
- *     would therefore let the core capture the barge-in, but this layer would
- *     not learn of it until the whole replacement turn (STT -> LLM -> TTS,
- *     seconds) had run — far too late to cut the sentence the user talked over.
- *     Cutting it promptly needs the core to emit speech-start from its
- *     segmenter; synthesizing it here would be an SDK-side VAD, duplicating the
- *     core's segmenter on one platform only.
- *  2. **Echo cancellation on the capture path.** Feeding while the speaker is
- *     live re-feeds the device's own reply, which the core segments as a user
- *     utterance and answers — the agent talks to itself. Suppressing that is
- *     `AcousticEchoCanceler` on a `VOICE_COMMUNICATION` capture, which not
- *     every device (nor the emulator's audio HAL) provides.
+ *  1. **A speech signal during playout — now available.**
+ *     `voice_agent_feed_abi.cpp` reports the segmenter's speech *onset* on the
+ *     frame that opens the energy gate, and raises `INTERRUPT_REASON_USER_BARGE_IN`
+ *     when that onset lands inside the window where the reply it just handed
+ *     back is still audible. Feeding through the playout would therefore be
+ *     answered in ~100 ms rather than after a whole replacement turn.
+ *  2. **Echo cancellation on the capture path — still missing.** Feeding while
+ *     the speaker is live re-feeds the device's own reply, which the core hears
+ *     as a voice: it would raise a barge-in against the agent's own words, cut
+ *     the reply, segment the echo as an utterance and answer it. Suppressing
+ *     that is `AcousticEchoCanceler` on a `VOICE_COMMUNICATION` capture, which
+ *     not every device — and not the emulator's audio HAL, where this pipeline
+ *     is validated — provides. [AudioCaptureManager] opens a plain
+ *     `MediaRecorder.AudioSource.MIC` today, so there is none.
  *
- * Until both exist, dropping the frames is the honest behaviour: the bounded
- * channel bounds memory and keeps the device's own TTS out of the next turn.
+ * Until the capture path can cancel the device's own output, dropping the
+ * frames is the honest behaviour: the bounded channel bounds memory and keeps
+ * the device's own TTS out of the next turn. Swift `VoiceAgentMicDriver` is the
+ * same shape (and its `configureVoiceAudioSession` explains why it, too, keeps
+ * away from the voice-processing I/O path), so the two platforms make the same
+ * promise and every UI mounted on either has to say so.
  */
 internal class VoiceAgentMicDriver(
     private val handle: Long,
@@ -136,6 +140,14 @@ internal class VoiceAgentMicDriver(
                     // loop on a single bad turn.
                     if (e is Error) throw e
                     logger.warning("Voice feed failed: ${e.message}")
+                    // A failed feed is a failed *turn*: the core closed an
+                    // utterance and spent seconds inside this one call, so the
+                    // frames queued behind it are as stale as the ones behind a
+                    // reply. Only the reply path used to drop them, which let one
+                    // failed turn hand its own backlog to the next — a spurious
+                    // utterance closing, failing, and closing again off the same
+                    // audio.
+                    discardBacklog(chunks)
                     null
                 } ?: continue
 
@@ -152,14 +164,19 @@ internal class VoiceAgentMicDriver(
             if (reply != null && reply.size > 0) {
                 logger.info("Playing agent reply (${reply.size} WAV bytes)")
                 playReply(reply.toByteArray())
-                // Drop frames captured while the turn ran / the device spoke so
-                // stale audio is not folded into the next turn. See the
-                // half-duplex note on the class: without echo cancellation these
-                // frames are mostly the device's own reply, and feeding them
-                // back would have the agent answer itself.
-                while (chunks.tryReceive().isSuccess) Unit
+                discardBacklog(chunks)
             }
         }
+    }
+
+    /**
+     * Drop everything captured while the last turn was running.
+     *
+     * See the half-duplex note on the class: without echo cancellation those frames are mostly the
+     * device's own reply, so feeding them back would have the agent answer itself.
+     */
+    private fun discardBacklog(chunks: Channel<ByteArray>) {
+        while (chunks.tryReceive().isSuccess) Unit
     }
 
     /**

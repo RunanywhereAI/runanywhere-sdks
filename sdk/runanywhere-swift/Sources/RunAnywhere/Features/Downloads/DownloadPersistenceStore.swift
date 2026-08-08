@@ -12,12 +12,31 @@
 //
 //  Three artifacts per model, all under Application Support:
 //
-//    <model>.plan         the commons download plan, so a restored transfer
-//                         knows its file list and destinations without replanning
-//    <model|file>.resume  CFNetwork's opaque resume blob for one file
-//    <model|file>.resumebytes  how far that file had got (see `ResumeCheckpoint`)
+//    <digest>.plan         the commons download plan plus the model id it
+//                          belongs to, so a restored transfer knows its file
+//                          list and destinations without replanning
+//    <digest>.resume       CFNetwork's opaque resume blob for one file
+//    <digest>.resumebytes  how far that file had got (see `ResumeCheckpoint`)
+//
+//  ## Why the names are digests
+//
+//  They used to be the key percent-encoded, which is lossless and let a model
+//  id be read straight back out of a filename. It was also silently broken for
+//  every real download. The resume artifacts are keyed per *file*, so the key
+//  is "<model id>|<absolute destination path>"; percent-encoding every
+//  non-alphanumeric byte of that tripled the length of an already ~270-byte
+//  path and produced a ~400-byte filename. `NAME_MAX` is 255, so every write
+//  failed with ENAMETOOLONG behind a `try?`, `loadResumeData` always returned
+//  nil, and a cancelled multi-gigabyte download always restarted from zero
+//  while its partial bytes stayed stranded in CFNetwork's temp directory.
+//
+//  A SHA-256 digest is a fixed 64 characters no matter how long the key or how
+//  deep the container path, which is the only property that actually matters
+//  here. It is not reversible, so the model id a `.plan` belongs to is stored
+//  *inside* the plan record rather than recovered from its filename.
 //
 
+import CryptoKit
 import Foundation
 
 /// How many bytes an interrupted attempt left recoverable for one file.
@@ -31,6 +50,17 @@ import Foundation
 /// count it actually observed for that file, next to the blob it belongs to.
 private struct ResumeCheckpoint: Codable {
     let bytesOnDisk: Int64
+}
+
+/// A persisted plan and the model it belongs to.
+///
+/// The model id rides inside the record because the filename is a digest: it
+/// is what `interruptedModelIDs` reads, and carrying it here means a model id
+/// of any length or character set is storable, which a filename-derived scheme
+/// could never promise.
+private struct PersistedPlan: Codable {
+    let modelID: String
+    let planBytes: Data
 }
 
 /// On-disk custody for interrupted background downloads. Stateless: every method
@@ -58,37 +88,38 @@ struct DownloadPersistenceStore: Sendable {
         return dir
     }
 
-    /// Percent-encoding every non-alphanumeric byte makes the transform lossless,
-    /// so `interruptedModelIDs` can read the model id straight back out of a
-    /// filename instead of needing a second index file to map them.
-    private func storageKey(_ value: String) -> String? {
-        value.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
+    /// A fixed-length, filesystem-safe name for an arbitrary key. See the file
+    /// header for why length — not reversibility — is the property that matters.
+    private func storageKey(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     private func url(modelID: String, artifact: Artifact) -> URL? {
-        guard let name = storageKey(modelID) else { return nil }
-        return directory()?.appendingPathComponent("\(name).\(artifact.rawValue)")
+        directory()?.appendingPathComponent("\(storageKey(modelID)).\(artifact.rawValue)")
     }
 
     /// Resume artifacts are keyed per *file*, not per model: a multi-file model can
     /// be interrupted with some files finished and one mid-flight.
     private func url(modelID: String, destinationPath: String, artifact: Artifact) -> URL? {
-        guard let name = storageKey("\(modelID)|\(destinationPath)") else { return nil }
-        return directory()?.appendingPathComponent("\(name).\(artifact.rawValue)")
+        directory()?.appendingPathComponent(
+            "\(storageKey("\(modelID)|\(destinationPath)")).\(artifact.rawValue)"
+        )
     }
 
     // MARK: - Plan
 
     func persistPlan(_ plan: RADownloadPlanResult, modelID: String) {
         guard let url = url(modelID: modelID, artifact: .plan),
-              let data = try? plan.serializedData() else { return }
+              let planBytes = try? plan.serializedData(),
+              let data = try? JSONEncoder().encode(
+                  PersistedPlan(modelID: modelID, planBytes: planBytes)
+              ) else { return }
         try? data.write(to: url, options: .atomic)
     }
 
     func loadPlan(modelID: String) -> RADownloadPlanResult? {
-        guard let url = url(modelID: modelID, artifact: .plan),
-              let data = try? Data(contentsOf: url) else { return nil }
-        return try? RADownloadPlanResult(serializedBytes: data)
+        guard let url = url(modelID: modelID, artifact: .plan) else { return nil }
+        return decodePlan(at: url)?.plan
     }
 
     func clearPlan(modelID: String) {
@@ -100,10 +131,28 @@ struct DownloadPersistenceStore: Sendable {
     /// started and never reached a terminal state. A plan is written when a
     /// transfer begins and removed when it completes or fails unrecoverably, so
     /// its presence *is* the record of an interrupted download.
+    ///
+    /// A record that no longer decodes is deleted rather than skipped. It cannot
+    /// be resumed by anything, and leaving it behind would keep the directory —
+    /// and `hasRecoverableState`, which gates the orphan sweep — permanently
+    /// pinned by a file nobody can use.
     func interruptedModelIDs() -> [String] {
         contents()
             .filter { $0.pathExtension == Artifact.plan.rawValue }
-            .compactMap { $0.deletingPathExtension().lastPathComponent.removingPercentEncoding }
+            .compactMap { url in
+                guard let record = decodePlan(at: url) else {
+                    try? FileManager.default.removeItem(at: url)
+                    return nil
+                }
+                return record.modelID
+            }
+    }
+
+    private func decodePlan(at url: URL) -> (modelID: String, plan: RADownloadPlanResult)? {
+        guard let data = try? Data(contentsOf: url),
+              let record = try? JSONDecoder().decode(PersistedPlan.self, from: data),
+              let plan = try? RADownloadPlanResult(serializedBytes: record.planBytes) else { return nil }
+        return (record.modelID, plan)
     }
 
     // MARK: - Resume data
@@ -120,20 +169,33 @@ struct DownloadPersistenceStore: Sendable {
     /// `bytesOnDisk` is the caller's last observed byte count for the file, or 0
     /// when it never saw one; the checkpoint is skipped in that case rather than
     /// recording a zero that would later read as "nothing recoverable".
-    func storeResumeData(_ data: Data, modelID: String, destinationPath: String, bytesOnDisk: Int64) {
+    ///
+    /// Returns whether the blob actually landed. The caller reports that, because
+    /// a failure here is the difference between a retry costing the remainder and
+    /// costing the whole file — exactly the failure that hid behind a `try?` for
+    /// as long as the filenames were too long to write.
+    @discardableResult
+    func storeResumeData(
+        _ data: Data, modelID: String, destinationPath: String, bytesOnDisk: Int64
+    ) -> Bool {
         guard let blobURL = url(modelID: modelID, destinationPath: destinationPath, artifact: .resume) else {
-            return
+            return false
         }
-        try? data.write(to: blobURL, options: .atomic)
+        do {
+            try data.write(to: blobURL, options: .atomic)
+        } catch {
+            return false
+        }
 
         guard bytesOnDisk > 0,
               let checkpointURL = url(
                   modelID: modelID, destinationPath: destinationPath, artifact: .resumeBytes
               ),
               let encoded = try? JSONEncoder().encode(ResumeCheckpoint(bytesOnDisk: bytesOnDisk)) else {
-            return
+            return true
         }
         try? encoded.write(to: checkpointURL, options: .atomic)
+        return true
     }
 
     func loadResumeData(modelID: String, destinationPath: String) -> Data? {
@@ -159,15 +221,31 @@ struct DownloadPersistenceStore: Sendable {
         }
     }
 
+    /// Every resume blob a model still holds, so the caller can hand each one
+    /// back to CFNetwork before deleting it. Deleting a blob without releasing it
+    /// strands the partial file it points at, which is how a discarded 3 GB
+    /// download leaks 3 GB of temp storage nothing will ever collect.
+    func resumeBlobs(modelID: String, destinationPaths: [String]) -> [Data] {
+        destinationPaths.compactMap { loadResumeData(modelID: modelID, destinationPath: $0) }
+    }
+
     /// Drop every resume artifact for a model, used once it is fully downloaded or
     /// has failed for a reason a resume cannot fix.
-    func clearResumeData(modelID: String) {
-        guard let prefix = storageKey("\(modelID)|") else { return }
-        let resumeExtensions = [Artifact.resume.rawValue, Artifact.resumeBytes.rawValue]
-        for entry in contents()
-        where resumeExtensions.contains(entry.pathExtension)
-            && entry.lastPathComponent.hasPrefix(prefix) {
-            try? FileManager.default.removeItem(at: entry)
+    func clearResumeData(modelID: String, destinationPaths: [String]) {
+        for path in destinationPaths {
+            clearResumeData(modelID: modelID, destinationPath: path)
+        }
+    }
+
+    /// Whether anything here could still continue a download.
+    ///
+    /// Answers the one question the orphan sweep must be sure of before it
+    /// deletes a partial file it cannot attribute: if there is no plan and no
+    /// blob, there is no attempt this SDK could resume, so nothing it deletes
+    /// can cost a user bytes they would otherwise have kept.
+    func hasRecoverableState() -> Bool {
+        contents().contains {
+            $0.pathExtension == Artifact.plan.rawValue || $0.pathExtension == Artifact.resume.rawValue
         }
     }
 

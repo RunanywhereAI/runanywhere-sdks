@@ -37,7 +37,14 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 
-enum class VoiceState { IDLE, STARTING, LISTENING, TRANSCRIBING, THINKING, SPEAKING }
+/**
+ * What the panel may claim about the pipeline.
+ *
+ * [FAILED] is deliberately not folded into [IDLE]: a session the core killed and one the user
+ * ended look identical from IDLE, and the difference is the whole reason the screen keeps the
+ * error line — "Ready to talk" over a turn that just died is the panel disagreeing with itself.
+ */
+enum class VoiceState { IDLE, STARTING, LISTENING, TRANSCRIBING, THINKING, SPEAKING, FAILED }
 
 data class VoiceTurn(val text: String, val isUser: Boolean)
 
@@ -111,7 +118,9 @@ class VoiceViewModel : ViewModel() {
             return
         }
         when (state) {
-            VoiceState.IDLE -> startConversation()
+            // FAILED holds no session (releaseFailedSession closed it), so the tap starts a fresh
+            // one exactly as it does from IDLE — there is nothing left to stop.
+            VoiceState.IDLE, VoiceState.FAILED -> startConversation()
             else -> stop()
         }
     }
@@ -304,11 +313,40 @@ class VoiceViewModel : ViewModel() {
             state = VoiceState.IDLE
             return
         }
+        endAgentSession(VoiceState.IDLE)
+    }
+
+    /**
+     * Hand the microphone back after the core reports a session it cannot continue.
+     *
+     * This used to be a label change and nothing else: [state] dropped to [VoiceState.IDLE] while
+     * the session object, its mic driver and that driver's AudioRecord all kept running — measured
+     * on the emulator as an active MIC record client (`RecordActivityMonitor … silenced:false`)
+     * underneath a panel reading "Ready to talk". A pipeline the core has given up on must not hold
+     * a live microphone, and "Ready to talk" must not stand in for "the last turn died". Mirrors
+     * iOS `VoiceAgentViewModel.releaseFailedSession`, which settles on its own error state for the
+     * same reason.
+     */
+    private fun releaseFailedSession() {
+        partialTranscript = null
+        isSpeechDetected = false
+        isInterrupting = false
+        endAgentSession(VoiceState.FAILED)
+    }
+
+    /**
+     * Cancel the event collector, close the session off-main, and settle on [next].
+     *
+     * Safe to call from inside the collector: cancelling the job that is running this unwinds it at
+     * its next suspension point, and the close is awaited by a separate coroutine that the next
+     * [startConversation] joins before opening another session.
+     */
+    private fun endAgentSession(next: VoiceState) {
         val sessionJob = job
         sessionJob?.cancel()
         job = null
         assistantTurnIndex = null
-        state = VoiceState.IDLE
+        state = next
         val previousCleanup = cleanupJob
         val openSession = session
         session = null
@@ -373,6 +411,10 @@ class VoiceViewModel : ViewModel() {
                 if (event.isFinal) {
                     partialTranscript = null
                     if (text.isNotBlank()) {
+                        // A notice about a turn that failed stops being true the moment the next
+                        // one is understood; left standing it reads as a fault in the turn the
+                        // reader is watching succeed.
+                        error = null
                         turns += VoiceTurn(text, isUser = true)
                         assistantTurnIndex = null
                     }
@@ -397,13 +439,13 @@ class VoiceViewModel : ViewModel() {
             is VoiceEvent.AgentResponse -> appendAssistantToken(event.text)
             is VoiceEvent.SpeechStarted -> isSpeechDetected = true
             is VoiceEvent.SpeechEnded -> isSpeechDetected = false
+            // A recoverable failure describes one turn, so the conversation — and the open
+            // microphone behind it — carries on and only the notice changes. A non-recoverable one
+            // describes the session, and a session the core has abandoned has to be released, not
+            // relabelled.
             is VoiceEvent.Error -> {
                 error = event.message
-                if (!event.recoverable) {
-                    state = VoiceState.IDLE
-                    isSpeechDetected = false
-                    partialTranscript = null
-                }
+                if (!event.recoverable) releaseFailedSession()
             }
         }
     }

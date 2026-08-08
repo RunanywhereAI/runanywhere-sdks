@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.download.ModelDownloadService
+import com.runanywhere.runanywhereai.download.asSentence
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -119,16 +121,33 @@ internal fun DownloadProgressBlock(progress: DownloadProgressInfo?, modifier: Mo
 enum class DownloadInterruption { FAILED, PAUSED }
 
 /**
+ * Which of the two an interruption record is. One mapping, next to the enum, so a new row type
+ * cannot invent a third reading of `cancelled`.
+ */
+internal fun ModelDownloadService.Interrupted?.kind(): DownloadInterruption? = when {
+    this == null -> null
+    cancelled -> DownloadInterruption.PAUSED
+    else -> DownloadInterruption.FAILED
+}
+
+/**
  * The note under an interrupted row.
  *
  * Both variants say the bytes are kept, because the reasonable fear with a half-finished
  * multi-gigabyte download is that starting again means starting from zero. It does not: the SDK
- * cancels with `delete_partial_bytes = false`.
+ * cancels with `delete_partial_bytes = false`, and a re-issued download continues from the partial
+ * file on disk. [kept] is the amount that survived, which turns that promise into a number.
+ *
+ * [detail] is the SDK's own account of a failure — "Insufficient storage", a server status — and is
+ * shown ahead of the generic line, because a reader who cannot see *why* it failed has no way to
+ * judge whether retrying will do anything.
  */
 @Composable
 internal fun DownloadInterruptionNote(
     kind: DownloadInterruption,
     modifier: Modifier = Modifier,
+    detail: String? = null,
+    kept: String? = null,
 ) {
     val dimens = LocalDimens.current
     val failed = kind == DownloadInterruption.FAILED
@@ -137,9 +156,19 @@ internal fun DownloadInterruptionNote(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val headline = when {
+        failed -> detail?.takeIf { it.isNotBlank() }?.asSentence() ?: "Download failed"
+        else -> "Paused"
+    }
+    val continuation = when {
+        kept != null && failed -> "Retry continues from the $kept already downloaded"
+        kept != null -> "Resume continues from the $kept already downloaded"
+        failed -> "Retry resumes where it stopped"
+        else -> "Resume picks up where it stopped"
+    }
     Row(
         modifier = modifier.padding(top = dimens.spacingXs),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
     ) {
         Icon(
@@ -148,15 +177,20 @@ internal fun DownloadInterruptionNote(
             tint = tint,
             modifier = Modifier.size(dimens.iconSm),
         )
-        Text(
-            text = if (failed) {
-                "Download failed — retry resumes where it stopped"
-            } else {
-                "Paused — resume picks up where it stopped"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = tint,
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+            Text(
+                text = headline,
+                style = MaterialTheme.typography.bodySmall,
+                color = tint,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = continuation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

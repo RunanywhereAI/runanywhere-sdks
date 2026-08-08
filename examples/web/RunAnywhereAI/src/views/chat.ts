@@ -45,11 +45,14 @@ import { getGenerationSettings, setThinkingModeEnabled } from './settings';
 import {
   answerDocumentAttachment,
   answerImageAttachment,
+  canAnswerDocumentAttachment,
   canAnswerImageAttachment,
   cancelActiveDocumentAttachmentAnswer,
   cancelActiveImageAttachmentAnswer,
+  imageAttachmentThumbnail,
   kindForFile,
   validateChatAttachmentFile,
+  type ChatAttachmentAnswer,
 } from '../services/chat-attachments';
 import { escapeHtml } from '../services/escape-html';
 import { renderMarkdown } from '../services/markdown';
@@ -71,6 +74,16 @@ interface ChatAttachmentInfo {
   kind: 'image' | 'document';
   name: string;
   detail?: string;
+  /**
+   * A thumbnail-sized JPEG data URL of an image attachment.
+   *
+   * An image turn that shows only a filename and a picture glyph asks the reader
+   * to remember which photo they sent — iOS keeps the image itself on the turn
+   * (LLMViewModel+Vision.swift:75-92 persists the attachment bytes). Stored at
+   * 96 px so a conversation full of photos stays a few kilobytes per turn in
+   * IndexedDB rather than a few megabytes.
+   */
+  thumbnailDataUrl?: string;
 }
 
 interface ChatSourceInfo {
@@ -111,6 +124,8 @@ interface PendingAttachment {
   file: File;
   name: string;
   description: string;
+  /** Filled in asynchronously for images; see `ChatAttachmentInfo`. */
+  thumbnailDataUrl?: string;
 }
 
 type JsonObject = Readonly<Record<string, unknown>>;
@@ -135,7 +150,13 @@ function isChatAttachmentInfo(value: unknown): value is ChatAttachmentInfo {
   return isJsonObject(value)
     && (value.kind === 'image' || value.kind === 'document')
     && typeof value.name === 'string'
-    && hasOptionalString(value, 'detail');
+    && hasOptionalString(value, 'detail')
+    // Restored straight into an `<img src>`, so a stored value that is not a
+    // data URL never reaches the DOM — the database is app-owned but it is still
+    // persisted, origin-scoped input.
+    && (value.thumbnailDataUrl === undefined
+      || (typeof value.thumbnailDataUrl === 'string'
+        && value.thumbnailDataUrl.startsWith('data:image/')));
 }
 
 function isChatSourceInfo(value: unknown): value is ChatSourceInfo {
@@ -172,6 +193,19 @@ const VLM_SHEET_OPTIONS: OpenSheetOptions = {
   ],
 };
 
+/**
+ * A grounded file answer needs both halves of the pipeline, so the picker it
+ * opens shows both — the same move the image branch already made, rather than
+ * failing the send with the SDK's "model is not downloaded" sentence.
+ */
+const DOCUMENT_SHEET_OPTIONS: OpenSheetOptions = {
+  title: 'Choose Document Models',
+  filterCategories: [
+    ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    ModelCategory.MODEL_CATEGORY_LANGUAGE,
+  ],
+};
+
 const CHAT_CAPABLE_MODEL_CATEGORIES: readonly ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_LANGUAGE,
   ModelCategory.MODEL_CATEGORY_MULTIMODAL,
@@ -194,6 +228,9 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
 
   messages = [];
   toolsEnabled = loadToolsEnabled();
+  // Module state outlives a panel rebuild. Without this, remounting the tab
+  // re-showed the pill for a File the previous composer had staged.
+  pendingAttachment = null;
 
   // Register the demo tools once at chat setup — iOS parity:
   // ToolSettingsViewModel.registerDemoTools (ToolSettingsView.swift:153-159).
@@ -210,19 +247,21 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       </div>
       <div class="chat-input-area">
         <div class="composer-menu-wrap">
-          <button class="composer-icon-btn" id="chat-attach-btn" type="button" aria-label="Attach or open mode" title="Attach or open mode">
+          <button class="composer-icon-btn" id="chat-attach-btn" type="button"
+            aria-label="Attach a file or open live camera" title="Attach a file or open live camera"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="chat-attach-menu">
             ${icon('plus')}
           </button>
-          <div class="composer-menu hidden" id="chat-attach-menu">
-            <button type="button" data-action="document">
+          <div class="composer-menu hidden" id="chat-attach-menu" role="menu">
+            <button type="button" role="menuitem" data-action="document">
               ${icon('file')}
               <span><strong>Document</strong><small>Ask questions with sources</small></span>
             </button>
-            <button type="button" data-action="image">
+            <button type="button" role="menuitem" data-action="image">
               ${icon('image')}
               <span><strong>Image</strong><small>Ask about a photo</small></span>
             </button>
-            <button type="button" data-action="live">
+            <button type="button" role="menuitem" data-action="live">
               ${icon('eye')}
               <span><strong>Live camera</strong><small>Look around with vision</small></span>
             </button>
@@ -306,9 +345,9 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
     attachmentPill.classList.remove('hidden');
     attachmentPill.innerHTML = `
-      ${icon(pendingAttachment.kind === 'image' ? 'image' : 'file')}
+      ${attachmentGlyph(pendingAttachment.kind, pendingAttachment.thumbnailDataUrl)}
       <span><strong>${escapeHtml(pendingAttachment.name)}</strong><small>${escapeHtml(pendingAttachment.description)}</small></span>
-      <button type="button" id="chat-clear-attachment" aria-label="Remove attachment">
+      <button type="button" id="chat-clear-attachment" aria-label="Remove ${escapeHtml(pendingAttachment.name)}">
         ${icon('close')}
       </button>
     `;
@@ -432,13 +471,21 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     setThinkingModeEnabled(!getGenerationSettings().thinkingModeEnabled);
     refreshThinkingButton();
   }, listenerOptions);
+  // `aria-expanded` is the only thing that tells a screen-reader user the menu
+  // opened at all — the visual state is a class that flips `display`, which is
+  // silent. Kept in one place so the flag cannot drift from the class.
+  const setAttachMenuOpen = (open: boolean) => {
+    attachMenu.classList.toggle('hidden', !open);
+    attachBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  const closeAttachMenu = () => setAttachMenuOpen(false);
   attachBtn.addEventListener('click', (event) => {
     event.stopPropagation();
-    attachMenu.classList.toggle('hidden');
+    setAttachMenuOpen(attachMenu.classList.contains('hidden'));
   }, listenerOptions);
   attachMenu.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) => {
     button.addEventListener('click', () => {
-      attachMenu.classList.add('hidden');
+      closeAttachMenu();
       const action = button.dataset.action;
       if (action === 'document') documentInput.click();
       if (action === 'image') imageInput.click();
@@ -446,8 +493,14 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       if (action === 'advanced') navigateTo('advanced');
     }, listenerOptions);
   });
-  const closeAttachMenu = () => attachMenu.classList.add('hidden');
   document.addEventListener('click', closeAttachMenu, listenerOptions);
+  // Escape is how every other dismissible surface in this app closes; a menu
+  // that only closes on an outside click strands a keyboard user inside it.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || attachMenu.classList.contains('hidden')) return;
+    closeAttachMenu();
+    attachBtn.focus();
+  }, listenerOptions);
   /**
    * Validate one file and stage it as the pending attachment.
    *
@@ -463,7 +516,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       showToast(error, 'warning', 4200);
       return false;
     }
-    pendingAttachment = kind === 'image'
+    const staged: PendingAttachment = kind === 'image'
       ? {
         kind: 'image',
         file,
@@ -476,8 +529,19 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         name: file.name || 'Selected document',
         description: 'Ask with sources from this document',
       };
+    pendingAttachment = staged;
     refreshAttachmentPill();
     refreshSendButton();
+    if (kind === 'image') {
+      // Decoding is async, so the pill appears immediately with its glyph and
+      // gains the picture a moment later rather than making the reader wait for
+      // a canvas round-trip before the composer responds at all.
+      void imageAttachmentThumbnail(file).then((thumbnailDataUrl) => {
+        if (!thumbnailDataUrl || pendingAttachment !== staged) return;
+        staged.thumbnailDataUrl = thumbnailDataUrl;
+        refreshAttachmentPill();
+      });
+    }
     return true;
   };
 
@@ -552,12 +616,23 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
   }, listenerOptions);
   talkBtn.addEventListener('click', () => navigateTo('voice'), listenerOptions);
-  const showConversation = (nextMessages: ChatMessage[]) => {
+  /**
+   * Show a different conversation.
+   *
+   * `clearComposer` is false for exactly one caller: the initial restore from
+   * IndexedDB. Restoring is not switching — the reader did not ask for it and
+   * may already be typing or have staged a file while it was in flight, and this
+   * function used to wipe both, so a message composed in the first second after
+   * opening chat silently vanished.
+   */
+  const showConversation = (nextMessages: ChatMessage[], clearComposer = true) => {
     messages = nextMessages;
     setOverlaySuppressed(conversationSuppressesModelOverlay(nextMessages));
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
-    pendingAttachment = null;
+    if (clearComposer) {
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      pendingAttachment = null;
+    }
     renderMessages(messagesEl);
     refreshAttachmentPill();
     refreshSendButton();
@@ -621,7 +696,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const initialConversationVersion = conversationActionVersion;
   conversationHydration = loadConversation().then((savedMessages) => {
     if (conversationActionVersion === initialConversationVersion) {
-      showConversation(savedMessages);
+      showConversation(savedMessages, false);
     }
   }).catch(reportConversationStorageError).finally(() => {
     conversationHydrated = true;
@@ -711,9 +786,21 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     prompt: string,
     host: HTMLElement,
   ): Promise<void> {
+    // Both branches leave the file staged on purpose: the reader's next action
+    // after picking a model is to press Send again, and re-attaching the file
+    // first would be busywork the app created.
     if (attachment.kind === 'image' && !canAnswerImageAttachment()) {
       openSheet(VLM_SHEET_OPTIONS);
       showToast('Load an image model first, then send the attached image.', 'info', 4200);
+      return;
+    }
+    if (attachment.kind === 'document' && !canAnswerDocumentAttachment()) {
+      openSheet(DOCUMENT_SHEET_OPTIONS);
+      showToast(
+        'Answering questions about a file needs an indexing model and a chat model. Download them here, then send the file again.',
+        'info',
+        5200,
+      );
       return;
     }
 
@@ -734,6 +821,9 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         kind: attachment.kind,
         name: attachment.name,
         detail: attachment.description,
+        ...(attachment.thumbnailDataUrl
+          ? { thumbnailDataUrl: attachment.thumbnailDataUrl }
+          : {}),
       },
     };
     const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
@@ -757,24 +847,28 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         assistantMsg.content = content;
         renderLastMessage(host, assistantMsg);
       };
+      let answer: ChatAttachmentAnswer;
       if (attachment.kind === 'image') {
         cancelGeneration = cancelActiveImageAttachmentAnswer;
-        const answer = await answerImageAttachment(attachment.file, question, settings, onProgress);
-        assistantMsg.content = answer.content;
-        assistantMsg.thinking = answer.thinking;
-        assistantMsg.sources = answer.sources;
+        answer = await answerImageAttachment(attachment.file, question, settings, onProgress);
       } else {
         cancelGeneration = cancelActiveDocumentAttachmentAnswer;
-        const answer = await answerDocumentAttachment(attachment.file, question, settings, onProgress);
-        assistantMsg.content = answer.content;
-        assistantMsg.thinking = answer.thinking;
-        assistantMsg.sources = answer.sources;
+        answer = await answerDocumentAttachment(attachment.file, question, settings, onProgress);
       }
+      assistantMsg.thinking = answer.thinking;
+      assistantMsg.sources = answer.sources;
+      // A stopped turn keeps whatever had already been written — it is on screen
+      // and the reader chose to stop it — and only says "Stopped." when nothing
+      // arrived at all. Replacing partial text with a one-word status would
+      // delete an answer the reader was in the middle of reading.
+      assistantMsg.content = answer.cancelled
+        ? (answer.content || 'Stopped.')
+        : (answer.content || attachmentEmptyAnswer(attachment.kind));
       renderLastMessage(host, assistantMsg, false);
     } catch (error) {
       if (assistantMsg.thinking === 'Starting…') assistantMsg.thinking = undefined;
       const cancelled = isAbortError(error);
-      assistantMsg.content = cancelled ? 'Cancelled.' : formatChatError(error);
+      assistantMsg.content = cancelled ? 'Stopped.' : formatChatError(error);
       // Only a real failure is flagged. A cancellation is the reader's own decision,
       // so painting it in the danger colour would report their own action back to
       // them as an error (DESIGN_GUIDELINE §9 keeps cancelled and error distinct).
@@ -812,6 +906,20 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       if (cancelGeneration) cancelGeneration();
     },
   };
+}
+
+/**
+ * What an attachment turn says when the model answered nothing.
+ *
+ * A plain sentence rather than the "(empty response)" stand-in this used to
+ * render — a parenthetical is developer shorthand, and a reader cannot tell it
+ * apart from an answer the model actually gave. iOS says the same thing in the
+ * same place (LLMViewModel+Vision.swift:128).
+ */
+function attachmentEmptyAnswer(kind: 'image' | 'document'): string {
+  return kind === 'image'
+    ? 'The model did not describe that image. Try another photo, or ask a more specific question.'
+    : 'The model did not find an answer in that file. Try rephrasing the question.';
 }
 
 /** Saved content stays readable even when no inference model is loaded. */
@@ -1538,6 +1646,22 @@ function renderMessages(host: HTMLElement): void {
   host.scrollTop = host.scrollHeight;
 }
 
+/**
+ * The picture itself when there is one, the modality glyph otherwise.
+ *
+ * Sized inline because the attachment card's stylesheet rule only ever expected
+ * an SVG; the thumbnail borrows that same 20px box so the pill and the bubble
+ * keep their existing rhythm. The `src` is a data URL this app produced and
+ * `isChatAttachmentInfo` re-checks on restore, never remote content.
+ */
+function attachmentGlyph(kind: 'image' | 'document', thumbnailDataUrl?: string): string {
+  if (kind === 'image' && thumbnailDataUrl) {
+    return `<img src="${escapeHtml(thumbnailDataUrl)}" alt=""
+      style="width:28px;height:28px;object-fit:cover;border-radius:var(--radius-sm);flex:none;" />`;
+  }
+  return icon(kind === 'image' ? 'image' : 'file');
+}
+
 function renderMessageActions(msg: ChatMessage, idx: number): string {
   if (msg.role !== 'assistant' || !msg.content) return '';
   return `
@@ -1595,7 +1719,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
   const attachmentSection = msg.attachment
     ? `
       <div class="chat-attachment-card chat-attachment-card--${msg.attachment.kind}">
-        ${icon(msg.attachment.kind === 'image' ? 'image' : 'file')}
+        ${attachmentGlyph(msg.attachment.kind, msg.attachment.thumbnailDataUrl)}
         <span><strong>${escapeHtml(msg.attachment.name)}</strong><small>${escapeHtml(msg.attachment.detail ?? '')}</small></span>
       </div>
     `

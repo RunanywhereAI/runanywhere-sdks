@@ -25,7 +25,10 @@ import RunAnywhere
 final class HuggingFaceDownloadModel: ObservableObject {
     enum Phase: Equatable {
         case idle
-        case downloading(Double)
+        /// In flight. `fraction` is 0...1 when a position is knowable, and nil
+        /// when it is not — an unknown size, or a phase like verification that
+        /// has no measurable length.
+        case running(ModelDownloadPhase, fraction: Double?)
         case done
         case failed(String)
     }
@@ -33,6 +36,14 @@ final class HuggingFaceDownloadModel: ObservableObject {
     @Published var phases: [String: Phase] = [:]
 
     /// Register the artifact with the SDK, then download it, updating progress.
+    ///
+    /// Every event is read, not only `.progress`. `models.download(id:)` reports
+    /// a failure as a `.failed` *event* and then finishes its stream normally, so
+    /// a loop that filters for `.progress` runs off the end of a failed download
+    /// and marks it "Downloaded" — a row claiming a model the user does not have.
+    /// The verification and unpacking phases matter for the opposite reason: on a
+    /// multi-gigabyte GGUF they run long enough that a bar left at 100% with no
+    /// explanation reads as a hang.
     func download(
         key: String,
         name: String,
@@ -40,7 +51,7 @@ final class HuggingFaceDownloadModel: ObservableObject {
         framework: InferenceFramework,
         sizeBytes: Int64?
     ) async {
-        phases[key] = .downloading(0)
+        phases[key] = .running(.starting, fraction: nil)
         do {
             let model = try await RunAnywhere.models.register(
                 .url(
@@ -50,18 +61,36 @@ final class HuggingFaceDownloadModel: ObservableObject {
                     memoryRequirementBytes: sizeBytes
                 )
             )
+            var terminal: Phase = .done
             for try await event in try await RunAnywhere.models.download(id: model.id) {
-                guard case .progress(let snapshot) = event else { continue }
-                // Nil fraction means the size is unknown; hold the last known
-                // value rather than snapping the bar back to zero.
-                if let fraction = snapshot.fraction {
-                    phases[key] = .downloading(Double(fraction))
+                switch event {
+                case .started:
+                    phases[key] = .running(.starting, fraction: nil)
+                case .progress(let snapshot):
+                    // Nil fraction means the size is unknown; the track sweeps
+                    // rather than snapping back to zero.
+                    phases[key] = .running(.downloading, fraction: snapshot.fraction.map(Double.init))
+                case .verifying:
+                    phases[key] = .running(.verifying, fraction: nil)
+                case .extracting(_, _, let percent):
+                    phases[key] = .running(
+                        .extracting(percent: percent),
+                        fraction: percent.map { Double($0) / 100 }
+                    )
+                case .completed:
+                    terminal = .done
+                case .cancelled:
+                    terminal = .idle
+                case .failed(_, _, let error):
+                    terminal = .failed(error.message)
                 }
             }
-            phases[key] = .done
-            await ModelListViewModel.shared.loadModelsFromRegistry()
+            phases[key] = terminal
+            if terminal == .done {
+                await ModelListViewModel.shared.loadModelsFromRegistry()
+            }
         } catch {
-            phases[key] = .failed(error.localizedDescription)
+            phases[key] = .failed((error as? SDKException)?.message ?? error.localizedDescription)
         }
     }
 }
@@ -537,14 +566,28 @@ struct HuggingFaceRepoDetailView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.primaryAccent)
-        case .downloading(let progress):
+        case let .running(phase, fraction):
             HStack(spacing: AppSpacing.smallMedium) {
-                ProgressView(value: progress)
-                    .frame(width: 100)
-                Text("\(Int(progress * 100))%")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
+                // No value means no position to claim — an unknown Content-Length
+                // or a phase with no measurable length — so the bar spins rather
+                // than sitting at a number it made up.
+                if let fraction {
+                    ProgressView(value: fraction).frame(width: 100)
+                    Text("\(Int(fraction * 100))%")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                        .monospacedDigit()
+                } else {
+                    ProgressView().controlSize(.small)
+                    Text(phase.label)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                fraction.map { "\(phase.label), \(Int($0 * 100)) percent" } ?? phase.label
+            )
         case .done:
             Label("Downloaded", systemImage: "checkmark.circle.fill")
                 .font(AppTypography.captionMedium)

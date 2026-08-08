@@ -76,6 +76,15 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
 
     static let sessionIdentifier = "com.runanywhere.downloads"
 
+    /// Suffix for a file that has fully landed but is not yet trusted.
+    ///
+    /// Deliberately not commons' ".part": that sidecar means "this many valid
+    /// bytes, continue from here", and the commons planner measures it to decide
+    /// a resume offset. A file staged here has every byte but an unproven
+    /// checksum, which is the opposite claim, and letting the planner read it as
+    /// a partial would have it resume from the end of a file it never verified.
+    private static let stagingSuffix = ".racstaged"
+
     /// A `DispatchQueue` rather than an actor because every mutation below happens
     /// inside a synchronous `URLSession` delegate callback. Hopping those onto an
     /// actor would make each one a suspension point, and two chunks of the same
@@ -126,7 +135,10 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
             config.isDiscretionary = false
             config.waitsForConnectivity = true
             // Serial on purpose: the delegate callbacks mutate the transfer table
-            // and their order is the progress order a caller sees.
+            // and their order is the progress order a caller sees. Nothing slow
+            // may run on it — see `didFinishDownloadingTo`, which hands the
+            // checksum off rather than hashing gigabytes here and stalling every
+            // other file's progress and every pending cancel behind it.
             let queue = OperationQueue()
             queue.maxConcurrentOperationCount = 1
             let created = URLSession(configuration: config, delegate: self, delegateQueue: queue)
@@ -212,17 +224,58 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
             logger.info("Adopted \(liveModelIDs.count) background download(s) still in flight")
         }
 
-        // A persisted plan whose files are all on disk, with no task still
-        // running, is a transfer that completed while the app was not running:
-        // the bytes landed but the registry was never told. Finalize it now
-        // rather than making the user tap download on a model that is already
-        // fully downloaded.
         for modelID in store.interruptedModelIDs() where !liveModelIDs.contains(modelID) {
-            guard let files = store.loadPlan(modelID: modelID)?.files,
-                  allFilesComplete(files) else { continue }
+            guard let plan = store.loadPlan(modelID: modelID) else { continue }
+            // A file whose bytes all landed but whose checksum was still running
+            // when the process died is staged, not lost. Finishing that check now
+            // is the difference between paying for the last few seconds of work
+            // and paying for the whole multi-gigabyte transfer again.
+            await promoteStagedFiles(plan: plan, modelID: modelID)
+
+            // A persisted plan whose files are all on disk, with no task still
+            // running, is a transfer that completed while the app was not running:
+            // the bytes landed but the registry was never told. Finalize it now
+            // rather than making the user tap download on a model that is already
+            // fully downloaded.
+            guard allFilesComplete(plan.files),
+                  store.loadPlan(modelID: modelID) != nil else { continue }
             logger.info("Finalizing a background download that completed while the app was closed",
                         metadata: ["modelId": modelID])
-            completeTransfer(modelID: modelID)
+            completeTransfer(modelID: modelID, plan: plan)
+        }
+
+        reclaimOrphanedPartials(hasLiveTasks: !liveModelIDs.isEmpty)
+    }
+
+    /// Verify and install any file left staged by a process that died between
+    /// "every byte arrived" and "the checksum passed".
+    ///
+    /// Installs only. Deciding that the *whole model* is finished is left to the
+    /// caller, because both callers already make that call for their own reasons
+    /// — `startTasks` when every file is on disk, `restoreInterruptedTransfers`
+    /// when no task survived — and having this decide too meant a plan finished
+    /// here and then finished again a few lines later, finalizing twice.
+    private func promoteStagedFiles(plan: RADownloadPlanResult, modelID: String) async {
+        for file in plan.files {
+            let staging = URL(fileURLWithPath: file.destinationPath + Self.stagingSuffix)
+            guard fileSize(staging.path) == file.expectedBytes else {
+                // Any other size is a staging file from an interrupted move, not
+                // a complete download; it can never be promoted, so drop it
+                // rather than leave it occupying the model's own size again.
+                if FileManager.default.fileExists(atPath: staging.path) {
+                    try? FileManager.default.removeItem(at: staging)
+                }
+                continue
+            }
+            let payload = BackgroundDownloadFile(
+                modelID: modelID,
+                destinationPath: file.destinationPath,
+                expectedBytes: file.expectedBytes,
+                sha256: file.checksumSha256
+            )
+            logger.info("Resuming verification of a file staged before the app closed",
+                        metadata: ["modelId": modelID, "file": file.file.filename])
+            _ = await installStagedFile(payload: payload, staging: staging)
         }
     }
 
@@ -250,6 +303,12 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         if notificationsEnabled {
             await DownloadNotifier.shared.requestAuthorizationIfNeeded()
         }
+
+        // A file left staged by an earlier attempt already holds every byte; only
+        // its checksum is unproven. Settling that before planning tasks is what
+        // stops a retry after a mid-verification kill from re-fetching a file it
+        // already has in full.
+        await promoteStagedFiles(plan: plan, modelID: modelID)
 
         // Ask the session what it is already moving before planning new tasks. A
         // background task survives the process, so on a relaunch — or on a second
@@ -348,7 +407,7 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         // Every file was already on disk (e.g. a re-issue after finalize was
         // interrupted); complete immediately.
         if plan.files.allSatisfy({ fileSize($0.destinationPath) == $0.expectedBytes }) {
-            completeTransfer(modelID: modelID)
+            completeTransfer(modelID: modelID, plan: plan)
         }
     }
 
@@ -402,20 +461,33 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
             guard let resumeData else {
                 // The server did not give us a resumable response (no
                 // ETag/Accept-Ranges, or the bytes were too few to be worth it).
-                // Logged rather than swallowed, because it is the difference
-                // between a retry costing the remainder and costing the whole file.
-                logger.info(
-                    "Download stopped without resume data",
+                // A warning, not a note: the next attempt now costs the whole
+                // file rather than the remainder, which is the exact outcome this
+                // coordinator exists to avoid.
+                logger.warning(
+                    "Download stopped without resume data; a retry will restart this file",
                     metadata: ["modelId": payload.modelID, "file": payload.destinationPath]
                 )
                 continue
             }
-            store.storeResumeData(
+            let stored = store.storeResumeData(
                 resumeData,
                 modelID: payload.modelID,
                 destinationPath: payload.destinationPath,
                 bytesOnDisk: observedBytes(modelID: payload.modelID, destinationPath: payload.destinationPath)
             )
+            guard stored else {
+                // CFNetwork handed the bytes over and the SDK failed to keep
+                // them. Reported at warning for the same reason as above, and
+                // separately worded so the two causes are never confused: one is
+                // the server's answer, this one is ours.
+                logger.warning(
+                    "Resume data could not be stored; a retry will restart this file",
+                    metadata: ["modelId": payload.modelID, "file": payload.destinationPath]
+                )
+                releasePartial(for: resumeData)
+                continue
+            }
             logger.info(
                 "Download stopped with resume data",
                 metadata: ["modelId": payload.modelID, "blobBytes": String(resumeData.count)]
@@ -425,12 +497,14 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
 
     // MARK: - Completion / failure
 
-    private func completeTransfer(modelID: String) {
+    private func completeTransfer(modelID: String, plan: RADownloadPlanResult?) {
         let transfer = stateQueue.sync { transfers.removeValue(forKey: modelID) }
+        let paths = (plan ?? transfer?.plan ?? store.loadPlan(modelID: modelID))?
+            .files.map(\.destinationPath) ?? []
         store.clearPlan(modelID: modelID)
         // Every byte is on disk; a stale resume blob would only mislead a later
         // attempt into continuing a file that is already finished.
-        store.clearResumeData(modelID: modelID)
+        discardResumeBlobs(modelID: modelID, destinationPaths: paths)
 
         if let continuation = transfer?.continuation {
             continuation.resume()
@@ -479,8 +553,13 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         await cancelTasks(for: modelID, preservingResumeData: recoverable)
         let transfer = stateQueue.sync { transfers.removeValue(forKey: modelID) }
         if !recoverable {
+            let paths = (transfer?.plan ?? store.loadPlan(modelID: modelID))?
+                .files.map(\.destinationPath) ?? []
+            for path in paths {
+                try? FileManager.default.removeItem(atPath: path + Self.stagingSuffix)
+            }
             store.clearPlan(modelID: modelID)
-            store.clearResumeData(modelID: modelID)
+            discardResumeBlobs(modelID: modelID, destinationPaths: paths)
         }
         let error = SDKException(code: .downloadFailed, message: message, category: .network)
         transfer?.continuation?.resume(throwing: error)
@@ -537,6 +616,66 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Delete a model's resume blobs after handing the bytes they point at back
+    /// to CFNetwork.
+    ///
+    /// Deleting the blob alone is not enough. The partial it describes lives in a
+    /// temp file CFNetwork keeps alive precisely because a resume was promised,
+    /// and nothing outside CFNetwork can name that file — so a blob that is
+    /// dropped rather than released strands its bytes for the life of the app
+    /// container. Starting a task from the blob and cancelling it plainly is the
+    /// supported way to say "this resume will never happen".
+    private func discardResumeBlobs(modelID: String, destinationPaths: [String]) {
+        for blob in store.resumeBlobs(modelID: modelID, destinationPaths: destinationPaths) {
+            releasePartial(for: blob)
+        }
+        store.clearResumeData(modelID: modelID, destinationPaths: destinationPaths)
+    }
+
+    private func releasePartial(for resumeData: Data) {
+        // Never resumed: a plain `cancel()` on a task built from the blob is what
+        // makes CFNetwork delete the partial it was holding.
+        session.downloadTask(withResumeData: resumeData).cancel()
+    }
+
+    /// Delete CFNetwork partials that no download could ever continue from.
+    ///
+    /// An interrupted `URLSessionDownloadTask` leaves its bytes in a
+    /// `CFNetworkDownload_*.tmp` file in the app's temp directory, addressable
+    /// only through a resume blob. Every blob this SDK loses — and before the
+    /// store's filenames were fixed it lost all of them — leaves a file the size
+    /// of the model behind, invisible to the Storage screen because it is not a
+    /// model, and never collected because the container's temp directory is only
+    /// purged under storage pressure.
+    ///
+    /// Guarded rather than clever: this runs only when the session has no tasks
+    /// and the store holds no plan and no blob, so there is provably no transfer
+    /// this SDK could resume, and only for files nothing has written for an hour,
+    /// so a transfer belonging to some other part of the app cannot be caught by
+    /// it either.
+    private func reclaimOrphanedPartials(hasLiveTasks: Bool) {
+        guard !hasLiveTasks, !store.hasRecoverableState() else { return }
+        let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: tempDirectory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey]
+        ) else { return }
+
+        let cutoff = Date().addingTimeInterval(-3600)
+        var reclaimed: Int64 = 0
+        for entry in entries where entry.lastPathComponent.hasPrefix("CFNetworkDownload_") {
+            let values = try? entry.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            guard let modified = values?.contentModificationDate, modified < cutoff else { continue }
+            reclaimed += Int64(values?.fileSize ?? 0)
+            try? FileManager.default.removeItem(at: entry)
+        }
+        guard reclaimed > 0 else { return }
+        logger.info(
+            "Reclaimed abandoned download partials",
+            metadata: ["bytes": String(reclaimed)]
+        )
+    }
+
     private func allFilesComplete(_ files: [RADownloadFilePlan]) -> Bool {
         files.allSatisfy { fileSize($0.destinationPath) == $0.expectedBytes }
     }
@@ -586,6 +725,11 @@ final class BackgroundDownloadCoordinator: NSObject, @unchecked Sendable {
             if fileSize(file.destinationPath) == file.expectedBytes {
                 return total + file.expectedBytes
             }
+            // A staged file holds every byte and only needs its checksum
+            // finishing, so it is the most recoverable state there is.
+            if fileSize(file.destinationPath + Self.stagingSuffix) == file.expectedBytes {
+                return total + file.expectedBytes
+            }
             guard store.loadResumeData(modelID: modelID, destinationPath: file.destinationPath) != nil else {
                 return total
             }
@@ -605,9 +749,9 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
     ) {
         guard let payload = decode(downloadTask.taskDescription) else { return }
 
-        // All three of these mean the bytes we hold are wrong, not merely
-        // incomplete, so the partial state is discarded — a resume would only
-        // rebuild the same bad file.
+        // Both of these mean the bytes we hold are wrong, not merely incomplete,
+        // so the partial state is discarded — a resume would only rebuild the
+        // same bad file.
         //
         // The status check comes first because a background session bypasses the
         // commons HTTP dispatcher and therefore its error handling too: a gated
@@ -633,25 +777,25 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
             )
             return
         }
-        guard verifiedChecksum(at: location, expected: payload.sha256) else {
-            failTransfer(
-                modelID: payload.modelID,
-                message: "Checksum verification failed for \(payload.destinationPath)",
-                recoverable: false
-            )
-            return
-        }
 
-        let destination = URL(fileURLWithPath: payload.destinationPath)
+        // Move now, verify later. `location` is deleted the moment this delegate
+        // call returns, so the move cannot be deferred — but the checksum can, and
+        // must be: this is the session's serial delegate queue, and hashing a
+        // multi-gigabyte file on it stalls every other file's progress callback
+        // and every pending `cancel(byProducingResumeData:)` completion behind it
+        // for the whole hash. Staging under a distinct suffix keeps a file with an
+        // unproven checksum from being mistaken for a finished one by anything
+        // that measures the destination path.
+        let staging = URL(fileURLWithPath: payload.destinationPath + Self.stagingSuffix)
         do {
             try FileManager.default.createDirectory(
-                at: destination.deletingLastPathComponent(),
+                at: staging.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
+            if FileManager.default.fileExists(atPath: staging.path) {
+                try FileManager.default.removeItem(at: staging)
             }
-            try FileManager.default.moveItem(at: location, to: destination)
+            try FileManager.default.moveItem(at: location, to: staging)
         } catch {
             failTransfer(
                 modelID: payload.modelID,
@@ -660,16 +804,82 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
             return
         }
 
+        Task.detached {
+            guard await self.installStagedFile(payload: payload, staging: staging) else { return }
+            // Adoption (not a bare plan read) on purpose: it is what refuses to
+            // finalize a transfer the user already cancelled, even though this
+            // last file happened to land.
+            guard let plan = self.adoptedTransfer(modelID: payload.modelID)?.plan,
+                  self.allFilesComplete(plan.files) else { return }
+            self.completeTransfer(modelID: payload.modelID, plan: plan)
+        }
+    }
+
+    /// Verify a fully-downloaded file and move it onto its destination, reporting
+    /// whether it landed.
+    ///
+    /// Runs off the delegate queue (see `didFinishDownloadingTo`). Reports the
+    /// verification phase before it starts, because on a multi-gigabyte model the
+    /// hash takes long enough that a caller left on the last progress event shows
+    /// a bar pinned at 100% and reads it as a hang.
+    private func installStagedFile(payload: BackgroundDownloadFile, staging: URL) async -> Bool {
+        await reportVerifying(modelID: payload.modelID, destinationPath: payload.destinationPath)
+
+        guard verifiedChecksum(at: staging, expected: payload.sha256) else {
+            try? FileManager.default.removeItem(at: staging)
+            failTransfer(
+                modelID: payload.modelID,
+                message: "Checksum verification failed for \(payload.destinationPath)",
+                recoverable: false
+            )
+            return false
+        }
+
+        let destination = URL(fileURLWithPath: payload.destinationPath)
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.moveItem(at: staging, to: destination)
+        } catch {
+            failTransfer(
+                modelID: payload.modelID,
+                message: "Could not store downloaded file: \(error.localizedDescription)"
+            )
+            return false
+        }
+
         // This file is done, so its resume blob is now a liability: a later
         // attempt that found it would try to continue a finished file.
-        store.clearResumeData(modelID: payload.modelID, destinationPath: payload.destinationPath)
+        discardResumeBlobs(modelID: payload.modelID, destinationPaths: [payload.destinationPath])
+        return true
+    }
 
-        // Adoption (not a bare plan read) on purpose: it is what refuses to
-        // finalize a transfer the user already cancelled, even though this last
-        // file happened to land.
-        guard let files = adoptedTransfer(modelID: payload.modelID)?.plan.files,
-              allFilesComplete(files) else { return }
-        completeTransfer(modelID: payload.modelID)
+    /// Tell the caller this file has left the network and is being checked.
+    private func reportVerifying(modelID: String, destinationPath: String) async {
+        let sample: DownloadProgressSample? = stateQueue.sync {
+            guard let transfer = transfers[modelID],
+                  let index = transfer.plan.files.firstIndex(where: {
+                      $0.destinationPath == destinationPath
+                  }) else { return nil }
+            let plan = transfer.plan
+            let total = plan.totalBytes > 0 ? plan.totalBytes : plan.files.reduce(0) { $0 + $1.expectedBytes }
+            return DownloadProgressSample(
+                modelID: modelID,
+                bytesDone: transfer.fileBytes.values.reduce(0, +) + transfer.preexistingBytes,
+                bytesTotal: total,
+                fileIndex: index,
+                fileCount: plan.files.count,
+                fileName: plan.files[index].file.filename,
+                elapsed: Date().timeIntervalSince(transfer.startedAt),
+                bytesMoved: 0,
+                state: .validating
+            )
+        }
+        guard let sample else { return }
+        nonisolated(unsafe) let callback = stateQueue.sync { transfers[modelID]?.onProgress }
+        await callback?(sample.asProto())
+        await notify { await $0.notifyVerifying(modelID: modelID) }
     }
 
     func urlSession(
@@ -712,6 +922,7 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
                 bytesTotal: total,
                 fileIndex: index,
                 fileCount: plan.files.count,
+                fileName: plan.files[index].file.filename,
                 elapsed: Date().timeIntervalSince(transfer.startedAt),
                 bytesMoved: done - transfer.preexistingBytes - inherited
             )
@@ -750,7 +961,7 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
             transfer.resumedBytes[index] = fileOffset
             transfers[modelID] = transfer
         }
-        logger.debug(
+        logger.info(
             "Resumed download",
             metadata: ["modelId": modelID, "offset": String(fileOffset)]
         )
@@ -776,12 +987,19 @@ extension BackgroundDownloadCoordinator: URLSessionDownloadDelegate {
         // corrupt; keeping a blob there would resume straight back into the bad file.
         let isDiscarded = stateQueue.sync { discardedModels.contains(payload.modelID) }
         if let resumeData = nsError.userInfo[NSURLSessionDownloadTaskResumeData] as? Data, !isDiscarded {
-            store.storeResumeData(
+            let stored = store.storeResumeData(
                 resumeData,
                 modelID: payload.modelID,
                 destinationPath: payload.destinationPath,
                 bytesOnDisk: observedBytes(modelID: payload.modelID, destinationPath: payload.destinationPath)
             )
+            if !stored {
+                logger.warning(
+                    "Resume data could not be stored; a retry will restart this file",
+                    metadata: ["modelId": payload.modelID, "file": payload.destinationPath]
+                )
+                releasePartial(for: resumeData)
+            }
         }
 
         if nsError.code == NSURLErrorCancelled { return }

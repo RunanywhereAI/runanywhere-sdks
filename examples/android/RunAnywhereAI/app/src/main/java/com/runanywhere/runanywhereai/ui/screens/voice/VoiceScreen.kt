@@ -220,7 +220,7 @@ fun VoiceScreen() {
             // the floor back, not the conversation ended — and ending it is still one tap away in
             // the row below, so neither intent is lost.
             voiceVm.state == VoiceState.SPEAKING -> voiceVm.interrupt()
-            voiceVm.state != VoiceState.IDLE -> voiceVm.toggle()
+            voiceVm.state !in START_STATES -> voiceVm.toggle()
             !ready -> Unit
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED -> voiceVm.toggle()
@@ -352,7 +352,7 @@ fun VoiceScreen() {
                 // button live through that window invites a second press that does nothing.
                 enabled = voiceVm.state != VoiceState.STARTING &&
                     !voiceVm.isInterrupting &&
-                    (ready || voiceVm.state != VoiceState.IDLE),
+                    (ready || voiceVm.state !in START_STATES),
                 pushToTalk = isNpuSwap,
                 isInterrupting = voiceVm.isInterrupting,
                 onClick = ::onMic,
@@ -364,7 +364,7 @@ fun VoiceScreen() {
                 horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (voiceVm.state != VoiceState.IDLE) {
+                if (voiceVm.state !in START_STATES) {
                     TextButton(onClick = voiceVm::stop) {
                         Text(if (isNpuSwap) "Cancel turn" else "End conversation")
                     }
@@ -413,16 +413,24 @@ private fun statusText(state: VoiceState, ready: Boolean, pushToTalk: Boolean): 
     // silently ignored. Naming the pause is what makes the tap read as the way to take the floor
     // rather than as one option among two.
     VoiceState.SPEAKING -> "Speaking — mic paused, tap to take the turn back"
+    // The session is gone and the microphone with it, so this cannot read "Ready to talk" — the
+    // reader has to know the conversation ended on its own before the error line beneath explains
+    // why. "Tap to start again" is the recovery, and it really is one tap.
+    VoiceState.FAILED -> "Conversation stopped — mic released, tap to start again"
 }
 
 /** The empty transcript, phrased for whatever the agent is doing at that moment. */
 private fun emptyTranscriptText(state: VoiceState, ready: Boolean): String = when (state) {
-    VoiceState.IDLE -> if (ready) "Tap the mic and start talking" else "Set up Voice AI above to begin"
+    // Deliberately does not quote the card's button label: that button says "Set up Voice AI" when
+    // something still has to be fetched and "Load Voice AI" when everything is already on disk, and
+    // naming one of the two here left the pane pointing at a control that reads differently.
+    VoiceState.IDLE -> if (ready) "Tap the mic and start talking" else "Get Voice AI ready above to begin"
     VoiceState.STARTING -> "Getting ready…"
     VoiceState.LISTENING -> "Go ahead — say something."
     VoiceState.TRANSCRIBING -> "Working out what you said…"
     VoiceState.THINKING -> "Working out a reply…"
     VoiceState.SPEAKING -> "Speaking. Tap the button to take the turn back."
+    VoiceState.FAILED -> "That didn't work out. Tap the mic to try again."
 }
 
 /**
@@ -574,10 +582,14 @@ private fun MicButton(
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // A state that starts a conversation wears the start affordance, whatever the panel says about
+    // the turn before it: after a failure the control is still "begin", so dressing it as the
+    // secondary stop button would make the one recovery on screen look inert.
+    val starts = state in START_STATES
     val container = when {
         !enabled -> scheme.surfaceContainerHighest
         state == VoiceState.LISTENING -> scheme.error
-        state != VoiceState.IDLE -> scheme.secondary
+        !starts -> scheme.secondary
         else -> scheme.primary
     }
     // Paired with the container rather than always `onPrimary`: white on the disabled grey and on
@@ -585,16 +597,21 @@ private fun MicButton(
     val content = when {
         !enabled -> scheme.onSurfaceVariant
         state == VoiceState.LISTENING -> scheme.onError
-        state != VoiceState.IDLE -> scheme.onSecondary
+        !starts -> scheme.onSecondary
         else -> scheme.onPrimary
     }
     val icon = when {
-        state == VoiceState.IDLE || state == VoiceState.STARTING -> RACIcons.Outline.Microphone
+        starts || state == VoiceState.STARTING -> RACIcons.Outline.Microphone
         state == VoiceState.LISTENING && pushToTalk -> RACIcons.Outline.Check
         else -> RACIcons.Outline.PlayerStop
     }
     val label = when {
+        // The only way a start state is disabled is that the pipeline is not loaded yet. Sighted
+        // readers get that from the "Needs setup" line beside the button; a screen reader was told
+        // "Start talking" about a control that cannot, so it says why here instead.
+        starts && !enabled -> "Start talking — get Voice AI ready first"
         state == VoiceState.IDLE -> "Start talking"
+        state == VoiceState.FAILED -> "Start talking again"
         state == VoiceState.STARTING -> "Starting"
         state == VoiceState.LISTENING && pushToTalk -> "Send recording"
         state == VoiceState.LISTENING -> "End conversation"
@@ -641,6 +658,16 @@ private fun MicButton(
 
 /** Stable list key for the single provisional row, so it is never confused with a settled turn. */
 private const val PARTIAL_TURN_KEY = "voice-partial-transcript"
+
+/**
+ * The states where the big button opens a conversation instead of acting on a live one.
+ *
+ * IDLE and FAILED differ in what the panel says about the *past* — nothing versus "the last session
+ * died" — not in what the control does next: neither holds a session, so both start one. Keeping the
+ * pair in one place is what stops the two from drifting into a button labelled "Stop" with nothing
+ * to stop.
+ */
+private val START_STATES = setOf(VoiceState.IDLE, VoiceState.FAILED)
 
 /**
  * How long the agent may listen in silence before the screen admits it has heard nothing.

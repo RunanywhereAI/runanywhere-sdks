@@ -3171,13 +3171,21 @@ void build_download_plan(const rav1::DownloadPlanRequest& request, rav1::Downloa
     //     unsized PLAIN file (unsized_nonarchive_file) trips the unknown-total
     //     refusal, because there we truly cannot bound the disk consumed.
     //   - WASM/MEMFS reports available_bytes == -1 (no POSIX statvfs) and the
-    //     browser enforces its own quota, so the free-space fail-closed is
-    //     scoped to native platforms.
+    //     browser enforces its own quota, so BOTH storage fail-closed arms are
+    //     scoped to native platforms. There is no device filesystem here to fill
+    //     and no figure to compare against, so refusing an unsized plain file
+    //     protects nothing — it only converts a download that would have
+    //     succeeded into a hard failure with no request issued, which is exactly
+    //     how every bare .gguf in the web catalogue came to look like a dead
+    //     artifact. The browser is the authority on its own quota and reports a
+    //     real quota error if the write does not fit.
     const bool free_space_known = available_bytes > 0;
 #if defined(__EMSCRIPTEN__)
     const bool require_free_space = false;
+    const bool require_plain_file_size = false;
 #else
     const bool require_free_space = true;
+    const bool require_plain_file_size = true;
 #endif
     if (invalid_existing_bytes) {
         result.set_can_start(false);
@@ -3186,27 +3194,33 @@ void build_download_plan(const rav1::DownloadPlanRequest& request, rav1::Downloa
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
     } else if (result.files_size() == 0) {
         result.set_can_start(false);
-    } else if (unsized_nonarchive_file) {
-        // A plain (non-archive) file has an unknown size — we cannot size the
-        // storage gate for it, so refuse rather than risk filling the disk.
+    } else if (unsized_nonarchive_file && head_auth_denied) {
+        // Access was denied, not merely unsized. Worth refusing on every
+        // platform: the download itself is going to fail the same way, and the
+        // caller has something actionable to do about it.
         result.set_can_start(false);
-        if (head_auth_denied) {
-            // The size is unknown because the HEAD probe was denied (401/403),
-            // not because the server omitted it — surface the actionable cause.
-            rac::foundation::populate_sdk_error(result.mutable_error(),
-                                                RAC_ERROR_AUTHENTICATION_FAILED);
-            result.mutable_error()->set_message(
-                "authentication failed while checking the download — check your Hugging Face "
-                "token / repo access, then try again.");
-        } else {
-            // The caller can retry once the server exposes a Content-Length.
-            rac::foundation::populate_sdk_error(result.mutable_error(),
-                                                RAC_ERROR_INSUFFICIENT_STORAGE);
-            result.mutable_error()->set_message(
-                "Cannot verify there is enough storage: the total download size is unknown (the "
-                "server did not report a file size). Try again later or check the model source.");
-        }
+        rac::foundation::populate_sdk_error(result.mutable_error(),
+                                            RAC_ERROR_AUTHENTICATION_FAILED);
+        result.mutable_error()->set_message(
+            "authentication failed while checking the download — check your Hugging Face "
+            "token / repo access, then try again.");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
+    } else if (unsized_nonarchive_file && require_plain_file_size) {
+        // A plain (non-archive) file has an unknown size — on a device we cannot
+        // size the storage gate for it, so refuse rather than risk filling the
+        // disk. The caller can retry once the server exposes a Content-Length.
+        result.set_can_start(false);
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INSUFFICIENT_STORAGE);
+        result.mutable_error()->set_message(
+            "Cannot verify there is enough storage: the total download size is unknown (the "
+            "server did not report a file size). Try again later or check the model source.");
+        result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
+    } else if (unsized_nonarchive_file) {
+        // Browser target: start with the size unknown. Progress is indeterminate
+        // until the response declares a length, which is the honest state and is
+        // what every SDK's unknown-total path already renders.
+        result.add_warnings("download size is unknown; progress will be indeterminate");
+        result.set_can_start(true);
     } else if (total_bytes > 0 && require_free_space && !free_space_known) {
         // We know the payload is non-trivial but could not read free space —
         // fail closed instead of proceeding blind.

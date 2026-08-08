@@ -1528,6 +1528,23 @@ struct PersistentStreamHandle {
 
 }  // namespace
 
+namespace rac::stt {
+
+// Declared in rac_stt_stream_internal.h — see there for why a stream session
+// cannot read this off its own STTOptions.
+int32_t configured_stream_sample_rate(rac_handle_t handle) {
+    ComponentOperationLease component_lease(handle);
+    if (!component_lease) {
+        return RAC_STT_DEFAULT_SAMPLE_RATE;
+    }
+    auto* component = component_lease.component();
+    std::lock_guard<std::mutex> lock(component->mtx);
+    return component->config.sample_rate > 0 ? component->config.sample_rate
+                                             : RAC_STT_DEFAULT_SAMPLE_RATE;
+}
+
+}  // namespace rac::stt
+
 extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
                                                         const rac_stt_options_t* options,
                                                         rac_handle_t* out_stream_handle) {

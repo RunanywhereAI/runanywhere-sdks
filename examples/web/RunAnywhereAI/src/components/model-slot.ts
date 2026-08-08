@@ -19,14 +19,18 @@ import { escapeHtml } from '../services/escape-html';
 import type { CatalogEntry } from '../services/model-catalog';
 import {
   cleanModelName,
-  formatBytes,
   formatFramework,
+  formatModelSize,
   modalityIcon,
   modelDisplaySizeBytes,
 } from '../services/model-display';
 import { engineCompatibility } from '../services/engine-availability';
 import { icon } from './icons';
-import { getModelStatus, type ModelStatusSnapshot } from './model-selection';
+import {
+  getModelStatus,
+  renderDownloadProgress,
+  type ModelStatusSnapshot,
+} from './model-selection';
 
 /** One role a surface needs filled, plus the entry currently filling it. */
 export interface ModelSlotView {
@@ -51,21 +55,49 @@ export interface ModelSlotView {
  * Every branch of `ModelStatusSnapshot` is named, in the user's terms rather
  * than the registry's: "On device" for downloaded-but-not-loaded is the
  * distinction that decides whether the next action costs bandwidth or seconds.
+ *
+ * The download branches name the phase the picker names — a slot that said "99%"
+ * through a two-minute checksum was describing the same event by a different,
+ * and by then untrue, number.
+ *
+ * The loaded branch says "Active", not "Ready". iOS spends "Ready" on a model
+ * that is merely on disk (`consumerStatusLabel`) and "Active" on the one that is
+ * loaded (`activeIndicator`), so a slot reading "Ready" for a loaded model made
+ * one word mean two different states across the two apps — the worst kind of
+ * divergence, because both readings are plausible.
  */
 export function renderModelSlotState(status: ModelStatusSnapshot): string {
   switch (status.status) {
     case 'loaded':
-      return '<span class="model-slot__state model-slot__state--ready">&#10003; Ready</span>';
+      return '<span class="model-slot__state model-slot__state--ready">&#10003; Active</span>';
     case 'downloaded':
       return '<span class="model-slot__state">On device</span>';
     case 'downloading':
-      return `<span class="model-slot__state">${Math.round(status.progress * 100)}%</span>`;
+      return `<span class="model-slot__state">${escapeHtml(downloadPhaseLabel(status))}</span>`;
     case 'loading':
       return '<span class="model-slot__state">Loading…</span>';
+    case 'paused':
+      return '<span class="model-slot__state model-slot__state--pending">Paused</span>';
     case 'error':
       return '<span class="model-slot__state model-slot__state--error">Failed</span>';
     default:
       return '<span class="model-slot__state model-slot__state--pending">Not set up</span>';
+  }
+}
+
+/** The short form of a download phase, for the one-line aside. */
+function downloadPhaseLabel(status: ModelStatusSnapshot): string {
+  switch (status.phase) {
+    case 'queued':
+      return 'Starting…';
+    case 'cancelling':
+      return 'Cancelling…';
+    case 'verifying':
+      return 'Checking…';
+    case 'extracting':
+      return 'Unpacking…';
+    default:
+      return status.indeterminate ? 'Downloading' : `${Math.round(status.progress * 100)}%`;
   }
 }
 
@@ -107,14 +139,23 @@ export function renderModelSlot(slot: ModelSlotView): string {
         <div class="model-slot__label">${escapeHtml(slot.label)}${optionalTag}</div>
         <div class="model-slot__hint">
           ${escapeHtml(cleanModelName(entry.name))}
-          · ${formatBytes(modelDisplaySizeBytes(entry))}
+          · ${formatModelSize(modelDisplaySizeBytes(entry))}
           <span class="backend-pill">${escapeHtml(formatFramework(entry.framework))}</span>
         </div>
         ${engineReason
           ? `<div class="model-slot__blocked">${escapeHtml(engineReason)}</div>`
           : ''}
-        ${!engineReason && status.status === 'downloading'
-          ? `<div class="progress-bar model-slot__progress"><div class="progress-fill" style="width:${Math.round(status.progress * 100)}%"></div></div>`
+        ${engineReason
+          ? ''
+          // The picker's own markup, not a second bar: this used to be a bare
+          // width with no readout, so the same transfer showed bytes, a rate and
+          // an estimate in the picker and a silent stripe here.
+          : renderDownloadProgress(status)}
+        ${!engineReason && status.status === 'paused'
+          ? '<div class="model-slot__blocked">Paused — resume picks up where it stopped</div>'
+          : ''}
+        ${!engineReason && status.status === 'error'
+          ? `<div class="model-slot__blocked">${escapeHtml(status.error ?? 'Download failed')}</div>`
           : ''}
       </div>
       <div class="model-slot__aside">

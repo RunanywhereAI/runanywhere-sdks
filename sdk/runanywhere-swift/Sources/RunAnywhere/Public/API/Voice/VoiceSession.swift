@@ -49,12 +49,24 @@ public final class VoiceSession: @unchecked Sendable {
     /// without the merge a subscriber is told the agent is speaking while the
     /// speaker is silent, and is never told when it stops.
     public var events: AsyncThrowingStream<VoiceEvent, Error> {
-        AsyncThrowingStream { continuation in
+        // `adapter.stream()` is what installs the native proto callback, and it
+        // has to run before this getter returns. It used to be called inside the
+        // pump `Task` below, which only *scheduled* the installation: a caller
+        // that reads `session.events` and then immediately calls `start()` could
+        // open the microphone and run an entire turn before the callback
+        // existed, and every event of that turn — transcript, reply, agent
+        // state — was dropped on the floor. Playback survived regardless,
+        // because the mic driver plays the audio the feed call returns inline,
+        // so the panel sat dead while the product talked out loud. Attaching
+        // here makes the subscription a fact by the time `events` is handed back.
+        let protoStream = adapter.stream()
+
+        return AsyncThrowingStream { continuation in
             let id = UUID()
             state.withLock { $0.subscribers[id] = continuation }
 
-            let task = Task { [adapter] in
-                for await proto in adapter.stream() {
+            let task = Task {
+                for await proto in protoStream {
                     if Task.isCancelled { break }
                     if let event = VoiceEvent.from(proto: proto) {
                         continuation.yield(event)

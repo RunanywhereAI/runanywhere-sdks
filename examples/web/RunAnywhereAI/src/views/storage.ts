@@ -17,10 +17,15 @@ import { showToast } from '../components/dialogs';
 import { RunAnywhere } from '@runanywhere/web';
 import type { ModelsState } from '@runanywhere/web';
 import {
-  findLoadedModelForCategory,
+  cancelModelDownload,
+  getModelStatus,
   onModelStateChange,
   openSheet as openModelSheet,
+  patchDownloadProgress,
   refreshModelSelectionState,
+  renderDownloadProgress,
+  resetModelRowState,
+  type ModelStatusSnapshot,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
 import { icon } from '../components/icons';
@@ -29,6 +34,7 @@ import { formatError } from '../services/format-error';
 import {
   formatBytes,
   formatFramework,
+  formatModelSize,
   modelDisplaySizeBytes,
   modalityIcon,
 } from '../services/model-display';
@@ -37,6 +43,15 @@ let container: HTMLElement;
 let unsubscribeState: (() => void) | null = null;
 let lastStorageInfo: ModelsState | null = null;
 let storageInfoError: string | null = null;
+
+/**
+ * The structure each rendered row was built for, keyed by model id.
+ *
+ * Only the parts that decide what the row *is* — its badge, its buttons, its
+ * note — never the numbers inside a transfer. That split is what lets a progress
+ * tick be patched instead of re-rendered.
+ */
+const renderedRowShapes = new Map<string, string>();
 
 export function initStorageTab(el: HTMLElement): TabLifecycle {
   container = el;
@@ -124,7 +139,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
 
   unsubscribeState = onModelStateChange(() => {
     void refreshStorageInfo();
-    renderModelList();
+    syncModelList();
   });
 
   return {
@@ -245,48 +260,136 @@ function updateStorageLocationUI(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Model list (read-only registry view + per-model Delete)
+// Model list (registry view + live transfers + per-model Delete)
 // ---------------------------------------------------------------------------
+
+/**
+ * The badge naming a model's state, in the words the picker and the pipeline
+ * slots already use.
+ *
+ * This list read from the registry alone, so it knew only three states —
+ * "Loaded", "Downloaded", "Not downloaded" — and a transfer running right now
+ * appeared under a tab called *Downloads* as "Not downloaded". The state comes
+ * from the same snapshot the picker renders from, so the two cannot disagree
+ * about what a model is doing.
+ */
+function storageStatusBadge(status: ModelStatusSnapshot): string {
+  switch (status.status) {
+    case 'loaded':
+      // "Active" everywhere in this app, and "On device" for merely downloaded —
+      // the split iOS draws between `activeIndicator` and a model that is only
+      // on disk. This badge used to be the app's fourth word for the same state.
+      return '<span class="badge badge-green">Active</span>';
+    case 'downloaded':
+      return '<span class="badge badge-blue">On device</span>';
+    case 'downloading':
+      return `<span class="badge badge-blue">${escapeHtml(downloadingBadgeLabel(status))}</span>`;
+    case 'loading':
+      return '<span class="badge badge-blue">Loading…</span>';
+    case 'paused':
+      return '<span class="badge badge-yellow">Paused</span>';
+    case 'error':
+      return '<span class="badge badge-red">Failed</span>';
+    default:
+      return '<span class="badge badge-grey">Not downloaded</span>';
+  }
+}
+
+/** The phase's own name, so a checksum is not reported as a stalled transfer. */
+function downloadingBadgeLabel(status: ModelStatusSnapshot): string {
+  switch (status.phase) {
+    case 'queued':
+      return 'Starting…';
+    case 'cancelling':
+      return 'Cancelling…';
+    case 'verifying':
+      return 'Checking…';
+    case 'extracting':
+      return 'Unpacking…';
+    default:
+      return 'Downloading';
+  }
+}
+
+/** What a row is, as opposed to what its numbers currently read. */
+function rowShape(status: ModelStatusSnapshot): string {
+  return `${status.status}|${status.phase ?? ''}|${status.error ?? ''}`;
+}
+
+/**
+ * Apply a model-state change to the list, rebuilding only when it changed shape.
+ *
+ * A running transfer emits about four progress events a second. Rebuilding the
+ * whole list on each of them would take the focus ring with it every time, so a
+ * keyboard user could never reach the Cancel button on the row they are watching
+ * — and the bar would restart its width transition on each rebuild, stuttering
+ * rather than gliding. A tick that only moves numbers is written into the
+ * existing markup instead.
+ */
+function syncModelList(): void {
+  if (!patchLiveTransfers()) renderModelList();
+}
+
+/** True when every row is still the shape it was rendered as and at least one
+ * live transfer was updated in place. */
+function patchLiveTransfers(): boolean {
+  const host = container.querySelector('#storage-model-list');
+  if (!host || renderedRowShapes.size === 0) return false;
+
+  const live: Array<[Element, ModelStatusSnapshot]> = [];
+  for (const entry of getCatalog()) {
+    const status = getModelStatus(entry.id);
+    if (renderedRowShapes.get(entry.id) !== rowShape(status)) return false;
+    if (status.status !== 'downloading') continue;
+    const row = host.querySelector(`[data-model-id="${CSS.escape(entry.id)}"]`);
+    if (!row) return false;
+    live.push([row, status]);
+  }
+  if (live.length === 0) return false;
+  return live.every(([row, status]) => patchDownloadProgress(row, status));
+}
 
 function renderModelList(): void {
   const host = container.querySelector('#storage-model-list') as HTMLElement | null;
   if (!host) return;
 
   const catalog = getCatalog();
+  renderedRowShapes.clear();
   if (!catalog.length) {
     host.innerHTML = '<p class="text-secondary" style="padding: 12px 0;">No models yet — still loading the list.</p>';
     return;
   }
 
-  const downloadedIds = new Set(
-    RunAnywhere.models.list({ downloadedOnly: true }).map((model) => model.id),
-  );
-  const loadedIds = new Set(
-    [...new Set(catalog.map((entry) => entry.category))]
-      .map((category) => findLoadedModelForCategory(category)?.id)
-      .filter((id): id is string => Boolean(id)),
-  );
-
   host.innerHTML = catalog.map((entry) => {
-    const isDownloaded = downloadedIds.has(entry.id);
-    const isLoaded = loadedIds.has(entry.id);
-    const statusLabel = isLoaded
-      ? '<span class="badge badge-green">Loaded</span>'
-      : isDownloaded
-        ? '<span class="badge badge-blue">Downloaded</span>'
-        : '<span class="badge badge-grey">Not downloaded</span>';
+    const status = getModelStatus(entry.id);
+    const isDownloading = status.status === 'downloading';
+    const hasArtifacts = status.status === 'downloaded' || status.status === 'loaded';
+    // A paused or failed transfer left partial bytes on disk. Delete is the only
+    // way to reclaim them, so the row that says they exist also offers it.
+    const hasPartials = status.status === 'paused' || status.status === 'error';
+    renderedRowShapes.set(entry.id, rowShape(status));
     return `
-      <div class="model-row" style="cursor: default;">
+      <div class="model-row" style="cursor: default;" data-model-id="${escapeHtml(entry.id)}">
         <div class="model-logo">${icon(modalityIcon(entry.category), { size: 20 })}</div>
         <div class="model-info">
           <div class="model-name">${escapeHtml(entry.name)}</div>
           <div class="model-meta">
             <span class="model-framework-badge">${formatFramework(entry.framework)}</span>
-            <span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
-            ${statusLabel}
+            <span class="model-size">${formatModelSize(modelDisplaySizeBytes(entry))}</span>
+            ${storageStatusBadge(status)}
           </div>
+          ${renderDownloadProgress(status)}
+          ${status.status === 'paused'
+            ? '<div class="model-row-error">Paused — resume from Manage Models picks up where it stopped</div>'
+            : ''}
+          ${status.status === 'error'
+            ? `<div class="model-row-error error">${escapeHtml(status.error ?? 'Download failed')}</div>`
+            : ''}
         </div>
-        ${isDownloaded
+        ${isDownloading
+          ? `<button class="btn btn-secondary btn-sm storage-cancel-btn" data-model-id="${escapeHtml(entry.id)}" style="font-size: 0.75rem;">Cancel</button>`
+          : ''}
+        ${hasArtifacts || hasPartials
           ? `<button class="btn btn-secondary btn-sm storage-delete-btn" data-model-id="${escapeHtml(entry.id)}" style="font-size: 0.75rem;">Delete</button>`
           : ''}
       </div>
@@ -299,12 +402,20 @@ function renderModelList(): void {
       if (modelId) void deleteModel(modelId);
     });
   });
+  host.querySelectorAll<HTMLButtonElement>('.storage-cancel-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const modelId = btn.dataset.modelId;
+      if (modelId) void cancelModelDownload(modelId);
+    });
+  });
 }
 
 async function deleteModel(modelId: string): Promise<void> {
   try {
     await RunAnywhere.models.delete(modelId);
-    refreshModelSelectionState();
+    // Clears the row's memory of a paused or failed attempt too: the partial
+    // bytes are gone, so an offer to resume them would be a lie.
+    resetModelRowState(modelId);
     showToast(`Deleted ${modelId}`, 'success');
   } catch (err) {
     showToast(`Failed to delete model: ${formatError(err)}`, 'warning');

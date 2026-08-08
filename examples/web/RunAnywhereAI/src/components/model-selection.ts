@@ -50,12 +50,15 @@ import { formatError } from '../services/format-error';
 import {
   formatBytes,
   formatFramework,
+  formatModelSize,
+  formatTransferBytes,
   modelDisplaySizeBytes,
   modalityIcon,
   cleanModelName,
   consumerTags,
   modelOrg,
   modelCapability,
+  transferDetailLine,
   variantSizeFeel,
   type ConsumerTag,
 } from '../services/model-display';
@@ -86,26 +89,71 @@ import { openAddFromHuggingFace } from './add-from-huggingface';
  * unpack can take tens of seconds, and a bar sitting at 100% with no label is
  * indistinguishable from a hung download. Naming the phase is what tells the
  * user the wait is expected.
+ *
+ * `queued` covers the gap between the click and the first byte — planning the
+ * download, checking quota, opening the connection. It can run for seconds on a
+ * multi-file model, and a determinate bar frozen at 0% through it reads as a
+ * transfer that stalled before it started.
+ *
+ * `cancelling` is the wind-down after the user's tap: the iterator has been
+ * broken out of but the SDK has not confirmed the stop. Leaving the row on its
+ * last progress frame there makes an ignored tap look identical to a stuck one.
+ *
+ * The five names, and the interrupted states below, are the vocabulary shared
+ * with iOS `ModelDownloadPhase` and Android `DownloadPhase`, so one download
+ * cannot be described three ways.
  */
-type DownloadPhase = 'transferring' | 'verifying' | 'extracting';
+type DownloadPhase = 'queued' | 'transferring' | 'verifying' | 'extracting' | 'cancelling';
 
 type RowState =
-  | { status: 'registered' }      // not downloaded yet
+  | { status: 'registered' }      // not downloaded yet, never attempted
   | {
       status: 'downloading';
-      /** 0..1 of the current phase. */
+      /** 0..1. Only a real position when `measured`; otherwise just a width. */
       progress: number;
+      /**
+       * True when `progress` is a position somebody reported, rather than a
+       * placeholder for a phase whose length nobody knows. A determinate bar is
+       * a claim, and the phases that cannot back it sweep instead.
+       */
+      measured?: boolean;
       phase: DownloadPhase;
       /** Absent until the first progress event reports a total. */
       bytesDone?: number;
       bytesTotal?: number;
       /** Bytes/second, smoothed. Absent until two samples exist. */
       bytesPerSecond?: number;
+      /** Seconds remaining, derived from the smoothed rate. Absent until then. */
+      etaSeconds?: number;
     }
+  /**
+   * Stopped by the user, bytes kept.
+   *
+   * A distinct state rather than a return to `registered` because the two differ
+   * in exactly the thing the user is deciding about: whether pressing the button
+   * again re-spends the gigabytes already fetched. It does not — the SDK cancels
+   * with `deletePartialBytes: false` — and only a state that remembers the
+   * interruption can say so.
+   */
+  | { status: 'paused' }
   | { status: 'downloaded' }      // on disk but not loaded
   | { status: 'loading' }
   | { status: 'loaded' }
-  | { status: 'error'; error: string };
+  | {
+      status: 'error';
+      error: string;
+      /** Which step failed, so a Retry repeats that step and not the other one. */
+      stage: 'download' | 'load';
+      /**
+       * Whether pressing the button again could plausibly end differently.
+       *
+       * The SDK's planner already knows which refusals are permanent and says so
+       * on `SDKError.retryable`; a UI that offers Retry on every failure sends
+       * the user straight back into the identical error. This is that verdict
+       * carried through to the button.
+       */
+      retryable: boolean;
+    };
 
 type RowStatus = RowState['status'];
 
@@ -120,21 +168,6 @@ const rowStates = new Map<string, RowState>();
  * later continuing it instead of starting over.
  */
 const activeDownloads = new Map<string, AsyncIterator<DownloadEvent>>();
-
-/**
- * Models whose transfer was cancelled part-way through in this session.
- *
- * Purely a labelling concern: the SDK cancels with `deletePartialBytes: false`
- * and plans the next attempt with `resumeExisting`, so pressing Download again
- * continues from where it stopped. "Download" implies starting over and would
- * make someone hesitate to cancel a large transfer they are able to resume;
- * this set is what lets the button say "Resume" and mean it.
- *
- * Session-scoped on purpose — it says what this user just did, and claiming
- * resumability across a reload would require the SDK to surface the plan's
- * `resumeFromBytes`, which the DownloadEvent union does not carry.
- */
-const resumableDownloads = new Set<string>();
 
 /**
  * The open sheet's backdrop, or null.
@@ -220,6 +253,20 @@ export function refreshFromRegistry(): void {
       appLogger.warning('[model-selection] registry listener threw', err);
     }
   }
+}
+
+/**
+ * Forget everything this component remembered about one model's artifacts.
+ *
+ * Called after the files are deleted. The interrupted states deliberately
+ * survive a registry hydrate (see `hydrateRowStatesFromRegistry`), so without
+ * this a deleted model would keep offering "Resume" for partial bytes that no
+ * longer exist — the exact untruthful control the paused state was added to
+ * avoid.
+ */
+export function resetModelRowState(modelId: string): void {
+  rowStates.delete(modelId);
+  refreshModelSelectionState();
 }
 
 /** Clear the view's SDK-lifetime state before `RunAnywhere.reset()`. */
@@ -482,16 +529,40 @@ export function openSheet(options: OpenSheetOptions = {}): void {
 export interface ModelStatusSnapshot {
   status: RowStatus;
   progress: number;   // 0..1
+  /** Which part of the download is running. Only set while `downloading`. */
+  phase?: DownloadPhase;
+  /**
+   * The one line of detail that belongs under the bar, already worded — the
+   * byte/rate/ETA readout while transferring, the phase's name after it.
+   *
+   * Resolved here rather than by each caller so the pipeline slots on Voice AI
+   * and Solutions cannot describe the same transfer differently from the picker
+   * that started it.
+   */
+  detail?: string;
+  /** The phase has no measurable position, so `progress` must not be believed. */
+  indeterminate?: boolean;
   error?: string;
+  /** Only meaningful with `status: 'error'` — see `RowState`. */
+  retryable?: boolean;
 }
 
 /** Read the current lifecycle status for a model id. */
 export function getModelStatus(modelId: string): ModelStatusSnapshot {
-  const state = rowStates.get(modelId) ?? { status: 'registered' };
+  return toSnapshot(rowStates.get(modelId) ?? { status: 'registered' });
+}
+
+/** The public view of one row's state. Single site, so the picker's own
+ * renderers and an external consumer can never read the state differently. */
+function toSnapshot(state: RowState): ModelStatusSnapshot {
   return {
     status: state.status,
     progress: state.status === 'downloading' ? state.progress : 0,
+    phase: state.status === 'downloading' ? state.phase : undefined,
+    detail: state.status === 'downloading' ? describePhase(state) : undefined,
+    indeterminate: state.status === 'downloading' ? state.measured !== true : undefined,
     error: state.status === 'error' ? state.error : undefined,
+    retryable: state.status === 'error' ? state.retryable : undefined,
   };
 }
 
@@ -1005,81 +1076,105 @@ function renderOrgVariants(org: OrgGroup): string {
     .join('');
 }
 
-/** "1.2 GB of 4.1 GB · 8.4 MB/s · 6 min left" — as much of it as is known. */
-function describeTransfer(state: RowState & { status: 'downloading' }): string {
-  const parts: string[] = [];
-
-  if (state.bytesTotal !== undefined && state.bytesDone !== undefined) {
-    parts.push(`${formatBytes(state.bytesDone)} of ${formatBytes(state.bytesTotal)}`);
-  } else if (state.bytesDone !== undefined) {
-    // No total: report what has arrived rather than inventing a denominator.
-    parts.push(formatBytes(state.bytesDone));
-  }
-
-  if (state.bytesPerSecond !== undefined && state.bytesPerSecond > 0) {
-    parts.push(`${formatBytes(state.bytesPerSecond)}/s`);
-
-    if (state.bytesTotal !== undefined && state.bytesDone !== undefined) {
-      const remaining = (state.bytesTotal - state.bytesDone) / state.bytesPerSecond;
-      // Only above 2s. A "1 second left" that lingers reads as a stall, and the
-      // estimate is least reliable exactly at the end.
-      if (remaining > 2) parts.push(`${formatDuration(remaining)} left`);
+/**
+ * What this phase is doing, in one line.
+ *
+ * The post-transfer phases replace the readout outright rather than appending to
+ * it: every byte is already on disk by then, so leaving the last measured rate
+ * on screen while nothing is moving is the difference between "nearly done" and
+ * "frozen at 99%". They keep the total size, though, because "Checking download"
+ * alone loses the sense of scale that explains why the wait is long.
+ *
+ * Wording matches iOS `ModelDownloadPhase.label` and its `byteFragment`.
+ */
+function describePhase(state: RowState & { status: 'downloading' }): string {
+  switch (state.phase) {
+    case 'queued':
+      return 'Starting…';
+    case 'cancelling':
+      return 'Cancelling…';
+    case 'verifying':
+    case 'extracting': {
+      const label = state.phase === 'verifying' ? 'Checking download' : 'Unpacking';
+      return state.bytesTotal
+        ? `${label} · ${formatTransferBytes(state.bytesTotal)}`
+        : label;
     }
+    default:
+      // Blank before the first byte lands — say the job is starting rather than
+      // printing "0 B", which reads as a transfer that is already stuck.
+      return transferDetailLine(state) || 'Starting…';
   }
-
-  return parts.join(' · ');
-}
-
-/** Coarse and honest: a download ETA is an estimate, so don't imply seconds. */
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.ceil(seconds)} sec`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`;
 }
 
 /**
- * The progress bar plus a line saying what is happening and how fast.
+ * The progress bar plus a line saying what is happening, how fast, and how much
+ * of it is done.
  *
  * Was a bare percentage bar in three places, discarding the `bytesDone` /
  * `bytesTotal` the SDK has always emitted. A percentage alone cannot answer the
  * only question a user has while waiting on a multi-gigabyte model — "how long
- * is this going to take" — and the two non-transfer phases had no label at all,
- * so verification looked like a hung download stuck at 100%.
+ * is this going to take" — and the non-transfer phases had no label at all, so
+ * verification looked like a hung download stuck at 100%.
+ *
+ * Exported so the pipeline slots render the identical markup instead of the
+ * bare bar they used to draw themselves.
  */
-function renderDownloadProgress(state: RowState): string {
-  if (state.status !== 'downloading') return '';
+export function renderDownloadProgress(status: ModelStatusSnapshot): string {
+  if (status.status !== 'downloading') return '';
 
-  const percent = Math.round(state.progress * 100);
-  const detail = state.phase === 'transferring'
-    ? describeTransfer(state)
-    : state.phase === 'verifying'
-      ? 'Checking the download is intact…'
-      : 'Unpacking…';
+  const percent = Math.round(status.progress * 100);
+  const detail = status.detail ?? '';
+  const indeterminate = status.indeterminate ?? false;
 
-  // `indeterminate` while a phase reports no measurable progress, so the bar
-  // animates instead of sitting at a frozen width that reads as stuck.
-  const indeterminate = state.phase !== 'transferring' && state.progress >= 1;
-
+  // The percent sits at the end of the same line as the readout — the order
+  // Android reads in, and the placement iOS gives it beside the bar. Both are
+  // one glance apart from the bar itself, which is the point.
   return `<div class="progress-bar mt-sm${indeterminate ? ' progress-bar--indeterminate' : ''}"
       role="progressbar" aria-valuemin="0" aria-valuemax="100"
       ${indeterminate ? '' : `aria-valuenow="${percent}"`}
-      aria-label="${escapeHtml(state.phase === 'transferring' ? 'Download progress' : detail)}">
-      <div class="progress-fill" style="width:${percent}%"></div>
+      aria-label="${escapeHtml(detail || 'Download progress')}">
+      <div class="progress-fill" style="width:${indeterminate ? 100 : percent}%"></div>
     </div>
-    ${detail ? `<div class="progress-detail">${escapeHtml(detail)}</div>` : ''}`;
+    <div class="progress-detail" style="display:flex;justify-content:space-between;gap:var(--space-sm)">
+      <span class="progress-detail__text">${escapeHtml(detail)}</span>
+      <span class="progress-detail__percent">${indeterminate ? '' : `${percent}%`}</span>
+    </div>`;
+}
+
+/**
+ * The note under a row whose download stopped part-way.
+ *
+ * The two cases look identical on disk — bytes present, nothing transferring —
+ * but they are opposite events: one is a fault, one is the user's own decision.
+ * Colouring a deliberate cancel in error red, or offering "Retry" for something
+ * that never failed, reads as the app having lost track of what happened.
+ *
+ * Both variants say the bytes are kept, because the reasonable fear about a
+ * half-finished multi-gigabyte download is that continuing means starting from
+ * zero. It does not. Wording matches Android `DownloadInterruptionNote`.
+ */
+function renderInterruptionNote(entryId: string, state: RowState): string {
+  if (state.status === 'paused') {
+    return '<div class="model-row-error">Paused — resume picks up where it stopped</div>';
+  }
+  if (state.status !== 'error') return '';
+  // A failure that cannot be retried must not imply one: the message says what
+  // is wrong, and the row's control is disabled rather than inviting a click
+  // into the identical error. The id is what that disabled control points its
+  // `aria-describedby` at, so the reason is announced with it.
+  const follow = state.retryable && state.stage === 'download'
+    ? ' Retry resumes where it stopped.'
+    : '';
+  return `<div class="model-row-error error" id="download-note-${escapeHtml(entryId)}">${escapeHtml(state.error)}${follow}</div>`;
 }
 
 /** A single variant row inside an expanded family. */
 function renderVariantRow(entry: CatalogEntry, bestForDevice: boolean): string {
   const state = stateOf(entry.id);
   const isBest = bestForDevice && isRecommendable(entry);
-  const progressBar = renderDownloadProgress(state);
-  const errorBar = state.status === 'error'
-    ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
-    : '';
+  const progressBar = renderDownloadProgress(toSnapshot(state));
+  const errorBar = renderInterruptionNote(entry.id, state);
   const bestBadge = isBest
     ? '<span class="variant-row__best">Best for this device</span>'
     : '';
@@ -1094,7 +1189,7 @@ function renderVariantRow(entry: CatalogEntry, bestForDevice: boolean): string {
       <div class="variant-row__info">
         <div class="variant-row__name">${escapeHtml(cleanModelName(entry.name))}${bestBadge}</div>
         <div class="variant-row__meta">
-          <span class="variant-row__size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
+          <span class="variant-row__size">${formatModelSize(modelDisplaySizeBytes(entry))}</span>
           ${renderBackendPill(entry)}
           <span class="variant-row__feel">${escapeHtml(variantSizeFeel(entry))}</span>
           ${capabilityPill}
@@ -1169,10 +1264,8 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, bestForDevi
   // not actionable, and let the disabled button + reason speak instead.
   const isDefault = bestForDevice && isRecommendable(entry);
   const tags = consumerTags(entry).map(renderTagPill).join('');
-  const progressBar = renderDownloadProgress(state);
-  const errorBar = state.status === 'error'
-    ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
-    : '';
+  const progressBar = renderDownloadProgress(toSnapshot(state));
+  const errorBar = renderInterruptionNote(entry.id, state);
   const bestBadge = isDefault
     ? '<span class="reco-card__best">Best for this device</span>'
     : '';
@@ -1183,7 +1276,7 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, bestForDevi
         <div class="model-logo reco-card__logo">${icon(modalityIcon(entry.category), { size: 20 })}</div>
         <div class="reco-card__title-wrap">
           <div class="reco-card__name">${escapeHtml(cleanModelName(entry.name))}${bestBadge}</div>
-          <div class="reco-card__size">${formatBytes(modelDisplaySizeBytes(entry))} ${renderBackendPill(entry)}</div>
+          <div class="reco-card__size">${formatModelSize(modelDisplaySizeBytes(entry))} ${renderBackendPill(entry)}</div>
           <div class="reco-card__tags">${tags}</div>
         </div>
         ${actionButton(entry, state)}
@@ -1201,10 +1294,8 @@ function renderTagPill(tag: ConsumerTag): string {
 
 /** Compact companion row (ASR/TTS/VLM/embedding): name, size + backend, tag. */
 function renderModelRow(entry: CatalogEntry, state: RowState): string {
-  const progressBar = renderDownloadProgress(state);
-  const errorBar = state.status === 'error'
-    ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
-    : '';
+  const progressBar = renderDownloadProgress(toSnapshot(state));
+  const errorBar = renderInterruptionNote(entry.id, state);
   const capability = modelCapability(entry);
   const capabilityPill = capability
     ? `<span class="tag-pill tag-pill--capability">${escapeHtml(capability)}</span>`
@@ -1216,7 +1307,7 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
       <div class="model-info">
         <div class="model-name">${escapeHtml(cleanModelName(entry.name))}</div>
         <div class="model-meta">
-          <span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
+          <span class="model-size">${formatModelSize(modelDisplaySizeBytes(entry))}</span>
           ${renderBackendPill(entry)}
           ${capabilityPill}
         </div>
@@ -1267,25 +1358,37 @@ function actionButton(entry: CatalogEntry, state: RowState): string {
   }
   switch (state.status) {
     case 'registered':
+      return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}">Download</button>`;
+    case 'paused':
       // "Resume" after a cancelled transfer, because that is what happens: the
       // partial bytes were kept and the next attempt continues from them.
       // Saying "Download" would imply the wait starts over.
-      if (resumableDownloads.has(entry.id)) {
-        return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}" title="Continue from where this stopped">Resume</button>`;
-      }
-      return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}">Download</button>`;
+      return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}" title="Continue from where this stopped">Resume</button>`;
     case 'downloading':
-      // Transferring is the only cancellable phase — verifying and extracting
-      // are short, local, and have no transfer left to abandon, so offering
-      // Cancel there would be a button that mostly misses its own window.
+      // Cancellable while bytes are still being fetched — including the queued
+      // phase, where the wait can be the longest part of a multi-file plan.
+      // Verifying and extracting are short, local, and have no transfer left to
+      // abandon, so a Cancel there would be a button that misses its own window.
       //
       // The percentage moved to the progress detail line, which frees this slot
       // for the control a waiting user actually wants. It was previously a
       // disabled button showing a number already rendered directly below it.
-      if (state.phase === 'transferring') {
-        return `<button type="button" class="model-action-btn model-action-btn--cancel" data-action="cancel-download" data-model-id="${safeModelId}" title="Stop this download">Cancel</button>`;
+      if (state.phase === 'queued' && !activeDownloads.has(entry.id)) {
+        // The plan/quota preflight runs before there is an iterator to break out
+        // of, so there is nothing a Cancel could stop yet. A button that does
+        // nothing is worse than no button.
+        return '<button type="button" class="model-action-btn model-action-btn--progress" disabled>Starting&hellip;</button>';
       }
-      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${state.phase === 'verifying' ? 'Checking&hellip;' : 'Unpacking&hellip;'}</button>`;
+      if (state.phase === 'queued' || state.phase === 'transferring') {
+        return `<button type="button" class="model-action-btn model-action-btn--cancel" data-action="cancel-download" data-model-id="${safeModelId}" title="Stop this download — the bytes already fetched are kept">Cancel</button>`;
+      }
+      // Once the stop is under way the control has nothing left to do, and a
+      // second tap has nothing to cancel. It says so rather than looking live.
+      return `<button type="button" class="model-action-btn model-action-btn--progress" disabled>${
+        state.phase === 'cancelling'
+          ? 'Cancelling&hellip;'
+          : state.phase === 'verifying' ? 'Checking&hellip;' : 'Unpacking&hellip;'
+      }</button>`;
     case 'downloaded':
       return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${safeModelId}">Use</button>`;
     case 'loading':
@@ -1296,7 +1399,18 @@ function actionButton(entry: CatalogEntry, state: RowState): string {
       }
       return `<button type="button" class="model-action-btn loaded" data-action="unload" data-model-id="${safeModelId}" title="Tap to unload">&#10003; Active</button>`;
     case 'error':
-      return `<button type="button" class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${safeModelId}">Retry</button>`;
+      // THE DEAD-END RETRY. Every failure used to render this button, including
+      // the download-plan refusals that are decided before a single byte is
+      // requested — an unresolvable file list, a partial that no longer matches
+      // the server, a backend that never answered the planner. Pressing it
+      // replayed the identical plan and produced the identical message, forever.
+      // The SDK already publishes the verdict on `SDKError.retryable`; when it
+      // says no, the control says no too, and the note above it carries the
+      // reason and the actual next step.
+      if (!state.retryable) {
+        return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" aria-describedby="download-note-${safeModelId}" disabled>Can&rsquo;t download</button>`;
+      }
+      return `<button type="button" class="model-action-btn model-action-btn--retry" data-action="${state.stage === 'load' ? 'load' : 'download'}" data-model-id="${safeModelId}">Retry</button>`;
   }
 }
 
@@ -1316,7 +1430,7 @@ async function handleAction(action: ModelAction, modelId: string): Promise<void>
     }
   }
   else if (action === 'unload') await unloadModel(modelId);
-  else if (action === 'cancel-download') await cancelDownload(modelId);
+  else if (action === 'cancel-download') await cancelModelDownload(modelId);
   else if (action === 'select') {
     completeSheetSelection(modelId, activeSheetOptions.onModelReady, modalEl);
   }
@@ -1331,19 +1445,74 @@ async function handleAction(action: ModelAction, modelId: string): Promise<void>
  * stop a multi-gigabyte transfer short of closing the tab, which loses the
  * partial file and the token with it.
  *
- * The generator emits `cancelled` on the way out, and that branch is what
- * returns the row to `registered`; doing it here as well would race it.
+ * The generator emits `cancelled` on the way out, and that branch is what moves
+ * the row to `paused`; doing it here as well would race it.
+ *
+ * Exported as `cancelModelDownload` for the Downloads tab, which lists the same
+ * transfers; a tab named for them that could only watch was the odd one out.
+ * Same verb, same preserved bytes, same resulting `paused` row — one call.
  */
-async function cancelDownload(modelId: string): Promise<void> {
+export async function cancelModelDownload(modelId: string): Promise<void> {
   const iterator = activeDownloads.get(modelId);
   if (!iterator) return;
   activeDownloads.delete(modelId);
+  // Winding a transfer down is not instant — the SDK has to tell the native
+  // orchestrator and wait for it to stop. Saying so is what stops a tap that
+  // did land from looking exactly like one that was ignored.
+  const state = rowStates.get(modelId);
+  if (state?.status === 'downloading') {
+    setRow(modelId, { ...state, phase: 'cancelling', measured: false });
+  }
   try {
     await iterator.return?.(undefined);
   } catch {
     // A generator that already finished rejects here; the row state is
     // whatever its terminal event set, which is correct either way.
   }
+}
+
+/**
+ * The size a finished transfer measured, for the phases that follow it.
+ *
+ * `verifying` / `extracting` / `cancelling` carry no byte counts of their own,
+ * so without this the detail line would drop the one number that explains why
+ * the wait is long. Mirrors Android's `latest.copy(...)` fold.
+ */
+function transferCarryOver(modelId: string): { bytesDone?: number; bytesTotal?: number } {
+  const state = rowStates.get(modelId);
+  return state?.status === 'downloading'
+    ? { bytesDone: state.bytesDone, bytesTotal: state.bytesTotal }
+    : {};
+}
+
+/**
+ * Record a failed download and say so once.
+ *
+ * `retryable` comes from the SDK rather than being assumed: the planner refuses
+ * some models permanently (an unresolvable file list, a partial that no longer
+ * matches the server) and those refusals must not be dressed up as a transient
+ * hiccup with a Retry beside them.
+ */
+function failDownload(modelId: string, message: string, retryable: boolean): void {
+  setRow(modelId, { status: 'error', error: message, stage: 'download', retryable });
+  showToast(
+    retryable ? `Download failed: ${message}` : `Can’t download this model: ${message}`,
+    'warning',
+    retryable ? undefined : 8000,
+  );
+}
+
+/**
+ * The SDK's own verdict on whether trying again could end differently.
+ *
+ * Reads `SDKException.proto.retryable` — set by `throwDownloadFailure` in the
+ * Web SDK from the planner's failure reason. Anything that is not a recognisable
+ * SDK error is treated as retryable: an unknown fault is more likely a blip than
+ * a permanent refusal, and the failure branch above still states what happened.
+ */
+function isRetryable(err: unknown): boolean {
+  const proto = (err as { proto?: { retryable?: unknown } } | null)?.proto;
+  return typeof proto?.retryable === 'boolean' ? proto.retryable : true;
 }
 
 async function startDownload(modelId: string): Promise<void> {
@@ -1355,6 +1524,16 @@ async function startDownload(modelId: string): Promise<void> {
       return;
     }
   }
+
+  // Everything from here to the first byte — re-seeding the registry, asking for
+  // persistent storage, planning, opening the connection — is time the user is
+  // waiting after their click, and it can run to seconds on a multi-file model.
+  // The row says so from the click rather than from the first progress event.
+  // Restored on every path that gives up before a transfer starts, so an
+  // abandoned attempt never leaves a row claiming to be queued.
+  const previousState = stateOf(modelId);
+  setRow(modelId, { status: 'downloading', progress: 0, phase: 'queued' });
+  const abandon = (): void => setRow(modelId, previousState);
 
   let model = RunAnywhere.models.get(modelId);
   if (!model && entry) {
@@ -1369,6 +1548,7 @@ async function startDownload(modelId: string): Promise<void> {
     }
   }
   if (!model) {
+    abandon();
     showToast(`Model ${modelId} not found in registry`, 'warning');
     return;
   }
@@ -1387,6 +1567,7 @@ async function startDownload(modelId: string): Promise<void> {
     const fallbackMessage = RunAnywhere.storage.isSupported
       ? 'Free space or open Storage → Choose Storage Folder.'
       : 'Please free up space in your browser.';
+    abandon();
     showToast(
       `Not enough browser storage for this model (need ${formatBytes(requiredBytes)}, `
         + `${formatBytes(storage.availableBytes)} free). ${fallbackMessage}`,
@@ -1413,11 +1594,16 @@ async function startDownload(modelId: string): Promise<void> {
     );
   }
 
-  setRow(modelId, { status: 'downloading', progress: 0, phase: 'transferring' });
-
   // Rate samples for the speed readout. `performance.now()` rather than
   // Date.now() so a clock adjustment mid-download cannot produce a negative
   // interval and a nonsense speed.
+  //
+  // Measured here only because the Web `DownloadEvent.progress` carries just the
+  // two byte counts. Swift and Kotlin receive `bytesPerSecond`/`etaSeconds`
+  // straight from the C++ orchestrator, which knows the whole transfer's
+  // history, and both apps say in writing that re-deriving a rate from two UI
+  // samples disagrees with it. The honest fix is to widen the Web event to carry
+  // the same fields; until then this is the closest approximation available.
   let lastAt = performance.now();
   let lastBytes = 0;
   let smoothed: number | undefined;
@@ -1445,42 +1631,57 @@ async function startDownload(modelId: string): Promise<void> {
             lastAt = now;
             lastBytes = event.bytesDone;
           }
+          const bytesTotal = event.bytesTotal > 0 ? event.bytesTotal : undefined;
           setRow(modelId, {
             status: 'downloading',
             phase: 'transferring',
-            progress: event.bytesTotal > 0 ? event.bytesDone / event.bytesTotal : 0,
+            progress: bytesTotal ? event.bytesDone / bytesTotal : 0,
+            // No Content-Length means no position to plot. An honest sweep beats
+            // a bar pinned at zero while bytes are visibly arriving.
+            measured: bytesTotal !== undefined,
             bytesDone: event.bytesDone,
-            bytesTotal: event.bytesTotal > 0 ? event.bytesTotal : undefined,
+            bytesTotal,
             bytesPerSecond: smoothed,
+            etaSeconds: smoothed && bytesTotal
+              ? Math.max(0, bytesTotal - event.bytesDone) / smoothed
+              : undefined,
           });
           break;
         }
         case 'verifying':
           // Named rather than shown as a finished transfer: verifying a
           // multi-gigabyte file takes real time, and a full bar with no label
-          // looks exactly like a hang.
-          setRow(modelId, { status: 'downloading', progress: 1, phase: 'verifying' });
+          // looks exactly like a hang. The size carries over — these events
+          // repeat none of it, and a line that empties out mid-operation reads
+          // as a reset.
+          setRow(modelId, {
+            ...transferCarryOver(modelId),
+            status: 'downloading',
+            phase: 'verifying',
+            progress: 1,
+          });
           break;
         case 'extracting':
           setRow(modelId, {
+            ...transferCarryOver(modelId),
             status: 'downloading',
             phase: 'extracting',
-            progress: event.percent === undefined ? 1 : event.percent / 100,
+            // `percent` is 0..100 when the SDK reports it, and absent otherwise —
+            // in which case the bar sweeps rather than claiming to be finished.
+            progress: event.percent === undefined ? 1 : Math.min(1, Math.max(0, event.percent / 100)),
+            measured: event.percent !== undefined,
           });
           break;
         case 'cancelled':
           // Was falling into the same branch as `completed`, so a cancelled
           // download claimed the model was on disk and the next Load failed
           // with a missing-file error the user had no way to connect to it.
-          resumableDownloads.add(modelId);
-          setRow(modelId, { status: 'registered' });
+          setRow(modelId, { status: 'paused' });
           return;
         case 'failed':
-          setRow(modelId, { status: 'error', error: event.error.message });
-          showToast(`Download failed: ${event.error.message}`, 'warning');
+          failDownload(modelId, event.error.message, event.error.retryable);
           return;
         case 'completed':
-          resumableDownloads.delete(modelId);
           setRow(modelId, { status: 'downloaded' });
           break;
         case 'started':
@@ -1488,9 +1689,7 @@ async function startDownload(modelId: string): Promise<void> {
       }
     }
   } catch (err) {
-    const message = formatError(err);
-    setRow(modelId, { status: 'error', error: message });
-    showToast(`Download failed: ${message}`, 'warning');
+    failDownload(modelId, formatError(err), isRetryable(err));
   } finally {
     // Covers every exit — completed, cancelled, failed, and the throw path — so
     // a stale iterator can never be handed to a later Cancel click. Guarded on
@@ -1530,7 +1729,10 @@ async function loadModel(modelId: string): Promise<boolean> {
     return true;
   } catch (err) {
     const message = formatError(err);
-    setRow(modelId, { status: 'error', error: message });
+    // Stage matters for the row's control: a load failure leaves the bytes on
+    // disk, so its Retry must load again rather than re-fetch a file that is
+    // already there.
+    setRow(modelId, { status: 'error', error: message, stage: 'load', retryable: isRetryable(err) });
     showToast(`Load failed: ${message}`, 'warning');
     return false;
   }
@@ -1569,24 +1771,58 @@ async function unloadModel(modelId: string): Promise<void> {
 // State + toolbar updates
 // ---------------------------------------------------------------------------
 
-/** Patch progress UI in place so download ticks do not rebuild the whole sheet. */
-function updateDownloadProgressInPlace(modelId: string, progress: number): boolean {
-  const host = document.getElementById('model-sheet-list');
-  if (!host) return false;
-
-  const row = host.querySelector(`[data-model-id="${CSS.escape(modelId)}"]`);
-  if (!row) return false;
-
-  const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
-  const progressBtn = row.querySelector('.model-action-btn--progress');
-  if (progressBtn) progressBtn.textContent = `${pct}%`;
-
+/**
+ * Write a live snapshot into an already-rendered `renderDownloadProgress`
+ * fragment, or report that the fragment is not there to write into.
+ *
+ * The counterpart to the renderer, and exported alongside it, because every
+ * surface that shows a transfer has the same problem: progress arrives about
+ * four times a second, and rebuilding the markup that often throws away focus —
+ * a keyboard user could never reach the Cancel button on a row that keeps being
+ * replaced underneath them.
+ */
+export function patchDownloadProgress(row: ParentNode, status: ModelStatusSnapshot): boolean {
+  const bar = row.querySelector('.progress-bar') as HTMLElement | null;
   const fill = row.querySelector('.progress-fill') as HTMLElement | null;
-  if (fill) {
-    fill.style.width = `${pct}%`;
-    return true;
-  }
-  return progressBtn !== null;
+  const detail = row.querySelector('.progress-detail__text');
+  const percentEl = row.querySelector('.progress-detail__percent');
+  if (!bar || !fill || !detail || !percentEl) return false;
+
+  const pct = Math.round(Math.max(0, Math.min(1, status.progress)) * 100);
+  const indeterminate = status.indeterminate ?? false;
+
+  bar.classList.toggle('progress-bar--indeterminate', indeterminate);
+  fill.style.width = `${indeterminate ? 100 : pct}%`;
+  if (indeterminate) bar.removeAttribute('aria-valuenow');
+  else bar.setAttribute('aria-valuenow', String(pct));
+  bar.setAttribute('aria-label', status.detail || 'Download progress');
+  detail.textContent = status.detail ?? '';
+  percentEl.textContent = indeterminate ? '' : `${pct}%`;
+  return true;
+}
+
+/**
+ * Patch the picker's progress UI so download ticks do not rebuild the sheet.
+ *
+ * Was updating the bar's width and nothing else, which meant the readout it sits
+ * under — the byte counter, the rate, the estimate — was painted once at the
+ * start of the transfer and then never again. A line reading "0 B of 4.1 GB"
+ * beside a bar that visibly advances is worse than no line at all.
+ *
+ * Returns false on a phase change so the caller re-renders instead: the action
+ * button changes with the phase (Cancel becomes "Checking…"), and that lives
+ * outside the fragment `patchDownloadProgress` can reach.
+ */
+function updateDownloadProgressInPlace(
+  modelId: string,
+  previous: RowState & { status: 'downloading' },
+  state: RowState & { status: 'downloading' },
+): boolean {
+  if (previous.phase !== state.phase) return false;
+
+  const host = document.getElementById('model-sheet-list');
+  const row = host?.querySelector(`[data-model-id="${CSS.escape(modelId)}"]`);
+  return row ? patchDownloadProgress(row, toSnapshot(state)) : false;
 }
 
 function setRow(modelId: string, state: RowState): void {
@@ -1595,7 +1831,7 @@ function setRow(modelId: string, state: RowState): void {
   if (modalEl) {
     const progressOnly = previous?.status === 'downloading'
       && state.status === 'downloading'
-      && updateDownloadProgressInPlace(modelId, state.progress);
+      && updateDownloadProgressInPlace(modelId, previous, state);
     if (!progressOnly) renderRows();
   }
   refreshToolbarLabel();
@@ -1697,6 +1933,13 @@ function hydrateRowStatesFromRegistry(): void {
     const state = rowStates.get(entry.id);
     if (state?.status === 'downloading' || state?.status === 'loading') continue;
     const isDownloaded = downloadedIds.has(entry.id);
+    // An interruption is not something the registry knows about — it reports
+    // "not downloaded" for a paused transfer, a failed one, and a model nobody
+    // ever touched alike. Keeping the row's memory of *why* it is not downloaded
+    // is what stops a hydrate (which runs on every sheet open) from quietly
+    // turning "Paused — resume picks up where it stopped" back into a plain
+    // Download button. A registry that now says the file is there always wins.
+    if (!isDownloaded && (state?.status === 'paused' || state?.status === 'error')) continue;
     rowStates.set(entry.id, { status: isDownloaded ? 'downloaded' : 'registered' });
   }
 

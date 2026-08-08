@@ -1,8 +1,40 @@
 package com.runanywhere.runanywhereai.download
 
 import ai.runanywhere.proto.v1.DownloadProgress
+import ai.runanywhere.proto.v1.ErrorCode
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.api.DownloadEvent
 import java.util.Locale
+
+/**
+ * What one SDK event means for a transfer somebody is watching.
+ *
+ * `RunAnywhere.models.download(...)` reports a failure as a terminal [DownloadEvent.Failed] and then
+ * ends the flow normally — it never throws. A collector that only pattern-matches the events it can
+ * draw therefore sees a failed download as a flow that simply finished, which is indistinguishable
+ * from success: the notification said "is ready" for a model that was not on disk. Making the fold
+ * return an outcome instead of a nullable frame means every caller has to answer the question.
+ */
+sealed interface DownloadUpdate {
+    /** New numbers to show. */
+    data class Advanced(val info: DownloadProgressInfo) : DownloadUpdate
+
+    /** A marker with nothing on it a reader would see — the opening event, mostly. */
+    data object Ignored : DownloadUpdate
+
+    /** Every byte is on disk and the model is registered. */
+    data object Finished : DownloadUpdate
+
+    /**
+     * The transfer ended with the model still incomplete.
+     *
+     * [cancelled] separates the user's own stop from a fault. They look identical in the data —
+     * bytes on disk, nothing running — but they are opposite events to a reader, and offering
+     * "Retry" in error red for something the user deliberately stopped reads as the app having lost
+     * track of what happened.
+     */
+    data class Stopped(val message: String, val cancelled: Boolean) : DownloadUpdate
+}
 
 /**
  * Which part of "downloading a model" is running.
@@ -58,6 +90,15 @@ data class DownloadProgressInfo(
     /** "3.4 MB/s", or null when no rate has been measured yet. */
     val speedLabel: String? get() = bytesPerSecond?.let { "${formatBytes(it.toLong())}/s" }
 
+    /**
+     * "456 MB already downloaded" — what a stopped transfer left behind.
+     *
+     * The reasonable fear with a half-finished multi-gigabyte download is that continuing means
+     * paying for it twice. Naming the amount is the only thing that answers it; "resumes where it
+     * stopped" is a promise, this is the evidence.
+     */
+    val keptLabel: String? get() = formatBytes(bytesDone).takeIf { bytesDone > 0 }
+
     /** "2m 15s left", or null when there is nothing trustworthy to project. */
     val etaLabel: String? get() = etaSeconds?.takeIf { it > 0 }?.let { "${formatDuration(it)} left" }
 
@@ -95,8 +136,7 @@ data class DownloadProgressInfo(
 
     companion object {
         /**
-         * Fold one SDK event into the running view of the transfer, or null when the event says
-         * nothing the UI shows.
+         * Fold one SDK event into the running view of the transfer.
          *
          * Shared by every collector so a download looks the same wherever it is watched from —
          * the foreground service's notification and the picker row used to each have their own
@@ -105,20 +145,32 @@ data class DownloadProgressInfo(
          * [latest] carries the bytes and file counts forward, because the post-transfer events
          * repeat none of them and a line that empties out mid-operation reads as a reset.
          */
-        fun advance(latest: DownloadProgressInfo, event: DownloadEvent): DownloadProgressInfo? =
+        fun advance(latest: DownloadProgressInfo, event: DownloadEvent): DownloadUpdate =
             when (event) {
-                is DownloadEvent.Progress -> from(event)
+                is DownloadEvent.Progress -> DownloadUpdate.Advanced(from(event))
                 // Every byte is on disk by the time these run, so the bar completes and the line
                 // names the phase instead of leaving a rate behind that is no longer moving.
                 is DownloadEvent.Verifying ->
-                    latest.copy(fraction = 1f, phase = DownloadPhase.VERIFYING)
+                    DownloadUpdate.Advanced(latest.copy(fraction = 1f, phase = DownloadPhase.VERIFYING))
                 // `percent` is deliberately ignored: the SDK does not pin its scale, and a bar
                 // driven by a number that might be 0..1 or 0..100 is worse than one that is honest
                 // about only knowing the phase.
                 is DownloadEvent.Extracting ->
-                    latest.copy(fraction = 1f, phase = DownloadPhase.EXTRACTING)
-                is DownloadEvent.Completed -> DownloadProgressInfo(fraction = 1f)
-                else -> null
+                    DownloadUpdate.Advanced(latest.copy(fraction = 1f, phase = DownloadPhase.EXTRACTING))
+                is DownloadEvent.Completed -> DownloadUpdate.Finished
+                // A cancel reaches Kotlin two ways: as coroutine cancellation when this process
+                // stopped the transfer, and — when the native worker settles first — as a Failed
+                // carrying ERROR_CODE_CANCELLED. Both are the user's own stop, so both must read
+                // as paused rather than as a fault the app is blaming them for.
+                is DownloadEvent.Failed -> DownloadUpdate.Stopped(
+                    message = event.error.stoppedMessage(),
+                    cancelled = event.error.code == ErrorCode.ERROR_CODE_CANCELLED,
+                )
+                is DownloadEvent.Cancelled -> DownloadUpdate.Stopped(
+                    message = "Download stopped",
+                    cancelled = true,
+                )
+                is DownloadEvent.Started -> DownloadUpdate.Ignored
             }
 
         fun from(event: DownloadEvent.Progress): DownloadProgressInfo = DownloadProgressInfo(
@@ -157,6 +209,25 @@ data class DownloadProgressInfo(
         }
     }
 }
+
+/**
+ * The SDK's failure text, ready to be read by a person.
+ *
+ * It arrives as a bare fragment from wherever it was raised — "network error", "insufficient
+ * storage" — and a lowercase fragment under a red icon reads like a log line that leaked into the
+ * UI. The trailing stop is dropped so a caller can append to it without producing "..".
+ */
+fun String.asSentence(): String = trim().trimEnd('.').replaceFirstChar { it.uppercaseChar() }
+
+/**
+ * A sentence a reader can act on, for a transfer that stopped.
+ *
+ * The SDK's own message is preferred because it names the actual cause, but it is blank often
+ * enough — a native worker that settles with no text — that a fallback is needed; "Download failed"
+ * with no reason is still better than an empty error dialog.
+ */
+private fun SDKException.stoppedMessage(): String =
+    error.message.ifBlank { recoverySuggestion ?: "Download failed" }
 
 /**
  * Binary-prefix size with one decimal above a megabyte.

@@ -187,7 +187,9 @@ fun ModelSelectionSheet(
                 TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
             },
             title = { Text("Delete model") },
-            text = { Text("Delete ${model.name} from this device? You can download it again later.") },
+            // The same short name the row, the notification and the outcome report use. Naming the
+            // raw catalog id here made the dialog look like it was about a different model.
+            text = { Text("Delete ${model.displayTitle()} from this device? You can download it again later.") },
         )
     }
 
@@ -575,12 +577,18 @@ private fun PickerModelRow(
         isCurrent = state.currentModelId == model.id,
         isReady = viewModel.isReady(model),
         isBusy = state.busyModelId == model.id,
-        progress = if (state.busyModelId == model.id) state.downloadProgress else null,
+        progress = state.downloadProgress.takeIf { state.downloadingModelId == model.id },
         interruption = state.interruptionFor(model.id),
         highlightLabel = highlightLabel,
         onSelect = { onSelect(model) },
         onDownload = { onDownload(model) },
-        onCancel = { viewModel.cancelDownload(model.id) },
+        // Only a transfer can be cancelled: offering the control while the row is loading would
+        // be a button that does nothing.
+        onCancel = if (state.downloadingModelId == model.id) {
+            { viewModel.cancelDownload(model.id) }
+        } else {
+            null
+        },
         onDelete = if (viewModel.isDeletable(model)) ({ onDelete(model) }) else null,
         modifier = Modifier.padding(horizontal = dimens.spacingLg),
     )

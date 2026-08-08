@@ -15,7 +15,14 @@ struct VoiceActivityDetectionView: View {
 
     var body: some View {
         Group {
-            NavigationView {
+            // A `NavigationView` wrapping a single child renders that child as
+            // the *sidebar* column of a Mac split view, which is why this screen
+            // drew itself in a ~200pt strip against the left edge of a 1450pt
+            // detail pane. This screen is pushed from a NavigationLink, so the
+            // window already owns a navigation container; on the Mac it is plain
+            // content in a centred column and `.toolbar` attaches to the
+            // window's own bar.
+            navigationHost {
                 ZStack {
                     VStack(spacing: 0) {
                         if hasModelSelected {
@@ -52,9 +59,6 @@ struct VoiceActivityDetectionView: View {
                     }
                 }
             }
-            #if os(iOS)
-            .navigationViewStyle(.stack)
-            #endif
         }
         .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .vad) { model in
@@ -71,6 +75,19 @@ struct VoiceActivityDetectionView: View {
         .onDisappear {
             viewModel.cleanup()
         }
+    }
+
+    /// The navigation container this platform actually needs — see `body`.
+    @ViewBuilder
+    private func navigationHost<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        #if os(macOS)
+        content()
+            .frame(maxWidth: AdaptiveSizing.conversationMaxWidth)
+            .frame(maxWidth: .infinity)
+        #else
+        NavigationView { content() }
+            .navigationViewStyle(.stack)
+        #endif
     }
 
     // MARK: - Main Content
@@ -276,6 +293,10 @@ struct VoiceActivityDetectionView: View {
             .opacity(
                 viewModel.selectedModelName == nil || viewModel.isProcessing ? 0.6 : 1.0
             )
+            // The Mac's accessibility tree reported this as a bare `AXButton`
+            // with no title, description or value.
+            .accessibilityLabel(viewModel.isListening ? "Stop detection" : "Start detection")
+            .accessibilityValue(viewModel.isSpeechDetected ? "Speech detected" : "Silence")
 
             Text(viewModel.isListening
                  ? "Listening for speech..."

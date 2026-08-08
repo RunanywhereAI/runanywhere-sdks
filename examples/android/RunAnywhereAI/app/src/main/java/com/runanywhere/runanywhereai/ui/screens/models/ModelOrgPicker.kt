@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
@@ -144,11 +145,17 @@ fun OrgCard(
                             isCurrent = state.currentModelId == model.id,
                             isReady = viewModel.isReady(model),
                             isBusy = state.busyModelId == model.id,
-                            progress = if (state.busyModelId == model.id) state.downloadProgress else null,
+                            progress = state.downloadProgress.takeIf { state.downloadingModelId == model.id },
                             interruption = state.interruptionFor(model.id),
                             onSelect = { onSelect(model) },
                             onDownload = { onDownload(model) },
-                            onCancel = { viewModel.cancelDownload(model.id) },
+                            // Only a transfer can be cancelled: offering the control while the row
+                            // is loading would be a button that does nothing.
+                            onCancel = if (state.downloadingModelId == model.id) {
+                                { viewModel.cancelDownload(model.id) }
+                            } else {
+                                null
+                            },
                             onDelete = if (viewModel.isDeletable(model)) ({ onDelete(model) }) else null,
                         )
                         if (index < group.models.lastIndex) {
@@ -174,13 +181,14 @@ private fun OrgModelRow(
     isReady: Boolean,
     isBusy: Boolean,
     progress: DownloadProgressInfo?,
-    interruption: DownloadInterruption?,
+    interruption: ModelDownloadService.Interrupted?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onCancel: (() -> Unit)? = null,
     onDelete: (() -> Unit)?,
 ) {
     val dimens = LocalDimens.current
+    val interruptionKind = interruption.kind()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -228,10 +236,14 @@ private fun OrgModelRow(
             }
             // Same bar and the same detail line as the flat picker list: an org-grouped row is a
             // different layout of the same transfer, not a different amount of information.
-            if (isBusy) {
+            if (progress != null) {
                 DownloadProgressBlock(progress)
-            } else if (interruption != null) {
-                DownloadInterruptionNote(interruption)
+            } else if (!isBusy && interruptionKind != null) {
+                DownloadInterruptionNote(
+                    kind = interruptionKind,
+                    detail = interruption?.message,
+                    kept = interruption?.progress?.keptLabel,
+                )
             }
         }
         Spacer(Modifier.width(dimens.spacingSm))
@@ -241,7 +253,7 @@ private fun OrgModelRow(
                 isCurrent = isCurrent,
                 isReady = isReady,
                 isBusy = isBusy,
-                interruption = interruption,
+                interruption = interruptionKind,
                 onDownload = onDownload,
                 onCancel = onCancel,
             )

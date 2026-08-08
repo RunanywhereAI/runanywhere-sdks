@@ -48,7 +48,13 @@ struct TextToSpeechView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationView {
+        // A `NavigationView` wrapping a single child renders that child as the
+        // *sidebar* column of a Mac split view, which is why this screen drew
+        // itself in a ~200pt strip against the left edge of a 1450pt detail
+        // pane. This screen is pushed from a NavigationLink, so the window
+        // already owns a navigation container; on the Mac it is plain content in
+        // a centred column and `.toolbar` attaches to the window's own bar.
+        navigationHost {
             ZStack {
                 VStack(spacing: 0) {
                     // Main content - only enabled when model is selected
@@ -86,9 +92,6 @@ struct TextToSpeechView: View {
                 }
             }
         }
-        #if os(iOS)
-        .navigationViewStyle(.stack)
-        #endif
         .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .tts) { model in
                 Task {
@@ -110,6 +113,19 @@ struct TextToSpeechView: View {
                 inputText = funnyTTSSampleTexts.randomElement() ?? inputText
             }
         }
+    }
+
+    /// The navigation container this platform actually needs — see `body`.
+    @ViewBuilder
+    private func navigationHost<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        #if os(macOS)
+        content()
+            .frame(maxWidth: AdaptiveSizing.conversationMaxWidth)
+            .frame(maxWidth: .infinity)
+        #else
+        NavigationView { content() }
+            .navigationViewStyle(.stack)
+        #endif
     }
 
     // MARK: - View Components
@@ -377,6 +393,13 @@ struct TextToSpeechView: View {
                 .disabled(inputText.isEmpty || viewModel.selectedModelName == nil)
             }
         }
+        // The glyph + word are two children, so the announcement was a fragment
+        // pair; and the state ("Speaking") was carried only by the fill turning
+        // orange. One name for the action, one value for the state.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(viewModel.isSpeaking ? "Stop" : "Speak")
+        .accessibilityValue(viewModel.isSpeaking ? "Speaking" : "Idle")
+        .accessibilityAddTraits(.isButton)
     }
 
     /// Model button for the navigation bar.

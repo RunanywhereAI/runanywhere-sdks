@@ -20,6 +20,11 @@
 //  instead, which is an honest statement that the size is unknown — and the byte
 //  counter still moves, so progress is visible either way.
 //
+//  The same rule now covers the phases *after* the bytes land. Verifying a
+//  multi-gigabyte checksum takes long enough to be mistaken for a freeze, and a
+//  full bar labelled "Downloading" throughout it is a lie twice over. Those
+//  phases sweep and say what they are doing.
+//
 //  ## Motion
 //
 //  The bar interpolates its own width on the standard tier when the fraction
@@ -39,32 +44,23 @@ struct ModelDownloadProgressView: View {
     /// Cancel the transfer. Bytes already on disk are kept for a resume.
     let onCancel: () -> Void
 
+    /// 44pt under a coarse pointer, per DESIGN_GUIDELINE §accessibility. The Mac
+    /// build has a precise pointer and a 44pt square would dominate a row that is
+    /// only two lines tall, so it takes the 28pt fine-pointer size instead — still
+    /// comfortably above the 24pt floor.
+    #if os(macOS)
+    private static let cancelHitSize: CGFloat = 28
+    #else
+    private static let cancelHitSize: CGFloat = 44
+    #endif
+
+    private var isCancelling: Bool { progress.phase == .cancelling }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             HStack(spacing: Space.sm) {
-                DownloadProgressTrack(fraction: progress.fraction)
-
-                // A percentage is still the fastest thing to read, so it stays —
-                // it just is not the only thing shown now. Monospaced digits so
-                // the label does not reflow as it counts up.
-                if let percent = progress.percent {
-                    Text("\(percent)%")
-                        .appType(.monoMetric)
-                        .foregroundStyle(AppColors.textSecondary)
-                        .contentTransition(.numericText())
-                }
-
-                Button(action: onCancel) {
-                    Image(systemName: "xmark")
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(AppColors.textSecondary)
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Cancel download")
-                .help("Cancel download — downloaded bytes are kept")
+                progressSummary
+                cancelButton
             }
 
             // `ViewThatFits` picks the longest variant that fits, so a wide row
@@ -86,16 +82,63 @@ struct ModelDownloadProgressView: View {
             // The detail line changes several times a second; a transition on it
             // would be noise, so it updates without animation.
             .animation(nil, value: progress.detailLine)
+            // Its text is already inside the summary's one-sentence label; read
+            // twice it becomes a stutter of numbers.
+            .accessibilityHidden(true)
+        }
+        // `.contain`, not `.combine`: combining swallowed the cancel button into
+        // the progress element, which left VoiceOver with no way to stop a
+        // download at all. The bar and its numbers are one element, the button
+        // stays its own.
+        .accessibilityElement(children: .contain)
+    }
+
+    private var progressSummary: some View {
+        HStack(spacing: Space.sm) {
+            DownloadProgressTrack(fraction: progress.fraction)
+
+            // A percentage is still the fastest thing to read, so it stays —
+            // it just is not the only thing shown now, and it is shown only
+            // while there is a real position to report. Monospaced digits so
+            // the label does not reflow as it counts up.
+            if let percent = progress.percent {
+                Text("\(percent)%")
+                    .appType(.monoMetric)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .contentTransition(.numericText())
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
     }
 
+    private var cancelButton: some View {
+        Button(action: onCancel) {
+            Image(systemName: "xmark")
+                .symbolRenderingMode(.hierarchical)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(AppColors.textSecondary)
+                .frame(width: Self.cancelHitSize, height: Self.cancelHitSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // Once the stop is under way the control cannot do anything more, and a
+        // second tap has nothing to cancel. It says so rather than looking live.
+        .disabled(isCancelling)
+        .accessibilityLabel(isCancelling ? "Cancelling download" : "Cancel download")
+        .help(isCancelling
+            ? "Stopping the download — downloaded bytes are kept"
+            : "Cancel download — downloaded bytes are kept")
+    }
+
     /// VoiceOver gets one sentence rather than a percent, a byte pair, a rate and
-    /// an ETA read as four separate fragments.
+    /// an ETA read as four separate fragments. The phase leads it, because
+    /// "Downloading" and "Checking download" are different answers to the only
+    /// question someone waiting is asking.
     private var accessibilityLabel: String {
-        let head = progress.percent.map { "Downloading, \($0) percent" } ?? "Downloading"
-        return "\(head). \(progress.detailLine)"
+        let head = progress.percent.map { "\(progress.phase.label), \($0) percent" } ?? progress.phase.label
+        let detail = progress.detailLine
+        return detail.isEmpty ? head : "\(head). \(detail)"
     }
 }
 
@@ -184,6 +227,9 @@ private struct IndeterminateSweep: View {
         ModelDownloadProgressView(progress: multiFile()) {}
         ModelDownloadProgressView(progress: retrying()) {}
         ModelDownloadProgressView(progress: unknownSize()) {}
+        ModelDownloadProgressView(progress: phased(.verifying)) {}
+        ModelDownloadProgressView(progress: phased(.extracting(percent: 62))) {}
+        ModelDownloadProgressView(progress: phased(.cancelling)) {}
     }
     .padding(Space.xl)
     .frame(width: 420)
@@ -192,9 +238,10 @@ private struct IndeterminateSweep: View {
 
 private func sample(fraction: Float) -> ModelDownloadProgress {
     var progress = ModelDownloadProgress()
+    progress.phase = .downloading
     progress.bytesTotal = 4_400_000_000
     progress.bytesDone = Int64(Float(progress.bytesTotal) * fraction)
-    progress.fraction = fraction
+    progress.byteFraction = fraction
     progress.bytesPerSecond = 3_600_000
     progress.etaSeconds = 735
     return progress
@@ -215,8 +262,15 @@ private func retrying() -> ModelDownloadProgress {
 
 private func unknownSize() -> ModelDownloadProgress {
     var progress = ModelDownloadProgress()
+    progress.phase = .downloading
     progress.bytesDone = 12_400_000
     progress.bytesTotal = 0
-    progress.fraction = nil
+    progress.byteFraction = nil
+    return progress
+}
+
+private func phased(_ phase: ModelDownloadPhase) -> ModelDownloadProgress {
+    var progress = sample(fraction: 1)
+    progress.phase = phase
     return progress
 }

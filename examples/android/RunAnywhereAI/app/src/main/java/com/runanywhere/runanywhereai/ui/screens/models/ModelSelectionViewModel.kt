@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
-import ai.runanywhere.proto.v1.ModelListRequest
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +11,7 @@ import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.isVisibleForNativeNpuCatalog
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.download.DownloadProgressInfo
+import com.runanywhere.runanywhereai.download.DownloadUpdate
 import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
@@ -21,38 +21,35 @@ import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
 data class ModelSelectionState(
     val models: List<RAModelInfo> = emptyList(),
     val currentModelId: String? = null,
-    val busyModelId: String? = null,
+    // Loading, deleting — work this picker is doing itself. A download's busy row comes from
+    // [downloadingModelId] instead, because the transfer outlives this ViewModel.
+    val localBusyModelId: String? = null,
+    // The model the foreground service is transferring right now, when this picker lists it.
+    val downloadingModelId: String? = null,
     // Full transfer detail (rate, remaining, retry count), not just a percentage, so a row can
     // explain a slow download instead of only claiming a number.
     val downloadProgress: DownloadProgressInfo? = null,
-    // The model whose download failed, kept with [error] so the row can offer a retry that resumes
-    // from the bytes already on disk rather than starting over.
-    val failedModelId: String? = null,
-    // The model whose download the user stopped. Distinct from [failedModelId] because nothing went
-    // wrong — the row says "Resume", not "Retry", and shows no error colour. Partial bytes survive a
-    // cancel (the SDK passes delete_partial_bytes = false), so resuming is genuinely cheap.
-    val pausedModelId: String? = null,
+    // Downloads that stopped with bytes still on disk, mirrored from the service so a row can
+    // offer to continue one that started before this picker was opened.
+    val interruptions: Map<String, ModelDownloadService.Interrupted> = emptyMap(),
     val isLoading: Boolean = true,
     val error: String? = null,
 ) {
+    /** The one busy row, whichever kind of work is holding it. */
+    val busyModelId: String? get() = downloadingModelId ?: localBusyModelId
+
     /**
-     * How a stopped transfer for [modelId] should be described, or null when there is nothing on
-     * disk to continue. Resolved here rather than at each row so the note and the verb are read
-     * from one place and cannot disagree.
+     * The stopped transfer for [modelId], or null when there is nothing on disk to continue.
+     * Handed to the row whole so the note and the trailing verb are read from one record and
+     * cannot disagree about what happened.
      */
-    fun interruptionFor(modelId: String): DownloadInterruption? = when (modelId) {
-        failedModelId -> DownloadInterruption.FAILED
-        pausedModelId -> DownloadInterruption.PAUSED
-        else -> null
-    }
+    fun interruptionFor(modelId: String): ModelDownloadService.Interrupted? = interruptions[modelId]
 }
 
 class ModelSelectionViewModel(
@@ -70,10 +67,9 @@ class ModelSelectionViewModel(
 
     private val isLlm: Boolean get() = context == ModelSelectionContext.LLM
 
-    // In-flight collector for a user-initiated download. Cancelling this cancels
-    // the SDK stream, whose finally block hands off to the native cancel while
-    // preserving resume bytes. Tracks both the foreground-service observation and
-    // the in-VM fallback path so [cancelDownload] works in either case.
+    // In-flight collector for the in-VM fallback download — the path taken only when the
+    // foreground service cannot be started. Service-owned downloads are watched through
+    // [ModelDownloadService.active] and have no job here to cancel.
     private var downloadJob: Job? = null
 
     init {
@@ -103,25 +99,32 @@ class ModelSelectionViewModel(
             BackendAvailability.snapshots.collect { reload() }
         }
         viewModelScope.launch {
-            // Adopt a transfer the foreground service is already running. A download started
-            // before this ViewModel existed — the app was backgrounded and the Activity recreated,
-            // or the picker was simply closed and reopened — has no collector here, so without
-            // this the row would offer "Get" over a download that is still going and a second tap
-            // would preempt it.
-            ModelDownloadService.state.collect { adoptActiveDownload(it) }
+            // The single source of "is something downloading". A transfer started before this
+            // ViewModel existed — the app was backgrounded and the Activity recreated, or the
+            // picker was simply closed and reopened — shows up here with no adoption dance, and a
+            // transfer that ends while the picker is closed cannot strand a row mid-progress.
+            ModelDownloadService.active.collect { snapshot ->
+                val previous = state.downloadingModelId
+                syncDownloadState(snapshot)
+                // A transfer this picker was showing just ended. Re-read the catalog so the row
+                // reports what is genuinely on disk rather than what the last frame claimed.
+                if (previous != null && snapshot?.modelId != previous) reload()
+            }
+        }
+        viewModelScope.launch {
+            ModelDownloadService.interrupted.collect { records ->
+                state = state.copy(interruptions = records)
+            }
         }
     }
 
-    /**
-     * Start mirroring [snapshot] if it names a running download this picker shows and nothing is
-     * already tracking it. Idempotent: the guard on an active [downloadJob] is what keeps the
-     * service's own state flow from spawning a second collector on every progress tick.
-     */
-    private fun adoptActiveDownload(snapshot: ModelDownloadService.Download?) {
-        if (snapshot == null || snapshot.status != ModelDownloadService.Status.RUNNING) return
-        if (downloadJob?.isActive == true) return
-        val model = state.models.firstOrNull { it.id == snapshot.modelId } ?: return
-        downloadJob = viewModelScope.launch { collectForegroundDownload(model) }
+    /** Mirror the service's live transfer into this picker's row state, if it lists that model. */
+    private fun syncDownloadState(snapshot: ModelDownloadService.Active? = ModelDownloadService.active.value) {
+        val mine = snapshot?.takeIf { active -> state.models.any { it.id == active.modelId } }
+        state = state.copy(
+            downloadingModelId = mine?.modelId,
+            downloadProgress = mine?.progress,
+        )
     }
 
     fun refresh() {
@@ -146,10 +149,14 @@ class ModelSelectionViewModel(
                 // they look tappable and then hard-fail at load.
                 .filter { BackendAvailability.isAvailable(it.framework) }
             state = state.copy(models = models, isLoading = false, error = null)
-            // The service's state flow is conflated, so a download that was already running when
-            // this picker was built emitted its RUNNING snapshot before [models] was populated and
-            // will not re-emit. Re-check now that there is a list to match it against.
-            adoptActiveDownload(ModelDownloadService.state.value)
+            // A model that is on disk has nothing left to resume, so an offer to continue it would
+            // be describing bytes that are now a finished file.
+            ModelDownloadService.interrupted.value.keys
+                .filter { id -> models.any { it.id == id && isReady(it) } }
+                .forEach { ModelDownloadService.forget(it) }
+            // The service's flow is conflated, so a transfer that was already running when this
+            // picker was built emitted before [models] existed to match it against. Re-check now.
+            syncDownloadState()
             syncCurrent(models)
             autoLoadIfNeeded(models)
         } catch (e: CancellationException) {
@@ -161,172 +168,103 @@ class ModelSelectionViewModel(
     }
 
     // User-initiated download. Prefers the foreground service so the transfer
-    // survives the screen turning off (Doze). Falls back to an in-VM download
-    // when the service can't be started (e.g. app in background). Either path is
-    // cancellable via [cancelDownload].
+    // survives the app being backgrounded and the screen turning off (Doze). Falls
+    // back to an in-VM download when the service can't be started (e.g. app already
+    // in the background). Either path is cancellable via [cancelDownload].
     fun download(model: RAModelInfo) {
         if (isReady(model)) return
-        if (model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()) {
-            state = state.copy(
-                error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
-            )
-            return
-        }
-        // Replace any prior collector/fallback so only one download is tracked.
+        if (!hasTokenForDownload(model)) return
+        // Replace any prior in-VM fallback so only one download is tracked here.
         downloadJob?.cancel()
         if (ModelDownloadService.start(model)) {
-            observeForegroundDownload(model)
+            // Paint the busy row on this frame rather than waiting for the service's flow to
+            // schedule; the same snapshot arrives from the collector a moment later.
+            state = state.copy(
+                downloadingModelId = model.id,
+                downloadProgress = DownloadProgressInfo(),
+                error = null,
+            )
         } else {
             downloadJob = viewModelScope.launch { downloadInternal(model) }
         }
     }
 
-    // Mirrors the foreground service's progress/terminal state into this VM's row
-    // state so the picker shows the same bar the notification does. The collector
-    // job is the cancellation handle for the foreground path.
-    private fun observeForegroundDownload(model: RAModelInfo) {
-        downloadJob = viewModelScope.launch { collectForegroundDownload(model) }
-    }
-
-    // Mirrors the foreground service's progress/terminal state into this VM's row and
-    // completes when THIS model reaches a terminal status — OR when the service is
-    // preempted by a different download — so the collector can never hang on a stale
-    // or other-model snapshot. Shared by the fire-and-forget picker path and the
-    // awaiting prepare() path.
-    private suspend fun collectForegroundDownload(model: RAModelInfo) {
-        state = state.copy(
-            busyModelId = model.id,
-            downloadProgress = DownloadProgressInfo(),
-            failedModelId = null,
-            pausedModelId = null,
-            error = null,
-        )
-        var sawOurModel = false
-        ModelDownloadService.state
-            .takeWhile { snapshot ->
-                when {
-                    snapshot == null -> true // service hasn't reported yet
-                    snapshot.modelId == model.id -> {
-                        sawOurModel = true
-                        snapshot.status == ModelDownloadService.Status.RUNNING
-                    }
-                    // A different model is active: keep waiting only during our
-                    // pre-registration window. Once we've tracked our model, a switch
-                    // means we were preempted — stop so applyTerminalDownload clears us.
-                    else -> !sawOurModel
-                }
-            }
-            .collect { snapshot ->
-                if (snapshot?.modelId == model.id &&
-                    snapshot.status == ModelDownloadService.Status.RUNNING
-                ) {
-                    state = state.copy(busyModelId = model.id, downloadProgress = snapshot.progress)
-                }
-            }
-        // The flow completed on a terminal (or preemption) snapshot; apply + clean up.
-        applyTerminalDownload(model, ModelDownloadService.state.value)
-    }
-
-    private suspend fun applyTerminalDownload(
-        model: RAModelInfo,
-        snapshot: ModelDownloadService.Download?,
-    ) {
-        if (snapshot == null || snapshot.modelId != model.id) {
-            state = state.copy(busyModelId = null, downloadProgress = null)
-            return
-        }
-        when (snapshot.status) {
-            ModelDownloadService.Status.COMPLETED -> {
-                state = state.copy(busyModelId = null, downloadProgress = null)
-                reload()
-            }
-            ModelDownloadService.Status.FAILED ->
-                // Remember which model failed so the row can offer Retry. The SDK cancels with
-                // delete_partial_bytes = false, so retrying resumes from the bytes already on disk
-                // rather than re-fetching gigabytes the user already paid for.
-                state = state.copy(
-                    busyModelId = null,
-                    downloadProgress = null,
-                    failedModelId = model.id,
-                    error = snapshot.error ?: "Download failed",
-                )
-            ModelDownloadService.Status.CANCELLED ->
-                // Deliberately no error: the user stopped this. The row switches to "Resume" so the
-                // partial bytes on disk are visibly an asset rather than something to start over.
-                state = state.copy(
-                    busyModelId = null,
-                    downloadProgress = null,
-                    pausedModelId = model.id,
-                )
-            ModelDownloadService.Status.RUNNING ->
-                state = state.copy(busyModelId = null, downloadProgress = null)
-        }
-        ModelDownloadService.clearIfTerminal(model.id)
-    }
-
-    // Cancels the in-flight download for [modelId]. Cancels the foreground-service
-    // job (which the SDK unwinds, preserving resume bytes) and the local collector.
+    // Cancels the in-flight download for [modelId]. The service unwinds the SDK stream, which
+    // preserves resume bytes and publishes the paused record every picker reads.
     fun cancelDownload(modelId: String) {
         viewModelScope.launch {
             ModelDownloadService.cancel(modelId)
             downloadJob?.cancel()
             downloadJob = null
-            // Cancelling the collector means applyTerminalDownload never runs, so the paused row
-            // state and the service's terminal snapshot are both settled here instead. Without the
-            // clear, the stale CANCELLED snapshot would end the next collector for this model the
-            // instant it subscribed.
-            if (state.busyModelId == modelId) {
-                state = state.copy(
-                    busyModelId = null,
-                    downloadProgress = null,
-                    pausedModelId = modelId,
-                )
-            }
-            ModelDownloadService.clearIfTerminal(modelId)
         }
     }
 
-    // Downloads the model (respecting the HF-token gate) with progress on this VM's
-    // state. Returns true when the model is on disk afterwards. Shared by the in-VM
-    // download fallback and [prepare].
+    // The HF-token gate, shared by every download entry point. Returns false (with the row's error
+    // set) when a private model is asked for without a token to fetch it.
+    private fun hasTokenForDownload(model: RAModelInfo): Boolean {
+        if (!model.requiresHfAuth() || SettingsRepository.settings.hfToken.isNotBlank()) return true
+        state = state.copy(
+            error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
+        )
+        return false
+    }
+
+    // Downloads the model on this ViewModel's own scope. Only used when the foreground service
+    // could not be started — it has no wake lock and dies with the process, so it is a fallback,
+    // not a peer. Returns true when the model is on disk afterwards.
     private suspend fun downloadInternal(model: RAModelInfo): Boolean {
         if (isReady(model)) return true
-        if (model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()) {
-            state = state.copy(
-                error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
-            )
-            return false
-        }
+        if (!hasTokenForDownload(model)) return false
         state = state.copy(
-            busyModelId = model.id,
+            downloadingModelId = model.id,
             downloadProgress = DownloadProgressInfo(),
-            failedModelId = null,
-            pausedModelId = null,
             error = null,
         )
+        ModelDownloadService.forget(model.id)
+        var latest = DownloadProgressInfo()
         return try {
             // Same as ModelDownloadService: free resident weights so the RAM
             // preflight can pass when another STT/LLM is still loaded.
             RuntimeModelSelection.unloadAllForDownload()
-            var latest = DownloadProgressInfo()
+            var finished = false
             RunAnywhere.models.download(model.id).collect { event ->
-                val info = DownloadProgressInfo.advance(latest, event) ?: return@collect
-                latest = info
-                state = state.copy(downloadProgress = info)
+                when (val update = DownloadProgressInfo.advance(latest, event)) {
+                    is DownloadUpdate.Advanced -> {
+                        latest = update.info
+                        state = state.copy(downloadProgress = update.info)
+                    }
+                    DownloadUpdate.Finished -> finished = true
+                    // The SDK reports a failure as a terminal event and then ends the stream
+                    // normally, so the end of the stream is not on its own a success.
+                    is DownloadUpdate.Stopped -> ModelDownloadService.noteInterrupted(
+                        modelId = model.id,
+                        cancelled = update.cancelled,
+                        message = update.message,
+                        progress = latest.takeIf { it.bytesDone > 0 },
+                    )
+                    DownloadUpdate.Ignored -> Unit
+                }
             }
-            state = state.copy(busyModelId = null, downloadProgress = null, currentModelId = null)
+            state = state.copy(downloadingModelId = null, downloadProgress = null)
             reload()
-            true
+            finished && isReady(model)
         } catch (e: CancellationException) {
+            ModelDownloadService.noteInterrupted(
+                modelId = model.id,
+                cancelled = true,
+                progress = latest.takeIf { it.bytesDone > 0 },
+            )
+            state = state.copy(downloadingModelId = null, downloadProgress = null)
             throw e
         } catch (e: Exception) {
             RACLog.e("download failed: ${model.id}", e)
-            state = state.copy(
-                busyModelId = null,
-                downloadProgress = null,
-                failedModelId = model.id,
-                error = e.message ?: "Download failed",
+            ModelDownloadService.noteInterrupted(
+                modelId = model.id,
+                cancelled = false,
+                message = e.message ?: "Download failed",
+                progress = latest.takeIf { it.bytesDone > 0 },
             )
+            state = state.copy(downloadingModelId = null, downloadProgress = null)
             false
         }
     }
@@ -344,31 +282,30 @@ class ModelSelectionViewModel(
     // headroom — loading between downloads would be undone by the next one.
     suspend fun ensureDownloaded(model: RAModelInfo): Boolean = awaitDownload(model)
 
-    // Downloads via the foreground service (survives screen-off / Doze) and suspends
-    // until this model reaches a terminal state, falling back to the in-VM stream when
-    // the service can't start (e.g. app already backgrounded). Returns true when the
-    // model is on disk afterward. Used by prepare() so voice-pipeline staging gets the
-    // same wake-lock/foreground guarantees as user-initiated picker downloads.
+    // Downloads via the foreground service (survives backgrounding / screen-off) and suspends until
+    // this model is no longer the running transfer, falling back to the in-VM stream when the
+    // service can't start. Returns true when the model is on disk afterward, so voice-pipeline
+    // staging gets the same wake-lock/foreground guarantees as user-initiated picker downloads.
     private suspend fun awaitDownload(model: RAModelInfo): Boolean {
         if (isReady(model)) return true
-        if (model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()) {
-            state = state.copy(
-                error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
-            )
-            return false
-        }
+        if (!hasTokenForDownload(model)) return false
         if (!ModelDownloadService.start(model)) return downloadInternal(model)
-        collectForegroundDownload(model)
+        ModelDownloadService.awaitFinish(model.id)
+        // The catalog carries the on-disk path, so it has to be re-read before "is it ready?"
+        // can be answered from anything better than the last progress frame.
+        reload()
         return isReady(model)
     }
 
     fun delete(model: RAModelInfo) {
         viewModelScope.launch {
-            state = state.copy(busyModelId = model.id, downloadProgress = null, error = null)
+            state = state.copy(localBusyModelId = model.id, error = null)
             try {
                 if (isLlm) LlmModelChangeInterlock.awaitReadyForModelChange()
                 RunAnywhere.models.delete(model.id)
                 RuntimeModelSelection.clearModelEverywhere(model.id)
+                // Its partial bytes went with it, so there is nothing left to resume.
+                ModelDownloadService.forget(model.id)
                 reload()
             } catch (e: CancellationException) {
                 throw e
@@ -376,7 +313,7 @@ class ModelSelectionViewModel(
                 RACLog.e("delete failed: ${model.id}", e)
                 state = state.copy(error = e.message ?: "Delete failed")
             } finally {
-                state = state.copy(busyModelId = null, downloadProgress = null)
+                state = state.copy(localBusyModelId = null)
             }
         }
     }
@@ -385,11 +322,11 @@ class ModelSelectionViewModel(
     // can dismiss. Only RAG references bypass lifecycle loading; platform built-ins such as
     // System TTS still create a native lifecycle service and must be loaded normally.
     suspend fun select(model: RAModelInfo): Boolean {
-        state = state.copy(busyModelId = model.id, error = null)
+        state = state.copy(localBusyModelId = model.id, error = null)
         return try {
             if (!context.loadsModel) {
                 RuntimeModelSelection.selectReference(context, model)
-                state = state.copy(currentModelId = model.id, busyModelId = null)
+                state = state.copy(currentModelId = model.id, localBusyModelId = null)
                 true
             } else {
                 if (isLlm) {
@@ -402,13 +339,13 @@ class ModelSelectionViewModel(
                 val actual = RuntimeModelSelection.queryCurrent(context, state.models + model)
                 if (actual?.id != model.id) {
                     state = state.copy(
-                        busyModelId = null,
+                        localBusyModelId = null,
                         error = "The runtime loaded ${actual?.id ?: "no model"} instead of ${model.id}.",
                     )
                     false
                 } else {
                     if (isLlm) GlobalState.lora.set(null)
-                    state = state.copy(currentModelId = actual.id, busyModelId = null)
+                    state = state.copy(currentModelId = actual.id, localBusyModelId = null)
                     true
                 }
             }
@@ -416,7 +353,7 @@ class ModelSelectionViewModel(
             throw e
         } catch (e: Exception) {
             RACLog.e("load failed: ${model.id}", e)
-            state = state.copy(busyModelId = null, error = e.message ?: "Load failed")
+            state = state.copy(localBusyModelId = null, error = e.message ?: "Load failed")
             false
         }
     }
@@ -449,7 +386,7 @@ class ModelSelectionViewModel(
         // Auto-loading a chat model while one is in flight puts that memory straight back and can
         // fail the very transfer that freed it — and leaves the picker claiming a model is Loaded
         // beside a row that just said it was unloading everything.
-        if (ModelDownloadService.state.value?.status == ModelDownloadService.Status.RUNNING) return
+        if (ModelDownloadService.active.value != null) return
         val ready = models.filter { isReady(it) && !it.isBuiltIn }
         // Default to the recommended chat model (Qwen3.5-0.8B — best on-device multi-turn recall) instead
         // of whatever happens to be first in the list; degrade through the other strong NPU chat models,
@@ -468,5 +405,4 @@ class ModelSelectionViewModel(
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             ModelSelectionViewModel(context) as T
     }
-
 }

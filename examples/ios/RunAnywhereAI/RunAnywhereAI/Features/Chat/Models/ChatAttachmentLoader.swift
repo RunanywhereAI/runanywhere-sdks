@@ -105,29 +105,30 @@ enum ChatAttachmentLoader {
     /// Throws rather than returning an optional: "the image could not be loaded"
     /// and "the image could not be prepared" are different failures, and a
     /// silently-nil return gave the caller no way to say which happened.
+    ///
+    /// Routed through the byte-level path so a photo from the library is
+    /// size-checked exactly as strictly as a dropped or pasted one. It used to
+    /// build the attachment itself and skip the check entirely, so the one source
+    /// most likely to exceed the ceiling — a modern phone camera roll — was the
+    /// one source that never hit it.
     static func imageAttachment(from item: PhotosPickerItem) async throws -> ChatImageAttachment {
         guard let data = try await item.loadTransferable(type: Data.self) else {
             throw LLMError.custom("The selected image could not be loaded.")
         }
+        return try imageAttachment(from: data, filename: photoFilename(for: item))
+    }
 
-        let image: ImageInput?
-        #if canImport(UIKit)
-        image = try UIImage(data: data).map { try ImageInput.uiImage($0) }
-        #elseif canImport(AppKit)
-        image = try NSImage(data: data).map { try ImageInput.nsImage($0) }
-        #else
-        image = nil
-        #endif
-
-        guard let image else {
-            throw LLMError.custom("The selected image could not be prepared for the vision model.")
+    /// A name for a library photo.
+    ///
+    /// Not `itemIdentifier`: that is a `PHAsset` local identifier — a bare UUID —
+    /// and showing it in the attachment chip named nothing while looking like a
+    /// bug. The library does not hand over the original filename, so the honest
+    /// answer is "Photo" plus whatever the format turns out to be.
+    private static func photoFilename(for item: PhotosPickerItem) -> String {
+        guard let ext = item.supportedContentTypes.first?.preferredFilenameExtension else {
+            return "Photo"
         }
-
-        return ChatImageAttachment(
-            data: data,
-            image: image,
-            filename: item.itemIdentifier ?? "Selected image"
-        )
+        return "Photo.\(ext)"
     }
 
     /// Build an image attachment from raw bytes.
@@ -191,6 +192,64 @@ enum ChatAttachmentLoader {
         case nil:
             // Unreachable: `rejectionReason` already refused an unknown type.
             throw LLMError.custom("That file isn't supported.")
+        }
+    }
+
+    /// The same validated read, for a surface that can only take an image.
+    ///
+    /// The vision workbench has no corpus and no embedding model, so a dropped
+    /// PDF there is a wrong turn rather than a broken file — and the sentence has
+    /// to say where the PDF *does* work, or the reader concludes the app cannot
+    /// read documents at all.
+    static func imageAttachment(forFileAt url: URL) async throws -> ChatImageAttachment {
+        switch try await attachment(forFileAt: url) {
+        case .image(let image):
+            return image
+        case .document(let document):
+            throw LLMError.custom(
+                "\(document.filename) is a document. This screen asks about pictures — "
+                    + "attach a document in a chat instead."
+            )
+        }
+    }
+}
+
+// MARK: - Drag and drop
+
+extension ChatAttachmentLoader {
+    /// The file behind a dropped item, when there is one.
+    ///
+    /// Here rather than on a view because a drop arrives on two surfaces (the
+    /// chat transcript and the vision workbench) and neither reads a single piece
+    /// of view state to unwrap it.
+    static func fileURL(from provider: NSItemProvider) async throws -> URL? {
+        guard provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) else { return nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            _ = provider.loadObject(ofClass: URL.self) { url, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: url)
+                }
+            }
+        }
+    }
+
+    /// Bytes for an image dragged from somewhere with no file behind it — a
+    /// browser, Preview, a screenshot thumbnail.
+    static func imageData(from provider: NSItemProvider) async throws -> Data? {
+        guard let identifier = provider.registeredTypeIdentifiers.first(where: {
+            UTType($0)?.conforms(to: .image) == true
+        }) else { return nil }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: identifier) { data, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: data)
+                }
+            }
         }
     }
 }
