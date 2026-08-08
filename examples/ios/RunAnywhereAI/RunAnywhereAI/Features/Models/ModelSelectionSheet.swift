@@ -555,7 +555,8 @@ struct ModelSelectionSheet: View {
                     ForEach(ready) { group in
                         NavigationLink {
                             ModelOrgDetailView(
-                                group: group,
+                                org: group.org,
+                                visibleModelIDs: Set(group.models.map(\.id)),
                                 tier: hardwareTier,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: isLoadingModel,
@@ -575,7 +576,8 @@ struct ModelSelectionSheet: View {
                     ForEach(rest) { group in
                         NavigationLink {
                             ModelOrgDetailView(
-                                group: group,
+                                org: group.org,
+                                visibleModelIDs: Set(group.models.map(\.id)),
                                 tier: hardwareTier,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: isLoadingModel,

@@ -309,6 +309,31 @@ function supportsChunkedMemfsIO(fs: EmscriptenFS): boolean {
     && typeof fs.write === 'function';
 }
 
+/**
+ * True for the empty MEMFS placeholder an OPFS-direct download leaves behind
+ * (`PlatformAdapter.installMemfsSizeStub`): a zero-length backing store whose
+ * `usedBytes` is set to the artifact's real size so commons'
+ * `validate_downloaded_sizes` can see the right length.
+ *
+ * The distinction is load-bearing in BOTH directions. `fs.stat().size` reports
+ * the full length, so a stub is indistinguishable from a real file by size
+ * alone — and reading it yields zeros, not bytes. Flushing one to OPFS
+ * therefore overwrites the genuine downloaded artifact with a correctly-sized
+ * run of 0x00, which no loader can open (`gguf_init_from_reader: invalid magic
+ * characters`) while every size check still passes.
+ */
+function isEmptyMemfsSizeStub(fs: EmscriptenFS, path: string): boolean {
+  try {
+    const node = (fs as {
+      lookupPath?(p: string): { node?: { usedBytes?: number; contents?: Uint8Array } };
+    }).lookupPath?.(path)?.node;
+    if (!node) return false;
+    return (node.contents?.length ?? 0) === 0 && (node.usedBytes ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function flushMemfsFileChunked(
   fs: EmscriptenFS,
   path: string,
@@ -861,6 +886,17 @@ export class OPFSBridge {
       );
       return 0;
     }
+    // Same situation as the ENOENT case above, one step further along: the
+    // bytes went straight to OPFS and MEMFS holds only the size placeholder.
+    // Flushing it would replace the real artifact with `size` zero bytes, so
+    // report "nothing to flush" and let the caller verify the OPFS copy.
+    if (isEmptyMemfsSizeStub(fs, path)) {
+      logger.debug(
+        `flushFromMemfs: '${path}' is an OPFS-direct size stub in MEMFS `
+        + `(${size} bytes, no contents); OPFS already holds the bytes`,
+      );
+      return 0;
+    }
     const dir = await resolveOPFSDirectory(dirSegments, true);
     if (!dir) {
       return 0;
@@ -923,12 +959,7 @@ export class OPFSBridge {
     if (fs.analyzePath?.(path)?.exists) {
       try {
         const size = fs.stat(path).size;
-        const node = (fs as {
-          lookupPath?(p: string): { node?: { usedBytes?: number; contents?: Uint8Array } };
-        }).lookupPath?.(path)?.node;
-        const emptyStub = !!node
-          && (node.contents?.length ?? 0) === 0
-          && (node.usedBytes ?? 0) > 0;
+        const emptyStub = isEmptyMemfsSizeStub(fs, path);
         if (size > 0 && !emptyStub) {
           logger.debug(`restoreToMemfs: '${path}' already in MEMFS (${size} bytes)`);
           return 0;

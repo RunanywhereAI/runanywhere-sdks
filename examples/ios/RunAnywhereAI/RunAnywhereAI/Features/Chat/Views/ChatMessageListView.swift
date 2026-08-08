@@ -370,6 +370,7 @@ struct ChatInputAreaView: View {
                 DocumentAttachmentPill(
                     attachment: documentAttachment,
                     areModelsReady: areDocumentModelsReady,
+                    indexState: viewModel.documentIndexState,
                     onRemove: onRemoveDocumentAttachment,
                     onChooseModels: onChooseDocumentModels
                 )
@@ -448,7 +449,12 @@ struct ChatInputAreaView: View {
                     Label("Attach Image", systemImage: "photo")
                 }
 
-                #if os(iOS)
+                // Not iOS-only. VLMCameraView ships real macOS support — an
+                // NSViewRepresentable preview and a Privacy & Security deep link —
+                // and ChatInterfaceView already presents it under #if os(macOS),
+                // but this was the only action that set showingVisionWorkbench.
+                // Behind an iOS guard that made a finished feature unreachable on
+                // a Mac that has working cameras.
                 Button {
                     onComposerAction(.takePhoto)
                 } label: {
@@ -458,7 +464,6 @@ struct ChatInputAreaView: View {
                     // the glyph Android (`RACIcons.Outline.Eye`) and the web app draw here.
                     Label("Live Camera", systemImage: "eye")
                 }
-                #endif
 
                 // Disabled rather than hidden when the clipboard is empty: a row
                 // that appears and disappears is a control nobody learns, and it
@@ -699,14 +704,15 @@ private struct ImageAttachmentPill: View {
 private struct DocumentAttachmentPill: View {
     let attachment: ChatDocumentAttachment
     let areModelsReady: Bool
+    let indexState: ChatDocumentIndexState
     let onRemove: () -> Void
     let onChooseModels: () -> Void
 
     var body: some View {
         AttachmentPillLayout(
             title: attachment.filename,
-            subtitle: areModelsReady ? "Ready for questions" : "Choose document models",
-            isReady: areModelsReady,
+            subtitle: indexState.chipSubtitle(modelsReady: areModelsReady),
+            isReady: indexState.isChipReady(modelsReady: areModelsReady),
             actionTitle: "Models",
             onAction: onChooseModels,
             onRemove: onRemove,

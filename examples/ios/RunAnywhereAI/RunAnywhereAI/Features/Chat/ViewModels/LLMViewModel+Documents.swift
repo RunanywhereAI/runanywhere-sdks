@@ -162,21 +162,33 @@ extension LLMViewModel {
         await documentRAGSession?.close()
         documentRAGSession = nil
 
-        let session = try await RunAnywhere.rag.open(
-            embeddingModel: ModelRef(id: embeddingModel.id),
-            llmModel: ModelRef(id: answerModel.id)
-        )
-        try await session.ingest(document: RagDocument(
-            text: document.text,
-            metadata: [
-                "source": document.filename,
-                "filename": document.filename
-            ]
-        ))
+        // Indexing is the part that can fail, so the chip tracks it rather than
+        // claiming readiness from the model choice alone.
+        setDocumentIndexState(.indexing)
+        do {
+            let session = try await RunAnywhere.rag.open(
+                embeddingModel: ModelRef(id: embeddingModel.id),
+                llmModel: ModelRef(id: answerModel.id)
+            )
+            try await session.ingest(document: RagDocument(
+                text: document.text,
+                metadata: [
+                    "source": document.filename,
+                    "filename": document.filename
+                ]
+            ))
 
-        documentRAGSession = session
-        preparedDocumentRAGPipelineKey = key
-        return session
+            documentRAGSession = session
+            preparedDocumentRAGPipelineKey = key
+            setDocumentIndexState(.indexed)
+            return session
+        } catch {
+            // Commons now names the cause (e.g. "The embedding model produced no
+            // vector …"); carry it verbatim rather than replacing it with a
+            // second, vaguer sentence of our own.
+            setDocumentIndexState(.failed(error.localizedDescription))
+            throw error
+        }
     }
 
     private func updateDocumentMessage(

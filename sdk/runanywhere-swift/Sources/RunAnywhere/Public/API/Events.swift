@@ -79,6 +79,22 @@ public enum VoiceEvent: Sendable {
     case agentResponse(text: String)
     case speechStarted
     case speechEnded
+
+    /// The session is running and reading the microphone, but the microphone is
+    /// not delivering a usable signal — muted, the wrong input device selected,
+    /// or a host with no audio device at all. `detail` is the core's own
+    /// measurement, e.g. "the microphone is delivering digital silence (every
+    /// sample zero for 8s)".
+    ///
+    /// Separate from `.error` because nothing has failed: the pipeline is
+    /// healthy and will hear the moment real signal arrives. Rendering it as an
+    /// error would be wrong, and rendering it as nothing at all is what left the
+    /// panel asserting "Go ahead — I'm listening" at a user it could not hear.
+    /// The distinction is on the wire already (`ERROR_CODE_INSUFFICIENT_AUDIO_DATA`
+    /// on a recoverable `VoiceSessionError`); this case stops the SDK throwing it
+    /// away.
+    case inputSilent(detail: String)
+
     case error(message: String, recoverable: Bool)
 
     /// Fold one native voice event onto the spec grammar, or drop it when it
@@ -102,6 +118,9 @@ public enum VoiceEvent: Sendable {
             }
             return nil
         case .sessionError(let error):
+            if error.code == .insufficientAudioData {
+                return .inputSilent(detail: error.message)
+            }
             return .error(message: error.message, recoverable: error.recoverable)
         case .turnLifecycle(let turn):
             if turn.kind == .agentResponseStarted {

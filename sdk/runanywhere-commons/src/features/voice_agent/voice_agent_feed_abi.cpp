@@ -20,12 +20,14 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <mutex>
 #include <string>
 #include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
@@ -52,13 +54,69 @@ constexpr int kBytesPerSample = 2;
 constexpr int kFrameMs = 100;
 constexpr size_t kFrameBytes =
     static_cast<size_t>(kSampleRateHz * kFrameMs / 1000) * kBytesPerSample;  // 3200 bytes
-constexpr float kSpeechRmsThreshold = 0.015f;
+// Floor-of-the-floor, NOT the gate. -72 dBFS: below this a frame carries no
+// more energy than a muted or disconnected input, so opening on it would only
+// hand STT noise. Everything above it is decided RELATIVE to the ambient floor
+// this mic actually delivers (kSpeechFloorMultiplier below), which is the whole
+// point: the previous absolute 0.015 (-36.5 dBFS) gate meant a measured
+// 0.000414-RMS (-67.7 dBFS) mic feed never opened it, so streaming STT produced
+// no partials and no final and the agent sat in "Listening" indefinitely — while
+// batch STT transcribed the very same audio verbatim and Silero VAD fired on it.
+// Any low-gain mic or quiet talker reproduces that, and the failure is
+// indistinguishable from a broken pipeline.
+//
+// The number was 0.0005 (-66 dBFS), which is ABOVE the 0.000414 feed the comment
+// cites as the motivating failure — so that exact feed still could not open the
+// gate and the agent still sat in "Listening" with no explanation. -72 dBFS
+// clears it with margin and is still ~18 dB above dithered dead air, and nothing
+// downstream loses protection: a mic whose own noise sits at this level has that
+// noise learned as its ambient floor within a second, so the RELATIVE gate
+// (x2.2) is what keeps it shut. Kept in step with kFallbackNoiseFloorRms in
+// features/stt/rac_stt_stream.cpp, which is the same physical quantity for the
+// one-shot STT segmenter.
+constexpr float kSpeechRmsFloor = 0.00025f;
 constexpr float kSpeechFloorMultiplier = 2.2f;
 constexpr float kNoiseFloorRise = 0.05f;
 constexpr int kEndOfUtteranceSilenceMs = 800;
 constexpr int kMinSpeechMs = 300;
 constexpr int kMaxUtteranceMs = 15000;
 constexpr size_t kPreRollFrames = 3;
+
+// --- Talking over an audible reply -----------------------------------------
+//
+// While the agent's own reply is coming out of the loudspeaker the microphone
+// hears it too, at a level nobody can predict (speaker volume, room coupling,
+// how the device is held). There is no acoustic echo canceller on this path, so
+// the ONLY thing separating "the user interrupted" from "the agent heard itself"
+// is that a real interrupting voice arrives ON TOP of the echo and is therefore
+// louder than it. `echo_floor` tracks what the agent sounds like to its own mic
+// during that window; a barge-in has to clear it by this margin and hold for
+// kBargeInMinFrames so a single loud syllable of the reply cannot trip it.
+//
+// Failing this test means failing to notice an interruption, which is the safe
+// direction to be wrong: the reply finishes and the user takes the turn the
+// ordinary way. Passing it wrongly would make the agent cut itself off mid
+// sentence, every turn.
+constexpr float kBargeInEchoMargin = 2.5f;
+constexpr int kBargeInMinFrames = 3;
+constexpr int kEchoSettleFrames = 4;
+// Playout does not stop on the exact millisecond the WAV's own duration says it
+// will — the platform player starts a beat after the core hands the bytes over
+// and drains a beat after the last sample. Frames landing in that overhang are
+// still the agent, so they stay inside the echo-judged window rather than
+// becoming the opening of a turn made of the agent's own last syllable.
+constexpr int64_t kReplyTailGuardMs = 250;
+
+// How long the input may deliver nothing at all before the core says so.
+//
+// Frames arriving with less energy than kSpeechRmsFloor are not "silence" —
+// ordinary room silence, and even a mic's own self-noise, sits well above that
+// floor. They mean the capture graph is handing over dead air: a muted mic, the
+// wrong input device, a host with no audio device. Nothing else in the stack can
+// tell the user that, so the panel would otherwise keep asserting it is
+// listening forever. Eight seconds is long enough that no real pause between
+// turns reaches it.
+constexpr int64_t kSilentInputWarnMs = 8000;
 
 // Normalized RMS of one PCM16 frame (matches the SDK drivers: divide by
 // Int16.max so the threshold constants carry over unchanged).
@@ -75,41 +133,111 @@ float frame_rms(const uint8_t* data, size_t bytes) {
     return static_cast<float>(std::sqrt(sum / static_cast<double>(samples)) / 32767.0);
 }
 
+// What one feed call observed. Grouped rather than passed as four out-params
+// because every field is a distinct thing the SDK has to act on, at a different
+// moment, and a bool-soup signature had already started to hide that.
+struct feed_outcome {
+    /// An utterance closed this call and was moved into `out_utterance`.
+    bool utterance_closed{false};
+    /// The energy gate opened this call — the moment the core first hears a
+    /// voice. Reported separately from the completed turn because a turn only
+    /// arrives seconds later, far too late for an SDK to cut a reply the user
+    /// talked over.
+    bool speech_started{false};
+    /// That onset happened while the agent's own reply was still audible AND
+    /// cleared the echo estimate, i.e. the user really is talking over it.
+    bool barge_in{false};
+    /// The input has delivered nothing but dead air for kSilentInputWarnMs and
+    /// has not said so yet.
+    bool input_silent{false};
+    /// Loudest frame during that dead stretch, so the diagnostic reports a
+    /// measurement instead of an adjective.
+    float silent_peak{0.0f};
+};
+
 // Accumulate fed audio into fixed analysis frames and run energy endpointing.
-// Returns true and moves the completed utterance into @p out_utterance when an
-// utterance closes this call (silence tail or max-duration cap). At most one
-// utterance is reported per call; any buffered backlog is dropped so the
-// device's own TTS playout is not folded into the next turn (mirrors the SDK's
-// former discard-pending-chunks behavior). The adaptive noise floor persists
-// across turns; only transient state resets.
+// At most one utterance is reported per call; any buffered backlog is dropped so
+// the device's own TTS playout is not folded into the next turn (mirrors the
+// SDK's former discard-pending-chunks behavior). The adaptive noise floor
+// persists across turns; only transient state resets.
 //
-// @p out_speech_started is set when the energy gate opened during this call.
-// That is the moment the core first hears a voice, and it is the whole reason
-// hands-free barge-in was impossible: this function used to answer a frame only
-// with a *completed turn*, seconds later, so an SDK feeding through playout
-// could not learn in time to cut the sentence the user talked over. Reporting
-// the onset separately is what lets it.
-bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, bool is_final,
-                  std::string* out_utterance, bool* out_speech_started) {
+// @p now_ms is the caller's wall clock, used to decide whether the reply handed
+// back by the previous call is still coming out of the loudspeaker.
+feed_outcome feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size,
+                          bool is_final, int64_t now_ms, std::string* out_utterance) {
     if (data && size > 0) {
         const uint8_t* bytes = static_cast<const uint8_t*>(data);
         s.frame_accum.insert(s.frame_accum.end(), bytes, bytes + size);
     }
 
-    bool completed = false;
+    feed_outcome outcome;
     while (s.frame_accum.size() >= kFrameBytes) {
         std::vector<uint8_t> frame(s.frame_accum.begin(), s.frame_accum.begin() + kFrameBytes);
         s.frame_accum.erase(s.frame_accum.begin(), s.frame_accum.begin() + kFrameBytes);
 
         const float level = frame_rms(frame.data(), frame.size());
-        const float threshold =
-            std::max(kSpeechRmsThreshold, s.noise_floor * kSpeechFloorMultiplier);
+        const bool reply_audible = s.reply_audible_until_ms > now_ms;
+
+        // Dead-input watch. Suspended while the agent is audible: the
+        // loudspeaker guarantees signal, so a quiet frame there says nothing
+        // about the microphone.
+        if (!reply_audible) {
+            if (level >= kSpeechRmsFloor) {
+                // Signal returned, so the stretch restarts — but the report is
+                // NOT re-armed here. Re-arming on any above-floor frame made a
+                // virtual/loopback input that returns to exact zeros between
+                // turns say this seven times in six minutes (measured), which
+                // trains the user to ignore the one message that matters. The
+                // claim is only worth repeating once the agent has actually
+                // heard a voice, which is where it is re-armed (gate open).
+                s.silent_input_ms = 0;
+                s.silent_input_peak = 0.0f;
+            } else {
+                s.silent_input_ms += kFrameMs;
+                s.silent_input_peak = std::max(s.silent_input_peak, level);
+                if (!s.silent_input_reported && s.silent_input_ms >= kSilentInputWarnMs) {
+                    s.silent_input_reported = true;
+                    outcome.input_silent = true;
+                    outcome.silent_peak = s.silent_input_peak;
+                }
+            }
+        }
+
+        // The gate is relative to whatever this microphone actually delivers;
+        // kSpeechRmsFloor only rules out dead air.
+        float threshold = std::max(kSpeechRmsFloor, s.noise_floor * kSpeechFloorMultiplier);
+        bool barge_in_armed = false;
+        if (reply_audible) {
+            ++s.echo_frames;
+            if (s.echo_frames <= kEchoSettleFrames) {
+                // Learning window: whatever arrives now is the agent hearing
+                // itself (the user cannot have reacted to a reply that has
+                // barely started), so take the loudest of it as the bar.
+                s.echo_floor = std::max(s.echo_floor, level);
+            } else {
+                barge_in_armed = true;
+            }
+            threshold = std::max(threshold, s.echo_floor * kBargeInEchoMargin);
+        } else {
+            s.echo_frames = 0;
+            s.echo_floor = 0.0f;
+            s.barge_in_frames = 0;
+        }
+
         const bool is_speech = level >= threshold;
+
+        // Keep raising the bar from echo-only frames after the learning window
+        // so a reply that gets louder mid-sentence still cannot trip it.
+        if (reply_audible && !is_speech) {
+            s.echo_floor = std::max(s.echo_floor, level);
+        }
+
         // Only adapt the floor while idle (between utterances). Adapting
         // mid-utterance lets inter-word pauses inflate the floor and lock out
-        // the next turn. Drop instantly to any quieter ambient; creep up slowly
-        // otherwise.
-        if (!s.in_speech) {
+        // the next turn. Never adapt from the agent's own playout — that would
+        // train the floor on the loudspeaker and deafen the next turn. Drop
+        // instantly to any quieter ambient; creep up slowly otherwise.
+        if (!s.in_speech && !reply_audible) {
             if (level < s.noise_floor) {
                 s.noise_floor = level;
             } else if (!is_speech) {
@@ -118,10 +246,20 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
         }
 
         if (!s.in_speech) {
+            // A voice arriving over an audible reply has to hold for a few
+            // frames: one loud syllable of the agent's own sentence must not be
+            // able to cut it off.
+            if (reply_audible) {
+                s.barge_in_frames = is_speech ? s.barge_in_frames + 1 : 0;
+            }
+            const bool open_gate =
+                is_speech &&
+                (!reply_audible || (barge_in_armed && s.barge_in_frames >= kBargeInMinFrames));
+
             s.pre_roll.push_back(std::move(frame));
             if (s.pre_roll.size() > kPreRollFrames)
                 s.pre_roll.pop_front();
-            if (is_speech) {
+            if (open_gate) {
                 s.in_speech = true;
                 s.speech_ms = kFrameMs;
                 s.silence_ms = 0;
@@ -130,8 +268,17 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
                     s.utterance.append(reinterpret_cast<const char*>(buffered.data()),
                                        buffered.size());
                 s.pre_roll.clear();
-                if (out_speech_started)
-                    *out_speech_started = true;
+                outcome.speech_started = true;
+                // Reported once per reply: close the window here so the rest of
+                // the same utterance does not repeat it.
+                outcome.barge_in = reply_audible;
+                s.reply_audible_until_ms = 0;
+                s.barge_in_frames = 0;
+                s.echo_frames = 0;
+                s.echo_floor = 0.0f;
+                s.silent_input_ms = 0;
+                s.silent_input_peak = 0.0f;
+                s.silent_input_reported = false;
             }
             continue;
         }
@@ -155,7 +302,7 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
             s.silence_ms = 0;
             if (ok) {
                 *out_utterance = std::move(audio);
-                completed = true;
+                outcome.utterance_closed = true;
                 // Drop any backlog captured while this utterance ran so the
                 // upcoming turn + TTS playout is not re-segmented.
                 s.frame_accum.clear();
@@ -166,10 +313,10 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
 
     // Explicit flush (stream stopping): close an in-progress utterance if it
     // already holds enough speech.
-    if (!completed && is_final && s.in_speech && s.speech_ms >= kMinSpeechMs &&
+    if (!outcome.utterance_closed && is_final && s.in_speech && s.speech_ms >= kMinSpeechMs &&
         !s.utterance.empty()) {
         *out_utterance = std::move(s.utterance);
-        completed = true;
+        outcome.utterance_closed = true;
     }
     if (is_final) {
         s.in_speech = false;
@@ -178,8 +325,14 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
         s.silence_ms = 0;
         s.pre_roll.clear();
         s.frame_accum.clear();
+        s.barge_in_frames = 0;
+        s.echo_frames = 0;
+        s.echo_floor = 0.0f;
+        s.silent_input_ms = 0;
+        s.silent_input_peak = 0.0f;
+        s.silent_input_reported = false;
     }
-    return completed;
+    return outcome;
 }
 
 // How long the reply we just handed the SDK will be audible for, in ms.
@@ -233,6 +386,52 @@ void emit_user_barge_in(rac_voice_agent_handle_t handle) {
     interrupted->set_reason(runanywhere::v1::INTERRUPT_REASON_USER_BARGE_IN);
     interrupted->set_detail("user started speaking while the reply was playing");
     rac::voice_agent::detail::emit_generated_voice_event(handle, event);
+}
+
+// Tell the SDK the microphone is handing over dead air.
+//
+// Without this the panel keeps asserting it is listening for as long as the user
+// is willing to wait, and a muted mic, a wrong input device or a host with no
+// audio device all look exactly like a broken STT pipeline. Nothing above the
+// core can tell the difference — only this layer sees the frame levels — so this
+// is the one place the truth exists.
+//
+// Reported as a RECOVERABLE session error: the session is still running and will
+// start hearing the moment real signal arrives, so it must not tear anything
+// down. Every SDK already folds a recoverable session error onto its
+// "show this message, keep the session" path.
+void emit_input_too_quiet(rac_voice_agent_handle_t handle, float peak_level, int64_t silent_ms) {
+    // 20*log10 of the peak frame RMS. -inf for a true digital zero, which is
+    // itself worth printing plainly rather than as a number.
+    char message[224];
+    if (peak_level > 0.0f) {
+        std::snprintf(message, sizeof(message),
+                      "I can't hear you — the microphone is delivering almost no signal (peak "
+                      "%.1f dBFS over the last %llds). Check that the right input device is "
+                      "selected and not muted.",
+                      20.0 * std::log10(static_cast<double>(peak_level)),
+                      static_cast<long long>(silent_ms / 1000));
+    } else {
+        std::snprintf(message, sizeof(message),
+                      "I can't hear you — the microphone is delivering digital silence (every "
+                      "sample zero for %llds). Check that the right input device is selected "
+                      "and not muted.",
+                      static_cast<long long>(silent_ms / 1000));
+    }
+
+    runanywhere::v1::VoiceEvent event;
+    event.set_timestamp_ms(rac_get_current_time_ms());
+    event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
+    event.set_severity(runanywhere::v1::ERROR_SEVERITY_WARNING);
+    event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AUDIO);
+    auto* session_error = event.mutable_session_error();
+    session_error->set_code(runanywhere::v1::ERROR_CODE_INSUFFICIENT_AUDIO_DATA);
+    session_error->set_message(message);
+    session_error->set_failed_component("audio");
+    session_error->set_recoverable(true);
+    rac::voice_agent::detail::emit_generated_voice_event(handle, event,
+                                                         runanywhere::v1::ERROR_SEVERITY_WARNING);
+    RAC_LOG_WARNING("VoiceAgent.Feed", "%s", message);
 }
 
 }  // namespace
@@ -292,30 +491,27 @@ extern "C" rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_
     // outside it so a slow turn never blocks buffering of the next frame.
     // Events are emitted after the lock is released: they run caller callbacks.
     std::string utterance;
-    bool have_utterance = false;
-    bool speech_started = false;
-    bool barge_in = false;
+    feed_outcome observed;
+    int64_t silent_ms = 0;
     {
         std::lock_guard<std::mutex> seg_lock(handle->feed.mutex);
-        have_utterance = feed_segment(handle->feed, audio_data, audio_size, is_final == RAC_TRUE,
-                                      &utterance, &speech_started);
-        if (speech_started) {
-            // An onset while the reply is still audible is a barge-in. Reported
-            // once per reply: the window is closed here so the rest of the same
-            // utterance does not repeat it.
-            barge_in = handle->feed.reply_audible_until_ms > rac_get_current_time_ms();
-            handle->feed.reply_audible_until_ms = 0;
-        }
+        observed = feed_segment(handle->feed, audio_data, audio_size, is_final == RAC_TRUE,
+                                rac_get_current_time_ms(), &utterance);
+        silent_ms = handle->feed.silent_input_ms;
     }
 
-    if (speech_started) {
-        if (barge_in) {
+    if (observed.input_silent) {
+        emit_input_too_quiet(handle, observed.silent_peak, silent_ms);
+    }
+
+    if (observed.speech_started) {
+        if (observed.barge_in) {
             emit_user_barge_in(handle);
         }
         emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED);
     }
 
-    if (!have_utterance) {
+    if (!observed.utterance_closed) {
         // No utterance closed this call: return an empty (default) result so
         // the SDK sees a valid buffer with no audio to play.
         runanywhere::v1::VoiceAgentResult empty;
@@ -339,7 +535,18 @@ extern "C" rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_
         const int64_t audible_ms = wav_duration_ms(result.synthesized_audio());
         if (audible_ms > 0) {
             std::lock_guard<std::mutex> seg_lock(handle->feed.mutex);
-            handle->feed.reply_audible_until_ms = rac_get_current_time_ms() + audible_ms;
+            handle->feed.reply_audible_until_ms =
+                rac_get_current_time_ms() + audible_ms + kReplyTailGuardMs;
+            // Everything buffered while the turn was being computed predates
+            // playout, so it is neither part of the finished turn nor of the
+            // agent's voice. Feeding it now would seed the echo estimate from
+            // pre-playout quiet and then let the reply's own onset clear the bar
+            // it set — the agent cutting itself off on every reply. It is
+            // dropped here, in the core, so no SDK has to know to do it.
+            handle->feed.frame_accum.clear();
+            handle->feed.echo_frames = 0;
+            handle->feed.echo_floor = 0.0f;
+            handle->feed.barge_in_frames = 0;
         }
     }
     return copy_proto_message(result, out_result);

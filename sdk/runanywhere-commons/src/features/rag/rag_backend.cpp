@@ -33,6 +33,14 @@ static const std::string kSystemPrompt =
 namespace runanywhere::rag {
 namespace {
 
+// Record a specific, user-facing ingest failure. Only the first reason is kept:
+// the earliest failure is the cause, and everything after it is a consequence.
+void set_error(std::string* out_error, std::string message) {
+    if (out_error && out_error->empty()) {
+        *out_error = std::move(message);
+    }
+}
+
 std::string first_string_metadata(const nlohmann::json& metadata,
                                   std::initializer_list<const char*> keys) {
     for (const char* key : keys) {
@@ -126,15 +134,23 @@ RAGBackend::~RAGBackend() {
 // Embedding helper — calls through embeddings service vtable
 // =============================================================================
 
-bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension) {
+bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension,
+                                                   std::string* out_error) {
     if (actual_dimension == 0) {
         LOGE("Embedding provider returned an empty vector; cannot resolve RAG dimension");
+        set_error(out_error,
+                  "The embedding model produced no vector, so this document could not be indexed. "
+                  "Reload the embedding model and try again.");
         return false;
     }
 
     if (config_.embedding_dimension > 0 && config_.embedding_dimension != actual_dimension) {
         LOGE("Embedding dimension mismatch: model produced %zu, pipeline expects %zu",
              actual_dimension, config_.embedding_dimension);
+        set_error(out_error, "This embedding model produces " + std::to_string(actual_dimension) +
+                                 "-dimension vectors but the index expects " +
+                                 std::to_string(config_.embedding_dimension) +
+                                 ". Start a new document session with one embedding model.");
         return false;
     }
 
@@ -149,6 +165,8 @@ bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension) {
         } catch (const std::exception& e) {
             LOGE("Failed to initialize vector store for embedding dimension %zu: %s",
                  actual_dimension, e.what());
+            set_error(out_error,
+                      std::string("The document index could not be created: ") + e.what());
             return false;
         }
     }
@@ -156,6 +174,7 @@ bool RAGBackend::ensure_embedding_dimension_locked(size_t actual_dimension) {
     if (!vector_store_) {
         LOGE("RAG vector store is unavailable after resolving embedding dimension %zu",
              actual_dimension);
+        set_error(out_error, "The document index is unavailable, so nothing could be stored.");
         return false;
     }
     return true;
@@ -215,7 +234,8 @@ RAGBackend::embed_texts_batch(const std::vector<std::string>& texts) const {
 // Document management
 // =============================================================================
 
-bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata) {
+bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata,
+                              std::string* out_error) {
     // Content-addressed dedup: skip re-chunk + re-embed when this exact input
     // (normalized) was already ingested into this index.
     const std::string content_hash = sha256_hex(normalize_for_hash(text));
@@ -224,6 +244,8 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
         std::lock_guard<std::mutex> lock(mutex_);
         if (!initialized_) {
             LOGE("Pipeline not initialized");
+            set_error(out_error,
+                      "The document pipeline has no embedding model, so nothing could be indexed.");
             return false;
         }
         if (ingested_content_hashes_.count(content_hash)) {
@@ -260,6 +282,9 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
 
     if (embeddings.size() != chunks.size()) {
         LOGE("Embedding count mismatch: got %zu, expected %zu", embeddings.size(), chunks.size());
+        set_error(out_error, "The embedding model returned " + std::to_string(embeddings.size()) +
+                                 " vectors for " + std::to_string(chunks.size()) +
+                                 " passages, so this document could not be indexed.");
         std::lock_guard<std::mutex> lock(mutex_);
         ingested_content_hashes_.erase(content_hash);
         return false;
@@ -272,7 +297,7 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
     // explicit dimensions and subsequent outputs are validated here before
     // any chunk reaches the index.
     const size_t actual_dimension = embeddings.empty() ? 0 : embeddings.front().size();
-    if (!ensure_embedding_dimension_locked(actual_dimension)) {
+    if (!ensure_embedding_dimension_locked(actual_dimension, out_error)) {
         ingested_content_hashes_.erase(content_hash);
         return false;
     }
@@ -305,6 +330,13 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
                 "Embedding dimension mismatch at chunk %zu: got %zu, expected %zu; aborting "
                 "document ingest",
                 i, embeddings[i].size(), embedding_dimension);
+            set_error(out_error, embeddings[i].empty()
+                                     ? "The embedding model produced no vector for passage " +
+                                           std::to_string(i + 1) + " of " +
+                                           std::to_string(chunks.size()) +
+                                           ", so this document could not be indexed."
+                                     : "The embedding model changed vector size mid-document, so "
+                                       "this document could not be indexed.");
             ingested_content_hashes_.erase(content_hash);
             return false;
         }
@@ -320,6 +352,7 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
 
     if (!doc_chunks.empty() && !vector_store_->add_chunks_batch(doc_chunks)) {
         LOGE("Failed to add chunks batch to vector store");
+        set_error(out_error, "The document index rejected this document's passages.");
         ingested_content_hashes_.erase(content_hash);
         return false;
     }

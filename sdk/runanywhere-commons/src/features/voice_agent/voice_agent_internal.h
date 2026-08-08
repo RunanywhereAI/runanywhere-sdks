@@ -73,9 +73,41 @@ struct rac_voice_agent_feed_state {
     bool in_speech{false};
     int speech_ms{0};
     int silence_ms{0};
-    /// Adaptive ambient floor; seeded to the absolute speech threshold and
-    /// never reset across turns (only adapted while idle).
-    float noise_floor{0.015f};
+    /// Adaptive ambient floor. Seeded to zero — "nothing observed yet" — so the
+    /// first frames are judged against the absolute floor-of-the-floor and the
+    /// floor then rises to whatever this room/mic actually delivers. It used to
+    /// be seeded to the old absolute 0.015 gate, which made the effective
+    /// threshold 0.033 (-29.6 dBFS) until a quieter frame arrived. Never reset
+    /// across turns; only adapted while idle.
+    float noise_floor{0.0f};
+    /// Consecutive analysis frames whose level cleared the (boosted) gate while
+    /// the agent's own reply was still audible. A barge-in has to survive a few
+    /// frames because the mic is hearing the loudspeaker at the same time.
+    int barge_in_frames{0};
+    /// Frames observed since the current reply became audible. The barge-in
+    /// detector stays disarmed for the first few of them while `echo_floor`
+    /// learns how loud the agent is to its own microphone — arming immediately
+    /// would let the reply's own onset, which arrives after a device-dependent
+    /// output latency, read as an interruption.
+    int echo_frames{0};
+    /// Echo level observed while the agent's reply is audible. During that
+    /// window the mic signal is dominated by the device's own loudspeaker, so
+    /// this is a running estimate of "the agent hearing itself" — the thing a
+    /// user's voice has to rise above for a barge-in to be real rather than
+    /// feedback. Reset when the audible window closes.
+    float echo_floor{0.0f};
+    /// Consecutive milliseconds of frames whose level did not even reach the
+    /// absolute floor-of-the-floor, i.e. the input is delivering essentially no
+    /// signal (muted mic, wrong input device, dead capture graph). Ordinary
+    /// room silence sits well above that floor, so this counts only genuinely
+    /// dead input.
+    int64_t silent_input_ms{0};
+    /// Loudest frame seen during the current dead-input stretch, so the
+    /// diagnostic can report what it actually measured.
+    float silent_input_peak{0.0f};
+    /// True once the dead-input diagnostic has been reported for the current
+    /// stretch, so it is said once instead of every frame.
+    bool silent_input_reported{false};
     /// Wall-clock instant the reply we last handed the SDK stops being audible,
     /// derived from that reply's own duration. 0 = no reply outstanding. A
     /// speech onset before this instant is the user talking over the agent,

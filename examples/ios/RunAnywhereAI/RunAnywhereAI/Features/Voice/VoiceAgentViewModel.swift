@@ -57,6 +57,17 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Error message to display to user
     @Published private(set) var errorMessage: String?
 
+    /// The SDK's measurement when the microphone is being read but is delivering
+    /// no usable signal, or `nil` when it is. Held apart from `errorMessage`
+    /// because nothing has failed — the session is live and will hear the moment
+    /// signal arrives — and because it has to change what the rest of the panel
+    /// says. While it is set, the status pill and the instruction line must stop
+    /// claiming to be listening: this screen was showing "Listening" and "Go
+    /// ahead — I'm listening" directly above the SDK's own "I can't hear you",
+    /// which is the panel contradicting itself in the one situation where the
+    /// user needs to be told to go and fix something.
+    @Published private(set) var inputSilentDetail: String?
+
     /// Current transcript from STT
     @Published private(set) var currentTranscript = ""
 
@@ -168,6 +179,11 @@ final class VoiceAgentViewModel: ObservableObject {
     /// trio is missing. Two opposite statements about one thing. Idle-and-
     /// unequipped is "Needs setup"; idle-and-equipped is "Ready".
     var statusLabel: String {
+        // A session that cannot hear anything is not "Listening", whatever the
+        // pipeline state says.
+        if inputSilentDetail != nil, isListening {
+            return "No input"
+        }
         switch sessionState {
         case .disconnected, .connected:
             return allModelsLoaded ? "Ready" : "Needs setup"
@@ -251,6 +267,9 @@ final class VoiceAgentViewModel: ObservableObject {
     /// taps. Ending is a visible `End` button now (`endButton` in
     /// `VoiceAssistantView`), so this line no longer has to teach a gesture.
     var instructionText: String {
+        if inputSilentDetail != nil, sessionState == .listening {
+            return "Check the microphone — nothing is reaching it"
+        }
         switch sessionState {
         case .listening:
             return isSpeechDetected ? "Listening…" : "Go ahead — I'm listening"
@@ -258,9 +277,16 @@ final class VoiceAgentViewModel: ObservableObject {
             return "Working out a reply…"
         case .speaking:
             // "Take the turn back" is the phrase all four apps use for this
-            // moment. It also names the only thing that works: the agent is
-            // half-duplex (the mic is gated while TTS plays), so speaking over
-            // it is not heard — the control has to be used.
+            // moment, and it names the thing that always works.
+            //
+            // The microphone is no longer gated during playout — the SDK keeps
+            // feeding it and the core decides whether a voice arriving over the
+            // reply is a real interruption or the mic hearing the loudspeaker
+            // (voice_agent_feed_abi.cpp). But that decision needs the user's
+            // voice to arrive meaningfully louder at the mic than the agent's own
+            // playout does, which depends on the device's speaker-to-mic
+            // coupling, so it is not something this label can promise. It
+            // therefore still names only the control.
             return isInterrupting ? "Stopping…" : "\(Self.pressVerb) to take the turn back"
         case .connecting:
             return "Connecting…"
@@ -294,14 +320,19 @@ final class VoiceAgentViewModel: ObservableObject {
     /// the panel contradicting the status pill directly above it. An empty state
     /// is still a claim about the system, and it has to be a true one.
     var transcriptPlaceholder: String {
+        if inputSilentDetail != nil, sessionState == .listening {
+            return "Nothing is reaching the microphone."
+        }
         switch sessionState {
         case .connecting: return "Getting ready…"
         case .listening: return isSpeechDetected ? "Listening…" : "Go ahead — say something."
         case .processing: return "Working out a reply…"
-        // Was "Talk over it any time to interrupt", which the build cannot do:
-        // the mic is gated for the whole of playout, so speech during a reply is
-        // never captured. The instruction line beside this one names the control
-        // that does work; this pane just states the state, matching Android.
+        // Was "Talk over it any time to interrupt". The microphone IS live
+        // through playout now, but whether a voice over the reply is recognised
+        // as an interruption depends on the device's speaker-to-mic coupling
+        // (see `instructionText`), so this pane does not promise it. It states
+        // the state, matching Android; the instruction line beside it names the
+        // control that always works.
         case .speaking: return "Speaking."
         case .connected: return "Ready when you are."
         case .disconnected, .error: return "Nothing heard yet."
@@ -858,6 +889,7 @@ final class VoiceAgentViewModel: ObservableObject {
         sessionState = .connecting
         currentStatus = "Connecting..."
         errorMessage = nil
+        inputSilentDetail = nil
         currentTranscript = ""
         isTranscriptFinal = false
         assistantResponse = ""
@@ -937,6 +969,7 @@ final class VoiceAgentViewModel: ObservableObject {
         audioLevel = 0.0
         isSpeechDetected = false
         isInterrupting = false
+        inputSilentDetail = nil
         let closing = session
         session = nil
         await closing?.close()
@@ -954,6 +987,12 @@ final class VoiceAgentViewModel: ObservableObject {
 
         case .speechStarted:
             isSpeechDetected = true
+            // A voice just arrived, so "I can't hear you" has stopped being true.
+            // Leaving it up would have the panel telling the user it cannot hear
+            // them while it transcribes them. Any recoverable note from the
+            // previous turn is superseded for the same reason.
+            inputSilentDetail = nil
+            errorMessage = nil
             // Do NOT force `.listening` here. Speech starting while the agent is
             // talking is barge-in, not a state change — claiming "Listening"
             // over a reply that is still being spoken is the panel contradicting
@@ -977,6 +1016,14 @@ final class VoiceAgentViewModel: ObservableObject {
         case .agentResponse(let text):
             // Emitted per token; append as it streams.
             assistantResponse += text
+
+        case .inputSilent(let detail):
+            // Not an error: the session is live and healthy, the microphone is
+            // not delivering. Recorded as its own state so the status pill,
+            // instruction line and transcript pane can all stop claiming to
+            // listen while it holds.
+            logger.warning("Voice input is silent: \(detail)")
+            inputSilentDetail = detail
 
         case let .error(message, recoverable):
             logger.error("Voice session error: \(message)")
@@ -1071,6 +1118,7 @@ final class VoiceAgentViewModel: ObservableObject {
         audioLevel = 0.0
         isSpeechDetected = false
         isInterrupting = false
+        inputSilentDetail = nil
         currentTranscript = ""
         isTranscriptFinal = false
         assistantResponse = ""

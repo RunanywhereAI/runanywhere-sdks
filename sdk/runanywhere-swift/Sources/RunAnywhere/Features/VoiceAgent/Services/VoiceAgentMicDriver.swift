@@ -9,6 +9,15 @@
 //  itself, returning the synthesized reply inline for playback. This driver is
 //  therefore a thin capture -> feed -> play loop with NO SDK-side VAD.
 //
+//  Playout runs CONCURRENTLY with the feed loop. It used to be awaited inline,
+//  which stopped the feed for the whole of a reply and then dropped everything
+//  captured during it — so speaking over the agent could not be heard at all and
+//  the only way to take the turn back was the on-screen control. The core
+//  already decides whether an onset inside the audible window is a real
+//  interruption or the agent hearing itself (see the echo estimate in
+//  voice_agent_feed_abi.cpp); this layer's job is only to keep the frames
+//  flowing and to stop the speaker when the core says the user has the turn.
+//
 
 import AVFoundation
 import CRACommons
@@ -36,6 +45,11 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
     private let onPlaybackPhase: @Sendable (AgentState) -> Void
 
     private let chunkLock = OSAllocatedUnfairLock<[Data]>(initialState: [])
+
+    /// The reply currently coming out of the speaker, held so it can be cut off
+    /// from outside the feed loop — which is the whole point of not awaiting it
+    /// inline any more.
+    private let playoutLock = OSAllocatedUnfairLock<Task<Void, Never>?>(initialState: nil)
 
     init(
         handle: CppBridge.VoiceAgentHandle,
@@ -69,7 +83,10 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
         // otherwise the activated session leaks and other apps stay ducked.
         defer {
             capture.stopRecording(deactivateSession: true)
-            playback.stop()
+            // Cancelling the playout task is what restores the `.listening`
+            // phase for a subscriber; `playback.stop()` alone would leave a UI
+            // latched on "Speaking" over a silent speaker.
+            cancelPlayout()
             chunkLock.withLock { $0.removeAll() }
             logger.info("Voice-agent mic capture stopped")
         }
@@ -82,11 +99,18 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
         try await feedLoop()
     }
 
-    /// Cut the agent off mid-utterance: stop playout and drop the frames that
-    /// were captured while it was speaking.
-    func stopPlayback() {
-        playback.stop()
-        discardPendingChunks()
+    /// Cut the agent off mid-utterance.
+    ///
+    /// - Parameter discardPendingInput: `true` for the on-screen interrupt
+    ///   control, where the frames buffered behind the tap are the tail of the
+    ///   agent's own playout and belong to nobody. `false` for a voice barge-in,
+    ///   where those frames are the first syllables of the user's sentence —
+    ///   dropping them would clip the very turn that caused the interrupt.
+    func stopPlayback(discardPendingInput: Bool) {
+        cancelPlayout()
+        if discardPendingInput {
+            discardPendingChunks()
+        }
     }
 
     // MARK: - Audio session
@@ -147,9 +171,12 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
     // MARK: - Feed loop
 
     /// Drains captured frames and feeds them to the core. The core blocks the
-    /// feed call for the duration of a turn when an utterance closes and
-    /// returns the synthesized reply inline; we play it and drop any backlog
-    /// captured during the turn so the device's own playout is not re-fed.
+    /// feed call for the duration of a turn when an utterance closes and returns
+    /// the synthesized reply inline; playout is started concurrently and the
+    /// loop goes straight back to feeding, so a voice arriving over the reply
+    /// reaches the core while there is still something to interrupt. The core
+    /// drops the backlog captured while it was computing the turn, so the
+    /// device's own playout is never re-segmented as a user turn.
     private func feedLoop() async throws {
         while !Task.isCancelled {
             let chunks = drainChunks()
@@ -186,32 +213,70 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
                 // full turn this call. `synthesizedAudio` is self-describing WAV.
                 if let reply = result?.synthesizedAudio, !reply.isEmpty {
                     logger.info("Playing agent reply (\(reply.count) WAV bytes)")
-                    await playReply(reply)
+                    // The feed call blocked for the whole turn, so this queue now
+                    // holds whatever the microphone heard while the reply was
+                    // being computed. Those frames predate playout: they are not
+                    // part of the turn that just closed and they are not the user
+                    // talking over a reply that had not started. Feeding them
+                    // would seed the core's echo estimate from pre-playout quiet
+                    // and let the reply's own onset clear the bar it set — the
+                    // agent interrupting itself. The core drops its own partial
+                    // frame the same way; this drops the driver's.
                     discardPendingChunks()
+                    startPlayout(reply)
                 }
             }
         }
     }
 
-    /// Play one reply, bracketing it with the phase the UI renders.
+    // MARK: - Playout
+
+    /// Begin one reply without blocking the feed loop, bracketing it with the
+    /// phase the UI renders.
     ///
     /// The `.listening` report is in a `defer` so an interrupted or failed
     /// playout still ends the speaking state — a panel that latches on
-    /// "Speaking" over a silent speaker is the exact contradiction this
-    /// signal exists to prevent. Mirrors Kotlin `playReply`.
-    private func playReply(_ wav: Data) async {
-        onPlaybackPhase(.speaking)
-        defer { onPlaybackPhase(.listening) }
-        do {
-            try await playback.play(wav)
-        } catch is CancellationError {
-            // Session teardown; `defer` has already restored the listening phase.
-        } catch {
-            // Barge-in lands here too: the user took the turn back mid-utterance,
-            // which is the ordinary outcome of the interrupt control rather than
-            // a fault, so it is not logged as an error.
-            logger.info("Agent reply playout ended early: \(error.localizedDescription)")
+    /// "Speaking" over a silent speaker is the exact contradiction this signal
+    /// exists to prevent.
+    private func startPlayout(_ wav: Data) {
+        let task = Task { [weak self] in
+            guard let self else { return }
+            self.onPlaybackPhase(.speaking)
+            defer { self.onPlaybackPhase(.listening) }
+            do {
+                try await self.playback.play(wav)
+            } catch is CancellationError {
+                // Session teardown or barge-in; `defer` restored the phase.
+            } catch {
+                // A cut-off playout lands here too — the ordinary outcome of the
+                // interrupt control or of the user talking over the reply, not a
+                // fault, so it is not logged as an error.
+                self.logger.info("Agent reply playout ended early: \(error.localizedDescription)")
+            }
         }
+        // Replies are strictly sequential (the core runs one turn per feed call),
+        // so a live task here can only be a stale one; cancel it rather than
+        // leaving two players fighting over the speaker.
+        let previous = playoutLock.withLock { current -> Task<Void, Never>? in
+            let stale = current
+            current = task
+            return stale
+        }
+        previous?.cancel()
+    }
+
+    /// Stop whatever is playing and let the playout task report `.listening`.
+    private func cancelPlayout() {
+        let task = playoutLock.withLock { current -> Task<Void, Never>? in
+            let live = current
+            current = nil
+            return live
+        }
+        task?.cancel()
+        // `play(_:)`'s cancellation handler stops the player, but a task that has
+        // not started yet has no handler installed; stopping directly makes the
+        // silence immediate either way.
+        playback.stop()
     }
 }
 

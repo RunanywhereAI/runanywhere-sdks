@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "features/common/rac_component_lifecycle_internal.h"
+#include "features/common/special_token_filter.h"
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 // BUG-STREAMING-001: the canonical 13-field LLM stream emitter shared with the
@@ -297,100 +298,6 @@ void emit_llm_streaming_update(const char* generation_id, int32_t tokens_generat
 }
 
 #endif  // RAC_HAVE_PROTOBUF
-
-// =============================================================================
-// EOS / SPECIAL TOKEN STRIPPING
-// =============================================================================
-
-/**
- * Strip tokenizer-internal special tokens from a streamed LLM token before
- * the value reaches user callbacks or downstream proto subscribers.
- *
- * Backends occasionally leak end-of-utterance / end-of-text sentinels into
- * the streaming callback when the runtime swallow path missed them (notably
- * SmolVLM, Qwen-VL, Llama-3 — see B-RN-14-001). Without this
- * filter the angle-bracket artifacts (`<|im_end|>`, `<|eot_id|>`,
- * `<|endoftext|>`, `<eot>`, `<end_of_utterance>`) appear in chat UIs.
- *
- * Two pattern families are recognised:
- *   1. `<|TOKEN|>` — Qwen / Llama-3 / GPT-style pipe-wrapped sentinels.
- *      The scanner consumes everything between `<|` and the next `|>` so
- *      this naturally covers `im_end`, `eot_id`, `endoftext`, `im_start`,
- *      `vision_start`, `vision_end`, etc.
- *   2. Bare `<TOKEN>` sentinels — `<eot>`, `<end_of_utterance>`,
- *      `<endoftext>`, `<eos>`. Only the explicit allowlist is stripped so
- *      legitimate user content containing `<` is preserved.
- *
- * The cleaned output is written to @p buf and is guaranteed NUL-terminated
- * provided @p buf_size >= 1. The function returns @p buf for convenience —
- * if the entire token was a sentinel, @p buf points at the empty string.
- */
-static const char* llm_strip_eos_tokens(const char* token, char* buf, size_t buf_size) {
-    if (!buf || buf_size == 0) {
-        return buf;
-    }
-    if (!token) {
-        buf[0] = '\0';
-        return buf;
-    }
-
-    // Bare-form sentinels matched as exact substrings. Keep the list short:
-    // every additional entry costs an O(n*m) scan per token. Patterns must
-    // not overlap (`<eos>` is a prefix of `<eos_id>` — not in this list).
-    static const char* kBareSentinels[] = {
-        "<end_of_utterance>",
-        "<endoftext>",
-        "<eot>",
-        "<eos>",
-    };
-    constexpr size_t kBareCount = sizeof(kBareSentinels) / sizeof(kBareSentinels[0]);
-
-    size_t out = 0;
-    size_t i = 0;
-    while (token[i] != '\0' && out + 1 < buf_size) {
-        if (token[i] == '<' && token[i + 1] == '|') {
-            // Pipe-wrapped form: skip everything through the next |> .
-            size_t end = i + 2;
-            while (token[end] != '\0') {
-                if (token[end] == '|' && token[end + 1] == '>') {
-                    i = end + 2;
-                    break;
-                }
-                ++end;
-            }
-            if (token[end] == '\0') {
-                // No closing |> in this chunk — copy `<` literally and
-                // continue so a multi-chunk sentinel surfacing across two
-                // callback invocations still appears (downstream gets one
-                // partial chunk; this never produced the angle-bracket
-                // artifact observed in the reports because the runtime
-                // emits the full sentinel as a single token).
-                buf[out++] = token[i++];
-            }
-            continue;
-        }
-
-        if (token[i] == '<') {
-            bool stripped = false;
-            for (size_t k = 0; k < kBareCount; ++k) {
-                const char* needle = kBareSentinels[k];
-                const size_t needle_len = strlen(needle);
-                if (strncmp(token + i, needle, needle_len) == 0) {
-                    i += needle_len;
-                    stripped = true;
-                    break;
-                }
-            }
-            if (stripped) {
-                continue;
-            }
-        }
-
-        buf[out++] = token[i++];
-    }
-    buf[out] = '\0';
-    return buf;
-}
 
 // =============================================================================
 // LIFECYCLE CALLBACKS
@@ -811,7 +718,7 @@ struct llm_stream_context {
  * Internal token callback that wraps user callback and tracks metrics.
  *
  * Every emitted token is run through
- * `llm_strip_eos_tokens()` before it reaches the user callback or the
+ * `rac::tokens::strip_special_tokens()` before it reaches the user callback or the
  * proto stream dispatcher. Backends occasionally leak EOS sentinels
  * (`<|im_end|>`, `<|eot_id|>`, `<end_of_utterance>`, …) which the example
  * apps used to strip locally; the regex-based example workaround in
@@ -843,7 +750,8 @@ static rac_bool_t llm_stream_token_callback(const char* token, rac_bool_t is_fin
     // chunk. The stack-allocated buffer comfortably fits a single decoded
     // token; backends emit at most a few dozen bytes per callback.
     char cleaned_buf[512];
-    const char* cleaned = llm_strip_eos_tokens(token, cleaned_buf, sizeof(cleaned_buf));
+    const char* cleaned =
+        rac::tokens::strip_special_tokens(token, cleaned_buf, sizeof(cleaned_buf));
     const bool cleaned_empty = (cleaned[0] == '\0');
 
     // Track first token time and emit first token event only for the first

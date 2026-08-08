@@ -23,6 +23,7 @@ import {
   EventCategory,
 } from '@runanywhere/proto-ts/component_types';
 import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
+import { pcm16ToWav } from './RunAnywhere+AudioConvert.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { STT, transcribe } from './RunAnywhere+STT.js';
 import { TTS, synthesize } from './RunAnywhere+TTS.js';
@@ -769,7 +770,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
         transcription,
         assistantResponse,
         thinkingContent: llm.thinkingContent,
-        synthesizedAudio: audioBytes,
+        synthesizedAudio: ttsAudioToSelfDescribing(audioBytes, tts.audioFormat, tts.sampleRate),
         finalState: this.getVoiceAgentComponentStates(),
       });
     } catch (error) {
@@ -1044,6 +1045,47 @@ function voiceAudioEncoding(format: AudioFormat): AudioEncoding {
     return AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
   }
   return AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
+}
+
+/**
+ * Make TTS output honour `VoiceAgentResult.synthesizedAudio`'s contract: a
+ * self-describing container.
+ *
+ * The proto field carries no sample rate, so every consumer — including
+ * `VoiceAgentMicDriver.playResultAudio`, which hands it straight to
+ * `AudioPlayback.playEncoded` → `decodeAudioData` — can only play it if the
+ * bytes describe themselves. The engines return headerless PCM plus an
+ * out-of-band `sampleRate`/`audioFormat`, which this provider knows and the
+ * result does not. Handing that PCM over raw made every voice-agent reply fail
+ * with "Unable to decode audio data": the turn synthesized fine and then threw
+ * instead of speaking. Wrap it here, where the rate is still in scope.
+ */
+function ttsAudioToSelfDescribing(
+  bytes: Uint8Array,
+  format: AudioFormat,
+  sampleRate: number,
+): Uint8Array {
+  if (bytes.byteLength === 0) return bytes;
+  // Already a RIFF/WAVE container (the native commons path wraps its own).
+  if (bytes.byteLength >= 12
+    && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+    return bytes;
+  }
+  const rate = sampleRate > 0 ? sampleRate : 22050;
+  if (format === AudioFormat.AUDIO_FORMAT_PCM_S16LE) {
+    // Copy out of the (possibly shared) WASM heap into a plain ArrayBuffer.
+    const pcm = new Uint8Array(bytes.byteLength);
+    pcm.set(bytes);
+    return pcm16ToWav(pcm.buffer, rate);
+  }
+  // Float32 PCM: quantise to the Int16 the WAV header declares.
+  const samples = ttsAudioToFloat32(bytes, format);
+  const int16 = new Int16Array(samples.length);
+  for (let i = 0; i < samples.length; i += 1) {
+    const clamped = Math.max(-1, Math.min(1, samples[i] ?? 0));
+    int16[i] = Math.round(clamped * (clamped < 0 ? 0x8000 : 0x7fff));
+  }
+  return pcm16ToWav(int16.buffer, rate);
 }
 
 function ttsAudioToFloat32(bytes: Uint8Array, format: AudioFormat): Float32Array {

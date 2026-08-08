@@ -471,6 +471,14 @@ struct proto_download_task {
     bool delete_partial_on_cancel = false;
     int64_t last_partial_bytes = 0;
     int64_t last_deleted_bytes = 0;
+    // The full transfer size the HTTP layer actually reported (Content-Length
+    // plus any resume prefix) for a single-file download. The plan's
+    // expected_bytes is a hand-maintained catalog estimate that drifts from the
+    // asset; once the response header has arrived the server is the authority,
+    // so the bar and the "of X" label stop contradicting the bytes on the wire.
+    // Written by the progress callback, read by the worker for its terminal
+    // frames. 0 = the transport has not reported a length yet.
+    int64_t observed_total_bytes = 0;
     int64_t started_at_unix_ms = 0;
     bool download_telemetry_started = false;   // model.download.started emitted once
     bool download_telemetry_finished = false;  // terminal model.download.* emitted once
@@ -1243,6 +1251,20 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
         return RAC_TRUE;
     }
 
+    // A single-file transfer has exactly one authority on its size: the response
+    // the server is streaming right now. The catalog's expected_bytes is only a
+    // pre-flight estimate, and when it drifts the UI contradicts itself — a
+    // 620.2 MB asset drew "11.3 MB of 572.2 MB" long after the header landed.
+    // Adopt the transport's length as soon as it reports one. (The multi-file
+    // aggregate keeps total_expected: per-file Content-Lengths arrive piecemeal,
+    // so a plan-wide total cannot be rebuilt from the file in flight.)
+    if (total_bytes > 0 && ctx->task->files.size() == 1 &&
+        static_cast<int64_t>(total_bytes) != ctx->total_expected) {
+        ctx->total_expected = static_cast<int64_t>(total_bytes);
+        std::lock_guard<std::mutex> lock(ctx->task->mutex);
+        ctx->task->observed_total_bytes = ctx->total_expected;
+    }
+
     int64_t total = ctx->total_expected > 0
                         ? ctx->total_expected
                         : (total_bytes > 0 ? static_cast<int64_t>(total_bytes) : 0);
@@ -1417,10 +1439,19 @@ enum class plan_file_step { CONTINUE, STOP };
 // / extraction failure it emits the terminal progress event, stops the task and
 // returns STOP. On success it sets `final_path` for this file and advances
 // `completed_before_file`, returning CONTINUE.
+//
+// `total_expected` is in/out: for a single-file plan the transport's own
+// Content-Length supersedes the catalog estimate mid-transfer (see
+// proto_http_progress), and the terminal frames this function emits have to
+// quote the same total the progress frames just did.
 plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& task,
-                                 const proto_plan_file& file, size_t i, int64_t total_expected,
+                                 const proto_plan_file& file, size_t i, int64_t& total_expected,
                                  uint64_t file_resume_from, int64_t& completed_before_file,
                                  std::string& final_path) {
+    // Mirrors total_expected for this file: for a single-file plan the two are
+    // the same number, so an adopted transport length has to move both or the
+    // extraction frame would quote the stale catalog size.
+    int64_t file_expected = file.expected_bytes;
     // Ensure the file's parent directory exists. Most bundles write straight
     // into the per-model folder (already created), but a descriptor may carry a
     // multi-segment subpath (e.g. VLM host-weight fixtures under "vlm/…") whose
@@ -1502,6 +1533,17 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
         rac_http_download_status_t status = execute_stream_with_retry(
             req, cb_ctx, file.destination_path, file_resume_from, i, &http_status);
 
+        // Pick up a length the transport reported mid-transfer, before any
+        // terminal frame below quotes a total (cancel / failure / extraction /
+        // completion all read total_expected).
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            if (task->observed_total_bytes > 0) {
+                total_expected = task->observed_total_bytes;
+                file_expected = task->observed_total_bytes;
+            }
+        }
+
         if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
             int64_t file_partial = partial_size_or_zero(file.destination_path);
             int64_t deleted = 0;
@@ -1545,7 +1587,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
 
     if (file.requires_extraction) {
         set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING,
-                          total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
+                          total_expected > 0 ? completed_before_file + file_expected : 0,
                           total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
         emit_progress(task);
 
@@ -1564,7 +1606,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
             // instead of re-opening a corrupt OPFS/MEMFS stub.
             delete_file(file.destination_path.c_str());
             set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED,
-                              total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
+                              total_expected > 0 ? completed_before_file + file_expected : 0,
                               total_expected, static_cast<int32_t>(i), file.storage_key, "",
                               "archive extraction failed");
             mark_task_stopped(task);
@@ -1595,7 +1637,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     }
 
     if (total_expected > 0) {
-        completed_before_file += std::max<int64_t>(file.expected_bytes, 0);
+        completed_before_file += std::max<int64_t>(file_expected, 0);
     } else {
         completed_before_file += file_size_or_zero(final_path);
     }
@@ -1941,7 +1983,9 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
                                                  nullptr);
     }
 
-    const int64_t total_expected = plan_total_expected(task->files);
+    // Non-const: process_plan_file replaces this with the transport's own length
+    // for a single-file plan (the catalog estimate is only a pre-flight guess).
+    int64_t total_expected = plan_total_expected(task->files);
     if (run_parallel_direct_download_worker(task, total_expected, resume_from)) {
         return;
     }
@@ -2093,6 +2137,11 @@ void web_download_on_progress(int64_t bytes_downloaded, int64_t total_bytes, voi
 
     const int64_t downloaded = drv->completed_before_file + bytes_downloaded;
     const proto_plan_file& file = task->files[drv->file_index];
+    // See proto_http_progress: for a single file the response being streamed is
+    // the authority on its size, not the catalog's expected_bytes estimate.
+    if (total_bytes > 0 && task->files.size() == 1 && total_bytes != drv->total_expected) {
+        drv->total_expected = total_bytes;
+    }
     // See proto_http_progress: multi-file bundles without per-file sizes need a
     // monotonic file-count overall fraction (a byte ratio against an unknown
     // plan total would otherwise stay at 0 the whole download, then snap to 1).
@@ -2130,6 +2179,13 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
 
     const size_t i = drv->file_index;
     const proto_plan_file& file = task->files[i];
+    // For a single-file plan the transport's own length superseded the catalog
+    // estimate mid-transfer (see web_download_on_progress), so the frames below
+    // have to quote the same number the progress frames just did — otherwise the
+    // extraction frame reports more bytes done than the total it is shown against.
+    const int64_t file_expected = (task->files.size() == 1 && drv->total_expected > 0)
+                                      ? drv->total_expected
+                                      : file.expected_bytes;
 
     const bool cancelled = task->cancel_requested.load() || result == RAC_ERROR_CANCELLED;
     if (cancelled) {
@@ -2177,7 +2233,7 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
     // the post-download tail of process_plan_file.
     if (file.requires_extraction) {
         set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING, 
-                          drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes
+                          drv->total_expected > 0 ? drv->completed_before_file + file_expected
                                                   : 0,
                           drv->total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
         emit_progress(task);
@@ -2194,7 +2250,7 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
             delete_file(file.destination_path.c_str());
             set_task_progress(
                 task, rav1::DOWNLOAD_STATE_FAILED, 
-                drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes : 0,
+                drv->total_expected > 0 ? drv->completed_before_file + file_expected : 0,
                 drv->total_expected, static_cast<int32_t>(i), file.storage_key, "",
                 "archive extraction failed");
             mark_task_stopped(task);
@@ -2217,7 +2273,7 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
     }
 
     if (drv->total_expected > 0) {
-        drv->completed_before_file += std::max<int64_t>(file.expected_bytes, 0);
+        drv->completed_before_file += std::max<int64_t>(file_expected, 0);
     } else {
         drv->completed_before_file += file_size_or_zero(drv->final_path);
     }

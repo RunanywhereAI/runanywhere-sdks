@@ -191,39 +191,65 @@ struct ModelVariantRow: View {
 }
 
 /// Org detail: recommended best-fit up top, every other model below.
+///
+/// Takes the org and the set of model ids the browse list decided to show —
+/// never a captured `ModelOrgGroup`. A `ModelOrgGroup` holds `RAModelInfo`
+/// *values*, and a value captured when the link was pushed still says
+/// `localPathURL == nil` after the download it started has finished, so every
+/// row kept offering "Get" for a model already fully on disk. The membership is
+/// stable (a download does not change a model's id) so it is safe to snapshot,
+/// while the readiness of each model is re-read from the live registry on every
+/// body evaluation.
 struct ModelOrgDetailView: View {
-    let group: ModelOrgGroup
+    let org: ModelOrg
+    /// Ids the caller's filters admitted, snapshotted at push time.
+    let visibleModelIDs: Set<String>
     let tier: HardwareTier
+    /// The model the *caller's* picker considers active. Each picker scopes this
+    /// differently (chat model, vision model, embedding model), so it stays a
+    /// caller decision rather than being read from the registry here.
     let selectedModelID: String?
     let isLoadingModel: Bool
     let availabilityReason: (RAModelInfo) -> String?
     let handlers: ModelActionHandlers
 
-    private var bestVariant: RAModelInfo {
-        group.models.last {
-            $0.consumerSizeBytes <= tier.memoryBudgetBytes && $0.consumerSizeBytes > 0
-        } ?? group.models[0]
+    @ObservedObject private var models = ModelListViewModel.shared
+
+    /// The org's models as the registry has them *now*.
+    private var variants: [RAModelInfo] {
+        ModelOrgCatalog.groups(
+            from: models.availableModels.filter { visibleModelIDs.contains($0.id) }
+        )
+        .first { $0.org == org }?.models ?? []
     }
 
-    private var otherVariants: [RAModelInfo] {
-        group.models.filter { $0.id != bestVariant.id }
+    private func bestVariant(in variants: [RAModelInfo]) -> RAModelInfo? {
+        variants.last {
+            $0.consumerSizeBytes <= tier.memoryBudgetBytes && $0.consumerSizeBytes > 0
+        } ?? variants.first
     }
 
     var body: some View {
+        let variants = variants
+        let best = bestVariant(in: variants)
+        let others = variants.filter { $0.id != best?.id }
+
         List {
-            Section {
-                row(for: bestVariant, highlight: "Best for this device")
-            } header: {
-                Text("Recommended")
-            } footer: {
-                Text("Models from \(group.displayName)")
-                    .font(AppTypography.caption)
+            if let best {
+                Section {
+                    row(for: best, in: variants, highlight: "Best for this device")
+                } header: {
+                    Text("Recommended")
+                } footer: {
+                    Text("Models from \(org.displayName)")
+                        .font(AppTypography.caption)
+                }
             }
 
-            if !otherVariants.isEmpty {
+            if !others.isEmpty {
                 Section {
-                    ForEach(otherVariants, id: \.id) { variant in
-                        row(for: variant, highlight: nil)
+                    ForEach(others, id: \.id) { variant in
+                        row(for: variant, in: variants, highlight: nil)
                     }
                 } header: {
                     Text("All models")
@@ -232,19 +258,33 @@ struct ModelOrgDetailView: View {
                         .font(AppTypography.caption)
                 }
             }
+
+            // Every model this org shipped has been deleted while the page was
+            // open. Saying so beats an empty list that reads as a load failure.
+            if variants.isEmpty {
+                Section {
+                    Text("No \(org.displayName) models are available any more.")
+                        .font(AppTypography.subheadline)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
         }
-        .navigationTitle(group.displayName)
+        .navigationTitle(org.displayName)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 
-    private func row(for variant: RAModelInfo, highlight: String?) -> some View {
-        let position = group.models.firstIndex { $0.id == variant.id } ?? 0
+    private func row(
+        for variant: RAModelInfo,
+        in variants: [RAModelInfo],
+        highlight: String?
+    ) -> some View {
+        let position = variants.firstIndex { $0.id == variant.id } ?? 0
         return ModelVariantRow(
             variant: variant,
-            feelDescriptor: group.models.count > 1
-                ? variant.variantFeelLabel(position: position, count: group.models.count)
+            feelDescriptor: variants.count > 1
+                ? variant.variantFeelLabel(position: position, count: variants.count)
                 : nil,
             highlight: highlight,
             availabilityReason: availabilityReason(variant),

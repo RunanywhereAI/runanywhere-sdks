@@ -63,21 +63,20 @@ struct SpeechToTextView: View {
                                     EmptyStateMark(systemImage: "waveform", diameter: 96)
 
                                     VStack(spacing: Space.sm) {
-                                        // "Recorded, nothing recognised" and
-                                        // "nothing recorded yet" are different
-                                        // facts; this pane used to show the
-                                        // second for both, telling the user
-                                        // they never recorded when in fact the
-                                        // audio came back with no speech in it.
-                                        Text(viewModel.noSpeechDetected
-                                             ? "No speech detected"
-                                             : "Ready to transcribe")
+                                        // Three different facts, three
+                                        // messages: nothing recorded yet, a
+                                        // recording the recogniser found no
+                                        // words in, and a live stream that
+                                        // returned no result at all. The pane
+                                        // once showed "nothing recorded yet"
+                                        // for all three, and later blamed the
+                                        // input device for the third — sending
+                                        // the reader to working hardware.
+                                        Text(viewModel.emptyOutcome.title)
                                             .appType(.title)
                                             .foregroundStyle(AppColors.textPrimary)
 
-                                        Text(viewModel.noSpeechDetected
-                                             ? "Nothing was recognised in that recording. Check your input device, then try again."
-                                             : readyModeDescription)
+                                        Text(viewModel.emptyOutcome.detail ?? readyModeDescription)
                                             .appType(.secondary)
                                             .foregroundStyle(AppColors.textSecondary)
                                             .multilineTextAlignment(.center)

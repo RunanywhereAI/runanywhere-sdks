@@ -16,6 +16,11 @@ public final class VoiceSession: @unchecked Sendable {
 
     private struct State {
         var micTask: Task<Void, Never>?
+        /// Watches the core's own event stream for a barge-in. Owned by the
+        /// session rather than by a caller's `events` subscription: stopping the
+        /// speaker when the user takes the turn is the session's job and has to
+        /// happen whether or not anybody is rendering events.
+        var bargeInTask: Task<Void, Never>?
         var driver: VoiceAgentMicDriver?
         var isClosed = false
         /// Subscribers of `events`, so the driver's playout phase can be merged
@@ -115,6 +120,25 @@ public final class VoiceSession: @unchecked Sendable {
                     logger.error("Voice-agent mic driver stopped: \(error.localizedDescription)")
                 }
             }
+
+            // Speaking over the agent: the core decides whether an onset inside
+            // the audible window is a real interruption or the microphone hearing
+            // the loudspeaker, and says so with INTERRUPT_REASON_USER_BARGE_IN.
+            // Only this layer can stop the speaker, so this subscription is the
+            // other half of that handshake — without it the core's decision has
+            // no effect and the agent talks over the user to the end of its
+            // sentence.
+            let protoStream = adapter.stream()
+            locked.bargeInTask = Task { [weak self, logger] in
+                for await proto in protoStream {
+                    if Task.isCancelled { break }
+                    guard case .interrupted(let interrupted) = proto.payload,
+                          interrupted.reason == .userBargeIn else { continue }
+                    logger.info("User barge-in: stopping playout, turn handed back")
+                    let driver = self?.state.withLock { $0.driver }
+                    driver?.stopPlayback(discardPendingInput: false)
+                }
+            }
         }
     }
 
@@ -130,7 +154,9 @@ public final class VoiceSession: @unchecked Sendable {
     /// in-flight response before returning.
     public func interrupt() async {
         let driver = state.withLock { $0.driver }
-        driver?.stopPlayback()
+        // The control was pressed, so whatever is queued behind it is the tail of
+        // the agent's own playout rather than the user's next sentence.
+        driver?.stopPlayback(discardPendingInput: true)
         if let handle = RunAnywhere.activeSpeechHandleSnapshot() {
             await handle.interrupt()
         } else {
@@ -140,15 +166,18 @@ public final class VoiceSession: @unchecked Sendable {
 
     /// Stop capture, tear down the pipeline, and release native resources.
     public func close() async {
-        let torn = state.withLock { locked -> (Task<Void, Never>?, Bool) in
-            guard !locked.isClosed else { return (nil, false) }
+        let torn = state.withLock { locked -> (Task<Void, Never>?, Task<Void, Never>?, Bool) in
+            guard !locked.isClosed else { return (nil, nil, false) }
             locked.isClosed = true
-            let task = locked.micTask
+            let mic = locked.micTask
+            let bargeIn = locked.bargeInTask
             locked.micTask = nil
+            locked.bargeInTask = nil
             locked.driver = nil
-            return (task, true)
+            return (mic, bargeIn, true)
         }
-        guard torn.1 else { return }
+        guard torn.2 else { return }
+        torn.1?.cancel()
         torn.0?.cancel()
         await torn.0?.value
         await CppBridge.VoiceAgent.shared.cleanup()

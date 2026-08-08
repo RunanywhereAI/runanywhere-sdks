@@ -1399,7 +1399,11 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
             t_first_token = std::chrono::steady_clock::now();
         }
         char buf[256];
-        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, true);
+        // `special = false`: control/special tokens render as nothing instead of
+        // as their literal spelling. With `true`, a token like SmolVLM's
+        // <end_of_utterance> reached the caller as visible text. Matches the LLM
+        // decode loop (engines/llamacpp/llamacpp_backend.cpp run_decode_loop).
+        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, false);
         if (len > 0) {
             response.append(buf, len);
         }
@@ -1566,7 +1570,13 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
         }
 
         char buf[256];
-        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, true);
+        // `special = false`: an EOG/control token must not be spelled out to the
+        // caller. With `true`, SmolVLM's <end_of_utterance> was emitted as the
+        // final chunk and rendered verbatim at the end of every answer — and read
+        // aloud when the answer was spoken. A special token now yields len == 0,
+        // so the block is skipped and the `!terminal_emitted` guard below is what
+        // closes the stream. Matches the LLM decode loop.
+        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, false);
         if (len > 0) {
             buf[len] = '\0';
             const rac_bool_t final_flag = is_eog ? RAC_TRUE : RAC_FALSE;

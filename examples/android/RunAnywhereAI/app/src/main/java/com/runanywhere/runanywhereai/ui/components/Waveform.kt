@@ -76,9 +76,13 @@ fun AudioWaveform(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-            .semantics {
-                contentDescription = if (active) "Microphone input level" else "Microphone idle"
-            },
+            // [active] is a tint, not a capture flag, so it must not drive this text. Both call
+            // sites compose the meter only while the microphone is open, and VAD passes
+            // `active = isSpeechDetected` — so branching on it announced "Microphone idle" over a
+            // live microphone for every stretch the detector scored as room noise rather than
+            // speech, which is the opposite of what was happening. The speech/silence state is
+            // already on screen as its own label, so the meter only has to describe itself.
+            .semantics { contentDescription = "Microphone input level" },
     ) {
         val samples = history
         val barWidth = BAR_WIDTH.toPx()

@@ -92,24 +92,48 @@ enum class SessionTermination {
 //     preceded the energy gate opening, and the trailing silence. A recognizer
 //     given a mid-word fragment answers with a marker, not with words.
 //
-// KNOWN WEAKNESS, deliberately left alone here: the speech test below is a
-// fixed absolute RMS, and a fixed threshold is wrong in both directions. Under a
-// quiet capture the gate never opens and the speaker's words are dropped with no
-// explanation. Under a room whose ambient already exceeds it, nothing ever reads
-// as silence, so the endpoint only fires at kFallbackMaxUtteranceMs and the
-// recognizer is handed fifteen seconds of noise — which comes back as the
-// non-speech marker the app then has to render.
+// The speech test is an ADAPTIVE floor, tracked per session. It used to be one
+// fixed absolute RMS (0.01, i.e. -40 dBFS), which is wrong in both directions and
+// was the reason Live transcription returned nothing at all: a capture quieter
+// than -40 dBFS RMS — a distant or low-gain microphone, or a virtual/loopback
+// input — never opened the gate, so no utterance was ever handed to the
+// recognizer and the app had to report "no speech" for a recording that batch
+// mode transcribed word-perfectly. In the other direction, a room whose ambient
+// already exceeded the fixed number never read as silence, so the endpoint only
+// fired at kFallbackMaxUtteranceMs.
 //
-// The fix is an adaptive ambient floor, and the shape is already established in
-// this codebase twice: the voice-agent segmenter in voice_agent_feed_abi.cpp
-// (absolute floor OR ambient x multiplier, adapted only between utterances) and
-// the energy VAD's explicit calibration phase in features/vad/energy_vad.cpp.
-// Neither transplants cleanly. The voice-agent shape cannot raise its floor once
-// the gate has latched, so seeded low it never recovers in the noisy case that
-// needs it most; the energy-VAD shape spends its calibration frames before the
-// gate may open, which drops a phrase from a caller who is already speaking when
-// the stream starts. Choosing between them needs measurement against real
-// captures — quiet, noisy, and speaking-from-the-first-frame — not a guess.
+// What discriminates speech from a room is the RATIO to that room, not an
+// absolute level, so the threshold is:
+//
+//     max(kFallbackNoiseFloorRms, ambient_rms * kFallbackAmbientMultiplier)
+//
+// The absolute term is now only a digital-silence guard (~-70 dBFS, a few LSBs of
+// 16-bit) so a muted or absent input device cannot be mistaken for speech; the
+// ratio term is what actually decides.
+//
+// Adaptation avoids both traps called out by the two existing shapes in this
+// codebase (the voice-agent segmenter in voice_agent_feed_abi.cpp, which cannot
+// raise its floor once latched, and the energy VAD's calibration phase in
+// features/vad/energy_vad.cpp, which spends frames before the gate may open):
+//
+//   - ambient starts at 0, so the threshold starts at the digital-silence guard
+//     and a caller already speaking in the first frame is captured immediately —
+//     no calibration window to miss a phrase in.
+//   - while the gate is shut it tracks two-sided (fast down, slow up), so a room
+//     that is merely quiet-to-normal is learned within a second and its silence
+//     becomes detectable, which is what makes the endpoint fire.
+//   - during an utterance it tracks DOWNWARD ONLY, so inter-word pauses pull the
+//     floor to the true room level while nothing the speaker does can raise the
+//     gate on themselves mid-phrase.
+//
+// REMAINING WEAKNESS, narrower than before but real: a room already loud in the
+// session's very first frame latches the gate before any room level has been
+// learned, and because the estimate cannot rise while latched, that utterance
+// still runs to kFallbackMaxUtteranceMs. It is bounded and self-limiting (the
+// recognizer answers with a non-speech marker, which is suppressed, and the
+// estimate rises between utterances), but the fully general fix is a
+// minimum-over-window tracker, which needs measurement against real noisy
+// captures rather than a guess.
 // ---------------------------------------------------------------------------
 constexpr int kFallbackFrameMs = 100;
 // Speech evidence required before a closed window is worth an inference.
@@ -121,8 +145,16 @@ constexpr int kFallbackMaxUtteranceMs = 15000;
 // never fire before the duration cap does.
 constexpr int kFallbackMinEndSilenceMs = 200;
 constexpr int kFallbackMaxEndSilenceMs = 5000;
-// See the KNOWN WEAKNESS note above before changing this number.
-constexpr float kFallbackSpeechRms = 0.01f;
+// Digital-silence guard only — see the adaptive-floor note above. -72 dBFS, the
+// same physical quantity as kSpeechRmsFloor in
+// features/voice_agent/voice_agent_feed_abi.cpp; keep the two in step.
+constexpr float kFallbackNoiseFloorRms = 0.00025f;
+// How far above the tracked room level a frame must sit to read as speech.
+constexpr float kFallbackAmbientMultiplier = 3.0f;
+// Per-frame EMA rates for the tracked room level. Falling fast and rising slowly
+// keeps the estimate near the quietest recent audio rather than near the speech.
+constexpr float kFallbackAmbientFallRate = 0.5f;
+constexpr float kFallbackAmbientRiseRate = 0.05f;
 // Retained pre-speech audio, so the consonant that opened the phrase is still
 // in the buffer by the time the energy gate agrees it was speech.
 constexpr size_t kFallbackPreRollFrames = 5;
@@ -180,6 +212,9 @@ struct StreamSession {
     bool fallback_in_speech = false;
     int fallback_speech_ms = 0;
     int fallback_silence_ms = 0;
+    // Tracked room level for the adaptive speech gate. Seeded at 0 so the very
+    // first frame can already read as speech; see the adaptive-floor note above.
+    float fallback_ambient_rms = 0.0f;
     // Trailing silence that closes an utterance, from STTOptions
     // .silence_duration_ms when the caller set it.
     int fallback_endpoint_silence_ms = kFallbackEndSilenceMs;
@@ -324,6 +359,27 @@ void reset_fallback_utterance(StreamSession& session) {
     session.fallback_in_speech = false;
     session.fallback_speech_ms = 0;
     session.fallback_silence_ms = 0;
+    // fallback_ambient_rms deliberately survives: the room does not change
+    // because one phrase ended, and re-seeding it to zero every utterance would
+    // make the second phrase in a noisy room behave like the first.
+}
+
+// Level a frame must reach to count as speech, given the room tracked so far.
+float fallback_speech_threshold(const StreamSession& session) {
+    return std::max(kFallbackNoiseFloorRms,
+                    session.fallback_ambient_rms * kFallbackAmbientMultiplier);
+}
+
+// Fold one frame's level into the tracked room estimate. While the gate is shut
+// this tracks both ways; inside an utterance it may only fall, so a speaker
+// cannot raise the gate on themselves mid-phrase.
+void update_fallback_ambient(StreamSession& session, float level) {
+    const bool falling = level < session.fallback_ambient_rms;
+    if (!falling && session.fallback_in_speech) {
+        return;
+    }
+    const float rate = falling ? kFallbackAmbientFallRate : kFallbackAmbientRiseRate;
+    session.fallback_ambient_rms += (level - session.fallback_ambient_rms) * rate;
 }
 
 // Move the buffered utterance out to @p out_audio and rearm for the next one.
@@ -348,7 +404,11 @@ bool feed_fallback_utterance(StreamSession& session, const uint8_t* audio_bytes,
     while (session.fallback_frame_accum.size() >= frame_bytes) {
         const uint8_t* frame = session.fallback_frame_accum.data();
         const float level = fallback_frame_rms(frame, frame_bytes);
-        const bool is_speech = level >= kFallbackSpeechRms;
+        // Classify against the room as it stands, then let this frame move the
+        // room estimate — in that order, so a frame is never measured against a
+        // floor it just raised.
+        const bool is_speech = level >= fallback_speech_threshold(session);
+        update_fallback_ambient(session, level);
 
         session.fallback_utterance.insert(session.fallback_utterance.end(), frame,
                                           frame + frame_bytes);

@@ -13,6 +13,7 @@ import {
   EmbeddingsProtoAdapter,
   RAGProtoAdapter,
 } from '../../Adapters/ModalityProtoAdapter.js';
+import { RAGStreamEventKind } from '@runanywhere/proto-ts/rag';
 import type {
   RAGConfiguration,
   RAGDocument,
@@ -42,7 +43,10 @@ import {
   Embeddings,
   embeddingCosineSimilarity,
 } from './RunAnywhere+Embeddings.js';
-import { TextGeneration } from './RunAnywhere+TextGeneration.js';
+import {
+  TextGeneration,
+  type TextGenerationOptions,
+} from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('RAG');
 export interface RAGDocumentSummary {
@@ -501,6 +505,36 @@ interface CrossWasmRAGDocument {
   chunkCount: number;
 }
 
+const CROSS_WASM_RAG_SYSTEM_PROMPT =
+  'Answer the question using only the supplied context. '
+  + 'If the context does not contain the answer, say so.';
+
+/**
+ * Outcome of retrieval + prompt assembly. `grounded: false` carries the
+ * finished empty-corpus result verbatim so neither query path has to
+ * reconstruct it.
+ */
+type CrossWasmPreparedQuery =
+  | { grounded: false; result: RAGResult }
+  | {
+    grounded: true;
+    version: number;
+    retrievedChunks: RAGSearchResult[];
+    context: string;
+    retrievalTimeMs: number;
+    request: TextGenerationOptions;
+  };
+
+function ragStreamCompleted(result: RAGResult, requestId: string): RAGStreamEvent {
+  return {
+    timestampUs: nowUs(),
+    requestId,
+    kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED,
+    token: '',
+    result,
+  };
+}
+
 interface PersistentRAGSnapshot {
   config: RAGConfiguration;
   chunks: CrossWasmRAGChunk[];
@@ -775,18 +809,24 @@ class CrossWasmRAGProvider implements RAGProvider {
     return this.retrieve(query, queryOptions, this.lifecycleVersion);
   }
 
-  async ragQuery(
+  /**
+   * Retrieve, assemble the grounded prompt, and make sure the answer model is
+   * resident. Shared by `ragQuery` and `ragQueryStream` so the two paths can
+   * only differ in how they consume the generation.
+   */
+  private async prepareQuery(
     question: string,
-    options: RAGQueryOverrides = {},
-  ): Promise<RAGResult> {
-    this.requireInitialized('RAG.query');
+    options: RAGQueryOverrides,
+    feature: 'RAG.query' | 'RAG.queryStream',
+  ): Promise<CrossWasmPreparedQuery> {
+    this.requireInitialized(feature);
     const version = this.lifecycleVersion;
     const query = question.trim();
     if (!query) {
       throw SDKException.fromCode(
         -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
         'RAG query question is empty.',
-        'RAG.query',
+        feature,
       );
     }
 
@@ -800,13 +840,16 @@ class CrossWasmRAGProvider implements RAGProvider {
       // equivalent (Swift parity: RARAGResult.totalTime).
       this.lastQueryMs = Date.now();
       return {
-        answer: '',
-        retrievedChunks: [],
-        contextUsed: '',
-        retrievalTimeMs,
-        generationTimeMs: 0,
-        usage: emptyTokenUsage(),
-        requestId: createId('rag-query'),
+        grounded: false,
+        result: {
+          answer: '',
+          retrievedChunks: [],
+          contextUsed: '',
+          retrievalTimeMs,
+          generationTimeMs: 0,
+          usage: emptyTokenUsage(),
+          requestId: createId('rag-query'),
+        },
       };
     }
 
@@ -835,30 +878,116 @@ class CrossWasmRAGProvider implements RAGProvider {
         ModelCategory.MODEL_CATEGORY_LANGUAGE,
         'LLM',
       );
-      this.assertCurrent(version, 'RAG.query');
+      this.assertCurrent(version, feature);
     }
 
+    return {
+      grounded: true,
+      version,
+      retrievedChunks,
+      context,
+      retrievalTimeMs,
+      request: {
+        ...(queryOptions.generation ?? {}),
+        prompt,
+        systemPrompt: queryOptions.generation?.systemPrompt ?? CROSS_WASM_RAG_SYSTEM_PROMPT,
+        conversationId: 'web-cross-wasm-rag',
+      },
+    };
+  }
+
+  async ragQuery(
+    question: string,
+    options: RAGQueryOverrides = {},
+  ): Promise<RAGResult> {
+    const prepared = await this.prepareQuery(question, options, 'RAG.query');
+    if (!prepared.grounded) return prepared.result;
+
     const generationStarted = nowMs();
-    const generated = await TextGeneration.generate({
-      ...(queryOptions.generation ?? {}),
-      prompt,
-      systemPrompt: queryOptions.generation?.systemPrompt
-        ?? 'Answer the question using only the supplied context. If the context does not contain the answer, say so.',
-      conversationId: 'web-cross-wasm-rag',
-    });
-    this.assertCurrent(version, 'RAG.query');
+    const generated = await TextGeneration.generate(prepared.request);
+    this.assertCurrent(prepared.version, 'RAG.query');
     const generationTimeMs = nowMs() - generationStarted;
     this.lastQueryMs = Date.now();
     return {
       answer: generated.text,
-      retrievedChunks,
-      contextUsed: context,
-      retrievalTimeMs,
+      retrievedChunks: prepared.retrievedChunks,
+      contextUsed: prepared.context,
+      retrievalTimeMs: prepared.retrievalTimeMs,
       generationTimeMs,
       usage: generated.usage ?? emptyTokenUsage(),
       requestId: createId('rag-query'),
       thinkingContent: generated.thinkingContent,
     };
+  }
+
+  /**
+   * Token-by-token grounded answer. The native RAG session ABI is absent in
+   * the current WASM builds, so without this the whole document-Q&A feature
+   * dead-ended on "Streaming RAG is not available on this provider" even
+   * though retrieval and generation both worked. Retrieval is announced first
+   * (the caller renders sources before any text), then the LLM's own token
+   * stream is forwarded — the same stream `generate` folds internally, so this
+   * is real streaming, not a one-shot answer replayed as a single chunk.
+   */
+  async *ragQueryStream(
+    question: string,
+    options: RAGQueryOverrides = {},
+  ): AsyncIterable<RAGStreamEvent> {
+    const requestId = createId('rag-query');
+    const prepared = await this.prepareQuery(question, options, 'RAG.queryStream');
+    if (!prepared.grounded) {
+      yield ragStreamCompleted({ ...prepared.result, requestId }, requestId);
+      return;
+    }
+    // Retrieval-only terminal for a retrieval-only session: without an answer
+    // model there is nothing to stream, and the chunks are the whole result.
+    yield {
+      timestampUs: nowUs(),
+      requestId,
+      kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN,
+      token: '',
+      result: {
+        answer: '',
+        retrievedChunks: prepared.retrievedChunks,
+        contextUsed: prepared.context,
+        retrievalTimeMs: prepared.retrievalTimeMs,
+        generationTimeMs: 0,
+        usage: emptyTokenUsage(),
+        requestId,
+      },
+    };
+
+    const generationStarted = nowMs();
+    const streaming = await TextGeneration.generateStream(prepared.request);
+    let answer = '';
+    try {
+      for await (const token of streaming.stream) {
+        if (!token) continue;
+        answer += token;
+        yield {
+          timestampUs: nowUs(),
+          requestId,
+          kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN,
+          token,
+        };
+      }
+    } catch (error) {
+      streaming.cancel();
+      throw error;
+    }
+    const generated = await streaming.result;
+    this.assertCurrent(prepared.version, 'RAG.queryStream');
+    this.lastQueryMs = Date.now();
+    yield ragStreamCompleted({
+      answer: generated.text || answer,
+      retrievedChunks: prepared.retrievedChunks,
+      contextUsed: prepared.context,
+      retrievalTimeMs: prepared.retrievalTimeMs,
+      generationTimeMs: nowMs() - generationStarted,
+      usage: generated.usage ?? emptyTokenUsage(),
+      requestId,
+      thinkingContent: generated.thinkingContent,
+    }, requestId);
   }
 
   async ragClearDocuments(): Promise<void> {
@@ -1189,6 +1318,11 @@ function renderRAGPrompt(template: string | undefined, context: string, query: s
 
 function nowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
+}
+
+/** Wall-clock microseconds — the `timestamp_us` unit every stream event uses. */
+function nowUs(): number {
+  return Date.now() * 1000;
 }
 
 /** `TokenUsage` zero value — used where a RAG result has no real usage to report. */

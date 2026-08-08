@@ -1008,8 +1008,11 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         out_result->processing_time_ms = duration.count();
     }
 
-    // Calculate word count and real-time factor
-    int32_t word_count = count_words(out_result->text);
+    // Word count and the event's text come off the same normalised transcript
+    // the STTOutput publishes (fill_stt_output), so a silent recording reports
+    // zero words instead of counting the engine's "[ Silence ]" marker.
+    const std::string spoken = rac::stt::transcript_for_display(out_result->text);
+    const int32_t word_count = count_words(spoken.c_str());
 
     RAC_LOG_INFO("STT.Component", "Transcription completed");
 
@@ -1022,8 +1025,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
             voice.set_model_id(model_id);
         if (model_name)
             voice.set_model_name(model_name);
-        if (out_result->text)
-            voice.set_text(out_result->text);
+        voice.set_text(spoken);
         voice.set_confidence(out_result->confidence);
         voice.set_duration_ms(static_cast<int64_t>(duration_ms));
         voice.set_input_audio_duration_ms(static_cast<int64_t>(audio_length_ms));
@@ -1814,6 +1816,20 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
                                           "failed to encode STTOutput");
     }
+    // rac_stt_result_to_proto is a mechanical field copy, so an engine's own
+    // no-speech marker ("[ Silence ]", "[BLANK_AUDIO]", "(wind)") arrives here
+    // verbatim. Batch was the one transcription path that published it as a
+    // transcript: every streaming path already routes through
+    // transcript_for_display, which is why Live mode showed its honest empty
+    // state while Batch rendered "[ Silence ]" in the same typography as real
+    // speech — and counted it as three spoken words.
+    const std::string spoken = rac::stt::transcript_for_display(raw.text);
+    output.set_text(spoken);
+    if (spoken.empty()) {
+        // A transcript with no words cannot carry word timings; leaving the
+        // marker's word spans behind would contradict the empty text.
+        output.clear_words();
+    }
     output.set_timestamp_ms(rac_get_current_time_ms());
     const size_t sample_width =
         request.audio().encoding() == runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE
@@ -1827,9 +1843,12 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     auto* metadata = output.mutable_metadata();
     metadata->set_model_id(ref.model_id ? ref.model_id : "");
 
-    const int32_t word_count = count_words(raw.text);
+    // Word count and event text both come off the normalised transcript, so
+    // telemetry stops reporting words for a silent recording too.
+    const int32_t word_count = count_words(spoken.c_str());
     publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED,
-                                transcription_id.c_str(), ref.model_id, raw.text, raw.confidence,
+                                transcription_id.c_str(), ref.model_id, spoken.c_str(),
+                                raw.confidence,
                                 processing_ms, duration_ms, static_cast<int32_t>(audio.size()),
                                 word_count, options.language, options.sample_rate,
                                 nullptr, ref.framework_name, /*is_streaming=*/false);

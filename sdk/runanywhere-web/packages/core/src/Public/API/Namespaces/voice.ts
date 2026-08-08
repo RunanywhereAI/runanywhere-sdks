@@ -166,6 +166,10 @@ function createSession(options: VoiceSessionOptions): VoiceSession {
           }
           if (turn.assistantText) publish({ type: 'agentResponse', text: turn.assistantText });
         },
+        // The user took the turn back while the reply was audible. The driver
+        // has already cut playout and will report the phase change; this is the
+        // event that says *why* the answer stopped short.
+        onBargeIn: () => publish({ type: 'speechStarted' }),
         onError: (error) => publish({ type: 'error', message: error.message, recoverable: true }),
       });
     },

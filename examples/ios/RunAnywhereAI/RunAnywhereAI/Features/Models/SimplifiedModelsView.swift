@@ -277,8 +277,13 @@ struct SimplifiedModelsView: View {
                 Section {
                     ForEach(browseOrgs) { group in
                         NavigationLink {
+                            // Only the org and the admitted ids cross the push.
+                            // Handing over the group itself froze each row's
+                            // readiness at push time, so a row kept saying "Get"
+                            // after its download finished.
                             ModelOrgDetailView(
-                                group: group,
+                                org: group.org,
+                                visibleModelIDs: Set(group.models.map(\.id)),
                                 tier: hardwareTier,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: viewModel.isLoadingModel,

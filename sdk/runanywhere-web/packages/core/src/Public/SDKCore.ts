@@ -787,7 +787,7 @@ async function planDownloadWithSelfHeal(
   modelId: string,
   request: DownloadPlanRequest,
 ): Promise<DownloadPlanResult | null> {
-  const plan = DownloadsCapability.plan(request);
+  const plan = await DownloadsCapability.plan(request);
   if (
     !plan ||
     plan.canStart ||

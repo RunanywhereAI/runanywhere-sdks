@@ -241,12 +241,11 @@ export const VAD = {
    * Handle-less form backing Swift's parameterless `RunAnywhere.resetVAD()`.
    * No-op returning false when no VAD model is loaded through lifecycle.
    */
-  resetLoaded(): boolean {
+  async resetLoaded(): Promise<boolean> {
     if (!currentLifecycleVADModel()) return false;
     return (
-      lifecycleVADAdapter('RunAnywhere.vad.resetLoaded').resetLifecycle() !=
-      null
-    );
+      await lifecycleVADAdapter('RunAnywhere.vad.resetLoaded').resetLifecycle()
+    ) != null;
   },
 
   /**
@@ -434,7 +433,7 @@ export async function detectVoice(
   assertRequestedModelMatches(current, options);
   const adapter = lifecycleVADAdapter('RunAnywhere.vad.detectVoice');
   const config = lifecycleConfiguration(options);
-  if (!adapter.configureLifecycle(config)) {
+  if (!await adapter.configureLifecycle(config)) {
     throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
   }
   // The threshold was applied by configureLifecycle. Keeping the per-frame
@@ -480,13 +479,13 @@ export async function* streamVoiceActivity(
   assertRequestedModelMatches(current, options);
   const adapter = lifecycleVADAdapter('VAD.streamVoiceActivity');
   const config = lifecycleConfiguration(options);
-  if (!adapter.configureLifecycle(config)) {
+  if (!await adapter.configureLifecycle(config)) {
     throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
   }
 
   let started = false;
   try {
-    if (!adapter.startLifecycle()) {
+    if (!await adapter.startLifecycle()) {
       throw SDKException.processingFailed('Failed to start the lifecycle VAD service');
     }
     started = true;
@@ -502,11 +501,26 @@ export async function* streamVoiceActivity(
       yield result;
     }
   } finally {
-    if (started && !adapter.stopLifecycle()) {
-      logger.warning('Failed to stop the lifecycle VAD service during stream cleanup');
+    // Teardown routes to whichever heap owns the detector, so it can now fail
+    // for transport reasons (a torn-down BackendWorker). Report it, never let
+    // it replace the error that ended the stream.
+    if (started) await warnOnCleanupFailure('stop', () => adapter.stopLifecycle());
+    await warnOnCleanupFailure('reset', () => adapter.resetLifecycle());
+  }
+}
+
+async function warnOnCleanupFailure(
+  verb: 'stop' | 'reset',
+  call: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    if (await call() == null) {
+      logger.warning(`Failed to ${verb} the lifecycle VAD service during stream cleanup`);
     }
-    if (!adapter.resetLifecycle()) {
-      logger.warning('Failed to reset the lifecycle VAD service during stream cleanup');
-    }
+  } catch (error) {
+    logger.warning(
+      `Failed to ${verb} the lifecycle VAD service during stream cleanup: `
+      + `${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

@@ -543,6 +543,7 @@ extension ChatInterfaceView {
                 },
                 onRemoveDocumentAttachment: {
                     pendingDocumentAttachment = nil
+                    viewModel.setDocumentIndexState(.notIndexed)
                 },
                 onChooseVisionModel: {
                     showingVisionModelSelection = true
@@ -754,6 +755,10 @@ extension ChatInterfaceView {
         case .document(let document):
             pendingDocumentAttachment = document
             pendingImageAttachment = nil
+            // A new document is not the previous one's index. Carrying the old
+            // state over would show a fresh attachment as already answerable —
+            // or as already failed.
+            viewModel.setDocumentIndexState(.notIndexed)
             if !areDocumentModelsReady { showNextDocumentModelPicker() }
         }
         isTextFieldFocused = true

@@ -23,6 +23,7 @@
 
 #include "core/internal/platform_compat.h"
 #include "features/common/rac_component_lifecycle_internal.h"
+#include "features/common/special_token_filter.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
@@ -101,54 +102,6 @@ static int32_t estimate_tokens(const char* text) {
     const size_t len = strlen(text);
     const int32_t tokens = static_cast<int32_t>((len + 3) / 4);
     return tokens > 0 ? tokens : 1;
-}
-
-// =============================================================================
-// SPECIAL TOKEN STRIPPING
-// =============================================================================
-
-/**
- * Strip model-internal special tokens (e.g. <|im_end|>) from a token string.
- *
- * Scans for patterns matching <|...|> and removes them. The cleaned result is
- * written to buf. Returns a pointer to buf (which may be an empty string if the
- * entire token was a special token).
- */
-static const char* vlm_strip_special_tokens(const char* token, char* buf, size_t buf_size) {
-    if (!token || !buf || buf_size == 0) {
-        if (buf && buf_size > 0)
-            buf[0] = '\0';
-        return buf;
-    }
-
-    size_t out = 0;
-    size_t i = 0;
-
-    // Use null-terminator checks instead of strlen() to avoid the upfront O(n) scan.
-    // Tokens are typically short (1-4 chars), but this avoids redundant work.
-    while (token[i] != '\0' && out < buf_size - 1) {
-        if (token[i] == '<' && token[i + 1] == '|') {
-            // Scan ahead for closing |>
-            size_t end = i + 2;
-            while (token[end] != '\0') {
-                if (token[end] == '|' && token[end + 1] == '>') {
-                    // Found <|...|> — skip the entire special token
-                    i = end + 2;
-                    break;
-                }
-                end++;
-            }
-            if (token[end] == '\0') {
-                // No closing |> found — copy the '<' literally
-                buf[out++] = token[i++];
-            }
-        } else {
-            buf[out++] = token[i++];
-        }
-    }
-
-    buf[out] = '\0';
-    return buf;
 }
 
 // =============================================================================
@@ -581,7 +534,13 @@ struct vlm_stream_context {
 
 /**
  * Internal token callback that wraps user callback and tracks metrics.
- * Strips special tokens (e.g. <|im_end|>) before forwarding to the caller.
+ *
+ * Every token is run through the shared sentinel filter
+ * (`rac::tokens::strip_special_tokens`, features/common/special_token_filter.h)
+ * before it reaches the caller or the accumulated result text. The filter is
+ * shared with the LLM module on purpose: the VLM copy used to recognise only
+ * the pipe-wrapped `<|...|>` family, so SmolVLM's bare `<end_of_utterance>`
+ * leaked into live-camera captions while chat was clean.
  */
 static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) {
     auto* ctx = reinterpret_cast<vlm_stream_context*>(user_data);
@@ -589,9 +548,9 @@ static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) 
     if (!token)
         return RAC_TRUE;
 
-    // Strip special tokens from the model output
+    // Strip tokenizer-internal sentinels from the model output.
     char cleaned[512];
-    vlm_strip_special_tokens(token, cleaned, sizeof(cleaned));
+    rac::tokens::strip_special_tokens(token, cleaned, sizeof(cleaned));
 
     // Track first token time (only for non-empty cleaned tokens)
     if (cleaned[0] != '\0' && !ctx->first_token_recorded) {
@@ -1148,7 +1107,8 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
 
     const char* safe_token = token ? token : "";
     char cleaned[512];
-    const char* display_token = vlm_strip_special_tokens(safe_token, cleaned, sizeof(cleaned));
+    const char* display_token =
+        rac::tokens::strip_special_tokens(safe_token, cleaned, sizeof(cleaned));
     if (display_token[0] != '\0') {
         ctx->text += display_token;
         ++ctx->token_count;
@@ -1297,6 +1257,10 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         rc = rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
                                         "failed to encode VLMResult");
     } else {
+        // The streaming verb filters sentinels per token; this one published the
+        // engine's answer verbatim, so a trailing `<end_of_utterance>` reached
+        // chat-with-image intact. Same filter, applied to the whole answer.
+        result.set_text(rac::tokens::strip_special_tokens(result.text()));
         rc = copy_proto(result, out_result);
     }
     // Prefer the decoded dimensions from the backend (the caller's rac_vlm_image
@@ -1383,6 +1347,34 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         rac::vlm::release_lifecycle_vlm(&ref);
         return RAC_ERROR_NOT_SUPPORTED;
     }
+
+    // Name the engine, the model and the image payload on every turn.
+    //
+    // This is the path all five SDKs stream vision through, and without it a
+    // vision answer is unattributable: the chat toolbar shows the *text* model
+    // (the VLM occupies a separate slot), so an answer that is not grounded in
+    // the picture cannot be told apart from one produced by a text-only model
+    // that never saw it. The image's format and byte count are what make "the
+    // bytes reached the VLM" a measurement rather than an assumption.
+    //
+    // data_size covers the pixel/base64 buffers only; a base64 string handed
+    // over without it, and a file path, both report 0 there, so measure what is
+    // actually present instead of printing a misleading zero.
+    size_t image_payload_bytes = image.data_size;
+    if (image_payload_bytes == 0) {
+        if (image.format == RAC_VLM_IMAGE_FORMAT_BASE64 && image.base64_data) {
+            image_payload_bytes = strlen(image.base64_data);
+        } else if (image.format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image.file_path) {
+            image_payload_bytes = strlen(image.file_path);
+        }
+    }
+    RAC_LOG_INFO(LOG_CAT,
+                 "vlm.stream turn: engine=%s model=%s image_format=%d image_payload_bytes=%zu "
+                 "image_dims=%ux%u prompt_chars=%zu max_tokens=%d",
+                 ref.framework_name ? ref.framework_name : "(unknown)",
+                 ref.model_id ? ref.model_id : "(unknown)", static_cast<int>(image.format),
+                 image_payload_bytes, image.width, image.height, prompt ? strlen(prompt) : 0,
+                 options.max_tokens);
 
     rac::vlm::clear_lifecycle_vlm_cancel(&ref);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.stream",

@@ -86,6 +86,14 @@ final class LLMViewModel {
     /// RAG session backing the chat's document questions. Held open across turns
     /// for the same document/model triple and closed before a new one opens.
     var documentRAGSession: RagSession?
+    /// How far the attached document has actually got towards being answerable.
+    ///
+    /// The composer chip used to read "Ready for questions" as soon as two models
+    /// were *chosen*, which is not the same claim: indexing only happens on the
+    /// first question, so a document whose embedding step then failed had already
+    /// told the user it was ready. This is the real state, and only `.indexed`
+    /// licenses that sentence.
+    private(set) var documentIndexState: ChatDocumentIndexState = .notIndexed
     /// When the turn in flight was started, so its duration is measured rather
     /// than reconstructed. `GenerationResult` reports throughput and a token
     /// count but no elapsed time, and dividing one by the other gives 0.0s on
@@ -303,6 +311,10 @@ final class LLMViewModel {
 
     func setError(_ err: Error?) {
         error = err
+    }
+
+    func setDocumentIndexState(_ state: ChatDocumentIndexState) {
+        documentIndexState = state
     }
 
     func setModelSupportsStreaming(_ value: Bool) {

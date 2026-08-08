@@ -910,18 +910,24 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_
 
     const auto ingest_start = std::chrono::steady_clock::now();
     bool added = false;
+    // Why the ingest failed, in words the reader can act on. Collapsing every
+    // ingest failure to the generic "Processing failed" is what left a user
+    // whose embedding model produced no vector with nothing to do about it.
+    std::string ingest_error;
     try {
-        added = s->backend->add_document(document.text(), metadata);
+        added = s->backend->add_document(document.text(), metadata, &ingest_error);
     } catch (const std::exception& e) {
         LOGE("rag.ingest exception: %s", e.what());
         publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.ingest", e.what());
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_PROCESSING_FAILED, e.what());
     }
     if (!added) {
-        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.ingest",
-                        rac_error_message(RAC_ERROR_PROCESSING_FAILED));
+        if (ingest_error.empty()) {
+            ingest_error = rac_error_message(RAC_ERROR_PROCESSING_FAILED);
+        }
+        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.ingest", ingest_error.c_str());
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_PROCESSING_FAILED,
-                                          rac_error_message(RAC_ERROR_PROCESSING_FAILED));
+                                          ingest_error.c_str());
     }
 
     auto stats = make_stats(*s->backend);

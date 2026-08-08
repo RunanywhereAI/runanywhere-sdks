@@ -540,8 +540,25 @@ private enum MLXSessionCoordinator {
     }
 }
 
+/// Stops a vision generation that has fallen into a degenerate loop, emitting
+/// the same token forever.
+///
+/// The run limit has to be long enough that only a real loop reaches it. It was
+/// 3, and 3 consecutive repeats is ordinary language once the comparison
+/// case-folds and trims (`consume` normalizes, so "The", " the" and "the" are
+/// one token) — so ordinary answers were being cancelled as runaways. Measured on
+/// macOS with MLX Qwen2-VL 2B 4bit and one image: three consecutive asks stopped
+/// after 1, 1 and 2 tokens, each with "Stopping MLX VLM generation after
+/// repeated token runaway" in the MLX log, and the user was shown a confident
+/// one-word answer ("The") with no indication it had been truncated — which is
+/// worse than an error, because nothing signals the answer is not an answer.
+///
+/// 24 is past any plausible legitimate run and still stops a true runaway two
+/// orders of magnitude short of the token budget. Held tokens are emitted as
+/// soon as a different token arrives, so raising the limit does not delay
+/// ordinary streaming; only an actually-repeating stretch is withheld.
 private struct RepetitionRunGuard {
-    private static let repeatedTokenLimit = 3
+    private static let repeatedTokenLimit = 24
     private var previousToken: String?
     private var runLength = 0
     private var heldRepeatedTokens: [String] = []

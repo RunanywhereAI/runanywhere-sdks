@@ -214,7 +214,13 @@ internal object ModelCatalog {
             "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
             LLAMA,
             LANGUAGE,
-            600_000_000,
+            // downloadBytes defaults to memoryBytes, so a RAM-shaped round number here is also
+            // published as the transfer total the progress bar divides by. 600_000_000 is 50 MB short
+            // of the real asset (measured twice: 650_379_104 bytes on disk, and the HTTP layer logs
+            // `bytes_written=650379104`), which drove the bar to 100% at 92% of the file and left the
+            // line reading "596.2 MB of 572.2 MB" with the ETA gone while 50 MB was still arriving.
+            memoryBytes = 600_000_000,
+            downloadBytes = 650_379_104,
             supportsLora = true
         ),
         SingleFileModel(

@@ -360,6 +360,19 @@ extension VoiceAssistantView {
 
     private var iOSControlArea: some View {
         VStack(spacing: Space.xl) {
+            // Nothing reaching the microphone is not a failure — the session is
+            // live and will hear the moment signal arrives — so it is drawn in
+            // the warning colour rather than the danger one, and the status pill
+            // and instruction line change with it instead of going on claiming
+            // to listen.
+            if let detail = viewModel.inputSilentDetail {
+                Text(detail)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.warningText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Space.xl)
+            }
+
             if let error = viewModel.errorMessage {
                 Text(error)
                     .appType(.caption)
@@ -519,6 +532,19 @@ extension VoiceAssistantView {
 
     private var controlArea: some View {
         VStack(spacing: Space.xl) {
+            // Nothing reaching the microphone is not a failure — the session is
+            // live and will hear the moment signal arrives — so it is drawn in
+            // the warning colour rather than the danger one, and the status pill
+            // and instruction line change with it instead of going on claiming
+            // to listen.
+            if let detail = viewModel.inputSilentDetail {
+                Text(detail)
+                    .appType(.caption)
+                    .foregroundStyle(AppColors.warningText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Space.xl)
+            }
+
             if let error = viewModel.errorMessage {
                 Text(error)
                     .appType(.caption)

@@ -554,8 +554,17 @@ private data class ThinkingPresentation(
 )
 
 private fun ChatMessage.thinkingPresentation(isStreamingTail: Boolean): ThinkingPresentation? = when {
-    isStreamingTail -> ThinkingPresentation(
-        text = thinking.orEmpty(),
+    // `thinking` is non-null only once a reasoning trace exists to show: the streaming path seeds it
+    // to "" when — and only when — reasoning was actually requested of this model
+    // (`reasoning.include_in_output`), and the VLM/RAG paths leave it null. Coercing null to "" here
+    // therefore opened a "Thinking… / Waiting for the first reasoning token…" panel over every reply
+    // from a model that emits no reasoning at all, promising a trace that could never arrive — on the
+    // same screen whose composer says "Thinking not supported by current model". Measured on a
+    // SmolVLM2 image turn, that empty panel was the only thing on screen for the 26.5s before the
+    // first token. Requiring non-null keeps the placeholder for real thinking models, whose trace
+    // starts as "" and fills in.
+    isStreamingTail && thinking != null -> ThinkingPresentation(
+        text = thinking,
         phase = ThinkingPhase.ACTIVE,
     )
     !thinking.isNullOrBlank() -> ThinkingPresentation(
