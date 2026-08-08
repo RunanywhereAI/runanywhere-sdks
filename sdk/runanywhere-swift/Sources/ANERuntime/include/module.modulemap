@@ -1,0 +1,9 @@
+module ANEBackend {
+    umbrella header "ANEBackend.h"
+
+    export *
+    module * { export * }
+
+    link framework "Accelerate"
+    link framework "CoreML"
+}

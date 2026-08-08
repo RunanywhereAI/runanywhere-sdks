@@ -160,6 +160,15 @@ let package = Package(
         ),
 
         // =================================================================
+        // ANE Backend — Apple Neural Engine LLM + CoreML diffusion (NeuRT)
+        // =================================================================
+        .library(
+            name: "RunAnywhereANE",
+            type: .static,
+            targets: ["ANERuntime"]
+        ),
+
+        // =================================================================
         // macOS CLI host — registers real mlx-swift callbacks, then
         // delegates to the C++ rcli stack with llama.cpp + MLX both enabled.
         // =================================================================
@@ -259,6 +268,19 @@ let package = Package(
         ),
 
         // =================================================================
+        // C Bridge Module - ANE (NeuRT) Backend Headers
+        // =================================================================
+        .target(
+            name: "ANEBackend",
+            dependencies: [
+                "CRACommons",
+                "RABackendNeuRTBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/ANERuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
         // C Bridge Module - MLX Backend Headers
         // =================================================================
         .target(
@@ -346,6 +368,30 @@ let package = Package(
                 .linkedFramework("CoreML"),
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
+            ]
+        ),
+
+        // =================================================================
+        // ANE Runtime Backend — Apple Neural Engine LLM + CoreML diffusion
+        //
+        // Links RABackendNeuRTBinary and registers the `neurt` engine plugin
+        // via `ANE.register()`. NeuRT is also bundled into ONNXRuntime (so
+        // existing ONNX/diffusion consumers are unaffected); this standalone
+        // product lets consumers opt into ANE directly.
+        // =================================================================
+        .target(
+            name: "ANERuntime",
+            dependencies: [
+                "RunAnywhere",
+                "ANEBackend",
+                "RABackendNeuRTBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/ANERuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("CoreML"),
             ]
         ),
 
@@ -539,6 +585,14 @@ let package = Package(
             name: "RunAnywhereTests",
             dependencies: [
                 "RunAnywhere",
+                // Backend runtimes so BackendRegistrationTests can exercise the
+                // real plugin registry through each shipped XCFramework. MLX is
+                // omitted: its MLXBackend module re-exposes commons headers whose
+                // rac_vlm_result has drifted in the shipped RABackendMLX
+                // xcframework, which clangs against CRACommons in one module.
+                "LlamaCPPRuntime",
+                "ONNXRuntime",
+                "ANERuntime",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests",
