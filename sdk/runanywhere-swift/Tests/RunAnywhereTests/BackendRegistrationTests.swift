@@ -105,7 +105,8 @@ final class BackendRegistrationTests: XCTestCase {
 
         ANE.register()
         XCTAssertGreaterThanOrEqual(
-            rac_plugin_count(), afterUnregister,
+            rac_plugin_count(),
+            afterUnregister,
             "re-registering after teardown must not shrink the registry"
         )
     }
@@ -130,7 +131,8 @@ final class BackendRegistrationTests: XCTestCase {
 
         // At least one real backend must be present after wiring everything up.
         XCTAssertGreaterThan(
-            rac_plugin_count(), 0,
+            rac_plugin_count(),
+            0,
             "registering every backend must leave a non-empty plugin registry"
         )
     }
